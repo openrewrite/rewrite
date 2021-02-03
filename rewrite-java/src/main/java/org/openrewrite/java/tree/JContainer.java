@@ -101,7 +101,7 @@ public class JContainer<T> implements Markable {
         ANNOTATION_ARGUMENTS(Space.Location.ANNOTATION_ARGUMENTS, JRightPadded.Location.ANNOTATION_ARGUMENT),
         CASE(Space.Location.CASE, JRightPadded.Location.CASE),
         IMPLEMENTS(Space.Location.IMPLEMENTS, JRightPadded.Location.IMPLEMENTS),
-        METHOD_DECL_ARGUMENTS(Space.Location.METHOD_DECL_ARGUMENTS, JRightPadded.Location.METHOD_DECL_ARGUMENT),
+        METHOD_DECL_PARAMETERS(Space.Location.METHOD_DECL_PARAMETERS, JRightPadded.Location.METHOD_DECL_PARAMETER),
         METHOD_INVOCATION_ARGUMENTS(Space.Location.METHOD_INVOCATION_ARGUMENTS, JRightPadded.Location.METHOD_INVOCATION_ARGUMENT),
         NEW_ARRAY_INITIALIZER(Space.Location.NEW_ARRAY_INITIALIZER, JRightPadded.Location.NEW_ARRAY_INITIALIZER),
         NEW_CLASS_ARGS(Space.Location.NEW_CLASS_ARGS, JRightPadded.Location.NEW_CLASS_ARGS),

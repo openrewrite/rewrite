@@ -176,7 +176,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         }
                         break;
                     }
-                    case METHOD_DECL_ARGUMENT: {
+                    case METHOD_DECL_PARAMETER: {
                         JContainer<Expression> container = getCursor().getParentOrThrow().getValue();
                         Expression firstArg = container.getElems().iterator().next();
                         if (firstArg.getPrefix().getLastWhitespace().contains("\n")) {

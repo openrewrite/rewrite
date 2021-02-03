@@ -17,8 +17,6 @@ package org.openrewrite.java.tree;
 
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.List;
-
 public abstract class Coordinates <J2 extends J> {
 
     protected J2 tree;
@@ -386,8 +384,8 @@ public abstract class Coordinates <J2 extends J> {
         }
 
         public JavaCoordinates<?> replaceTypeParameters() { return create(Space.Location.TYPE_PARAMETER_SUFFIX); }
-        public JavaCoordinates<?> replaceParameters() { return create(Space.Location.METHOD_DECL_ARGUMENT_SUFFIX); }
-        public JavaCoordinates<?> replaceReturnType() { return create(Space.Location.METHOD_DECL_ARGUMENT_SUFFIX); }
+        public JavaCoordinates<?> replaceParameters() { return create(Space.Location.METHOD_DECL_PARAMETERS); }
+        public JavaCoordinates<?> replaceThrows() { return create(Space.Location.THROWS); }
 
         /**
          * Intended for replacement semantics, where the method body specified will be entirely replaced by the code
@@ -398,9 +396,6 @@ public abstract class Coordinates <J2 extends J> {
         public JavaCoordinates<?> replaceBody() {
             return create(Space.Location.BLOCK_END);
         }
-
-        public JavaCoordinates<?> replaceThrows() { return create(Space.Location.METHOD_DECL_ARGUMENT_SUFFIX); }
-
     }
 
     public static class MethodInvocation extends Coordinates<J.MethodInvocation> {
@@ -410,9 +405,9 @@ public abstract class Coordinates <J2 extends J> {
         }
 
         @Override
-        public JavaCoordinates<?> before() {
-            return create(Space.Location.METHOD_INVOCATION_PREFIX);
-        }
+        public JavaCoordinates<?> before() {return create(Space.Location.METHOD_INVOCATION_PREFIX); }
+        public JavaCoordinates<?> replaceArguments() { return create(Space.Location.METHOD_INVOCATION_ARGUMENTS); }
+
     }
 
     public static class Modifier extends Coordinates<J.Modifier> {

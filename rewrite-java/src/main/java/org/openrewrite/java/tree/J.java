@@ -2823,7 +2823,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates<J.MethodDecl> coordinates() {
+        public Coordinates.MethodDecl coordinates() {
             return new Coordinates.MethodDecl(this);
         }
 
@@ -2971,7 +2971,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates<J.MethodInvocation> coordinates() {
+        public Coordinates.MethodInvocation coordinates() {
             return new Coordinates.MethodInvocation(this);
         }
 

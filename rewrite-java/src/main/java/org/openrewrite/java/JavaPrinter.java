@@ -701,7 +701,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
         visitContainer("<", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
         visit(method.getReturnTypeExpr(), p);
         visit(method.getName(), p);
-        visitContainer("(", method.getPadding().getParams(), JContainer.Location.METHOD_DECL_ARGUMENTS, ",", ")", p);
+        visitContainer("(", method.getPadding().getParams(), JContainer.Location.METHOD_DECL_PARAMETERS, ",", ")", p);
         visitContainer("throws", method.getPadding().getThrows(), JContainer.Location.THROWS, ",", null, p);
         visit(method.getBody(), p);
         visitLeftPadded("default", method.getPadding().getDefaultValue(), JLeftPadded.Location.METHOD_DECL_DEFAULT_VALUE, p);

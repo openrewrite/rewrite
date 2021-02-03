@@ -483,7 +483,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
                         null :
                         visitTypeName(m.getReturnTypeExpr(), p));
         m = m.withName(visitAndCast(m.getName(), p));
-        m = m.getPadding().withParams(visitContainer(m.getPadding().getParams(), JContainer.Location.METHOD_DECL_ARGUMENTS, p));
+        m = m.getPadding().withParams(visitContainer(m.getPadding().getParams(), JContainer.Location.METHOD_DECL_PARAMETERS, p));
         if (m.getPadding().getThrows() != null) {
             m = m.getPadding().withThrows(visitContainer(m.getPadding().getThrows(), JContainer.Location.THROWS, p));
         }

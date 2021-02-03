@@ -20,6 +20,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
@@ -27,7 +28,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
-import static org.openrewrite.java.tree.Space.EMPTY;
 
 @Incubating(since = "7.0.0")
 public class JavaTemplate {
@@ -193,28 +193,23 @@ public class JavaTemplate {
                 return super.visitClassDecl(classDecl, insertionScope);
             }
             J.ClassDecl c = super.visitClassDecl(classDecl, insertionScope);
-            if (coordinates.getTree().getId().equals(classDecl.getId())) {
+            if (coordinates.getTree().getId().equals(c.getId())) {
                 switch (coordinates.getSpaceLocation()) {
                     case TYPE_PARAMETER_SUFFIX:
-                        //Regardless if the type parameters are null or have one or more types, these are replaced
-                        //with a single element list and this element's around semantics are used to replace all types
-                        c = classDecl.withTypeParameters(Collections.singletonList(
-                                new J.TypeParameter(Tree.randomId(), EMPTY, Markers.EMPTY, null,
-                                        new J.Empty(Tree.randomId(), EMPTY, Markers.EMPTY), null)
+                        c = c.withTypeParameters(Collections.singletonList(
+                                new J.TypeParameter(Tree.randomId(), Space.EMPTY, Markers.EMPTY, null,
+                                        new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY), null)
                         ));
                         insertionScope.putMessage("newCoordinates", c.getTypeParameters().get(0).coordinates().replaceThis());
                         break;
                     case EXTENDS:
                         if (c.getExtends() == null) {
-                            c = c.withExtends(new J.Empty(Tree.randomId(), EMPTY, Markers.EMPTY));
+                            c = c.withExtends(new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY));
                         }
                         insertionScope.putMessage("newCoordinates", c.getExtends().coordinates().replaceThis());
                         break;
                     case IMPLEMENTS_SUFFIX:
-                        //Regardless if the implements clause is null or has one or more elements, these are replaced
-                        //with a single element list and this element's around semantics are used to replace all elements
-                        //of the implements clause
-                        c = classDecl.withImplements(Collections.singletonList(new J.Empty(Tree.randomId(), EMPTY, Markers.EMPTY)));
+                        c = c.withImplements(Collections.singletonList(new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY)));
                         insertionScope.putMessage("newCoordinates", c.getImplements().get(0).coordinates().replaceThis());
                         break;
                     case BLOCK_END:
@@ -232,11 +227,48 @@ public class JavaTemplate {
             if (!insertionScope.isScopeInPath(method)) {
                 return method.withAnnotations(emptyList()).withBody(null);
             }
+
             J.MethodDecl m = super.visitMethod(method, insertionScope);
             if (coordinates.getTree().getId().equals(m.getId())) {
                 switch (coordinates.getSpaceLocation()) {
-
+                    case TYPE_PARAMETER_SUFFIX:
+                        m = m.withTypeParameters(Collections.singletonList(
+                                new J.TypeParameter(Tree.randomId(), Space.EMPTY, Markers.EMPTY, null,
+                                        new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY), null)
+                        ));
+                        insertionScope.putMessage("newCoordinates", m.getTypeParameters().get(0).coordinates().replaceThis());
+                        break;
+                    case METHOD_DECL_PARAMETERS:
+                        m = m.withParams(Collections.singletonList(new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY)));
+                        insertionScope.putMessage("newCoordinates", m.getParams().get(0).coordinates().replaceThis());
+                        break;
+                    case THROWS:
+                        m = m.withThrows(Collections.singletonList(new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY)));
+                        insertionScope.putMessage("newCoordinates", m.getThrows().get(0).coordinates().replaceThis());
+                        break;
+                    case BLOCK_END:
+                        if (m.getBody() == null) {
+                            m = m.withBody(new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, new JRightPadded<Boolean>(false, Space.EMPTY, Markers.EMPTY), null, Space.EMPTY));
+                        }
+                        insertionScope.putMessage("newCoordinates", m.getBody().coordinates().replaceThis());
+                        break;
                 }
+            }
+            return m;
+        }
+
+        @Override
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Cursor insertionScope) {
+            if (!insertionScope.isScopeInPath(method)) {
+                return super.visitMethodInvocation(method, insertionScope);
+            }
+
+            J.MethodInvocation m = super.visitMethodInvocation(method, insertionScope);
+            if (coordinates.getTree().getId().equals(m.getId())
+                    && coordinates.getSpaceLocation() == Space.Location.METHOD_DECL_PARAMETERS) {
+
+                    m = m.withArgs(Collections.singletonList(new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY)));
+                    insertionScope.putMessage("newCoordinates", m.getArgs().get(0).coordinates().replaceThis());
             }
             return m;
         }

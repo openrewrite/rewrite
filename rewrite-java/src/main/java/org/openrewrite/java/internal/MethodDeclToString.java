@@ -40,7 +40,7 @@ public class MethodDeclToString {
                 acc.append(method.getReturnTypeExpr().printTrimmed()).append(' ');
             }
             acc.append(method.getSimpleName());
-            visitContainer("(", method.getPadding().getParams(), JContainer.Location.METHOD_DECL_ARGUMENTS, ",", ")", unused);
+            visitContainer("(", method.getPadding().getParams(), JContainer.Location.METHOD_DECL_PARAMETERS, ",", ")", unused);
             visitContainer("throws", method.getPadding().getThrows(), JContainer.Location.THROWS, ",", "", unused);
             return method;
         }
