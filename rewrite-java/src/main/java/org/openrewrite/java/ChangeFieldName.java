@@ -64,7 +64,8 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
     @Override
     public J.Ident visitIdentifier(J.Ident ident, P p) {
         J.Ident i = super.visitIdentifier(ident, p);
-        if (ident.getSimpleName().equals(hasName) && isFieldReference(ident)) {
+        if (ident.getSimpleName().equals(hasName) && isFieldReference(ident) &&
+                isThisReferenceToClassType(ident)) {
             i = i.withName(toName);
         }
         return i;
@@ -73,6 +74,17 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
     private boolean matchesClass(@Nullable JavaType test) {
         JavaType.Class testClassType = TypeUtils.asClass(test);
         return testClassType != null && testClassType.getFullyQualifiedName().equals(classType.getFullyQualifiedName());
+    }
+
+    private boolean isThisReferenceToClassType(J.Ident ident) {
+        J.FieldAccess fieldAccess = getCursor().firstEnclosing(J.FieldAccess.class);
+        if (fieldAccess == null) {
+            return true;
+        }
+        while(fieldAccess.getType() == null && fieldAccess.getTarget() instanceof J.FieldAccess) {
+            fieldAccess = (J.FieldAccess) fieldAccess.getTarget();
+        }
+        return classType.equals(fieldAccess.getTarget().getType());
     }
 
     private boolean isFieldReference(J.Ident ident) {
