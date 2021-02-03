@@ -138,6 +138,19 @@ interface SpacesTest : RecipeTest {
     )
 
     @Test
+    fun beforeClassBody(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            class Test{
+            }
+        """,
+        after = """
+            class Test {
+            }
+        """
+    )
+
+    @Test
     fun beforeParensMethodDeclarationFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             jp.styles(
                     listOf(NamedStyles("Test", listOf(IntelliJ.spaces().run {
