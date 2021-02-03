@@ -32,8 +32,11 @@ import java.util.Objects;
 public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     @Incubating(since = "7.0.0")
-    public <J2 extends J> List<J2> generate(JavaTemplate template, JavaCoordinates<?> coordinates, Object... parameters) {
-        return template.generate(getCursor(), coordinates, parameters);
+    public J generate(JavaTemplate template, JavaCoordinates<?> coordinates, Object... parameters) {
+
+        //TODO: Call template.generate, merge the results back into the tree, return mutated tree.
+        //return template.generate(getCursor(), coordinates, parameters);
+        return null;
     }
 
     /**
