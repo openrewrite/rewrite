@@ -243,12 +243,12 @@ public class JavaTemplate {
                         insertionScope.putMessage("newCoordinates", m.getParams().get(0).coordinates().replaceThis());
                         break;
                     case THROWS:
-                        m = m.withThrows(Collections.singletonList(new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY)));
+                        m = m.withThrows(Collections.singletonList(new J.Empty(Tree.randomId(), Space.format(" "), Markers.EMPTY)));
                         insertionScope.putMessage("newCoordinates", m.getThrows().get(0).coordinates().replaceThis());
                         break;
                     case BLOCK_END:
                         if (m.getBody() == null) {
-                            m = m.withBody(new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, new JRightPadded<Boolean>(false, Space.EMPTY, Markers.EMPTY), null, Space.EMPTY));
+                            m = m.withBody(new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, new JRightPadded<>(false, Space.EMPTY, Markers.EMPTY), null, Space.EMPTY));
                         }
                         insertionScope.putMessage("newCoordinates", m.getBody().coordinates().replaceThis());
                         break;
@@ -265,7 +265,7 @@ public class JavaTemplate {
 
             J.MethodInvocation m = super.visitMethodInvocation(method, insertionScope);
             if (coordinates.getTree().getId().equals(m.getId())
-                    && coordinates.getSpaceLocation() == Space.Location.METHOD_DECL_PARAMETERS) {
+                    && coordinates.getSpaceLocation() == Space.Location.METHOD_INVOCATION_ARGUMENTS) {
 
                     m = m.withArgs(Collections.singletonList(new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY)));
                     insertionScope.putMessage("newCoordinates", m.getArgs().get(0).coordinates().replaceThis());

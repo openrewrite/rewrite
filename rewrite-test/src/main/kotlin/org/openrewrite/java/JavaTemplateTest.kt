@@ -18,12 +18,13 @@ package org.openrewrite.java
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.CoordinatesPrinter
 import org.openrewrite.ExecutionContext
 import org.openrewrite.RecipeTest
 import org.openrewrite.internal.ListUtils
 import org.openrewrite.java.format.MinimumViableSpacingVisitor
-import org.openrewrite.java.tree.J
-import org.openrewrite.java.tree.Statement
+import org.openrewrite.java.tree.*
+import org.openrewrite.marker.Markers
 
 interface JavaTemplateTest : RecipeTest {
 
@@ -238,45 +239,6 @@ interface JavaTemplateTest : RecipeTest {
                 void foo(String m, List<String> others) {
                     others.add(m);
                 }
-            }
-        """
-    )
-
-    //TODO - Test needs to be renabled once auto-format is working.
-    @Test
-    @Disabled("This test requires some fixes to auto-format")
-    fun addToEmptyClassBody(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-
-            val template = JavaTemplate.builder("{private String name = null;}").templateEventHandler(TemplateLoggingEventHandler()).build()
-
-            init {
-                setCursoringOn()
-            }
-
-            override fun visitClassDecl(classDecl: J.ClassDecl, p: ExecutionContext): J.ClassDecl {
-
-                val c = super.visitClassDecl(classDecl, p)
-
-                //Replace body.
-                val generatedBlocks = template.generate<J.Block>(cursor, c.coordinates().replaceBody())
-                assertThat(generatedBlocks[0].statements).`as`("The list of generated statements should be 1.")
-                    .hasSize(1)
-                val generatedVariableDecls = generatedBlocks[0].statements[0] as J.VariableDecls
-                assertThat(generatedVariableDecls.typeAsClass).isNotNull
-                return c.withBody(generatedBlocks[0])
-            }
-        }.toRecipe(),
-        before = """
-            import java.util.List;
-            public class A {
-            }
-        """,
-        after = """
-            import java.util.List;
-            public class A {
-                private String name = null;
             }
         """
     )
@@ -822,4 +784,277 @@ interface JavaTemplateTest : RecipeTest {
             }
         """
     )
+
+    @Test
+    fun replaceClassTypeParameters(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val template = JavaTemplate.builder("T,P")
+                .templateEventHandler(TemplateLoggingEventHandler()).build()
+            init {
+                setCursoringOn()
+            }
+
+            override fun visitClassDecl(classDecl: J.ClassDecl, p: ExecutionContext): J.ClassDecl {
+                val c = super.visitClassDecl(classDecl, p)
+                val generatedElements = template.generate<J.TypeParameter>(cursor, c.coordinates().replaceTypeParameters())
+                return c.withTypeParameters(generatedElements)
+            }
+        }.toRecipe(),
+        before = """
+            public class A <T> {
+                void foo() {
+                }
+            }
+        """,
+        after = """
+            public class A <T,P> {
+                void foo() {
+                }
+            }
+        """
+    )
+
+    @Test
+    @Disabled("Need some changes to auto-formatting")
+    fun replaceClassExtends(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+
+            val template = JavaTemplate.builder("ArrayList<String>").templateEventHandler(TemplateLoggingEventHandler()).build()
+
+            init {
+                setCursoringOn()
+            }
+
+            override fun visitClassDecl(classDecl: J.ClassDecl, p: ExecutionContext): J.ClassDecl {
+
+                val c = super.visitClassDecl(classDecl, p)
+
+                //Replace body.
+                val generatedBlocks = template.generate<J.Block>(cursor, c.coordinates().replaceExtendsClause())
+                return c.withBody(generatedBlocks[0])
+            }
+        }.toRecipe(),
+        before = """
+            import java.util.ArrayList;
+            public abstract class A {
+                private String name = "Jill";
+            }
+        """,
+        after = """
+            import java.util.ArrayList;
+            public abstract class A extends ArrayList<String> {
+                private String name = "Jill";
+            }
+        """
+    )
+
+    @Test
+    @Disabled("Need some changes to auto-formatting")
+    fun replaceClassImplements(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+
+            val template = JavaTemplate.builder("List<String>").templateEventHandler(TemplateLoggingEventHandler()).build()
+
+            init {
+                setCursoringOn()
+            }
+
+            override fun visitClassDecl(classDecl: J.ClassDecl, p: ExecutionContext): J.ClassDecl {
+
+                val c = super.visitClassDecl(classDecl, p)
+
+                //Replace implements clause.
+                val generatedBlocks = template.generate<J.Block>(cursor, c.coordinates().replaceImplementsClause())
+                return c.withBody(generatedBlocks[0])
+            }
+        }.toRecipe(),
+        before = """
+            import java.util.List;
+            public abstract class A {
+                private String name = "Jill";
+            }
+        """,
+        after = """
+            import java.util.List;
+            public abstract class A  implements List<String> {
+                private String name = "Jill";
+            }
+        """
+    )
+
+    //TODO - Test needs to be renabled once auto-format is working.
+    @Test
+    @Disabled("This test requires some fixes to auto-format")
+    fun replaceClassBody(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+
+            val template = JavaTemplate.builder("""
+                {
+                private String name = "Jill";
+                private String name2 = "Fred";
+                }
+                """).templateEventHandler(TemplateLoggingEventHandler()).build()
+
+            init {
+                setCursoringOn()
+            }
+
+            override fun visitClassDecl(classDecl: J.ClassDecl, p: ExecutionContext): J.ClassDecl {
+
+                val c = super.visitClassDecl(classDecl, p)
+
+                //Replace body.
+                val generatedBlocks = template.generate<J.Block>(cursor, c.coordinates().replaceBody())
+                assertThat(generatedBlocks[0].statements).`as`("The list of generated statements should be 2.")
+                    .hasSize(2)
+                val generatedVariableDecls = generatedBlocks[0].statements[0] as J.VariableDecls
+                assertThat(generatedVariableDecls.typeAsClass).isNotNull
+                return c.withBody(generatedBlocks[0])
+            }
+        }.toRecipe(),
+        before = """
+            import java.util.List;
+            public class A {
+            }
+        """,
+        after = """
+            import java.util.List;
+            public class A {
+                private String name = "Jill";
+                private String name2 = "Fred";
+            }
+        """
+    )
+
+    @Test
+    fun replaceMethodDeclarationTypeParameters(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val template = JavaTemplate.builder("T,P")
+                .templateEventHandler(TemplateLoggingEventHandler()).build()
+            init {
+                setCursoringOn()
+            }
+            override fun visitMethod(method: J.MethodDecl, p: ExecutionContext): J.MethodDecl {
+                val m = super.visitMethod(method, p)
+                val generatedElements = template.generate<J.TypeParameter>(cursor, m.coordinates().replaceTypeParameters())
+                return m.withTypeParameters(generatedElements)
+            }
+        }.toRecipe(),
+        before = """
+            public class A {
+                <T> void foo() {
+                }
+            }
+        """,
+        after = """
+            public class A {
+                <T,P> void foo() {
+                }
+            }
+        """
+    )
+
+    @Test
+    fun replaceMethodDeclarationParameters(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val template = JavaTemplate.builder("String foo, String bar")
+                .templateEventHandler(TemplateLoggingEventHandler()).build()
+            init {
+                setCursoringOn()
+            }
+            override fun visitMethod(method: J.MethodDecl, p: ExecutionContext): J.MethodDecl {
+                val m = super.visitMethod(method, p)
+                val generatedElements = template.generate<Statement>(cursor, m.coordinates().replaceParameters())
+                return m.withParams(generatedElements)
+            }
+        }.toRecipe(),
+        before = """
+            public class A {
+                void foo() {
+                }
+            }
+        """,
+        after = """
+            public class A {
+                void foo(String foo, String bar) {
+                }
+            }
+        """
+    )
+
+    @Test
+    @Disabled("Formatting issues, need to fix.")
+    fun replaceMethodDeclarationThrows(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val template = JavaTemplate.builder(" Exception, Throwable")
+                .templateEventHandler(TemplateLoggingEventHandler()).build()
+            init {
+                setCursoringOn()
+            }
+            override fun visitMethod(method: J.MethodDecl, p: ExecutionContext): J.MethodDecl {
+                val m = super.visitMethod(method, p)
+                val generatedElements = template.generate<NameTree>(cursor, m.coordinates().replaceThrows())
+                return m.padding.withThrows(JContainer.build(Space.format(" "), JRightPadded.withElems(emptyList(), generatedElements), Markers.EMPTY))
+
+            }
+        }.toRecipe(),
+        before = """
+            public class A {
+                void foo() {
+                }
+            }
+        """,
+        after = """
+            public class A {
+                void foo() throws Exception, Throwable {
+                }
+            }
+        """
+    )
+
+    @Test
+    fun replaceMethodInvocationArguments(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val template = JavaTemplate.builder("\"fred\", \"sally\", \"dude\"")
+                .templateEventHandler(TemplateLoggingEventHandler()).build()
+            init {
+                setCursoringOn()
+            }
+
+            override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
+                val m = super.visitMethodInvocation(method, p)
+                val generatedElements = template.generate<Expression>(cursor, m.coordinates().replaceArguments())
+                return m.withArgs(generatedElements)
+            }
+        }.toRecipe(),
+        before = """
+            public class A {
+                void foo() {
+                    logNames("fred");
+                }
+
+                void logNames(String... names) {
+                }
+            }
+        """,
+        after = """
+            public class A {
+                void foo() {
+                    logNames("fred", "sally", "dude");
+                }
+
+                void logNames(String... names) {
+                }
+            }
+        """
+    )
+
 }
