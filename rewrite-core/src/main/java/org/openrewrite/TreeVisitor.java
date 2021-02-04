@@ -81,6 +81,11 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     @Nullable
+    public T postVisit(T tree, P p) {
+        return defaultValue(tree, p);
+    }
+
+    @Nullable
     public T visit(@Nullable Tree tree, P p, Cursor parent) {
         this.cursor.set(parent);
         return visit(tree, p);
@@ -120,6 +125,8 @@ public abstract class TreeVisitor<T extends Tree, P> {
             }
             afterVisit.remove();
         }
+
+        t = postVisit(t, p);
 
         return t;
     }
