@@ -29,7 +29,6 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.*;
 import org.openrewrite.java.search.FindTypes;
-import org.openrewrite.java.tree.Coordinates;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
@@ -2183,9 +2182,11 @@ public interface J extends Serializable, Tree {
         /**
          * Retrieve just the package from the import.
          * e.g.:
+         * <pre>
          * import org.foo.A;            -> "org.foo"
          * import static org.foo.A.bar; -> "org.foo"
          * import org.foo.*;            -> "org.foo"
+         * </pre>
          */
 
         public String getPackageName() {
