@@ -126,8 +126,6 @@ public abstract class TreeVisitor<T extends Tree, P> {
             afterVisit.remove();
         }
 
-        t = postVisit(t, p);
-
         return t;
     }
 
