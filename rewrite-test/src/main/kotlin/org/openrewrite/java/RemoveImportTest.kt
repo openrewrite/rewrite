@@ -24,32 +24,6 @@ interface RemoveImportTest : RecipeTest {
         RemoveImport<ExecutionContext>(type).toRecipe()
 
     @Test
-    fun removeStaticFieldImport(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = removeImport("java.time.DayOfWeek.MONDAY"),
-        before = """
-            import java.time.DayOfWeek;
-            import static java.time.DayOfWeek.MONDAY;
-            import static java.time.DayOfWeek.TUESDAY;
-            
-            class WorkWeek {
-                DayOfWeek shortWeekStarts(){
-                    return TUESDAY;
-                }
-            }
-        """,
-        after = """
-            import java.time.DayOfWeek;
-            import static java.time.DayOfWeek.TUESDAY;
-            
-            class WorkWeek {
-                DayOfWeek shortWeekStarts(){
-                    return TUESDAY;
-                }
-            }
-        """
-    )
-    @Test
     fun removeNamedImport(jp: JavaParser) = assertChanged(
         jp,
         recipe = removeImport("java.util.List"),
@@ -133,6 +107,33 @@ interface RemoveImportTest : RecipeTest {
             import static java.util.Collections.*;
             class A {
                Object o = emptyList();
+            }
+        """
+    )
+
+    @Test
+    fun removeStaticImportIfNotReferenced(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = removeImport("java.time.DayOfWeek.MONDAY"),
+        before = """
+            import java.time.DayOfWeek;
+            import static java.time.DayOfWeek.MONDAY;
+            import static java.time.DayOfWeek.TUESDAY;
+            
+            class WorkWeek {
+                DayOfWeek shortWeekStarts(){
+                    return TUESDAY;
+                }
+            }
+        """,
+        after = """
+            import java.time.DayOfWeek;
+            import static java.time.DayOfWeek.TUESDAY;
+            
+            class WorkWeek {
+                DayOfWeek shortWeekStarts(){
+                    return TUESDAY;
+                }
             }
         """
     )
