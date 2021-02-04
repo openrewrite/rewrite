@@ -15,13 +15,15 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.*;
+import org.openrewrite.Cursor;
+import org.openrewrite.Incubating;
+import org.openrewrite.Tree;
+import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
@@ -67,8 +69,8 @@ public class JavaTemplate {
 
      public <J2 extends J> J2 generateAndMerge(Cursor parentScope, JavaCoordinates<?> coordinates, Object... parameters) {
         List<J> generatedElements = generate(parentScope, coordinates, parameters);
-        J mutated = new InsertAtCoordinates(coordinates).visit(parentScope.getValue(), generatedElements);
-        return (J2) new AutoFormatVisitor<String>().visit(mutated, "", parentScope);
+         //noinspection unchecked,ConstantConditions
+         return (J2) new InsertAtCoordinates(coordinates).visit(parentScope.getValue(), generatedElements);
     }
 
     private static class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
@@ -84,55 +86,91 @@ public class JavaTemplate {
         public J visitBlock(J.Block block, List<? extends J> generated) {
             J.Block b = visitAndCast(block, generated, super::visitBlock);
             if (b.getId().equals(insertId) && location == Space.Location.BLOCK_END) {
+                //noinspection unchecked
                 return b.withStatements(ListUtils.concatAll(b.getStatements(), (List<Statement>) generated));
             }
-            b.withStatements(maybeMergeList(b.getStatements(), generated));
-
-//                for (int index=0; index < b.getStatements().size(); index++) {
-//                    if (insertId.equals(b.getStatements().get(index).getId())) {
-//                        List<Statement> statements = new ArrayList<>();
-//                        if (location == Space.Location.REPLACE) {
-//                            statements.addAll(b.getStatements().subList(0, index + 1));
-//                            statements.addAll((List<Statement>)generated);
-//                            statements.addAll(b.getStatements().subList(index + 1, b.getStatements().size()));
-//                        } else {
-//                            statements.addAll(b.getStatements().subList(0, index));
-//                            statements.addAll((List<Statement>)generated);
-//                            statements.addAll(b.getStatements().subList(index, b.getStatements().size()));
-//                        }
-//                        return b.withStatements(statements);
-//                    }
-//                }
+            //noinspection ConstantConditions
+            b = b.withStatements(maybeMergeList(b.getStatements(), generated));
             return b;
         }
 
         @Override
+        @SuppressWarnings("unchecked")
         public J visitClassDecl(J.ClassDecl classDeclaration, List<? extends J> generated) {
             J.ClassDecl c = visitAndCast(classDeclaration, generated, super::visitClassDecl);
-            c.withAnnotations(maybeMergeList(c.getAnnotations(), generated));
-            c.withTypeParameters(maybeMergeList(c.getTypeParameters(), generated));
-            c.withImplements(maybeMergeList(c.getImplements(), generated));
+            if (insertId.equals(c.getId())) {
+                switch (location) {
+                    case ANNOTATION_PREFIX:
+                        c = c.withAnnotations((List<J.Annotation>) generated);
+                        break;
+                    case TYPE_PARAMETER_SUFFIX:
+                        c = c.withTypeParameters((List<J.TypeParameter>) generated);
+                        break;
+                    case EXTENDS:
+                        c = c.withExtends((TypeTree) generated.get(0));
+                        break;
+                    case IMPLEMENTS:
+                        c = c.withImplements((List<TypeTree>) generated);
+                        break;
+                    case BLOCK_END:
+                        c = c.withBody((J.Block) generated.get(0));
+                        break;
+                }
+            } else {
+
+                c = c.withAnnotations(maybeMergeList(c.getAnnotations(), generated));
+                c = c.withTypeParameters(maybeMergeList(c.getTypeParameters(), generated));
+                c = c.withImplements(maybeMergeList(c.getImplements(), generated));
+            }
             return c;
         }
 
         @Override
+        @SuppressWarnings("unchecked")
         public J visitMethod(J.MethodDecl method, List<? extends J> generated) {
             J.MethodDecl m = visitAndCast(method, generated, super::visitMethod);
-            m.withAnnotations(maybeMergeList(m.getAnnotations(), generated));
-            m.withTypeParameters(maybeMergeList(m.getTypeParameters(), generated));
-            m.withThrows(maybeMergeList(m.getThrows(), generated));
-            m.withAnnotations(maybeMergeList(m.getAnnotations(), generated));
+            if (insertId.equals(m.getId())) {
+                switch (location) {
+                    case ANNOTATION_PREFIX:
+                        m = m.withAnnotations((List<J.Annotation>) generated);
+                        break;
+                    case TYPE_PARAMETER_SUFFIX:
+                        m = m.withTypeParameters((List<J.TypeParameter>) generated);
+                        break;
+                    case METHOD_DECL_PARAMETERS:
+                        m = m.withParams((List<Statement>) generated);
+                        break;
+                    case THROWS:
+                        m = m.withThrows((List<NameTree>) generated);
+                        break;
+                    case BLOCK_END:
+                        m = m.withBody((J.Block) generated.get(0));
+                        break;
+                }
+            } else {
+                m = m.withAnnotations(maybeMergeList(m.getAnnotations(), generated));
+                m = m.withTypeParameters(maybeMergeList(m.getTypeParameters(), generated));
+                m = m.withThrows(maybeMergeList(m.getThrows(), generated));
+                m = m.withAnnotations(maybeMergeList(m.getAnnotations(), generated));
+            }
             return m;
         }
 
         @Override
+        @SuppressWarnings("unchecked")
         public J visitMethodInvocation(J.MethodInvocation method, List<? extends J> generated) {
             J.MethodInvocation m = visitAndCast(method, generated, super::visitMethodInvocation);
-            m.withArgs(maybeMergeList(m.getArgs(), generated));
+            if (insertId.equals(m.getId()) && location == Space.Location.METHOD_INVOCATION_ARGUMENTS) {
+                m = m.withArgs((List<Expression>) generated);
+            } else {
+                //noinspection ConstantConditions
+                m = m.withArgs(maybeMergeList(m.getArgs(), generated));
+            }
             return m;
         }
 
-        private <T extends J> List<T> maybeMergeList(@Nullable List<T> originalList, List<? extends J> generated) {
+        @SuppressWarnings("unchecked")
+        private <T extends J> @Nullable List<T> maybeMergeList(@Nullable List<T> originalList, List<? extends J> generated) {
             if (originalList != null) {
                 for (int index = 0; index < originalList.size(); index++) {
                     if (insertId.equals(originalList.get(index).getId())) {
@@ -185,20 +223,13 @@ public class JavaTemplate {
 
         //Prune down the original AST to just the elements in scope at the insertion point.
         J.CompilationUnit pruned = (J.CompilationUnit) new TemplateVisitor(coordinates, imports).visit(cu, parentScope);
+        assert pruned != null;
 
         //As part of the pruning process, the coordinates may have changed if a parent tree is used with coordinates
         //that use replace semantics with an immediate child element.
         JavaCoordinates<?> newCoordinates = parentScope.pollMessage("newCoordinates");
         if (newCoordinates != null) {
             coordinates = newCoordinates;
-        }
-
-        //Walk down from the parent scope to find the tree element mapped by the coordinates.
-        AtomicReference<Cursor> cursorReference = new AtomicReference<>();
-        new FindCoordinateCursor(parentScope, coordinates).visit(parentScope.getValue(), cursorReference);
-        Cursor insertionScope = cursorReference.get();
-        if (insertionScope == null) {
-            insertionScope = parentScope;
         }
 
         String generatedSource = new TemplatePrinter(coordinates).print(pruned, printedTemplate);
@@ -214,13 +245,10 @@ public class JavaTemplate {
         ExtractionContext extractionContext = new ExtractionContext();
         new ExtractTemplatedCode().visit(synthetic, extractionContext);
 
-        final Cursor formatScope = extractionContext.formatCursor != null ? extractionContext.formatCursor :
-                insertionScope.dropParentUntil(J.class::isInstance);
-
-        return extractionContext.getSnippets();
-//        return extractionContext.getSnippets().stream()
-//                .map(snippet -> (J2) new AutoFormatVisitor<String>().visit(snippet, "", formatScope))
-//                .collect(toList());
+        //noinspection unchecked
+        return extractionContext.getSnippets().stream()
+                .map(snippet -> (J2) new AutoFormatVisitor<String>().visit(snippet, "", parentScope))
+                .collect(toList());
     }
 
     /**
@@ -299,21 +327,39 @@ public class JavaTemplate {
             J.ClassDecl c = super.visitClassDecl(classDecl, insertionScope);
             if (coordinates.getTree().getId().equals(c.getId())) {
                 switch (coordinates.getSpaceLocation()) {
+                    case ANNOTATION_PREFIX:
+                        insertionScope.putMessage("newCoordinates", c.coordinates().before());
+                        break;
                     case TYPE_PARAMETER_SUFFIX:
                         c = c.withTypeParameters(Collections.singletonList(
                                 new J.TypeParameter(Tree.randomId(), Space.EMPTY, Markers.EMPTY, null,
                                         new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY), null)
                         ));
+                        //noinspection ConstantConditions
                         insertionScope.putMessage("newCoordinates", c.getTypeParameters().get(0).coordinates().replaceThis());
                         break;
                     case EXTENDS:
                         if (c.getExtends() == null) {
-                            c = c.withExtends(new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY));
+                            c = c.getPadding().withExtends(
+                                    new JLeftPadded<>(
+                                            Space.format(" "),
+                                            new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY),
+                                            Markers.EMPTY)
+                            );
                         }
+                        //noinspection ConstantConditions
                         insertionScope.putMessage("newCoordinates", c.getExtends().coordinates().replaceThis());
                         break;
-                    case IMPLEMENTS_SUFFIX:
-                        c = c.withImplements(Collections.singletonList(new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY)));
+                    case IMPLEMENTS:
+
+                        c = c.getPadding().withImplements(JContainer.build(
+                                Space.format(" "),
+                                JRightPadded.withElems(emptyList(),
+                                        Collections.singletonList(new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY))
+                                ),
+                                Markers.EMPTY)
+                        );
+                        //noinspection ConstantConditions
                         insertionScope.putMessage("newCoordinates", c.getImplements().get(0).coordinates().replaceThis());
                         break;
                     case BLOCK_END:
@@ -335,11 +381,15 @@ public class JavaTemplate {
             J.MethodDecl m = super.visitMethod(method, insertionScope);
             if (coordinates.getTree().getId().equals(m.getId())) {
                 switch (coordinates.getSpaceLocation()) {
+                    case ANNOTATION_PREFIX:
+                        insertionScope.putMessage("newCoordinates", m.coordinates().before());
+                        break;
                     case TYPE_PARAMETER_SUFFIX:
                         m = m.withTypeParameters(Collections.singletonList(
                                 new J.TypeParameter(Tree.randomId(), Space.EMPTY, Markers.EMPTY, null,
                                         new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY), null)
                         ));
+                        //noinspection ConstantConditions
                         insertionScope.putMessage("newCoordinates", m.getTypeParameters().get(0).coordinates().replaceThis());
                         break;
                     case METHOD_DECL_PARAMETERS:
@@ -348,12 +398,14 @@ public class JavaTemplate {
                         break;
                     case THROWS:
                         m = m.withThrows(Collections.singletonList(new J.Empty(Tree.randomId(), Space.format(" "), Markers.EMPTY)));
+                        //noinspection ConstantConditions
                         insertionScope.putMessage("newCoordinates", m.getThrows().get(0).coordinates().replaceThis());
                         break;
                     case BLOCK_END:
                         if (m.getBody() == null) {
                             m = m.withBody(new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, new JRightPadded<>(false, Space.EMPTY, Markers.EMPTY), null, Space.EMPTY));
                         }
+                        //noinspection ConstantConditions
                         insertionScope.putMessage("newCoordinates", m.getBody().coordinates().replaceThis());
                         break;
                 }
@@ -475,9 +527,6 @@ public class JavaTemplate {
         private final Set<UUID> collectedIds = new HashSet<>();
         private long startDepth = 0;
 
-        @Nullable
-        private Cursor formatCursor;
-
         @SuppressWarnings("unchecked")
         private <J2 extends J> List<J2> getSnippets() {
             //This returns all elements that have the same depth as the starting element.
@@ -538,10 +587,7 @@ public class JavaTemplate {
                     //the first class declaration (with no imports). Do not add the compilation unit to the collected
                     //elements
                     context.startDepth++;
-                    context.formatCursor = getCursor();
                     return space;
-                } else {
-                    context.formatCursor = getCursor().dropParentUntil(J.class::isInstance);
                 }
                 List<Comment> comments = new ArrayList<>(space.getComments());
                 comments.remove(startToken);

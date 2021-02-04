@@ -136,13 +136,7 @@ public abstract class Coordinates <J2 extends J> {
          *
          * @return annotations replacement coordinates
          */
-        public JavaCoordinates<?> lastAnnotation() {
-            if (tree.getModifiers() != null) {
-                return create(Space.Location.MODIFIER_PREFIX);
-            } else {
-                return create(Space.Location.CLASS_DECL_PREFIX);
-            }
-        }
+        public JavaCoordinates<?> replaceAnnotations() { return create(Space.Location.ANNOTATION_PREFIX); }
 
         /**
          * Intended for replacement semantics, where the type parameters will be entirely replaced by the code
@@ -167,7 +161,7 @@ public abstract class Coordinates <J2 extends J> {
          *
          * @return implements clause replacement coordinates
          */
-        public JavaCoordinates<?> replaceImplementsClause() { return create(Space.Location.IMPLEMENTS_SUFFIX); }
+        public JavaCoordinates<?> replaceImplementsClause() { return create(Space.Location.IMPLEMENTS); }
 
         /**
          * Intended for replacement semantics, where the class body will be entirely replaced by the code
@@ -375,14 +369,7 @@ public abstract class Coordinates <J2 extends J> {
             return create(Space.Location.METHOD_DECL_PREFIX);
         }
 
-        public JavaCoordinates<?> lastAnnotation() {
-            if (tree.getModifiers() != null) {
-                return create(Space.Location.MODIFIER_PREFIX);
-            } else {
-                return create(Space.Location.METHOD_DECL_PREFIX);
-            }
-        }
-
+        public JavaCoordinates<?> replaceAnnotations() { return create(Space.Location.ANNOTATION_PREFIX); }
         public JavaCoordinates<?> replaceTypeParameters() { return create(Space.Location.TYPE_PARAMETER_SUFFIX); }
         public JavaCoordinates<?> replaceParameters() { return create(Space.Location.METHOD_DECL_PARAMETERS); }
         public JavaCoordinates<?> replaceThrows() { return create(Space.Location.THROWS); }

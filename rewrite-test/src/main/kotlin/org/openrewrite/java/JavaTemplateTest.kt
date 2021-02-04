@@ -465,7 +465,7 @@ interface JavaTemplateTest : RecipeTest {
             }
             override fun visitMethod(method: J.MethodDecl, p: ExecutionContext): J.MethodDecl {
                 var m = super.visitMethod(method, p)
-                m = generate<J.MethodDecl>(template, m.coordinates().before())
+                m = generate<J.MethodDecl>(template, m.coordinates().replaceAnnotations())
                 //TODO - I tried using AutoFormat here but it is not putting a space between the end of the
                 //      annotation and the void on the method.
                 return  MinimumViableSpacingVisitor<ExecutionContext>().visitMethod(m, p)
@@ -500,7 +500,7 @@ interface JavaTemplateTest : RecipeTest {
 
             override fun visitClassDecl(clazz: J.ClassDecl, p: ExecutionContext): J.ClassDecl {
                 var c = super.visitClassDecl(clazz, p)
-                c = generate<J.ClassDecl>(template, c.coordinates().lastAnnotation())
+                c = generate<J.ClassDecl>(template, c.coordinates().replaceAnnotations())
                 assertThat(c.annotations).`as`("The list of generated annotations should be 1.").hasSize(1)
                 assertThat(c.annotations[0].type).isNotNull
                 //TODO - I tried using AutoFormat here but it is not putting a space between the end of the
@@ -536,7 +536,7 @@ interface JavaTemplateTest : RecipeTest {
             override fun visitClassDecl(clazz: J.ClassDecl, p: ExecutionContext): J.ClassDecl {
                 var c = super.visitClassDecl(clazz, p)
 
-                c = generate<J.ClassDecl>(template, clazz.coordinates().lastAnnotation())
+                c = generate<J.ClassDecl>(template, clazz.coordinates().replaceAnnotations())
 
                 assertThat(c.annotations).`as`("The list of generated annotations should be 1.").hasSize(1)
                 assertThat(c.annotations[0].type).isNotNull
@@ -586,7 +586,7 @@ interface JavaTemplateTest : RecipeTest {
                             b.statements[0] as J
                         )
                     //Make sure type attribution is valid on the generated method invocations.
-                    assertThat(b.statements).`as`("The list of generated statements should be 2.").hasSize(2)
+                    assertThat(b.statements).`as`("The list of generated statements should be 4.").hasSize(4)
                     assertThat((b.statements[0] as J.MethodInvocation).type).`as`("The type information should be populated").isNotNull
                     assertThat((b.statements[1] as J.MethodInvocation).type).`as`("The type information should be populated").isNotNull
                 }
@@ -618,6 +618,8 @@ interface JavaTemplateTest : RecipeTest {
                 void foo(String m, List<String> others) {
                     others.add(m);
                     incrementCounterByListSize(others);
+                    incrementCounterByListSize(others);
+                    others.add(m);
                 }
                 char incrementCounterByListSize(List<String> list) {
                     n += list.size();
@@ -702,6 +704,8 @@ interface JavaTemplateTest : RecipeTest {
                     boolean flag = true;
                     List<String> clone;
                     if (flag) {
+                        clone.add(m);
+                        B.cloneList(others);
                         B.cloneList(others);
                         clone.add(m);
                     }
@@ -812,7 +816,7 @@ interface JavaTemplateTest : RecipeTest {
         """,
         after = """
             import java.util.List;
-            public abstract class A  implements List<String> {
+            public abstract class A implements List<String> {
                 private String name = "Jill";
             }
         """
