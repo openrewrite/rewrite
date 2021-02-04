@@ -35,7 +35,7 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
         if (c != cu) {
             doAfterVisit(new SimplifyBooleanExpressionVisitor());
         }
-        return maybeAutoFormat(cu, c, p);
+        return maybeAutoFormat(cu, c, p); // TODO, don't want to require autoformatting the entire CU
     }
 
     @Override
