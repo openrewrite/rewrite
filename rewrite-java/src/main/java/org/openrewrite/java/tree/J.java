@@ -1958,6 +1958,10 @@ public interface J extends Serializable, Tree {
             }
         }
 
+        public static Ident build(UUID id, String simpleName, @Nullable JavaType type) {
+            return build(id, Space.EMPTY, Markers.EMPTY, simpleName, type);
+        }
+
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @Data
         public static final class IdentFlyweight implements Serializable {

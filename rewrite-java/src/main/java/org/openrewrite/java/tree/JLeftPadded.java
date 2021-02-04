@@ -112,4 +112,8 @@ public class JLeftPadded<T> implements Markable {
     public String toString() {
         return "JLeftPadded(before=" + before + ", elem=" + elem.getClass().getSimpleName() + ')';
     }
+
+    public static <T> JLeftPadded<T> build(T elem) {
+        return new JLeftPadded<>(Space.EMPTY, elem, Markers.EMPTY);
+    }
 }
