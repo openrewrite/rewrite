@@ -43,7 +43,7 @@ public class FindIndentXmlVisitor<P> extends XmlVisitor<P> {
     }
 
     @Override
-    public Xml visitEach(Xml tree, P p) {
+    public Xml preVisit(Xml tree, P p) {
         String prefix = tree.getPrefix();
 
         AtomicBoolean takeWhile = new AtomicBoolean(true);
@@ -88,7 +88,7 @@ public class FindIndentXmlVisitor<P> extends XmlVisitor<P> {
             }
         }
 
-        return super.visitEach(tree, p);
+        return super.preVisit(tree, p);
     }
 
     public boolean isIndentedWithSpaces() {

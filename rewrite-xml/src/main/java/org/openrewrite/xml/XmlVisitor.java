@@ -22,18 +22,18 @@ import org.openrewrite.xml.tree.Xml;
 public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
 
     public Xml visitDocument(Xml.Document document, P p) {
-        Xml.Document d = visitAndCast(document, p, this::visitEach);
+        Xml.Document d = visitAndCast(document, p, this::preVisit);
         d = d.withProlog(visitAndCast(d.getProlog(), p));
         return d.withRoot(visitAndCast(d.getRoot(), p));
     }
 
     public Xml visitProcessingInstruction(Xml.ProcessingInstruction pi, P p) {
-        Xml.ProcessingInstruction procInstr = visitAndCast(pi, p, this::visitEach);
+        Xml.ProcessingInstruction procInstr = visitAndCast(pi, p, this::preVisit);
         return procInstr.withAttributes(ListUtils.map(procInstr.getAttributes(), a -> visitAndCast(a, p)));
     }
 
     public Xml visitTag(Xml.Tag tag, P p) {
-        Xml.Tag t = visitAndCast(tag, p, this::visitEach);
+        Xml.Tag t = visitAndCast(tag, p, this::preVisit);
         t = t.withAttributes(ListUtils.map(t.getAttributes(), a -> visitAndCast(a, p)));
         if(t.getContent() != null) {
             t = t.withContent(ListUtils.map(t.getContent(), c -> visitAndCast(c, p)));
@@ -42,35 +42,35 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
     }
 
     public Xml visitAttribute(Xml.Attribute attribute, P p) {
-        return visitAndCast(attribute, p, this::visitEach);
+        return visitAndCast(attribute, p, this::preVisit);
     }
 
     public Xml visitCharData(Xml.CharData charData, P p) {
-        return visitAndCast(charData, p, this::visitEach);
+        return visitAndCast(charData, p, this::preVisit);
     }
 
     public Xml visitComment(Xml.Comment comment, P p) {
-        return visitAndCast(comment, p, this::visitEach);
+        return visitAndCast(comment, p, this::preVisit);
     }
 
     public Xml visitDocTypeDecl(Xml.DocTypeDecl docTypeDecl, P p) {
-        Xml.DocTypeDecl d = visitAndCast(docTypeDecl, p, this::visitEach);
+        Xml.DocTypeDecl d = visitAndCast(docTypeDecl, p, this::preVisit);
         d = d.withInternalSubset(ListUtils.map(d.getInternalSubset(), i -> visitAndCast(i, p)));
         return d.withExternalSubsets(visitAndCast(d.getExternalSubsets(), p));
     }
 
     public Xml visitProlog(Xml.Prolog prolog, P p) {
-        Xml.Prolog pl = visitAndCast(prolog, p, this::visitEach);
+        Xml.Prolog pl = visitAndCast(prolog, p, this::preVisit);
         pl = pl.withXmlDecls(ListUtils.map(pl.getXmlDecls(), d -> visitAndCast(d, p)));
         return pl.withMisc(ListUtils.map(pl.getMisc(), m -> visitAndCast(m, p)));
     }
 
     public Xml visitIdent(Xml.Ident ident, P p) {
-        return visitAndCast(ident, p, this::visitEach);
+        return visitAndCast(ident, p, this::preVisit);
     }
 
     public Xml visitElement(Xml.Element element, P p) {
-        Xml.Element e = visitAndCast(element, p, this::visitEach);
+        Xml.Element e = visitAndCast(element, p, this::preVisit);
         return e.withSubset(ListUtils.map(e.getSubset(), i -> visitAndCast(i, p)));
     }
 }

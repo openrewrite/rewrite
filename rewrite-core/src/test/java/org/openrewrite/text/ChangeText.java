@@ -41,7 +41,7 @@ public class ChangeText extends Recipe {
 
     private class ChangeTextVisitor extends TreeVisitor<PlainText, ExecutionContext> {
         @Override
-        public PlainText visitEach(PlainText tree, ExecutionContext ctx) {
+        public PlainText preVisit(PlainText tree, ExecutionContext ctx) {
             return tree.withText(toText);
         }
     }

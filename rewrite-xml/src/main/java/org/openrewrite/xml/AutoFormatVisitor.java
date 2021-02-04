@@ -41,8 +41,8 @@ public class AutoFormatVisitor<P> extends XmlVisitor<P> {
     }
 
     @Override
-    public Xml visitEach(Xml tree, P p) {
-        Xml x = super.visitEach(tree, p);
+    public Xml preVisit(Xml tree, P p) {
+        Xml x = super.preVisit(tree, p);
         if (x != null) {
             String prefix = x.getPrefix();
             if (prefix.contains("\n") && (scope.length == 0 || stream(scope).anyMatch(s -> getCursor().isScopeInPath(s)))) {

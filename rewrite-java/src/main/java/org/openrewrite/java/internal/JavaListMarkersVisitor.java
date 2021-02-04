@@ -29,11 +29,11 @@ public class JavaListMarkersVisitor<T> extends JavaVisitor<Set<T>> {
     }
 
     @Override
-    public J visitEach(J j, Set<T> ts) {
+    public J preVisit(J j, Set<T> ts) {
         if (j.getMarkers().findFirst(markerType).isPresent()) {
             //noinspection unchecked
             ts.add((T) j);
         }
-        return super.visitEach(j, ts);
+        return super.preVisit(j, ts);
     }
 }

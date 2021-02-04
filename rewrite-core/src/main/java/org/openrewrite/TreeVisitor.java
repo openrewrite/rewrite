@@ -76,7 +76,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     @Nullable
-    public T visitEach(T tree, P p) {
+    public T preVisit(T tree, P p) {
         return defaultValue(tree, p);
     }
 
@@ -102,7 +102,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
             cursor.set(new Cursor(cursor.get(), tree));
         }
 
-        @SuppressWarnings("unchecked") T t = visitEach((T) tree, p);
+        @SuppressWarnings("unchecked") T t = preVisit((T) tree, p);
         if (t == null) {
             afterVisit.remove();
             return defaultValue(null, p);

@@ -31,11 +31,11 @@ public class PropertyListMarkerVisitor<T> extends PropertiesVisitor<Set<T>> {
     }
 
     @Override
-    public Properties visitEach(Properties p, Set<T> ts) {
+    public Properties preVisit(Properties p, Set<T> ts) {
         if (p.getMarkers().findFirst(markerType).isPresent()) {
             //noinspection unchecked
             ts.add((T) p);
         }
-        return super.visitEach(p, ts);
+        return super.preVisit(p, ts);
     }
 }
