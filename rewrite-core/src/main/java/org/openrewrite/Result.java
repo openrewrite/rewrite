@@ -63,22 +63,34 @@ public class Result {
      * @return Git-style patch diff representing the changes to this compilation unit
      */
     public String diff() {
-        return diff(null);
+        return diff(TreePrinter.identity());
+    }
+
+    /**
+     * @return Git-style patch diff representing the changes to this compilation unit
+     */
+    public String diff(TreePrinter<?> treePrinter) {
+        return diff(null, treePrinter);
     }
 
     /**
      * @param relativeTo Optional relative path that is used to relativize file paths of reported differences.
      * @return Git-style patch diff representing the changes to this compilation unit
      */
-    public String diff(@Nullable Path relativeTo) {
-        // FIXME fix source path when deleting files
-        Path sourcePath = after != null ?
-                after.getSourcePath() :
-                (relativeTo == null ? Paths.get(".") : relativeTo).resolve("partial-" + System.nanoTime());
+    public String diff(@Nullable Path relativeTo, TreePrinter<?> treePrinter) {
+        Path sourcePath;
+        if (after != null) {
+            sourcePath = after.getSourcePath();
+        } else if (before != null) {
+            sourcePath = before.getSourcePath();
+        } else {
+            sourcePath = (relativeTo == null ? Paths.get(".") : relativeTo).resolve("partial-" + System.nanoTime());
+        }
 
+        //noinspection ConstantConditions
         return new InMemoryDiffEntry(sourcePath, relativeTo,
                 before == null ? "" : before.print(),
-                after == null ? "" : after.print(),
+                after == null ? "" : after.print(treePrinter, null),
                 recipesThatMadeChanges).getDiff();
     }
 

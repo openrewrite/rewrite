@@ -30,7 +30,6 @@ import org.openrewrite.internal.lang.Nullable;
 @Data
 public class SearchResult implements Marker {
     public static final TreePrinter<Void> PRINTER = new TreePrinter<Void>() {
-
         private Integer mark = null;
 
         @Override
