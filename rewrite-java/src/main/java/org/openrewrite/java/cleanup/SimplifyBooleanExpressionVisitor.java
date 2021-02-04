@@ -20,11 +20,15 @@ import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.UnwrapParentheses;
+import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
 @Incubating(since = "7.0.0")
 public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
+
+    private static final String MAYBE_AUTO_FORMAT_ME = "MAYBE_AUTO_FORMAT_ME";
+
     public SimplifyBooleanExpressionVisitor() {
         setCursoringOn();
     }
@@ -35,7 +39,7 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
         if (c != cu) {
             doAfterVisit(new SimplifyBooleanExpressionVisitor());
         }
-        return maybeAutoFormat(cu, c, p); // TODO, don't want to require autoformatting the entire CU
+        return c;
     }
 
     @Override
@@ -83,6 +87,16 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
             }
         }
 
+        getCursor().dropParentUntil(J.class::isInstance).putMessage(MAYBE_AUTO_FORMAT_ME, "");
+        return j;
+    }
+
+    @Override
+    public @Nullable J postVisit(J tree, P p) {
+        J j = super.postVisit(tree, p);
+        if (getCursor().pollMessage(MAYBE_AUTO_FORMAT_ME) != null) {
+            j = new AutoFormatVisitor<>().visit(j, p, getCursor());
+        }
         return j;
     }
 
@@ -104,6 +118,7 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
             }
         }
 
+        getCursor().dropParentUntil(J.class::isInstance).putMessage(MAYBE_AUTO_FORMAT_ME, "");
         return j;
     }
 
