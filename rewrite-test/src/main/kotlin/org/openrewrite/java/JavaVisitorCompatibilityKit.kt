@@ -57,6 +57,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class ChangeTypeTck : ChangeTypeTest
 
     @Nested
+    inner class CovariantEqualsTck : CovariantEqualsTest
+
+    @Nested
     inner class DeleteMethodArgumentTck : DeleteMethodArgumentTest
 
     @Nested
