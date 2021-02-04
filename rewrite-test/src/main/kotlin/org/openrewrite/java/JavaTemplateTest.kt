@@ -16,15 +16,11 @@
 package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
-import org.openrewrite.CoordinatesPrinter
 import org.openrewrite.ExecutionContext
 import org.openrewrite.RecipeTest
-import org.openrewrite.internal.ListUtils
 import org.openrewrite.java.format.MinimumViableSpacingVisitor
 import org.openrewrite.java.tree.*
-import org.openrewrite.marker.Markers
 
 interface JavaTemplateTest : RecipeTest {
 
@@ -38,9 +34,8 @@ interface JavaTemplateTest : RecipeTest {
             }
 
             override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
-                var m = super.visitMethodInvocation(method, p)
-                m = m.withArgs(template.generate(cursor,  m.args[0].coordinates().replaceThis()))
-                return m
+                val m = super.visitMethodInvocation(method, p)
+                return generate(template,  m.args[0].coordinates().replaceThis())
             }
         }.toRecipe(),
         before = """
@@ -67,7 +62,7 @@ interface JavaTemplateTest : RecipeTest {
     )
 
     @Test
-    fun beforeMethodBodyStatement(jp: JavaParser) = assertChanged(
+    fun beforeStatements(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaVisitor<ExecutionContext>() {
             init {
@@ -79,36 +74,24 @@ interface JavaTemplateTest : RecipeTest {
                 val parent = cursor.dropParentUntil { it is J }.getValue<J>()
                 if (parent is J.MethodDecl) {
 
-                    //Test to make sure the template extraction is working correctly. Both of these calls should return
-                    //a single template element and should have type attribution
-
-                    //Test when statement is the insertion scope is before the first statement in the block
-                    var generatedMethodInvocations = template.generate<J.MethodInvocation>(
-                            cursor,
-                            block.statements[0].coordinates().before(),
-                            (parent.params[0] as J.VariableDecls).vars[0]
-                        )
-                    assertThat(generatedMethodInvocations).`as`("The list of generated statements should be 1.")
-                        .hasSize(1)
-                    assertThat(generatedMethodInvocations[0].type).isNotNull
+                    //Test when coordinate is before the first statement in the block
+                    var b = generate<J.Block>(
+                        template,
+                        block.statements[0].coordinates().before(),
+                        (parent.params[0] as J.VariableDecls).vars[0]
+                    )
+                    assertThat(b.statements).`as`("The list of statements should be 3.").hasSize(3)
+                    assertThat((b.statements[0] as J.MethodInvocation).type).isNotNull
 
                     //Test when insertion scope is between two statements in a block
-                    generatedMethodInvocations = template
-                        .generate(
-                            cursor,
-                            block.statements[0].coordinates().before(),
+                    b = generate(
+                            template,
+                            block.statements[1].coordinates().before(),
                             (parent.params[0] as J.VariableDecls).vars[0]
                         )
-                    assertThat(generatedMethodInvocations).`as`("The list of generated statements should be 1.")
-                        .hasSize(1)
-                    assertThat(generatedMethodInvocations[0].type).isNotNull
-
-                    return block.withStatements(
-                        ListUtils.concat(
-                            generatedMethodInvocations[0],
-                            block.statements
-                        )
-                    )
+                    assertThat(b.statements).`as`("The list of statements should be 3.").hasSize(3)
+                    assertThat((b.statements[1] as J.MethodInvocation).type).isNotNull
+                    return b
                 }
                 return super.visitBlock(block, p)
             }
@@ -128,8 +111,8 @@ interface JavaTemplateTest : RecipeTest {
             public class A {
                 int n = 0;
                 void foo(String m, List<String> others) {
-                    others.add(m);
                     n++;
+                    others.add(m);
                     n++;
                 }
             }
@@ -151,19 +134,13 @@ interface JavaTemplateTest : RecipeTest {
                 if (parent is J.MethodDecl) {
 
                     //Test when insertion scope is after the last statements in a block
-                    val generatedMethodInvocations = template.generate<J.MethodInvocation>(cursor,
+                    val b = generate<J.Block>(template,
                         block.coordinates().lastStatement(),
                         (parent.params[0] as J.VariableDecls).vars[0])
-                    assertThat(generatedMethodInvocations).`as`("The list of generated statements should be 1.")
-                        .hasSize(1)
-                    assertThat(generatedMethodInvocations[0].type).isNotNull
 
-                    return block.withStatements(
-                        ListUtils.concat(
-                            block.statements,
-                            generatedMethodInvocations[0]
-                        )
-                    )
+                    assertThat(b.statements).`as`("The list of generated statements should be 1.").hasSize(3)
+                    assertThat((b.statements[2] as J.MethodInvocation).type).isNotNull
+                    return b
                 }
                 return super.visitBlock(block, p)
             }
@@ -207,19 +184,12 @@ interface JavaTemplateTest : RecipeTest {
                     //a single template element and should have type attribution
 
                     //Test when insertion scope is between two statements in a block
-                    val generatedMethodInvocations = template.generate<J.MethodInvocation>(cursor,
+                    val b = generate<J.Block>(template,
                         block.coordinates().lastStatement(),
                         (parent.params[0] as J.VariableDecls).vars[0])
-                    assertThat(generatedMethodInvocations).`as`("The list of generated statements should be 1.")
-                        .hasSize(1)
-                    assertThat(generatedMethodInvocations[0].type).isNotNull
-
-                    return block.withStatements(
-                        ListUtils.concat(
-                            block.statements,
-                            generatedMethodInvocations[0]
-                        )
-                    )
+                    assertThat(b.statements).`as`("The list of generated statements should be 1.").hasSize(1)
+                    assertThat((b.statements[0] as J.MethodInvocation).type).isNotNull
+                    return b
                 }
                 return super.visitBlock(block, p)
             }
@@ -267,17 +237,9 @@ interface JavaTemplateTest : RecipeTest {
                 if (parent is J.ClassDecl) {
 
                     //Test generating the method as the last element in the class block
-                    val generatedMethodDeclarations = template.generate<J.MethodDecl>(cursor, block.coordinates().lastStatement())
-                    assertThat(generatedMethodDeclarations).`as`("The list of generated statements should be 1.")
-                        .hasSize(1)
-                    assertThat(generatedMethodDeclarations[0].type).isNotNull
-
-                    b = b.withStatements(
-                        ListUtils.concat(
-                            block.statements,
-                            generatedMethodDeclarations[0]
-                        )
-                    )
+                    b = generate<J.Block>(template, block.coordinates().lastStatement())
+                    assertThat(b.statements).`as`("The list of generated statements should be 3.").hasSize(3)
+                    assertThat((b.statements[2] as J.MethodDecl).type).isNotNull
                 }
                 return b
             }
@@ -334,17 +296,9 @@ interface JavaTemplateTest : RecipeTest {
                 val parent = cursor.dropParentUntil { it is J }.getValue<J>()
                 if (parent is J.ClassDecl) {
 
-                    val generatedMethodDeclarations = template.generate<J.MethodDecl>(cursor, block.coordinates().lastStatement())
-                    assertThat(generatedMethodDeclarations).`as`("The list of generated statements should be 1.")
-                        .hasSize(1)
-                    assertThat(generatedMethodDeclarations[0].type).isNotNull
-
-                    b = b.withStatements(
-                        ListUtils.concat(
-                            block.statements,
-                            generatedMethodDeclarations[0]
-                        )
-                    )
+                    b = generate<J.Block>(template, block.coordinates().lastStatement())
+                    assertThat(b.statements).`as`("The list of generated statements should be 1.").hasSize(3)
+                    assertThat((b.statements[2] as J.MethodDecl).type).isNotNull
                 }
                 return b
             }
@@ -394,10 +348,8 @@ interface JavaTemplateTest : RecipeTest {
                 val m = super.visitMethodInvocation(method, p) as J.MethodInvocation
                 if (m.name.ident.simpleName != "countLetters") return m
                 val argument = m.args[0]
-
-                val generated = template.generate<J>(cursor, m.coordinates().replaceThis(), argument)
-                assertThat(generated).`as`("The list of generated invocations should be 1.").hasSize(1)
-                return generated[0].withPrefix(method.prefix)
+                val results = generate<J.MethodInvocation>(template, m.coordinates().replaceThis(), argument)
+                return results
             }
         }.toRecipe(),
         before = """
@@ -513,13 +465,7 @@ interface JavaTemplateTest : RecipeTest {
             }
             override fun visitMethod(method: J.MethodDecl, p: ExecutionContext): J.MethodDecl {
                 var m = super.visitMethod(method, p)
-                val generatedElements = template.generate<J.Annotation>(cursor, m.coordinates().before())
-                m = m.withAnnotations(
-                    ListUtils.concat(
-                        m.annotations,
-                        generatedElements[0]
-                    )
-                )
+                m = generate<J.MethodDecl>(template, m.coordinates().before())
                 //TODO - I tried using AutoFormat here but it is not putting a space between the end of the
                 //      annotation and the void on the method.
                 return  MinimumViableSpacingVisitor<ExecutionContext>().visitMethod(m, p)
@@ -554,7 +500,7 @@ interface JavaTemplateTest : RecipeTest {
 
             override fun visitClassDecl(clazz: J.ClassDecl, p: ExecutionContext): J.ClassDecl {
                 var c = super.visitClassDecl(clazz, p)
-                c = c.withAnnotations(template.generate<J.Annotation>(cursor, c.coordinates().lastAnnotation()))
+                c = generate<J.ClassDecl>(template, c.coordinates().lastAnnotation())
                 assertThat(c.annotations).`as`("The list of generated annotations should be 1.").hasSize(1)
                 assertThat(c.annotations[0].type).isNotNull
                 //TODO - I tried using AutoFormat here but it is not putting a space between the end of the
@@ -590,17 +536,12 @@ interface JavaTemplateTest : RecipeTest {
             override fun visitClassDecl(clazz: J.ClassDecl, p: ExecutionContext): J.ClassDecl {
                 var c = super.visitClassDecl(clazz, p)
 
-                val generatedAnnotations = template.generate<J.Annotation>(cursor, clazz.coordinates().lastAnnotation())
+                c = generate<J.ClassDecl>(template, clazz.coordinates().lastAnnotation())
 
-                assertThat(generatedAnnotations).`as`("The list of generated annotations should be 1.").hasSize(1)
-                assertThat(generatedAnnotations[0].type).isNotNull
+                assertThat(c.annotations).`as`("The list of generated annotations should be 1.").hasSize(1)
+                assertThat(c.annotations[0].type).isNotNull
 
-                c = c.withAnnotations(ListUtils.concat(c.annotations, generatedAnnotations[0]))
-                c = MinimumViableSpacingVisitor<ExecutionContext>().visitClassDecl(
-                    c,
-                    ExecutionContext.builder().build()
-                )
-                return c
+                return MinimumViableSpacingVisitor<ExecutionContext>().visitClassDecl(c,ExecutionContext.builder().build())
             }
         }.toRecipe(),
         before = """
@@ -640,16 +581,14 @@ interface JavaTemplateTest : RecipeTest {
 
 
                     //Test when statement is the insertion scope is before the first statement in the block
-                    val generatedStatements = template.generate<Statement>(cursor, b.statements[0].coordinates().before(),
+                    b = generate<J.Block>(template, b.statements[0].coordinates().before(),
                             b.statements[1] as J,
                             b.statements[0] as J
                         )
                     //Make sure type attribution is valid on the generated method invocations.
-                    assertThat(generatedStatements).`as`("The list of generated statements should be 2.").hasSize(2)
-                    assertThat((generatedStatements[0] as J.MethodInvocation).type).`as`("The type information should be populated").isNotNull
-                    assertThat((generatedStatements[1] as J.MethodInvocation).type).`as`("The type information should be populated").isNotNull
-
-                    b = b.withStatements(generatedStatements)
+                    assertThat(b.statements).`as`("The list of generated statements should be 2.").hasSize(2)
+                    assertThat((b.statements[0] as J.MethodInvocation).type).`as`("The type information should be populated").isNotNull
+                    assertThat((b.statements[1] as J.MethodInvocation).type).`as`("The type information should be populated").isNotNull
                 }
                 return b
             }
@@ -708,17 +647,16 @@ interface JavaTemplateTest : RecipeTest {
                 if (parent is J.If) {
 
                     //Test when statement is the insertion scope is before the first statement in the block
-                    val generatedStatements = template.generate<Statement>(cursor,
+                    b = generate<J.Block>(template,
                         b.coordinates().lastStatement(),
                         b.statements[1],
                         b.statements[0]
                     )
 
                     //Make sure type attribution is valid on the generated method invocations.
-                    assertThat(generatedStatements).`as`("The list of generated statements should be 2.").hasSize(2)
-                    assertThat((generatedStatements[0] as J.MethodInvocation).type).`as`("The type information should be populated").isNotNull
-                    assertThat((generatedStatements[1] as J.MethodInvocation).type).`as`("The type information should be populated").isNotNull
-                    b = b.withStatements(generatedStatements)
+                    assertThat(b.statements).`as`("The list of generated statements should be 2.").hasSize(4)
+                    assertThat((b.statements[2] as J.MethodInvocation).type).`as`("The type information should be populated").isNotNull
+                    assertThat((b.statements[3] as J.MethodInvocation).type).`as`("The type information should be populated").isNotNull
                 }
                 return b
             }
@@ -797,8 +735,7 @@ interface JavaTemplateTest : RecipeTest {
 
             override fun visitClassDecl(classDecl: J.ClassDecl, p: ExecutionContext): J.ClassDecl {
                 val c = super.visitClassDecl(classDecl, p)
-                val generatedElements = template.generate<J.TypeParameter>(cursor, c.coordinates().replaceTypeParameters())
-                return c.withTypeParameters(generatedElements)
+                return generate<J.ClassDecl>(template, c.coordinates().replaceTypeParameters())
             }
         }.toRecipe(),
         before = """
@@ -816,7 +753,6 @@ interface JavaTemplateTest : RecipeTest {
     )
 
     @Test
-    @Disabled("Need some changes to auto-formatting")
     fun replaceClassExtends(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
@@ -832,8 +768,7 @@ interface JavaTemplateTest : RecipeTest {
                 val c = super.visitClassDecl(classDecl, p)
 
                 //Replace body.
-                val generatedBlocks = template.generate<J.Block>(cursor, c.coordinates().replaceExtendsClause())
-                return c.withBody(generatedBlocks[0])
+                return generate<J.ClassDecl>(template, c.coordinates().replaceExtendsClause())
             }
         }.toRecipe(),
         before = """
@@ -851,7 +786,6 @@ interface JavaTemplateTest : RecipeTest {
     )
 
     @Test
-    @Disabled("Need some changes to auto-formatting")
     fun replaceClassImplements(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
@@ -867,8 +801,7 @@ interface JavaTemplateTest : RecipeTest {
                 val c = super.visitClassDecl(classDecl, p)
 
                 //Replace implements clause.
-                val generatedBlocks = template.generate<J.Block>(cursor, c.coordinates().replaceImplementsClause())
-                return c.withBody(generatedBlocks[0])
+                return  generate<J.ClassDecl>(template, c.coordinates().replaceImplementsClause())
             }
         }.toRecipe(),
         before = """
@@ -885,9 +818,7 @@ interface JavaTemplateTest : RecipeTest {
         """
     )
 
-    //TODO - Test needs to be renabled once auto-format is working.
     @Test
-    @Disabled("This test requires some fixes to auto-format")
     fun replaceClassBody(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
@@ -905,15 +836,14 @@ interface JavaTemplateTest : RecipeTest {
 
             override fun visitClassDecl(classDecl: J.ClassDecl, p: ExecutionContext): J.ClassDecl {
 
-                val c = super.visitClassDecl(classDecl, p)
+                var c = super.visitClassDecl(classDecl, p)
 
                 //Replace body.
-                val generatedBlocks = template.generate<J.Block>(cursor, c.coordinates().replaceBody())
-                assertThat(generatedBlocks[0].statements).`as`("The list of generated statements should be 2.")
+                 c = generate<J.ClassDecl>(template, c.coordinates().replaceBody())
+                assertThat(c.body.statements).`as`("The list of generated statements should be 2.")
                     .hasSize(2)
-                val generatedVariableDecls = generatedBlocks[0].statements[0] as J.VariableDecls
-                assertThat(generatedVariableDecls.typeAsClass).isNotNull
-                return c.withBody(generatedBlocks[0])
+                assertThat((c.body.statements[0] as J.VariableDecls).typeAsClass).isNotNull
+                return c
             }
         }.toRecipe(),
         before = """
@@ -941,8 +871,7 @@ interface JavaTemplateTest : RecipeTest {
             }
             override fun visitMethod(method: J.MethodDecl, p: ExecutionContext): J.MethodDecl {
                 val m = super.visitMethod(method, p)
-                val generatedElements = template.generate<J.TypeParameter>(cursor, m.coordinates().replaceTypeParameters())
-                return m.withTypeParameters(generatedElements)
+                return generate<J.MethodDecl>(template, m.coordinates().replaceTypeParameters())
             }
         }.toRecipe(),
         before = """
@@ -970,8 +899,7 @@ interface JavaTemplateTest : RecipeTest {
             }
             override fun visitMethod(method: J.MethodDecl, p: ExecutionContext): J.MethodDecl {
                 val m = super.visitMethod(method, p)
-                val generatedElements = template.generate<Statement>(cursor, m.coordinates().replaceParameters())
-                return m.withParams(generatedElements)
+                return generate<J.MethodDecl>(template, m.coordinates().replaceParameters())
             }
         }.toRecipe(),
         before = """
@@ -989,7 +917,6 @@ interface JavaTemplateTest : RecipeTest {
     )
 
     @Test
-    @Disabled("Formatting issues, need to fix.")
     fun replaceMethodDeclarationThrows(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
@@ -1000,9 +927,7 @@ interface JavaTemplateTest : RecipeTest {
             }
             override fun visitMethod(method: J.MethodDecl, p: ExecutionContext): J.MethodDecl {
                 val m = super.visitMethod(method, p)
-                val generatedElements = template.generate<NameTree>(cursor, m.coordinates().replaceThrows())
-                return m.padding.withThrows(JContainer.build(Space.format(" "), JRightPadded.withElems(emptyList(), generatedElements), Markers.EMPTY))
-
+                return generate<J.MethodDecl>(template, m.coordinates().replaceThrows())
             }
         }.toRecipe(),
         before = """
@@ -1031,8 +956,7 @@ interface JavaTemplateTest : RecipeTest {
 
             override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
                 val m = super.visitMethodInvocation(method, p)
-                val generatedElements = template.generate<Expression>(cursor, m.coordinates().replaceArguments())
-                return m.withArgs(generatedElements)
+                return generate<J.MethodInvocation>(template, m.coordinates().replaceArguments())
             }
         }.toRecipe(),
         before = """
