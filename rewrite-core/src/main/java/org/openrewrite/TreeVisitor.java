@@ -24,10 +24,10 @@ import java.util.function.BiFunction;
 
 /**
  * Abstract {@link TreeVisitor} for processing {@link Tree elements}
- *
+ * <p>
  * Always returns input type T
  * provides Parameterizable P input which is mutable allowing context to be shared
- *
+ * <p>
  * postProcessing via afterVisit for conditionally chaining other operations with the expectation is that after
  * TreeVisitors are invoked immediately after visiting SourceFile
  *
@@ -52,15 +52,34 @@ public abstract class TreeVisitor<T extends Tree, P> {
         this.cursor.set(cursor);
     }
 
-    // ephemeral do once after visit (sourceFile)
+    /**
+     * Execute the visitor once after the whole source file has been visited.
+     * The visitor is executed against the whole source file. This operation only happens once
+     * immediately after the containing visitor visits the whole source file. A subsequent {@link Recipe}
+     * cycle will not run it.
+     * <p>
+     * This method is ideal for one-off operations like auto-formatting, adding/removing imports, etc.
+     *
+     * @param visitor The visitor to run.
+     */
     protected void doAfterVisit(TreeVisitor<T, P> visitor) {
         afterVisit.get().add(visitor);
     }
 
-    // ephemeral do once after visit
-    protected void doAfterVisit(Recipe visitor) {
+    /**
+     * Execute the recipe's main visitor once after the whole source file has been visited.
+     * The visitor is executed against the whole source file. This operation only happens once
+     * immediately after the containing visitor visits the whole source file. A subsequent {@link Recipe}
+     * cycle will not run it.
+     * <p>
+     * This method is ideal for one-off operations like auto-formatting, adding/removing imports, etc.
+     *
+     * @param recipe The recipe whose visitor to run.
+     */
+    @Incubating(since = "7.0.0")
+    protected void doAfterVisit(Recipe recipe) {
         //noinspection unchecked
-        afterVisit.get().add((TreeVisitor<T, P>) visitor.getVisitor());
+        afterVisit.get().add((TreeVisitor<T, P>) recipe.getVisitor());
     }
 
     protected List<TreeVisitor<T, P>> getAfterVisit() {
@@ -76,7 +95,12 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     @Nullable
-    public T visitEach(T tree, P p) {
+    public T preVisit(T tree, P p) {
+        return defaultValue(tree, p);
+    }
+
+    @Nullable
+    public T postVisit(T tree, P p) {
         return defaultValue(tree, p);
     }
 
@@ -102,21 +126,23 @@ public abstract class TreeVisitor<T extends Tree, P> {
             cursor.set(new Cursor(cursor.get(), tree));
         }
 
-        @SuppressWarnings("unchecked") T t = visitEach((T) tree, p);
-        if (t == null) {
-            afterVisit.remove();
-            return defaultValue(null, p);
+        @SuppressWarnings("unchecked") T t = preVisit((T) tree, p);
+        if (t != null) {
+            t = t.accept(this, p);
         }
-
-        t = t.accept(this, p);
+        if (t != null) {
+            t = postVisit(t, p);
+        }
 
         if (cursored) {
             cursor.set(cursor.get().getParent());
         }
 
         if (topLevel) {
-            for (TreeVisitor<T, P> v : afterVisit.get()) {
-                t = v.visit(t, p);
+            if (t != null) {
+                for (TreeVisitor<T, P> v : afterVisit.get()) {
+                    t = v.visit(t, p);
+                }
             }
             afterVisit.remove();
         }

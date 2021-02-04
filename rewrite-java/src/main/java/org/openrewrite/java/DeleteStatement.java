@@ -83,13 +83,13 @@ public class DeleteStatement<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J visitEach(J tree, P p) {
+    public J preVisit(J tree, P p) {
         if (statement.isScope(tree)) {
             for (JavaType.Class referenced : FindReferencedTypes.find(tree)) {
                 maybeRemoveImport(referenced);
             }
         }
-        return super.visitEach(tree, p);
+        return super.preVisit(tree, p);
     }
 
     private Statement emptyBlock() {

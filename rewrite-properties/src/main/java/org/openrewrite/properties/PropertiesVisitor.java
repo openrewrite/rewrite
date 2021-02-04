@@ -22,15 +22,14 @@ import org.openrewrite.properties.tree.Properties;
 public class PropertiesVisitor<P> extends TreeVisitor<Properties, P> {
 
     public Properties visitFile(Properties.File file, P p) {
-        Properties.File f = visitAndCast(file, p, this::visitEach);
-        return f.withContent(ListUtils.map(file.getContent(), c -> visitAndCast(c, p)));
+        return file.withContent(ListUtils.map(file.getContent(), c -> visitAndCast(c, p)));
     }
 
     public Properties visitEntry(Properties.Entry entry, P p) {
-        return visitAndCast(entry, p, this::visitEach);
+        return entry;
     }
 
     public Properties visitComment(Properties.Comment comment, P p) {
-        return visitAndCast(comment, p, this::visitEach);
+        return comment;
     }
 }

@@ -43,7 +43,7 @@ class JavaTemplatePrinter extends JavaPrinter<Cursor> {
 
         J.Block b;
         if (!(parent.getValue() instanceof J.ClassDecl)) {
-            b = visitAndCast(block, insertionScope, this::visitEach);
+            b = visitAndCast(block, insertionScope, this::preVisit);
             b = visitAndCast(b, insertionScope, this::visitStatement);
 
             if (b.getStatements().stream().anyMatch(insertionScope::isScopeInPath)) {

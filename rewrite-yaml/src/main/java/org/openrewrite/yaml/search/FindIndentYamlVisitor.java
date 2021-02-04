@@ -43,7 +43,7 @@ public class FindIndentYamlVisitor<P> extends YamlVisitor<P> {
     }
 
     @Override
-    public Yaml visitEach(Yaml tree, P p) {
+    public Yaml preVisit(Yaml tree, P p) {
         String prefix = tree.getPrefix();
 
         AtomicBoolean takeWhile = new AtomicBoolean(true);
@@ -88,7 +88,7 @@ public class FindIndentYamlVisitor<P> extends YamlVisitor<P> {
             }
         }
 
-        return super.visitEach(tree, p);
+        return super.preVisit(tree, p);
     }
 
     public boolean isIndentedWithSpaces() {

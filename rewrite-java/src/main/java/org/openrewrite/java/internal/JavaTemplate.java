@@ -290,7 +290,7 @@ public class JavaTemplate {
 
             J.Block b;
             if (!(parent.getValue() instanceof J.ClassDecl)) {
-                b = visitAndCast(block, insertionScope, this::visitEach);
+                b = visitAndCast(block, insertionScope, this::preVisit);
                 b = b.getPadding().withStatic(visitRightPadded(b.getPadding().getStatic(), JRightPadded.Location.STATIC_INIT, insertionScope));
                 b = b.withPrefix(visitSpace(b.getPrefix(), Space.Location.BLOCK_PREFIX, insertionScope));
                 b = visitAndCast(b, insertionScope, this::visitStatement);
@@ -483,7 +483,7 @@ public class JavaTemplate {
         }
 
         @Override
-        public @Nullable J visitEach(@Nullable J tree, List<? extends J> generated) {
+        public @Nullable J preVisit(@Nullable J tree, List<? extends J> generated) {
 
             if (tree == null || location != Space.Location.REPLACE || !tree.getId().equals(insertId)) {
                 return tree;

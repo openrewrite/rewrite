@@ -58,13 +58,13 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 }
             }
         }
-        visitEach((J) parent.getPath(J.class::isInstance).next(), p);
+        preVisit((J) parent.getPath(J.class::isInstance).next(), p);
         return visit(tree, p);
     }
 
     @Override
     @Nullable
-    public J visitEach(J tree, P p) {
+    public J preVisit(J tree, P p) {
         if (tree instanceof J.CompilationUnit ||
                 tree instanceof J.Package ||
                 tree instanceof J.Import ||
@@ -86,7 +86,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
         }
 
-        return super.visitEach(tree, p);
+        return super.preVisit(tree, p);
     }
 
     @Override

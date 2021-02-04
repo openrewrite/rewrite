@@ -31,11 +31,11 @@ public class XmlListMarkersVisitor<T> extends XmlVisitor<Set<T>> {
     }
 
     @Override
-    public Xml visitEach(Xml xml, @NonNull Set<T> ts) {
+    public Xml preVisit(Xml xml, @NonNull Set<T> ts) {
         if (xml.getMarkers().findFirst(markerType).isPresent()) {
             //noinspection unchecked
             ts.add((T) xml);
         }
-        return super.visitEach(xml, ts);
+        return super.preVisit(xml, ts);
     }
 }
