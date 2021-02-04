@@ -112,6 +112,33 @@ interface RemoveImportTest : RecipeTest {
     )
 
     @Test
+    fun removeStaticImportIfNotReferenced(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = removeImport("java.time.DayOfWeek.MONDAY"),
+        before = """
+            import java.time.DayOfWeek;
+            import static java.time.DayOfWeek.MONDAY;
+            import static java.time.DayOfWeek.TUESDAY;
+            
+            class WorkWeek {
+                DayOfWeek shortWeekStarts(){
+                    return TUESDAY;
+                }
+            }
+        """,
+        after = """
+            import java.time.DayOfWeek;
+            import static java.time.DayOfWeek.TUESDAY;
+            
+            class WorkWeek {
+                DayOfWeek shortWeekStarts(){
+                    return TUESDAY;
+                }
+            }
+        """
+    )
+
+    @Test
     fun leaveNamedStaticImportIfReferenceStillExists(jp: JavaParser) = assertChanged(
         jp,
         recipe = removeImport("java.util.Collections"),

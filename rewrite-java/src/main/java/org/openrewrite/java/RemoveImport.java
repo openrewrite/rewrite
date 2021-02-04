@@ -21,10 +21,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.IdentityHashMap;
-import java.util.Set;
+import java.util.*;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -96,7 +93,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
     @Override
     public J.Import visitImport(J.Import impoort, P p) {
         if (impoort.isStatic()) {
-            if (impoort.getQualid().getTarget().printTrimmed().equals(type)) {
+            if (impoort.getQualid().getTarget().printTrimmed().equals(type) || impoort.getQualid().printTrimmed().equals(type)) {
                 if ("*".equals(impoort.getQualid().getSimpleName())) {
                     staticStarImport = impoort;
                 } else {
