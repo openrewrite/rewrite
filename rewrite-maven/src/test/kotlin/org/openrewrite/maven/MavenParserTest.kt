@@ -33,7 +33,7 @@ class MavenParserTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-
+                <packaging>pom</packaging>
                 <developers>
                     <developer>
                         <name>Trygve Laugst&oslash;l</name>
@@ -45,6 +45,7 @@ class MavenParserTest {
                     <groupId>org.junit.jupiter</groupId>
                     <artifactId>junit-jupiter-api</artifactId>
                     <version>5.7.0</version>
+                    <type>pom</type>
                     <scope>test</scope>
                   </dependency>
                 </dependencies>
@@ -57,6 +58,10 @@ class MavenParserTest {
 
         assertThat(maven.model.dependencies.first().model.licenses.first()?.type)
                 .isEqualTo(Pom.LicenseType.Eclipse)
+        assertThat(maven.model.dependencies.first().type)
+            .isEqualTo("pom")
+        assertThat(maven.model.packaging)
+            .isEqualTo("pom")
     }
 
     @Test
@@ -155,7 +160,7 @@ class MavenParserTest {
     }
 
     val parserStrict = MavenParser.builder().resolveOptional(false).build()
-    val parserLenient = MavenParser.builder().continueOnError(true).resolveOptional(false).build()
+    val parserLenient = MavenParser.builder().onError{  }.resolveOptional(false).build()
 
     @Issue("https://github.com/openrewrite/rewrite/issues/199")
     @Test

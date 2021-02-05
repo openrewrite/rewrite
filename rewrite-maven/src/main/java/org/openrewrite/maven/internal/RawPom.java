@@ -174,13 +174,6 @@ public class RawPom {
         @Nullable
         @JacksonXmlElementWrapper(useWrapping = true)
         Set<GroupArtifact> exclusions;
-
-        /**
-         * @return the groupId, artifactId, and version concatenated with ":" as the delimiter between them.
-         */
-        public String gavCoordinates() {
-            return groupId + ":" + artifactId + ":" + version;
-        }
     }
 
     @Getter

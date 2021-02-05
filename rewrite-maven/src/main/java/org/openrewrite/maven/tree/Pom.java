@@ -53,7 +53,7 @@ public class Pom implements Marker {
     String snapshotVersion;
 
     @Nullable
-    String type;
+    String packaging;
 
     @Nullable
     String classifier;
@@ -77,7 +77,7 @@ public class Pom implements Marker {
                String artifactId,
                @Nullable String version,
                @Nullable String snapshotVersion,
-               @Nullable String type,
+               @Nullable String packaging,
                @Nullable String classifier,
                @Nullable Pom parent,
                Collection<Dependency> dependencies,
@@ -90,7 +90,7 @@ public class Pom implements Marker {
         this.artifactId = artifactId;
         this.version = version;
         this.snapshotVersion = snapshotVersion;
-        this.type = type;
+        this.packaging = packaging;
         this.classifier = classifier;
         this.parent = parent;
         this.dependencies = dependencies;
@@ -187,8 +187,8 @@ public class Pom implements Marker {
     }
 
     @Nullable
-    public String getType() {
-        return type;
+    public String getPackaging() {
+        return packaging;
     }
 
     @Nullable
@@ -280,6 +280,9 @@ public class Pom implements Marker {
 
         @Nullable
         String classifier;
+
+        @Nullable
+        String type;
 
         boolean optional;
         Pom model;

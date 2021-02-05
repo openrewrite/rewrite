@@ -121,7 +121,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public void maybeAddDependency(String groupId, String artifactId, String version,
-                                   @Nullable String classifier, @Nullable String scope) {
+                                   @Nullable String classifier, @Nullable String scope, @Nullable String type) {
         AddDependencyVisitor<P> op = new AddDependencyVisitor<>(
                 groupId,
                 artifactId,
@@ -130,6 +130,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                 true,
                 classifier,
                 scope,
+                type,
                 true,
                 null);
 
