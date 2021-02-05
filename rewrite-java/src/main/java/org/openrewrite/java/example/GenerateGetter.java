@@ -23,20 +23,13 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaTemplate;
+import org.openrewrite.java.internal.JavaTemplate;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class GenerateGetter extends Recipe {
-    private static final JavaTemplate GETTER = JavaTemplate
-            .builder("" +
-                    "public #{} get#{}() {\n" +
-                    "    return #{};\n" +
-                    "}")
-            .build();
-
     private final String fieldName;
 
     @Override
@@ -45,6 +38,11 @@ public class GenerateGetter extends Recipe {
     }
 
     private class GenerateGetterVisitor<P> extends JavaIsoVisitor<P> {
+        private final JavaTemplate getter = template("" +
+                "public #{} get#{}() {\n" +
+                "    return #{};\n" +
+                "}"
+        ).build();
 
         public GenerateGetterVisitor() {
             setCursoringOn();
@@ -64,11 +62,10 @@ public class GenerateGetter extends Recipe {
             Cursor varCursor = getCursor().pollNearestMessage("varCursor");
             if (varCursor != null) {
                 J.VariableDecls.NamedVar var = varCursor.getValue();
-                J.Block body = c.getBody();
-                c = GETTER.generate(getCursor(), c.getBody().getCoordinates().lastStatement(),
-                    TypeUtils.asClass(var.getType()).getClassName(),
-                    StringUtils.capitalize(var.getSimpleName()),
-                    var.getSimpleName());
+                c = c.withTemplate(getter, c.getBody().getCoordinates().lastStatement(),
+                        TypeUtils.asClass(var.getType()).getClassName(),
+                        StringUtils.capitalize(var.getSimpleName()),
+                        var.getSimpleName());
             }
             return c;
         }

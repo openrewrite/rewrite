@@ -22,6 +22,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.format.AutoFormatVisitor;
+import org.openrewrite.java.internal.JavaTemplate;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -32,8 +33,8 @@ import java.util.Objects;
 public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     @Incubating(since = "7.0.0")
-    public <J2 extends J> J2 generate(JavaTemplate template, JavaCoordinates<?> coordinates, Object... parameters) {
-        return template.generate(getCursor(), coordinates, parameters);
+    public JavaTemplate.Builder template(String code) {
+        return JavaTemplate.builder(this::getCursor, code);
     }
 
     /**
@@ -49,14 +50,13 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
     }
 
-
     public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, P p) {
         return maybeAutoFormat(before, after, p, getCursor());
     }
 
     @SuppressWarnings({"unchecked", "ConstantConditions"})
     public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, P p, Cursor cursor) {
-        if(before != after) {
+        if (before != after) {
             return (J2) new AutoFormatVisitor<>().visit(after, p, cursor);
         }
         return after;

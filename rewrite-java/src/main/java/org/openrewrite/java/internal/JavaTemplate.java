@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java;
+package org.openrewrite.java.internal;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
@@ -22,73 +22,75 @@ import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.*;
 import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
+import java.util.function.Supplier;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
+/**
+ * Build ASTs from the text of Java source code without knowing how to build the AST
+ * elements that make up that text.
+ */
 @Incubating(since = "7.0.0")
 public class JavaTemplate {
-
-    public interface TemplateEventHandler {
-
-        void afterVariableSubstitution(String substitutedTemplate);
-
-        void beforeParseTemplate(String generatedTemplate);
-
-    }
-
     private static final String SNIPPET_MARKER_START = "<<<<START>>>>";
     private static final String SNIPPET_MARKER_END = "<<<<END>>>>";
 
+    private final Supplier<Cursor> parentScopeGetter;
     private final JavaParser parser;
     private final String code;
     private final int parameterCount;
     private final Set<String> imports;
     private final String parameterMarker;
-    @Nullable
-    private final TemplateEventHandler templateEventHandler;
 
-    private JavaTemplate(JavaParser parser, String code, Set<String> imports, String parameterMarker, @Nullable TemplateEventHandler templateEventHandler) {
+    @Nullable
+    private final JavaTemplate.EventHandler eventHandler;
+
+    private JavaTemplate(Supplier<Cursor> parentScopeGetter, JavaParser parser, String code, Set<String> imports, String parameterMarker, @Nullable JavaTemplate.EventHandler eventHandler) {
+        this.parentScopeGetter = parentScopeGetter;
         this.parser = parser;
         this.code = code;
         this.parameterCount = StringUtils.countOccurrences(code, parameterMarker);
         this.imports = imports;
         this.parameterMarker = parameterMarker;
-        this.templateEventHandler = templateEventHandler;
+        this.eventHandler = eventHandler;
     }
 
-    public static Builder builder(String code) {
-        return new Builder(code);
+    public static Builder builder(Supplier<Cursor> parentScope, String code) {
+        return new Builder(parentScope, code);
     }
 
-    public <J2 extends J> J2 generate(Cursor parentScope, JavaCoordinates<?> coordinates, Object... parameters) {
-        List<J> generatedElements = generateList(parentScope, coordinates, parameters);
-        //noinspection unchecked,ConstantConditions
-        return (J2) new InsertAtCoordinates(coordinates).visit(parentScope.getValue(), generatedElements);
-    }
-
-    private <J2 extends J> List<J2> generateList(Cursor parentScope, JavaCoordinates<?> coordinates, Object... parameters) {
+    /**
+     * @param changing    The tree that will be returned modified where one of its subtrees will have
+     *                    been added or replaced by an AST formed from the template.
+     * @param coordinates The point where the template will either insert or replace code.
+     * @param parameters  Parameters substituted into the template.
+     * @param <J2>        The type of the changing tree.
+     * @return A modified form of the changing tree.
+     */
+    public <J2 extends J> J2 withTemplate(Tree changing, JavaCoordinates<?> coordinates, Object... parameters) {
+        Cursor parentScope = parentScopeGetter.get();
 
         if (parameters.length != parameterCount) {
             throw new IllegalArgumentException("This template requires " + parameterCount + " parameters.");
         }
 
         //Substitute parameter markers with the string representation of each parameter.
-        String printedTemplate = substituteParameters(parameters);
-
-        if (templateEventHandler != null) {
-            templateEventHandler.afterVariableSubstitution(printedTemplate);
+        String substitutedTemplate = substituteParameters(parameters);
+        if (eventHandler != null) {
+            eventHandler.afterVariableSubstitution(substitutedTemplate);
         }
 
         J.CompilationUnit cu = parentScope.firstEnclosingOrThrow(J.CompilationUnit.class);
 
         //Prune down the original AST to just the elements in scope at the insertion point.
-        J.CompilationUnit pruned = (J.CompilationUnit) new TemplateVisitor(coordinates, imports).visit(cu, parentScope);
+        J.CompilationUnit pruned = (J.CompilationUnit) new TemplatePruner(coordinates, imports).visit(cu, parentScope);
         assert pruned != null;
 
         //As part of the pruning process, the coordinates may have changed if a parent tree is used with coordinates
@@ -98,10 +100,10 @@ public class JavaTemplate {
             coordinates = newCoordinates;
         }
 
-        String generatedSource = new TemplatePrinter(coordinates).print(pruned, printedTemplate);
+        String generatedSource = new TemplatePrinter(coordinates).print(pruned, substitutedTemplate);
 
-        if (templateEventHandler != null) {
-            templateEventHandler.beforeParseTemplate(generatedSource);
+        if (eventHandler != null) {
+            eventHandler.beforeParseTemplate(generatedSource);
         }
 
         parser.reset();
@@ -112,9 +114,12 @@ public class JavaTemplate {
         new ExtractTemplatedCode().visit(synthetic, extractionContext);
 
         //noinspection unchecked
-        return extractionContext.getSnippets().stream()
+        List<J> generatedElements = extractionContext.getSnippets().stream()
                 .map(snippet -> (J2) new AutoFormatVisitor<String>().visit(snippet, "", parentScope))
                 .collect(toList());
+
+        //noinspection unchecked,ConstantConditions
+        return (J2) new InsertAtCoordinates(coordinates).visit(parentScope.getValue(), generatedElements);
     }
 
     /**
@@ -146,15 +151,15 @@ public class JavaTemplate {
     }
 
     /**
-     * A java visitor that prunes the original AST down to just the things needed to compile the template code.
+     * A Java visitor that prunes the original AST down to just the things needed to compile the template code.
      * The typed Cursor represents the insertion point within the original AST.
      */
-    private static class TemplateVisitor extends JavaIsoVisitor<Cursor> {
+    private static class TemplatePruner extends JavaIsoVisitor<Cursor> {
 
         private final JavaCoordinates<?> coordinates;
         private final Set<String> imports;
 
-        TemplateVisitor(JavaCoordinates<?> coordinates, Set<String> imports) {
+        TemplatePruner(JavaCoordinates<?> coordinates, Set<String> imports) {
             this.coordinates = coordinates;
             this.imports = imports;
             setCursoringOn();
@@ -200,7 +205,6 @@ public class JavaTemplate {
                         insertionScope.putMessage("newCoordinates", c.getExtends().getCoordinates().replace());
                         break;
                     case IMPLEMENTS:
-
                         c = c.getPadding().withImplements(JContainer.build(
                                 Space.format(" "),
                                 JRightPadded.withElems(emptyList(),
@@ -226,7 +230,6 @@ public class JavaTemplate {
             if (!insertionScope.isScopeInPath(method)) {
                 return method.withAnnotations(emptyList()).withBody(null);
             }
-
             J.MethodDecl m = super.visitMethod(method, insertionScope);
             if (coordinates.getTree().getId().equals(m.getId())) {
                 switch (coordinates.getSpaceLocation()) {
@@ -271,7 +274,6 @@ public class JavaTemplate {
             J.MethodInvocation m = super.visitMethodInvocation(method, insertionScope);
             if (coordinates.getTree().getId().equals(m.getId())
                     && coordinates.getSpaceLocation() == Space.Location.METHOD_INVOCATION_ARGUMENTS) {
-
                 m = m.withArgs(Collections.singletonList(new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY)));
                 insertionScope.putMessage("newCoordinates", m.getArgs().get(0).getCoordinates().replace());
             }
@@ -327,7 +329,6 @@ public class JavaTemplate {
      * Custom Java Printer that will add additional import and add the printed template at the insertion point.
      */
     private static class TemplatePrinter extends JavaPrinter<String> {
-
         private final JavaCoordinates<?> coordinates;
 
         private TemplatePrinter(JavaCoordinates<?> coordinates) {
@@ -339,8 +340,8 @@ public class JavaTemplate {
         @Override
         public Space visitSpace(Space space, Space.Location location, String template) {
             J parent = getCursor().firstEnclosing(J.class);
-            if (parent != null && parent.getId().equals(coordinates.getTree().getId())
-                    && location == coordinates.getSpaceLocation()) {
+            if (parent != null && parent.getId().equals(coordinates.getTree().getId()) &&
+                    location == coordinates.getSpaceLocation()) {
                 getPrinterAcc().append(getMarkedTemplate(template));
                 return space;
             } else {
@@ -582,8 +583,6 @@ public class JavaTemplate {
             return m;
         }
 
-        //TODO Added remaining cases where a list of elements might require add/merge semantics.
-
         @SuppressWarnings("unchecked")
         private <T extends J> @Nullable List<T> maybeMergeList(@Nullable List<T> originalList, List<? extends J> generated) {
             if (originalList != null) {
@@ -608,6 +607,7 @@ public class JavaTemplate {
     }
 
     public static class Builder {
+        private final Supplier<Cursor> parentScope;
         private final String code;
         private final Set<String> imports = new HashSet<>();
 
@@ -618,9 +618,10 @@ public class JavaTemplate {
         private String parameterMarker = "#{}";
 
         @Nullable
-        private TemplateEventHandler templateEventHandler;
+        private JavaTemplate.EventHandler eventHandler;
 
-        Builder(String code) {
+        Builder(Supplier<Cursor> parentScope, String code) {
+            this.parentScope = parentScope;
             this.code = code.trim();
         }
 
@@ -682,13 +683,19 @@ public class JavaTemplate {
             return this;
         }
 
-        public Builder templateEventHandler(TemplateEventHandler templateEventHandler) {
-            this.templateEventHandler = templateEventHandler;
+        public Builder eventHandler(EventHandler eventHandler) {
+            this.eventHandler = eventHandler;
             return this;
         }
 
         public JavaTemplate build() {
-            return new JavaTemplate(javaParser, code, imports, parameterMarker, templateEventHandler);
+            return new JavaTemplate(parentScope, javaParser, code, imports, parameterMarker, eventHandler);
         }
+    }
+
+    public interface EventHandler {
+        void afterVariableSubstitution(String substitutedTemplate);
+
+        void beforeParseTemplate(String generatedTemplate);
     }
 }

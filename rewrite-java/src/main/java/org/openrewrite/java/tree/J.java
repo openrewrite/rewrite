@@ -25,6 +25,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
+import org.openrewrite.java.internal.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.*;
@@ -100,6 +101,11 @@ public interface J extends Serializable, Tree {
 
     Coordinates<?> getCoordinates();
 
+    @Incubating(since = "7.0.0")
+    default <J2 extends J> J2 withTemplate(JavaTemplate template, JavaCoordinates<?> coordinates, Object... parameters) {
+        return template.withTemplate(this, coordinates, parameters);
+    }
+
     @SuppressWarnings("unchecked")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -134,6 +140,7 @@ public interface J extends Serializable, Tree {
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitAnnotatedType(this, p);
         }
+
         @Override
         public Coordinates<J.AnnotatedType> getCoordinates() {
             return new Coordinates.AnnotatedType(this);
@@ -193,6 +200,7 @@ public interface J extends Serializable, Tree {
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitAnnotation(this, p);
         }
+
         @Override
         public Coordinates<J.Annotation> getCoordinates() {
             return new Coordinates.Annotation(this);
@@ -255,11 +263,11 @@ public interface J extends Serializable, Tree {
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitArrayAccess(this, p);
         }
+
         @Override
         public Coordinates<J.ArrayAccess> getCoordinates() {
             return new Coordinates.ArrayAccess(this);
         }
-
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -297,6 +305,7 @@ public interface J extends Serializable, Tree {
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitArrayType(this, p);
         }
+
         @Override
         public Coordinates<J.ArrayType> getCoordinates() {
             return new Coordinates.ArrayType(this);
@@ -324,6 +333,7 @@ public interface J extends Serializable, Tree {
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitAssert(this, p);
         }
+
         @Override
         public Coordinates<J.Assert> getCoordinates() {
             return new Coordinates.Assert(this);

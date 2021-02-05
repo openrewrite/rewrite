@@ -15,12 +15,13 @@
  */
 package org.openrewrite.java;
 
+import org.openrewrite.java.internal.JavaTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class TemplateLoggingEventHandler implements JavaTemplate.TemplateEventHandler {
+public class LoggingEventHandler implements JavaTemplate.EventHandler {
 
-    private static final Logger logger = LoggerFactory.getLogger(TemplateLoggingEventHandler.class);
+    private static final Logger logger = LoggerFactory.getLogger(LoggingEventHandler.class);
 
     @Override
     public void afterVariableSubstitution(String substitutedTemplate) {

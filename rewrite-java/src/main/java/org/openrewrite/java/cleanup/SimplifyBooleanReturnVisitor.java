@@ -19,7 +19,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.DeleteStatement;
-import org.openrewrite.java.JavaTemplate;
+import org.openrewrite.java.internal.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -32,8 +32,7 @@ import java.util.stream.Collectors;
 
 @Incubating(since = "7.0.0")
 public class SimplifyBooleanReturnVisitor<P> extends JavaVisitor<P> {
-
-    private static final JavaTemplate NOT_IF_CONDITION_RETURN = JavaTemplate.builder("return !(#{});").build();
+    private final JavaTemplate notIfConditionReturn = template("return !(#{});").build();
 
     public SimplifyBooleanReturnVisitor() {
         setCursoringOn();
@@ -87,7 +86,7 @@ public class SimplifyBooleanReturnVisitor<P> extends JavaVisitor<P> {
 
                     if (returnThenPart) {
                         // we need to NOT the expression inside the if condition
-                        return NOT_IF_CONDITION_RETURN.generate(getCursor(), i.getCoordinates().replace(), ifCondition);
+                        return i.withTemplate(notIfConditionReturn, i.getCoordinates().replace(), ifCondition);
                     }
                 }
             }

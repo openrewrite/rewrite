@@ -18,14 +18,13 @@ package org.openrewrite.java.tree;
 import org.openrewrite.internal.lang.Nullable;
 
 public abstract class Coordinates<J2 extends J> {
+    J2 tree;
 
-    protected J2 tree;
-
-    protected Coordinates(J2 tree) {
+    Coordinates(J2 tree) {
         this.tree = tree;
     }
 
-    protected JavaCoordinates<?> create(@Nullable Space.Location location) {
+    JavaCoordinates<?> create(@Nullable Space.Location location) {
         return new JavaCoordinates<>(tree, location);
     }
 
@@ -36,8 +35,7 @@ public abstract class Coordinates<J2 extends J> {
     public abstract JavaCoordinates<?> before();
 
     public static class AnnotatedType extends Coordinates<J.AnnotatedType> {
-
-        protected AnnotatedType(J.AnnotatedType tree) {
+        AnnotatedType(J.AnnotatedType tree) {
             super(tree);
         }
 
@@ -48,8 +46,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Annotation extends Coordinates<J.Annotation> {
-
-        protected Annotation(J.Annotation tree) {
+        Annotation(J.Annotation tree) {
             super(tree);
         }
 
@@ -60,8 +57,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class ArrayAccess extends Coordinates<J.ArrayAccess> {
-
-        protected ArrayAccess(J.ArrayAccess tree) {
+        ArrayAccess(J.ArrayAccess tree) {
             super(tree);
         }
 
@@ -72,8 +68,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class ArrayDimension extends Coordinates<J.ArrayDimension> {
-
-        protected ArrayDimension(J.ArrayDimension tree) {
+        ArrayDimension(J.ArrayDimension tree) {
             super(tree);
         }
 
@@ -84,8 +79,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class ArrayType extends Coordinates<J.ArrayType> {
-
-        protected ArrayType(J.ArrayType tree) {
+        ArrayType(J.ArrayType tree) {
             super(tree);
         }
 
@@ -96,8 +90,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Assert extends Coordinates<J.Assert> {
-
-        protected Assert(J.Assert tree) {
+        Assert(J.Assert tree) {
             super(tree);
         }
 
@@ -108,8 +101,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Assign extends Coordinates<J.Assign> {
-
-        protected Assign(J.Assign tree) {
+        Assign(J.Assign tree) {
             super(tree);
         }
 
@@ -120,20 +112,18 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class AssignOp extends Coordinates<J.AssignOp> {
-
-        protected AssignOp(J.AssignOp tree) {
+        AssignOp(J.AssignOp tree) {
             super(tree);
         }
 
         @Override
         public JavaCoordinates<?> before() {
-            return create(Space.Location.ASSIGN_OP_OPERATOR);
+            return create(Space.Location.ASSIGN_OP_PREFIX);
         }
     }
 
     public static class Binary extends Coordinates<J.Binary> {
-
-        protected Binary(J.Binary tree) {
+        Binary(J.Binary tree) {
             super(tree);
         }
 
@@ -144,8 +134,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Block extends Coordinates<J.Block> {
-
-        protected Block(J.Block tree) {
+        Block(J.Block tree) {
             super(tree);
         }
 
@@ -160,8 +149,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Break extends Coordinates<J.Break> {
-
-        protected Break(J.Break tree) {
+        Break(J.Break tree) {
             super(tree);
         }
 
@@ -172,8 +160,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Case extends Coordinates<J.Case> {
-
-        protected Case(J.Case tree) {
+        Case(J.Case tree) {
             super(tree);
         }
 
@@ -184,8 +171,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class ClassDecl extends Coordinates<J.ClassDecl> {
-
-        protected ClassDecl(J.ClassDecl tree) {
+        ClassDecl(J.ClassDecl tree) {
             super(tree);
         }
 
@@ -248,8 +234,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class CompilationUnit extends Coordinates<J.CompilationUnit> {
-
-        protected CompilationUnit(J.CompilationUnit tree) {
+        CompilationUnit(J.CompilationUnit tree) {
             super(tree);
         }
 
@@ -260,8 +245,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Continue extends Coordinates<J.Continue> {
-
-        protected Continue(J.Continue tree) {
+        Continue(J.Continue tree) {
             super(tree);
         }
 
@@ -272,8 +256,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class ControlParentheses<J2 extends J> extends Coordinates<J.ControlParentheses<J2>> {
-
-        protected ControlParentheses(J.ControlParentheses<J2> tree) {
+        ControlParentheses(J.ControlParentheses<J2> tree) {
             super(tree);
         }
 
@@ -284,8 +267,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class DoWhileLoop extends Coordinates<J.DoWhileLoop> {
-
-        protected DoWhileLoop(J.DoWhileLoop tree) {
+        DoWhileLoop(J.DoWhileLoop tree) {
             super(tree);
         }
 
@@ -296,8 +278,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Empty extends Coordinates<J.Empty> {
-
-        protected Empty(J.Empty tree) {
+        Empty(J.Empty tree) {
             super(tree);
         }
 
@@ -308,8 +289,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class EnumValue extends Coordinates<J.EnumValue> {
-
-        protected EnumValue(J.EnumValue tree) {
+        EnumValue(J.EnumValue tree) {
             super(tree);
         }
 
@@ -320,8 +300,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class EnumValueSet extends Coordinates<J.EnumValueSet> {
-
-        protected EnumValueSet(J.EnumValueSet tree) {
+        EnumValueSet(J.EnumValueSet tree) {
             super(tree);
         }
 
@@ -332,8 +311,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class FieldAccess extends Coordinates<J.FieldAccess> {
-
-        protected FieldAccess(J.FieldAccess tree) {
+        FieldAccess(J.FieldAccess tree) {
             super(tree);
         }
 
@@ -344,8 +322,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class ForEachLoop extends Coordinates<J.ForEachLoop> {
-
-        protected ForEachLoop(J.ForEachLoop tree) {
+        ForEachLoop(J.ForEachLoop tree) {
             super(tree);
         }
 
@@ -355,7 +332,7 @@ public abstract class Coordinates<J2 extends J> {
         }
 
         public static class Control extends Coordinates<J.ForEachLoop.Control> {
-            protected Control(J.ForEachLoop.Control tree) {
+            Control(J.ForEachLoop.Control tree) {
                 super(tree);
             }
 
@@ -367,8 +344,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class ForLoop extends Coordinates<J.ForLoop> {
-
-        protected ForLoop(J.ForLoop tree) {
+        ForLoop(J.ForLoop tree) {
             super(tree);
         }
 
@@ -379,7 +355,7 @@ public abstract class Coordinates<J2 extends J> {
 
 
         public static class Control extends Coordinates<J.ForLoop.Control> {
-            protected Control(J.ForLoop.Control tree) {
+            Control(J.ForLoop.Control tree) {
                 super(tree);
             }
 
@@ -391,8 +367,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Ident extends Coordinates<J.Ident> {
-
-        protected Ident(J.Ident tree) {
+        Ident(J.Ident tree) {
             super(tree);
         }
 
@@ -403,8 +378,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class If extends Coordinates<J.If> {
-
-        protected If(J.If tree) {
+        If(J.If tree) {
             super(tree);
         }
 
@@ -414,7 +388,7 @@ public abstract class Coordinates<J2 extends J> {
         }
 
         public static class Else extends Coordinates<J.If.Else> {
-            protected Else(J.If.Else tree) {
+            Else(J.If.Else tree) {
                 super(tree);
             }
 
@@ -426,8 +400,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Import extends Coordinates<J.Import> {
-
-        protected Import(J.Import tree) {
+        Import(J.Import tree) {
             super(tree);
         }
 
@@ -438,8 +411,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class InstanceOf extends Coordinates<J.InstanceOf> {
-
-        protected InstanceOf(J.InstanceOf tree) {
+        InstanceOf(J.InstanceOf tree) {
             super(tree);
         }
 
@@ -450,8 +422,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Label extends Coordinates<J.Label> {
-
-        protected Label(J.Label tree) {
+        Label(J.Label tree) {
             super(tree);
         }
 
@@ -462,8 +433,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Lambda extends Coordinates<J.Lambda> {
-
-        protected Lambda(J.Lambda tree) {
+        Lambda(J.Lambda tree) {
             super(tree);
         }
 
@@ -474,7 +444,7 @@ public abstract class Coordinates<J2 extends J> {
 
         public static class Parameters extends Coordinates<J.Lambda.Parameters> {
 
-            protected Parameters(J.Lambda.Parameters tree) {
+            Parameters(J.Lambda.Parameters tree) {
                 super(tree);
             }
 
@@ -486,8 +456,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Literal extends Coordinates<J.Literal> {
-
-        protected Literal(J.Literal tree) {
+        Literal(J.Literal tree) {
             super(tree);
         }
 
@@ -498,8 +467,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class MemberReference extends Coordinates<J.MemberReference> {
-
-        protected MemberReference(J.MemberReference tree) {
+        MemberReference(J.MemberReference tree) {
             super(tree);
         }
 
@@ -510,8 +478,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class MethodDecl extends Coordinates<J.MethodDecl> {
-
-        protected MethodDecl(J.MethodDecl tree) {
+        MethodDecl(J.MethodDecl tree) {
             super(tree);
         }
 
@@ -536,20 +503,13 @@ public abstract class Coordinates<J2 extends J> {
             return create(Space.Location.THROWS);
         }
 
-        /**
-         * Intended for replacement semantics, where the method body specified will be entirely replaced by the code
-         * generated via JavaTemplate
-         *
-         * @return method body replacement coordinates
-         */
         public JavaCoordinates<?> replaceBody() {
             return create(Space.Location.BLOCK_END);
         }
     }
 
     public static class MethodInvocation extends Coordinates<J.MethodInvocation> {
-
-        protected MethodInvocation(J.MethodInvocation tree) {
+        MethodInvocation(J.MethodInvocation tree) {
             super(tree);
         }
 
@@ -565,8 +525,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Modifier extends Coordinates<J.Modifier> {
-
-        protected Modifier(J.Modifier tree) {
+        Modifier(J.Modifier tree) {
             super(tree);
         }
 
@@ -577,8 +536,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class MultiCatch extends Coordinates<J.MultiCatch> {
-
-        protected MultiCatch(J.MultiCatch tree) {
+        MultiCatch(J.MultiCatch tree) {
             super(tree);
         }
 
@@ -589,8 +547,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class NewArray extends Coordinates<J.NewArray> {
-
-        protected NewArray(J.NewArray tree) {
+        NewArray(J.NewArray tree) {
             super(tree);
         }
 
@@ -601,8 +558,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class NewClass extends Coordinates<J.NewClass> {
-
-        protected NewClass(J.NewClass tree) {
+        NewClass(J.NewClass tree) {
             super(tree);
         }
 
@@ -613,8 +569,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Package extends Coordinates<J.Package> {
-
-        protected Package(J.Package tree) {
+        Package(J.Package tree) {
             super(tree);
         }
 
@@ -625,8 +580,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class ParameterizedType extends Coordinates<J.ParameterizedType> {
-
-        protected ParameterizedType(J.ParameterizedType tree) {
+        ParameterizedType(J.ParameterizedType tree) {
             super(tree);
         }
 
@@ -637,8 +591,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Parentheses<J2 extends J> extends Coordinates<J.Parentheses<J2>> {
-
-        protected Parentheses(J.Parentheses<J2> tree) {
+        Parentheses(J.Parentheses<J2> tree) {
             super(tree);
         }
 
@@ -649,8 +602,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Primitive extends Coordinates<J.Primitive> {
-
-        protected Primitive(J.Primitive tree) {
+        Primitive(J.Primitive tree) {
             super(tree);
         }
 
@@ -661,8 +613,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Return extends Coordinates<J.Return> {
-
-        protected Return(J.Return tree) {
+        Return(J.Return tree) {
             super(tree);
         }
 
@@ -673,8 +624,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Switch extends Coordinates<J.Switch> {
-
-        protected Switch(J.Switch tree) {
+        Switch(J.Switch tree) {
             super(tree);
         }
 
@@ -685,8 +635,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Synchronized extends Coordinates<J.Synchronized> {
-
-        protected Synchronized(J.Synchronized tree) {
+        Synchronized(J.Synchronized tree) {
             super(tree);
         }
 
@@ -697,8 +646,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Ternary extends Coordinates<J.Ternary> {
-
-        protected Ternary(J.Ternary tree) {
+        Ternary(J.Ternary tree) {
             super(tree);
         }
 
@@ -709,8 +657,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Throw extends Coordinates<J.Throw> {
-
-        protected Throw(J.Throw tree) {
+        Throw(J.Throw tree) {
             super(tree);
         }
 
@@ -721,8 +668,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Try extends Coordinates<J.Try> {
-
-        protected Try(J.Try tree) {
+        Try(J.Try tree) {
             super(tree);
         }
 
@@ -732,8 +678,7 @@ public abstract class Coordinates<J2 extends J> {
         }
 
         public static class Catch extends Coordinates<J.Try.Catch> {
-
-            protected Catch(J.Try.Catch catzch) {
+            Catch(J.Try.Catch catzch) {
                 super(catzch);
             }
 
@@ -744,8 +689,7 @@ public abstract class Coordinates<J2 extends J> {
         }
 
         public static class Resource extends Coordinates<J.Try.Resource> {
-
-            protected Resource(J.Try.Resource tree) {
+            Resource(J.Try.Resource tree) {
                 super(tree);
             }
 
@@ -757,8 +701,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class TypeCast extends Coordinates<J.TypeCast> {
-
-        protected TypeCast(J.TypeCast tree) {
+        TypeCast(J.TypeCast tree) {
             super(tree);
         }
 
@@ -769,8 +712,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class TypeParameter extends Coordinates<J.TypeParameter> {
-
-        protected TypeParameter(J.TypeParameter tree) {
+        TypeParameter(J.TypeParameter tree) {
             super(tree);
         }
 
@@ -785,8 +727,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Unary extends Coordinates<J.Unary> {
-
-        protected Unary(J.Unary tree) {
+        Unary(J.Unary tree) {
             super(tree);
         }
 
@@ -797,8 +738,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class VariableDecls extends Coordinates<J.VariableDecls> {
-
-        protected VariableDecls(J.VariableDecls tree) {
+        VariableDecls(J.VariableDecls tree) {
             super(tree);
         }
 
@@ -808,8 +748,7 @@ public abstract class Coordinates<J2 extends J> {
         }
 
         public static class NamedVar extends Coordinates<J.VariableDecls.NamedVar> {
-
-            protected NamedVar(J.VariableDecls.NamedVar tree) {
+            NamedVar(J.VariableDecls.NamedVar tree) {
                 super(tree);
             }
 
@@ -821,8 +760,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class WhileLoop extends Coordinates<J.WhileLoop> {
-
-        protected WhileLoop(J.WhileLoop tree) {
+        WhileLoop(J.WhileLoop tree) {
             super(tree);
         }
 
@@ -833,8 +771,7 @@ public abstract class Coordinates<J2 extends J> {
     }
 
     public static class Wildcard extends Coordinates<J.Wildcard> {
-
-        protected Wildcard(J.Wildcard tree) {
+        Wildcard(J.Wildcard tree) {
             super(tree);
         }
 
