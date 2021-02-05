@@ -59,6 +59,9 @@ public class AddDependency extends Recipe {
     @Nullable
     private String scope;
 
+    @Nullable
+    private String type;
+
     private boolean skipIfPresent = true;
 
     /**
@@ -122,6 +125,7 @@ public class AddDependency extends Recipe {
                 releasesOnly,
                 classifier,
                 scope,
+                type,
                 skipIfPresent,
                 familyPattern == null ? null : Pattern.compile(familyPattern.replace("*", ".*"))
         );

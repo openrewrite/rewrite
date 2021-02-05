@@ -56,7 +56,6 @@ public class RawMavenResolver {
 
     private final Collection<String> activeProfiles;
     private final boolean resolveOptional;
-    private final boolean continueOnError;
 
     @Nullable
     private final MavenSettings mavenSettings;
@@ -64,7 +63,7 @@ public class RawMavenResolver {
     private final Consumer<Throwable> onError;
 
     public RawMavenResolver(MavenDownloader downloader, boolean forParent, Collection<String> activeProfiles,
-                            @Nullable MavenSettings mavenSettings, boolean resolveOptional, boolean continueOnError, @Nullable Consumer<Throwable> onError) {
+                            @Nullable MavenSettings mavenSettings, boolean resolveOptional, @Nullable Consumer<Throwable> onError) {
         this.onError = onError;
         this.versionSelection = new TreeMap<>();
         for (Scope scope : Scope.values()) {
@@ -75,7 +74,6 @@ public class RawMavenResolver {
         this.activeProfiles = activeProfiles;
         this.mavenSettings = mavenSettings;
         this.resolveOptional = resolveOptional;
-        this.continueOnError = continueOnError;
     }
 
     @Nullable
@@ -105,7 +103,7 @@ public class RawMavenResolver {
     private Pom _resolve(RawMaven rawMaven, Scope scope, @Nullable String requestedVersion, List<RawRepositories.Repository> repositories,
                          @Nullable LinkedHashSet<PartialTreeKey> seenParentPoms) {
         ResolutionTask rootTask = new ResolutionTask(scope, rawMaven, emptySet(),
-                false, null, requestedVersion, repositories, seenParentPoms);
+                false, null, null, requestedVersion, repositories, seenParentPoms);
 
         workQueue.add(rootTask);
 
@@ -159,14 +157,13 @@ public class RawMavenResolver {
         } catch (Throwable t) {
             if(onError != null) {
                 onError.accept(t);
-            }
-            if(continueOnError) {
                 return true;
+            } else {
+                if (t instanceof MavenParsingException) {
+                    throw t;
+                }
+                throw new MavenParsingException(t);
             }
-            if(t instanceof MavenParsingException) {
-                throw t;
-            }
-            throw new MavenParsingException(t);
         }
     }
 
@@ -213,7 +210,7 @@ public class RawMavenResolver {
                         RawMaven rawMaven = downloader.download(groupId, artifactId, version, null, null, null,
                                 partialMaven.getRepositories());
                         if (rawMaven != null) {
-                            Pom maven = new RawMavenResolver(downloader, true, activeProfiles, mavenSettings, resolveOptional, continueOnError, onError)
+                            Pom maven = new RawMavenResolver(downloader, true, activeProfiles, mavenSettings, resolveOptional, onError)
                                     .resolve(rawMaven, Scope.Compile, d.getVersion(), partialMaven.getRepositories());
 
                             if (maven != null) {
@@ -373,6 +370,7 @@ public class RawMavenResolver {
                                                 .collect(Collectors.toSet()),
                                 dep.getOptional() != null && dep.getOptional(),
                                 dep.getClassifier(),
+                                dep.getType(),
                                 dep.getVersion(),
                                 partialMaven.getRepositories(),
                                 null
@@ -431,7 +429,7 @@ public class RawMavenResolver {
 
                     //noinspection OptionalAssignedToNull
                     if (maybeParent == null) {
-                        parent = new RawMavenResolver(downloader, true, activeProfiles, mavenSettings, resolveOptional, continueOnError, onError)
+                        parent = new RawMavenResolver(downloader, true, activeProfiles, mavenSettings, resolveOptional, onError)
                                 ._resolve(rawParentModel, Scope.Compile, rawParent.getVersion(), partialMaven.getRepositories(), parentPomSightings);
                         resolved.put(parentKey, Optional.ofNullable(parent));
                     } else {
@@ -510,6 +508,7 @@ public class RawMavenResolver {
                             return new Pom.Dependency(
                                     depTask.getScope(),
                                     depTask.getClassifier(),
+                                    depTask.getType(),
                                     optional,
                                     resolved,
                                     depTask.getRequestedVersion(),
@@ -535,7 +534,7 @@ public class RawMavenResolver {
 
                             Pom conflictResolved = assembleResults(new ResolutionTask(scope, conflictResolvedRaw,
                                     ancestorDep.getExclusions(), ancestorDep.isOptional(), ancestorDep.getRequestedVersion(),
-                                    ancestorDep.getClassifier(), task.getRepositories(), null), nextAssemblyStack);
+                                    ancestorDep.getClassifier(), ancestorDep.getType(), task.getRepositories(), null), nextAssemblyStack);
 
                             if (conflictResolved == null) {
                                 dependencies.add(ancestorDep);
@@ -543,6 +542,7 @@ public class RawMavenResolver {
                                 dependencies.add(new Pom.Dependency(
                                         scope,
                                         ancestorDep.getClassifier(),
+                                        ancestorDep.getType(),
                                         ancestorDep.isOptional(),
                                         conflictResolved,
                                         ancestorDep.getRequestedVersion(),
@@ -585,7 +585,7 @@ public class RawMavenResolver {
                                 rawPom.getArtifactId(),
                                 version,
                                 rawPom.getSnapshotVersion(),
-                                null,
+                                rawPom.getPackaging(),
                                 null,
                                 partial.getParent(),
                                 dependencies,
@@ -625,6 +625,9 @@ public class RawMavenResolver {
         @EqualsAndHashCode.Include
         @Nullable
         String classifier;
+
+        @EqualsAndHashCode.Include
+        String type;
 
         @EqualsAndHashCode.Include
         @Nullable

@@ -110,7 +110,8 @@ class RawPomTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-            
+                <packaging>jar</packaging>
+                
                 <dependencyManagement>
                     <dependencies>
                         <dependency>
@@ -191,6 +192,8 @@ class RawPomTest {
         val model = MavenXmlMapper.readMapper().readValue(pom, RawPom::class.java)
 
         assertThat(model.parent!!.groupId).isEqualTo("org.springframework.boot")
+
+        assertThat(model.packaging).isEqualTo("jar")
 
         assertThat(model.getActiveDependencies(emptyList())[0].groupId)
             .isEqualTo("org.junit.jupiter")

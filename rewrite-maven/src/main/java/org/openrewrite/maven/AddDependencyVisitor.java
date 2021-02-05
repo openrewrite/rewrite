@@ -67,6 +67,9 @@ public class AddDependencyVisitor<P> extends MavenVisitor<P> {
     @Nullable
     private final String scope;
 
+    @Nullable
+    private final String type;
+
     private final boolean skipIfPresent;
 
     @Nullable
@@ -82,6 +85,7 @@ public class AddDependencyVisitor<P> extends MavenVisitor<P> {
                                 boolean releasesOnly,
                                 @Nullable String classifier,
                                 @Nullable String scope,
+                                @Nullable String type,
                                 boolean skipIfPresent,
                                 @Nullable Pattern familyPattern) {
         this.groupId = groupId;
@@ -91,6 +95,7 @@ public class AddDependencyVisitor<P> extends MavenVisitor<P> {
         this.releasesOnly = releasesOnly;
         this.classifier = classifier;
         this.scope = scope;
+        this.type = type;
         this.skipIfPresent = skipIfPresent;
         this.familyPattern = familyPattern;
     }
@@ -120,12 +125,14 @@ public class AddDependencyVisitor<P> extends MavenVisitor<P> {
         doAfterVisit(new InsertDependencyInOrder());
 
         Collection<Pom.Dependency> dependencies = new ArrayList<>(model.getDependencies());
+        String packaging = (type == null) ? "jar" : type;
         dependencies.add(
                 new Pom.Dependency(
                         Scope.fromName(scope),
                         classifier,
+                        packaging,
                         false,
-                        new Pom(null, groupId, artifactId, version, null, "jar", classifier, null,
+                        new Pom(null, groupId, artifactId, version, null, packaging, classifier, null,
                                 emptyList(), new Pom.DependencyManagement(emptyList()), emptyList(), emptyList(), emptyMap()),
                         version,
                         emptySet()
