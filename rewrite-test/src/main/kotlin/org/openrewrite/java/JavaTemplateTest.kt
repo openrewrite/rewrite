@@ -35,7 +35,7 @@ interface JavaTemplateTest : RecipeTest {
 
             override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
                 val m = super.visitMethodInvocation(method, p)
-                return generate(template,  m.args[0].coordinates().replaceThis())
+                return generate(template,  m.args[0].coordinates.replace())
             }
         }.toRecipe(),
         before = """
@@ -77,7 +77,7 @@ interface JavaTemplateTest : RecipeTest {
                     //Test when coordinate is before the first statement in the block
                     var b = generate<J.Block>(
                         template,
-                        block.statements[0].coordinates().before(),
+                        block.statements[0].coordinates.before(),
                         (parent.params[0] as J.VariableDecls).vars[0]
                     )
                     assertThat(b.statements).`as`("The list of statements should be 3.").hasSize(3)
@@ -86,7 +86,7 @@ interface JavaTemplateTest : RecipeTest {
                     //Test when insertion scope is between two statements in a block
                     b = generate(
                             template,
-                            block.statements[1].coordinates().before(),
+                            block.statements[1].coordinates.before(),
                             (parent.params[0] as J.VariableDecls).vars[0]
                         )
                     assertThat(b.statements).`as`("The list of statements should be 3.").hasSize(3)
@@ -135,7 +135,7 @@ interface JavaTemplateTest : RecipeTest {
 
                     //Test when insertion scope is after the last statements in a block
                     val b = generate<J.Block>(template,
-                        block.coordinates().lastStatement(),
+                        block.coordinates.lastStatement(),
                         (parent.params[0] as J.VariableDecls).vars[0])
 
                     assertThat(b.statements).`as`("The list of generated statements should be 1.").hasSize(3)
@@ -185,7 +185,7 @@ interface JavaTemplateTest : RecipeTest {
 
                     //Test when insertion scope is between two statements in a block
                     val b = generate<J.Block>(template,
-                        block.coordinates().lastStatement(),
+                        block.coordinates.lastStatement(),
                         (parent.params[0] as J.VariableDecls).vars[0])
                     assertThat(b.statements).`as`("The list of generated statements should be 1.").hasSize(1)
                     assertThat((b.statements[0] as J.MethodInvocation).type).isNotNull
@@ -237,7 +237,7 @@ interface JavaTemplateTest : RecipeTest {
                 if (parent is J.ClassDecl) {
 
                     //Test generating the method as the last element in the class block
-                    b = generate<J.Block>(template, block.coordinates().lastStatement())
+                    b = generate(template, block.coordinates.lastStatement())
                     assertThat(b.statements).`as`("The list of generated statements should be 3.").hasSize(3)
                     assertThat((b.statements[2] as J.MethodDecl).type).isNotNull
                 }
@@ -296,7 +296,7 @@ interface JavaTemplateTest : RecipeTest {
                 val parent = cursor.dropParentUntil { it is J }.getValue<J>()
                 if (parent is J.ClassDecl) {
 
-                    b = generate<J.Block>(template, block.coordinates().lastStatement())
+                    b = generate(template, block.coordinates.lastStatement())
                     assertThat(b.statements).`as`("The list of generated statements should be 1.").hasSize(3)
                     assertThat((b.statements[2] as J.MethodDecl).type).isNotNull
                 }
@@ -348,7 +348,7 @@ interface JavaTemplateTest : RecipeTest {
                 val m = super.visitMethodInvocation(method, p) as J.MethodInvocation
                 if (m.name.ident.simpleName != "countLetters") return m
                 val argument = m.args[0]
-                val results = generate<J.MethodInvocation>(template, m.coordinates().replaceThis(), argument)
+                val results = generate<J.MethodInvocation>(template, m.coordinates.replace(), argument)
                 return results
             }
         }.toRecipe(),
@@ -465,7 +465,7 @@ interface JavaTemplateTest : RecipeTest {
             }
             override fun visitMethod(method: J.MethodDecl, p: ExecutionContext): J.MethodDecl {
                 var m = super.visitMethod(method, p)
-                m = generate<J.MethodDecl>(template, m.coordinates().replaceAnnotations())
+                m = generate(template, m.coordinates.replaceAnnotations())
                 //TODO - I tried using AutoFormat here but it is not putting a space between the end of the
                 //      annotation and the void on the method.
                 return  MinimumViableSpacingVisitor<ExecutionContext>().visitMethod(m, p)
@@ -500,7 +500,7 @@ interface JavaTemplateTest : RecipeTest {
 
             override fun visitClassDecl(clazz: J.ClassDecl, p: ExecutionContext): J.ClassDecl {
                 var c = super.visitClassDecl(clazz, p)
-                c = generate<J.ClassDecl>(template, c.coordinates().replaceAnnotations())
+                c = generate(template, c.coordinates.replaceAnnotations())
                 assertThat(c.annotations).`as`("The list of generated annotations should be 1.").hasSize(1)
                 assertThat(c.annotations[0].type).isNotNull
                 //TODO - I tried using AutoFormat here but it is not putting a space between the end of the
@@ -536,7 +536,7 @@ interface JavaTemplateTest : RecipeTest {
             override fun visitClassDecl(clazz: J.ClassDecl, p: ExecutionContext): J.ClassDecl {
                 var c = super.visitClassDecl(clazz, p)
 
-                c = generate<J.ClassDecl>(template, clazz.coordinates().replaceAnnotations())
+                c = generate(template, c.coordinates.replaceAnnotations())
 
                 assertThat(c.annotations).`as`("The list of generated annotations should be 1.").hasSize(1)
                 assertThat(c.annotations[0].type).isNotNull
@@ -581,7 +581,7 @@ interface JavaTemplateTest : RecipeTest {
 
 
                     //Test when statement is the insertion scope is before the first statement in the block
-                    b = generate<J.Block>(template, b.statements[0].coordinates().before(),
+                    b = generate(template, b.statements[0].coordinates.before(),
                             b.statements[1] as J,
                             b.statements[0] as J
                         )
@@ -649,8 +649,8 @@ interface JavaTemplateTest : RecipeTest {
                 if (parent is J.If) {
 
                     //Test when statement is the insertion scope is before the first statement in the block
-                    b = generate<J.Block>(template,
-                        b.coordinates().lastStatement(),
+                    b = generate(template,
+                        b.coordinates.lastStatement(),
                         b.statements[1],
                         b.statements[0]
                     )
@@ -739,7 +739,7 @@ interface JavaTemplateTest : RecipeTest {
 
             override fun visitClassDecl(classDecl: J.ClassDecl, p: ExecutionContext): J.ClassDecl {
                 val c = super.visitClassDecl(classDecl, p)
-                return generate<J.ClassDecl>(template, c.coordinates().replaceTypeParameters())
+                return generate(template, c.coordinates.replaceTypeParameters())
             }
         }.toRecipe(),
         before = """
@@ -772,7 +772,7 @@ interface JavaTemplateTest : RecipeTest {
                 val c = super.visitClassDecl(classDecl, p)
 
                 //Replace body.
-                return generate<J.ClassDecl>(template, c.coordinates().replaceExtendsClause())
+                return generate(template, c.coordinates.replaceExtendsClause())
             }
         }.toRecipe(),
         before = """
@@ -805,7 +805,7 @@ interface JavaTemplateTest : RecipeTest {
                 val c = super.visitClassDecl(classDecl, p)
 
                 //Replace implements clause.
-                return  generate<J.ClassDecl>(template, c.coordinates().replaceImplementsClause())
+                return  generate(template, c.coordinates.replaceImplementsClause())
             }
         }.toRecipe(),
         before = """
@@ -843,7 +843,7 @@ interface JavaTemplateTest : RecipeTest {
                 var c = super.visitClassDecl(classDecl, p)
 
                 //Replace body.
-                 c = generate<J.ClassDecl>(template, c.coordinates().replaceBody())
+                 c = generate(template, c.coordinates.replaceBody())
                 assertThat(c.body.statements).`as`("The list of generated statements should be 2.")
                     .hasSize(2)
                 assertThat((c.body.statements[0] as J.VariableDecls).typeAsClass).isNotNull
@@ -875,7 +875,7 @@ interface JavaTemplateTest : RecipeTest {
             }
             override fun visitMethod(method: J.MethodDecl, p: ExecutionContext): J.MethodDecl {
                 val m = super.visitMethod(method, p)
-                return generate<J.MethodDecl>(template, m.coordinates().replaceTypeParameters())
+                return generate(template, m.coordinates.replaceTypeParameters())
             }
         }.toRecipe(),
         before = """
@@ -903,7 +903,7 @@ interface JavaTemplateTest : RecipeTest {
             }
             override fun visitMethod(method: J.MethodDecl, p: ExecutionContext): J.MethodDecl {
                 val m = super.visitMethod(method, p)
-                return generate<J.MethodDecl>(template, m.coordinates().replaceParameters())
+                return generate(template, m.coordinates.replaceParameters())
             }
         }.toRecipe(),
         before = """
@@ -931,7 +931,7 @@ interface JavaTemplateTest : RecipeTest {
             }
             override fun visitMethod(method: J.MethodDecl, p: ExecutionContext): J.MethodDecl {
                 val m = super.visitMethod(method, p)
-                return generate<J.MethodDecl>(template, m.coordinates().replaceThrows())
+                return generate(template, m.coordinates.replaceThrows())
             }
         }.toRecipe(),
         before = """
@@ -960,7 +960,7 @@ interface JavaTemplateTest : RecipeTest {
 
             override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
                 val m = super.visitMethodInvocation(method, p)
-                return generate<J.MethodInvocation>(template, m.coordinates().replaceArguments())
+                return generate(template, m.coordinates.replaceArguments())
             }
         }.toRecipe(),
         before = """

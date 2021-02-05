@@ -66,10 +66,10 @@ public class JavaTemplate {
         return new Builder(code);
     }
 
-     public <J2 extends J> J2 generate(Cursor parentScope, JavaCoordinates<?> coordinates, Object... parameters) {
+    public <J2 extends J> J2 generate(Cursor parentScope, JavaCoordinates<?> coordinates, Object... parameters) {
         List<J> generatedElements = generateList(parentScope, coordinates, parameters);
-         //noinspection unchecked,ConstantConditions
-         return (J2) new InsertAtCoordinates(coordinates).visit(parentScope.getValue(), generatedElements);
+        //noinspection unchecked,ConstantConditions
+        return (J2) new InsertAtCoordinates(coordinates).visit(parentScope.getValue(), generatedElements);
     }
 
     private <J2 extends J> List<J2> generateList(Cursor parentScope, JavaCoordinates<?> coordinates, Object... parameters) {
@@ -177,7 +177,7 @@ public class JavaTemplate {
             if (coordinates.getTree().getId().equals(c.getId())) {
                 switch (coordinates.getSpaceLocation()) {
                     case ANNOTATION_PREFIX:
-                        insertionScope.putMessage("newCoordinates", c.coordinates().before());
+                        insertionScope.putMessage("newCoordinates", c.getCoordinates().before());
                         break;
                     case TYPE_PARAMETER_SUFFIX:
                         c = c.withTypeParameters(Collections.singletonList(
@@ -185,7 +185,7 @@ public class JavaTemplate {
                                         new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY), null)
                         ));
                         //noinspection ConstantConditions
-                        insertionScope.putMessage("newCoordinates", c.getTypeParameters().get(0).coordinates().replaceThis());
+                        insertionScope.putMessage("newCoordinates", c.getTypeParameters().get(0).getCoordinates().replace());
                         break;
                     case EXTENDS:
                         if (c.getExtends() == null) {
@@ -197,7 +197,7 @@ public class JavaTemplate {
                             );
                         }
                         //noinspection ConstantConditions
-                        insertionScope.putMessage("newCoordinates", c.getExtends().coordinates().replaceThis());
+                        insertionScope.putMessage("newCoordinates", c.getExtends().getCoordinates().replace());
                         break;
                     case IMPLEMENTS:
 
@@ -209,10 +209,10 @@ public class JavaTemplate {
                                 Markers.EMPTY)
                         );
                         //noinspection ConstantConditions
-                        insertionScope.putMessage("newCoordinates", c.getImplements().get(0).coordinates().replaceThis());
+                        insertionScope.putMessage("newCoordinates", c.getImplements().get(0).getCoordinates().replace());
                         break;
                     case BLOCK_END:
-                        insertionScope.putMessage("newCoordinates", c.getBody().coordinates().replaceThis());
+                        insertionScope.putMessage("newCoordinates", c.getBody().getCoordinates().replace());
                         break;
                     default:
                 }
@@ -231,7 +231,7 @@ public class JavaTemplate {
             if (coordinates.getTree().getId().equals(m.getId())) {
                 switch (coordinates.getSpaceLocation()) {
                     case ANNOTATION_PREFIX:
-                        insertionScope.putMessage("newCoordinates", m.coordinates().before());
+                        insertionScope.putMessage("newCoordinates", m.getCoordinates().before());
                         break;
                     case TYPE_PARAMETER_SUFFIX:
                         m = m.withTypeParameters(Collections.singletonList(
@@ -239,23 +239,23 @@ public class JavaTemplate {
                                         new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY), null)
                         ));
                         //noinspection ConstantConditions
-                        insertionScope.putMessage("newCoordinates", m.getTypeParameters().get(0).coordinates().replaceThis());
+                        insertionScope.putMessage("newCoordinates", m.getTypeParameters().get(0).getCoordinates().replace());
                         break;
                     case METHOD_DECL_PARAMETERS:
                         m = m.withParams(Collections.singletonList(new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY)));
-                        insertionScope.putMessage("newCoordinates", m.getParams().get(0).coordinates().replaceThis());
+                        insertionScope.putMessage("newCoordinates", m.getParams().get(0).getCoordinates().replace());
                         break;
                     case THROWS:
                         m = m.withThrows(Collections.singletonList(new J.Empty(Tree.randomId(), Space.format(" "), Markers.EMPTY)));
                         //noinspection ConstantConditions
-                        insertionScope.putMessage("newCoordinates", m.getThrows().get(0).coordinates().replaceThis());
+                        insertionScope.putMessage("newCoordinates", m.getThrows().get(0).getCoordinates().replace());
                         break;
                     case BLOCK_END:
                         if (m.getBody() == null) {
                             m = m.withBody(new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, new JRightPadded<>(false, Space.EMPTY, Markers.EMPTY), null, Space.EMPTY));
                         }
                         //noinspection ConstantConditions
-                        insertionScope.putMessage("newCoordinates", m.getBody().coordinates().replaceThis());
+                        insertionScope.putMessage("newCoordinates", m.getBody().getCoordinates().replace());
                         break;
                 }
             }
@@ -272,8 +272,8 @@ public class JavaTemplate {
             if (coordinates.getTree().getId().equals(m.getId())
                     && coordinates.getSpaceLocation() == Space.Location.METHOD_INVOCATION_ARGUMENTS) {
 
-                    m = m.withArgs(Collections.singletonList(new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY)));
-                    insertionScope.putMessage("newCoordinates", m.getArgs().get(0).coordinates().replaceThis());
+                m = m.withArgs(Collections.singletonList(new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY)));
+                insertionScope.putMessage("newCoordinates", m.getArgs().get(0).getCoordinates().replace());
             }
             return m;
         }
@@ -350,7 +350,7 @@ public class JavaTemplate {
 
         @Override
         public @Nullable J visit(@Nullable Tree tree, String template) {
-            if (coordinates.getSpaceLocation() == Space.Location.REPLACE && tree !=null && tree.getId().equals(coordinates.getTree().getId())) {
+            if (coordinates.getSpaceLocation() == Space.Location.REPLACE && tree != null && tree.getId().equals(coordinates.getTree().getId())) {
                 getPrinterAcc().append(getMarkedTemplate(template));
                 return (J) tree;
             }
@@ -359,7 +359,7 @@ public class JavaTemplate {
 
         private String getMarkedTemplate(String template) {
             return "/*" + SNIPPET_MARKER_START + "*/" + template
-                 + "/*" + SNIPPET_MARKER_END + "*/";
+                    + "/*" + SNIPPET_MARKER_END + "*/";
         }
     }
 
@@ -413,7 +413,7 @@ public class JavaTemplate {
                 //that element will not be collected.
                 context.collectElements = false;
 
-                while(context.collectedElements.size() > 1 && getCursor().isScopeInPath(context.collectedElements.get(0).element)) {
+                while (context.collectedElements.size() > 1 && getCursor().isScopeInPath(context.collectedElements.get(0).element)) {
                     //If we have collected more than one element and the ending element is on the path of the first element, then
                     //the first element does not belong to the template, exclude it and move the start depth up.
                     context.collectedElements.remove(0);

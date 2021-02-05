@@ -21,14 +21,11 @@ import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
-
-import java.util.List;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -68,7 +65,7 @@ public class GenerateGetter extends Recipe {
             if (varCursor != null) {
                 J.VariableDecls.NamedVar var = varCursor.getValue();
                 J.Block body = c.getBody();
-                c = GETTER.generate(getCursor(), c.getBody().coordinates().lastStatement(),
+                c = GETTER.generate(getCursor(), c.getBody().getCoordinates().lastStatement(),
                     TypeUtils.asClass(var.getType()).getClassName(),
                     StringUtils.capitalize(var.getSimpleName()),
                     var.getSimpleName());
