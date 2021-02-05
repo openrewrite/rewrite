@@ -244,10 +244,6 @@ public class RawMavenResolver {
         }
 
         partialMaven.setDependencyTasks(rawMaven.getActiveDependencies(activeProfiles).stream()
-                .filter(dep -> {
-                    // we don't care about test-jar, etc.
-                    return dep.getType() == null || dep.getType().equals("jar");
-                })
                 .filter(dep -> resolveOptional || dep.getOptional() == null || !dep.getOptional())
                 .map(dep -> {
                     // replace property references, source versions from dependency management sections, etc.
@@ -279,7 +275,10 @@ public class RawMavenResolver {
                                 return null;
                             }
                         } catch (Exception exception) {
-                                continue;
+                            if(onError != null) {
+                                onError.accept(exception);
+                            }
+                            continue;
                         }
                     }
 
@@ -396,7 +395,7 @@ public class RawMavenResolver {
         RawPom pom = rawMaven.getPom();
         if (pom.getParent() != null) {
             RawPom.Parent rawParent = pom.getParent();
-            // With "->" indicating a "has parent" relationship, this code is meant to detect cycles like
+            // With "->" indicating a "has parent" relationship, parentPomSightings is used to detect cycles like
             // A -> B -> A
             // And cut them off early with a clearer, more actionable error than a stack overflow
             LinkedHashSet<PartialTreeKey> parentPomSightings;

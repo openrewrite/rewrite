@@ -45,7 +45,7 @@ class MavenParserTest {
                     <groupId>org.junit.jupiter</groupId>
                     <artifactId>junit-jupiter-api</artifactId>
                     <version>5.7.0</version>
-                    <type>jar</type>
+                    <type>pom</type>
                     <scope>test</scope>
                   </dependency>
                 </dependencies>
@@ -59,7 +59,7 @@ class MavenParserTest {
         assertThat(maven.model.dependencies.first().model.licenses.first()?.type)
                 .isEqualTo(Pom.LicenseType.Eclipse)
         assertThat(maven.model.dependencies.first().type)
-            .isEqualTo("jar")
+            .isEqualTo("pom")
         assertThat(maven.model.packaging)
             .isEqualTo("pom")
     }
