@@ -23,8 +23,6 @@ import org.openrewrite.internal.lang.Nullable;
 @Data
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 public class JavaCoordinates <J2 extends J>{
-
     J2 tree;
-
     Space.Location spaceLocation;
 }

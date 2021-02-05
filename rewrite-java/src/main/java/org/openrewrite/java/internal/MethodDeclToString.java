@@ -31,7 +31,7 @@ public class MethodDeclToString {
         @Override
         public J visitMethod(J.MethodDecl method, Void unused) {
             visitModifiers(Space.formatFirstPrefix(method.getModifiers(), Space.EMPTY), unused);
-            StringBuilder acc = getPrinterAcc();
+            StringBuilder acc = getPrinter();
             if (!method.getModifiers().isEmpty()) {
                 acc.append(' ');
             }

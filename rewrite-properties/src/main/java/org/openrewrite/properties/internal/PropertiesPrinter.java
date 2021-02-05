@@ -37,7 +37,7 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<P> {
     }
 
     @NonNull
-    protected StringBuilder getPrinterAcc() {
+    protected StringBuilder getPrinter() {
         StringBuilder acc = getCursor().getRoot().peekMessage(PRINTER_ACC_KEY);
         if (acc == null) {
             acc = new StringBuilder();
@@ -49,7 +49,7 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<P> {
     public String print(Properties properties, P p) {
         setCursor(new Cursor(null, "EPSILON"));
         visit(properties, p);
-        return getPrinterAcc().toString();
+        return getPrinter().toString();
     }
 
     @Override
@@ -60,11 +60,11 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<P> {
             return defaultValue(null, p);
         }
 
-        StringBuilder printerAcc = getPrinterAcc();
-        treePrinter.doBefore(tree, printerAcc, p);
+        StringBuilder printer = getPrinter();
+        treePrinter.doBefore(tree, printer, p);
         tree = super.visit(tree, p);
         if (tree != null) {
-            treePrinter.doAfter(tree, printerAcc, p);
+            treePrinter.doAfter(tree, printer, p);
         }
         return (Properties) tree;
     }
@@ -79,7 +79,7 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<P> {
 
     @Override
     public Properties visitFile(Properties.File file, P p) {
-        StringBuilder acc = getPrinterAcc();
+        StringBuilder acc = getPrinter();
         acc.append(file.getPrefix());
         visit(file.getContent(), p);
         acc.append(file.getEof());
@@ -88,7 +88,7 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<P> {
 
     @Override
     public Properties visitEntry(Properties.Entry entry, P p) {
-        StringBuilder acc = getPrinterAcc();
+        StringBuilder acc = getPrinter();
         acc.append(entry.getPrefix())
                 .append(entry.getKey())
                 .append(entry.getBeforeEquals())
@@ -100,7 +100,7 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<P> {
 
     @Override
     public Properties visitComment(Properties.Comment comment, P p) {
-        StringBuilder acc = getPrinterAcc();
+        StringBuilder acc = getPrinter();
         acc.append(comment.getPrefix())
                 .append('#')
                 .append(comment.getMessage());

@@ -32,7 +32,7 @@ public class VariableDeclsToString {
         @Override
         public J visitMultiVariable(J.VariableDecls multiVariable, Void unused) {
             visitModifiers(Space.formatFirstPrefix(multiVariable.getModifiers(), Space.EMPTY), unused);
-            StringBuilder acc = getPrinterAcc();
+            StringBuilder acc = getPrinter();
             if (!multiVariable.getModifiers().isEmpty()) {
                 acc.append(' ');
             }

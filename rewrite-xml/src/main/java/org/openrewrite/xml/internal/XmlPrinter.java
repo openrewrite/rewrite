@@ -37,7 +37,7 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
     }
 
     @NonNull
-    protected StringBuilder getPrinterAcc() {
+    protected StringBuilder getPrinter() {
         StringBuilder acc = getCursor().getRoot().peekMessage(PRINTER_ACC_KEY);
         if (acc == null) {
             acc = new StringBuilder();
@@ -49,7 +49,7 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
     public String print(Xml xml, P p) {
         setCursor(new Cursor(null, "EPSILON"));
         visit(xml, p);
-        return getPrinterAcc().toString();
+        return getPrinter().toString();
     }
 
     @Override
@@ -60,7 +60,7 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
             return defaultValue(null, p);
         }
 
-        StringBuilder printerAcc = getPrinterAcc();
+        StringBuilder printerAcc = getPrinter();
         treePrinter.doBefore(tree, printerAcc, p);
         tree = super.visit(tree, p);
         if (tree != null) {
@@ -79,7 +79,7 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
 
     @Override
     public Xml visitDocument(Xml.Document document, P p) {
-        StringBuilder acc = getPrinterAcc();
+        StringBuilder acc = getPrinter();
         acc.append(document.getPrefix());
         document = (Xml.Document) super.visitDocument(document, p);
         acc.append(document.getEof());
@@ -88,13 +88,13 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
 
     @Override
     public Xml visitProlog(Xml.Prolog prolog, P p) {
-        getPrinterAcc().append(prolog.getPrefix());
+        getPrinter().append(prolog.getPrefix());
         return super.visitProlog(prolog, p);
     }
 
     @Override
     public Xml visitTag(Xml.Tag tag, P p) {
-        StringBuilder acc = getPrinterAcc();
+        StringBuilder acc = getPrinter();
         acc.append(tag.getPrefix())
                 .append('<')
                 .append(tag.getName());
@@ -117,7 +117,7 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
 
     @Override
     public Xml visitAttribute(Xml.Attribute attribute, P p) {
-        StringBuilder acc = getPrinterAcc();
+        StringBuilder acc = getPrinter();
         char valueDelim;
         if (Xml.Attribute.Value.Quote.Double.equals(attribute.getValue().getQuote())) {
             valueDelim = '"';
@@ -139,7 +139,7 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
 
     @Override
     public Xml visitComment(Xml.Comment comment, P p) {
-        StringBuilder acc = getPrinterAcc();
+        StringBuilder acc = getPrinter();
         acc.append(comment.getPrefix())
                 .append("<!--")
                 .append(comment.getText())
@@ -149,7 +149,7 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
 
     @Override
     public Xml visitProcessingInstruction(Xml.ProcessingInstruction pi, P p) {
-        StringBuilder acc = getPrinterAcc();
+        StringBuilder acc = getPrinter();
         acc.append(pi.getPrefix())
                 .append("<?")
                 .append(pi.getName());
@@ -161,7 +161,7 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
 
     @Override
     public Xml visitCharData(Xml.CharData charData, P p) {
-        StringBuilder acc = getPrinterAcc();
+        StringBuilder acc = getPrinter();
         acc.append(charData.getPrefix());
         if (charData.isCdata()) {
             acc.append("<![CDATA[")
@@ -176,7 +176,7 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
 
     @Override
     public Xml visitDocTypeDecl(Xml.DocTypeDecl docTypeDecl, P p) {
-        StringBuilder acc = getPrinterAcc();
+        StringBuilder acc = getPrinter();
         acc.append(docTypeDecl.getPrefix())
                 .append("<!DOCTYPE");
         visit(docTypeDecl.getName(), p);
@@ -194,7 +194,7 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
 
     @Override
     public Xml visitElement(Xml.Element element, P p) {
-        StringBuilder acc = getPrinterAcc();
+        StringBuilder acc = getPrinter();
         acc.append(element.getPrefix())
                 .append("<!ELEMENT");
         visit(element.getSubset(), p);
@@ -204,7 +204,7 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
 
     @Override
     public Xml visitIdent(Xml.Ident ident, P p) {
-        getPrinterAcc().append(ident.getPrefix())
+        getPrinter().append(ident.getPrefix())
                 .append(ident.getName());
         return ident;
     }

@@ -37,7 +37,7 @@ public class YamlPrinter<P> extends YamlVisitor<P> {
     }
 
     @NonNull
-    protected StringBuilder getPrinterAcc() {
+    protected StringBuilder getPrinter() {
         StringBuilder acc = getCursor().getRoot().peekMessage(PRINTER_ACC_KEY);
         if (acc == null) {
             acc = new StringBuilder();
@@ -49,7 +49,7 @@ public class YamlPrinter<P> extends YamlVisitor<P> {
     public String print(Yaml yaml, P p) {
         setCursor(new Cursor(null, "EPSILON"));
         visit(yaml, p);
-        return getPrinterAcc().toString();
+        return getPrinter().toString();
     }
 
     @Override
@@ -60,7 +60,7 @@ public class YamlPrinter<P> extends YamlVisitor<P> {
             return defaultValue(null, p);
         }
 
-        StringBuilder printerAcc = getPrinterAcc();
+        StringBuilder printerAcc = getPrinter();
         treePrinter.doBefore(tree, printerAcc, p);
         tree = super.visit(tree, p);
         if (tree != null) {
@@ -79,7 +79,7 @@ public class YamlPrinter<P> extends YamlVisitor<P> {
 
     @Override
     public Yaml visitDocument(Yaml.Document document, P p) {
-        StringBuilder acc = getPrinterAcc();
+        StringBuilder acc = getPrinter();
         acc.append(document.getPrefix());
         if (document.isExplicit()) {
             acc.append("---");
@@ -93,13 +93,13 @@ public class YamlPrinter<P> extends YamlVisitor<P> {
 
     @Override
     public Yaml visitDocuments(Yaml.Documents documents, P p) {
-        getPrinterAcc().append(documents.getPrefix());
+        getPrinter().append(documents.getPrefix());
         return super.visitDocuments(documents, p);
     }
 
     @Override
     public Yaml visitSequenceEntry(Yaml.Sequence.Entry entry, P p) {
-        StringBuilder acc = getPrinterAcc();
+        StringBuilder acc = getPrinter();
         acc.append(entry.getPrefix()).append('-');
         visit(entry.getBlock(), p);
         return entry;
@@ -107,13 +107,13 @@ public class YamlPrinter<P> extends YamlVisitor<P> {
 
     @Override
     public Yaml visitSequence(Yaml.Sequence sequence, P p) {
-        getPrinterAcc().append(sequence.getPrefix());
+        getPrinter().append(sequence.getPrefix());
         return super.visitSequence(sequence, p);
     }
 
     @Override
     public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, P p) {
-        StringBuilder acc = getPrinterAcc();
+        StringBuilder acc = getPrinter();
         acc.append(entry.getPrefix());
         visit(entry.getKey(), p);
         acc.append(entry.getBeforeMappingValueIndicator())
@@ -129,7 +129,7 @@ public class YamlPrinter<P> extends YamlVisitor<P> {
 
     @Override
     public Yaml visitScalar(Yaml.Scalar scalar, P p) {
-        StringBuilder acc = getPrinterAcc();
+        StringBuilder acc = getPrinter();
         acc.append(scalar.getPrefix());
         switch (scalar.getStyle()) {
             case DOUBLE_QUOTED:

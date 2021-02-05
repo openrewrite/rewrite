@@ -15,19 +15,27 @@
  */
 package org.openrewrite.java
 
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.RecipeTest
-import org.openrewrite.java.internal.JavaTemplate
 import org.openrewrite.java.tree.J
+import org.slf4j.LoggerFactory
+import java.util.function.Consumer
 
 interface JavaTemplateTest : RecipeTest {
+    companion object {
+        private val logger = LoggerFactory.getLogger(JavaTemplateTest::class.java)
+        private val logEvent = Consumer<String> { s -> logger.info(s) }
+    }
+
     @Test
     fun lamdaMethodParameterTest(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("""() -> "test"""").eventHandler(LoggingEventHandler()).build()
+            val template = template("""() -> "test"""")
+                .doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
 
             init {
                 setCursoringOn()
@@ -65,7 +73,9 @@ interface JavaTemplateTest : RecipeTest {
         jp,
         recipe = object : JavaVisitor<ExecutionContext>() {
             val template = template("others.add(#{});")
-                .eventHandler(LoggingEventHandler()).build()
+                .doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
 
             init {
                 setCursoringOn()
@@ -112,7 +122,9 @@ interface JavaTemplateTest : RecipeTest {
     fun lastInMethodBodyStatement(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaVisitor<ExecutionContext>() {
-            val template = template("others.add(#{});").eventHandler(LoggingEventHandler()).build()
+            val template = template("others.add(#{});").doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
 
             init {
                 setCursoringOn()
@@ -158,7 +170,9 @@ interface JavaTemplateTest : RecipeTest {
     fun addToEmptyMethodBody(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaVisitor<ExecutionContext>() {
-            val template = template("others.add(#{});").eventHandler(LoggingEventHandler()).build()
+            val template = template("others.add(#{});").doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
 
             init {
                 setCursoringOn()
@@ -207,7 +221,9 @@ interface JavaTemplateTest : RecipeTest {
                             return 'f';
                         }
                     """
-            ).eventHandler(LoggingEventHandler()).build()
+            ).doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
 
             init {
                 setCursoringOn()
@@ -262,7 +278,9 @@ interface JavaTemplateTest : RecipeTest {
                             return 'f';
                         }
                     """
-            ).eventHandler(LoggingEventHandler()).build()
+            ).doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
 
             init {
                 setCursoringOn()
@@ -273,7 +291,6 @@ interface JavaTemplateTest : RecipeTest {
                 val parent = cursor.dropParentUntil { it is J }.getValue<J>()
                 if (parent is J.ClassDecl) {
                     b = b.withTemplate(template, block.coordinates.lastStatement())
-                    assertThat((b.statements[2] as J.MethodDecl).type).isNotNull
                 }
                 return b
             }
@@ -312,7 +329,9 @@ interface JavaTemplateTest : RecipeTest {
         jp,
         recipe = object : JavaVisitor<ExecutionContext>() {
             val template: JavaTemplate = template("withString(#{}).length()")
-                .eventHandler(LoggingEventHandler()).build()
+                .doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
 
             init {
                 setCursoringOn()
@@ -433,7 +452,9 @@ interface JavaTemplateTest : RecipeTest {
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
             val template = template("@Deprecated")
-                .eventHandler(LoggingEventHandler()).build()
+                .doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
 
             init {
                 setCursoringOn()
@@ -463,7 +484,9 @@ interface JavaTemplateTest : RecipeTest {
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
             val template = template("@Deprecated")
-                .eventHandler(LoggingEventHandler()).build()
+                .doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
 
             init {
                 setCursoringOn()
@@ -493,7 +516,9 @@ interface JavaTemplateTest : RecipeTest {
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
             val template = template("@Deprecated")
-                .eventHandler(LoggingEventHandler()).build()
+                .doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
 
             init {
                 setCursoringOn()
@@ -527,7 +552,9 @@ interface JavaTemplateTest : RecipeTest {
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
             val template = template("\n#{};\n#{};")
-                .eventHandler(LoggingEventHandler()).build()
+                .doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
 
             init {
                 setCursoringOn()
@@ -587,7 +614,9 @@ interface JavaTemplateTest : RecipeTest {
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
             val template = template("#{};\n#{};")
-                .eventHandler(LoggingEventHandler()).build()
+                .doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
 
             init {
                 setCursoringOn()
@@ -676,7 +705,9 @@ interface JavaTemplateTest : RecipeTest {
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
             val template = template("T,P")
-                .eventHandler(LoggingEventHandler()).build()
+                .doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
 
             init {
                 setCursoringOn()
@@ -705,7 +736,9 @@ interface JavaTemplateTest : RecipeTest {
     fun replaceClassExtends(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("ArrayList<String>").eventHandler(LoggingEventHandler()).build()
+            val template = template("ArrayList<String>").doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
 
             init {
                 setCursoringOn()
@@ -734,7 +767,9 @@ interface JavaTemplateTest : RecipeTest {
     fun replaceClassImplements(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("List<String>").eventHandler(LoggingEventHandler()).build()
+            val template = template("List<String>").doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
 
             init {
                 setCursoringOn()
@@ -770,7 +805,9 @@ interface JavaTemplateTest : RecipeTest {
                         private String name2 = "Fred";
                         }
                     """
-            ).eventHandler(LoggingEventHandler()).build()
+            ).doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
 
             init {
                 setCursoringOn()
@@ -800,7 +837,9 @@ interface JavaTemplateTest : RecipeTest {
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
             val template = template("T,P")
-                .eventHandler(LoggingEventHandler()).build()
+                .doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
 
             init {
                 setCursoringOn()
@@ -830,7 +869,9 @@ interface JavaTemplateTest : RecipeTest {
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
             val template = template("String foo, String bar")
-                .eventHandler(LoggingEventHandler()).build()
+                .doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
 
             init {
                 setCursoringOn()
@@ -860,7 +901,9 @@ interface JavaTemplateTest : RecipeTest {
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
             val template = template(" Exception, Throwable")
-                .eventHandler(LoggingEventHandler()).build()
+                .doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
 
             init {
                 setCursoringOn()
@@ -890,7 +933,9 @@ interface JavaTemplateTest : RecipeTest {
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
             val template = template("\"fred\", \"sally\", \"dude\"")
-                .eventHandler(LoggingEventHandler()).build()
+                .doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
 
             init {
                 setCursoringOn()

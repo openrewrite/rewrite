@@ -30,7 +30,7 @@ public class MethodInvocationToString {
     private static final JavaPrinter<Void> METHOD_PRINTER = new JavaPrinter<Void>(TreePrinter.identity()) {
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, Void unused) {
-            StringBuilder acc = getPrinterAcc();
+            StringBuilder acc = getPrinter();
             JavaType.Method type = method.getType();
             if (type == null) {
                 acc.append("<unknown receiver type>.");

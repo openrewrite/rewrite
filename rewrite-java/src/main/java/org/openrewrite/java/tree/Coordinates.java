@@ -747,6 +747,10 @@ public abstract class Coordinates<J2 extends J> {
             return create(Space.Location.MULTI_VARIABLE_PREFIX);
         }
 
+        public JavaCoordinates<?> replaceAnnotations() {
+            return create(Space.Location.ANNOTATION_PREFIX);
+        }
+
         public static class NamedVar extends Coordinates<J.VariableDecls.NamedVar> {
             NamedVar(J.VariableDecls.NamedVar tree) {
                 super(tree);

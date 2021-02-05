@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.internal;
+package org.openrewrite.java;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
@@ -22,12 +22,12 @@ import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.*;
 import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import static java.util.Collections.emptyList;
@@ -48,18 +48,20 @@ public class JavaTemplate {
     private final int parameterCount;
     private final Set<String> imports;
     private final String parameterMarker;
+    private final Consumer<String> onAfterVariableSubstitution;
+    private final Consumer<String> onBeforeParseTemplate;
 
-    @Nullable
-    private final JavaTemplate.EventHandler eventHandler;
-
-    private JavaTemplate(Supplier<Cursor> parentScopeGetter, JavaParser parser, String code, Set<String> imports, String parameterMarker, @Nullable JavaTemplate.EventHandler eventHandler) {
+    private JavaTemplate(Supplier<Cursor> parentScopeGetter, JavaParser parser, String code, Set<String> imports,
+                         String parameterMarker, Consumer<String> onAfterVariableSubstitution,
+                         Consumer<String> onBeforeParseTemplate) {
         this.parentScopeGetter = parentScopeGetter;
         this.parser = parser;
         this.code = code;
-        this.parameterCount = StringUtils.countOccurrences(code, parameterMarker);
         this.imports = imports;
         this.parameterMarker = parameterMarker;
-        this.eventHandler = eventHandler;
+        this.onAfterVariableSubstitution = onAfterVariableSubstitution;
+        this.onBeforeParseTemplate = onBeforeParseTemplate;
+        this.parameterCount = StringUtils.countOccurrences(code, parameterMarker);
     }
 
     public static Builder builder(Supplier<Cursor> parentScope, String code) {
@@ -83,9 +85,7 @@ public class JavaTemplate {
 
         //Substitute parameter markers with the string representation of each parameter.
         String substitutedTemplate = substituteParameters(parameters);
-        if (eventHandler != null) {
-            eventHandler.afterVariableSubstitution(substitutedTemplate);
-        }
+        onAfterVariableSubstitution.accept(substitutedTemplate);
 
         J.CompilationUnit cu = parentScope.firstEnclosingOrThrow(J.CompilationUnit.class);
 
@@ -101,10 +101,7 @@ public class JavaTemplate {
         }
 
         String generatedSource = new TemplatePrinter(coordinates).print(pruned, substitutedTemplate);
-
-        if (eventHandler != null) {
-            eventHandler.beforeParseTemplate(generatedSource);
-        }
+        onBeforeParseTemplate.accept(generatedSource);
 
         parser.reset();
         J.CompilationUnit synthetic = parser.parse(generatedSource).iterator().next();
@@ -342,7 +339,7 @@ public class JavaTemplate {
             J parent = getCursor().firstEnclosing(J.class);
             if (parent != null && parent.getId().equals(coordinates.getTree().getId()) &&
                     location == coordinates.getSpaceLocation()) {
-                getPrinterAcc().append(getMarkedTemplate(template));
+                getPrinter().append(getMarkedTemplate(template));
                 return space;
             } else {
                 return super.visitSpace(space, location, template);
@@ -352,7 +349,7 @@ public class JavaTemplate {
         @Override
         public @Nullable J visit(@Nullable Tree tree, String template) {
             if (coordinates.getSpaceLocation() == Space.Location.REPLACE && tree != null && tree.getId().equals(coordinates.getTree().getId())) {
-                getPrinterAcc().append(getMarkedTemplate(template));
+                getPrinter().append(getMarkedTemplate(template));
                 return (J) tree;
             }
             return super.visit(tree, template);
@@ -617,8 +614,10 @@ public class JavaTemplate {
 
         private String parameterMarker = "#{}";
 
-        @Nullable
-        private JavaTemplate.EventHandler eventHandler;
+        private Consumer<String> onAfterVariableSubstitution = s -> {
+        };
+        private Consumer<String> onBeforeParseTemplate = s -> {
+        };
 
         Builder(Supplier<Cursor> parentScope, String code) {
             this.parentScope = parentScope;
@@ -683,19 +682,19 @@ public class JavaTemplate {
             return this;
         }
 
-        public Builder eventHandler(EventHandler eventHandler) {
-            this.eventHandler = eventHandler;
+        public Builder doAfterVariableSubstitution(Consumer<String> afterVariableSubstitution) {
+            this.onAfterVariableSubstitution = afterVariableSubstitution;
+            return this;
+        }
+
+        public Builder doBeforeParseTemplate(Consumer<String> beforeParseTemplate) {
+            this.onBeforeParseTemplate = beforeParseTemplate;
             return this;
         }
 
         public JavaTemplate build() {
-            return new JavaTemplate(parentScope, javaParser, code, imports, parameterMarker, eventHandler);
+            return new JavaTemplate(parentScope, javaParser, code, imports, parameterMarker,
+                    onAfterVariableSubstitution, onBeforeParseTemplate);
         }
-    }
-
-    public interface EventHandler {
-        void afterVariableSubstitution(String substitutedTemplate);
-
-        void beforeParseTemplate(String generatedTemplate);
     }
 }

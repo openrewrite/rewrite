@@ -32,7 +32,7 @@ public class ClassDeclToString {
         @Override
         public J visitClassDecl(J.ClassDecl classDecl, Void unused) {
             visitModifiers(Space.formatFirstPrefix(classDecl.getModifiers(), Space.EMPTY), unused);
-            StringBuilder acc = getPrinterAcc();
+            StringBuilder acc = getPrinter();
             if (!classDecl.getModifiers().isEmpty()) {
                 acc.append(' ');
             }

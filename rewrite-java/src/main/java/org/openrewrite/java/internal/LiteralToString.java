@@ -28,7 +28,7 @@ public class LiteralToString {
     private static final JavaPrinter<Void> LITERAL_PRINTER = new JavaPrinter<Void>(TreePrinter.identity()) {
         @Override
         public J visitLiteral(J.Literal literal, Void unused) {
-            StringBuilder acc = getPrinterAcc();
+            StringBuilder acc = getPrinter();
             if(literal.getType() != null) {
                 acc.append(literal.getType().getKeyword());
             } else {
