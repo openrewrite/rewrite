@@ -17,6 +17,7 @@ package org.openrewrite.java.format
 
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.java.JavaParser
@@ -659,6 +660,7 @@ interface SpacesTest : RecipeTest {
     )
 
     @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/234")
     @Test
     fun withinAnnotationParametersSpaces(jp: JavaParser.Builder<*,*>) = assertChanged(
         parser = jp.styles(
