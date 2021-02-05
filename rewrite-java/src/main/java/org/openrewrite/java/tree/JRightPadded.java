@@ -142,6 +142,10 @@ public class JRightPadded<T> implements Markable {
         return after;
     }
 
+    public static <T> JRightPadded<T> build(T elem) {
+        return new JRightPadded<>(elem, Space.EMPTY, Markers.EMPTY);
+    }
+
     @Override
     public String toString() {
         return "JRightPadded(elem=" + elem.getClass().getSimpleName() + ", after=" + after + ')';

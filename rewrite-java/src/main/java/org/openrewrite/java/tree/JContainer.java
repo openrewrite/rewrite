@@ -54,6 +54,10 @@ public class JContainer<T> implements Markable {
         this.markers = markers;
     }
 
+    public static <T> JContainer<T> build(List<JRightPadded<T>> elems) {
+        return build(Space.EMPTY, elems, Markers.EMPTY);
+    }
+
     @JsonCreator
     public static <T> JContainer<T> build(Space before, List<JRightPadded<T>> elems, Markers markers) {
         if (before.isEmpty() && elems.isEmpty()) {
