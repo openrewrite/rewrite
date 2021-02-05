@@ -33,7 +33,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     @Incubating(since = "7.0.0")
     public <J2 extends J> J2 generate(JavaTemplate template, JavaCoordinates<?> coordinates, Object... parameters) {
-        return template.generateAndMerge(getCursor(), coordinates, parameters);
+        return template.generate(getCursor(), coordinates, parameters);
     }
 
     /**

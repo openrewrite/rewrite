@@ -68,15 +68,10 @@ public class GenerateGetter extends Recipe {
             if (varCursor != null) {
                 J.VariableDecls.NamedVar var = varCursor.getValue();
                 J.Block body = c.getBody();
-                List<J.MethodDecl> generatedMethodDecls = GETTER.generate(getCursor(), c.getBody().coordinates().lastStatement(),
+                c = GETTER.generate(getCursor(), c.getBody().coordinates().lastStatement(),
                     TypeUtils.asClass(var.getType()).getClassName(),
                     StringUtils.capitalize(var.getSimpleName()),
                     var.getSimpleName());
-                c = c.withBody(body.withStatements(
-                        ListUtils.concat(
-                                body.getStatements(),
-                                generatedMethodDecls.get(0)
-                        )));
             }
             return c;
         }

@@ -27,7 +27,6 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
@@ -67,146 +66,13 @@ public class JavaTemplate {
         return new Builder(code);
     }
 
-     public <J2 extends J> J2 generateAndMerge(Cursor parentScope, JavaCoordinates<?> coordinates, Object... parameters) {
-        List<J> generatedElements = generate(parentScope, coordinates, parameters);
+     public <J2 extends J> J2 generate(Cursor parentScope, JavaCoordinates<?> coordinates, Object... parameters) {
+        List<J> generatedElements = generateList(parentScope, coordinates, parameters);
          //noinspection unchecked,ConstantConditions
          return (J2) new InsertAtCoordinates(coordinates).visit(parentScope.getValue(), generatedElements);
     }
 
-    private static class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
-        private final UUID insertId;
-        private final Space.Location location;
-
-        private InsertAtCoordinates(JavaCoordinates<?> coordinates) {
-            this.insertId = coordinates.getTree().getId();
-            this.location = coordinates.getSpaceLocation();
-        }
-
-        @Override
-        public J visitBlock(J.Block block, List<? extends J> generated) {
-            J.Block b = visitAndCast(block, generated, super::visitBlock);
-            if (b.getId().equals(insertId) && location == Space.Location.BLOCK_END) {
-                //noinspection unchecked
-                return b.withStatements(ListUtils.concatAll(b.getStatements(), (List<Statement>) generated));
-            }
-            //noinspection ConstantConditions
-            b = b.withStatements(maybeMergeList(b.getStatements(), generated));
-            return b;
-        }
-
-        @Override
-        @SuppressWarnings("unchecked")
-        public J visitClassDecl(J.ClassDecl classDeclaration, List<? extends J> generated) {
-            J.ClassDecl c = visitAndCast(classDeclaration, generated, super::visitClassDecl);
-            if (insertId.equals(c.getId())) {
-                switch (location) {
-                    case ANNOTATION_PREFIX:
-                        c = c.withAnnotations((List<J.Annotation>) generated);
-                        break;
-                    case TYPE_PARAMETER_SUFFIX:
-                        c = c.withTypeParameters((List<J.TypeParameter>) generated);
-                        break;
-                    case EXTENDS:
-                        c = c.withExtends((TypeTree) generated.get(0));
-                        break;
-                    case IMPLEMENTS:
-                        c = c.withImplements((List<TypeTree>) generated);
-                        break;
-                    case BLOCK_END:
-                        c = c.withBody((J.Block) generated.get(0));
-                        break;
-                }
-            } else {
-
-                c = c.withAnnotations(maybeMergeList(c.getAnnotations(), generated));
-                c = c.withTypeParameters(maybeMergeList(c.getTypeParameters(), generated));
-                c = c.withImplements(maybeMergeList(c.getImplements(), generated));
-            }
-            return c;
-        }
-
-        @Override
-        @SuppressWarnings("unchecked")
-        public J visitMethod(J.MethodDecl method, List<? extends J> generated) {
-            J.MethodDecl m = visitAndCast(method, generated, super::visitMethod);
-            if (insertId.equals(m.getId())) {
-                switch (location) {
-                    case ANNOTATION_PREFIX:
-                        m = m.withAnnotations((List<J.Annotation>) generated);
-                        break;
-                    case TYPE_PARAMETER_SUFFIX:
-                        m = m.withTypeParameters((List<J.TypeParameter>) generated);
-                        break;
-                    case METHOD_DECL_PARAMETERS:
-                        m = m.withParams((List<Statement>) generated);
-                        break;
-                    case THROWS:
-                        m = m.withThrows((List<NameTree>) generated);
-                        break;
-                    case BLOCK_END:
-                        m = m.withBody((J.Block) generated.get(0));
-                        break;
-                }
-            } else {
-                m = m.withAnnotations(maybeMergeList(m.getAnnotations(), generated));
-                m = m.withTypeParameters(maybeMergeList(m.getTypeParameters(), generated));
-                m = m.withThrows(maybeMergeList(m.getThrows(), generated));
-                m = m.withAnnotations(maybeMergeList(m.getAnnotations(), generated));
-            }
-            return m;
-        }
-
-        @Override
-        @SuppressWarnings("unchecked")
-        public J visitMethodInvocation(J.MethodInvocation method, List<? extends J> generated) {
-            J.MethodInvocation m = visitAndCast(method, generated, super::visitMethodInvocation);
-            if (insertId.equals(m.getId()) && location == Space.Location.METHOD_INVOCATION_ARGUMENTS) {
-                m = m.withArgs((List<Expression>) generated);
-            } else {
-                //noinspection ConstantConditions
-                m = m.withArgs(maybeMergeList(m.getArgs(), generated));
-            }
-            return m;
-        }
-
-        @SuppressWarnings("unchecked")
-        private <T extends J> @Nullable List<T> maybeMergeList(@Nullable List<T> originalList, List<? extends J> generated) {
-            if (originalList != null) {
-                for (int index = 0; index < originalList.size(); index++) {
-                    if (insertId.equals(originalList.get(index).getId())) {
-                        List<T> newList = new ArrayList<>();
-                        if (location == Space.Location.REPLACE) {
-                            newList.addAll(originalList.subList(0, index + 1));
-                            newList.addAll((List<T>) generated);
-                            newList.addAll(originalList.subList(index + 1, originalList.size()));
-                        } else {
-                            newList.addAll(originalList.subList(0, index));
-                            newList.addAll((List<T>) generated);
-                            newList.addAll(originalList.subList(index, originalList.size()));
-                        }
-                        return newList;
-                    }
-                }
-            }
-            return originalList;
-        }
-
-        @Override
-        public @Nullable J visitEach(@Nullable J tree, List<? extends J> generated) {
-
-            if (tree == null || location != Space.Location.REPLACE || !tree.getId().equals(insertId)) {
-                return tree;
-            }
-            // Handles all cases where there is a replace on the current element.
-            if (generated.size() == 1) {
-                return generated.get(0);
-            } else {
-                throw new IllegalStateException("The template generated the incorrect number of elements.");
-            }
-        }
-    }
-
-    public <J2 extends J> List<J2> generate(Cursor parentScope, JavaCoordinates<?> coordinates, Object... parameters) {
+    private <J2 extends J> List<J2> generateList(Cursor parentScope, JavaCoordinates<?> coordinates, Object... parameters) {
 
         if (parameters.length != parameterCount) {
             throw new IllegalArgumentException("This template requires " + parameterCount + " parameters.");
@@ -279,23 +145,6 @@ public class JavaTemplate {
         return parameter.toString();
     }
 
-    public class FindCoordinateCursor extends JavaVisitor<AtomicReference<Cursor>> {
-        private final UUID elementId;
-
-        public FindCoordinateCursor(Cursor parentCursor, JavaCoordinates<?> coordinates) {
-            this.elementId = coordinates.getTree().getId();
-            setCursoringOn();
-            setCursor(parentCursor);
-        }
-
-        @Override
-        public J visit(@Nullable Tree tree, AtomicReference<Cursor> cursorReference) {
-            if (tree != null && tree.getId().equals(elementId)) {
-                cursorReference.set(getCursor());
-            }
-            return super.visit(tree, cursorReference);
-        }
-    }
     /**
      * A java visitor that prunes the original AST down to just the things needed to compile the template code.
      * The typed Cursor represents the insertion point within the original AST.
@@ -616,6 +465,145 @@ public class JavaTemplate {
                     .filter(c -> c.getText().equals(marker))
                     .findAny()
                     .orElse(null);
+        }
+    }
+
+    /**
+     * This visitor will insert the generated elements into the correct location within an AST and return the mutated
+     * version.
+     */
+    private static class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
+        private final UUID insertId;
+        private final Space.Location location;
+
+        private InsertAtCoordinates(JavaCoordinates<?> coordinates) {
+            this.insertId = coordinates.getTree().getId();
+            this.location = coordinates.getSpaceLocation();
+        }
+
+        @Override
+        public @Nullable J visitEach(@Nullable J tree, List<? extends J> generated) {
+
+            if (tree == null || location != Space.Location.REPLACE || !tree.getId().equals(insertId)) {
+                return tree;
+            }
+            // Handles all cases where there is a replace on the current element.
+            if (generated.size() == 1) {
+                return generated.get(0);
+            } else {
+                throw new IllegalStateException("The template generated the incorrect number of elements.");
+            }
+        }
+
+        @Override
+        public J visitBlock(J.Block block, List<? extends J> generated) {
+            J.Block b = visitAndCast(block, generated, super::visitBlock);
+            if (b.getId().equals(insertId) && location == Space.Location.BLOCK_END) {
+                //noinspection unchecked
+                return b.withStatements(ListUtils.concatAll(b.getStatements(), (List<Statement>) generated));
+            }
+            //noinspection ConstantConditions
+            b = b.withStatements(maybeMergeList(b.getStatements(), generated));
+            return b;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public J visitClassDecl(J.ClassDecl classDeclaration, List<? extends J> generated) {
+            J.ClassDecl c = visitAndCast(classDeclaration, generated, super::visitClassDecl);
+            if (insertId.equals(c.getId())) {
+                switch (location) {
+                    case ANNOTATION_PREFIX:
+                        c = c.withAnnotations((List<J.Annotation>) generated);
+                        break;
+                    case TYPE_PARAMETER_SUFFIX:
+                        c = c.withTypeParameters((List<J.TypeParameter>) generated);
+                        break;
+                    case EXTENDS:
+                        c = c.withExtends((TypeTree) generated.get(0));
+                        break;
+                    case IMPLEMENTS:
+                        c = c.withImplements((List<TypeTree>) generated);
+                        break;
+                    case BLOCK_END:
+                        c = c.withBody((J.Block) generated.get(0));
+                        break;
+                }
+            } else {
+
+                c = c.withAnnotations(maybeMergeList(c.getAnnotations(), generated));
+                c = c.withTypeParameters(maybeMergeList(c.getTypeParameters(), generated));
+                c = c.withImplements(maybeMergeList(c.getImplements(), generated));
+            }
+            return c;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public J visitMethod(J.MethodDecl method, List<? extends J> generated) {
+            J.MethodDecl m = visitAndCast(method, generated, super::visitMethod);
+            if (insertId.equals(m.getId())) {
+                switch (location) {
+                    case ANNOTATION_PREFIX:
+                        m = m.withAnnotations((List<J.Annotation>) generated);
+                        break;
+                    case TYPE_PARAMETER_SUFFIX:
+                        m = m.withTypeParameters((List<J.TypeParameter>) generated);
+                        break;
+                    case METHOD_DECL_PARAMETERS:
+                        m = m.withParams((List<Statement>) generated);
+                        break;
+                    case THROWS:
+                        m = m.withThrows((List<NameTree>) generated);
+                        break;
+                    case BLOCK_END:
+                        m = m.withBody((J.Block) generated.get(0));
+                        break;
+                }
+            } else {
+                m = m.withAnnotations(maybeMergeList(m.getAnnotations(), generated));
+                m = m.withTypeParameters(maybeMergeList(m.getTypeParameters(), generated));
+                m = m.withThrows(maybeMergeList(m.getThrows(), generated));
+                m = m.withAnnotations(maybeMergeList(m.getAnnotations(), generated));
+            }
+            return m;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public J visitMethodInvocation(J.MethodInvocation method, List<? extends J> generated) {
+            J.MethodInvocation m = visitAndCast(method, generated, super::visitMethodInvocation);
+            if (insertId.equals(m.getId()) && location == Space.Location.METHOD_INVOCATION_ARGUMENTS) {
+                m = m.withArgs((List<Expression>) generated);
+            } else {
+                //noinspection ConstantConditions
+                m = m.withArgs(maybeMergeList(m.getArgs(), generated));
+            }
+            return m;
+        }
+
+        //TODO Added remaining cases where a list of elements might require add/merge semantics.
+
+        @SuppressWarnings("unchecked")
+        private <T extends J> @Nullable List<T> maybeMergeList(@Nullable List<T> originalList, List<? extends J> generated) {
+            if (originalList != null) {
+                for (int index = 0; index < originalList.size(); index++) {
+                    if (insertId.equals(originalList.get(index).getId())) {
+                        List<T> newList = new ArrayList<>();
+                        if (location == Space.Location.REPLACE) {
+                            newList.addAll(originalList.subList(0, index + 1));
+                            newList.addAll((List<T>) generated);
+                            newList.addAll(originalList.subList(index + 1, originalList.size()));
+                        } else {
+                            newList.addAll(originalList.subList(0, index));
+                            newList.addAll((List<T>) generated);
+                            newList.addAll(originalList.subList(index, originalList.size()));
+                        }
+                        return newList;
+                    }
+                }
+            }
+            return originalList;
         }
     }
 
