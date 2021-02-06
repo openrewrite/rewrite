@@ -41,7 +41,7 @@ interface MinimumViableSpacingTest : RecipeTest {
             }
         """,
         after = """
-            class A{public <T> void foo(){}}
+            class A {public <T> void foo() {}}
         """
     )
 }
