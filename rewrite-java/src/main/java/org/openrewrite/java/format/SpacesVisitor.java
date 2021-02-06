@@ -206,7 +206,9 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         if (padding.getArgs() != null) {
             a = padding.withArgs(spaceBefore(padding.getArgs(),
                     style.getBeforeParentheses().isAnnotationParameters()));
-            a = a.withArgs(ListUtils.map(a.getArgs(), arg -> spaceBefore(arg, style.getWithin().isAnnotationParentheses())));
+            if(a.getArgs() != null) {
+                a = a.withArgs(ListUtils.map(a.getArgs(), (i, arg) -> i == 0 ? arg : spaceBefore(arg, style.getWithin().isAnnotationParentheses())));
+            }
         }
         return a;
     }
@@ -447,50 +449,54 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             }
         }
         if (n.getPadding().getInitializer() != null) {
-            JContainer<Expression> initializer = n.getPadding().getInitializer();
-            if (!initializer.getElems().isEmpty()) {
+            JContainer<Expression> i = n.getPadding().getInitializer();
+            if (!i.getElems().isEmpty()) {
+                if(style.getOther().isAfterComma()) {
+                    i = JContainer.withElems(i, ListUtils.map(i.getElems(), (idx, elem) -> idx == 0 ? elem : spaceBefore(elem, true)));
+                }
+
                 boolean useSpaceWithinArrayInitializerBraces = style.getWithin().isArrayInitializerBraces();
                 if (useSpaceWithinArrayInitializerBraces) {
-                    if (!(initializer.getElems().iterator().next() instanceof J.Empty)) {
-                        if (StringUtils.isNullOrEmpty(initializer.getElems().iterator().next().getPrefix().getWhitespace())) {
-                            initializer = initializer.getPadding().withElems(ListUtils.mapFirst(initializer.getPadding().getElems(),
+                    if (!(i.getElems().iterator().next() instanceof J.Empty)) {
+                        if (StringUtils.isNullOrEmpty(i.getElems().iterator().next().getPrefix().getWhitespace())) {
+                            i = i.getPadding().withElems(ListUtils.mapFirst(i.getPadding().getElems(),
                                     e -> e.withElem(e.getElem().withPrefix(e.getElem().getPrefix().withWhitespace(" ")))));
                         }
-                        if (StringUtils.isNullOrEmpty(initializer.getPadding().getElems().get(initializer.getElems().size() - 1).getAfter().getWhitespace())) {
-                            initializer = initializer.getPadding().withElems(ListUtils.mapLast(initializer.getPadding().getElems(),
+                        if (StringUtils.isNullOrEmpty(i.getPadding().getElems().get(i.getElems().size() - 1).getAfter().getWhitespace())) {
+                            i = i.getPadding().withElems(ListUtils.mapLast(i.getPadding().getElems(),
                                     e -> e.withAfter(e.getAfter().withWhitespace(" "))));
                         }
                     }
                 } else {
-                    if (!(initializer.getElems().iterator().next() instanceof J.Empty)) {
-                        if (initializer.getElems().iterator().next().getPrefix().getWhitespace().equals(" ")) {
-                            initializer = initializer.getPadding().withElems(ListUtils.mapFirst(initializer.getPadding().getElems(),
+                    if (!(i.getElems().iterator().next() instanceof J.Empty)) {
+                        if (i.getElems().iterator().next().getPrefix().getWhitespace().equals(" ")) {
+                            i = i.getPadding().withElems(ListUtils.mapFirst(i.getPadding().getElems(),
                                     e -> e.withElem(e.getElem().withPrefix(e.getElem().getPrefix().withWhitespace("")))));
                         }
-                        if (initializer.getPadding().getElems().get(initializer.getElems().size() - 1).getAfter().getWhitespace().equals(" ")) {
-                            initializer = initializer.getPadding().withElems(ListUtils.mapLast(initializer.getPadding().getElems(),
+                        if (i.getPadding().getElems().get(i.getElems().size() - 1).getAfter().getWhitespace().equals(" ")) {
+                            i = i.getPadding().withElems(ListUtils.mapLast(i.getPadding().getElems(),
                                     e -> e.withAfter(e.getAfter().withWhitespace(""))));
                         }
                     }
                 }
                 boolean useSpaceWithinEmptyArrayInitializerBraces = style.getWithin().isEmptyArrayInitializerBraces();
                 if (useSpaceWithinEmptyArrayInitializerBraces) {
-                    if ((initializer.getElems().iterator().next() instanceof J.Empty)) {
-                        if (StringUtils.isNullOrEmpty(initializer.getElems().iterator().next().getPrefix().getWhitespace())) {
-                            initializer = initializer.getPadding().withElems(ListUtils.mapFirst(initializer.getPadding().getElems(),
+                    if ((i.getElems().iterator().next() instanceof J.Empty)) {
+                        if (StringUtils.isNullOrEmpty(i.getElems().iterator().next().getPrefix().getWhitespace())) {
+                            i = i.getPadding().withElems(ListUtils.mapFirst(i.getPadding().getElems(),
                                     e -> e.withElem(e.getElem().withPrefix(e.getElem().getPrefix().withWhitespace(" ")))));
                         }
                     }
                 } else {
-                    if ((initializer.getElems().iterator().next() instanceof J.Empty)) {
-                        if (initializer.getElems().iterator().next().getPrefix().getWhitespace().equals(" ")) {
-                            initializer = initializer.getPadding().withElems(ListUtils.mapFirst(initializer.getPadding().getElems(),
+                    if ((i.getElems().iterator().next() instanceof J.Empty)) {
+                        if (i.getElems().iterator().next().getPrefix().getWhitespace().equals(" ")) {
+                            i = i.getPadding().withElems(ListUtils.mapFirst(i.getPadding().getElems(),
                                     e -> e.withElem(e.getElem().withPrefix(e.getElem().getPrefix().withWhitespace("")))));
                         }
                     }
                 }
             }
-            n = n.getPadding().withInitializer(initializer);
+            n = n.getPadding().withInitializer(i);
         }
         return n;
     }

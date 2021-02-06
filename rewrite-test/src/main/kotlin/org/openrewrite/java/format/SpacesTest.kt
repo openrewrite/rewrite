@@ -659,7 +659,6 @@ interface SpacesTest : RecipeTest {
             """
     )
 
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/234")
     @Test
     fun withinAnnotationParametersSpaces(jp: JavaParser.Builder<*,*>) = assertChanged(
@@ -671,14 +670,11 @@ interface SpacesTest : RecipeTest {
         before = """
             @EqualsAndHashCode(exclude = {"this","that"},callSuper=false)
             class Test {
-                void a(){}
             }
         """,
         after = """
             @EqualsAndHashCode(exclude = {"this", "that"}, callSuper = false)
             class Test {
-                void a() {
-                }
             }
         """
     )
