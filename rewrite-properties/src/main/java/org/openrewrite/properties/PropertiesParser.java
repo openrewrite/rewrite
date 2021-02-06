@@ -74,11 +74,11 @@ public class PropertiesParser implements Parser<Properties.File> {
 
         return new Properties.File(
                 randomId(),
+                "",
+                Markers.EMPTY,
                 sourceFile,
                 contents,
-                prefix.toString(),
-                "",
-                Markers.EMPTY
+                prefix.toString()
         );
     }
 
@@ -134,9 +134,9 @@ public class PropertiesParser implements Parser<Properties.File> {
 
         return new Properties.Comment(
                 randomId(),
-                message.toString(),
                 prefixBuilder.toString(),
-                Markers.EMPTY
+                Markers.EMPTY,
+                message.toString()
         );
     }
 
@@ -201,11 +201,11 @@ public class PropertiesParser implements Parser<Properties.File> {
 
         return new Properties.Entry(
                 randomId(),
+                prefixBuilder.toString(),
+                Markers.EMPTY,
                 key.toString(),
                 equalsPrefix.toString(),
-                new Properties.Value(randomId(), value.toString(), valuePrefix.toString()),
-                prefixBuilder.toString(),
-                Markers.EMPTY
+                new Properties.Value(randomId(), valuePrefix.toString(), Markers.EMPTY, value.toString())
         );
     }
 

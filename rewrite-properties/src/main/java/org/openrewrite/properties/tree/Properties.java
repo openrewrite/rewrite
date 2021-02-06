@@ -28,17 +28,13 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.internal.PropertiesPrinter;
-import org.openrewrite.properties.internal.PropertyListMarkerVisitor;
 
 import java.io.Serializable;
 import java.nio.file.Path;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
@@ -65,19 +61,6 @@ public interface Properties extends Serializable, Tree {
         return v.defaultValue(this, p);
     }
 
-    /**
-     * Find all subtrees marked with a particular marker rooted at this tree.
-     *
-     * @param markerType The marker type to look for
-     * @param <P2>       The expected supertype common to all subtrees that could be found.
-     * @return The set of matching subtrees.
-     */
-    default <P2 extends Properties> Set<P2> findMarkedWith(Class<? extends Marker> markerType) {
-        Set<P2> trees = new HashSet<>();
-        new PropertyListMarkerVisitor<P2>(markerType).visit(this, trees);
-        return trees;
-    }
-
     String getPrefix();
 
     Properties withPrefix(String prefix);
@@ -91,6 +74,12 @@ public interface Properties extends Serializable, Tree {
         UUID id;
 
         @With
+        String prefix;
+
+        @With
+        Markers markers;
+
+        @With
         Path sourcePath;
 
         @With
@@ -98,12 +87,6 @@ public interface Properties extends Serializable, Tree {
 
         @With
         String eof;
-
-        @With
-        String prefix;
-
-        @With
-        Markers markers;
 
         @Override
         public <P> Properties acceptProperties(PropertiesVisitor<P> v, P p) {
@@ -122,6 +105,12 @@ public interface Properties extends Serializable, Tree {
         UUID id;
 
         @With
+        String prefix;
+
+        @With
+        Markers markers;
+
+        @With
         String key;
 
         @With
@@ -129,12 +118,6 @@ public interface Properties extends Serializable, Tree {
 
         @With
         Value value;
-
-        @With
-        String prefix;
-
-        @With
-        Markers markers;
 
         @Override
         public <P> Properties acceptProperties(PropertiesVisitor<P> v, P p) {
@@ -150,10 +133,13 @@ public interface Properties extends Serializable, Tree {
         UUID id;
 
         @With
-        String text;
+        String prefix;
 
         @With
-        String prefix;
+        Markers markers;
+
+        @With
+        String text;
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -164,12 +150,12 @@ public interface Properties extends Serializable, Tree {
         UUID id;
 
         @With
-        String message;
-
-        @With
         String prefix;
 
         @With
         Markers markers;
+
+        @With
+        String message;
     }
 }

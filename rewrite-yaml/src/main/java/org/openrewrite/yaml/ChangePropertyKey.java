@@ -114,21 +114,21 @@ public class ChangePropertyKey extends Recipe {
             Yaml.Mapping m = (Yaml.Mapping) super.visitMapping(mapping, p);
 
             if (m.getEntries().contains(scope)) {
-                String newEntryFormatting = scope.getPrefix();
-                if (newEntryFormatting.isEmpty()) {
-                    newEntryFormatting = "\n";
+                String newEntryPrefix = scope.getPrefix();
+                if (newEntryPrefix.isEmpty()) {
+                    newEntryPrefix = "\n";
                 }
 
                 m = m.withEntries(Stream.concat(
                         m.getEntries().stream(),
                         Stream.of(
                                 new Yaml.Mapping.Entry(randomId(),
-                                        new Yaml.Scalar(randomId(), Yaml.Scalar.Style.PLAIN, subproperty,
-                                                "", Markers.EMPTY),
+                                        newEntryPrefix,
+                                        Markers.EMPTY,
+                                        new Yaml.Scalar(randomId(), "", Markers.EMPTY,
+                                                Yaml.Scalar.Style.PLAIN, subproperty),
                                         scope.getBeforeMappingValueIndicator(),
-                                        value.copyPaste(),
-                                        newEntryFormatting,
-                                        Markers.EMPTY
+                                        value.copyPaste()
                                 )
                         )
                 ).collect(toList()));
@@ -174,7 +174,6 @@ public class ChangePropertyKey extends Recipe {
                     }
                 }
             }
-
             return m;
         }
     }

@@ -96,16 +96,16 @@ public interface Yaml extends Serializable, Tree {
         UUID id;
 
         @With
-        Path sourcePath;
-
-        @With
-        List<Document> documents;
-
-        @With
         String prefix;
 
         @With
         Markers markers;
+
+        @With
+        Path sourcePath;
+
+        @With
+        List<Document> documents;
 
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
@@ -114,8 +114,8 @@ public interface Yaml extends Serializable, Tree {
 
         @Override
         public Documents copyPaste() {
-            return new Documents(randomId(), sourcePath,
-                    documents.stream().map(Document::copyPaste).collect(toList()), prefix, Markers.EMPTY);
+            return new Documents(randomId(), prefix, Markers.EMPTY,
+                    sourcePath, documents.stream().map(Document::copyPaste).collect(toList()));
         }
     }
 
@@ -127,6 +127,12 @@ public interface Yaml extends Serializable, Tree {
         UUID id;
 
         @With
+        String prefix;
+
+        @With
+        Markers markers;
+
+        @With
         boolean explicit;
 
         @With
@@ -136,12 +142,6 @@ public interface Yaml extends Serializable, Tree {
         @With
         End end;
 
-        @With
-        String prefix;
-
-        @With
-        Markers markers;
-
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
             return v.visitDocument(this, p);
@@ -149,8 +149,9 @@ public interface Yaml extends Serializable, Tree {
 
         @Override
         public Document copyPaste() {
-            return new Document(randomId(), explicit, blocks.stream().map(Block::copyPaste).collect(toList()),
-                    end == null ? null : end.copyPaste(), prefix, Markers.EMPTY);
+            return new Document(randomId(), prefix, Markers.EMPTY,
+                    explicit, blocks.stream().map(Block::copyPaste).collect(toList()),
+                    end == null ? null : end.copyPaste());
         }
 
         /**
@@ -184,16 +185,16 @@ public interface Yaml extends Serializable, Tree {
         UUID id;
 
         @With
-        Style style;
-
-        @With
-        String value;
-
-        @With
         String prefix;
 
         @With
         Markers markers;
+
+        @With
+        Style style;
+
+        @With
+        String value;
 
         public enum Style {
             DOUBLE_QUOTED,
@@ -210,7 +211,7 @@ public interface Yaml extends Serializable, Tree {
 
         @Override
         public Scalar copyPaste() {
-            return new Scalar(randomId(), style, value, prefix, Markers.EMPTY);
+            return new Scalar(randomId(), prefix, Markers.EMPTY, style, value);
         }
     }
 
@@ -222,13 +223,13 @@ public interface Yaml extends Serializable, Tree {
         UUID id;
 
         @With
-        List<Entry> entries;
-
-        @With
         String prefix;
 
         @With
         Markers markers;
+
+        @With
+        List<Entry> entries;
 
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
@@ -237,8 +238,8 @@ public interface Yaml extends Serializable, Tree {
 
         @Override
         public Mapping copyPaste() {
-            return new Mapping(randomId(), entries.stream().map(Entry::copyPaste).collect(toList()), prefix,
-                    Markers.EMPTY);
+            return new Mapping(randomId(), prefix, Markers.EMPTY,
+                    entries.stream().map(Entry::copyPaste).collect(toList()));
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -247,6 +248,12 @@ public interface Yaml extends Serializable, Tree {
         public static class Entry implements Yaml {
             @EqualsAndHashCode.Include
             UUID id;
+
+            @With
+            String prefix;
+
+            @With
+            Markers markers;
 
             @With
             Scalar key;
@@ -258,12 +265,6 @@ public interface Yaml extends Serializable, Tree {
             @With
             Block value;
 
-            @With
-            String prefix;
-
-            @With
-            Markers markers;
-
             @Override
             public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
                 return v.visitMappingEntry(this, p);
@@ -271,7 +272,8 @@ public interface Yaml extends Serializable, Tree {
 
             @Override
             public Entry copyPaste() {
-                return new Entry(randomId(), key.copyPaste(), beforeMappingValueIndicator, value.copyPaste(), prefix, Markers.EMPTY);
+                return new Entry(randomId(), prefix, Markers.EMPTY, key.copyPaste(),
+                        beforeMappingValueIndicator, value.copyPaste());
             }
         }
     }
@@ -284,13 +286,13 @@ public interface Yaml extends Serializable, Tree {
         UUID id;
 
         @With
-        List<Entry> entries;
-
-        @With
         String prefix;
 
         @With
         Markers markers;
+
+        @With
+        List<Entry> entries;
 
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
@@ -299,8 +301,8 @@ public interface Yaml extends Serializable, Tree {
 
         @Override
         public Sequence copyPaste() {
-            return new Sequence(randomId(), entries.stream().map(Entry::copyPaste).collect(toList()), prefix,
-                    Markers.EMPTY);
+            return new Sequence(randomId(), prefix, Markers.EMPTY,
+                    entries.stream().map(Entry::copyPaste).collect(toList()));
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -311,13 +313,13 @@ public interface Yaml extends Serializable, Tree {
             UUID id;
 
             @With
-            Block block;
-
-            @With
             String prefix;
 
             @With
             Markers markers;
+
+            @With
+            Block block;
 
             @Override
             public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
@@ -326,7 +328,8 @@ public interface Yaml extends Serializable, Tree {
 
             @Override
             public Entry copyPaste() {
-                return new Entry(randomId(), block.copyPaste(), prefix, Markers.EMPTY);
+                return new Entry(randomId(), prefix, Markers.EMPTY,
+                        block.copyPaste());
             }
         }
     }
