@@ -21,6 +21,10 @@ import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.Space;
 
 public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
+    public MinimumViableSpacingVisitor() {
+        setCursoringOn();
+    }
+
     @Override
     public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, P p) {
         J.ClassDecl c = super.visitClassDecl(classDecl, p);
@@ -45,7 +49,34 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
             }
         }
 
-        return c.withName(c.getName().withPrefix(c.getName().getPrefix().withWhitespace(" ")));
+        c = c.withName(c.getName().withPrefix(c.getName().getPrefix().withWhitespace(" ")));
+
+        if (c.getPadding().getExtends() != null) {
+            Space before = c.getPadding().getExtends().getBefore();
+            if (before.getWhitespace().isEmpty()) {
+                c = c.getPadding().withExtends(c.getPadding().getExtends().withBefore(before.withWhitespace(" ")));
+            }
+        }
+
+        if (c.getPadding().getImplements() != null) {
+            Space before = c.getPadding().getImplements().getBefore();
+            if (before.getWhitespace().isEmpty()) {
+                c = c.getPadding().withImplements(c.getPadding().getImplements().withBefore(before.withWhitespace(" ")));
+            }
+        }
+
+        return c;
+    }
+
+    @Override
+    public J.Block visitBlock(J.Block block, P p) {
+        J.Block b = super.visitBlock(block, p);
+        @SuppressWarnings("ConstantConditions") Object parent = getCursor().getParent().getValue();
+        if (!b.isStatic() && (parent instanceof J.MethodDecl || parent instanceof J.ClassDecl) &&
+                b.getPrefix().getWhitespace().isEmpty()) {
+            b = b.withPrefix(b.getPrefix().withWhitespace(" "));
+        }
+        return b;
     }
 
     @Override
@@ -80,6 +111,13 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         }
         if (!first) {
             m = m.withName(m.getName().withPrefix(m.getName().getPrefix().withWhitespace(" ")));
+        }
+
+        if (m.getPadding().getThrows() != null) {
+            Space before = m.getPadding().getThrows().getBefore();
+            if (before.getWhitespace().isEmpty()) {
+                m = m.getPadding().withThrows(m.getPadding().getThrows().withBefore(before.withWhitespace(" ")));
+            }
         }
 
         return m;

@@ -180,57 +180,25 @@ public abstract class Coordinates<J2 extends J> {
             return create(Space.Location.CLASS_DECL_PREFIX);
         }
 
-        /**
-         * Intended to add an annotation (represented by the JavaTemplate) as the last annotation associated with the
-         * class.
-         *
-         * @return annotations replacement coordinates
-         */
         public JavaCoordinates<?> replaceAnnotations() {
             return create(Space.Location.ANNOTATION_PREFIX);
         }
 
-        /**
-         * Intended for replacement semantics, where the type parameters will be entirely replaced by the code
-         * generated via JavaTemplate. Any template should EXCLUDE &lt; and &gt; as those are rendered by the
-         * container.
-         *
-         * @return type parameters replacement coordinates
-         */
         public JavaCoordinates<?> replaceTypeParameters() {
-            return create(Space.Location.TYPE_PARAMETER_SUFFIX);
+            return create(Space.Location.TYPE_PARAMETERS);
         }
 
-        /**
-         * Intended for replacement semantics, where the extends clause will be entirely replaced by the code
-         * generated via JavaTemplate
-         *
-         * @return extends clause replacement coordinates
-         */
         public JavaCoordinates<?> replaceExtendsClause() {
             return create(Space.Location.EXTENDS);
         }
 
-        /**
-         * Intended for replacement semantics, where the implements clause will be entirely replaced by the code
-         * generated via JavaTemplate
-         *
-         * @return implements clause replacement coordinates
-         */
         public JavaCoordinates<?> replaceImplementsClause() {
             return create(Space.Location.IMPLEMENTS);
         }
 
-        /**
-         * Intended for replacement semantics, where the class body will be entirely replaced by the code
-         * generated via JavaTemplate
-         *
-         * @return class body replacement coordinates
-         */
         public JavaCoordinates<?> replaceBody() {
-            return create(Space.Location.BLOCK_END);
+            return create(Space.Location.BLOCK_PREFIX);
         }
-
     }
 
     public static class CompilationUnit extends Coordinates<J.CompilationUnit> {
@@ -492,7 +460,7 @@ public abstract class Coordinates<J2 extends J> {
         }
 
         public JavaCoordinates<?> replaceTypeParameters() {
-            return create(Space.Location.TYPE_PARAMETER_SUFFIX);
+            return create(Space.Location.TYPE_PARAMETERS);
         }
 
         public JavaCoordinates<?> replaceParameters() {
@@ -504,7 +472,7 @@ public abstract class Coordinates<J2 extends J> {
         }
 
         public JavaCoordinates<?> replaceBody() {
-            return create(Space.Location.BLOCK_END);
+            return create(Space.Location.BLOCK_PREFIX);
         }
     }
 

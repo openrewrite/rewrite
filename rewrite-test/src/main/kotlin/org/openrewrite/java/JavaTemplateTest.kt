@@ -29,10 +29,10 @@ interface JavaTemplateTest : RecipeTest {
     }
 
     @Test
-    fun lamdaMethodParameterTest(jp: JavaParser) = assertChanged(
+    fun replaceMethodArgumentsTest(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("""() -> "test"""")
+            val template = template("""(() -> "test")""")
                 .doAfterVariableSubstitution(logEvent)
                 .doBeforeParseTemplate(logEvent)
                 .build()
@@ -43,7 +43,7 @@ interface JavaTemplateTest : RecipeTest {
 
             override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
                 val m = super.visitMethodInvocation(method, p)
-                return m.withTemplate(template, m.args[0].coordinates.replace())
+                return m.withTemplate(template, m.coordinates.replaceArguments())
             }
         }.toRecipe(),
         before = """
@@ -90,7 +90,6 @@ interface JavaTemplateTest : RecipeTest {
                         block.statements[1].coordinates.before(),
                         (parent.params[0] as J.VariableDecls).vars[0]
                     )
-
                 }
                 return b
             }
@@ -278,9 +277,7 @@ interface JavaTemplateTest : RecipeTest {
                             return 'f';
                         }
                     """
-            ).doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .build()
+            ).doAfterVariableSubstitution(logEvent).doBeforeParseTemplate(logEvent).build()
 
             init {
                 setCursoringOn()
@@ -473,7 +470,8 @@ interface JavaTemplateTest : RecipeTest {
         """,
         after = """
             public class A {
-                @Deprecated void foo() {
+                @Deprecated
+                void foo() {
                 }
             }
         """
@@ -504,7 +502,8 @@ interface JavaTemplateTest : RecipeTest {
             }
         """,
         after = """
-            @Deprecated public class A {
+            @Deprecated
+            public class A {
                 void foo() {
                 }
             }
@@ -540,7 +539,8 @@ interface JavaTemplateTest : RecipeTest {
         after = """
             import java.util.List;
             
-            @Deprecated public class A {
+            @Deprecated
+            public class A {
                 void foo() {
                 }
             }
@@ -704,7 +704,7 @@ interface JavaTemplateTest : RecipeTest {
     fun replaceClassTypeParameters(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("T,P")
+            val template = template("<T,P>")
                 .doAfterVariableSubstitution(logEvent)
                 .doBeforeParseTemplate(logEvent)
                 .build()
@@ -736,7 +736,7 @@ interface JavaTemplateTest : RecipeTest {
     fun replaceClassExtends(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("ArrayList<String>").doAfterVariableSubstitution(logEvent)
+            val template = template("extends ArrayList<String>").doAfterVariableSubstitution(logEvent)
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
@@ -767,7 +767,7 @@ interface JavaTemplateTest : RecipeTest {
     fun replaceClassImplements(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("List<String>").doAfterVariableSubstitution(logEvent)
+            val template = template("implements List<String>").doAfterVariableSubstitution(logEvent)
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
@@ -805,9 +805,7 @@ interface JavaTemplateTest : RecipeTest {
                         private String name2 = "Fred";
                         }
                     """
-            ).doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .build()
+            ).doAfterVariableSubstitution(logEvent).doBeforeParseTemplate(logEvent).build()
 
             init {
                 setCursoringOn()
@@ -836,7 +834,7 @@ interface JavaTemplateTest : RecipeTest {
     fun replaceMethodDeclarationTypeParameters(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("T,P")
+            val template = template("<T,P>")
                 .doAfterVariableSubstitution(logEvent)
                 .doBeforeParseTemplate(logEvent)
                 .build()
@@ -868,7 +866,7 @@ interface JavaTemplateTest : RecipeTest {
     fun replaceMethodDeclarationParameters(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("String foo, String bar")
+            val template = template("(String foo, String bar)")
                 .doAfterVariableSubstitution(logEvent)
                 .doBeforeParseTemplate(logEvent)
                 .build()
@@ -900,7 +898,7 @@ interface JavaTemplateTest : RecipeTest {
     fun replaceMethodDeclarationThrows(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template(" Exception, Throwable")
+            val template = template("throws Exception, Throwable")
                 .doAfterVariableSubstitution(logEvent)
                 .doBeforeParseTemplate(logEvent)
                 .build()
@@ -932,7 +930,7 @@ interface JavaTemplateTest : RecipeTest {
     fun replaceMethodInvocationArguments(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("\"fred\", \"sally\", \"dude\"")
+            val template = template("(\"fred\", \"sally\", \"dude\")")
                 .doAfterVariableSubstitution(logEvent)
                 .doBeforeParseTemplate(logEvent)
                 .build()

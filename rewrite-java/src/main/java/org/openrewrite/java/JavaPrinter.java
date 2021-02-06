@@ -56,7 +56,6 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
     @Override
     @Nullable
     public J visit(@Nullable Tree tree, P p) {
-
         if (tree == null) {
             return defaultValue(null, p);
         }

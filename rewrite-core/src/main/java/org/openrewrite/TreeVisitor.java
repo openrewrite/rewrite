@@ -40,16 +40,16 @@ public abstract class TreeVisitor<T extends Tree, P> {
 
     protected boolean cursored = IS_DEBUGGING;
 
-    private final ThreadLocal<Cursor> cursor = new ThreadLocal<>();
-    private final ThreadLocal<List<TreeVisitor<T, P>>> afterVisit = new ThreadLocal<>();
+    private Cursor cursor;
+    private List<TreeVisitor<T, P>> afterVisit;
 
     protected final void setCursoringOn() {
         this.cursored = true;
-        cursor.set(new Cursor(null, "root"));
+        setCursor(new Cursor(null, "root"));
     }
 
     protected void setCursor(@Nullable Cursor cursor) {
-        this.cursor.set(cursor);
+        this.cursor = cursor;
     }
 
     /**
@@ -63,7 +63,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
      * @param visitor The visitor to run.
      */
     protected void doAfterVisit(TreeVisitor<T, P> visitor) {
-        afterVisit.get().add(visitor);
+        afterVisit.add(visitor);
     }
 
     /**
@@ -79,19 +79,19 @@ public abstract class TreeVisitor<T extends Tree, P> {
     @Incubating(since = "7.0.0")
     protected void doAfterVisit(Recipe recipe) {
         //noinspection unchecked
-        afterVisit.get().add((TreeVisitor<T, P>) recipe.getVisitor());
+        afterVisit.add((TreeVisitor<T, P>) recipe.getVisitor());
     }
 
     protected List<TreeVisitor<T, P>> getAfterVisit() {
-        return afterVisit.get();
+        return afterVisit;
     }
 
     public final Cursor getCursor() {
-        if (cursor.get() == null) {
+        if (cursor == null) {
             throw new IllegalStateException("Cursoring is not enabled for this visitor. " +
                     "Call setCursoringOn() in the visitor's constructor to enable.");
         }
-        return cursor.get();
+        return cursor;
     }
 
     @Nullable
@@ -106,7 +106,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
 
     @Nullable
     public T visit(@Nullable Tree tree, P p, Cursor parent) {
-        this.cursor.set(parent);
+        this.cursor = parent;
         return visit(tree, p);
     }
 
@@ -117,13 +117,13 @@ public abstract class TreeVisitor<T extends Tree, P> {
         }
 
         boolean topLevel = false;
-        if (afterVisit.get() == null) {
+        if (afterVisit == null) {
             topLevel = true;
-            afterVisit.set(new ArrayList<>());
+            afterVisit = new ArrayList<>();
         }
 
         if (cursored) {
-            cursor.set(new Cursor(cursor.get(), tree));
+            setCursor(new Cursor(cursor, tree));
         }
 
         @SuppressWarnings("unchecked") T t = preVisit((T) tree, p);
@@ -135,16 +135,16 @@ public abstract class TreeVisitor<T extends Tree, P> {
         }
 
         if (cursored) {
-            cursor.set(cursor.get().getParent());
+            setCursor(cursor.getParent());
         }
 
         if (topLevel) {
             if (t != null) {
-                for (TreeVisitor<T, P> v : afterVisit.get()) {
+                for (TreeVisitor<T, P> v : afterVisit) {
                     t = v.visit(t, p);
                 }
             }
-            afterVisit.remove();
+            afterVisit = null;
         }
 
         return t;
