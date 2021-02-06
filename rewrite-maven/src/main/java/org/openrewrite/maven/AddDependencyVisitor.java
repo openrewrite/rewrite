@@ -16,9 +16,11 @@
 package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
+import org.openrewrite.RecipeException;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.cache.NoopCache;
+import org.openrewrite.maven.cache.MavenArtifactCache;
+import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
 import org.openrewrite.maven.internal.MavenDownloader;
 import org.openrewrite.maven.internal.MavenMetadata;
@@ -128,13 +130,15 @@ public class AddDependencyVisitor<P> extends MavenVisitor<P> {
         String packaging = (type == null) ? "jar" : type;
         dependencies.add(
                 new Pom.Dependency(
+                        null,
                         Scope.fromName(scope),
                         classifier,
-                        packaging,
+                        type,
                         false,
-                        new Pom(null, groupId, artifactId, version, null, packaging, classifier, null,
+                        new Pom(groupId, artifactId, version, null, packaging, classifier, null,
                                 emptyList(), new Pom.DependencyManagement(emptyList()), emptyList(), emptyList(), emptyMap()),
                         version,
+                        null,
                         emptySet()
                 )
         );
@@ -193,8 +197,11 @@ public class AddDependencyVisitor<P> extends MavenVisitor<P> {
             return version;
         }
 
-        MavenMetadata mavenMetadata = new MavenDownloader(new NoopCache(), emptyMap(), settings)
-                .downloadMetadata(groupId, artifactId, emptyList());
+        MavenMetadata mavenMetadata = new MavenDownloader(MavenPomCache.NOOP, MavenArtifactCache.NOOP,
+                emptyMap(), settings,
+                t -> {
+                    throw new RecipeException(t);
+                }).downloadMetadata(groupId, artifactId, emptyList());
 
         LatestRelease latest = new LatestRelease(metadataPattern);
         return mavenMetadata.getVersioning().getVersions().stream()

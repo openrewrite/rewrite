@@ -27,10 +27,10 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.CacheResult;
-import org.openrewrite.maven.cache.MavenCache;
+import org.openrewrite.maven.cache.MavenArtifactCache;
+import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.tree.Maven;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.openrewrite.maven.tree.Pom;
 
 import javax.net.ssl.SSLException;
 import java.io.ByteArrayInputStream;
@@ -41,6 +41,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -48,11 +49,10 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 
 public class MavenDownloader {
-    private static final Logger logger = LoggerFactory.getLogger(MavenDownloader.class);
-
     private static final RetryConfig retryConfig = RetryConfig.custom()
             .retryExceptions(SocketTimeoutException.class, TimeoutException.class)
             .build();
+
     private static final RetryRegistry retryRegistry = RetryRegistry.of(retryConfig);
 
     private static final OkHttpClient httpClient = new OkHttpClient.Builder()
@@ -69,10 +69,14 @@ public class MavenDownloader {
     private static final RawRepositories.Repository SUPER_POM_REPOSITORY = new RawRepositories.Repository("central", "https://repo.maven.apache.org/maven2",
             new RawRepositories.ArtifactPolicy(true), new RawRepositories.ArtifactPolicy(false));
 
-    private final MavenCache mavenCache;
+    private final MavenPomCache mavenPomCache;
+    private final MavenArtifactCache mavenArtifactCache;
     private final Map<Path, RawMaven> projectPoms;
+
     @Nullable
     private final MavenSettings settings;
+
+    private final Consumer<Throwable> onError;
     private final Map<String, MavenSettings.Server> serverIdToServer;
 
     /**
@@ -80,10 +84,14 @@ public class MavenDownloader {
      * Failing to do this will result in being unable to download dependencies or their metadata when information from settings.xml is required to access artifact
      * repositories.
      */
-    public MavenDownloader(MavenCache mavenCache, Map<Path, RawMaven> projectPoms, @Nullable MavenSettings settings) {
-        this.mavenCache = mavenCache;
+    public MavenDownloader(MavenPomCache mavenPomCache, MavenArtifactCache mavenArtifactCache,
+                           Map<Path, RawMaven> projectPoms, @Nullable MavenSettings settings,
+                           Consumer<Throwable> onError) {
+        this.mavenPomCache = mavenPomCache;
+        this.mavenArtifactCache = mavenArtifactCache;
         this.projectPoms = projectPoms;
         this.settings = settings;
+        this.onError = onError;
         if (settings == null || settings.getServers() == null) {
             serverIdToServer = new HashMap<>();
         } else {
@@ -108,7 +116,7 @@ public class MavenDownloader {
                             .tag("type", "metadata");
 
                     try {
-                        CacheResult<MavenMetadata> result = mavenCache.computeMavenMetadata(URI.create(repo.getUrl()), groupId, artifactId,
+                        CacheResult<MavenMetadata> result = mavenPomCache.computeMavenMetadata(URI.create(repo.getUrl()), groupId, artifactId,
                                 () -> forceDownloadMetadata(groupId, artifactId, null, repo));
 
                         sample.stop(addTagsByResult(timer, result).register(Metrics.globalRegistry));
@@ -142,8 +150,6 @@ public class MavenDownloader {
     @Nullable
     private MavenMetadata forceDownloadMetadata(String groupId, String artifactId,
                                                 @Nullable String version, RawRepositories.Repository repo) throws IOException {
-        logger.debug("Resolving {}:{} metadata from {}", groupId, artifactId, repo.getUrl());
-
         String uri = repo.getUrl() + "/" +
                 groupId.replace('.', '/') + '/' +
                 artifactId + '/' +
@@ -184,98 +190,101 @@ public class MavenDownloader {
     public RawMaven download(String groupId,
                              String artifactId,
                              String version,
-                             @Nullable String classifier,
                              @Nullable String relativePath,
                              @Nullable RawMaven containingPom,
-                             List<RawRepositories.Repository> repositories) {
-
-        String versionMaybeDatedSnapshot = findDatedSnapshotVersionIfNecessary(groupId, artifactId, version, repositories);
-        if (versionMaybeDatedSnapshot == null) {
-            return null;
-        }
-
-        Timer.Sample sample = Timer.start();
-
-        // The pom being examined might be from a remote repository or a local filesystem.
-        // First try to match the requested download with one of the project poms so we don't needlessly ping remote repos
-        for (RawMaven projectPom : projectPoms.values()) {
-            if (groupId.equals(projectPom.getPom().getGroupId()) &&
-                    artifactId.equals(projectPom.getPom().getArtifactId())) {
-                return projectPom;
+                             List<RawRepositories.Repository> repositories,
+                             Consumer<Throwable> onError) {
+        try {
+            String versionMaybeDatedSnapshot = findDatedSnapshotVersionIfNecessary(groupId, artifactId, version, repositories);
+            if (versionMaybeDatedSnapshot == null) {
+                return null;
             }
-        }
-        if (containingPom != null && !StringUtils.isBlank(relativePath)) {
-            Path folderContainingPom = containingPom.getSourcePath()
-                    .getParent();
-            if (folderContainingPom != null) {
-                RawMaven maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath, "pom.xml"))
-                        .normalize());
-                // Even poms published to remote repositories still contain relative paths to their parent poms
-                // So double check that the GAV coordinates match so that we don't get a relative path from a remote
-                // pom like ".." or "../.." which coincidentally _happens_ to have led to an unrelated pom on the local filesystem
-                if (maybeLocalPom != null
-                        && groupId.equals(maybeLocalPom.getPom().getGroupId())
-                        && artifactId.equals(maybeLocalPom.getPom().getArtifactId())
-                        && version.equals(maybeLocalPom.getPom().getVersion())) {
-                    return maybeLocalPom;
+
+            Timer.Sample sample = Timer.start();
+
+            // The pom being examined might be from a remote repository or a local filesystem.
+            // First try to match the requested download with one of the project poms so we don't needlessly ping remote repos
+            for (RawMaven projectPom : projectPoms.values()) {
+                if (groupId.equals(projectPom.getPom().getGroupId()) &&
+                        artifactId.equals(projectPom.getPom().getArtifactId())) {
+                    return projectPom;
                 }
             }
-        }
-
-        return Stream.concat(repositories.stream(), Stream.of(SUPER_POM_REPOSITORY))
-                .map(this::normalizeRepository)
-                .filter(Objects::nonNull)
-                .distinct()
-                .filter(repo -> repo.acceptsVersion(version))
-                .map(repo -> {
-                    Timer.Builder timer = Timer.builder("rewrite.maven.download")
-                            .tag("repo.id", repo.getUrl())
-                            .tag("group.id", groupId)
-                            .tag("artifact.id", artifactId)
-                            .tag("type", "pom");
-
-                    try {
-                        CacheResult<RawMaven> result = mavenCache.computeMaven(URI.create(repo.getUrl()), groupId, artifactId,
-                                versionMaybeDatedSnapshot, () -> {
-                                    String uri = URI.create(repo.getUrl()) + "/" +
-                                            groupId.replace('.', '/') + '/' +
-                                            artifactId + '/' +
-                                            version + '/' +
-                                            artifactId + '-' + versionMaybeDatedSnapshot + ".pom";
-
-                                    Request.Builder request = applyAuthentication(repo, new Request.Builder().url(uri).get());
-                                    try (Response response = sendRequest.apply(request.build())) {
-                                        if (response.isSuccessful() && response.body() != null) {
-                                            @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
-                                                    .bytes();
-
-                                            // This path doesn't matter except for debugging/error logs where it might get displayed
-                                            Path inputPath = Paths.get(groupId, artifactId, version);
-                                            return RawMaven.parse(
-                                                    new Parser.Input(inputPath, () -> new ByteArrayInputStream(responseBody), true),
-                                                    null,
-                                                    versionMaybeDatedSnapshot.equals(version) ? null : versionMaybeDatedSnapshot
-                                            );
-                                        }
-                                    } catch (Throwable throwable) {
-                                        return null;
-                                    }
-
-                                    return null;
-                                });
-
-                        sample.stop(addTagsByResult(timer, result).register(Metrics.globalRegistry));
-                        return result.getData();
-                    } catch (Exception e) {
-                        logger.debug("Failed to download {}:{}:{}:{}", groupId, artifactId, version, classifier, e);
-                        sample.stop(timer.tags("outcome", "error", "exception", e.getClass().getName())
-                                .register(Metrics.globalRegistry));
-                        return null;
+            if (containingPom != null && !StringUtils.isBlank(relativePath)) {
+                Path folderContainingPom = containingPom.getSourcePath()
+                        .getParent();
+                if (folderContainingPom != null) {
+                    RawMaven maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath, "pom.xml"))
+                            .normalize());
+                    // Even poms published to remote repositories still contain relative paths to their parent poms
+                    // So double check that the GAV coordinates match so that we don't get a relative path from a remote
+                    // pom like ".." or "../.." which coincidentally _happens_ to have led to an unrelated pom on the local filesystem
+                    if (maybeLocalPom != null
+                            && groupId.equals(maybeLocalPom.getPom().getGroupId())
+                            && artifactId.equals(maybeLocalPom.getPom().getArtifactId())
+                            && version.equals(maybeLocalPom.getPom().getVersion())) {
+                        return maybeLocalPom;
                     }
-                })
-                .filter(Objects::nonNull)
-                .findFirst()
-                .orElse(null);
+                }
+            }
+
+            return Stream.concat(repositories.stream(), Stream.of(SUPER_POM_REPOSITORY))
+                    .map(this::normalizeRepository)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .filter(repo -> repo.acceptsVersion(version))
+                    .map(repo -> {
+                        Timer.Builder timer = Timer.builder("rewrite.maven.download")
+                                .tag("repo.id", repo.getUrl())
+                                .tag("group.id", groupId)
+                                .tag("artifact.id", artifactId)
+                                .tag("type", "pom");
+
+                        try {
+                            CacheResult<RawMaven> result = mavenPomCache.computeMaven(URI.create(repo.getUrl()), groupId, artifactId,
+                                    versionMaybeDatedSnapshot, () -> {
+                                        String uri = URI.create(repo.getUrl()) + "/" +
+                                                groupId.replace('.', '/') + '/' +
+                                                artifactId + '/' +
+                                                version + '/' +
+                                                artifactId + '-' + versionMaybeDatedSnapshot + ".pom";
+
+                                        Request.Builder request = applyAuthentication(repo, new Request.Builder().url(uri).get());
+                                        try (Response response = sendRequest.apply(request.build())) {
+                                            if (response.isSuccessful() && response.body() != null) {
+                                                @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
+                                                        .bytes();
+
+                                                // This path doesn't matter except for debugging/error logs where it might get displayed
+                                                Path inputPath = Paths.get(groupId, artifactId, version);
+                                                return RawMaven.parse(
+                                                        new Parser.Input(inputPath, () -> new ByteArrayInputStream(responseBody), true),
+                                                        null,
+                                                        versionMaybeDatedSnapshot.equals(version) ? null : versionMaybeDatedSnapshot
+                                                ).withRepository(repo);
+                                            }
+                                        } catch (Throwable throwable) {
+                                            throw new RuntimeException("Unable to download dependency", throwable);
+                                        }
+
+                                        return null;
+                                    });
+
+                            sample.stop(addTagsByResult(timer, result).register(Metrics.globalRegistry));
+                            return result.getData();
+                        } catch (Exception e) {
+                            sample.stop(timer.tags("outcome", "error", "exception", e.getClass().getName())
+                                    .register(Metrics.globalRegistry));
+                            return null;
+                        }
+                    })
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElse(null);
+        } catch(Throwable t) {
+            onError.accept(t);
+            return null;
+        }
     }
 
     @Nullable
@@ -290,7 +299,7 @@ public class MavenDownloader {
                         try {
                             return forceDownloadMetadata(groupId, artifactId, version, repo);
                         } catch (IOException e) {
-                            logger.debug("Failed to download snapshot metadata for {}:{}:{}", groupId, artifactId, version);
+                            onError.accept(e);
                             return null;
                         }
                     })
@@ -310,13 +319,42 @@ public class MavenDownloader {
         return version;
     }
 
+    /**
+     * Fetch the jar file indicated by the dependency.
+     *
+     * @param dependency The dependency to download.
+     * @return The path on disk of the downloaded artifact or <code>null</code> if unable to download.
+     */
+    @Nullable
+    public Path downloadArtifact(Pom.Dependency dependency) {
+        return mavenArtifactCache.computeArtifact(dependency, () -> {
+            String uri = dependency.getRepository() + "/" +
+                    dependency.getGroupId().replace('.', '/') + '/' +
+                    dependency.getArtifactId() + '/' +
+                    dependency.getVersion() + '/' +
+                    dependency.getArtifactId() + '-' + dependency.getDatedSnapshotVersion() + ".jar";
+
+            Request.Builder request = applyAuthentication(dependency.getRepository(), new Request.Builder().url(uri).get());
+            try (Response response = sendRequest.apply(request.build())) {
+                ResponseBody body = response.body();
+                if (response.isSuccessful() && body != null) {
+                    return body.byteStream();
+                }
+            } catch (Throwable throwable) {
+                onError.accept(throwable);
+            }
+
+            return null;
+        }, onError);
+    }
+
     @Nullable
     private RawRepositories.Repository normalizeRepository(RawRepositories.Repository repository) {
 
         RawRepositories.Repository repoWithMirrors = applyMirrors(repository);
         CacheResult<RawRepositories.Repository> result;
         try {
-            result = mavenCache.computeRepository(repoWithMirrors, () -> {
+            result = mavenPomCache.computeRepository(repoWithMirrors, () -> {
                 // Always prefer to use https, fallback to http only if https isn't available
                 // URLs are case-sensitive after the domain name, so it can be incorrect to lowerCase() a whole URL
                 // This regex accepts any capitalization of the letters in "http"
@@ -335,7 +373,7 @@ public class MavenDownloader {
                     return null;
                 } catch (SSLException e) {
                     // Fallback to http if https is unavailable and the original URL was an http URL
-                    if(httpsUrl.equals(originalUrl)) {
+                    if (httpsUrl.equals(originalUrl)) {
                         return null;
                     }
                     try (Response httpResponse = sendRequest.apply(request.url(originalUrl).build())) {
@@ -370,6 +408,15 @@ public class MavenDownloader {
     }
 
     private Request.Builder applyAuthentication(RawRepositories.Repository repository, Request.Builder request) {
+        MavenSettings.Server authInfo = serverIdToServer.get(repository.getId());
+        if (authInfo != null) {
+            String credentials = Credentials.basic(authInfo.getUsername(), authInfo.getPassword());
+            request.header("Authorization", credentials);
+        }
+        return request;
+    }
+
+    private Request.Builder applyAuthentication(Pom.Repository repository, Request.Builder request) {
         MavenSettings.Server authInfo = serverIdToServer.get(repository.getId());
         if (authInfo != null) {
             String credentials = Credentials.basic(authInfo.getUsername(), authInfo.getPassword());

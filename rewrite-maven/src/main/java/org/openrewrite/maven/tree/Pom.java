@@ -19,13 +19,11 @@ import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 
 import java.net.URI;
 import java.net.URL;
-import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -36,8 +34,6 @@ import java.util.stream.Stream;
 @Getter
 @EqualsAndHashCode
 public class Pom implements Marker {
-    Path sourcePath;
-
     @Nullable
     String groupId;
 
@@ -72,8 +68,7 @@ public class Pom implements Marker {
     Collection<Repository> repositories;
     Map<String, String> properties;
 
-    public Pom(@Nullable Path sourcePath,
-               @Nullable String groupId,
+    public Pom(@Nullable String groupId,
                String artifactId,
                @Nullable String version,
                @Nullable String snapshotVersion,
@@ -85,7 +80,6 @@ public class Pom implements Marker {
                Collection<License> licenses,
                Collection<Repository> repositories,
                Map<String, String> properties) {
-        this.sourcePath = sourcePath;
         this.groupId = groupId;
         this.artifactId = artifactId;
         this.version = version;
@@ -200,8 +194,10 @@ public class Pom implements Marker {
     @EqualsAndHashCode(onlyExplicitlyIncluded = true)
     @Data
     public static class Repository {
+        String id;
+
         @EqualsAndHashCode.Include
-        URL url;
+        URI uri;
 
         boolean releases;
         boolean snapshots;
@@ -276,6 +272,8 @@ public class Pom implements Marker {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
     public static class Dependency implements DependencyDescriptor {
+        Repository repository;
+
         Scope scope;
 
         @Nullable
@@ -289,6 +287,9 @@ public class Pom implements Marker {
 
         @Nullable
         String requestedVersion;
+
+        @Nullable
+        String datedSnapshotVersion;
 
         Set<GroupArtifact> exclusions;
 
@@ -304,14 +305,6 @@ public class Pom implements Marker {
             return model.getVersion();
         }
 
-        public URI getArtifactUri() {
-            return model.getSourcePath().toUri()
-                    .resolve(getArtifactId() + '-' + getVersion() +
-                            (StringUtils.isBlank(classifier) ? "" : '-' + classifier) +
-                            ".jar")
-                    .normalize();
-        }
-
         public String getCoordinates() {
             return model.getGroupId() + ':' + model.getArtifactId() + ':' + model.getVersion() +
                     (classifier == null ? "" : ':' + classifier);
@@ -322,7 +315,7 @@ public class Pom implements Marker {
             return "Dependency {" + getCoordinates() +
                     (optional ? ", optional" : "") +
                     (!getVersion().equals(requestedVersion) ? ", requested=" + requestedVersion : "") +
-                    ", from=" + model.getSourcePath() + '}';
+                    '}';
         }
 
         /**
@@ -364,7 +357,6 @@ public class Pom implements Marker {
     public String toString() {
         return "Pom{" +
                 groupId + ':' + artifactId + ':' + version +
-                ", from=" + sourcePath +
                 '}';
     }
 }

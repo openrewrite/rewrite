@@ -30,7 +30,8 @@ class UpgradeParentVersionTest : RecipeTest {
             "org.springframework.boot",
             "spring-boot-starter-parent",
             "~1.5",
-        null),
+            null as String?
+        ),
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>

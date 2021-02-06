@@ -23,9 +23,7 @@ import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.tree.Xml;
 
-import java.net.MalformedURLException;
 import java.net.URI;
-import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -49,28 +47,23 @@ public class RawMavenResolver {
 
     private final MavenDownloader downloader;
 
-    /**
-     * Is this resolver being used for resolving parents or import BOMs? Just a flag for logging purposes alone...
-     */
-    private final boolean forParent;
-
     private final Collection<String> activeProfiles;
     private final boolean resolveOptional;
 
     @Nullable
     private final MavenSettings mavenSettings;
-    @Nullable
+
     private final Consumer<Throwable> onError;
 
-    public RawMavenResolver(MavenDownloader downloader, boolean forParent, Collection<String> activeProfiles,
-                            @Nullable MavenSettings mavenSettings, boolean resolveOptional, @Nullable Consumer<Throwable> onError) {
+    public RawMavenResolver(MavenDownloader downloader, Collection<String> activeProfiles,
+                            @Nullable MavenSettings mavenSettings, boolean resolveOptional,
+                            Consumer<Throwable> onError) {
         this.onError = onError;
         this.versionSelection = new TreeMap<>();
         for (Scope scope : Scope.values()) {
             versionSelection.putIfAbsent(scope, new HashMap<>());
         }
         this.downloader = downloader;
-        this.forParent = forParent;
         this.activeProfiles = activeProfiles;
         this.mavenSettings = mavenSettings;
         this.resolveOptional = resolveOptional;
@@ -121,7 +114,7 @@ public class RawMavenResolver {
             return; // already processed
         }
 
-        PartialMaven partialMaven = new PartialMaven(rawMaven.getDocument().getSourcePath(), rawMaven.getPom());
+        PartialMaven partialMaven = new PartialMaven(rawMaven.getPom());
         processProperties(task, partialMaven);
         processRepositories(task, partialMaven);
         processParent(task, partialMaven);
@@ -136,37 +129,6 @@ public class RawMavenResolver {
         partialMaven.setProperties(task.getRawMaven().getActiveProperties(activeProfiles));
     }
 
-    /**
-     * Runs a piece of potentially exception-generating code, returning "false" to indicate that the code did not throw.
-     * If the Runnable does throw, the behavior depends on whether continueOnError is set.
-     * If the Runnable throws and continueOnError is not set, the exception will be rethrown.
-     * If the Runnable throws and continueOnError is set, the exception will be suppressed and doesThrow will return true.
-     *
-     * The idea is to be able to succinctly write continueOnError-aware code in a form like:
-     * if(doesThrow(() -> {
-     *     // Some code which might throw
-     *  }) {
-     *     // Handle continuing execution here, knowing that the code did try to throw an error
-     * }
-     *
-     */
-    private boolean doesThrow(Runnable fun) {
-        try {
-            fun.run();
-            return false;
-        } catch (Throwable t) {
-            if(onError != null) {
-                onError.accept(t);
-                return true;
-            } else {
-                if (t instanceof MavenParsingException) {
-                    throw t;
-                }
-                throw new MavenParsingException(t);
-            }
-        }
-    }
-
     private void processDependencyManagement(ResolutionTask task, PartialMaven partialMaven) {
         RawPom pom = task.getRawMaven().getPom();
         List<DependencyManagementDependency> managedDependencies = new ArrayList<>();
@@ -174,14 +136,10 @@ public class RawMavenResolver {
         RawPom.DependencyManagement dependencyManagement = pom.getDependencyManagement();
         if (dependencyManagement != null && dependencyManagement.getDependencies() != null) {
             for (RawPom.Dependency d : dependencyManagement.getDependencies().getDependencies()) {
-                if (doesThrow(() -> {
-                    if(d.getVersion() == null) {
-                        throw new MavenParsingException(
-                                "Problem with dependencyManagement section of %s:%s:%s. Unable to determine version of managed dependency %s:%s",
-                                pom.getGroupId(), pom.getArtifactId(), pom.getVersion(), d.getGroupId(), d.getArtifactId());
-                    }
-                })) {
-                    continue;
+                if (d.getVersion() == null) {
+                    onError.accept(new MavenParsingException(
+                            "Problem with dependencyManagement section of %s:%s:%s. Unable to determine version of managed dependency %s:%s",
+                            pom.getGroupId(), pom.getArtifactId(), pom.getVersion(), d.getGroupId(), d.getArtifactId()));
                 }
                 assert d.getVersion() != null;
 
@@ -189,42 +147,35 @@ public class RawMavenResolver {
                 String artifactId = partialMaven.getArtifactId(d.getArtifactId());
                 String version = partialMaven.getVersion(d.getVersion());
 
-                if(doesThrow(() -> {
-                    if (groupId == null || artifactId == null || version == null) {
-                        throw new MavenParsingException(
-                                "Problem with dependencyManagement section of %s:%s:%s. Unable to determine groupId, " +
-                                        "artifactId, or version of managed dependency %s:%s.",
-                                pom.getGroupId(), pom.getArtifactId(), pom.getVersion(), d.getGroupId(), d.getArtifactId());
-                    }
-                })) {
-                    continue;
+                if (groupId == null || artifactId == null || version == null) {
+                    onError.accept(new MavenParsingException(
+                            "Problem with dependencyManagement section of %s:%s:%s. Unable to determine groupId, " +
+                                    "artifactId, or version of managed dependency %s:%s.",
+                            pom.getGroupId(), pom.getArtifactId(), pom.getVersion(), d.getGroupId(), d.getArtifactId()));
                 }
                 assert groupId != null;
                 assert artifactId != null;
                 assert version != null;
 
                 // https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#importing-dependencies
-                doesThrow(() -> {
-                    if (Objects.equals(d.getType(), "pom") && Objects.equals(d.getScope(), "import")) {
+                if (Objects.equals(d.getType(), "pom") && Objects.equals(d.getScope(), "import")) {
+                    RawMaven rawMaven = downloader.download(groupId, artifactId, version, null, null,
+                            partialMaven.getRepositories(), onError);
+                    if (rawMaven != null) {
+                        Pom maven = new RawMavenResolver(downloader, activeProfiles, mavenSettings, resolveOptional, onError)
+                                .resolve(rawMaven, Scope.Compile, d.getVersion(), partialMaven.getRepositories());
 
-                        RawMaven rawMaven = downloader.download(groupId, artifactId, version, null, null, null,
-                                partialMaven.getRepositories());
-                        if (rawMaven != null) {
-                            Pom maven = new RawMavenResolver(downloader, true, activeProfiles, mavenSettings, resolveOptional, onError)
-                                    .resolve(rawMaven, Scope.Compile, d.getVersion(), partialMaven.getRepositories());
-
-                            if (maven != null) {
-                                managedDependencies.add(new DependencyManagementDependency.Imported(groupId, artifactId,
-                                        version, d.getVersion(), maven));
-                            }
+                        if (maven != null) {
+                            managedDependencies.add(new DependencyManagementDependency.Imported(groupId, artifactId,
+                                    version, d.getVersion(), maven));
                         }
-                    } else {
-                        managedDependencies.add(new DependencyManagementDependency.Defined(
-                                groupId, artifactId, version, d.getVersion(),
-                                d.getScope() == null ? null : Scope.fromName(d.getScope()),
-                                d.getClassifier(), d.getExclusions()));
                     }
-                });
+                } else {
+                    managedDependencies.add(new DependencyManagementDependency.Defined(
+                            groupId, artifactId, version, d.getVersion(),
+                            d.getScope() == null ? null : Scope.fromName(d.getScope()),
+                            d.getClassifier(), d.getExclusions()));
+                }
             }
         }
 
@@ -250,22 +201,18 @@ public class RawMavenResolver {
                     String groupId = partialMaven.getGroupId(dep.getGroupId());
                     String artifactId = partialMaven.getArtifactId(dep.getArtifactId());
 
-                    if (doesThrow(() -> {
-                        if(groupId == null) {
-                            throw new MavenParsingException(
-                                    "Problem resolving dependency of %s:%s:%s. Unable to determine groupId.",
-                                    rawMaven.getPom().getGroupId(), rawMaven.getPom().getArtifactId(), rawMaven.getPom().getVersion());
-                        }
-                        if(artifactId == null) {
-                            throw new MavenParsingException(
-                                    "Problem resolving dependency of %s:%s:%s. Unable to determine artifactId.",
-                                    rawMaven.getPom().getGroupId(), rawMaven.getPom().getArtifactId(), rawMaven.getPom().getVersion());
-                        }
-                    })) {
+                    if (groupId == null) {
+                        onError.accept(new MavenParsingException(
+                                "Problem resolving dependency of %s:%s:%s. Unable to determine groupId.",
+                                rawMaven.getPom().getGroupId(), rawMaven.getPom().getArtifactId(), rawMaven.getPom().getVersion()));
                         return null;
                     }
-                    assert groupId != null;
-                    assert artifactId != null;
+                    if (artifactId == null) {
+                        onError.accept(new MavenParsingException(
+                                "Problem resolving dependency of %s:%s:%s. Unable to determine artifactId.",
+                                rawMaven.getPom().getGroupId(), rawMaven.getPom().getArtifactId(), rawMaven.getPom().getVersion()));
+                        return null;
+                    }
 
                     // Handle dependency exclusions
                     for (GroupArtifact e : task.getExclusions()) {
@@ -275,85 +222,82 @@ public class RawMavenResolver {
                                 return null;
                             }
                         } catch (Exception exception) {
-                            if(onError != null) {
-                                onError.accept(exception);
-                            }
-                            continue;
+                            onError.accept(exception);
+                            return null;
                         }
                     }
 
                     ResolutionTask[] resolutionTaskContainer = new ResolutionTask[1];
-                    if(doesThrow(() -> {
-                        String version = null;
-                        String last;
-                        // loop so that when dependencyManagement refers to a property that we take another pass to resolve the property.
-                        int i = 0;
-                        do {
-                            last = version;
-                            String result = null;
-                            if (last != null) {
-                                String partialMavenVersion = partialMaven.getVersion(last);
-                                if (partialMavenVersion != null) {
-                                    result = partialMavenVersion;
-                                }
+
+                    String version = null;
+                    String last;
+                    // loop so that when dependencyManagement refers to a property that we take another pass to resolve the property.
+                    int i = 0;
+                    do {
+                        last = version;
+                        String result = null;
+                        if (last != null) {
+                            String partialMavenVersion = partialMaven.getVersion(last);
+                            if (partialMavenVersion != null) {
+                                result = partialMavenVersion;
                             }
-                            if (result == null) {
-                                OUTER:
-                                for (DependencyManagementDependency managed : partialMaven.getDependencyManagement().getDependencies()) {
-                                    for (DependencyDescriptor dependencyDescriptor : managed.getDependencies()) {
-                                        if (groupId.equals(partialMaven.getGroupId(dependencyDescriptor.getGroupId())) &&
-                                                artifactId.equals(partialMaven.getArtifactId(dependencyDescriptor.getArtifactId()))) {
-                                            result = dependencyDescriptor.getVersion();
-                                            break OUTER;
-                                        }
+                        }
+                        if (result == null) {
+                            OUTER:
+                            for (DependencyManagementDependency managed : partialMaven.getDependencyManagement().getDependencies()) {
+                                for (DependencyDescriptor dependencyDescriptor : managed.getDependencies()) {
+                                    if (groupId.equals(partialMaven.getGroupId(dependencyDescriptor.getGroupId())) &&
+                                            artifactId.equals(partialMaven.getArtifactId(dependencyDescriptor.getArtifactId()))) {
+                                        result = dependencyDescriptor.getVersion();
+                                        break OUTER;
                                     }
                                 }
-
-                                if (result == null && partialMaven.getParent() != null) {
-                                    result = partialMaven.getParent().getManagedVersion(groupId, artifactId);
-                                }
                             }
-                            version = result;
-                        } while (i++ < 2 || !Objects.equals(version, last));
 
-                        // dependencyManagement takes precedence over the version specified on the dependency
-                        if (version == null) {
-                            String depVersion = dep.getVersion();
-                            if (depVersion != null) {
-                                version = partialMaven.getVersion(depVersion);
+                            if (result == null && partialMaven.getParent() != null) {
+                                result = partialMaven.getParent().getManagedVersion(groupId, artifactId);
                             }
                         }
+                        version = result;
+                    } while (i++ < 2 || !Objects.equals(version, last));
 
-                        if (version == null) {
-                            throw new MavenParsingException("Failed to determine version for %s:%s. Initial value was %s. Including POM is at %s",
-                                    groupId, artifactId, dep.getVersion(), rawMaven.getSourcePath());
+                    // dependencyManagement takes precedence over the version specified on the dependency
+                    if (version == null) {
+                        String depVersion = dep.getVersion();
+                        if (depVersion != null) {
+                            version = partialMaven.getVersion(depVersion);
                         }
+                    }
 
-                        Scope requestedScope;
-                        requestedScope = Scope.fromName(partialMaven.getScope(dep.getScope()));
-                        Scope effectiveScope = requestedScope.transitiveOf(task.getScope());
+                    if (version == null) {
+                        onError.accept(new MavenParsingException("Failed to determine version for %s:%s. Initial value was %s. Including POM is at %s",
+                                groupId, artifactId, dep.getVersion(), rawMaven.getSourcePath()));
+                        return null;
+                    }
 
-                        if (effectiveScope == null) {
-                            return;
-                        }
+                    Scope requestedScope;
+                    requestedScope = Scope.fromName(partialMaven.getScope(dep.getScope()));
+                    Scope effectiveScope = requestedScope.transitiveOf(task.getScope());
 
-
+                    if (effectiveScope != null) {
                         RequestedVersion requestedVersion = selectVersion(effectiveScope, groupId, artifactId, version);
                         versionSelection.get(effectiveScope).put(new GroupArtifact(groupId, artifactId), requestedVersion);
                         version = requestedVersion.resolve(downloader, partialMaven.getRepositories());
 
-
                         if (version.contains("${")) {
-                            throw new MavenParsingException("Unable to download %s:%s:%s. Including POM is at %s", groupId, artifactId, version, rawMaven.getSourcePath());
+                            onError.accept(new MavenParsingException("Unable to download %s:%s:%s. Including POM is at %s",
+                                    groupId, artifactId, version, rawMaven.getSourcePath()));
+                            return null;
                         }
 
                         RawMaven download = downloader.download(groupId, artifactId,
-                                version, dep.getClassifier(), null, rawMaven,
-                                partialMaven.getRepositories());
+                                version, null, rawMaven,
+                                partialMaven.getRepositories(), onError);
 
                         if (download == null) {
-                            throw new MavenParsingException("Unable to download %s:%s:%s. Including POM is at %s",
-                                    groupId, artifactId, version, rawMaven.getSourcePath());
+                            onError.accept(new MavenParsingException("Unable to download %s:%s:%s. Including POM is at %s",
+                                    groupId, artifactId, version, rawMaven.getSourcePath()));
+                            return null;
                         }
 
                         resolutionTaskContainer[0] = new ResolutionTask(
@@ -363,8 +307,12 @@ public class RawMavenResolver {
                                         emptySet() :
                                         dep.getExclusions().stream()
                                                 .map(ex -> new GroupArtifact(
-                                                        ex.getGroupId().replace("*", ".*"),
-                                                        ex.getArtifactId().replace("*", ".*")
+                                                        partialMaven.getValue(ex.getGroupId()),
+                                                        partialMaven.getValue(ex.getArtifactId())
+                                                ))
+                                                .map(ex -> new GroupArtifact(
+                                                        ex.getGroupId() == null ? ".*" : ex.getGroupId().replace("*", ".*"),
+                                                        ex.getArtifactId() == null ? ".*" : ex.getArtifactId().replace("*", ".*")
                                                 ))
                                                 .collect(Collectors.toSet()),
                                 dep.getOptional() != null && dep.getOptional(),
@@ -374,8 +322,6 @@ public class RawMavenResolver {
                                 partialMaven.getRepositories(),
                                 null
                         );
-                    })) {
-                        return null;
                     }
 
                     ResolutionTask resolutionTask = resolutionTaskContainer[0];
@@ -406,37 +352,32 @@ public class RawMavenResolver {
             }
 
             PartialTreeKey gav = new PartialTreeKey(rawParent.getGroupId(), rawParent.getArtifactId(), rawParent.getVersion());
-            if(doesThrow(() -> {
-                if (parentPomSightings.contains(gav)) {
-                    throw new MavenParsingException("Cycle in parent poms detected: " + gav.getGroupId() + ":" + gav.getArtifactId() + ":" + gav.getVersion() + " is its own parent by way of these poms:\n" + parentPomSightings.stream()
-                            .map(it -> it.groupId + ":" + it.getArtifactId() + ":" + it.getVersion())
-                            .collect(joining("\n")));
-                }
-            })) {
+            if (parentPomSightings.contains(gav)) {
+                onError.accept(new MavenParsingException("Cycle in parent poms detected: " + gav.getGroupId() + ":" + gav.getArtifactId() + ":" + gav.getVersion() + " is its own parent by way of these poms:\n" + parentPomSightings.stream()
+                        .map(it -> it.groupId + ":" + it.getArtifactId() + ":" + it.getVersion())
+                        .collect(joining("\n"))));
                 return;
             }
             parentPomSightings.add(gav);
 
-            doesThrow(() -> {
-                Pom parent = null;
-                RawMaven rawParentModel = downloader.download(rawParent.getGroupId(), rawParent.getArtifactId(),
-                        rawParent.getVersion(), null, rawParent.getRelativePath(), rawMaven,
-                        partialMaven.getRepositories());
-                if (rawParentModel != null) {
-                    PartialTreeKey parentKey = new PartialTreeKey(rawParent.getGroupId(), rawParent.getArtifactId(), rawParent.getVersion());
-                    Optional<Pom> maybeParent = resolved.get(parentKey);
+            Pom parent = null;
+            RawMaven rawParentModel = downloader.download(rawParent.getGroupId(), rawParent.getArtifactId(),
+                    rawParent.getVersion(), rawParent.getRelativePath(), rawMaven,
+                    partialMaven.getRepositories(), onError);
+            if (rawParentModel != null) {
+                PartialTreeKey parentKey = new PartialTreeKey(rawParent.getGroupId(), rawParent.getArtifactId(), rawParent.getVersion());
+                Optional<Pom> maybeParent = resolved.get(parentKey);
 
-                    //noinspection OptionalAssignedToNull
-                    if (maybeParent == null) {
-                        parent = new RawMavenResolver(downloader, true, activeProfiles, mavenSettings, resolveOptional, onError)
-                                ._resolve(rawParentModel, Scope.Compile, rawParent.getVersion(), partialMaven.getRepositories(), parentPomSightings);
-                        resolved.put(parentKey, Optional.ofNullable(parent));
-                    } else {
-                        parent = maybeParent.orElse(null);
-                    }
+                //noinspection OptionalAssignedToNull
+                if (maybeParent == null) {
+                    parent = new RawMavenResolver(downloader, activeProfiles, mavenSettings, resolveOptional, onError)
+                            ._resolve(rawParentModel, Scope.Compile, rawParent.getVersion(), partialMaven.getRepositories(), parentPomSightings);
+                    resolved.put(parentKey, Optional.ofNullable(parent));
+                } else {
+                    parent = maybeParent.orElse(null);
                 }
-                partialMaven.setParent(parent);
-            });
+            }
+            partialMaven.setParent(parent);
         }
     }
 
@@ -448,16 +389,18 @@ public class RawMavenResolver {
         }
 
         for (RawRepositories.Repository repository : repositoriesFromPom) {
-            doesThrow(() -> {
-                String url = repository.getUrl().trim();
-                if (repository.getUrl().contains("${")) {
-                    url = placeholderHelper.replacePlaceholders(url, k -> partialMaven.getProperties().get(k));
-                }
+            String url = repository.getUrl().trim();
+            if (repository.getUrl().contains("${")) {
+                url = placeholderHelper.replacePlaceholders(url, k -> partialMaven.getProperties().get(k));
+            }
+            try {
                 // Prevent malformed URLs from being used
                 //noinspection ResultOfMethodCallIgnored
                 URI.create(url);
                 repositories.add(new RawRepositories.Repository(repository.getId(), url, repository.getReleases(), repository.getSnapshots()));
-            });
+            } catch (Throwable t) {
+                onError.accept(new MavenParsingException("Invalid repository URL %s", url));
+            }
         }
 
         repositories.addAll(task.getRepositories());
@@ -505,12 +448,14 @@ public class RawMavenResolver {
                             }
 
                             return new Pom.Dependency(
+                                    mapRepository(rawMaven.getRepository()),
                                     depTask.getScope(),
                                     depTask.getClassifier(),
                                     depTask.getType(),
                                     optional,
                                     resolved,
                                     depTask.getRequestedVersion(),
+                                    rawMaven.getPom().getSnapshotVersion(),
                                     depTask.getExclusions()
                             );
                         })
@@ -529,9 +474,9 @@ public class RawMavenResolver {
 
                         if (!conflictResolvedVersion.equals(ancestorDep.getVersion())) {
                             RawMaven conflictResolvedRaw = downloader.download(groupId, artifactId, conflictResolvedVersion,
-                                    ancestorDep.getClassifier(), null, null, task.getRepositories());
+                                    null, null, task.getRepositories(), onError);
 
-                            Pom conflictResolved = assembleResults(new ResolutionTask(scope, conflictResolvedRaw,
+                            Pom conflictResolved = conflictResolvedRaw == null ? null : assembleResults(new ResolutionTask(scope, conflictResolvedRaw,
                                     ancestorDep.getExclusions(), ancestorDep.isOptional(), ancestorDep.getRequestedVersion(),
                                     ancestorDep.getClassifier(), ancestorDep.getType(), task.getRepositories(), null), nextAssemblyStack);
 
@@ -539,12 +484,14 @@ public class RawMavenResolver {
                                 dependencies.add(ancestorDep);
                             } else {
                                 dependencies.add(new Pom.Dependency(
+                                        mapRepository(rawMaven.getRepository()),
                                         scope,
                                         ancestorDep.getClassifier(),
                                         ancestorDep.getType(),
                                         ancestorDep.isOptional(),
                                         conflictResolved,
                                         ancestorDep.getRequestedVersion(),
+                                        rawMaven.getPom().getSnapshotVersion(),
                                         ancestorDep.getExclusions()
                                 ));
                             }
@@ -566,20 +513,11 @@ public class RawMavenResolver {
 
                 List<Pom.Repository> repositories = new ArrayList<>();
                 for (RawRepositories.Repository repo : partial.getRepositories()) {
-                    doesThrow(() -> {
-                        try {
-                            repositories.add(new Pom.Repository(URI.create(repo.getUrl()).toURL(),
-                                    repo.getReleases() == null || repo.getReleases().isEnabled(),
-                                    repo.getSnapshots() == null || repo.getSnapshots().isEnabled()));
-                        } catch (MalformedURLException e) {
-                            throw new MavenParsingException("Malformed repository URL '%s'", repo.getUrl());
-                        }
-                    });
+                    repositories.add(mapRepository(repo));
                 }
 
                 result = Optional.of(
                         new Pom(
-                                partial.getSourcePath(),
                                 groupId,
                                 rawPom.getArtifactId(),
                                 version,
@@ -602,6 +540,16 @@ public class RawMavenResolver {
         }
 
         return result.orElse(null);
+    }
+
+    @Nullable
+    private Pom.Repository mapRepository(@Nullable RawRepositories.Repository repo) {
+        if (repo == null) {
+            return null;
+        }
+        return new Pom.Repository(repo.getId(), URI.create(repo.getUrl()),
+                repo.getReleases() == null || repo.getReleases().isEnabled(),
+                repo.getSnapshots() == null || repo.getSnapshots().isEnabled());
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -657,9 +605,6 @@ public class RawMavenResolver {
     @Getter
     @Setter
     class PartialMaven {
-        @EqualsAndHashCode.Include
-        final Path sourcePath;
-
         @EqualsAndHashCode.Include
         final RawPom rawPom;
 
@@ -727,7 +672,12 @@ public class RawMavenResolver {
             return s == null ? null : getValue(s);
         }
 
-        private String getValue(String v) {
+        public String getValue(@Nullable String v) {
+            if (v == null) {
+                //noinspection ConstantConditions
+                return null;
+            }
+
             if (v.startsWith("${") && v.endsWith("}")) {
                 String key = v.replace("${", "").replace("}", "");
 
@@ -758,8 +708,12 @@ public class RawMavenResolver {
                     return value;
                 }
 
-                return v;
+                onError.accept(new MavenParsingException("Unable to resolve property %s", v));
+
+                //noinspection ConstantConditions
+                return null;
             }
+
             return v;
         }
     }

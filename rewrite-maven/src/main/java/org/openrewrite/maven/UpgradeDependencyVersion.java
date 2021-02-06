@@ -17,12 +17,10 @@ package org.openrewrite.maven;
 
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.cache.NoopCache;
+import org.openrewrite.maven.cache.MavenArtifactCache;
+import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenDownloader;
 import org.openrewrite.maven.internal.MavenMetadata;
 import org.openrewrite.maven.tree.DependencyManagementDependency;
@@ -82,13 +80,11 @@ public class UpgradeDependencyVersion extends Recipe {
         return new UpgradeDependencyVersionVisitor();
     }
 
-
     private class UpgradeDependencyVersionVisitor extends MavenVisitor<ExecutionContext> {
-
         @Nullable
         private Collection<String> availableVersions;
 
-        private VersionComparator versionComparator;
+        private final VersionComparator versionComparator;
 
         public UpgradeDependencyVersionVisitor() {
             //noinspection ConstantConditions
@@ -131,8 +127,11 @@ public class UpgradeDependencyVersion extends Recipe {
 
         private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion) {
             if (availableVersions == null) {
-                MavenMetadata mavenMetadata = new MavenDownloader(new NoopCache(), emptyMap(), settings)
-                        .downloadMetadata(groupId, artifactId, emptyList());
+                MavenMetadata mavenMetadata = new MavenDownloader(MavenPomCache.NOOP, MavenArtifactCache.NOOP,
+                        emptyMap(), settings,
+                        t -> {
+                            throw new RecipeException(t);
+                        }).downloadMetadata(groupId, artifactId, emptyList());
                 availableVersions = mavenMetadata.getVersioning().getVersions().stream()
                         .filter(versionComparator::isValid)
                         .collect(Collectors.toList());

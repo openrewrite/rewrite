@@ -94,21 +94,11 @@ class MavenParserTest {
                 <artifactId>single-project</artifactId>
                 <version>0.1.0-SNAPSHOT</version>
 
-                <properties>
-                    <maven.compiler.source>1.8</maven.compiler.source>
-                    <maven.compiler.target>1.8</maven.compiler.target>
-                </properties>
-
                 <dependencies>
                     <dependency>
                         <groupId>com.google.guava</groupId>
                         <artifactId>guava</artifactId>
                         <version>29.0-jre</version>
-                    </dependency>
-                    <dependency>
-                        <groupId>org.openrewrite.recipe</groupId>
-                        <artifactId>rewrite-checkstyle</artifactId>
-                        <version>2.0.1</version>
                     </dependency>
                 </dependencies>
 
@@ -118,14 +108,8 @@ class MavenParserTest {
                         <name>JCenter</name>
                         <url>https://jcenter.bintray.com/</url>
                     </repository>
-                    <repository>
-                        <id>bintray</id>
-                        <name>Bintray</name>
-                        <url>https://dl.bintray.com/openrewrite/maven</url>
-                    </repository>
                 </repositories>
             </project>
-
         """)
     }
 
@@ -159,8 +143,8 @@ class MavenParserTest {
         assertThat(maven.model.dependencies.first()).matches{ it.scope == Scope.Compile}
     }
 
-    val parserStrict = MavenParser.builder().resolveOptional(false).build()
-    val parserLenient = MavenParser.builder().onError{  }.resolveOptional(false).build()
+    private val parserStrict = MavenParser.builder().doOnError { t -> throw t }.resolveOptional(false).build()
+    private val parserLenient = MavenParser.builder().resolveOptional(false).build()
 
     @Issue("https://github.com/openrewrite/rewrite/issues/199")
     @Test

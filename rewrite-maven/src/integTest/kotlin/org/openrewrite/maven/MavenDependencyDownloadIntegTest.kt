@@ -36,7 +36,7 @@ class MavenDependencyDownloadIntegTest {
         val compileDependencies = maven.model.getDependencies(Scope.Compile)
 
         compileDependencies.forEach { dep ->
-            println("${dep.coordinates} -> ${dep.artifactUri}")
+            println("${dep.repository} ${dep.coordinates}")
         }
     }
 
@@ -52,7 +52,7 @@ class MavenDependencyDownloadIntegTest {
                 .sortedBy { d -> d.coordinates }
 
         compileDependencies.forEach { dep ->
-            println("${dep.coordinates} -> ${dep.artifactUri}")
+            println("${dep.repository} ${dep.coordinates}")
         }
     }
 

@@ -36,7 +36,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Callable;
 
-public class MapdbCache implements MavenCache {
+public class MapdbMavenPomCache implements MavenPomCache {
     private static final Serializer<Optional<RawMaven>> MAVEN_SERIALIZER = new OptionalJacksonMapdbSerializer<>(RawMaven.class);
     private static final Serializer<RawRepositories.Repository> REPOSITORY_SERIALIZER = new JacksonMapdbSerializer<>(RawRepositories.Repository.class);
     private static final Serializer<Optional<RawRepositories.Repository>> OPTIONAL_REPOSITORY_SERIALIZER = new OptionalJacksonMapdbSerializer<>(RawRepositories.Repository.class);
@@ -53,8 +53,8 @@ public class MapdbCache implements MavenCache {
     CacheResult<MavenMetadata> UNAVAILABLE_METADATA = new CacheResult<>(CacheResult.State.Unavailable, null);
     CacheResult<RawRepositories.Repository> UNAVAILABLE_REPOSITORY = new CacheResult<>(CacheResult.State.Unavailable, null);
 
-    public MapdbCache(@Nullable File workspace,
-                      @Nullable Long maxCacheStoreSize) {
+    public MapdbMavenPomCache(@Nullable File workspace,
+                              @Nullable Long maxCacheStoreSize) {
         if (workspace != null) {
             DB localRepositoryDiskDb = DBMaker
                     .fileDB(workspace)

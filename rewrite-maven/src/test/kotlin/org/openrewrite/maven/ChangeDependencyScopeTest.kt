@@ -106,7 +106,7 @@ class ChangeDependencyScopeTest : RecipeTest {
 
     @Test
     fun scopeToNoScope() = assertChanged(
-        recipe = ChangeDependencyScope("com.google.guava", "guava", null),
+        recipe = ChangeDependencyScope("com.google.guava", "guava", null as String?),
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>

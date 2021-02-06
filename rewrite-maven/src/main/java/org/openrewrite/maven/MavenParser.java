@@ -17,8 +17,10 @@ package org.openrewrite.maven;
 
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.cache.InMemoryCache;
-import org.openrewrite.maven.cache.MavenCache;
+import org.openrewrite.maven.cache.InMemoryMavenPomCache;
+import org.openrewrite.maven.cache.MavenArtifactCache;
+import org.openrewrite.maven.cache.MavenPomCache;
+import org.openrewrite.maven.cache.ReadOnlyLocalMavenArtifactCache;
 import org.openrewrite.maven.internal.MavenDownloader;
 import org.openrewrite.maven.internal.RawMaven;
 import org.openrewrite.maven.internal.RawMavenResolver;
@@ -44,27 +46,27 @@ import static java.util.stream.StreamSupport.stream;
 public class MavenParser implements Parser<Maven> {
     private static final Logger logger = LoggerFactory.getLogger(MavenParser.class);
 
-    private final MavenCache mavenCache;
+    private final MavenPomCache mavenPomCache;
+    private final MavenArtifactCache mavenArtifactCache;
     private final Collection<String> activeProfiles;
 
     @Nullable
     private final MavenSettings mavenSettings;
 
     private final boolean resolveOptional;
-
-    @Nullable
     private final Consumer<Throwable> onError;
+
     /**
-     *
-     * @param mavenCache The cache to be used to speed up dependency resolution
-     * @param activeProfiles The maven profile names set to be active. Profiles are typically defined in the settings.xml
-     * @param mavenSettings The parsed settings.xml file to retrieve profiles, credentials, mirrors, etc. from
+     * @param mavenPomCache   The cache to be used to speed up dependency resolution
+     * @param activeProfiles  The maven profile names set to be active. Profiles are typically defined in the settings.xml
+     * @param mavenSettings   The parsed settings.xml file to retrieve profiles, credentials, mirrors, etc. from
      * @param resolveOptional When set to 'true' resolve dependencies marked as optional
-     * @param onError An optional, user supplied error handler. If a supplied onError handler does not re-throw exceptions they will be suppressed and execution will continue where possible.
+     * @param onError         An optional, user supplied error handler. If a supplied onError handler does not re-throw exceptions they will be suppressed and execution will continue where possible.
      */
-    private MavenParser(MavenCache mavenCache, Collection<String> activeProfiles,
-                        @Nullable MavenSettings mavenSettings, boolean resolveOptional, @Nullable Consumer<Throwable> onError) {
-        this.mavenCache = mavenCache;
+    private MavenParser(MavenPomCache mavenPomCache, MavenArtifactCache mavenArtifactCache, Collection<String> activeProfiles,
+                        @Nullable MavenSettings mavenSettings, boolean resolveOptional, Consumer<Throwable> onError) {
+        this.mavenPomCache = mavenPomCache;
+        this.mavenArtifactCache = mavenArtifactCache;
         this.activeProfiles = activeProfiles;
         this.mavenSettings = mavenSettings;
         this.resolveOptional = resolveOptional;
@@ -77,12 +79,12 @@ public class MavenParser implements Parser<Maven> {
                 .map(source -> RawMaven.parse(source, relativeTo, null))
                 .collect(toList());
 
-        MavenDownloader downloader = new MavenDownloader(mavenCache,
+        MavenDownloader downloader = new MavenDownloader(mavenPomCache, mavenArtifactCache,
                 projectPoms.stream().collect(toMap(RawMaven::getSourcePath, Function.identity())),
-                mavenSettings);
+                mavenSettings, onError);
 
         List<Maven> parsed = projectPoms.stream()
-                .map(raw -> new RawMavenResolver(downloader, false, activeProfiles,
+                .map(raw -> new RawMavenResolver(downloader, activeProfiles,
                         mavenSettings, resolveOptional, onError).resolve(raw))
                 .filter(Objects::nonNull)
                 .map(xmlDoc -> new Maven(xmlDoc, mavenSettings))
@@ -139,14 +141,15 @@ public class MavenParser implements Parser<Maven> {
     }
 
     public static class Builder {
-        private MavenCache mavenCache = new InMemoryCache();
+        private MavenPomCache mavenPomCache = new InMemoryMavenPomCache();
+        private MavenArtifactCache mavenArtifactCache = ReadOnlyLocalMavenArtifactCache.MAVEN_LOCAL;
         private final Collection<String> activeProfiles = new HashSet<>();
         private boolean resolveOptional = true;
 
         @Nullable
         private MavenSettings mavenSettings;
-        private boolean continueOnError;
-        @Nullable private Consumer<Throwable> onError;
+
+        private Consumer<Throwable> onError = t -> {};
 
         public Builder resolveOptional(@Nullable Boolean optional) {
             this.resolveOptional = optional == null || optional;
@@ -181,18 +184,23 @@ public class MavenParser implements Parser<Maven> {
             return this;
         }
 
-        public Builder cache(MavenCache cache) {
-            this.mavenCache = cache;
+        public Builder pomCache(MavenPomCache cache) {
+            this.mavenPomCache = cache;
             return this;
         }
 
-        public Builder onError(@Nullable Consumer<Throwable> onError) {
-            this.onError = onError;
+        public Builder artifactCache(MavenArtifactCache cache) {
+            this.mavenArtifactCache = cache;
+            return this;
+        }
+
+        public Builder doOnError(@Nullable Consumer<Throwable> onError) {
+            this.onError = onError == null ? t -> {} : onError;
             return this;
         }
 
         public MavenParser build() {
-            return new MavenParser(mavenCache, activeProfiles,
+            return new MavenParser(mavenPomCache, mavenArtifactCache, activeProfiles,
                     mavenSettings, resolveOptional, onError);
         }
     }

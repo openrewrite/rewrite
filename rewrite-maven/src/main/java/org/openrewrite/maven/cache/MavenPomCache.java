@@ -22,7 +22,27 @@ import org.openrewrite.maven.internal.RawRepositories;
 import java.net.URI;
 import java.util.concurrent.Callable;
 
-public interface MavenCache extends AutoCloseable {
+public interface MavenPomCache extends AutoCloseable {
+    MavenPomCache NOOP = new MavenPomCache() {
+        @Override
+        public CacheResult<MavenMetadata> computeMavenMetadata(URI repo, String groupId, String artifactId,
+                                                               Callable<MavenMetadata> orElseGet) throws Exception {
+            return new CacheResult<>(CacheResult.State.Updated, orElseGet.call());
+        }
+
+        @Override
+        public CacheResult<RawMaven> computeMaven(URI repo, String groupId, String artifactId, String version,
+                                                  Callable<RawMaven> orElseGet) throws Exception {
+            return new CacheResult<>(CacheResult.State.Updated, orElseGet.call());
+        }
+
+        @Override
+        public CacheResult<RawRepositories.Repository> computeRepository(RawRepositories.Repository repository,
+                                                                         Callable<RawRepositories.Repository> orElseGet) throws Exception {
+            return new CacheResult<>(CacheResult.State.Updated, orElseGet.call());
+        }
+    };
+
     CacheResult<MavenMetadata> computeMavenMetadata(URI repo,
                                                     String groupId,
                                                     String artifactId,

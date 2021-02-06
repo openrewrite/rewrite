@@ -19,12 +19,12 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Parser
 import org.openrewrite.RecipeTest
-import org.openrewrite.maven.cache.InMemoryCache
+import org.openrewrite.maven.cache.InMemoryMavenPomCache
 import org.openrewrite.maven.tree.Maven
 
 class AddDependencyTest : RecipeTest {
     companion object {
-        private val mavenCache = InMemoryCache()
+        private val mavenCache = InMemoryMavenPomCache()
     }
 
     override val recipe: AddDependency
@@ -39,7 +39,7 @@ class AddDependencyTest : RecipeTest {
     override val parser: Parser<*>?
         get() = MavenParser.builder()
             .resolveOptional(false)
-            .cache(mavenCache)
+            .pomCache(mavenCache)
             .build()
 
     @Test

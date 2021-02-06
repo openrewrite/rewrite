@@ -37,7 +37,7 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Issue
-import org.openrewrite.maven.cache.InMemoryCache
+import org.openrewrite.maven.cache.InMemoryMavenPomCache
 import org.openrewrite.maven.tree.Maven
 import org.openrewrite.maven.tree.Pom
 import org.slf4j.Logger
@@ -56,7 +56,7 @@ class MavenDependencyResolutionIntegTest {
         private val meterRegistry = Metrics.globalRegistry
 //        private val mavenCache = MapdbCache(File(System.getProperty("user.home") + "/.m2/rewrite"), null)
 //        private val mavenCache = NoopCache()
-        private val mavenCache = InMemoryCache()
+        private val mavenCache = InMemoryMavenPomCache()
 
         @JvmStatic
         @BeforeAll
@@ -105,7 +105,7 @@ class MavenDependencyResolutionIntegTest {
         """.trimIndent()
 
         val maven = MavenParser.builder()
-                .cache(mavenCache)
+                .pomCache(mavenCache)
                 .resolveOptional(false)
                 .build()
                 .parse(pom)
@@ -464,7 +464,7 @@ class MavenDependencyResolutionIntegTest {
         val pomFile = tempDir.resolve("pom.xml").toFile().apply { writeText(pom) }
 
         val pomAst: Maven = MavenParser.builder()
-                .cache(mavenCache)
+                .pomCache(mavenCache)
                 .resolveOptional(false)
                 .build()
                 .parse(listOf(pomFile.toPath()), null)

@@ -18,17 +18,17 @@ package org.openrewrite.maven
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.RecipeTest
-import org.openrewrite.maven.cache.InMemoryCache
+import org.openrewrite.maven.cache.InMemoryMavenPomCache
 import org.openrewrite.maven.tree.Maven
 
 class RemoveDependencyTest : RecipeTest {
     companion object {
-        private val mavenCache = InMemoryCache()
+        private val mavenCache = InMemoryMavenPomCache()
     }
 
     override val parser: MavenParser = MavenParser.builder()
         .resolveOptional(false)
-        .cache(mavenCache)
+        .pomCache(mavenCache)
         .build()
 
     override val recipe = RemoveDependency("junit","junit")

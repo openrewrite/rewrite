@@ -15,23 +15,8 @@
  */
 package org.openrewrite.maven.internal;
 
-/**
- * Represents problems that can arise during parsing Maven poms into their Rewrite AST.
- */
-public class MavenParsingException extends RuntimeException {
-    public MavenParsingException(Throwable cause) {
-        super(cause);
-    }
-
-    public MavenParsingException(String message) {
-        super(message);
-    }
-
-    public MavenParsingException(String message, Object ... args) {
-        super(String.format(message, args));
-    }
-
-    public MavenParsingException(Throwable cause, String message, Object ... args) {
-        super(String.format(message, args), cause);
+public class MavenDownloadingException extends RuntimeException {
+    public MavenDownloadingException(String message, Throwable cause) {
+        super(message, cause);
     }
 }

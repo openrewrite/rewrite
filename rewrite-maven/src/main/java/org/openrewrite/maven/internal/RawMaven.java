@@ -15,9 +15,7 @@
  */
 package org.openrewrite.maven.internal;
 
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
@@ -34,12 +32,20 @@ import java.util.Objects;
 
 import static java.util.Collections.singletonList;
 
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@AllArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@RequiredArgsConstructor
 @Getter
 public class RawMaven {
-    Xml.Document document;
-    RawPom pom;
+    final Xml.Document document;
+    final RawPom pom;
+
+    /**
+     * Provided when this pom was downloaded from a remote repository.
+     */
+    @With
+    @Nullable
+    RawRepositories.Repository repository;
 
     @Override
     public boolean equals(Object o) {

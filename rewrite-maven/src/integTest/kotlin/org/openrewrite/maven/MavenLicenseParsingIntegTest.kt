@@ -18,7 +18,7 @@ package org.openrewrite.maven
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import org.openrewrite.maven.cache.InMemoryCache
+import org.openrewrite.maven.cache.InMemoryMavenPomCache
 import org.openrewrite.maven.tree.Maven
 import org.openrewrite.maven.tree.Pom
 import org.openrewrite.maven.tree.Scope
@@ -26,7 +26,7 @@ import java.nio.file.Path
 
 class MavenLicenseParsingIntegTest {
     companion object {
-        private val mavenCache = InMemoryCache()
+        private val mavenCache = InMemoryMavenPomCache()
     }
 
     @Test
@@ -64,7 +64,7 @@ class MavenLicenseParsingIntegTest {
         val pomFile = tempDir.resolve("pom.xml").toFile().apply { writeText(pom) }
 
         val pomAst: Maven = MavenParser.builder()
-                .cache(mavenCache)
+                .pomCache(mavenCache)
                 .resolveOptional(false)
                 .build()
                 .parse(listOf(pomFile.toPath()), null)

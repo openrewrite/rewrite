@@ -30,9 +30,9 @@ class UpgradeDependencyVersionTest : RecipeTest {
     fun upgradeVersion() = assertChanged(
         recipe = UpgradeDependencyVersion(
             "org.springframework.boot",
-            null,
+            null as String?,
             "~1.5",
-            null),
+            null as String?),
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>
@@ -73,7 +73,7 @@ class UpgradeDependencyVersionTest : RecipeTest {
     fun upgradeGuava() = assertChanged(
         recipe = UpgradeDependencyVersion(
             "com.google.guava",
-            null,
+            null as String?,
             "25-28",
             "-jre"),
         before = """
@@ -164,7 +164,7 @@ class UpgradeDependencyVersionTest : RecipeTest {
         assertChanged(
             recipe = UpgradeDependencyVersion(
                 "com.google.guava",
-                null,
+                null as String?,
                 "25-28",
                 "-jre"),
             dependsOn = arrayOf(server.toFile()),
