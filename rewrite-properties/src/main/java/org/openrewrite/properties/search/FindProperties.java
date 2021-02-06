@@ -20,43 +20,49 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.marker.RecipeSearchResult;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 
+import java.util.HashSet;
 import java.util.Set;
 
 /**
- * This recipe will find all occurrences of the property key and mark those properties with {@link SearchResult} markers.
+ * Finds occurrences of a property key.
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class FindProperties extends Recipe {
-
     private final String propertyKey;
 
-    public static Set<Properties> find(Properties p, String propertyKey) {
-        //noinspection ConstantConditions
-        return ((FindPropertiesVisitor) new FindProperties(propertyKey).getVisitor())
-                .visit(p, ExecutionContext.builder().build())
-                .findMarkedWith(SearchResult.class);
+    public static Set<Properties.Entry> find(Properties p, String propertyKey) {
+        PropertiesVisitor<Set<Properties.Entry>> findVisitor = new PropertiesVisitor<Set<Properties.Entry>>() {
+            @Override
+            public Properties visitEntry(Properties.Entry entry, Set<Properties.Entry> ps) {
+                if (entry.getKey().equals(propertyKey)) {
+                    ps.add(entry);
+                }
+                return super.visitEntry(entry, ps);
+            }
+        };
+
+        Set<Properties.Entry> ps = new HashSet<>();
+        findVisitor.visit(p, ps);
+        return ps;
     }
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new FindPropertiesVisitor();
-    }
-
-    public class FindPropertiesVisitor extends PropertiesVisitor<ExecutionContext> {
-
-        @Override
-        public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
-            Properties p = super.visitEntry(entry, ctx);
-            if (entry.getKey().equals(propertyKey)) {
-                p = p.withMarker(new SearchResult(null));
+        return new PropertiesVisitor<ExecutionContext>() {
+            @Override
+            public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
+                Properties p = super.visitEntry(entry, ctx);
+                if (entry.getKey().equals(propertyKey)) {
+                    p = p.withMarker(new RecipeSearchResult(FindProperties.this));
+                }
+                return p;
             }
-            return p;
-        }
+        };
     }
 }
-

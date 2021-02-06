@@ -20,18 +20,19 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeUtils;
-import org.openrewrite.marker.SearchResult;
+import org.openrewrite.marker.RecipeSearchResult;
 
+import java.util.HashSet;
 import java.util.Set;
 
 /**
- * This recipe will find all references to a type matching the fully qualified type name and mark those fields with
- * {@link SearchResult} markers.
+ * This recipe finds all explicit references to a type.
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -40,31 +41,44 @@ public final class FindTypes extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new FindTypesVisitor();
+        return new JavaVisitor<ExecutionContext>() {
+            {
+                setCursoringOn();
+            }
+
+            @Override
+            public <N extends NameTree> N visitTypeName(N name, ExecutionContext ctx) {
+                N n = super.visitTypeName(name, ctx);
+                JavaType.Class asClass = TypeUtils.asClass(n.getType());
+                if (asClass != null && asClass.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
+                        getCursor().firstEnclosing(J.Import.class) == null) {
+                    return n.withMarker(new RecipeSearchResult(FindTypes.this));
+                }
+                return n;
+            }
+        };
     }
 
     public static Set<NameTree> find(J j, String fullyQualifiedClassName) {
-        //noinspection ConstantConditions
-        return ((FindTypesVisitor) new FindTypes(fullyQualifiedClassName).getVisitor())
-                .visit(j, ExecutionContext.builder().build())
-                .findMarkedWith(SearchResult.class);
-    }
-
-    private class FindTypesVisitor extends JavaVisitor<ExecutionContext> {
-
-        public FindTypesVisitor() {
-            setCursoringOn();
-        }
-
-        @Override
-        public <N extends NameTree> N visitTypeName(N name, ExecutionContext ctx) {
-            N n = super.visitTypeName(name, ctx);
-            JavaType.Class asClass = TypeUtils.asClass(n.getType());
-            if (asClass != null && asClass.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
-                    getCursor().firstEnclosing(J.Import.class) == null) {
-                return n.withMarker(new SearchResult(null));
+        JavaIsoVisitor<Set<NameTree>> findVisitor = new JavaIsoVisitor<Set<NameTree>>() {
+            {
+                setCursoringOn();
             }
-            return n;
-        }
+
+            @Override
+            public <N extends NameTree> N visitTypeName(N name, Set<NameTree> ns) {
+                N n = super.visitTypeName(name, ns);
+                JavaType.Class asClass = TypeUtils.asClass(n.getType());
+                if (asClass != null && asClass.getFullyQualifiedName().equals(fullyQualifiedClassName) &&
+                        getCursor().firstEnclosing(J.Import.class) == null) {
+                    ns.add(name);
+                }
+                return n;
+            }
+        };
+
+        Set<NameTree> ts = new HashSet<>();
+        findVisitor.visit(j, ts);
+        return ts;
     }
 }

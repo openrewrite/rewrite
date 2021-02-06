@@ -23,56 +23,52 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.marker.SearchResult;
+import org.openrewrite.marker.RecipeSearchResult;
 
+import java.util.HashSet;
 import java.util.Set;
 
 /**
- * A Java search visitor that will return a list of matching method invocations within the abstract syntax tree.
- *
- * See {@link  MethodMatcher} for details on the expression's syntax.
+ * Finds matching method invocations.
  */
-@Data
 @EqualsAndHashCode(callSuper = true)
+@Data
 public final class FindMethods extends Recipe {
-
     /**
      * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
-     * See {@link  MethodMatcher} for details on the expression's syntax.
+     * See {@link MethodMatcher} for details on the expression's syntax.
      */
     private final String methodPattern;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new FindMethodsVisitor(methodPattern);
+        MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
+        return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                if (methodMatcher.matches(method)) {
+                    m = m.withMarker(new RecipeSearchResult(FindMethods.this));
+                }
+                return m;
+            }
+        };
     }
 
     public static Set<J.MethodInvocation> find(J j, String methodPattern) {
-        //noinspection ConstantConditions
-        return new FindMethodsVisitor(methodPattern)
-                .visit(j, ExecutionContext.builder().build())
-                .findMarkedWith(SearchResult.class);
-    }
-
-    private static class FindMethodsVisitor extends JavaIsoVisitor<ExecutionContext> {
-        private final MethodMatcher matcher;
-
-        /**
-         * See {@link FindMethods} for details on how the signature should be formatted.
-         *
-         * @param signature Pointcut expression for matching methods.
-         */
-        public FindMethodsVisitor(String signature) {
-            this.matcher = new MethodMatcher(signature);
-        }
-
-        @Override
-        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if (matcher.matches(method)) {
-                return m.withMarker(new SearchResult(null));
+        MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
+        JavaIsoVisitor<Set<J.MethodInvocation>> findVisitor = new JavaIsoVisitor<Set<J.MethodInvocation>>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Set<J.MethodInvocation> ms) {
+                if (methodMatcher.matches(method)) {
+                    ms.add(method);
+                }
+                return super.visitMethodInvocation(method, ms);
             }
-            return super.visitMethodInvocation(m, ctx);
-        }
+        };
+
+        Set<J.MethodInvocation> ms = new HashSet<>();
+        findVisitor.visit(j, ms);
+        return ms;
     }
 }

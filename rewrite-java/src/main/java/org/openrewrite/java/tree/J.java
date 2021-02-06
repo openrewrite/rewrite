@@ -86,19 +86,6 @@ public interface J extends Serializable, Tree {
         return withPrefix(getPrefix().withComments(comments));
     }
 
-    /**
-     * Find all subtrees marked with a particular marker rooted at this tree.
-     *
-     * @param markerType The marker type to look for
-     * @param <J2>       The expected supertype common to all subtrees that could be found.
-     * @return The set of matching subtrees.
-     */
-    default <J2 extends J> Set<J2> findMarkedWith(Class<? extends Marker> markerType) {
-        Set<J2> trees = new HashSet<>();
-        new JavaListMarkersVisitor<J2>(markerType).visit(this, trees);
-        return trees;
-    }
-
     Coordinates<?> getCoordinates();
 
     @Incubating(since = "7.0.0")

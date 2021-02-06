@@ -23,44 +23,54 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.marker.RecipeSearchResult;
 import org.openrewrite.marker.SearchResult;
 
+import java.util.HashSet;
 import java.util.Set;
 
 /**
- * This recipe will find all fields that have a type matching the fully qualified type name and mark those fields with
- * {@link SearchResult} markers.
+ * Finds fields that have a matching type.
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class FindFields extends Recipe {
-
     private final String fullyQualifiedTypeName;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new FindFieldsVisitor();
-    }
-
-    public static Set<J.VariableDecls> find(J j, String clazz) {
-        //noinspection ConstantConditions
-        return ((FindFieldsVisitor) new FindFields(clazz).getVisitor())
-                .visit(j, ExecutionContext.builder().build())
-                .findMarkedWith(SearchResult.class);
-    }
-
-    private final class FindFieldsVisitor extends JavaIsoVisitor<ExecutionContext> {
-
-        @Override
-        public J.VariableDecls visitMultiVariable(J.VariableDecls multiVariable, ExecutionContext ctx) {
-            if (multiVariable.getTypeExpr() instanceof J.MultiCatch) {
+        return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public J.VariableDecls visitMultiVariable(J.VariableDecls multiVariable, ExecutionContext ctx) {
+                if (multiVariable.getTypeExpr() instanceof J.MultiCatch) {
+                    return multiVariable;
+                }
+                if (multiVariable.getTypeExpr() != null && TypeUtils.hasElementType(multiVariable.getTypeExpr()
+                        .getType(), fullyQualifiedTypeName)) {
+                    return multiVariable.withMarker(new RecipeSearchResult(FindFields.this));
+                }
                 return multiVariable;
             }
-            if (multiVariable.getTypeExpr() != null && TypeUtils.hasElementType(multiVariable.getTypeExpr()
-                    .getType(), fullyQualifiedTypeName)) {
-                return multiVariable.withMarker(new SearchResult(null));
+        };
+    }
+
+    public static Set<J.VariableDecls> find(J j, String fullyQualifiedTypeName) {
+        JavaIsoVisitor<Set<J.VariableDecls>> findVisitor = new JavaIsoVisitor<Set<J.VariableDecls>>() {
+            @Override
+            public J.VariableDecls visitMultiVariable(J.VariableDecls multiVariable, Set<J.VariableDecls> vs) {
+                if (multiVariable.getTypeExpr() instanceof J.MultiCatch) {
+                    return multiVariable;
+                }
+                if (multiVariable.getTypeExpr() != null && TypeUtils.hasElementType(multiVariable.getTypeExpr()
+                        .getType(), fullyQualifiedTypeName)) {
+                    vs.add(multiVariable);
+                }
+                return multiVariable;
             }
-            return multiVariable;
-        }
+        };
+
+        Set<J.VariableDecls> vs = new HashSet<>();
+        findVisitor.visit(j, vs);
+        return vs;
     }
 }

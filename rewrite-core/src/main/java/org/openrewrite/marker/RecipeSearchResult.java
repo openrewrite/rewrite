@@ -15,9 +15,12 @@
  */
 package org.openrewrite.marker;
 
+import lombok.Data;
 import org.openrewrite.Incubating;
+import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
+import org.openrewrite.internal.lang.Nullable;
 
 /**
  * Mark any AST element with "paint". Used by search visitors to mark AST elements that
@@ -25,28 +28,7 @@ import org.openrewrite.TreePrinter;
  * contextualized in the tree that they are found in.
  */
 @Incubating(since = "7.0.0")
-public interface SearchResult extends Marker {
-    TreePrinter<Void> PRINTER = new TreePrinter<Void>() {
-        private Integer mark = null;
-
-        @Override
-        public void doBefore(Tree tree, StringBuilder printerAcc, Void unused) {
-            if (tree.getMarkers().findFirst(SearchResult.class).isPresent()) {
-                mark = printerAcc.length();
-            }
-        }
-
-        @Override
-        public void doAfter(Tree tree, StringBuilder printerAcc, Void unused) {
-            if (mark != null) {
-                for (int i = mark; i < printerAcc.length(); i++) {
-                    if (!Character.isWhitespace(printerAcc.charAt(i))) {
-                        printerAcc.insert(i, "~~>");
-                        break;
-                    }
-                }
-                mark = null;
-            }
-        }
-    };
+@Data
+public class RecipeSearchResult implements SearchResult {
+    private final Recipe recipe;
 }

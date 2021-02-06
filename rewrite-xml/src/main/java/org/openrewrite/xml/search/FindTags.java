@@ -20,44 +20,56 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.marker.SearchResult;
+import org.openrewrite.marker.RecipeSearchResult;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.HashSet;
 import java.util.Set;
 
-@Data
 @EqualsAndHashCode(callSuper = true)
+@Data
 public class FindTags extends Recipe {
     private final String xPath;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new FindTagsVisitor(new XPathMatcher(xPath));
+        XPathMatcher xPathMatcher = new XPathMatcher(xPath);
+        return new XmlVisitor<ExecutionContext>() {
+            {
+                setCursoringOn();
+            }
+
+            @Override
+            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
+                if (xPathMatcher.matches(getCursor())) {
+                    t = t.withMarker(new RecipeSearchResult(FindTags.this));
+                }
+                return t;
+            }
+        };
     }
 
     public static Set<Xml.Tag> find(Xml x, String xPath) {
-        //noinspection ConstantConditions
-        return new FindTagsVisitor(new XPathMatcher(xPath)).visit(x, ExecutionContext.builder().build())
-                .findMarkedWith(SearchResult.class);
-    }
-
-    private static class FindTagsVisitor extends XmlVisitor<ExecutionContext> {
-
-        private final XPathMatcher xPathMatcher;
-
-        public FindTagsVisitor(XPathMatcher xPathMatcher) {
-            this.xPathMatcher = xPathMatcher;
-            setCursoringOn();
-        }
-
-        @Override
-        public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            if (xPathMatcher.matches(getCursor())) {
-                return tag.withMarker(new SearchResult(null));
+        XPathMatcher xPathMatcher = new XPathMatcher(xPath);
+        XmlVisitor<Set<Xml.Tag>> findVisitor = new XmlVisitor<Set<Xml.Tag>>() {
+            {
+                setCursoringOn();
             }
-            return super.visitTag(tag, ctx);
-        }
+
+            @Override
+            public Xml visitTag(Xml.Tag tag, Set<Xml.Tag> ts) {
+                if (xPathMatcher.matches(getCursor())) {
+                    ts.add(tag);
+                }
+                return super.visitTag(tag, ts);
+            }
+        };
+
+        Set<Xml.Tag> ts = new HashSet<>();
+        findVisitor.visit(x, ts);
+        return ts;
     }
 }

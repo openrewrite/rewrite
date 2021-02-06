@@ -80,17 +80,17 @@ public class Markers {
     }
 
     /**
-     * Add a new marker or update some existing marker with the same type (equality not assignability).
+     * Add a new marker or update some existing marker.
      *
-     * @param identity          A new marker to add if none of this type already exist.
-     * @param remappingFunction The function that merges an existing marker with identity.
+     * @param identity          A new marker to add if it doesn't already exist.
+     * @param remappingFunction The function that merges an existing marker.
      * @return A new {@link Markers} with an added or updated marker.
      */
     public <M extends Marker> Markers compute(M identity, BinaryOperator<M> remappingFunction) {
         List<Marker> updatedmarker = new ArrayList<>(markers.size() + 1);
         boolean updated = false;
         for (Marker m : this.markers) {
-            if (m.getClass().equals(identity.getClass())) {
+            if (m.equals(identity)) {
                 //noinspection unchecked
                 updatedmarker.add(remappingFunction.apply((M) m, identity));
                 updated = true;

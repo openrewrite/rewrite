@@ -21,7 +21,7 @@ import org.openrewrite.Incubating;
 
 @Incubating(since = "7.0.0")
 @Data
-public class GitMarker implements Marker {
+public class GitProvenance implements Marker {
     private final String origin;
     private final String branch;
     private final String change;

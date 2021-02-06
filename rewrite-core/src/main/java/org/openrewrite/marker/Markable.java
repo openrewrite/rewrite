@@ -24,7 +24,7 @@ public interface Markable {
     default <M extends Markable> M withMarker(Marker... add) {
         Markers markers = getMarkers();
         for (Marker marker : add) {
-            markers = markers.add(marker);
+            markers = markers.compute(marker, (m1, m2) -> m2);
         }
         return withMarkers(markers);
     }

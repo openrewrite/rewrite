@@ -23,54 +23,52 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.marker.SearchResult;
+import org.openrewrite.marker.RecipeSearchResult;
 
+import java.util.HashSet;
 import java.util.Set;
 
 /**
- * This recipe will find all annotations matching the annotation pattern and mark those elements with a
- * {@link SearchResult} marker.
- *
- * The annotation pattern, expressed as a pointcut expression, is used to find matching annotations.
- * See {@link  AnnotationMatcher} for details on the expression's syntax.
- * 
+ * Find all annotations matching the annotation pattern.
  */
-@Data
 @EqualsAndHashCode(callSuper = true)
+@Data
 public class FindAnnotations extends Recipe {
-
     /**
-     * An annotation pattern, expressed as a pointcut expression. See {@link FindAnnotations} for syntax.
+     * An annotation pattern, expressed as a pointcut expression.
+     * See {@link AnnotationMatcher} for syntax.
      */
     private final String annotationPattern;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new FindAnnotationsVisitor(annotationPattern);
-    }
-
-    public static Set<J.Annotation> find(J j, String clazz) {
-        //noinspection ConstantConditions
-        return new FindAnnotationsVisitor(clazz)
-                .visit(j, ExecutionContext.builder().build())
-                .findMarkedWith(SearchResult.class);
-    }
-
-    private static class FindAnnotationsVisitor extends JavaIsoVisitor<ExecutionContext> {
-        private final AnnotationMatcher matcher;
-
-        public FindAnnotationsVisitor(String signature) {
-            this.matcher = new AnnotationMatcher(signature);
-        }
-
-        @Override
-        public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
-            J.Annotation a = super.visitAnnotation(annotation, ctx);
-            if (matcher.matches(annotation)) {
-                a = a.withMarker(new SearchResult(null));
+        AnnotationMatcher annotationMatcher = new AnnotationMatcher(annotationPattern);
+        return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                J.Annotation a = super.visitAnnotation(annotation, ctx);
+                if (annotationMatcher.matches(annotation)) {
+                    a = a.withMarker(new RecipeSearchResult(FindAnnotations.this));
+                }
+                return a;
             }
-            return a;
-        }
+        };
+    }
 
+    public static Set<J.Annotation> find(J j, String annotationPattern) {
+        AnnotationMatcher annotationMatcher = new AnnotationMatcher(annotationPattern);
+        JavaIsoVisitor<Set<J.Annotation>> findVisitor = new JavaIsoVisitor<Set<J.Annotation>>() {
+            @Override
+            public J.Annotation visitAnnotation(J.Annotation annotation, Set<J.Annotation> as) {
+                if (annotationMatcher.matches(annotation)) {
+                    as.add(annotation);
+                }
+                return super.visitAnnotation(annotation, as);
+            }
+        };
+
+        Set<J.Annotation> as = new HashSet<>();
+        findVisitor.visit(j, as);
+        return as;
     }
 }

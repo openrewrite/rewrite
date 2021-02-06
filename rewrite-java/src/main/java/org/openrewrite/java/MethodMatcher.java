@@ -166,7 +166,10 @@ public class MethodMatcher {
         } else if (type instanceof JavaType.Class) {
             return ((JavaType.Class) type).getFullyQualifiedName();
         } else if (type instanceof JavaType.Array) {
-            return typePattern(((JavaType.Array) type).getElemType()) + "[]";
+            JavaType elemType = ((JavaType.Array) type).getElemType();
+            if (elemType != null) {
+                return typePattern(elemType) + "[]";
+            }
         }
         return null;
     }

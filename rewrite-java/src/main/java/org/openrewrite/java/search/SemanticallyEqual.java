@@ -26,9 +26,7 @@ import java.util.List;
 import java.util.Objects;
 
 /*
- * Semantically Equal recursively checks the equality of each element of two ASTs to determine if the two trees are semantically equal.
- * This is necessary because ASTs are so frequently recreated that merely comparing the IDs of two ASTs is ineffective.
- * SemanticallyEqual has only been implemented for annotations for now.
+ * Recursively checks the equality of each element of two ASTs to determine if two trees are semantically equal.
  */
 @Incubating(since = "6.0.0")
 public class SemanticallyEqual {
@@ -181,6 +179,5 @@ public class SemanticallyEqual {
 
             return thisType.deepEquals(otherType);
         }
-
     }
 }
