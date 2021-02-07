@@ -2134,7 +2134,6 @@ public interface J extends Serializable, Tree {
         @With
         Markers markers;
 
-        @With
         JLeftPadded<Boolean> statik;
 
         @With

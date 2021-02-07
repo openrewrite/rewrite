@@ -428,7 +428,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     public J visitImport(J.Import impoort, P p) {
         J.Import i = impoort;
         i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.IMPORT_PREFIX, p));
-        i = i.withStatik(visitLeftPadded(i.getPadding().getStatic(), JLeftPadded.Location.STATIC_IMPORT, p));
+        i = i.getPadding().withStatic(visitLeftPadded(i.getPadding().getStatic(), JLeftPadded.Location.STATIC_IMPORT, p));
         i = i.withQualid(visitAndCast(i.getQualid(), p));
         return i;
     }

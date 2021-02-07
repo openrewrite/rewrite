@@ -31,7 +31,7 @@ public class ImportToString {
         public J visitImport(J.Import impoort, Void unused) {
             J.Import i = impoort.withPrefix(Space.EMPTY);
             i = i.withQualid(i.getQualid().withPrefix(i.getQualid().getPrefix().withWhitespace(" ")));
-            i = i.withStatik(i.getPadding().getStatic().withBefore(i.getPadding().getStatic().getBefore().withWhitespace(" ")));
+            i = i.getPadding().withStatic(i.getPadding().getStatic().withBefore(i.getPadding().getStatic().getBefore().withWhitespace(" ")));
             return super.visitImport(i, unused);
         }
     };
