@@ -23,7 +23,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 
 import java.net.URI;
-import java.net.URL;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;

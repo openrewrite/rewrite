@@ -122,7 +122,7 @@ public class MapdbMavenPomCache implements MavenPomCache {
     }
 
     private void fillUnresolvablePoms() {
-        new BufferedReader(new InputStreamReader(MavenDownloader.class.getResourceAsStream("/unresolvable.txt"), StandardCharsets.UTF_8))
+        new BufferedReader(new InputStreamReader(MavenPomDownloader.class.getResourceAsStream("/unresolvable.txt"), StandardCharsets.UTF_8))
                 .lines()
                 .filter(line -> !line.isEmpty())
                 .forEach(unresolvablePoms::add);

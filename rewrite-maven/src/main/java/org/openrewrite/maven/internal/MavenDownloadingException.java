@@ -16,7 +16,15 @@
 package org.openrewrite.maven.internal;
 
 public class MavenDownloadingException extends RuntimeException {
+    public MavenDownloadingException(String message) {
+        super(message);
+    }
+
     public MavenDownloadingException(String message, Throwable cause) {
         super(message, cause);
+    }
+
+    public MavenDownloadingException(String message, Object... args) {
+        super(String.format(message, args));
     }
 }

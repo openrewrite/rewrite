@@ -25,10 +25,15 @@ import java.util.function.Consumer;
 
 public class ReadOnlyLocalMavenArtifactCache extends LocalMavenArtifactCache {
     public static ReadOnlyLocalMavenArtifactCache MAVEN_LOCAL = new ReadOnlyLocalMavenArtifactCache(
-            Paths.get(System.getProperty("user.home")));
+            Paths.get(System.getProperty("user.home"), ".m2", "repository"));
 
     public ReadOnlyLocalMavenArtifactCache(Path cache) {
         super(cache);
+    }
+
+    @Override
+    public @Nullable Path getArtifact(Pom.Dependency dependency) {
+        return super.getArtifact(dependency);
     }
 
     @Override

@@ -27,10 +27,8 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.CacheResult;
-import org.openrewrite.maven.cache.MavenArtifactCache;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.maven.tree.Pom;
 
 import javax.net.ssl.SSLException;
 import java.io.ByteArrayInputStream;
@@ -48,7 +46,7 @@ import java.util.stream.Stream;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 
-public class MavenDownloader {
+public class MavenPomDownloader {
     private static final RetryConfig retryConfig = RetryConfig.custom()
             .retryExceptions(SocketTimeoutException.class, TimeoutException.class)
             .build();
@@ -70,7 +68,6 @@ public class MavenDownloader {
             new RawRepositories.ArtifactPolicy(true), new RawRepositories.ArtifactPolicy(false));
 
     private final MavenPomCache mavenPomCache;
-    private final MavenArtifactCache mavenArtifactCache;
     private final Map<Path, RawMaven> projectPoms;
 
     @Nullable
@@ -84,21 +81,17 @@ public class MavenDownloader {
      * Failing to do this will result in being unable to download dependencies or their metadata when information from settings.xml is required to access artifact
      * repositories.
      */
-    public MavenDownloader(MavenPomCache mavenPomCache, MavenArtifactCache mavenArtifactCache,
-                           Map<Path, RawMaven> projectPoms, @Nullable MavenSettings settings,
-                           Consumer<Throwable> onError) {
+    public MavenPomDownloader(MavenPomCache mavenPomCache, Map<Path, RawMaven> projectPoms,
+                              @Nullable MavenSettings settings,
+                              Consumer<Throwable> onError) {
         this.mavenPomCache = mavenPomCache;
-        this.mavenArtifactCache = mavenArtifactCache;
         this.projectPoms = projectPoms;
         this.settings = settings;
         this.onError = onError;
-        if (settings == null || settings.getServers() == null) {
-            serverIdToServer = new HashMap<>();
-        } else {
-            serverIdToServer = settings.getServers().getServers()
-                    .stream()
-                    .collect(toMap(MavenSettings.Server::getId, Function.identity()));
-        }
+        this.serverIdToServer = settings == null || settings.getServers() == null ?
+                new HashMap<>() :
+                settings.getServers().getServers().stream()
+                        .collect(toMap(MavenSettings.Server::getId, Function.identity()));
     }
 
     public MavenMetadata downloadMetadata(String groupId, String artifactId,
@@ -281,7 +274,7 @@ public class MavenDownloader {
                     .filter(Objects::nonNull)
                     .findFirst()
                     .orElse(null);
-        } catch(Throwable t) {
+        } catch (Throwable t) {
             onError.accept(t);
             return null;
         }
@@ -317,35 +310,6 @@ public class MavenDownloader {
         }
 
         return version;
-    }
-
-    /**
-     * Fetch the jar file indicated by the dependency.
-     *
-     * @param dependency The dependency to download.
-     * @return The path on disk of the downloaded artifact or <code>null</code> if unable to download.
-     */
-    @Nullable
-    public Path downloadArtifact(Pom.Dependency dependency) {
-        return mavenArtifactCache.computeArtifact(dependency, () -> {
-            String uri = dependency.getRepository() + "/" +
-                    dependency.getGroupId().replace('.', '/') + '/' +
-                    dependency.getArtifactId() + '/' +
-                    dependency.getVersion() + '/' +
-                    dependency.getArtifactId() + '-' + dependency.getDatedSnapshotVersion() + ".jar";
-
-            Request.Builder request = applyAuthentication(dependency.getRepository(), new Request.Builder().url(uri).get());
-            try (Response response = sendRequest.apply(request.build())) {
-                ResponseBody body = response.body();
-                if (response.isSuccessful() && body != null) {
-                    return body.byteStream();
-                }
-            } catch (Throwable throwable) {
-                onError.accept(throwable);
-            }
-
-            return null;
-        }, onError);
     }
 
     @Nullable
@@ -408,15 +372,6 @@ public class MavenDownloader {
     }
 
     private Request.Builder applyAuthentication(RawRepositories.Repository repository, Request.Builder request) {
-        MavenSettings.Server authInfo = serverIdToServer.get(repository.getId());
-        if (authInfo != null) {
-            String credentials = Credentials.basic(authInfo.getUsername(), authInfo.getPassword());
-            request.header("Authorization", credentials);
-        }
-        return request;
-    }
-
-    private Request.Builder applyAuthentication(Pom.Repository repository, Request.Builder request) {
         MavenSettings.Server authInfo = serverIdToServer.get(repository.getId());
         if (authInfo != null) {
             String credentials = Credentials.basic(authInfo.getUsername(), authInfo.getPassword());

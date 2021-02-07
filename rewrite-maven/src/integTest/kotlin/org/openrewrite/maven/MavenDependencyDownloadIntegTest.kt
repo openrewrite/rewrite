@@ -18,97 +18,60 @@ package org.openrewrite.maven
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
-import org.openrewrite.Issue
+import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Parser
+import org.openrewrite.maven.cache.LocalMavenArtifactCache
+import org.openrewrite.maven.cache.ReadOnlyLocalMavenArtifactCache
 import org.openrewrite.maven.tree.Maven
 import org.openrewrite.maven.tree.Scope
+import java.nio.file.Path
 import java.nio.file.Paths
 
 class MavenDependencyDownloadIntegTest {
+    private fun downloader(path: Path) = MavenArtifactDownloader(
+        ReadOnlyLocalMavenArtifactCache.MAVEN_LOCAL.orElse(
+            LocalMavenArtifactCache(path)
+        ),
+        null
+    ) { t -> throw t }
+
     @Test
-    fun springWebMvc() {
+    fun springWebMvc(@TempDir tempDir: Path) {
         val maven: Maven = MavenParser.builder()
-                .resolveOptional(false)
-                .build()
-                .parse(singleDependencyPom("org.springframework:spring-webmvc:4.3.6.RELEASE"))
-                .first()
+            .doOnError { t -> t.printStackTrace() }
+            .resolveOptional(false)
+            .build()
+            .parse(singleDependencyPom("org.springframework:spring-webmvc:5.3.2"))
+            .first()
 
         val compileDependencies = maven.model.getDependencies(Scope.Compile)
 
         compileDependencies.forEach { dep ->
             println("${dep.repository} ${dep.coordinates}")
         }
-    }
 
-    @Test
-    fun rewriteCore() {
-        val maven: Maven = MavenParser.builder()
-                .resolveOptional(false)
-                .build()
-                .parse(singleDependencyPom("org.openrewrite:rewrite-core:6.0.1"))
-                .first()
-
-        val compileDependencies = maven.model.getDependencies(Scope.Runtime)
-                .sortedBy { d -> d.coordinates }
-
+        val downloader = downloader(tempDir)
         compileDependencies.forEach { dep ->
-            println("${dep.repository} ${dep.coordinates}")
+            println(dep.coordinates + downloader.downloadArtifact(dep))
         }
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/135")
     @Test
-    fun selfRecursiveParent() {
-        MavenParser.builder()
+    fun rewriteCore(@TempDir tempDir: Path) {
+        val maven: Maven = MavenParser.builder()
+            .doOnError { t -> t.printStackTrace() }
             .resolveOptional(false)
             .build()
-            .parse("""
-                <project>
-                    <modelVersion>4.0.0</modelVersion>
-                
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    
-                    <parent>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                    </parent>
-                </project>
-            """)
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/135")
-    @Test
-    fun selfRecursiveDependency() {
-        val maven = MavenParser.builder()
-            .resolveOptional(false)
-            .build()
-            .parse("""
-                <project>
-                    <modelVersion>4.0.0</modelVersion>
-
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    
-                    <dependencies>
-                        <dependency>
-                            <groupId>com.mycompany.app</groupId>
-                            <artifactId>my-app</artifactId>
-                            <version>1</version>
-                        </dependency>
-                    </dependencies>
-                </project>
-            """)
+            .parse(singleDependencyPom("org.openrewrite:rewrite-core:6.0.1"))
             .first()
-        // Maven itself would respond to this pom with a fatal error.
-        // So long as we don't produce an AST with cycles it's OK
-        assertThat(maven.model.dependencies)
-            .hasSize(1)
-        assertThat(maven.model.dependencies.first().model.dependencies)
-            .hasSize(0)
+
+        val runtimeDependencies = maven.model.getDependencies(Scope.Runtime)
+            .sortedBy { d -> d.coordinates }
+
+        val downloader = downloader(tempDir)
+        runtimeDependencies.forEach { dep ->
+            println(dep.coordinates + downloader.downloadArtifact(dep))
+        }
     }
 
     @Disabled("This requires a full instance of artifactory with particular configuration to be running locally")
@@ -155,7 +118,8 @@ class MavenDependencyDownloadIntegTest {
                         </dependency>
                     </dependencies>
                 </project>
-                """)
+                """
+            )
             .first()
 
         assertThat(maven.model.dependencies)

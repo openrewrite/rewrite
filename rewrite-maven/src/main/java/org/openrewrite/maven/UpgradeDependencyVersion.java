@@ -19,9 +19,8 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.cache.MavenArtifactCache;
 import org.openrewrite.maven.cache.MavenPomCache;
-import org.openrewrite.maven.internal.MavenDownloader;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.MavenMetadata;
 import org.openrewrite.maven.tree.DependencyManagementDependency;
 import org.openrewrite.maven.tree.Maven;
@@ -127,7 +126,7 @@ public class UpgradeDependencyVersion extends Recipe {
 
         private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion) {
             if (availableVersions == null) {
-                MavenMetadata mavenMetadata = new MavenDownloader(MavenPomCache.NOOP, MavenArtifactCache.NOOP,
+                MavenMetadata mavenMetadata = new MavenPomDownloader(MavenPomCache.NOOP,
                         emptyMap(), settings,
                         t -> {
                             throw new RecipeException(t);

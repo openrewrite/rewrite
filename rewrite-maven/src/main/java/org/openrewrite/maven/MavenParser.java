@@ -18,10 +18,8 @@ package org.openrewrite.maven;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
-import org.openrewrite.maven.cache.MavenArtifactCache;
 import org.openrewrite.maven.cache.MavenPomCache;
-import org.openrewrite.maven.cache.ReadOnlyLocalMavenArtifactCache;
-import org.openrewrite.maven.internal.MavenDownloader;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.RawMaven;
 import org.openrewrite.maven.internal.RawMavenResolver;
 import org.openrewrite.maven.tree.Maven;
@@ -47,7 +45,6 @@ public class MavenParser implements Parser<Maven> {
     private static final Logger logger = LoggerFactory.getLogger(MavenParser.class);
 
     private final MavenPomCache mavenPomCache;
-    private final MavenArtifactCache mavenArtifactCache;
     private final Collection<String> activeProfiles;
 
     @Nullable
@@ -63,10 +60,9 @@ public class MavenParser implements Parser<Maven> {
      * @param resolveOptional When set to 'true' resolve dependencies marked as optional
      * @param onError         An optional, user supplied error handler. If a supplied onError handler does not re-throw exceptions they will be suppressed and execution will continue where possible.
      */
-    private MavenParser(MavenPomCache mavenPomCache, MavenArtifactCache mavenArtifactCache, Collection<String> activeProfiles,
+    private MavenParser(MavenPomCache mavenPomCache, Collection<String> activeProfiles,
                         @Nullable MavenSettings mavenSettings, boolean resolveOptional, Consumer<Throwable> onError) {
         this.mavenPomCache = mavenPomCache;
-        this.mavenArtifactCache = mavenArtifactCache;
         this.activeProfiles = activeProfiles;
         this.mavenSettings = mavenSettings;
         this.resolveOptional = resolveOptional;
@@ -79,7 +75,7 @@ public class MavenParser implements Parser<Maven> {
                 .map(source -> RawMaven.parse(source, relativeTo, null))
                 .collect(toList());
 
-        MavenDownloader downloader = new MavenDownloader(mavenPomCache, mavenArtifactCache,
+        MavenPomDownloader downloader = new MavenPomDownloader(mavenPomCache,
                 projectPoms.stream().collect(toMap(RawMaven::getSourcePath, Function.identity())),
                 mavenSettings, onError);
 
@@ -142,7 +138,6 @@ public class MavenParser implements Parser<Maven> {
 
     public static class Builder {
         private MavenPomCache mavenPomCache = new InMemoryMavenPomCache();
-        private MavenArtifactCache mavenArtifactCache = ReadOnlyLocalMavenArtifactCache.MAVEN_LOCAL;
         private final Collection<String> activeProfiles = new HashSet<>();
         private boolean resolveOptional = true;
 
@@ -189,19 +184,13 @@ public class MavenParser implements Parser<Maven> {
             return this;
         }
 
-        public Builder artifactCache(MavenArtifactCache cache) {
-            this.mavenArtifactCache = cache;
-            return this;
-        }
-
         public Builder doOnError(@Nullable Consumer<Throwable> onError) {
             this.onError = onError == null ? t -> {} : onError;
             return this;
         }
 
         public MavenParser build() {
-            return new MavenParser(mavenPomCache, mavenArtifactCache, activeProfiles,
-                    mavenSettings, resolveOptional, onError);
+            return new MavenParser(mavenPomCache, activeProfiles, mavenSettings, resolveOptional, onError);
         }
     }
 }

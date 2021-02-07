@@ -45,7 +45,7 @@ public class RawMavenResolver {
     private final Map<PartialTreeKey, Optional<Pom>> resolved = new HashMap<>();
     private final Map<ResolutionTask, PartialMaven> partialResults = new HashMap<>();
 
-    private final MavenDownloader downloader;
+    private final MavenPomDownloader downloader;
 
     private final Collection<String> activeProfiles;
     private final boolean resolveOptional;
@@ -55,7 +55,7 @@ public class RawMavenResolver {
 
     private final Consumer<Throwable> onError;
 
-    public RawMavenResolver(MavenDownloader downloader, Collection<String> activeProfiles,
+    public RawMavenResolver(MavenPomDownloader downloader, Collection<String> activeProfiles,
                             @Nullable MavenSettings mavenSettings, boolean resolveOptional,
                             Consumer<Throwable> onError) {
         this.onError = onError;
@@ -448,7 +448,7 @@ public class RawMavenResolver {
                             }
 
                             return new Pom.Dependency(
-                                    mapRepository(rawMaven.getRepository()),
+                                    mapRepository(depTask.getRawMaven().getRepository()),
                                     depTask.getScope(),
                                     depTask.getClassifier(),
                                     depTask.getType(),

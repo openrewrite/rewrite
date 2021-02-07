@@ -17,8 +17,10 @@ package org.openrewrite.maven.cache;
 
 import lombok.Data;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.tree.Pom;
 
+import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
@@ -41,25 +43,32 @@ public class LocalMavenArtifactCache implements MavenArtifactCache {
     @Nullable
     public Path putArtifact(Pom.Dependency dependency, InputStream artifactInputStream, Consumer<Throwable> onError) {
         Path path = dependencyPath(dependency);
-        try (InputStream is = artifactInputStream;
-             OutputStream out = Files.newOutputStream(path)) {
-            if (is != null) {
-                byte[] buffer = new byte[1024];
-                int read;
-                while ((read = is.read(buffer, 0, 1024)) >= 0) {
-                    out.write(buffer, 0, read);
+        File folder = path.getParent().toFile();
+        if(folder.exists() || folder.mkdirs()) {
+            try (InputStream is = artifactInputStream;
+                 OutputStream out = Files.newOutputStream(path)) {
+                if (is != null) {
+                    byte[] buffer = new byte[1024];
+                    int read;
+                    while ((read = is.read(buffer, 0, 1024)) >= 0) {
+                        out.write(buffer, 0, read);
+                    }
                 }
+            } catch (Exception e) {
+                onError.accept(e);
+                return null;
             }
-        } catch (Exception e) {
-            onError.accept(e);
+        } else {
+            onError.accept(new MavenDownloadingException("Unable to create local folder for artifact"));
             return null;
         }
         return path;
     }
 
     private Path dependencyPath(Pom.Dependency dependency) {
-        return cache.resolve(Paths.get(dependency.getGroupId(),
+        return cache.resolve(Paths.get(dependency.getGroupId().replace('.', '/'),
                 dependency.getArtifactId(),
+                dependency.getVersion(),
                 dependency.getArtifactId() + "-" + dependency.getVersion() +
                         (dependency.getClassifier() == null ? "" : dependency.getClassifier()) +
                         ".jar"));

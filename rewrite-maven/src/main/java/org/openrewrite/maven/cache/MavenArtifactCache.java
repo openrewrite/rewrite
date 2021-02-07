@@ -18,8 +18,10 @@ package org.openrewrite.maven.cache;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Pom;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
+import java.util.concurrent.Callable;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -31,7 +33,13 @@ public interface MavenArtifactCache {
         }
 
         @Override
-        public @Nullable Path putArtifact(Pom.Dependency dependency, InputStream is, Consumer<Throwable> onError) {
+        @Nullable
+        public Path putArtifact(Pom.Dependency dependency, InputStream is, Consumer<Throwable> onError) {
+            try {
+                is.close();
+            } catch (IOException e) {
+                onError.accept(e);
+            }
             return null;
         }
     };
@@ -43,13 +51,16 @@ public interface MavenArtifactCache {
     Path putArtifact(Pom.Dependency dependency, InputStream is, Consumer<Throwable> onError);
 
     @Nullable
-    default Path computeArtifact(Pom.Dependency dependency, Supplier<@Nullable InputStream> orElseGet,
+    default Path computeArtifact(Pom.Dependency dependency, Callable<@Nullable InputStream> orElseGet,
                                  Consumer<Throwable> onError) {
         Path artifact = getArtifact(dependency);
         if (artifact == null) {
-            InputStream is = orElseGet.get();
-            if (is != null) {
-                artifact = putArtifact(dependency, is, onError);
+            try (InputStream is = orElseGet.call()) {
+                if (is != null) {
+                    artifact = putArtifact(dependency, is, onError);
+                }
+            } catch (Exception e) {
+                onError.accept(e);
             }
         }
         return artifact;

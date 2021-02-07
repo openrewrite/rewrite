@@ -19,10 +19,9 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.RecipeException;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.cache.MavenArtifactCache;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
-import org.openrewrite.maven.internal.MavenDownloader;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.MavenMetadata;
 import org.openrewrite.maven.internal.Version;
 import org.openrewrite.maven.tree.Maven;
@@ -197,7 +196,7 @@ public class AddDependencyVisitor<P> extends MavenVisitor<P> {
             return version;
         }
 
-        MavenMetadata mavenMetadata = new MavenDownloader(MavenPomCache.NOOP, MavenArtifactCache.NOOP,
+        MavenMetadata mavenMetadata = new MavenPomDownloader(MavenPomCache.NOOP,
                 emptyMap(), settings,
                 t -> {
                     throw new RecipeException(t);

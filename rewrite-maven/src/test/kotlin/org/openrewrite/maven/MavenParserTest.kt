@@ -244,4 +244,58 @@ class MavenParserTest {
         assertThatThrownBy { parserStrict.parse(invalidPom) }
         parserLenient.parse(invalidPom)
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/135")
+    @Test
+    fun selfRecursiveParent() {
+        MavenParser.builder()
+            .resolveOptional(false)
+            .build()
+            .parse("""
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                    </parent>
+                </project>
+            """)
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/135")
+    @Test
+    fun selfRecursiveDependency() {
+        val maven = MavenParser.builder()
+            .resolveOptional(false)
+            .build()
+            .parse("""
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>my-app</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """)
+            .first()
+
+        // Maven itself would respond to this pom with a fatal error.
+        // So long as we don't produce an AST with cycles it's OK
+        assertThat(maven.model.dependencies).hasSize(1)
+        assertThat(maven.model.dependencies.first().model.dependencies).hasSize(0)
+    }
 }
