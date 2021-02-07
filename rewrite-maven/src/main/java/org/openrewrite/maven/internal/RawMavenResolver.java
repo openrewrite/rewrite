@@ -89,12 +89,12 @@ public class RawMavenResolver {
      */
     @Nullable
     public Pom resolve(RawMaven rawMaven, Scope scope, @Nullable String requestedVersion, List<RawRepositories.Repository> repositories) {
-        return _resolve(rawMaven, scope, requestedVersion, repositories, null);
+        return resolve(rawMaven, scope, requestedVersion, repositories, null);
     }
 
     @Nullable
-    private Pom _resolve(RawMaven rawMaven, Scope scope, @Nullable String requestedVersion, List<RawRepositories.Repository> repositories,
-                         @Nullable LinkedHashSet<PartialTreeKey> seenParentPoms) {
+    private Pom resolve(RawMaven rawMaven, Scope scope, @Nullable String requestedVersion, List<RawRepositories.Repository> repositories,
+                        @Nullable LinkedHashSet<PartialTreeKey> seenParentPoms) {
         ResolutionTask rootTask = new ResolutionTask(scope, rawMaven, emptySet(),
                 false, null, null, requestedVersion, repositories, seenParentPoms);
 
@@ -371,7 +371,7 @@ public class RawMavenResolver {
                 //noinspection OptionalAssignedToNull
                 if (maybeParent == null) {
                     parent = new RawMavenResolver(downloader, activeProfiles, mavenSettings, resolveOptional, onError)
-                            ._resolve(rawParentModel, Scope.Compile, rawParent.getVersion(), partialMaven.getRepositories(), parentPomSightings);
+                            .resolve(rawParentModel, Scope.Compile, rawParent.getVersion(), partialMaven.getRepositories(), parentPomSightings);
                     resolved.put(parentKey, Optional.ofNullable(parent));
                 } else {
                     parent = maybeParent.orElse(null);

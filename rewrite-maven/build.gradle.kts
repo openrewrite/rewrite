@@ -19,6 +19,9 @@ dependencies {
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")
 
     compileOnly("org.mapdb:mapdb:latest.release")
+    compileOnly(project(":rewrite-java"))
+    compileOnly(project(":rewrite-yaml"))
+    compileOnly(project(":rewrite-properties"))
 
     implementation("io.micrometer:micrometer-core:latest.release")
 
@@ -38,6 +41,9 @@ dependencies {
     integTestImplementation("io.micrometer:micrometer-registry-prometheus:latest.release")
 
     integTestImplementation(project(":rewrite-java-11"))
+    integTestImplementation(project(":rewrite-properties"))
+    integTestImplementation(project(":rewrite-xml"))
+    integTestImplementation(project(":rewrite-yaml"))
 
     testImplementation("ch.qos.logback:logback-classic:1.0.13")
     testImplementation("org.mapdb:mapdb:latest.release")

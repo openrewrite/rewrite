@@ -107,26 +107,6 @@ public class MavenParser implements Parser<Maven> {
         return parsed;
     }
 
-    public static List<Maven> parseProject(Path path) {
-        try {
-            List<Path> poms = Files.find(path, Integer.MAX_VALUE, (filePath, fileAttr) -> fileAttr.isRegularFile() && filePath.endsWith("pom.xml"))
-                    .collect(toList());
-
-            if (logger.isInfoEnabled()) {
-                for (Path pom : poms) {
-                    logger.info("Parsing {}", pom);
-                }
-            }
-
-            return MavenParser.builder()
-                    .mavenConfig(path.resolve(".mvn/maven.config"))
-                    .build()
-                    .parse(poms, path);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
     @Override
     public boolean accept(Path path) {
         return path.toString().equals("pom.xml") || path.toString().endsWith(".pom");

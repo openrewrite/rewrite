@@ -15,19 +15,31 @@
  */
 package org.openrewrite.maven
 
-import org.openrewrite.maven.tree.Scope
+import org.openrewrite.java.JavaParser
+import org.openrewrite.maven.cache.LocalMavenArtifactCache
+import org.openrewrite.maven.cache.ReadOnlyLocalMavenArtifactCache
+import org.openrewrite.maven.utilities.MavenProjectParser
+import java.nio.file.Path
 import java.nio.file.Paths
+import java.util.function.Consumer
 
 object ParseMavenProjectOnDisk {
     @JvmStatic
     fun main(args: Array<String>) {
-        val mavens = MavenParser.parseProject(Paths.get(args.first()))
+        val errorConsumer = Consumer<Throwable> { t -> throw t }
 
-        mavens.forEach {
+        val downloader = MavenArtifactDownloader(
+            ReadOnlyLocalMavenArtifactCache.MAVEN_LOCAL.orElse(
+                LocalMavenArtifactCache(Paths.get(System.getProperty("user.home"), ".rewrite-cache"))
+            ),
+            null,
+            errorConsumer
+        )
+
+        val parser = MavenProjectParser(downloader, JavaParser.fromJavaVersion(), errorConsumer)
+
+        parser.parse(Paths.get(args.first())).forEach {
             println(it.sourcePath)
-            it.model.getDependencies(Scope.Runtime).forEach { dep ->
-                println("  $dep")
-            }
         }
     }
 }

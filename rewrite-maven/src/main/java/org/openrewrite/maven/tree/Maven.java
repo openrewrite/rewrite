@@ -24,7 +24,16 @@ import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
+import java.util.function.BiPredicate;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 
@@ -52,6 +61,53 @@ public class Maven extends Xml.Document {
         modules = document.getMarkers().findFirst(Modules.class)
                 .map(Modules::getModules)
                 .orElse(emptyList());
+    }
+
+    public static List<Path> getMavenPoms(Path projectDir, Consumer<Throwable> onError) {
+        return getSources(projectDir, onError, "pom.xml");
+    }
+
+    public List<Path> getJavaSources(Consumer<Throwable> onError) {
+        if (!"jar".equals(model.getPackaging())) {
+            return emptyList();
+        }
+        return getSources(getSourcePath().getParent().resolve(Paths.get("src", "main", "java")),
+                onError, ".java");
+    }
+
+    public List<Path> getTestJavaSources(Consumer<Throwable> onError) {
+        if (!"jar".equals(model.getPackaging())) {
+            return emptyList();
+        }
+        return getSources(getSourcePath().getParent().resolve(Paths.get("src", "test", "java")),
+                onError, ".java");
+    }
+
+    public List<Path> getResources(Consumer<Throwable> onError) {
+        if (!"jar".equals(model.getPackaging())) {
+            return emptyList();
+        }
+        return getSources(getSourcePath().getParent().resolve(Paths.get("src", "main", "resources")),
+                onError, ".properties", ".xml", ".yml", ".yaml");
+    }
+
+    public List<Path> getTestResources(Consumer<Throwable> onError) {
+        if (!"jar".equals(model.getPackaging())) {
+            return emptyList();
+        }
+        return getSources(getSourcePath().getParent().resolve(Paths.get("src", "test", "resources")),
+                onError, ".properties", ".xml", ".yml", ".yaml");
+    }
+
+    private static List<Path> getSources(Path srcDir, Consumer<Throwable> onError, String... fileTypes) {
+        BiPredicate<Path, java.nio.file.attribute.BasicFileAttributes> predicate = (p, bfa) ->
+                bfa.isRegularFile() && Arrays.stream(fileTypes).anyMatch(type -> p.getFileName().toString().endsWith(type));
+        try {
+            return Files.find(srcDir, 999, predicate).collect(Collectors.toList());
+        } catch (IOException e) {
+            onError.accept(e);
+            return emptyList();
+        }
     }
 
     public Pom getModel() {
