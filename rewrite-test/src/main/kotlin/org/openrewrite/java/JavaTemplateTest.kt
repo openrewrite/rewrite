@@ -479,7 +479,7 @@ interface JavaTemplateTest : RecipeTest {
         """
     )
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/239")
+    @Issue("#239")
     @Disabled
     @Test
     fun replaceAnnotation(jp: JavaParser) = assertChanged(
