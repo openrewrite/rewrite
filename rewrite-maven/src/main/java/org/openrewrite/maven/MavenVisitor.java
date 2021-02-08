@@ -38,12 +38,10 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
 
     protected Pom model;
     protected Collection<Pom> modules;
-    protected MavenSettings settings;
 
     public Maven visitMaven(Maven maven, ExecutionContext ctx) {
         this.model = maven.getModel();
         this.modules = maven.getModules();
-        this.settings = maven.getSettings();
         return (Maven) visitDocument(maven, ctx);
     }
 
@@ -51,7 +49,7 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
     public final Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
         Xml.Document refactored = (Xml.Document) super.visitDocument(document, ctx);
         if (refactored != document) {
-            return new Maven(refactored, settings);
+            return new Maven(refactored);
         }
         return refactored;
     }

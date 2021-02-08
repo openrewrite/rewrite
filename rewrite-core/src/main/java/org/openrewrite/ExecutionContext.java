@@ -27,10 +27,20 @@ public interface ExecutionContext {
     void putMessage(String key, Object value);
 
     @Nullable
-    <T> T peekMessage(String key);
+    <T> T getMessage(String key);
+
+    default <T> T getMessage(String key, T defaultValue) {
+        T t = getMessage(key);
+        return t == null ? defaultValue : t;
+    }
 
     @Nullable
     <T> T pollMessage(String key);
+
+    default <T> T pollMessage(String key, T defaultValue) {
+        T t = pollMessage(key);
+        return t == null ? defaultValue : t;
+    }
 
     Consumer<Throwable> getOnError();
 }

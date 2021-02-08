@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.maven;
+package org.openrewrite.maven.utilities;
 
 import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryConfig;
@@ -21,9 +21,11 @@ import io.github.resilience4j.retry.RetryRegistry;
 import io.vavr.CheckedFunction1;
 import okhttp3.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.MavenArtifactCache;
 import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.tree.MavenRepository;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -126,7 +128,7 @@ public class MavenArtifactDownloader {
         }, onError);
     }
 
-    private Request.Builder applyAuthentication(Pom.Repository repository, Request.Builder request) {
+    private Request.Builder applyAuthentication(MavenRepository repository, Request.Builder request) {
         MavenSettings.Server authInfo = serverIdToServer.get(repository.getId());
         if (authInfo != null) {
             String credentials = Credentials.basic(authInfo.getUsername(), authInfo.getPassword());

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven.internal;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import lombok.*;
@@ -37,7 +36,6 @@ public class RawRepositories {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
     public static class Repository {
-
         @Nullable
         String id;
 
@@ -49,16 +47,6 @@ public class RawRepositories {
 
         @Nullable
         ArtifactPolicy snapshots;
-
-        public boolean acceptsVersion(String version) {
-            if (version.endsWith("-SNAPSHOT")) {
-                return snapshots != null && snapshots.isEnabled();
-            } else if (url.equals("https://repo.spring.io/milestone")) {
-                // special case this repository since it will be so commonly used
-                return version.matches(".*(M|RC)\\d+$");
-            }
-            return releases != null && releases.isEnabled();
-        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

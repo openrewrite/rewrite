@@ -15,21 +15,24 @@
  */
 package org.openrewrite.maven;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import lombok.experimental.NonFinal;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenXmlMapper;
 import org.openrewrite.maven.internal.RawRepositories;
+import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.tree.MavenRepositoryCredentials;
+import org.openrewrite.maven.tree.MavenRepositoryMirror;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.net.URI;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
@@ -54,15 +57,44 @@ public class MavenSettings {
     @With
     Servers servers;
 
-    public static MavenSettings parse(Parser.Input source) {
+    @Nullable
+    @SuppressWarnings("ConstantConditions")
+    public static MavenSettings parse(Parser.Input source, ExecutionContext ctx, String... activeProfiles) {
         try {
-            return MavenXmlMapper.readMapper().readValue(source.getSource(), MavenSettings.class);
+            MavenSettings settings = MavenXmlMapper.readMapper().readValue(source.getSource(), MavenSettings.class);
+            MavenExecutionContextView view = new MavenExecutionContextView(ctx);
+
+            if (settings.servers != null) {
+                view.setCredentials(settings.servers.getServers().stream()
+                        .map(server -> new MavenRepositoryCredentials(server.getId(), server.getUsername(), server.getPassword()))
+                        .collect(Collectors.toList()));
+            }
+
+            if (settings.mirrors != null) {
+                view.setMirrors(settings.mirrors.getMirrors().stream()
+                        .map(mirror -> new MavenRepositoryMirror(mirror.getId(), mirror.getUrl(), mirror.getMirrorOf()))
+                        .collect(Collectors.toList()));
+            }
+
+            view.setRepositories(settings.getActiveRepositories(activeProfiles).stream()
+                    .map(repo -> new MavenRepository(
+                            repo.getId(),
+                            URI.create(repo.getUrl()),
+                            repo.getReleases() == null || repo.getReleases().isEnabled(),
+                            repo.getSnapshots() != null && repo.getSnapshots().isEnabled(),
+                            null,
+                            null
+                    ))
+                    .collect(Collectors.toList()));
+
+            return settings;
         } catch (IOException e) {
-            throw new UncheckedIOException("Failed to parse " + source.getPath(), e);
+            ctx.getOnError().accept(new IOException("Failed to parse " + source.getPath(), e));
+            return null;
         }
     }
 
-    public List<RawRepositories.Repository> getActiveRepositories(Collection<String> activeProfiles) {
+    public List<RawRepositories.Repository> getActiveRepositories(String... activeProfiles) {
         List<RawRepositories.Repository> activeRepositories = new ArrayList<>();
 
         if (profiles != null) {
@@ -75,27 +107,8 @@ public class MavenSettings {
                 }
             }
         }
-        return applyMirrors(activeRepositories);
-    }
 
-    public List<RawRepositories.Repository> applyMirrors(Collection<RawRepositories.Repository> repositories) {
-        if (mirrors == null) {
-            if (repositories instanceof List) {
-                return (List<RawRepositories.Repository>) repositories;
-            } else {
-                return new ArrayList<>(repositories);
-            }
-        } else {
-            return mirrors.applyMirrors(repositories);
-        }
-    }
-
-    public RawRepositories.Repository applyMirrors(RawRepositories.Repository repository) {
-        if (mirrors == null) {
-            return repository;
-        } else {
-            return mirrors.applyMirrors(repository);
-        }
+        return activeRepositories;
     }
 
     @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -125,7 +138,7 @@ public class MavenSettings {
         @Nullable
         RawRepositories repositories;
 
-        public boolean isActive(Collection<String> activeProfiles) {
+        public boolean isActive(Iterable<String> activeProfiles) {
             if (id != null) {
                 for (String activeProfile : activeProfiles) {
                     if (activeProfile.trim().equals(id)) {
@@ -134,6 +147,10 @@ public class MavenSettings {
                 }
             }
             return false;
+        }
+
+        public boolean isActive(String... activeProfiles) {
+            return isActive(Arrays.asList(activeProfiles));
         }
     }
 
@@ -144,152 +161,19 @@ public class MavenSettings {
         @JacksonXmlProperty(localName = "mirror")
         @JacksonXmlElementWrapper(useWrapping = false)
         List<Mirror> mirrors = emptyList();
-
-        public List<RawRepositories.Repository> applyMirrors(Collection<RawRepositories.Repository> repositories) {
-            return repositories.stream()
-                    .map(this::applyMirrors)
-                    .distinct()
-                    .collect(Collectors.toList());
-        }
-
-        public RawRepositories.Repository applyMirrors(RawRepositories.Repository repository) {
-            RawRepositories.Repository result = repository;
-            for (Mirror mirror : mirrors) {
-                result = mirror.apply(result);
-            }
-            return result;
-        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
     public static class Mirror {
-
-        /**
-         * The id of this mirror.
-         */
         @Nullable
         String id;
 
-        /**
-         * The optional name that describes the mirror.
-         */
         @Nullable
-        String name;
+        String url;
 
-        @Nullable
-        URI url;
-
-        /**
-         * The server ID of the repository being mirrored, e.g., "central".
-         * This can be a literal id, but it can also take a few other patterns:
-         * * = everything
-         * external:* = everything not on the localhost and not file based.
-         * repo,repo1 = repo or repo1
-         * !repo1 = everything except repo1
-         * <p>
-         * See: https://maven.apache.org/guides/mini/guide-mirror-settings.html#advanced-mirror-specification
-         */
         @Nullable
         String mirrorOf;
-
-        @Nullable
-        @NonFinal
-        private ApplicabilitySpec applicabilitySpec = null;
-
-        private ApplicabilitySpec buildApplicabilitySpec() {
-            if (mirrorOf == null) {
-                return APPLICABLE_TO_NOTHING;
-            }
-            if (mirrorOf.equals("*")) {
-                return APPLICABLE_TO_EVERYTHING;
-            }
-            int colonIndex = mirrorOf.indexOf(':');
-            String mirrorOfWithoutExternal = mirrorOf;
-            boolean externalOnly = false;
-            if (colonIndex != -1) {
-                externalOnly = true;
-                mirrorOfWithoutExternal = mirrorOf.substring(colonIndex + 1);
-            }
-            List<String> mirrorsOf = Arrays.stream(mirrorOfWithoutExternal.split(",")).collect(Collectors.toList());
-            Set<String> excludedRepos = new HashSet<>();
-            Set<String> includedRepos = new HashSet<>();
-            for (String mirror : mirrorsOf) {
-                if (mirror.startsWith("!")) {
-                    excludedRepos.add(mirror.substring(1));
-                } else {
-                    includedRepos.add(mirror);
-                }
-            }
-
-            return new DefaultApplicabilitySpec(externalOnly, excludedRepos, includedRepos);
-        }
-
-        private interface ApplicabilitySpec {
-            boolean isApplicable(RawRepositories.Repository repo);
-        }
-
-        private static ApplicabilitySpec APPLICABLE_TO_EVERYTHING = repo -> true;
-        private static ApplicabilitySpec APPLICABLE_TO_NOTHING = repo -> false;
-
-        private static class DefaultApplicabilitySpec implements ApplicabilitySpec {
-            final boolean isExternalOnly;
-            final Set<String> excludedRepos;
-            final Set<String> includedRepos;
-
-            DefaultApplicabilitySpec(boolean isExternalOnly, Set<String> excludedRepos, Set<String> includedRepos) {
-                this.isExternalOnly = isExternalOnly;
-                this.excludedRepos = excludedRepos;
-                this.includedRepos = includedRepos;
-            }
-
-            @Override
-            public boolean isApplicable(RawRepositories.Repository repo) {
-                if (isExternalOnly && isInternal(repo)) {
-                    return false;
-                }
-                // Named inclusion/exclusion beats wildcard inclusion/exclusion
-                if (excludedRepos.stream().anyMatch(it -> it.equals("*"))) {
-                    return includedRepos.contains(repo.getId());
-                }
-                if (includedRepos.stream().anyMatch(it -> it.equals("*"))) {
-                    return !excludedRepos.contains(repo.getId());
-                }
-                return !excludedRepos.contains(repo.getId()) && includedRepos.contains(repo.getId());
-            }
-
-            private boolean isInternal(RawRepositories.Repository repo) {
-                URI repoUri = URI.create(repo.getUrl());
-                if (repoUri.getScheme().startsWith("file")) {
-                    return true;
-                }
-                // Best-effort basis, by no means a full guarantee of detecting all possible local URIs
-                return repoUri.getHost().equals("localhost") || repoUri.getHost().equals("127.0.0.1");
-            }
-        }
-
-        /**
-         * Apply this mirror to the supplied Repository.
-         * If this mirror is applicable, a Repository with the URL specified in this mirror will be returned.
-         * If this mirror is inapplicable, the supplied repository will be returned unmodified.
-         */
-        public RawRepositories.Repository apply(RawRepositories.Repository repo) {
-            if (isApplicable(repo) && url != null) {
-                return new RawRepositories.Repository(id, url.toString(), repo.getReleases(), repo.getSnapshots());
-            } else {
-                return repo;
-            }
-        }
-
-        /**
-         * Returns true if this mirror is applicable to the supplied repository, otherwise false.
-         */
-        public boolean isApplicable(RawRepositories.Repository repo) {
-            if (applicabilitySpec == null) {
-                applicabilitySpec = buildApplicabilitySpec();
-            }
-            return applicabilitySpec.isApplicable(repo);
-        }
     }
 
     @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -306,11 +190,7 @@ public class MavenSettings {
     public static class Server {
         String id;
 
-        // Prevent user credentials from being inadvertently serialized
-        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         String username;
-
-        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         String password;
     }
 }

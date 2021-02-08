@@ -20,6 +20,7 @@ import lombok.experimental.FieldDefaults;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 
@@ -46,7 +47,7 @@ public class RawMaven {
      */
     @With
     @Nullable
-    RawRepositories.Repository repository;
+    MavenRepository repository;
 
     @Override
     public boolean equals(Object o) {

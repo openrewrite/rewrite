@@ -20,8 +20,8 @@ import io.micrometer.core.instrument.Tags;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.MavenMetadata;
 import org.openrewrite.maven.internal.RawMaven;
-import org.openrewrite.maven.internal.RawRepositories;
 import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.MavenRepository;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -33,12 +33,12 @@ import java.util.concurrent.Callable;
 public class InMemoryMavenPomCache implements MavenPomCache {
     private final Map<String, Optional<RawMaven>> pomCache = new HashMap<>();
     private final Map<GroupArtifactRepository, Optional<MavenMetadata>> mavenMetadataCache = new HashMap<>();
-    private final Map<RawRepositories.Repository, Optional<RawRepositories.Repository>> normalizedRepositoryUrls = new HashMap<>();
+    private final Map<MavenRepository, Optional<MavenRepository>> normalizedRepositoryUrls = new HashMap<>();
     private final Set<String> unresolvablePoms = new HashSet<>();
 
     private final CacheResult<RawMaven> UNAVAILABLE_POM = new CacheResult<>(CacheResult.State.Unavailable, null);
     private final CacheResult<MavenMetadata> UNAVAILABLE_METADATA = new CacheResult<>(CacheResult.State.Unavailable, null);
-    private final CacheResult<RawRepositories.Repository> UNAVAILABLE_REPOSITORY = new CacheResult<>(CacheResult.State.Unavailable, null);
+    private final CacheResult<MavenRepository> UNAVAILABLE_REPOSITORY = new CacheResult<>(CacheResult.State.Unavailable, null);
 
     public InMemoryMavenPomCache() {
         Metrics.gaugeMapSize("rewrite.maven.cache.size", Tags.of("type", "inmem", "content", "poms"), pomCache);
@@ -108,14 +108,14 @@ public class InMemoryMavenPomCache implements MavenPomCache {
     }
 
     @Override
-    public CacheResult<RawRepositories.Repository> computeRepository(RawRepositories.Repository repository,
-                                                                     Callable<RawRepositories.Repository> orElseGet) throws Exception {
-        Optional<RawRepositories.Repository> normalizedRepository = normalizedRepositoryUrls.get(repository);
+    public CacheResult<MavenRepository> computeRepository(MavenRepository repository,
+                                                          Callable<MavenRepository> orElseGet) throws Exception {
+        Optional<MavenRepository> normalizedRepository = normalizedRepositoryUrls.get(repository);
 
         //noinspection OptionalAssignedToNull
         if (normalizedRepository == null) {
             try {
-                RawRepositories.Repository repo = orElseGet.call();
+                MavenRepository repo = orElseGet.call();
                 normalizedRepositoryUrls.put(repository, Optional.ofNullable(repo));
                 return new CacheResult<>(CacheResult.State.Updated, repo);
             } catch (Exception e) {

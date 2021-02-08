@@ -98,7 +98,7 @@ public class UpgradeParentVersion extends Recipe {
                                                             ExecutionContext ctx) {
             if (availableVersions == null) {
                 MavenMetadata mavenMetadata = new MavenPomDownloader(MavenPomCache.NOOP,
-                        emptyMap(), settings, ctx).downloadMetadata(groupId, artifactId, emptyList());
+                        emptyMap(), ctx).downloadMetadata(groupId, artifactId, emptyList());
                 availableVersions = mavenMetadata.getVersioning().getVersions().stream()
                         .filter(versionComparator::isValid)
                         .collect(Collectors.toList());

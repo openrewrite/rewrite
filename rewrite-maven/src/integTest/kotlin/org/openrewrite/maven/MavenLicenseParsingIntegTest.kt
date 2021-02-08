@@ -65,7 +65,7 @@ class MavenLicenseParsingIntegTest {
         val pomFile = tempDir.resolve("pom.xml").toFile().apply { writeText(pom) }
 
         val pomAst: Maven = MavenParser.builder()
-                .pomCache(mavenCache)
+                .cache(mavenCache)
                 .resolveOptional(false)
                 .build()
                 .parse(listOf(pomFile.toPath()), null, InMemoryExecutionContext())

@@ -20,7 +20,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
@@ -40,9 +39,8 @@ import static java.util.Collections.emptyList;
 public class Maven extends Xml.Document {
     private final transient Pom model;
     private final transient Collection<Pom> modules;
-    private final transient MavenSettings settings;
 
-    public Maven(Xml.Document document, @Nullable MavenSettings settings) {
+    public Maven(Xml.Document document) {
         super(
                 document.getId(),
                 document.getSourcePath(),
@@ -53,8 +51,6 @@ public class Maven extends Xml.Document {
                 document.getEof()
         );
 
-        this.settings = settings;
-
         model = document.getMarkers().findFirst(Pom.class).orElse(null);
         assert model != null;
 
@@ -64,7 +60,9 @@ public class Maven extends Xml.Document {
     }
 
     public static List<Path> getMavenPoms(Path projectDir, ExecutionContext ctx) {
-        return getSources(projectDir, ctx, "pom.xml");
+        return getSources(projectDir, ctx, "pom.xml").stream()
+                .filter(p -> p.getFileName().toString().equals("pom.xml"))
+                .collect(Collectors.toList());
     }
 
     public List<Path> getJavaSources(ExecutionContext ctx) {
@@ -118,10 +116,6 @@ public class Maven extends Xml.Document {
         return modules;
     }
 
-    public MavenSettings getSettings() {
-        return settings;
-    }
-
     @SuppressWarnings("unchecked")
     @Override
     @Nullable
@@ -140,7 +134,7 @@ public class Maven extends Xml.Document {
         if (m instanceof Maven) {
             return (Maven) m;
         }
-        return new Maven(m, settings);
+        return new Maven(m);
     }
 
     @Override
@@ -149,7 +143,7 @@ public class Maven extends Xml.Document {
         if (m instanceof Maven) {
             return (Maven) m;
         }
-        return new Maven(m, settings);
+        return new Maven(m);
     }
 
     @Override
@@ -158,7 +152,7 @@ public class Maven extends Xml.Document {
         if (m instanceof Maven) {
             return (Maven) m;
         }
-        return new Maven(m, settings);
+        return new Maven(m);
     }
 
     @Override
@@ -167,7 +161,7 @@ public class Maven extends Xml.Document {
         if (m instanceof Maven) {
             return (Maven) m;
         }
-        return new Maven(m, settings);
+        return new Maven(m);
     }
 
     public Maven withModel(Pom model) {

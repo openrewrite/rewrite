@@ -28,7 +28,7 @@ class RemoveDependencyTest : RecipeTest {
 
     override val parser: MavenParser = MavenParser.builder()
         .resolveOptional(false)
-        .pomCache(mavenCache)
+        .cache(mavenCache)
         .build()
 
     override val recipe = RemoveDependency("junit","junit")

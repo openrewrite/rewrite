@@ -22,10 +22,12 @@ import org.openrewrite.maven.internal.grammar.VersionRangeLexer;
 import org.openrewrite.maven.internal.grammar.VersionRangeParser;
 import org.openrewrite.maven.internal.grammar.VersionRangeParserBaseVisitor;
 import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.MavenRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
@@ -222,7 +224,7 @@ public class RequestedVersion {
         }
     }
 
-    public String resolve(MavenPomDownloader downloader, List<RawRepositories.Repository> repositories) {
+    public String resolve(MavenPomDownloader downloader, Collection<MavenRepository> repositories) {
         String selectedVersion;
         if (isRange() || isDynamic()) {
             MavenMetadata metadata = downloader.downloadMetadata(groupArtifact.getGroupId(),

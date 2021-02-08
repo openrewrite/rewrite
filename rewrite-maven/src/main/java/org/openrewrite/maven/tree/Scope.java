@@ -23,7 +23,8 @@ public enum Scope {
     Provided,
     Runtime,
     Test,
-    System;
+    System,
+    Invalid;
 
     /**
      * @param scope The scope to test
@@ -111,7 +112,7 @@ public enum Scope {
             case "system":
                 return System;
             default:
-                throw new IllegalArgumentException("unsupported scope '" + scope + "'");
+                return Invalid;
         }
     }
 }

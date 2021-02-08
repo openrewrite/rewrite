@@ -19,6 +19,7 @@ import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.java.JavaParser
 import org.openrewrite.maven.cache.LocalMavenArtifactCache
 import org.openrewrite.maven.cache.ReadOnlyLocalMavenArtifactCache
+import org.openrewrite.maven.utilities.MavenArtifactDownloader
 import org.openrewrite.maven.utilities.MavenProjectParser
 import java.nio.file.Paths
 import java.util.function.Consumer

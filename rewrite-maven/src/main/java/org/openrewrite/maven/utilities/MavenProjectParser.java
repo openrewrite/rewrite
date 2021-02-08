@@ -18,7 +18,6 @@ package org.openrewrite.maven.utilities;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaParser;
-import org.openrewrite.maven.MavenArtifactDownloader;
 import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
@@ -76,35 +75,47 @@ public class MavenProjectParser {
             List<Path> resources = new ArrayList<>(maven.getResources(ctx));
             resources.addAll(maven.getTestResources(ctx));
 
-            sourceFiles.addAll(
-                    new XmlParser().parse(
-                            resources.stream()
-                                    .filter(p -> p.getFileName().toString().endsWith(".xml"))
-                                    .collect(Collectors.toList()),
-                            projectDirectory,
-                            ctx
-                    )
-            );
+            try {
+                sourceFiles.addAll(
+                        new XmlParser().parse(
+                                resources.stream()
+                                        .filter(p -> p.getFileName().toString().endsWith(".xml"))
+                                        .collect(Collectors.toList()),
+                                projectDirectory,
+                                ctx
+                        )
+                );
+            } catch(Throwable t) {
+                ctx.getOnError().accept(t);
+            }
 
-            sourceFiles.addAll(
-                    new YamlParser().parse(
-                            resources.stream()
-                                    .filter(p -> p.getFileName().toString().endsWith(".yml") || p.getFileName().toString().endsWith(".yaml"))
-                                    .collect(Collectors.toList()),
-                            projectDirectory,
-                            ctx
-                    )
-            );
+            try {
+                sourceFiles.addAll(
+                        new YamlParser().parse(
+                                resources.stream()
+                                        .filter(p -> p.getFileName().toString().endsWith(".yml") || p.getFileName().toString().endsWith(".yaml"))
+                                        .collect(Collectors.toList()),
+                                projectDirectory,
+                                ctx
+                        )
+                );
+            } catch(Throwable t) {
+                ctx.getOnError().accept(t);
+            }
 
-            sourceFiles.addAll(
-                    new PropertiesParser().parse(
-                            resources.stream()
-                                    .filter(p -> p.getFileName().toString().endsWith(".properties"))
-                                    .collect(Collectors.toList()),
-                            projectDirectory,
-                            ctx
-                    )
-            );
+            try {
+                sourceFiles.addAll(
+                        new PropertiesParser().parse(
+                                resources.stream()
+                                        .filter(p -> p.getFileName().toString().endsWith(".properties"))
+                                        .collect(Collectors.toList()),
+                                projectDirectory,
+                                ctx
+                        )
+                );
+            } catch(Throwable t) {
+                ctx.getOnError().accept(t);
+            }
         }
 
         return sourceFiles;

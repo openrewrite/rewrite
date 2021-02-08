@@ -39,7 +39,7 @@ class AddDependencyTest : RecipeTest {
     override val parser: Parser<*>?
         get() = MavenParser.builder()
             .resolveOptional(false)
-            .pomCache(mavenCache)
+            .cache(mavenCache)
             .build()
 
     @Test

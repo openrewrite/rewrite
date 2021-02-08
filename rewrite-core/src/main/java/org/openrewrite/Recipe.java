@@ -335,8 +335,8 @@ public class Recipe {
         }
 
         @Override
-        public <T> @Nullable T peekMessage(String key) {
-            return delegate.peekMessage(key);
+        public <T> @Nullable T getMessage(String key) {
+            return delegate.getMessage(key);
         }
 
         @Override

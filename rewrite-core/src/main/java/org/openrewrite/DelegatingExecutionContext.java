@@ -17,45 +17,32 @@ package org.openrewrite;
 
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
-public class InMemoryExecutionContext implements ExecutionContext {
-    private final Map<String, Object> messages = new ConcurrentHashMap<>();
-    private final Consumer<Throwable> onError;
+public class DelegatingExecutionContext implements ExecutionContext {
+    private final ExecutionContext delegate;
 
-    public InMemoryExecutionContext() {
-        this(
-                t -> {
-                }
-        );
-    }
-
-    public InMemoryExecutionContext(Consumer<Throwable> onError) {
-        this.onError = onError;
+    public DelegatingExecutionContext(ExecutionContext delegate) {
+        this.delegate = delegate;
     }
 
     @Override
     public void putMessage(String key, Object value) {
-        messages.put(key, value);
+        delegate.putMessage(key, value);
     }
 
     @Override
-    @Nullable
-    public <T> T getMessage(String key) {
-        //noinspection unchecked
-        return (T) messages.get(key);
+    public <T> @Nullable T getMessage(String key) {
+        return delegate.getMessage(key);
     }
 
     @Override
-    @Nullable
-    public <T> T pollMessage(String key) {
-        //noinspection unchecked
-        return (T) messages.remove(key);
+    public <T> @Nullable T pollMessage(String key) {
+        return delegate.pollMessage(key);
     }
 
+    @Override
     public Consumer<Throwable> getOnError() {
-        return onError;
+        return delegate.getOnError();
     }
 }

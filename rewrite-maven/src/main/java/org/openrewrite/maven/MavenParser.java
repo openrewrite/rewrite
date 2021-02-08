@@ -42,23 +42,16 @@ import static java.util.stream.StreamSupport.stream;
 public class MavenParser implements Parser<Maven> {
     private final MavenPomCache mavenPomCache;
     private final Collection<String> activeProfiles;
-
-    @Nullable
-    private final MavenSettings mavenSettings;
-
     private final boolean resolveOptional;
 
     /**
      * @param mavenPomCache   The cache to be used to speed up dependency resolution
      * @param activeProfiles  The maven profile names set to be active. Profiles are typically defined in the settings.xml
-     * @param mavenSettings   The parsed settings.xml file to retrieve profiles, credentials, mirrors, etc. from
      * @param resolveOptional When set to 'true' resolve dependencies marked as optional
      */
-    private MavenParser(MavenPomCache mavenPomCache, Collection<String> activeProfiles,
-                        @Nullable MavenSettings mavenSettings, boolean resolveOptional) {
+    private MavenParser(MavenPomCache mavenPomCache, Collection<String> activeProfiles, boolean resolveOptional) {
         this.mavenPomCache = mavenPomCache;
         this.activeProfiles = activeProfiles;
-        this.mavenSettings = mavenSettings;
         this.resolveOptional = resolveOptional;
     }
 
@@ -69,14 +62,12 @@ public class MavenParser implements Parser<Maven> {
                 .collect(toList());
 
         MavenPomDownloader downloader = new MavenPomDownloader(mavenPomCache,
-                projectPoms.stream().collect(toMap(RawMaven::getSourcePath, Function.identity())),
-                mavenSettings, ctx);
+                projectPoms.stream().collect(toMap(RawMaven::getSourcePath, Function.identity())), ctx);
 
         List<Maven> parsed = projectPoms.stream()
-                .map(raw -> new RawMavenResolver(downloader, activeProfiles,
-                        mavenSettings, resolveOptional, ctx).resolve(raw))
+                .map(raw -> new RawMavenResolver(downloader, activeProfiles, resolveOptional, ctx, relativeTo).resolve(raw))
                 .filter(Objects::nonNull)
-                .map(xmlDoc -> new Maven(xmlDoc, mavenSettings))
+                .map(Maven::new)
                 .collect(toCollection(ArrayList::new));
 
         for (int i = 0; i < parsed.size(); i++) {
@@ -114,9 +105,6 @@ public class MavenParser implements Parser<Maven> {
         private final Collection<String> activeProfiles = new HashSet<>();
         private boolean resolveOptional = true;
 
-        @Nullable
-        private MavenSettings mavenSettings;
-
         public Builder resolveOptional(@Nullable Boolean optional) {
             this.resolveOptional = optional == null || optional;
             return this;
@@ -146,18 +134,13 @@ public class MavenParser implements Parser<Maven> {
             return this;
         }
 
-        public Builder mavenSettings(Parser.Input source) {
-            this.mavenSettings = MavenSettings.parse(source);
-            return this;
-        }
-
-        public Builder pomCache(MavenPomCache cache) {
+        public Builder cache(MavenPomCache cache) {
             this.mavenPomCache = cache;
             return this;
         }
 
         public MavenParser build() {
-            return new MavenParser(mavenPomCache, activeProfiles, mavenSettings, resolveOptional);
+            return new MavenParser(mavenPomCache, activeProfiles, resolveOptional);
         }
     }
 }

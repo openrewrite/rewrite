@@ -25,6 +25,7 @@ import org.openrewrite.maven.cache.LocalMavenArtifactCache
 import org.openrewrite.maven.cache.ReadOnlyLocalMavenArtifactCache
 import org.openrewrite.maven.tree.Maven
 import org.openrewrite.maven.tree.Scope
+import org.openrewrite.maven.utilities.MavenArtifactDownloader
 import java.nio.file.Path
 import java.nio.file.Paths
 
@@ -78,10 +79,9 @@ class MavenDependencyDownloadIntegTest {
     @Disabled("This requires a full instance of artifactory with particular configuration to be running locally")
     @Test
     fun withAuth() {
-        // Don't worry about the credentials stored in here being useful for any other purpose or worth protecting
-        val maven: Maven = MavenParser.builder()
-            .mavenSettings(Parser.Input(Paths.get("settings.xml")) {
-                """
+        val ctx = InMemoryExecutionContext()
+        MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
+            """
                 <settings>
                     <mirrors>
                         <mirror>
@@ -100,11 +100,12 @@ class MavenDependencyDownloadIntegTest {
                     </servers>
                 </settings>
                 """.trimIndent().byteInputStream()
-            })
-            .build()
-            .parse(
-                ctx,
-                """
+        }, ctx)
+
+        // Don't worry about the credentials stored in here being useful for any other purpose or worth protecting
+        val maven: Maven = MavenParser.builder().build().parse(
+            ctx,
+            """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
                 
@@ -121,8 +122,7 @@ class MavenDependencyDownloadIntegTest {
                     </dependencies>
                 </project>
                 """
-            )
-            .first()
+        ).first()
 
         assertThat(maven.model.dependencies)
             .hasSize(1)

@@ -197,7 +197,7 @@ public class AddDependencyVisitor extends MavenVisitor {
         }
 
         MavenMetadata mavenMetadata = new MavenPomDownloader(MavenPomCache.NOOP,
-                emptyMap(), settings, ctx).downloadMetadata(groupId, artifactId, emptyList());
+                emptyMap(), ctx).downloadMetadata(groupId, artifactId, emptyList());
 
         LatestRelease latest = new LatestRelease(metadataPattern);
         return mavenMetadata.getVersioning().getVersions().stream()

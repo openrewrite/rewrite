@@ -22,7 +22,6 @@ import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 
-import java.net.URI;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -64,7 +63,7 @@ public class Pom implements Marker {
     @With
     Collection<License> licenses;
 
-    Collection<Repository> repositories;
+    Collection<MavenRepository> repositories;
     Map<String, String> properties;
 
     public Pom(@Nullable String groupId,
@@ -77,7 +76,7 @@ public class Pom implements Marker {
                Collection<Dependency> dependencies,
                DependencyManagement dependencyManagement,
                Collection<License> licenses,
-               Collection<Repository> repositories,
+               Collection<MavenRepository> repositories,
                Map<String, String> properties) {
         this.groupId = groupId;
         this.artifactId = artifactId;
@@ -190,19 +189,6 @@ public class Pom implements Marker {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-    @Data
-    public static class Repository {
-        String id;
-
-        @EqualsAndHashCode.Include
-        URI uri;
-
-        boolean releases;
-        boolean snapshots;
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
     public static class License {
         String name;
@@ -271,7 +257,7 @@ public class Pom implements Marker {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
     public static class Dependency implements DependencyDescriptor {
-        Repository repository;
+        MavenRepository repository;
 
         Scope scope;
 

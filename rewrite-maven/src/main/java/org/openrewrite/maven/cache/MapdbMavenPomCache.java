@@ -25,6 +25,7 @@ import org.mapdb.serializer.SerializerString;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.*;
 import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.MavenRepository;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -38,20 +39,20 @@ import java.util.concurrent.Callable;
 
 public class MapdbMavenPomCache implements MavenPomCache {
     private static final Serializer<Optional<RawMaven>> MAVEN_SERIALIZER = new OptionalJacksonMapdbSerializer<>(RawMaven.class);
-    private static final Serializer<RawRepositories.Repository> REPOSITORY_SERIALIZER = new JacksonMapdbSerializer<>(RawRepositories.Repository.class);
-    private static final Serializer<Optional<RawRepositories.Repository>> OPTIONAL_REPOSITORY_SERIALIZER = new OptionalJacksonMapdbSerializer<>(RawRepositories.Repository.class);
+    private static final Serializer<MavenRepository> REPOSITORY_SERIALIZER = new JacksonMapdbSerializer<>(MavenRepository.class);
+    private static final Serializer<Optional<MavenRepository>> OPTIONAL_REPOSITORY_SERIALIZER = new OptionalJacksonMapdbSerializer<>(MavenRepository.class);
     private static final Serializer<Optional<MavenMetadata>> MAVEN_METADATA_SERIALIZER = new OptionalJacksonMapdbSerializer<>(MavenMetadata.class);
     private static final Serializer<GroupArtifactRepository> GROUP_ARTIFACT_SERIALIZER = new JacksonMapdbSerializer<>(GroupArtifactRepository.class);
 
     private final HTreeMap<String, Optional<RawMaven>> pomCache;
     private final HTreeMap<GroupArtifactRepository, Optional<MavenMetadata>> mavenMetadataCache;
-    private final HTreeMap<RawRepositories.Repository, Optional<RawRepositories.Repository>> normalizedRepositoryUrls;
+    private final HTreeMap<MavenRepository, Optional<MavenRepository>> normalizedRepositoryUrls;
 
     private final Set<String> unresolvablePoms = new HashSet<>();
 
     CacheResult<RawMaven> UNAVAILABLE_POM = new CacheResult<>(CacheResult.State.Unavailable, null);
     CacheResult<MavenMetadata> UNAVAILABLE_METADATA = new CacheResult<>(CacheResult.State.Unavailable, null);
-    CacheResult<RawRepositories.Repository> UNAVAILABLE_REPOSITORY = new CacheResult<>(CacheResult.State.Unavailable, null);
+    CacheResult<MavenRepository> UNAVAILABLE_REPOSITORY = new CacheResult<>(CacheResult.State.Unavailable, null);
 
     public MapdbMavenPomCache(@Nullable File workspace,
                               @Nullable Long maxCacheStoreSize) {
@@ -181,14 +182,14 @@ public class MapdbMavenPomCache implements MavenPomCache {
     }
 
     @Override
-    public CacheResult<RawRepositories.Repository> computeRepository(RawRepositories.Repository repository,
-                                                                     Callable<RawRepositories.Repository> orElseGet) throws Exception {
-        Optional<RawRepositories.Repository> normalizedRepository = normalizedRepositoryUrls.get(repository);
+    public CacheResult<MavenRepository> computeRepository(MavenRepository repository,
+                                                          Callable<MavenRepository> orElseGet) throws Exception {
+        Optional<MavenRepository> normalizedRepository = normalizedRepositoryUrls.get(repository);
 
         //noinspection OptionalAssignedToNull
         if (normalizedRepository == null) {
             try {
-                RawRepositories.Repository repo = orElseGet.call();
+                MavenRepository repo = orElseGet.call();
                 normalizedRepositoryUrls.put(repository, Optional.ofNullable(repo));
                 return new CacheResult<>(CacheResult.State.Updated, repo);
             } catch (Exception e) {
