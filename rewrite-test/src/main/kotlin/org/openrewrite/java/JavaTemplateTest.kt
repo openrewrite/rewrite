@@ -480,7 +480,6 @@ interface JavaTemplateTest : RecipeTest {
     )
 
     @Issue("#239")
-    @Disabled
     @Test
     fun replaceAnnotation(jp: JavaParser) = assertChanged(
         jp,

@@ -178,8 +178,6 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
     public J visitMethod(J.MethodDecl method, Cursor insertionScope) {
         if (!insertionScope.isScopeInPath(method)) {
             return super.visitMethod(method.withAnnotations(emptyList()).withBody(EMPTY_BLOCK), insertionScope);
-        } else if (!method.getId().equals(coordinates.getTree().getId())) {
-            return super.visitMethod(method.withAnnotations(emptyList()), insertionScope);
         }
 
         visitSpace(method.getPrefix(), Space.Location.METHOD_DECL_PREFIX, insertionScope);
