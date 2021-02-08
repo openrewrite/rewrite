@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.format
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
@@ -27,94 +26,6 @@ import org.openrewrite.style.NamedStyles
 interface SpacesTest : RecipeTest {
     override val recipe: Recipe?
         get() = Spaces()
-
-    val dependsOn: Array<String>
-        get() = arrayOf(
-                """
-                    class MyResource implements AutoCloseable {
-                        public void close() {
-                        }
-                    }
-                """
-        )
-
-    val testCode: String
-        get() = """
-            @SuppressWarnings({"ALL"})
-            public class A {
-                void bar() {}
-                void foo(int arg) {
-                    Runnable r = () -> {};
-                    Runnable r1 = this::bar;
-                    if (true) {
-                        foo(1);
-                    } else {
-                        foo(2);
-                    }
-                    int j = 0;
-                    for (int i = 0; i < 10 || j > 0; i++) {
-                        j += i;
-                    }
-                    int[] arr = new int[]{1, 3, 5, 6, 7, 87, 1213, 2};
-                    for (int e : arr) {
-                        j += e;
-                    }
-                    int[] arr2 = new int[]{};
-                    int elem = arr[j];
-                    int x;
-                    while (j < 1000 && x > 0) {
-                        j = j + 1;
-                    }
-                    do {
-                        j = j + 1;
-                    } while (j < 2000);
-                    switch (j) {
-                        case 1:
-                        default:
-                    }
-                    try (MyResource res1 = new MyResource(); MyResource res2 = null) {
-                    } catch (Exception e) {
-                    } finally {
-                    }
-                    Object o = new Object();
-                    synchronized (o) {
-                    }
-                    if (x == 0) {
-                    }
-                    if (j != 0) {
-                    }
-                    if (x <= 0) {
-                    }
-                    if (j >= 0) {
-                    }
-                    x = x << 2;
-                    x = x >> 2;
-                    x = x >>> 2;
-                    x = x | 2;
-                    x = x & 2;
-                    x = x ^ 2;
-                    x = x + 1;
-                    x = x - 1;
-                    x = x * 2;
-                    x = x / 2;
-                    x = x % 2;
-                    boolean b;
-                    b = !b;
-                    x = -x;
-                    x = +x;
-                    x++;
-                    ++x;
-                    x--;
-                    --x;
-                    x += (x + 1);
-                }
-            }
-            
-            @SuppressWarnings({})
-            public interface I {}
-            
-            public class C {}
-        """
 
     @Test
     fun beforeParensMethodDeclarationTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
@@ -141,12 +52,12 @@ interface SpacesTest : RecipeTest {
 
     @Test
     fun beforeClassBody(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+            jp,
+            before = """
             class Test{
             }
         """,
-        after = """
+            after = """
             class Test {
             }
         """
@@ -661,22 +572,28 @@ interface SpacesTest : RecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/234")
     @Test
-    fun withinAnnotationParametersSpaces(jp: JavaParser.Builder<*,*>) = assertChanged(
-        parser = jp.styles(
-            listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
-                withWithin(within.withAnnotationParentheses(true))
-            })))
-        ).build(),
-        before = """
-            @EqualsAndHashCode(exclude = {"this","that"},callSuper=false)
-            class Test {
-            }
-        """,
-        after = """
-            @EqualsAndHashCode(exclude = {"this", "that"}, callSuper = false)
-            class Test {
-            }
-        """
+    fun withinAnnotationParametersSpaces(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.withAnnotationParentheses(true))
+                    })))
+            ).build(),
+            dependsOn = arrayOf("""
+                @interface Foo {
+                    String[] exclude() default {};
+                    boolean callSuper() default false;
+                }
+            """),
+            before = """
+                @Foo(exclude = {"this","that"},callSuper=false)
+                class Test {
+                }
+            """,
+            after = """
+                @Foo(exclude = {"this", "that"}, callSuper = false)
+                class Test {
+                }
+            """
     )
 
     @Test
@@ -692,6 +609,7 @@ interface SpacesTest : RecipeTest {
                 class Test {
                     void foo() {
                         int x = 0;
+                        x += 1;
                     }
                 }
             """,
@@ -699,6 +617,7 @@ interface SpacesTest : RecipeTest {
                 class Test {
                     void foo() {
                         int x=0;
+                        x+=1;
                     }
                 }
             """
@@ -717,6 +636,7 @@ interface SpacesTest : RecipeTest {
                 class Test {
                     void foo() {
                         int x=0;
+                        x+=1;
                     }
                 }
             """,
@@ -724,6 +644,7 @@ interface SpacesTest : RecipeTest {
                 class Test {
                     void foo() {
                         int x = 0;
+                        x += 1;
                     }
                 }
             """
@@ -1214,145 +1135,1320 @@ interface SpacesTest : RecipeTest {
     )
 
     @Test
-    fun beforeParens(jp: JavaParser.Builder<*, *>) = assertChanged(
-            jp.styles(
+    fun aroundOperatorsLambdaArrowFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
                     listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
-                        withBeforeParentheses(beforeParentheses.run {
-                            withMethodDeclaration(true)
-                                    .withMethodCall(true)
-                                    .withIfParentheses(false)
-                                    .withForParentheses(false)
-                                    .withWhileParentheses(false)
-                                    .withSwitchParentheses(false)
-                                    .withTryParentheses(false)
-                                    .withCatchParentheses(false)
-                                    .withSynchronizedParentheses(false)
-                                    .withAnnotationParameters(true)
-                        }).withAroundOperators(aroundOperators.run {
-                            withAssignment(false)
-                                    .withLogical(false)
-                                    .withEquality(false)
-                                    .withRelational(false)
-                                    .withBitwise(false)
-                                    .withAdditive(false)
-                                    .withMultiplicative(false)
-                                    .withShift(false)
-                                    .withUnary(true)
-                                    .withLambdaArrow(false)
-                                    .withMethodReferenceDoubleColon(true)
-                        }).withBeforeLeftBrace(beforeLeftBrace.run {
-                            withClassLeftBrace(false)
-                                    .withMethodLeftBrace(false)
-                                    .withIfLeftBrace(false)
-                                    .withElseLeftBrace(false)
-                                    .withForLeftBrace(false)
-                                    .withWhileLeftBrace(false)
-                                    .withDoLeftBrace(false)
-                                    .withSwitchLeftBrace(false)
-                                    .withTryLeftBrace(false)
-                                    .withCatchLeftBrace(false)
-                                    .withFinallyLeftBrace(false)
-                                    .withSynchronizedLeftBrace(false)
-                                    .withArrayInitializerLeftBrace(true)
-                                    .withAnnotationArrayInitializerLeftBrace(true)
-                        }).withBeforeKeywords(beforeKeywords.run {
-                            withElseKeyword(false)
-                                    .withWhileKeyword(false)
-                                    .withCatchKeyword(false)
-                                    .withFinallyKeyword(false)
-                        }).withWithin(within.run {
-                            withCodeBraces(true)
-                                    .withBrackets(true)
-                                    .withArrayInitializerBraces(true)
-                                    .withEmptyArrayInitializerBraces(true)
-                                    .withGroupingParentheses(true)
+                        withAroundOperators(aroundOperators.run {
+                            withLambdaArrow(false)
                         })
                     })))
             ).build(),
-            dependsOn = dependsOn,
-            before = testCode,
-            after = /* THE HORROR */ """
-            @SuppressWarnings ( { "ALL" })
-            public class A{
-                void bar (){}
-                void foo (int arg){
-                    Runnable r=()->{};
-                    Runnable r1=this :: bar;
-                    if(true){
-                        foo (1);
-                    }else{
-                        foo (2);
+            before = """
+                class Test {
+                    void foo() {
+                        Runnable r = () -> {};
                     }
-                    int j=0;
-                    for(int i=0; i<10||j>0; i ++){
-                        j+=i;
-                    }
-                    int[] arr=new int[] { 1, 3, 5, 6, 7, 87, 1213, 2 };
-                    for(int e : arr){
-                        j+=e;
-                    }
-                    int[] arr2=new int[] { };
-                    int elem=arr[ j ];
-                    int x;
-                    while(j<1000&&x>0){
-                        j=j+1;
-                    }
-                    do{
-                        j=j+1;
-                    }while(j<2000);
-                    switch(j){
-                        case 1:
-                        default:
-                    }
-                    try(MyResource res1 = new MyResource(); MyResource res2 = null){
-                    }catch(Exception e){
-                    }finally{
-                    }
-                    Object o=new Object();
-                    synchronized(o){
-                    }
-                    if(x==0){
-                    }
-                    if(j!=0){
-                    }
-                    if(x<=0){
-                    }
-                    if(j>=0){
-                    }
-                    x=x<<2;
-                    x=x>>2;
-                    x=x>>>2;
-                    x=x|2;
-                    x=x&2;
-                    x=x^2;
-                    x=x+1;
-                    x=x-1;
-                    x=x*2;
-                    x=x/2;
-                    x=x%2;
-                    boolean b;
-                    b=! b;
-                    x=- x;
-                    x=+ x;
-                    x ++;
-                    ++ x;
-                    x --;
-                    -- x;
-                    x+=( x+1 );
                 }
-            }
-
-            @SuppressWarnings ( { })
-            public interface I{ }
-            
-            public class C{ }
-        """
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        Runnable r = ()->{};
+                    }
+                }
+            """
     )
 
     @Test
-    fun unchanged(jp: JavaParser.Builder<*, *>) = assertUnchanged(
-            jp.styles(listOf(NamedStyles("testspaces", listOf(IntelliJ.spaces())))).build(),
-            dependsOn = dependsOn,
-            before = testCode
+    fun aroundOperatorsLambdaArrowTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withAroundOperators(aroundOperators.run {
+                            withLambdaArrow(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    void foo() {
+                        Runnable r = ()->{};
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        Runnable r = () -> {};
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun aroundOperatorsMethodReferenceDoubleColonTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withAroundOperators(aroundOperators.run {
+                            withMethodReferenceDoubleColon(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    void foo() {
+                        Runnable r1 = this::foo;
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        Runnable r1 = this :: foo;
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun aroundOperatorsMethodReferenceDoubleColonFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withAroundOperators(aroundOperators.run {
+                            withMethodReferenceDoubleColon(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    void foo() {
+                        Runnable r1 = this :: foo;
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        Runnable r1 = this::foo;
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceClassLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withClassLeftBrace(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                }
+            """,
+            after = """
+                class Test{
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceClassLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withClassLeftBrace(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test{
+                }
+            """,
+            after = """
+                class Test {
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceMethodLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withMethodLeftBrace(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test{
+                    public void foo() {
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo(){
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceMethodLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withMethodLeftBrace(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test{
+                    public void foo(){
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceIfLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withIfLeftBrace(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test{
+                    public void foo() {
+                        if (true) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        if (true){
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceIfLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withIfLeftBrace(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test{
+                    public void foo() {
+                        if (true){
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        if (true) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceElseLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withElseLeftBrace(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test{
+                    public void foo() {
+                        if (true) {
+                        } else {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        if (true) {
+                        } else{
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceElseLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withElseLeftBrace(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        if (true) {
+                        } else{
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        if (true) {
+                        } else {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceForLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withForLeftBrace(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        for (int i = 0; i < 10; i++) {
+                        }
+                        for (int i : new int[]{1, 2, 3}) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        for (int i = 0; i < 10; i++){
+                        }
+                        for (int i : new int[]{1, 2, 3}){
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceForLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withForLeftBrace(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        for (int i = 0; i < 10; i++){
+                        }
+                        for (int i : new int[]{1, 2, 3}){
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        for (int i = 0; i < 10; i++) {
+                        }
+                        for (int i : new int[]{1, 2, 3}) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceWhileLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withWhileLeftBrace(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        while (true != false) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        while (true != false){
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceWhileLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withWhileLeftBrace(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        while (true != false){
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        while (true != false) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceDoLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withDoLeftBrace(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        do {
+                        } while (true != false);
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        do{
+                        } while (true != false);
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceDoLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withDoLeftBrace(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        do{
+                        } while (true != false);
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        do {
+                        } while (true != false);
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceSwitchLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withSwitchLeftBrace(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        switch (1) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        switch (1){
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceSwitchLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withSwitchLeftBrace(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        switch (1){
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        switch (1) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceTryLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withTryLeftBrace(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        try {
+                        } catch (Exception e) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        try{
+                        } catch (Exception e) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceTryLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withTryLeftBrace(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        try{
+                        } catch (Exception e) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        try {
+                        } catch (Exception e) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceCatchLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withCatchLeftBrace(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        try {
+                        } catch (Exception e) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        try {
+                        } catch (Exception e){
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceCatchLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withCatchLeftBrace(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        try {
+                        } catch (Exception e){
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        try {
+                        } catch (Exception e) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceFinallyLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withFinallyLeftBrace(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        try {
+                        } catch (Exception e) {
+                        } finally {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        try {
+                        } catch (Exception e) {
+                        } finally{
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceFinallyLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withFinallyLeftBrace(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        try {
+                        } catch (Exception e) {
+                        } finally{
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        try {
+                        } catch (Exception e) {
+                        } finally {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceSynchronizedLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withSynchronizedLeftBrace(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        synchronized (this) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        synchronized (this){
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceSynchronizedLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withSynchronizedLeftBrace(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        synchronized (this){
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        synchronized (this) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceArrayInitializerLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withArrayInitializerLeftBrace(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        int[] arr = new int[]{1, 2, 3};
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        int[] arr = new int[] {1, 2, 3};
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceArrayInitializerLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withArrayInitializerLeftBrace(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        int[] arr = new int[] {1, 2, 3};
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        int[] arr = new int[]{1, 2, 3};
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceAnnotationArrayInitializerLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withAnnotationArrayInitializerLeftBrace(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                @SuppressWarnings({"ALL"})
+                class Test {
+                }
+            """,
+            after = """
+                @SuppressWarnings( {"ALL"})
+                class Test {
+                }
+            """
+    )
+
+    @Test
+    fun beforeLeftBraceAnnotationArrayInitializerLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeLeftBrace(beforeLeftBrace.run {
+                            withAnnotationArrayInitializerLeftBrace(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                @SuppressWarnings( {"ALL"})
+                class Test {
+                }
+            """,
+            after = """
+                @SuppressWarnings({"ALL"})
+                class Test {
+                }
+            """
+    )
+
+    @Test
+    fun beforeKeywordsElseKeywordFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeKeywords(beforeKeywords.run {
+                            withElseKeyword(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        if (true) {
+                        } else {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        if (true) {
+                        }else {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeKeywordsElseKeywordTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeKeywords(beforeKeywords.run {
+                            withElseKeyword(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        if (true) {
+                        }else {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        if (true) {
+                        } else {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeKeywordsWhileKeywordFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeKeywords(beforeKeywords.run {
+                            withWhileKeyword(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        do {
+                        } while (true);
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        do {
+                        }while (true);
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeKeywordsWhileKeywordTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeKeywords(beforeKeywords.run {
+                            withWhileKeyword(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        do {
+                        }while (true);
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        do {
+                        } while (true);
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeKeywordsCatchKeywordFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeKeywords(beforeKeywords.run {
+                            withCatchKeyword(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        try {
+                        } catch (Exception e) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        try {
+                        }catch (Exception e) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeKeywordsCatchKeywordTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeKeywords(beforeKeywords.run {
+                            withCatchKeyword(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        try {
+                        }catch (Exception e) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        try {
+                        } catch (Exception e) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeKeywordsFinallyKeywordFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeKeywords(beforeKeywords.run {
+                            withFinallyKeyword(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        try {
+                        } catch (Exception e) {
+                        } finally {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        try {
+                        } catch (Exception e) {
+                        }finally {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun beforeKeywordsFinallyKeywordTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withBeforeKeywords(beforeKeywords.run {
+                            withFinallyKeyword(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        try {
+                        } catch (Exception e) {
+                        }finally {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        try {
+                        } catch (Exception e) {
+                        } finally {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinCodeBracesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withCodeBraces(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {}
+                
+                interface ITest {}
+            """,
+            after = """
+                class Test { }
+                
+                interface ITest { }
+            """
+    )
+
+    @Test
+    fun withinCodeBracesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withCodeBraces(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test { }
+                
+                interface ITest { }
+            """,
+            after = """
+                class Test {}
+                
+                interface ITest {}
+            """
+    )
+
+    @Test
+    fun withinBracketsTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withBrackets(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo(int[] a) {
+                        int x = a[0];
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo(int[] a) {
+                        int x = a[ 0 ];
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinBracketsFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withBrackets(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo(int[] a) {
+                        int x = a[ 0 ];
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo(int[] a) {
+                        int x = a[0];
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinArrayInitializerBracesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withArrayInitializerBraces(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        int[] x = {1, 2, 3};
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        int[] x = { 1, 2, 3 };
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinArrayInitializerBracesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withArrayInitializerBraces(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        int[] x = { 1, 2, 3 };
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        int[] x = {1, 2, 3};
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinEmptyArrayInitializerBracesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withEmptyArrayInitializerBraces(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        int[] x = {};
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        int[] x = { };
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinEmptyArrayInitializerBracesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withEmptyArrayInitializerBraces(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        int[] x = { };
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        int[] x = {};
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinGroupingParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withGroupingParentheses(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo(int x) {
+                        x += (x + 1);
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo(int x) {
+                        x += ( x + 1 );
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinGroupingParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withGroupingParentheses(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo(int x) {
+                        x += ( x + 1 );
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo(int x) {
+                        x += (x + 1);
+                    }
+                }
+            """
     )
 }
