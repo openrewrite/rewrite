@@ -436,12 +436,8 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.NewArray visitNewArray(J.NewArray newArray, P p) {
         J.NewArray n = super.visitNewArray(newArray, p);
-        if (getCursor().getParent() != null && getCursor().getParent().getValue() instanceof J.Annotation) {
-            if (n.getPadding().getInitializer() != null) {
-                n = n.getPadding().withInitializer(
-                        spaceBefore(n.getPadding().getInitializer(), style.getBeforeLeftBrace().isAnnotationArrayInitializerLeftBrace())
-                );
-            }
+        if (getCursor().getParent() != null && getCursor().dropParentUntil(o -> o instanceof J).getValue() instanceof J.Annotation) {
+            n = spaceBefore(n, style.getBeforeLeftBrace().isAnnotationArrayInitializerLeftBrace());
         } else {
             if (n.getPadding().getInitializer() != null) {
                 JContainer<Expression> initializer = spaceBefore(n.getPadding().getInitializer(), style.getBeforeLeftBrace().isArrayInitializerLeftBrace());
