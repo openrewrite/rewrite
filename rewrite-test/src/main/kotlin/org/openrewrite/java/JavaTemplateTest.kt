@@ -15,8 +15,10 @@
  */
 package org.openrewrite.java
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
+import org.openrewrite.Issue
 import org.openrewrite.RecipeTest
 import org.openrewrite.java.tree.J
 import org.slf4j.LoggerFactory
@@ -474,6 +476,42 @@ interface JavaTemplateTest : RecipeTest {
                 void foo() {
                 }
             }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/239")
+    @Disabled
+    @Test
+    fun replaceAnnotation(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val template = template("@Issue")
+                .doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
+
+            init {
+                setCursoringOn()
+            }
+
+            override fun visitAnnotation(annotation: J.Annotation, p: ExecutionContext): J.Annotation {
+                val a = super.visitAnnotation(annotation, p)
+                return a.withTemplate(template, a.coordinates.replace())
+            }
+        }.toRecipe(),
+        before = """
+                public class A {
+                    @Deprecated
+                    void foo() {
+                    }
+                }
+            """,
+        after = """
+                public class A {
+                    @Issue
+                    void foo() {
+                    }
+                }
         """
     )
 
