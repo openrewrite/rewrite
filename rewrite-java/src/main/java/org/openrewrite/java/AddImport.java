@@ -100,7 +100,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         List<JRightPadded<J.Import>> imports = new ArrayList<>(cu.getPadding().getImports());
 
         if (imports.isEmpty()) {
-            importToAdd = cu.getPackageDecl() == null ?
+            importToAdd = cu.getPackageDeclaration() == null ?
                     importToAdd.withPrefix(cu.getClasses().get(0).getPrefix()) :
                     importToAdd.withPrefix(Space.format("\n\n"));
         }

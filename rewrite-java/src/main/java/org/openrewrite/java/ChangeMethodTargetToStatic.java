@@ -64,7 +64,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
             if (methodMatcher.matches(method)) {
                 JavaType.FullyQualified classType = JavaType.Class.build(fullyQualifiedTargetTypeName);
 
-                m = method.withSelect(J.Ident.build(randomId(),
+                m = method.withSelect(J.Identifier.build(randomId(),
                         method.getSelect() == null ?
                                 Space.EMPTY :
                                 method.getSelect().getPrefix(),

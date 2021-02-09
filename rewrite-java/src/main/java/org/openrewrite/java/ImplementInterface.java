@@ -23,26 +23,26 @@ import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.tree.Space.format;
 
 public class ImplementInterface<P> extends JavaIsoVisitor<P> {
-    private final J.ClassDecl scope;
+    private final J.ClassDeclaration scope;
     private final JavaType.FullyQualified interfaceType;
 
-    public ImplementInterface(J.ClassDecl scope, JavaType.FullyQualified interfaceType) {
+    public ImplementInterface(J.ClassDeclaration scope, JavaType.FullyQualified interfaceType) {
         this.scope = scope;
         this.interfaceType = interfaceType;
     }
 
-    public ImplementInterface(J.ClassDecl scope, String interfaze) {
+    public ImplementInterface(J.ClassDeclaration scope, String interfaze) {
         this(scope, JavaType.Class.build(interfaze));
     }
 
     @Override
-    public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, P p) {
-        J.ClassDecl c = super.visitClassDecl(classDecl, p);
+    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
+        J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
         if (c.isScope(scope) && (c.getImplements() == null || c.getImplements().stream()
                 .noneMatch(f -> interfaceType.equals(f.getType())))) {
             maybeAddImport(interfaceType);
 
-            c = c.withImplements(ListUtils.concat(c.getImplements(), J.Ident.build(
+            c = c.withImplements(ListUtils.concat(c.getImplements(), J.Identifier.build(
                     randomId(),
                     format(" "),
                     Markers.EMPTY,

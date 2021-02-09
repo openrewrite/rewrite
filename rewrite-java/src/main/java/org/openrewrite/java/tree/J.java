@@ -110,16 +110,16 @@ public interface J extends Serializable, Tree {
         List<J.Annotation> annotations;
 
         @With
-        TypeTree typeExpr;
+        TypeTree typeExpression;
 
         @Override
         public JavaType getType() {
-            return typeExpr.getType();
+            return typeExpression.getType();
         }
 
         @Override
         public AnnotatedType withType(@Nullable JavaType type) {
-            return withTypeExpr(typeExpr.withType(type));
+            return withTypeExpression(typeExpression.withType(type));
         }
 
         @Override
@@ -160,21 +160,21 @@ public interface J extends Serializable, Tree {
         NameTree annotationType;
 
         public String getSimpleName() {
-            return annotationType instanceof J.Ident ?
-                    ((Ident) annotationType).getSimpleName() :
+            return annotationType instanceof Identifier ?
+                    ((Identifier) annotationType).getSimpleName() :
                     ((J.FieldAccess) annotationType).getSimpleName();
         }
 
         @Nullable
-        JContainer<Expression> args;
+        JContainer<Expression> arguments;
 
         @Nullable
-        public List<Expression> getArgs() {
-            return args == null ? null : args.getElems();
+        public List<Expression> getArguments() {
+            return arguments == null ? null : arguments.getElements();
         }
 
-        public Annotation withArgs(@Nullable List<Expression> args) {
-            return getPadding().withArgs(JContainer.withElemsNullable(this.args, args));
+        public Annotation withArguments(@Nullable List<Expression> arguments) {
+            return getPadding().withArguments(JContainer.withElementsNullable(this.arguments, arguments));
         }
 
         @Override
@@ -218,12 +218,12 @@ public interface J extends Serializable, Tree {
             private final Annotation t;
 
             @Nullable
-            public JContainer<Expression> getArgs() {
-                return t.args;
+            public JContainer<Expression> getArguments() {
+                return t.arguments;
             }
 
-            public Annotation withArgs(@Nullable JContainer<Expression> args) {
-                return t.args == args ? t : new Annotation(t.id, t.prefix, t.markers, t.annotationType, args);
+            public Annotation withArguments(@Nullable JContainer<Expression> arguments) {
+                return t.arguments == arguments ? t : new Annotation(t.id, t.prefix, t.markers, t.annotationType, arguments);
             }
         }
     }
@@ -337,7 +337,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class Assign implements J, Statement, Expression {
+    final class Assignment implements J, Statement, Expression {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -361,11 +361,11 @@ public interface J extends Serializable, Tree {
         JLeftPadded<Expression> assignment;
 
         public Expression getAssignment() {
-            return assignment.getElem();
+            return assignment.getElement();
         }
 
-        public Assign withAssignment(Expression assignment) {
-            return getPadding().withAssignment(this.assignment.withElem(assignment));
+        public Assignment withAssignment(Expression assignment) {
+            return getPadding().withAssignment(this.assignment.withElement(assignment));
         }
 
         @With
@@ -375,12 +375,12 @@ public interface J extends Serializable, Tree {
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
-            return v.visitAssign(this, p);
+            return v.visitAssignment(this, p);
         }
 
         @Override
-        public Coordinates<J.Assign> getCoordinates() {
-            return new Coordinates.Assign(this);
+        public Coordinates<Assignment> getCoordinates() {
+            return new Coordinates.Assignment(this);
         }
 
         @Override
@@ -405,14 +405,14 @@ public interface J extends Serializable, Tree {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final Assign t;
+            private final Assignment t;
 
             public JLeftPadded<Expression> getAssignment() {
                 return t.assignment;
             }
 
-            public Assign withAssignment(JLeftPadded<Expression> assignment) {
-                return t.assignment == assignment ? t : new Assign(t.id, t.prefix, t.markers, t.variable, assignment, t.type);
+            public Assignment withAssignment(JLeftPadded<Expression> assignment) {
+                return t.assignment == assignment ? t : new Assignment(t.id, t.prefix, t.markers, t.variable, assignment, t.type);
             }
         }
     }
@@ -422,7 +422,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class AssignOp implements J, Statement, Expression {
+    final class AssignmentOperation implements J, Statement, Expression {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -446,11 +446,11 @@ public interface J extends Serializable, Tree {
         JLeftPadded<Type> operator;
 
         public Type getOperator() {
-            return operator.getElem();
+            return operator.getElement();
         }
 
-        public AssignOp withOperator(Type operator) {
-            return getPadding().withOperator(this.operator.withElem(operator));
+        public AssignmentOperation withOperator(Type operator) {
+            return getPadding().withOperator(this.operator.withElement(operator));
         }
 
         @With
@@ -464,12 +464,12 @@ public interface J extends Serializable, Tree {
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
-            return v.visitAssignOp(this, p);
+            return v.visitAssignmentOperation(this, p);
         }
 
         @Override
-        public Coordinates<J.AssignOp> getCoordinates() {
-            return new Coordinates.AssignOp(this);
+        public Coordinates<AssignmentOperation> getCoordinates() {
+            return new Coordinates.AssignmentOperation(this);
         }
 
         @Override
@@ -508,14 +508,14 @@ public interface J extends Serializable, Tree {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final AssignOp t;
+            private final AssignmentOperation t;
 
             public JLeftPadded<Type> getOperator() {
                 return t.operator;
             }
 
-            public AssignOp withOperator(JLeftPadded<Type> operator) {
-                return t.operator == operator ? t : new AssignOp(t.id, t.prefix, t.markers, t.variable, operator, t.assignment, t.type);
+            public AssignmentOperation withOperator(JLeftPadded<Type> operator) {
+                return t.operator == operator ? t : new AssignmentOperation(t.id, t.prefix, t.markers, t.variable, operator, t.assignment, t.type);
             }
         }
     }
@@ -545,11 +545,11 @@ public interface J extends Serializable, Tree {
         JLeftPadded<Type> operator;
 
         public Type getOperator() {
-            return operator.getElem();
+            return operator.getElement();
         }
 
         public Binary withOperator(Type operator) {
-            return getPadding().withOperator(this.operator.withElem(operator));
+            return getPadding().withOperator(this.operator.withElement(operator));
         }
 
         @With
@@ -653,21 +653,21 @@ public interface J extends Serializable, Tree {
         JRightPadded<Boolean> statik;
 
         public boolean isStatic() {
-            return statik.getElem();
+            return statik.getElement();
         }
 
         public Block withStatic(boolean statik) {
-            return getPadding().withStatic(this.statik.withElem(statik));
+            return getPadding().withStatic(this.statik.withElement(statik));
         }
 
         List<JRightPadded<Statement>> statements;
 
         public List<Statement> getStatements() {
-            return JRightPadded.getElems(statements);
+            return JRightPadded.getElements(statements);
         }
 
         public Block withStatements(List<Statement> statements) {
-            return getPadding().withStatements(JRightPadded.withElems(this.statements, statements));
+            return getPadding().withStatements(JRightPadded.withElements(this.statements, statements));
         }
 
         @Getter
@@ -736,7 +736,7 @@ public interface J extends Serializable, Tree {
 
         @With
         @Nullable
-        Ident label;
+        J.Identifier label;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -779,12 +779,12 @@ public interface J extends Serializable, Tree {
         JContainer<Statement> statements;
 
         public List<Statement> getStatements() {
-            return statements.getElems();
+            return statements.getElements();
         }
 
         public Case withStatements(List<Statement> statements) {
-            return getPadding().withStatements(this.statements.getPadding().withElems(JRightPadded.withElems(
-                    this.statements.getPadding().getElems(), statements)));
+            return getPadding().withStatements(this.statements.getPadding().withElements(JRightPadded.withElements(
+                    this.statements.getPadding().getElements(), statements)));
         }
 
         @Override
@@ -830,7 +830,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class ClassDecl implements J, Statement {
+    final class ClassDeclaration implements J, Statement {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -858,27 +858,27 @@ public interface J extends Serializable, Tree {
         JLeftPadded<Kind> kind;
 
         public Kind getKind() {
-            return kind.getElem();
+            return kind.getElement();
         }
 
-        public ClassDecl withKind(Kind kind) {
-            return getPadding().withKind(this.kind.withElem(kind));
+        public ClassDeclaration withKind(Kind kind) {
+            return getPadding().withKind(this.kind.withElement(kind));
         }
 
         @With
         @Getter
-        Ident name;
+        Identifier name;
 
         @Nullable
         JContainer<TypeParameter> typeParameters;
 
         @Nullable
         public List<TypeParameter> getTypeParameters() {
-            return typeParameters == null ? null : typeParameters.getElems();
+            return typeParameters == null ? null : typeParameters.getElements();
         }
 
-        public ClassDecl withTypeParameters(@Nullable List<TypeParameter> typeParameters) {
-            return getPadding().withTypeParameters(JContainer.withElemsNullable(this.typeParameters, typeParameters));
+        public ClassDeclaration withTypeParameters(@Nullable List<TypeParameter> typeParameters) {
+            return getPadding().withTypeParameters(JContainer.withElementsNullable(this.typeParameters, typeParameters));
         }
 
         @Nullable
@@ -886,11 +886,11 @@ public interface J extends Serializable, Tree {
 
         @Nullable
         public TypeTree getExtends() {
-            return extendings == null ? null : extendings.getElem();
+            return extendings == null ? null : extendings.getElement();
         }
 
-        public ClassDecl withExtends(@Nullable TypeTree extendings) {
-            return getPadding().withExtends(JLeftPadded.withElem(this.extendings, extendings));
+        public ClassDeclaration withExtends(@Nullable TypeTree extendings) {
+            return getPadding().withExtends(JLeftPadded.withElement(this.extendings, extendings));
         }
 
         @Nullable
@@ -898,11 +898,11 @@ public interface J extends Serializable, Tree {
 
         @Nullable
         public List<TypeTree> getImplements() {
-            return implementings == null ? null : implementings.getElems();
+            return implementings == null ? null : implementings.getElements();
         }
 
-        public ClassDecl withImplements(@Nullable List<TypeTree> implementings) {
-            return getPadding().withImplements(JContainer.withElemsNullable(this.implementings, implementings));
+        public ClassDeclaration withImplements(@Nullable List<TypeTree> implementings) {
+            return getPadding().withImplements(JContainer.withElementsNullable(this.implementings, implementings));
         }
 
         @With
@@ -916,12 +916,12 @@ public interface J extends Serializable, Tree {
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
-            return v.visitClassDecl(this, p);
+            return v.visitClassDeclaration(this, p);
         }
 
         @Override
-        public Coordinates.ClassDecl getCoordinates() {
-            return new Coordinates.ClassDecl(this);
+        public Coordinates.ClassDeclaration getCoordinates() {
+            return new Coordinates.ClassDeclaration(this);
         }
 
         public String getSimpleName() {
@@ -941,7 +941,7 @@ public interface J extends Serializable, Tree {
 
         @Override
         public String toString() {
-            return "ClassDecl(" + ClassDeclToString.toString(this) + ")";
+            return "ClassDeclaration(" + ClassDeclarationToString.toString(this) + ")";
         }
 
         public Padding getPadding() {
@@ -961,14 +961,14 @@ public interface J extends Serializable, Tree {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final ClassDecl t;
+            private final ClassDeclaration t;
 
             public JLeftPadded<Kind> getKind() {
                 return t.kind;
             }
 
-            public ClassDecl withKind(JLeftPadded<Kind> kind) {
-                return t.kind == kind ? t : new ClassDecl(t.id, t.prefix, t.markers, t.annotations, t.modifiers, kind, t.name, t.typeParameters, t.extendings, t.implementings, t.body, t.type);
+            public ClassDeclaration withKind(JLeftPadded<Kind> kind) {
+                return t.kind == kind ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.annotations, t.modifiers, kind, t.name, t.typeParameters, t.extendings, t.implementings, t.body, t.type);
             }
 
             @Nullable
@@ -976,8 +976,8 @@ public interface J extends Serializable, Tree {
                 return t.extendings;
             }
 
-            public ClassDecl withExtends(@Nullable JLeftPadded<TypeTree> extendings) {
-                return t.extendings == extendings ? t : new ClassDecl(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.kind, t.name, t.typeParameters, extendings, t.implementings, t.body, t.type);
+            public ClassDeclaration withExtends(@Nullable JLeftPadded<TypeTree> extendings) {
+                return t.extendings == extendings ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.kind, t.name, t.typeParameters, extendings, t.implementings, t.body, t.type);
             }
 
             @Nullable
@@ -985,8 +985,8 @@ public interface J extends Serializable, Tree {
                 return t.implementings;
             }
 
-            public ClassDecl withImplements(@Nullable JContainer<TypeTree> implementings) {
-                return t.implementings == implementings ? t : new ClassDecl(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.kind, t.name, t.typeParameters, t.extendings, implementings, t.body, t.type);
+            public ClassDeclaration withImplements(@Nullable JContainer<TypeTree> implementings) {
+                return t.implementings == implementings ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.kind, t.name, t.typeParameters, t.extendings, implementings, t.body, t.type);
             }
 
             @Nullable
@@ -994,8 +994,8 @@ public interface J extends Serializable, Tree {
                 return t.typeParameters;
             }
 
-            public ClassDecl withTypeParameters(@Nullable JContainer<TypeParameter> typeParameters) {
-                return t.typeParameters == typeParameters ? t : new ClassDecl(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.kind, t.name, typeParameters, t.extendings, t.implementings, t.body, t.type);
+            public ClassDeclaration withTypeParameters(@Nullable JContainer<TypeParameter> typeParameters) {
+                return t.typeParameters == typeParameters ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.kind, t.name, typeParameters, t.extendings, t.implementings, t.body, t.type);
             }
         }
     }
@@ -1027,30 +1027,30 @@ public interface J extends Serializable, Tree {
         Path sourcePath;
 
         @Nullable
-        JRightPadded<Package> packageDecl;
+        JRightPadded<Package> packageDeclaration;
 
         @Nullable
-        public Package getPackageDecl() {
-            return packageDecl == null ? null : packageDecl.getElem();
+        public Package getPackageDeclaration() {
+            return packageDeclaration == null ? null : packageDeclaration.getElement();
         }
 
-        public CompilationUnit withPackageDecl(Package packageDecl) {
-            return getPadding().withPackageDecl(JRightPadded.withElem(this.packageDecl, packageDecl));
+        public CompilationUnit withPackageDeclaration(Package packageDeclaration) {
+            return getPadding().withPackageDeclaration(JRightPadded.withElement(this.packageDeclaration, packageDeclaration));
         }
 
         List<JRightPadded<Import>> imports;
 
         public List<Import> getImports() {
-            return JRightPadded.getElems(imports);
+            return JRightPadded.getElements(imports);
         }
 
         public CompilationUnit withImports(List<Import> imports) {
-            return getPadding().withImports(JRightPadded.withElems(this.imports, imports));
+            return getPadding().withImports(JRightPadded.withElements(this.imports, imports));
         }
 
         @With
         @Getter
-        List<ClassDecl> classes;
+        List<ClassDeclaration> classes;
 
         @With
         @Getter
@@ -1090,12 +1090,12 @@ public interface J extends Serializable, Tree {
             private final CompilationUnit t;
 
             @Nullable
-            public JRightPadded<Package> getPackageDecl() {
-                return t.packageDecl;
+            public JRightPadded<Package> getPackageDeclaration() {
+                return t.packageDeclaration;
             }
 
-            public CompilationUnit withPackageDecl(@Nullable JRightPadded<Package> packageDecl) {
-                return t.packageDecl == packageDecl ? t : new CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, packageDecl, t.imports, t.classes, t.eof);
+            public CompilationUnit withPackageDeclaration(@Nullable JRightPadded<Package> packageDeclaration) {
+                return t.packageDeclaration == packageDeclaration ? t : new CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, packageDeclaration, t.imports, t.classes, t.eof);
             }
 
             public List<JRightPadded<Import>> getImports() {
@@ -1103,7 +1103,7 @@ public interface J extends Serializable, Tree {
             }
 
             public CompilationUnit withImports(List<JRightPadded<Import>> imports) {
-                return t.imports == imports ? t : new CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.packageDecl, imports, t.classes, t.eof);
+                return t.imports == imports ? t : new CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.packageDeclaration, imports, t.classes, t.eof);
             }
         }
     }
@@ -1123,7 +1123,7 @@ public interface J extends Serializable, Tree {
 
         @With
         @Nullable
-        Ident label;
+        J.Identifier label;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -1161,21 +1161,21 @@ public interface J extends Serializable, Tree {
         JRightPadded<Statement> body;
 
         public Statement getBody() {
-            return body.getElem();
+            return body.getElement();
         }
 
         public DoWhileLoop withBody(Statement body) {
-            return getPadding().withBody(this.body.withElem(body));
+            return getPadding().withBody(this.body.withElement(body));
         }
 
         JLeftPadded<ControlParentheses<Expression>> whileCondition;
 
         public ControlParentheses<Expression> getWhileCondition() {
-            return whileCondition.getElem();
+            return whileCondition.getElement();
         }
 
         public DoWhileLoop withWhileCondition(ControlParentheses<Expression> whileCondition) {
-            return getPadding().withWhileCondition(this.whileCondition.withElem(whileCondition));
+            return getPadding().withWhileCondition(this.whileCondition.withElement(whileCondition));
         }
 
         @Override
@@ -1274,7 +1274,7 @@ public interface J extends Serializable, Tree {
         Markers markers;
 
         @With
-        Ident name;
+        Identifier name;
 
         @With
         @Nullable
@@ -1316,11 +1316,11 @@ public interface J extends Serializable, Tree {
         List<JRightPadded<EnumValue>> enums;
 
         public List<EnumValue> getEnums() {
-            return JRightPadded.getElems(enums);
+            return JRightPadded.getElements(enums);
         }
 
         public EnumValueSet withEnums(List<EnumValue> enums) {
-            return getPadding().withEnums(JRightPadded.withElems(this.enums, enums));
+            return getPadding().withEnums(JRightPadded.withElements(this.enums, enums));
         }
 
         @With
@@ -1391,14 +1391,14 @@ public interface J extends Serializable, Tree {
         @Getter
         Expression target;
 
-        JLeftPadded<Ident> name;
+        JLeftPadded<Identifier> name;
 
-        public Ident getName() {
-            return name.getElem();
+        public Identifier getName() {
+            return name.getElement();
         }
 
-        public FieldAccess withName(Ident name) {
-            return getPadding().withName(this.name.withElem(name));
+        public FieldAccess withName(Identifier name) {
+            return getPadding().withName(this.name.withElement(name));
         }
 
         @With
@@ -1417,7 +1417,7 @@ public interface J extends Serializable, Tree {
         }
 
         public String getSimpleName() {
-            return name.getElem().getSimpleName();
+            return name.getElement().getSimpleName();
         }
 
         @Override
@@ -1478,8 +1478,8 @@ public interface J extends Serializable, Tree {
             if (fieldAccess.getTarget() instanceof J.FieldAccess) {
                 return isFullyQualifiedClassReference((J.FieldAccess) fieldAccess.getTarget(), className.substring(0, className.lastIndexOf('.')));
             }
-            if (fieldAccess.getTarget() instanceof J.Ident) {
-                return ((J.Ident) fieldAccess.getTarget()).getSimpleName().equals(className.substring(0, className.lastIndexOf('.')));
+            if (fieldAccess.getTarget() instanceof Identifier) {
+                return ((Identifier) fieldAccess.getTarget()).getSimpleName().equals(className.substring(0, className.lastIndexOf('.')));
             }
             return false;
         }
@@ -1503,11 +1503,11 @@ public interface J extends Serializable, Tree {
         public static class Padding {
             private final FieldAccess t;
 
-            public JLeftPadded<Ident> getName() {
+            public JLeftPadded<Identifier> getName() {
                 return t.name;
             }
 
-            public FieldAccess withName(JLeftPadded<Ident> name) {
+            public FieldAccess withName(JLeftPadded<Identifier> name) {
                 return t.name == name ? t : new FieldAccess(t.id, t.prefix, t.markers, t.target, name, t.type);
             }
         }
@@ -1542,11 +1542,11 @@ public interface J extends Serializable, Tree {
         JRightPadded<Statement> body;
 
         public Statement getBody() {
-            return body.getElem();
+            return body.getElement();
         }
 
         public ForEachLoop withBody(Statement body) {
-            return getPadding().withBody(this.body.withElem(body));
+            return getPadding().withBody(this.body.withElement(body));
         }
 
         @Override
@@ -1581,24 +1581,24 @@ public interface J extends Serializable, Tree {
             @Getter
             Markers markers;
 
-            JRightPadded<VariableDecls> variable;
+            JRightPadded<VariableDeclarations> variable;
 
-            public VariableDecls getVariable() {
-                return variable.getElem();
+            public VariableDeclarations getVariable() {
+                return variable.getElement();
             }
 
-            public Control withVariable(VariableDecls variable) {
-                return getPadding().withVariable(this.variable.withElem(variable));
+            public Control withVariable(VariableDeclarations variable) {
+                return getPadding().withVariable(this.variable.withElement(variable));
             }
 
             JRightPadded<Expression> iterable;
 
             public Expression getIterable() {
-                return iterable.getElem();
+                return iterable.getElement();
             }
 
             public Control withIterable(Expression iterable) {
-                return getPadding().withIterable(this.iterable.withElem(iterable));
+                return getPadding().withIterable(this.iterable.withElement(iterable));
             }
 
             @Override
@@ -1630,11 +1630,11 @@ public interface J extends Serializable, Tree {
             public static class Padding {
                 private final Control t;
 
-                public JRightPadded<VariableDecls> getVariable() {
+                public JRightPadded<VariableDeclarations> getVariable() {
                     return t.variable;
                 }
 
-                public Control withVariable(JRightPadded<VariableDecls> variable) {
+                public Control withVariable(JRightPadded<VariableDeclarations> variable) {
                     return t.variable == variable ? t : new Control(t.id, t.prefix, t.markers, variable, t.iterable);
                 }
 
@@ -1706,11 +1706,11 @@ public interface J extends Serializable, Tree {
         JRightPadded<Statement> body;
 
         public Statement getBody() {
-            return body.getElem();
+            return body.getElement();
         }
 
         public ForLoop withBody(Statement body) {
-            return getPadding().withBody(this.body.withElem(body));
+            return getPadding().withBody(this.body.withElement(body));
         }
 
         @Override
@@ -1748,31 +1748,31 @@ public interface J extends Serializable, Tree {
             JRightPadded<Statement> init;
 
             public Statement getInit() {
-                return init.getElem();
+                return init.getElement();
             }
 
             public Control withInit(Statement init) {
-                return getPadding().withInit(this.init.withElem(init));
+                return getPadding().withInit(this.init.withElement(init));
             }
 
             JRightPadded<Expression> condition;
 
             public Expression getCondition() {
-                return condition.getElem();
+                return condition.getElement();
             }
 
             public Control withCondition(Expression condition) {
-                return getPadding().withCondition(this.condition.withElem(condition));
+                return getPadding().withCondition(this.condition.withElement(condition));
             }
 
             List<JRightPadded<Statement>> update;
 
             public List<Statement> getUpdate() {
-                return JRightPadded.getElems(update);
+                return JRightPadded.getElements(update);
             }
 
             public Control withUpdate(List<Statement> update) {
-                return getPadding().withUpdate(JRightPadded.withElems(this.update, update));
+                return getPadding().withUpdate(JRightPadded.withElements(this.update, update));
             }
 
             @Override
@@ -1862,8 +1862,8 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Getter
-    final class Ident implements J, TypeTree, Expression {
-        private static final Map<String, Map<JavaType, IdentFlyweight>> flyweights = new WeakHashMap<>();
+    final class Identifier implements J, TypeTree, Expression {
+        private static final Map<String, Map<JavaType, IdentifierFlyweight>> flyweights = new WeakHashMap<>();
 
         @EqualsAndHashCode.Include
         UUID id;
@@ -1872,23 +1872,23 @@ public interface J extends Serializable, Tree {
 
         Markers markers;
 
-        IdentFlyweight ident;
+        IdentifierFlyweight typeInformation;
 
-        private Ident(UUID id, IdentFlyweight ident, Space prefix, Markers markers) {
+        private Identifier(UUID id, IdentifierFlyweight typeInformation, Space prefix, Markers markers) {
             this.id = id;
-            this.ident = ident;
+            this.typeInformation = typeInformation;
             this.prefix = prefix;
             this.markers = markers;
         }
 
         @Override
         public JavaType getType() {
-            return ident.getType();
+            return typeInformation.getType();
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        public Ident withType(@Nullable JavaType type) {
+        public Identifier withType(@Nullable JavaType type) {
             if (type == getType()) {
                 return this;
             }
@@ -1896,7 +1896,7 @@ public interface J extends Serializable, Tree {
         }
 
         public String getSimpleName() {
-            return ident.getSimpleName();
+            return typeInformation.getSimpleName();
         }
 
         @Override
@@ -1905,45 +1905,45 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates<J.Ident> getCoordinates() {
-            return new Coordinates.Ident(this);
+        public Coordinates<Identifier> getCoordinates() {
+            return new Coordinates.Identifier(this);
         }
 
-        public Ident withName(String name) {
-            if (name.equals(ident.getSimpleName())) {
+        public Identifier withName(String name) {
+            if (name.equals(typeInformation.getSimpleName())) {
                 return this;
             }
             return build(id, prefix, markers, name, getType());
         }
 
         @SuppressWarnings("unchecked")
-        public Ident withMarkers(Markers markers) {
+        public Identifier withMarkers(Markers markers) {
             if (markers == this.markers) {
                 return this;
             }
-            return build(id, prefix, markers, ident.getSimpleName(), getType());
+            return build(id, prefix, markers, typeInformation.getSimpleName(), getType());
         }
 
         @SuppressWarnings("unchecked")
-        public Ident withPrefix(Space prefix) {
+        public Identifier withPrefix(Space prefix) {
             if (prefix == this.prefix) {
                 return this;
             }
-            return build(id, prefix, markers, ident.getSimpleName(), getType());
+            return build(id, prefix, markers, typeInformation.getSimpleName(), getType());
         }
 
         @JsonCreator
-        public static Ident build(UUID id,
-                                  Space prefix,
-                                  Markers markers,
-                                  String simpleName,
-                                  @Nullable JavaType type) {
+        public static Identifier build(UUID id,
+                                       Space prefix,
+                                       Markers markers,
+                                       String simpleName,
+                                       @Nullable JavaType type) {
             synchronized (flyweights) {
-                return new Ident(
+                return new Identifier(
                         id,
                         flyweights
                                 .computeIfAbsent(simpleName, n -> new HashMap<>())
-                                .computeIfAbsent(type, t -> new IdentFlyweight(simpleName, t)),
+                                .computeIfAbsent(type, t -> new IdentifierFlyweight(simpleName, t)),
                         prefix,
                         markers
                 );
@@ -1952,7 +1952,7 @@ public interface J extends Serializable, Tree {
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @Data
-        public static final class IdentFlyweight implements Serializable {
+        public static final class IdentifierFlyweight implements Serializable {
             String simpleName;
 
             @Nullable
@@ -1996,11 +1996,11 @@ public interface J extends Serializable, Tree {
         JRightPadded<Statement> thenPart;
 
         public Statement getThenPart() {
-            return thenPart.getElem();
+            return thenPart.getElement();
         }
 
         public If withThenPart(Statement thenPart) {
-            return getPadding().withThenPart(this.thenPart.withElem(thenPart));
+            return getPadding().withThenPart(this.thenPart.withElement(thenPart));
         }
 
         @With
@@ -2043,11 +2043,11 @@ public interface J extends Serializable, Tree {
             JRightPadded<Statement> body;
 
             public Statement getBody() {
-                return body.getElem();
+                return body.getElement();
             }
 
             public Else withBody(Statement body) {
-                return getPadding().withBody(this.body.withElem(body));
+                return getPadding().withBody(this.body.withElement(body));
             }
 
             @Override
@@ -2146,11 +2146,11 @@ public interface J extends Serializable, Tree {
         FieldAccess qualid;
 
         public boolean isStatic() {
-            return statik.getElem();
+            return statik.getElement();
         }
 
         public Import withStatic(boolean statik) {
-            return getPadding().withStatic(this.statik.withElem(statik));
+            return getPadding().withStatic(this.statik.withElement(statik));
         }
 
         @Override
@@ -2282,14 +2282,14 @@ public interface J extends Serializable, Tree {
         @Getter
         Markers markers;
 
-        JRightPadded<Expression> expr;
+        JRightPadded<Expression> expression;
 
-        public Expression getExpr() {
-            return expr.getElem();
+        public Expression getExpression() {
+            return expression.getElement();
         }
 
-        public InstanceOf withExpr(Expression expr) {
-            return getPadding().withExpr(this.expr.withElem(expr));
+        public InstanceOf withExpression(Expression expression) {
+            return getPadding().withExpr(this.expression.withElement(expression));
         }
 
         @With
@@ -2331,11 +2331,11 @@ public interface J extends Serializable, Tree {
             private final InstanceOf t;
 
             public JRightPadded<Expression> getExpr() {
-                return t.expr;
+                return t.expression;
             }
 
-            public InstanceOf withExpr(JRightPadded<Expression> expr) {
-                return t.expr == expr ? t : new InstanceOf(t.id, t.prefix, t.markers, expr, t.clazz, t.type);
+            public InstanceOf withExpr(JRightPadded<Expression> expression) {
+                return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.type);
             }
         }
     }
@@ -2365,14 +2365,14 @@ public interface J extends Serializable, Tree {
         /**
          * Right padded before the ':'
          */
-        JRightPadded<Ident> label;
+        JRightPadded<Identifier> label;
 
-        public Ident getLabel() {
-            return label.getElem();
+        public Identifier getLabel() {
+            return label.getElement();
         }
 
-        public Label withLabel(Ident label) {
-            return getPadding().withLabel(this.label.withElem(label));
+        public Label withLabel(Identifier label) {
+            return getPadding().withLabel(this.label.withElement(label));
         }
 
         @With
@@ -2408,11 +2408,11 @@ public interface J extends Serializable, Tree {
         public static class Padding {
             private final Label t;
 
-            public JRightPadded<Ident> getLabel() {
+            public JRightPadded<Identifier> getLabel() {
                 return t.label;
             }
 
-            public Label withLabel(JRightPadded<Ident> label) {
+            public Label withLabel(JRightPadded<Identifier> label) {
                 return t.label == label ? t : new Label(t.id, t.prefix, t.markers, label, t.statement);
             }
         }
@@ -2480,14 +2480,14 @@ public interface J extends Serializable, Tree {
             @Getter
             boolean parenthesized;
 
-            List<JRightPadded<J>> params;
+            List<JRightPadded<J>> parameters;
 
-            public List<J> getParams() {
-                return JRightPadded.getElems(params);
+            public List<J> getParameters() {
+                return JRightPadded.getElements(parameters);
             }
 
-            public Parameters withParams(List<J> params) {
-                return getPadding().withParams(JRightPadded.withElems(this.params, params));
+            public Parameters withParameters(List<J> parameters) {
+                return getPadding().withParams(JRightPadded.withElements(this.parameters, parameters));
             }
 
             @Override
@@ -2515,11 +2515,11 @@ public interface J extends Serializable, Tree {
                 private final Parameters t;
 
                 public List<JRightPadded<J>> getParams() {
-                    return t.params;
+                    return t.parameters;
                 }
 
-                public Parameters withParams(List<JRightPadded<J>> params) {
-                    return t.params == params ? t : new Parameters(t.id, t.prefix, t.markers, t.parenthesized, params);
+                public Parameters withParams(List<JRightPadded<J>> parameters) {
+                    return t.parameters == parameters ? t : new Parameters(t.id, t.prefix, t.markers, t.parenthesized, parameters);
                 }
             }
         }
@@ -2622,21 +2622,21 @@ public interface J extends Serializable, Tree {
 
         @Nullable
         public List<Expression> getTypeParameters() {
-            return typeParameters == null ? null : typeParameters.getElems();
+            return typeParameters == null ? null : typeParameters.getElements();
         }
 
         public MemberReference withTypeParameters(@Nullable List<Expression> typeParameters) {
-            return getPadding().withTypeParameters(JContainer.withElemsNullable(this.typeParameters, typeParameters));
+            return getPadding().withTypeParameters(JContainer.withElementsNullable(this.typeParameters, typeParameters));
         }
 
-        JLeftPadded<Ident> reference;
+        JLeftPadded<Identifier> reference;
 
-        public Ident getReference() {
-            return reference.getElem();
+        public Identifier getReference() {
+            return reference.getElement();
         }
 
-        public MemberReference withReference(Ident reference) {
-            return getPadding().withReference(this.reference.withElem(reference));
+        public MemberReference withReference(Identifier reference) {
+            return getPadding().withReference(this.reference.withElement(reference));
         }
 
         @With
@@ -2682,11 +2682,11 @@ public interface J extends Serializable, Tree {
                 return t.typeParameters == typeParameters ? t : new MemberReference(t.id, t.prefix, t.markers, t.containing, typeParameters, t.reference, t.type);
             }
 
-            public JLeftPadded<Ident> getReference() {
+            public JLeftPadded<Identifier> getReference() {
                 return t.reference;
             }
 
-            public MemberReference withReference(JLeftPadded<Ident> reference) {
+            public MemberReference withReference(JLeftPadded<Identifier> reference) {
                 return t.reference == reference ? t : new MemberReference(t.id, t.prefix, t.markers, t.containing, t.typeParameters, reference, t.type);
             }
         }
@@ -2696,7 +2696,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class MethodDecl implements J, Statement {
+    final class MethodDeclaration implements J, Statement {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -2726,11 +2726,11 @@ public interface J extends Serializable, Tree {
 
         @Nullable
         public List<TypeParameter> getTypeParameters() {
-            return typeParameters == null ? null : typeParameters.getElems();
+            return typeParameters == null ? null : typeParameters.getElements();
         }
 
-        public MethodDecl withTypeParameters(@Nullable List<TypeParameter> typeParameters) {
-            return getPadding().withTypeParameters(JContainer.withElemsNullable(this.typeParameters, typeParameters));
+        public MethodDeclaration withTypeParameters(@Nullable List<TypeParameter> typeParameters) {
+            return getPadding().withTypeParameters(JContainer.withElementsNullable(this.typeParameters, typeParameters));
         }
 
         /**
@@ -2739,20 +2739,20 @@ public interface J extends Serializable, Tree {
         @With
         @Getter
         @Nullable
-        TypeTree returnTypeExpr;
+        TypeTree returnTypeExpression;
 
         @With
         @Getter
-        Ident name;
+        Identifier name;
 
-        JContainer<Statement> params;
+        JContainer<Statement> parameters;
 
-        public List<Statement> getParams() {
-            return params.getElems();
+        public List<Statement> getParameters() {
+            return parameters.getElements();
         }
 
-        public MethodDecl withParams(List<Statement> params) {
-            return getPadding().withParams(JContainer.withElems(this.params, params));
+        public MethodDeclaration withParameters(List<Statement> parameters) {
+            return getPadding().withParameters(JContainer.withElements(this.parameters, parameters));
         }
 
         @Nullable
@@ -2760,11 +2760,11 @@ public interface J extends Serializable, Tree {
 
         @Nullable
         public List<NameTree> getThrows() {
-            return throwz == null ? null : throwz.getElems();
+            return throwz == null ? null : throwz.getElements();
         }
 
-        public MethodDecl withThrows(@Nullable List<NameTree> throwz) {
-            return getPadding().withThrows(JContainer.withElemsNullable(this.throwz, throwz));
+        public MethodDeclaration withThrows(@Nullable List<NameTree> throwz) {
+            return getPadding().withThrows(JContainer.withElementsNullable(this.throwz, throwz));
         }
 
         /**
@@ -2783,11 +2783,11 @@ public interface J extends Serializable, Tree {
 
         @Nullable
         public Expression getDefaultValue() {
-            return defaultValue == null ? null : defaultValue.getElem();
+            return defaultValue == null ? null : defaultValue.getElement();
         }
 
-        public MethodDecl withDefaultValue(@Nullable Expression defaultValue) {
-            return getPadding().withDefaultValue(JLeftPadded.withElem(this.defaultValue, defaultValue));
+        public MethodDeclaration withDefaultValue(@Nullable Expression defaultValue) {
+            return getPadding().withDefaultValue(JLeftPadded.withElement(this.defaultValue, defaultValue));
         }
 
         @With
@@ -2797,7 +2797,7 @@ public interface J extends Serializable, Tree {
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
-            return v.visitMethod(this, p);
+            return v.visitMethodDeclaration(this, p);
         }
 
         public boolean isAbstract() {
@@ -2805,7 +2805,7 @@ public interface J extends Serializable, Tree {
         }
 
         public boolean isConstructor() {
-            return getReturnTypeExpr() == null;
+            return getReturnTypeExpression() == null;
         }
 
         public String getSimpleName() {
@@ -2818,12 +2818,12 @@ public interface J extends Serializable, Tree {
 
         @Override
         public String toString() {
-            return "MethodDecl(" + MethodDeclToString.toString(this) + ")";
+            return "MethodDeclaration(" + MethodDeclarationToString.toString(this) + ")";
         }
 
         @Override
-        public Coordinates.MethodDecl getCoordinates() {
-            return new Coordinates.MethodDecl(this);
+        public Coordinates.MethodDeclaration getCoordinates() {
+            return new Coordinates.MethodDeclaration(this);
         }
 
         public Padding getPadding() {
@@ -2843,23 +2843,23 @@ public interface J extends Serializable, Tree {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final MethodDecl t;
+            private final MethodDeclaration t;
 
             @Nullable
             public JContainer<TypeParameter> getTypeParameters() {
                 return t.typeParameters;
             }
 
-            public MethodDecl withTypeParameters(@Nullable JContainer<TypeParameter> typeParameters) {
-                return t.typeParameters == typeParameters ? t : new MethodDecl(t.id, t.prefix, t.markers, t.annotations, t.modifiers, typeParameters, t.returnTypeExpr, t.name, t.params, t.throwz, t.body, t.defaultValue, t.type);
+            public MethodDeclaration withTypeParameters(@Nullable JContainer<TypeParameter> typeParameters) {
+                return t.typeParameters == typeParameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.annotations, t.modifiers, typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, t.defaultValue, t.type);
             }
 
-            public JContainer<Statement> getParams() {
-                return t.params;
+            public JContainer<Statement> getParameters() {
+                return t.parameters;
             }
 
-            public MethodDecl withParams(JContainer<Statement> params) {
-                return t.params == params ? t : new MethodDecl(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.typeParameters, t.returnTypeExpr, t.name, params, t.throwz, t.body, t.defaultValue, t.type);
+            public MethodDeclaration withParameters(JContainer<Statement> parameters) {
+                return t.parameters == parameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, parameters, t.throwz, t.body, t.defaultValue, t.type);
             }
 
             @Nullable
@@ -2867,8 +2867,8 @@ public interface J extends Serializable, Tree {
                 return t.throwz;
             }
 
-            public MethodDecl withThrows(@Nullable JContainer<NameTree> throwz) {
-                return t.throwz == throwz ? t : new MethodDecl(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.typeParameters, t.returnTypeExpr, t.name, t.params, throwz, t.body, t.defaultValue, t.type);
+            public MethodDeclaration withThrows(@Nullable JContainer<NameTree> throwz) {
+                return t.throwz == throwz ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, throwz, t.body, t.defaultValue, t.type);
             }
 
             @Nullable
@@ -2876,8 +2876,8 @@ public interface J extends Serializable, Tree {
                 return t.defaultValue;
             }
 
-            public MethodDecl withDefaultValue(@Nullable JLeftPadded<Expression> defaultValue) {
-                return t.defaultValue == defaultValue ? t : new MethodDecl(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.typeParameters, t.returnTypeExpr, t.name, t.params, t.throwz, t.body, defaultValue, t.type);
+            public MethodDeclaration withDefaultValue(@Nullable JLeftPadded<Expression> defaultValue) {
+                return t.defaultValue == defaultValue ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, defaultValue, t.type);
             }
         }
     }
@@ -2911,11 +2911,11 @@ public interface J extends Serializable, Tree {
 
         @Nullable
         public Expression getSelect() {
-            return select == null ? null : select.getElem();
+            return select == null ? null : select.getElement();
         }
 
         public MethodInvocation withSelect(@Nullable Expression select) {
-            return getPadding().withSelect(JRightPadded.withElem(this.select, select));
+            return getPadding().withSelect(JRightPadded.withElement(this.select, select));
         }
 
         @Nullable
@@ -2923,21 +2923,21 @@ public interface J extends Serializable, Tree {
 
         @Nullable
         public List<Expression> getTypeParameters() {
-            return typeParameters == null ? null : typeParameters.getElems();
+            return typeParameters == null ? null : typeParameters.getElements();
         }
 
         @With
         @Getter
-        Ident name;
+        Identifier name;
 
-        JContainer<Expression> args;
+        JContainer<Expression> arguments;
 
-        public List<Expression> getArgs() {
-            return args.getElems();
+        public List<Expression> getArguments() {
+            return arguments.getElements();
         }
 
-        public MethodInvocation withArgs(List<Expression> args) {
-            return getPadding().withArgs(JContainer.withElems(this.args, args));
+        public MethodInvocation withArguments(List<Expression> arguments) {
+            return getPadding().withArguments(JContainer.withElements(this.arguments, arguments));
         }
 
         @Nullable
@@ -2951,7 +2951,7 @@ public interface J extends Serializable, Tree {
                 return this;
             }
             if (type instanceof JavaType.Method) {
-                return new MethodInvocation(id, prefix, markers, select, typeParameters, name, args, (JavaType.Method) type);
+                return new MethodInvocation(id, prefix, markers, select, typeParameters, name, arguments, (JavaType.Method) type);
             }
             return this;
         }
@@ -3019,7 +3019,7 @@ public interface J extends Serializable, Tree {
             }
 
             public MethodInvocation withSelect(@Nullable JRightPadded<Expression> select) {
-                return t.select == select ? t : new MethodInvocation(t.id, t.prefix, t.markers, select, t.typeParameters, t.name, t.args, t.type);
+                return t.select == select ? t : new MethodInvocation(t.id, t.prefix, t.markers, select, t.typeParameters, t.name, t.arguments, t.type);
             }
 
             @Nullable
@@ -3028,15 +3028,15 @@ public interface J extends Serializable, Tree {
             }
 
             public MethodInvocation withTypeParameters(@Nullable JContainer<Expression> typeParameters) {
-                return t.typeParameters == typeParameters ? t : new MethodInvocation(t.id, t.prefix, t.markers, t.select, typeParameters, t.name, t.args, t.type);
+                return t.typeParameters == typeParameters ? t : new MethodInvocation(t.id, t.prefix, t.markers, t.select, typeParameters, t.name, t.arguments, t.type);
             }
 
-            public JContainer<Expression> getArgs() {
-                return t.args;
+            public JContainer<Expression> getArguments() {
+                return t.arguments;
             }
 
-            public MethodInvocation withArgs(JContainer<Expression> args) {
-                return t.args == args ? t : new MethodInvocation(t.id, t.prefix, t.markers, t.select, t.typeParameters, t.name, args, t.type);
+            public MethodInvocation withArguments(JContainer<Expression> arguments) {
+                return t.arguments == arguments ? t : new MethodInvocation(t.id, t.prefix, t.markers, t.select, t.typeParameters, t.name, arguments, t.type);
             }
         }
     }
@@ -3107,11 +3107,11 @@ public interface J extends Serializable, Tree {
         List<JRightPadded<NameTree>> alternatives;
 
         public List<NameTree> getAlternatives() {
-            return JRightPadded.getElems(alternatives);
+            return JRightPadded.getElements(alternatives);
         }
 
         public MultiCatch withAlternatives(List<NameTree> alternatives) {
-            return getPadding().withAlternatives(JRightPadded.withElems(this.alternatives, alternatives));
+            return getPadding().withAlternatives(JRightPadded.withElements(this.alternatives, alternatives));
         }
 
         @Override
@@ -3135,7 +3135,7 @@ public interface J extends Serializable, Tree {
         public JavaType getType() {
             return new JavaType.MultiCatch(alternatives.stream()
                     .filter(Objects::nonNull)
-                    .map(alt -> alt.getElem().getType())
+                    .map(alt -> alt.getElement().getType())
                     .collect(toList()));
         }
 
@@ -3193,7 +3193,7 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         @Getter
-        TypeTree typeExpr;
+        TypeTree typeExpression;
 
         @With
         @Getter
@@ -3204,7 +3204,7 @@ public interface J extends Serializable, Tree {
 
         @Nullable
         public List<Expression> getInitializer() {
-            return initializer == null ? null : initializer.getElems();
+            return initializer == null ? null : initializer.getElements();
         }
 
         @With
@@ -3247,7 +3247,7 @@ public interface J extends Serializable, Tree {
             }
 
             public NewArray withInitializer(@Nullable JContainer<Expression> initializer) {
-                return t.initializer == initializer ? t : new NewArray(t.id, t.prefix, t.markers, t.typeExpr, t.dimensions, initializer, t.type);
+                return t.initializer == initializer ? t : new NewArray(t.id, t.prefix, t.markers, t.typeExpression, t.dimensions, initializer, t.type);
             }
         }
     }
@@ -3277,11 +3277,11 @@ public interface J extends Serializable, Tree {
         JRightPadded<Expression> index;
 
         public Expression getIndex() {
-            return index.getElem();
+            return index.getElement();
         }
 
         public ArrayDimension withIndex(Expression index) {
-            return getPadding().withIndex(this.index.withElem(index));
+            return getPadding().withIndex(this.index.withElement(index));
         }
 
         @Override
@@ -3350,15 +3350,15 @@ public interface J extends Serializable, Tree {
          * Right padded before the '.'
          */
         @Nullable
-        JRightPadded<Expression> encl;
+        JRightPadded<Expression> enclosing;
 
         @Nullable
-        public Expression getEncl() {
-            return encl == null ? null : encl.getElem();
+        public Expression getEnclosing() {
+            return enclosing == null ? null : enclosing.getElement();
         }
 
-        public NewClass withEncl(Expression encl) {
-            return getPadding().withEncl(JRightPadded.withElem(this.encl, encl));
+        public NewClass withEnclosing(Expression enclosing) {
+            return getPadding().withEnclosing(JRightPadded.withElement(this.enclosing, enclosing));
         }
 
         Space nooh;
@@ -3371,7 +3371,7 @@ public interface J extends Serializable, Tree {
             if (nooh == this.nooh) {
                 return this;
             }
-            return new NewClass(id, prefix, markers, encl, nooh, clazz, args, body, type);
+            return new NewClass(id, prefix, markers, enclosing, nooh, clazz, arguments, body, type);
         }
 
         @Nullable
@@ -3380,15 +3380,15 @@ public interface J extends Serializable, Tree {
         TypeTree clazz;
 
         @Nullable
-        JContainer<Expression> args;
+        JContainer<Expression> arguments;
 
         @Nullable
-        public JContainer<Expression> getArgs() {
-            return args;
+        public JContainer<Expression> getArguments() {
+            return arguments;
         }
 
-        public NewClass withArgs(@Nullable List<Expression> args) {
-            return getPadding().withArgs(JContainer.withElemsNullable(this.args, args));
+        public NewClass withArguments(@Nullable List<Expression> arguments) {
+            return getPadding().withArguments(JContainer.withElementsNullable(this.arguments, arguments));
         }
 
         @With
@@ -3436,21 +3436,21 @@ public interface J extends Serializable, Tree {
             private final NewClass t;
 
             @Nullable
-            public JRightPadded<Expression> getEncl() {
-                return t.encl;
+            public JRightPadded<Expression> getEnclosing() {
+                return t.enclosing;
             }
 
-            public NewClass withEncl(@Nullable JRightPadded<Expression> encl) {
-                return t.encl == encl ? t : new NewClass(t.id, t.prefix, t.markers, encl, t.nooh, t.clazz, t.args, t.body, t.type);
+            public NewClass withEnclosing(@Nullable JRightPadded<Expression> enclosing) {
+                return t.enclosing == enclosing ? t : new NewClass(t.id, t.prefix, t.markers, enclosing, t.nooh, t.clazz, t.arguments, t.body, t.type);
             }
 
             @Nullable
-            public JContainer<Expression> getArgs() {
-                return t.args;
+            public JContainer<Expression> getArguments() {
+                return t.arguments;
             }
 
-            public NewClass withArgs(@Nullable JContainer<Expression> args) {
-                return t.args == args ? t : new NewClass(t.id, t.prefix, t.markers, t.encl, t.nooh, t.clazz, args, t.body, t.type);
+            public NewClass withArguments(@Nullable JContainer<Expression> arguments) {
+                return t.arguments == arguments ? t : new NewClass(t.id, t.prefix, t.markers, t.enclosing, t.nooh, t.clazz, arguments, t.body, t.type);
             }
         }
     }
@@ -3469,7 +3469,7 @@ public interface J extends Serializable, Tree {
         Markers markers;
 
         @With
-        Expression expr;
+        Expression expression;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -3513,11 +3513,11 @@ public interface J extends Serializable, Tree {
 
         @Nullable
         public List<Expression> getTypeParameters() {
-            return typeParameters == null ? null : typeParameters.getElems();
+            return typeParameters == null ? null : typeParameters.getElements();
         }
 
         public ParameterizedType withTypeParameters(@Nullable List<Expression> typeParameters) {
-            return getPadding().withTypeParameters(JContainer.withElemsNullable(this.typeParameters, typeParameters));
+            return getPadding().withTypeParameters(JContainer.withElementsNullable(this.typeParameters, typeParameters));
         }
 
         @Override
@@ -3599,11 +3599,11 @@ public interface J extends Serializable, Tree {
         JRightPadded<J2> tree;
 
         public J2 getTree() {
-            return tree.getElem();
+            return tree.getElement();
         }
 
         public Parentheses<J2> withTree(J2 tree) {
-            return getPadding().withTree(this.tree.withElem(tree));
+            return getPadding().withTree(this.tree.withElement(tree));
         }
 
         @Override
@@ -3690,11 +3690,11 @@ public interface J extends Serializable, Tree {
         JRightPadded<J2> tree;
 
         public J2 getTree() {
-            return tree.getElem();
+            return tree.getElement();
         }
 
         public ControlParentheses<J2> withTree(J2 tree) {
-            return getPadding().withTree(this.tree.withElem(tree));
+            return getPadding().withTree(this.tree.withElement(tree));
         }
 
         @Override
@@ -3818,7 +3818,7 @@ public interface J extends Serializable, Tree {
 
         @With
         @Nullable
-        Expression expr;
+        Expression expression;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -3920,21 +3920,21 @@ public interface J extends Serializable, Tree {
         JLeftPadded<Expression> truePart;
 
         public Expression getTruePart() {
-            return truePart.getElem();
+            return truePart.getElement();
         }
 
         public Ternary withTruePart(Expression truePart) {
-            return getPadding().withTruePart(this.truePart.withElem(truePart));
+            return getPadding().withTruePart(this.truePart.withElement(truePart));
         }
 
         JLeftPadded<Expression> falsePart;
 
         public Expression getFalsePart() {
-            return falsePart.getElem();
+            return falsePart.getElement();
         }
 
         public Ternary withFalsePart(Expression falsePart) {
-            return getPadding().withFalsePart(this.falsePart.withElem(falsePart));
+            return getPadding().withFalsePart(this.falsePart.withElement(falsePart));
         }
 
         @With
@@ -4043,11 +4043,11 @@ public interface J extends Serializable, Tree {
 
         @Nullable
         public List<Resource> getResources() {
-            return resources == null ? null : resources.getElems();
+            return resources == null ? null : resources.getElements();
         }
 
         public Try withResources(@Nullable List<Resource> resources) {
-            return getPadding().withResources(JContainer.withElemsNullable(this.resources, resources));
+            return getPadding().withResources(JContainer.withElementsNullable(this.resources, resources));
         }
 
         @With
@@ -4063,11 +4063,11 @@ public interface J extends Serializable, Tree {
 
         @Nullable
         public Block getFinally() {
-            return finallie == null ? null : finallie.getElem();
+            return finallie == null ? null : finallie.getElement();
         }
 
         public Try withFinally(Block finallie) {
-            return getPadding().withFinally(JLeftPadded.withElem(this.finallie, finallie));
+            return getPadding().withFinally(JLeftPadded.withElement(this.finallie, finallie));
         }
 
         @Override
@@ -4094,7 +4094,7 @@ public interface J extends Serializable, Tree {
             Markers markers;
 
             @With
-            VariableDecls variableDecls;
+            VariableDeclarations variableDeclarations;
 
             /**
              * Only honored on the last resource in a collection of resources.
@@ -4122,7 +4122,7 @@ public interface J extends Serializable, Tree {
             Markers markers;
 
             @With
-            ControlParentheses<VariableDecls> param;
+            ControlParentheses<VariableDeclarations> parameter;
 
             @With
             Block body;
@@ -4194,7 +4194,7 @@ public interface J extends Serializable, Tree {
         ControlParentheses<TypeTree> clazz;
 
         @With
-        Expression expr;
+        Expression expression;
 
         @Override
         public JavaType getType() {
@@ -4257,11 +4257,11 @@ public interface J extends Serializable, Tree {
 
         @Nullable
         public List<TypeTree> getBounds() {
-            return bounds == null ? null : bounds.getElems();
+            return bounds == null ? null : bounds.getElements();
         }
 
         public TypeParameter withBounds(@Nullable List<TypeTree> bounds) {
-            return getPadding().withBounds(JContainer.withElemsNullable(this.bounds, bounds));
+            return getPadding().withBounds(JContainer.withElementsNullable(this.bounds, bounds));
         }
 
         @Override
@@ -4329,16 +4329,16 @@ public interface J extends Serializable, Tree {
         JLeftPadded<Type> operator;
 
         public Type getOperator() {
-            return operator.getElem();
+            return operator.getElement();
         }
 
         public Unary withOperator(Type operator) {
-            return getPadding().withOperator(this.operator.withElem(operator));
+            return getPadding().withOperator(this.operator.withElement(operator));
         }
 
         @With
         @Getter
-        Expression expr;
+        Expression expression;
 
         @With
         @Nullable
@@ -4357,7 +4357,7 @@ public interface J extends Serializable, Tree {
 
         @Override
         public List<Tree> getSideEffects() {
-            return expr.getSideEffects();
+            return expression.getSideEffects();
         }
 
         public enum Type {
@@ -4395,7 +4395,7 @@ public interface J extends Serializable, Tree {
             }
 
             public Unary withOperator(JLeftPadded<Type> operator) {
-                return t.operator == operator ? t : new Unary(t.id, t.prefix, t.markers, operator, t.expr, t.type);
+                return t.operator == operator ? t : new Unary(t.id, t.prefix, t.markers, operator, t.expression, t.type);
             }
         }
     }
@@ -4404,7 +4404,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class VariableDecls implements J, Statement {
+    final class VariableDeclarations implements J, Statement {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -4432,7 +4432,7 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         @Getter
-        TypeTree typeExpr;
+        TypeTree typeExpression;
 
         @With
         @Nullable
@@ -4443,29 +4443,29 @@ public interface J extends Serializable, Tree {
         @Getter
         List<JLeftPadded<Space>> dimensionsBeforeName;
 
-        List<JRightPadded<NamedVar>> vars;
+        List<JRightPadded<NamedVariable>> variables;
 
-        public List<NamedVar> getVars() {
-            return JRightPadded.getElems(vars);
+        public List<NamedVariable> getVariables() {
+            return JRightPadded.getElements(variables);
         }
 
-        public VariableDecls withVars(List<NamedVar> vars) {
-            return getPadding().withVars(JRightPadded.withElems(this.vars, vars));
+        public VariableDeclarations withVariables(List<NamedVariable> vars) {
+            return getPadding().withVars(JRightPadded.withElements(this.variables, vars));
         }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
-            return v.visitMultiVariable(this, p);
+            return v.visitVariableDeclarations(this, p);
         }
 
         @Override
-        public Coordinates<J.VariableDecls> getCoordinates() {
-            return new Coordinates.VariableDecls(this);
+        public Coordinates<VariableDeclarations> getCoordinates() {
+            return new Coordinates.VariableDeclaration(this);
         }
 
         @Nullable
         public JavaType.Class getTypeAsClass() {
-            return typeExpr == null ? null : TypeUtils.asClass(typeExpr.getType());
+            return typeExpression == null ? null : TypeUtils.asClass(typeExpression.getType());
         }
 
         @ToString
@@ -4473,7 +4473,7 @@ public interface J extends Serializable, Tree {
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @RequiredArgsConstructor
         @AllArgsConstructor(access = AccessLevel.PRIVATE)
-        public static final class NamedVar implements J, NameTree {
+        public static final class NamedVariable implements J, NameTree {
             @Nullable
             @NonFinal
             transient WeakReference<Padding> padding;
@@ -4492,7 +4492,7 @@ public interface J extends Serializable, Tree {
 
             @With
             @Getter
-            Ident name;
+            Identifier name;
 
             @With
             @Getter
@@ -4503,11 +4503,11 @@ public interface J extends Serializable, Tree {
 
             @Nullable
             public Expression getInitializer() {
-                return initializer == null ? null : initializer.getElem();
+                return initializer == null ? null : initializer.getElement();
             }
 
-            public NamedVar withInitializer(@Nullable Expression initializer) {
-                return getPadding().withInitializer(JLeftPadded.withElem(this.initializer, initializer));
+            public NamedVariable withInitializer(@Nullable Expression initializer) {
+                return getPadding().withInitializer(JLeftPadded.withElement(this.initializer, initializer));
             }
 
             @With
@@ -4525,18 +4525,18 @@ public interface J extends Serializable, Tree {
             }
 
             @Override
-            public Coordinates<J.VariableDecls.NamedVar> getCoordinates() {
-                return new Coordinates.VariableDecls.NamedVar(this);
+            public Coordinates<NamedVariable> getCoordinates() {
+                return new Coordinates.VariableDeclaration.NamedVar(this);
             }
 
             public boolean isField(Cursor cursor) {
                 return cursor
                         .getParentOrThrow() // JRightPadded
-                        .getParentOrThrow() // J.VariableDecls
+                        .getParentOrThrow() // J.VariableDeclarations
                         .getParentOrThrow() // JRightPadded
                         .getParentOrThrow() // J.Block
-                        .getParentOrThrow() // maybe J.ClassDecl
-                        .getValue() instanceof J.ClassDecl;
+                        .getParentOrThrow() // maybe J.ClassDeclaration
+                        .getValue() instanceof ClassDeclaration;
             }
 
             public Padding getPadding() {
@@ -4556,15 +4556,15 @@ public interface J extends Serializable, Tree {
 
             @RequiredArgsConstructor
             public static class Padding {
-                private final NamedVar t;
+                private final NamedVariable t;
 
                 @Nullable
                 public JLeftPadded<Expression> getInitializer() {
                     return t.initializer;
                 }
 
-                public NamedVar withInitializer(@Nullable JLeftPadded<Expression> initializer) {
-                    return t.initializer == initializer ? t : new NamedVar(t.id, t.prefix, t.markers, t.name, t.dimensionsAfterName, initializer, t.type);
+                public NamedVariable withInitializer(@Nullable JLeftPadded<Expression> initializer) {
+                    return t.initializer == initializer ? t : new NamedVariable(t.id, t.prefix, t.markers, t.name, t.dimensionsAfterName, initializer, t.type);
                 }
             }
         }
@@ -4575,7 +4575,7 @@ public interface J extends Serializable, Tree {
 
         @Override
         public String toString() {
-            return "VariableDecls(" + VariableDeclsToString.toString(this) + ")";
+            return "VariableDeclarations(" + VariableDeclarationsToString.toString(this) + ")";
         }
 
         public Padding getPadding() {
@@ -4595,14 +4595,14 @@ public interface J extends Serializable, Tree {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final VariableDecls t;
+            private final VariableDeclarations t;
 
-            public List<JRightPadded<NamedVar>> getVars() {
-                return t.vars;
+            public List<JRightPadded<NamedVariable>> getVars() {
+                return t.variables;
             }
 
-            public VariableDecls withVars(List<JRightPadded<NamedVar>> vars) {
-                return t.vars == vars ? t : new VariableDecls(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.typeExpr, t.varargs, t.dimensionsBeforeName, vars);
+            public VariableDeclarations withVars(List<JRightPadded<NamedVariable>> vars) {
+                return t.variables == vars ? t : new VariableDeclarations(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.typeExpression, t.varargs, t.dimensionsBeforeName, vars);
             }
         }
     }
@@ -4636,11 +4636,11 @@ public interface J extends Serializable, Tree {
         JRightPadded<Statement> body;
 
         public Statement getBody() {
-            return body.getElem();
+            return body.getElement();
         }
 
         public WhileLoop withBody(Statement body) {
-            return getPadding().withBody(this.body.withElem(body));
+            return getPadding().withBody(this.body.withElement(body));
         }
 
         @Override
@@ -4709,11 +4709,11 @@ public interface J extends Serializable, Tree {
 
         @Nullable
         public Bound getBound() {
-            return bound == null ? null : bound.getElem();
+            return bound == null ? null : bound.getElement();
         }
 
         public Wildcard withBound(@Nullable Bound bound) {
-            return getPadding().withBound(JLeftPadded.withElem(this.bound, bound));
+            return getPadding().withBound(JLeftPadded.withElement(this.bound, bound));
         }
 
         @With

@@ -39,15 +39,15 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     public <T extends J> J visitParentheses(J.Parentheses<T> parens, P p) {
         J par = super.visitParentheses(parens, p);
         Cursor c = getCursor().pollNearestMessage(UNNECESSARY_PARENTHESES_MARKER);
-        if (c != null && (c.getValue() instanceof J.Literal || c.getValue() instanceof J.Ident)) {
+        if (c != null && (c.getValue() instanceof J.Literal || c.getValue() instanceof J.Identifier)) {
             par = new UnwrapParentheses<>((J.Parentheses<?>) par).visit(par, p, getCursor());
         }
         return par;
     }
 
     @Override
-    public J visitIdentifier(J.Ident ident, P p) {
-        J.Ident i = visitAndCast(ident, p, super::visitIdentifier);
+    public J visitIdentifier(J.Identifier ident, P p) {
+        J.Identifier i = visitAndCast(ident, p, super::visitIdentifier);
         if (style.isIdent() && getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.Parentheses) {
             getCursor().putMessageOnFirstEnclosing(J.Parentheses.class, UNNECESSARY_PARENTHESES_MARKER, getCursor());
         }
@@ -74,39 +74,39 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
-    public J visitAssignOp(J.AssignOp assignOp, P p) {
-        J.AssignOp a = visitAndCast(assignOp, p, super::visitAssignOp);
-        J.AssignOp.Type op = a.getOperator();
-        if (a.getAssignment() instanceof J.Parentheses && ((style.isBandAssign() && op == J.AssignOp.Type.BitAnd) ||
-                (style.isBorAssign() && op == J.AssignOp.Type.BitOr) ||
-                (style.isBsrAssign() && op == J.AssignOp.Type.UnsignedRightShift) ||
-                (style.isBxorAssign() && op == J.AssignOp.Type.BitXor) ||
-                (style.isSrAssign() && op == J.AssignOp.Type.RightShift) ||
-                (style.isSlAssign() && op == J.AssignOp.Type.LeftShift) ||
-                (style.isMinusAssign() && op == J.AssignOp.Type.Subtraction) ||
-                (style.isDivAssign() && op == J.AssignOp.Type.Division) ||
-                (style.isPlusAssign() && op == J.AssignOp.Type.Addition) ||
-                (style.isStarAssign() && op == J.AssignOp.Type.Multiplication) ||
-                (style.isModAssign() && op == J.AssignOp.Type.Modulo))) {
-            a = (J.AssignOp) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment()).visit(a, p, getCursor());
+    public J visitAssignmentOperation(J.AssignmentOperation assignOp, P p) {
+        J.AssignmentOperation a = visitAndCast(assignOp, p, super::visitAssignmentOperation);
+        J.AssignmentOperation.Type op = a.getOperator();
+        if (a.getAssignment() instanceof J.Parentheses && ((style.isBandAssign() && op == J.AssignmentOperation.Type.BitAnd) ||
+                (style.isBorAssign() && op == J.AssignmentOperation.Type.BitOr) ||
+                (style.isBsrAssign() && op == J.AssignmentOperation.Type.UnsignedRightShift) ||
+                (style.isBxorAssign() && op == J.AssignmentOperation.Type.BitXor) ||
+                (style.isSrAssign() && op == J.AssignmentOperation.Type.RightShift) ||
+                (style.isSlAssign() && op == J.AssignmentOperation.Type.LeftShift) ||
+                (style.isMinusAssign() && op == J.AssignmentOperation.Type.Subtraction) ||
+                (style.isDivAssign() && op == J.AssignmentOperation.Type.Division) ||
+                (style.isPlusAssign() && op == J.AssignmentOperation.Type.Addition) ||
+                (style.isStarAssign() && op == J.AssignmentOperation.Type.Multiplication) ||
+                (style.isModAssign() && op == J.AssignmentOperation.Type.Modulo))) {
+            a = (J.AssignmentOperation) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment()).visit(a, p, getCursor());
         }
         return a;
     }
 
     @Override
-    public J visitAssign(J.Assign assign, P p) {
-        J.Assign a = visitAndCast(assign, p, super::visitAssign);
+    public J visitAssignment(J.Assignment assignment, P p) {
+        J.Assignment a = visitAndCast(assignment, p, super::visitAssignment);
         if (style.isAssign() && a.getAssignment() instanceof J.Parentheses) {
-            a = (J.Assign) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment()).visit(a, p, getCursor());
+            a = (J.Assignment) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment()).visit(a, p, getCursor());
         }
         return a;
     }
 
     @Override
-    public J visitVariable(J.VariableDecls.NamedVar variable, P p) {
-        J.VariableDecls.NamedVar v = visitAndCast(variable, p, super::visitVariable);
+    public J visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
+        J.VariableDeclarations.NamedVariable v = visitAndCast(variable, p, super::visitVariable);
         if (style.isAssign() && v.getInitializer() != null && v.getInitializer() instanceof J.Parentheses) {
-            v = (J.VariableDecls.NamedVar) new UnwrapParentheses<>((J.Parentheses<?>) v.getInitializer()).visit(v, p, getCursor());
+            v = (J.VariableDeclarations.NamedVariable) new UnwrapParentheses<>((J.Parentheses<?>) v.getInitializer()).visit(v, p, getCursor());
         }
         return v;
     }
@@ -114,10 +114,10 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     @Override
     public J visitLambda(J.Lambda lambda, P p) {
         J.Lambda l = visitAndCast(lambda, p, super::visitLambda);
-        if (l.getParameters().getParams().size() == 1 &&
+        if (l.getParameters().getParameters().size() == 1 &&
                 l.getParameters().isParenthesized() &&
-                l.getParameters().getParams().get(0) instanceof J.VariableDecls &&
-                ((J.VariableDecls) l.getParameters().getParams().get(0)).getTypeExpr() == null) {
+                l.getParameters().getParameters().get(0) instanceof J.VariableDeclarations &&
+                ((J.VariableDeclarations) l.getParameters().getParameters().get(0)).getTypeExpression() == null) {
             l = l.withParameters(l.getParameters().withParenthesized(false));
         }
         return l;

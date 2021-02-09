@@ -57,10 +57,10 @@ public class FindInheritedFields {
         }
 
         @Override
-        public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, Set<JavaType.Var> ctx) {
+        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Set<JavaType.Var> ctx) {
             JavaType.Class asClass = TypeUtils.asClass(classDecl.getType());
             ctx.addAll(superFields(asClass == null ? null : asClass.getSupertype()));
-            return super.visitClassDecl(classDecl, ctx);
+            return super.visitClassDeclaration(classDecl, ctx);
         }
     }
 }

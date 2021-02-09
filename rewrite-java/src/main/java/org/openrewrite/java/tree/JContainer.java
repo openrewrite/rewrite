@@ -45,25 +45,25 @@ public class JContainer<T> implements Markable {
     private static final JContainer<?> EMPTY = new JContainer<>(Space.EMPTY, emptyList(), Markers.EMPTY);
 
     private final Space before;
-    private final List<JRightPadded<T>> elems;
+    private final List<JRightPadded<T>> elements;
     private final Markers markers;
 
-    private JContainer(Space before, List<JRightPadded<T>> elems, Markers markers) {
+    private JContainer(Space before, List<JRightPadded<T>> elements, Markers markers) {
         this.before = before;
-        this.elems = elems;
+        this.elements = elements;
         this.markers = markers;
     }
 
-    public static <T> JContainer<T> build(List<JRightPadded<T>> elems) {
-        return build(Space.EMPTY, elems, Markers.EMPTY);
+    public static <T> JContainer<T> build(List<JRightPadded<T>> elements) {
+        return build(Space.EMPTY, elements, Markers.EMPTY);
     }
 
     @JsonCreator
-    public static <T> JContainer<T> build(Space before, List<JRightPadded<T>> elems, Markers markers) {
-        if (before.isEmpty() && elems.isEmpty()) {
+    public static <T> JContainer<T> build(Space before, List<JRightPadded<T>> elements, Markers markers) {
+        if (before.isEmpty() && elements.isEmpty()) {
             return empty();
         }
-        return new JContainer<>(before, elems, markers);
+        return new JContainer<>(before, elements, markers);
     }
 
     @SuppressWarnings("unchecked")
@@ -72,16 +72,16 @@ public class JContainer<T> implements Markable {
     }
 
     public JContainer<T> withBefore(Space before) {
-        return build(before, elems, markers);
+        return build(before, elements, markers);
     }
 
     @SuppressWarnings("unchecked")
     public JContainer<T> withMarkers(Markers markers) {
-        return build(getBefore(), elems, markers);
+        return build(getBefore(), elements, markers);
     }
 
-    public List<T> getElems() {
-        return JRightPadded.getElems(elems);
+    public List<T> getElements() {
+        return JRightPadded.getElements(elements);
     }
 
     public Space getBefore() {
@@ -94,40 +94,40 @@ public class JContainer<T> implements Markable {
     }
 
     public JContainer<T> map(UnaryOperator<T> map) {
-        return getPadding().withElems(ListUtils.map(elems, t -> t.map(map)));
+        return getPadding().withElements(ListUtils.map(elements, t -> t.map(map)));
     }
 
     public Space getLastSpace() {
-        return elems.isEmpty() ? Space.EMPTY : elems.get(elems.size() - 1).getAfter();
+        return elements.isEmpty() ? Space.EMPTY : elements.get(elements.size() - 1).getAfter();
     }
 
     public enum Location {
         ANNOTATION_ARGUMENTS(Space.Location.ANNOTATION_ARGUMENTS, JRightPadded.Location.ANNOTATION_ARGUMENT),
         CASE(Space.Location.CASE, JRightPadded.Location.CASE),
         IMPLEMENTS(Space.Location.IMPLEMENTS, JRightPadded.Location.IMPLEMENTS),
-        METHOD_DECL_PARAMETERS(Space.Location.METHOD_DECL_PARAMETERS, JRightPadded.Location.METHOD_DECL_PARAMETER),
+        METHOD_DECLARATION_PARAMETERS(Space.Location.METHOD_DECLARATION_PARAMETERS, JRightPadded.Location.METHOD_DECLARATION_PARAMETER),
         METHOD_INVOCATION_ARGUMENTS(Space.Location.METHOD_INVOCATION_ARGUMENTS, JRightPadded.Location.METHOD_INVOCATION_ARGUMENT),
         NEW_ARRAY_INITIALIZER(Space.Location.NEW_ARRAY_INITIALIZER, JRightPadded.Location.NEW_ARRAY_INITIALIZER),
-        NEW_CLASS_ARGS(Space.Location.NEW_CLASS_ARGS, JRightPadded.Location.NEW_CLASS_ARGS),
+        NEW_CLASS_ARGUMENTS(Space.Location.NEW_CLASS_ARGUMENTS, JRightPadded.Location.NEW_CLASS_ARGUMENTS),
         THROWS(Space.Location.THROWS, JRightPadded.Location.THROWS),
         TRY_RESOURCES(Space.Location.TRY_RESOURCES, JRightPadded.Location.TRY_RESOURCE),
         TYPE_BOUNDS(Space.Location.TYPE_BOUNDS, JRightPadded.Location.TYPE_BOUND),
         TYPE_PARAMETERS(Space.Location.TYPE_PARAMETERS, JRightPadded.Location.TYPE_PARAMETER);
 
         private final Space.Location beforeLocation;
-        private final JRightPadded.Location elemLocation;
+        private final JRightPadded.Location elementLocation;
 
-        Location(Space.Location beforeLocation, JRightPadded.Location elemLocation) {
+        Location(Space.Location beforeLocation, JRightPadded.Location elementLocation) {
             this.beforeLocation = beforeLocation;
-            this.elemLocation = elemLocation;
+            this.elementLocation = elementLocation;
         }
 
         public Space.Location getBeforeLocation() {
             return beforeLocation;
         }
 
-        public JRightPadded.Location getElemLocation() {
-            return elemLocation;
+        public JRightPadded.Location getElementLocation() {
+            return elementLocation;
         }
     }
 
@@ -142,38 +142,38 @@ public class JContainer<T> implements Markable {
     public static class Padding<T> {
         private final JContainer<T> c;
 
-        public List<JRightPadded<T>> getElems() {
-            return c.elems;
+        public List<JRightPadded<T>> getElements() {
+            return c.elements;
         }
 
-        public JContainer<T> withElems(List<JRightPadded<T>> elem) {
-            return c.elems == elem ? c : build(c.before, elem, c.markers);
+        public JContainer<T> withElements(List<JRightPadded<T>> elements) {
+            return c.elements == elements ? c : build(c.before, elements, c.markers);
         }
     }
 
     @Nullable
-    public static <J2 extends J> JContainer<J2> withElemsNullable(@Nullable JContainer<J2> before, @Nullable List<J2> elems) {
+    public static <J2 extends J> JContainer<J2> withElementsNullable(@Nullable JContainer<J2> before, @Nullable List<J2> elements) {
         if (before == null) {
-            if (elems == null || elems.isEmpty()) {
+            if (elements == null || elements.isEmpty()) {
                 return null;
             }
-            return JContainer.build(Space.EMPTY, JRightPadded.withElems(emptyList(), elems), Markers.EMPTY);
+            return JContainer.build(Space.EMPTY, JRightPadded.withElements(emptyList(), elements), Markers.EMPTY);
         }
-        if (elems == null || elems.isEmpty()) {
+        if (elements == null || elements.isEmpty()) {
             return null;
         }
-        return before.getPadding().withElems(JRightPadded.withElems(before.elems, elems));
+        return before.getPadding().withElements(JRightPadded.withElements(before.elements, elements));
     }
 
-    public static <J2 extends J> JContainer<J2> withElems(JContainer<J2> before, @Nullable List<J2> elems) {
-        if (elems == null) {
-            return before.getPadding().withElems(emptyList());
+    public static <J2 extends J> JContainer<J2> withElements(JContainer<J2> before, @Nullable List<J2> elements) {
+        if (elements == null) {
+            return before.getPadding().withElements(emptyList());
         }
-        return before.getPadding().withElems(JRightPadded.withElems(before.elems, elems));
+        return before.getPadding().withElements(JRightPadded.withElements(before.elements, elements));
     }
 
     @Override
     public String toString() {
-        return "JContainer(before=" + before + ", elemCount=" + elems.size() + ')';
+        return "JContainer(before=" + before + ", elementCount=" + elements.size() + ')';
     }
 }

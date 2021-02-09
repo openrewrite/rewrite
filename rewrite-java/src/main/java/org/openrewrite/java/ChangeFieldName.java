@@ -37,9 +37,9 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.VariableDecls.NamedVar visitVariable(J.VariableDecls.NamedVar variable, P p) {
-        J.VariableDecls.NamedVar v = variable;
-        J.ClassDecl enclosingClass = getCursor().firstEnclosingOrThrow(J.ClassDecl.class);
+    public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
+        J.VariableDeclarations.NamedVariable v = variable;
+        J.ClassDeclaration enclosingClass = getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class);
         if (variable.isField(getCursor()) && matchesClass(enclosingClass.getType()) &&
                 variable.getSimpleName().equals(hasName)) {
             v = v.withName(v.getName().withName(toName));
@@ -56,14 +56,14 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
         J.FieldAccess f = super.visitFieldAccess(fieldAccess, p);
         if (matchesClass(fieldAccess.getTarget().getType()) &&
                 fieldAccess.getSimpleName().equals(hasName)) {
-            f = f.getPadding().withName(f.getPadding().getName().withElem(f.getPadding().getName().getElem().withName(toName)));
+            f = f.getPadding().withName(f.getPadding().getName().withElement(f.getPadding().getName().getElement().withName(toName)));
         }
         return f;
     }
 
     @Override
-    public J.Ident visitIdentifier(J.Ident ident, P p) {
-        J.Ident i = super.visitIdentifier(ident, p);
+    public J.Identifier visitIdentifier(J.Identifier ident, P p) {
+        J.Identifier i = super.visitIdentifier(ident, p);
         if (ident.getSimpleName().equals(hasName) && isFieldReference(ident) &&
                 isThisReferenceToClassType(ident)) {
             i = i.withName(toName);
@@ -76,7 +76,7 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
         return testClassType != null && testClassType.getFullyQualifiedName().equals(classType.getFullyQualifiedName());
     }
 
-    private boolean isThisReferenceToClassType(J.Ident ident) {
+    private boolean isThisReferenceToClassType(J.Identifier ident) {
         J.FieldAccess fieldAccess = getCursor().firstEnclosing(J.FieldAccess.class);
         if (fieldAccess == null) {
             return true;
@@ -87,28 +87,28 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
         return classType.equals(fieldAccess.getTarget().getType());
     }
 
-    private boolean isFieldReference(J.Ident ident) {
+    private boolean isFieldReference(J.Identifier ident) {
         AtomicReference<Cursor> nearest = new AtomicReference<>();
         new FindVariableDefinition(ident, getCursor()).visit(getCursor().firstEnclosing(J.CompilationUnit.class), nearest);
         return nearest.get() != null && nearest.get()
                 .dropParentUntil(J.class::isInstance) // maybe J.VariableDecls
                 .dropParentUntil(J.class::isInstance) // maybe J.Block
                 .dropParentUntil(J.class::isInstance) // maybe J.ClassDecl
-                .getValue() instanceof J.ClassDecl;
+                .getValue() instanceof J.ClassDeclaration;
     }
 
     private static class FindVariableDefinition extends JavaIsoVisitor<AtomicReference<Cursor>> {
-        private final J.Ident ident;
+        private final J.Identifier ident;
         private final Cursor referenceScope;
 
-        public FindVariableDefinition(J.Ident ident, Cursor referenceScope) {
+        public FindVariableDefinition(J.Identifier ident, Cursor referenceScope) {
             this.ident = ident;
             this.referenceScope = referenceScope;
             setCursoringOn();
         }
 
         @Override
-        public J.VariableDecls.NamedVar visitVariable(J.VariableDecls.NamedVar variable, AtomicReference<Cursor> ctx) {
+        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, AtomicReference<Cursor> ctx) {
             if (variable.getSimpleName().equalsIgnoreCase(ident.getSimpleName()) && isInSameNameScope(referenceScope)) {
                 // the definition will be the "closest" cursor, i.e. the one with the longest path in the same name scope
                 ctx.accumulateAndGet(getCursor(), (r1, r2) -> {

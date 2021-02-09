@@ -45,13 +45,13 @@ public class SimplifyBooleanReturnVisitor<P> extends JavaVisitor<P> {
         Cursor parent = getCursor().dropParentUntil(J.class::isInstance);
 
         if (parent.getValue() instanceof J.Block &&
-                parent.getParentOrThrow().getValue() instanceof J.MethodDecl &&
+                parent.getParentOrThrow().getValue() instanceof J.MethodDeclaration &&
                 thenHasOnlyReturnStatement(iff) &&
                 elseWithOnlyReturn(i)) {
             List<Statement> followingStatements = followingStatements();
             Optional<Expression> singleFollowingStatement = Optional.ofNullable(followingStatements.isEmpty() ? null : followingStatements.get(0))
                     .flatMap(stat -> Optional.ofNullable(stat instanceof J.Return ? (J.Return) stat : null))
-                    .map(J.Return::getExpr);
+                    .map(J.Return::getExpression);
 
             if (followingStatements.isEmpty() || singleFollowingStatement.map(r -> isLiteralFalse(r) || isLiteralTrue(r)).orElse(false)) {
                 J.Return retrn = getReturnIfOnlyStatementInThen(iff).orElse(null);
@@ -59,18 +59,18 @@ public class SimplifyBooleanReturnVisitor<P> extends JavaVisitor<P> {
 
                 Expression ifCondition = i.getIfCondition().getTree();
 
-                if (isLiteralTrue(retrn.getExpr())) {
+                if (isLiteralTrue(retrn.getExpression())) {
                     if (singleFollowingStatement.map(this::isLiteralFalse).orElse(false) && i.getElsePart() == null) {
                         doAfterVisit(new DeleteStatement<>(followingStatements().get(0)));
-                        return maybeAutoFormat(retrn, retrn.withExpr(ifCondition), p, parent);
+                        return maybeAutoFormat(retrn, retrn.withExpression(ifCondition), p, parent);
                     } else if (!singleFollowingStatement.isPresent() &&
                             getReturnExprIfOnlyStatementInElseThen(i).map(this::isLiteralFalse).orElse(false)) {
                         if (i.getElsePart() != null) {
                             doAfterVisit(new DeleteStatement<>(i.getElsePart().getBody()));
                         }
-                        return maybeAutoFormat(retrn, retrn.withExpr(ifCondition), p, parent);
+                        return maybeAutoFormat(retrn, retrn.withExpression(ifCondition), p, parent);
                     }
-                } else if (isLiteralFalse(retrn.getExpr())) {
+                } else if (isLiteralFalse(retrn.getExpression())) {
                     boolean returnThenPart = false;
 
                     if (singleFollowingStatement.map(this::isLiteralTrue).orElse(false) && i.getElsePart() == null) {
@@ -101,7 +101,7 @@ public class SimplifyBooleanReturnVisitor<P> extends JavaVisitor<P> {
 
     private boolean thenHasOnlyReturnStatement(J.If iff) {
         return getReturnIfOnlyStatementInThen(iff)
-                .map(retrn -> isLiteralFalse(retrn.getExpr()) || isLiteralTrue(retrn.getExpr()))
+                .map(retrn -> isLiteralFalse(retrn.getExpression()) || isLiteralTrue(retrn.getExpression()))
                 .orElse(false);
     }
 
@@ -145,7 +145,7 @@ public class SimplifyBooleanReturnVisitor<P> extends JavaVisitor<P> {
 
         Statement elze = iff2.getElsePart().getBody();
         if (elze instanceof J.Return) {
-            return Optional.ofNullable(((J.Return) elze).getExpr());
+            return Optional.ofNullable(((J.Return) elze).getExpression());
         }
 
         if (elze instanceof J.Block) {
@@ -153,7 +153,7 @@ public class SimplifyBooleanReturnVisitor<P> extends JavaVisitor<P> {
             if (statements.size() == 1) {
                 J statement = statements.get(0);
                 if (statement instanceof J.Return) {
-                    return Optional.ofNullable(((J.Return) statement).getExpr());
+                    return Optional.ofNullable(((J.Return) statement).getExpression());
                 }
             }
         }

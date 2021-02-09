@@ -49,19 +49,19 @@ public class GenerateGetter extends Recipe {
         }
 
         @Override
-        public J.VariableDecls.NamedVar visitVariable(J.VariableDecls.NamedVar variable, P p) {
+        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
             if (variable.isField(getCursor()) && variable.getSimpleName().equals(fieldName)) {
-                getCursor().putMessageOnFirstEnclosing(J.ClassDecl.class, "varCursor", getCursor());
+                getCursor().putMessageOnFirstEnclosing(J.ClassDeclaration.class, "varCursor", getCursor());
             }
             return super.visitVariable(variable, p);
         }
 
         @Override
-        public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, P p) {
-            J.ClassDecl c = super.visitClassDecl(classDecl, p);
+        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
+            J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
             Cursor varCursor = getCursor().pollNearestMessage("varCursor");
             if (varCursor != null) {
-                J.VariableDecls.NamedVar var = varCursor.getValue();
+                J.VariableDeclarations.NamedVariable var = varCursor.getValue();
                 c = c.withTemplate(getter, c.getBody().getCoordinates().lastStatement(),
                         TypeUtils.asClass(var.getType()).getClassName(),
                         StringUtils.capitalize(var.getSimpleName()),

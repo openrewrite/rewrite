@@ -25,8 +25,8 @@ import org.openrewrite.java.hasElementType
 interface MethodInvocationTest {
     private fun J.CompilationUnit.allInvs() = classes[0].body
         .statements
-        .filterIsInstance<J.VariableDecls>()
-        .map { it.vars[0].initializer as J.MethodInvocation }
+        .filterIsInstance<J.VariableDeclarations>()
+        .map { it.variables[0].initializer as J.MethodInvocation }
 
     @Test
     fun methodInvocation(jp: JavaParser) {
@@ -44,7 +44,7 @@ interface MethodInvocationTest {
         assertEquals("foo", inv.name.printTrimmed())
         assertEquals("java.lang.Integer", inv.returnType.asClass()?.fullyQualifiedName)
         assertEquals(listOf(JavaType.Primitive.Int, JavaType.Primitive.Int, JavaType.Primitive.Int),
-            inv.args.filterIsInstance<J.Literal>().map { it.type })
+            inv.arguments.filterIsInstance<J.Literal>().map { it.type })
 
         val effectParams = inv.type!!.resolvedSignature.paramTypes
         assertEquals("java.lang.Integer", effectParams[0].asClass()?.fullyQualifiedName)
@@ -75,7 +75,7 @@ interface MethodInvocationTest {
             // check assumptions about the call site
             assertEquals("java.lang.Integer", test.returnType.asClass()?.fullyQualifiedName)
             assertEquals(listOf(JavaType.Primitive.Int, JavaType.Primitive.Int, JavaType.Primitive.Int),
-                test.args.filterIsInstance<J.Literal>().map { it.type })
+                test.arguments.filterIsInstance<J.Literal>().map { it.type })
 
             val effectiveParams = test.type!!.resolvedSignature.paramTypes
             assertEquals("java.lang.Integer", effectiveParams[0].asClass()?.fullyQualifiedName)
@@ -119,7 +119,7 @@ interface MethodInvocationTest {
             }
         """)[0]
 
-        val inv = a.classes[0].body.statements.filterIsInstance<J.VariableDecls>().first().vars[0]
+        val inv = a.classes[0].body.statements.filterIsInstance<J.VariableDeclarations>().first().variables[0]
             .initializer as J.MethodInvocation
         assertNull(inv.type?.declaringType)
         assertNull(inv.type)

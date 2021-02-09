@@ -23,7 +23,7 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTreeTest
 import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
 
-interface ClassDeclTest : JavaTreeTest {
+interface ClassDeclarationTest : JavaTreeTest {
 
     @Issue("#70")
     @Test

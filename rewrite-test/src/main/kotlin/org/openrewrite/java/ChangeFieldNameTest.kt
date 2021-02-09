@@ -23,11 +23,11 @@ import org.openrewrite.java.tree.JavaType
 
 interface ChangeFieldNameTest : RecipeTest {
     fun changeFieldName(from: String, to: String) = object : JavaIsoVisitor<ExecutionContext>() {
-        override fun visitMultiVariable(v: J.VariableDecls, p: ExecutionContext): J.VariableDecls {
-            if (cursor.dropParentUntil { it is J }.dropParentUntil { it is J }.getValue<J>() is J.ClassDecl) {
+        override fun visitVariableDeclarations(v: J.VariableDeclarations, p: ExecutionContext): J.VariableDeclarations {
+            if (cursor.dropParentUntil { it is J }.dropParentUntil { it is J }.getValue<J>() is J.ClassDeclaration) {
                 doAfterVisit(ChangeFieldName(JavaType.Class.build("Test"), from, to))
             }
-            return super.visitMultiVariable(v, p)
+            return super.visitVariableDeclarations(v, p)
         }
     }.toRecipe(cursored = true)
 

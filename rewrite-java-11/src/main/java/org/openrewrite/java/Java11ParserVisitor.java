@@ -177,7 +177,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitAssignment(AssignmentTree node, Space fmt) {
-        return new J.Assign(randomId(), fmt, Markers.EMPTY,
+        return new J.Assignment(randomId(), fmt, Markers.EMPTY,
                 convert(node.getVariable()),
                 padLeft(sourceBefore("="), convert(node.getExpression())),
                 type(node));
@@ -304,7 +304,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     public J visitBreak(BreakTree node, Space fmt) {
         skip("break");
 
-        J.Ident label = node.getLabel() == null ? null : J.Ident.build(randomId(),
+        J.Identifier label = node.getLabel() == null ? null : J.Identifier.build(randomId(),
                 sourceBefore(node.getLabel().toString()), Markers.EMPTY,
                 skip(node.getLabel().toString()), null);
 
@@ -315,7 +315,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     public J visitCase(CaseTree node, Space fmt) {
         Expression pattern;
         if (node.getExpression() == null) {
-            pattern = J.Ident.build(randomId(), Space.EMPTY, Markers.EMPTY, skip("default"), null);
+            pattern = J.Identifier.build(randomId(), Space.EMPTY, Markers.EMPTY, skip("default"), null);
         } else {
             skip("case");
             pattern = convertOrNull(node.getExpression());
@@ -330,9 +330,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         skip("catch");
 
         Space paramPrefix = sourceBefore("(");
-        J.VariableDecls paramDecl = convert(node.getParameter());
+        J.VariableDeclarations paramDecl = convert(node.getParameter());
 
-        J.ControlParentheses<J.VariableDecls> param = new J.ControlParentheses<>(randomId(), paramPrefix,
+        J.ControlParentheses<J.VariableDeclarations> param = new J.ControlParentheses<>(randomId(), paramPrefix,
                 Markers.EMPTY, padRight(paramDecl, sourceBefore(")")));
 
         return new J.Try.Catch(randomId(), fmt, Markers.EMPTY, param, convert(node.getBlock()));
@@ -343,19 +343,19 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         List<J.Annotation> annotations = convertAll(node.getModifiers().getAnnotations());
         List<J.Modifier> modifiers = sortedFlags(node.getModifiers());
 
-        JLeftPadded<J.ClassDecl.Kind> kind;
+        JLeftPadded<J.ClassDeclaration.Kind> kind;
         if (hasFlag(node.getModifiers(), Flags.ENUM)) {
-            kind = padLeft(sourceBefore("enum"), J.ClassDecl.Kind.Enum);
+            kind = padLeft(sourceBefore("enum"), J.ClassDeclaration.Kind.Enum);
         } else if (hasFlag(node.getModifiers(), Flags.ANNOTATION)) {
             // note that annotations ALSO have the INTERFACE flag
-            kind = padLeft(sourceBefore("@interface"), J.ClassDecl.Kind.Annotation);
+            kind = padLeft(sourceBefore("@interface"), J.ClassDeclaration.Kind.Annotation);
         } else if (hasFlag(node.getModifiers(), Flags.INTERFACE)) {
-            kind = padLeft(sourceBefore("interface"), J.ClassDecl.Kind.Interface);
+            kind = padLeft(sourceBefore("interface"), J.ClassDeclaration.Kind.Interface);
         } else {
-            kind = padLeft(sourceBefore("class"), J.ClassDecl.Kind.Class);
+            kind = padLeft(sourceBefore("class"), J.ClassDeclaration.Kind.Class);
         }
 
-        J.Ident name = J.Ident.build(randomId(), sourceBefore(node.getSimpleName().toString()),
+        J.Identifier name = J.Identifier.build(randomId(), sourceBefore(node.getSimpleName().toString()),
                 Markers.EMPTY, ((JCClassDecl) node).getSimpleName().toString(), type(node));
 
         JContainer<J.TypeParameter> typeParams = node.getTypeParameters().isEmpty() ? null : JContainer.build(
@@ -368,7 +368,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
         JContainer<TypeTree> implementings = null;
         if (node.getImplementsClause() != null && !node.getImplementsClause().isEmpty()) {
-            Space implementsPrefix = sourceBefore(kind.getElem() == J.ClassDecl.Kind.Interface ?
+            Space implementsPrefix = sourceBefore(kind.getElement() == J.ClassDeclaration.Kind.Interface ?
                     "extends" : "implements");
 
             implementings = JContainer.build(
@@ -426,7 +426,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         J.Block body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
                 members, sourceBefore("}"));
 
-        return new J.ClassDecl(randomId(), fmt, Markers.EMPTY, annotations, modifiers, kind, name, typeParams, extendings, implementings, body, (JavaType.Class) type(node));
+        return new J.ClassDeclaration(randomId(), fmt, Markers.EMPTY, annotations, modifiers, kind, name, typeParams, extendings, implementings, body, (JavaType.Class) type(node));
     }
 
     @Override
@@ -462,57 +462,57 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         Expression left = convert(((JCAssignOp) node).lhs);
 
         Space opPrefix = whitespace();
-        J.AssignOp.Type op;
+        J.AssignmentOperation.Type op;
         switch (((JCAssignOp) node).getTag()) {
             case PLUS_ASG:
                 skip("+=");
-                op = J.AssignOp.Type.Addition;
+                op = J.AssignmentOperation.Type.Addition;
                 break;
             case MINUS_ASG:
                 skip("-=");
-                op = J.AssignOp.Type.Subtraction;
+                op = J.AssignmentOperation.Type.Subtraction;
                 break;
             case DIV_ASG:
                 skip("/=");
-                op = J.AssignOp.Type.Division;
+                op = J.AssignmentOperation.Type.Division;
                 break;
             case MUL_ASG:
                 skip("*=");
-                op = J.AssignOp.Type.Multiplication;
+                op = J.AssignmentOperation.Type.Multiplication;
                 break;
             case MOD_ASG:
                 skip("%=");
-                op = J.AssignOp.Type.Modulo;
+                op = J.AssignmentOperation.Type.Modulo;
                 break;
             case BITAND_ASG:
                 skip("&=");
-                op = J.AssignOp.Type.BitAnd;
+                op = J.AssignmentOperation.Type.BitAnd;
                 break;
             case BITOR_ASG:
                 skip("|=");
-                op = J.AssignOp.Type.BitOr;
+                op = J.AssignmentOperation.Type.BitOr;
                 break;
             case BITXOR_ASG:
                 skip("^=");
-                op = J.AssignOp.Type.BitXor;
+                op = J.AssignmentOperation.Type.BitXor;
                 break;
             case SL_ASG:
                 skip("<<=");
-                op = J.AssignOp.Type.LeftShift;
+                op = J.AssignmentOperation.Type.LeftShift;
                 break;
             case SR_ASG:
                 skip(">>=");
-                op = J.AssignOp.Type.RightShift;
+                op = J.AssignmentOperation.Type.RightShift;
                 break;
             case USR_ASG:
                 skip(">>>=");
-                op = J.AssignOp.Type.UnsignedRightShift;
+                op = J.AssignmentOperation.Type.UnsignedRightShift;
                 break;
             default:
                 throw new IllegalArgumentException("Unexpected compound assignment tag " + ((JCAssignOp) node).getTag());
         }
 
-        return new J.AssignOp(randomId(), fmt, Markers.EMPTY, left,
+        return new J.AssignmentOperation(randomId(), fmt, Markers.EMPTY, left,
                 padLeft(opPrefix, op), convert(((JCAssignOp) node).rhs), type(node));
     }
 
@@ -530,7 +530,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         skip("continue");
         Name label = node.getLabel();
         return new J.Continue(randomId(), fmt, Markers.EMPTY,
-                label == null ? null : J.Ident.build(randomId(), sourceBefore(label.toString()),
+                label == null ? null : J.Identifier.build(randomId(), sourceBefore(label.toString()),
                         Markers.EMPTY, label.toString(), null));
     }
 
@@ -559,7 +559,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
     private J visitEnumVariable(VariableTree node, Space fmt) {
         skip(node.getName().toString());
-        J.Ident name = J.Ident.build(randomId(), EMPTY, Markers.EMPTY, node.getName().toString(), type(node));
+        J.Identifier name = J.Identifier.build(randomId(), EMPTY, Markers.EMPTY, node.getName().toString(), type(node));
 
         J.NewClass initializer = null;
         if (source.charAt(endPos(node) - 1) == ')' || source.charAt(endPos(node) - 1) == '}') {
@@ -604,7 +604,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     @Override
     public J visitIdentifier(IdentifierTree node, Space fmt) {
         cursor += node.getName().toString().length();
-        return J.Ident.build(randomId(), fmt, Markers.EMPTY, node.getName().toString(), type(node));
+        return J.Identifier.build(randomId(), fmt, Markers.EMPTY, node.getName().toString(), type(node));
     }
 
     @Override
@@ -639,7 +639,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     public J visitLabeledStatement(LabeledStatementTree node, Space fmt) {
         skip(node.getLabel().toString());
         return new J.Label(randomId(), fmt, Markers.EMPTY,
-                padRight(J.Ident.build(randomId(), EMPTY, Markers.EMPTY, node.getLabel().toString(), null), sourceBefore(":")),
+                padRight(J.Identifier.build(randomId(), EMPTY, Markers.EMPTY, node.getLabel().toString(), null), sourceBefore(":")),
                 convert(node.getStatement()));
     }
 
@@ -700,7 +700,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 Markers.EMPTY,
                 convert(ref.expr),
                 convertTypeParameters(node.getTypeArguments()),
-                padLeft(sourceBefore("::"), J.Ident.build(randomId(),
+                padLeft(sourceBefore("::"), J.Identifier.build(randomId(),
                         sourceBefore(referenceName),
                         Markers.EMPTY,
                         referenceName,
@@ -713,7 +713,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         JCFieldAccess fieldAccess = (JCFieldAccess) node;
         return new J.FieldAccess(randomId(), fmt, Markers.EMPTY,
                 convert(fieldAccess.selected),
-                padLeft(sourceBefore("."), J.Ident.build(randomId(),
+                padLeft(sourceBefore("."), J.Identifier.build(randomId(),
                         sourceBefore(fieldAccess.name.toString()), Markers.EMPTY,
                         fieldAccess.name.toString(), null)),
                 type(node));
@@ -737,10 +737,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                     t -> sourceBefore(">")), Markers.EMPTY);
         }
 
-        J.Ident name;
+        J.Identifier name;
         if (jcSelect instanceof JCFieldAccess) {
             String selectName = ((JCFieldAccess) jcSelect).name.toString();
-            name = J.Ident.build(randomId(), sourceBefore(selectName), Markers.EMPTY, selectName, null);
+            name = J.Identifier.build(randomId(), sourceBefore(selectName), Markers.EMPTY, selectName, null);
         } else {
             name = convert(jcSelect);
         }
@@ -772,7 +772,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
         Symbol.MethodSymbol nodeSym = jcMethod.sym;
 
-        J.Ident name;
+        J.Identifier name;
         if ("<init>".equals(node.getName().toString())) {
             String owner = null;
             if (nodeSym == null) {
@@ -789,9 +789,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             } else {
                 owner = jcMethod.sym.owner.name.toString();
             }
-            name = J.Ident.build(randomId(), sourceBefore(owner), Markers.EMPTY, owner, null);
+            name = J.Identifier.build(randomId(), sourceBefore(owner), Markers.EMPTY, owner, null);
         } else {
-            name = J.Ident.build(randomId(), sourceBefore(node.getName().toString()), Markers.EMPTY,
+            name = J.Identifier.build(randomId(), sourceBefore(node.getName().toString()), Markers.EMPTY,
                     node.getName().toString(), null);
         }
 
@@ -811,7 +811,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         JLeftPadded<Expression> defaultValue = node.getDefaultValue() == null ? null :
                 padLeft(sourceBefore("default"), convert(node.getDefaultValue()));
 
-        return new J.MethodDecl(randomId(), fmt, Markers.EMPTY, annotations, modifiers, typeParams,
+        return new J.MethodDeclaration(randomId(), fmt, Markers.EMPTY, annotations, modifiers, typeParams,
                 returnType, name, params, throwss, body, defaultValue,
                 methodType(jcMethod.type, jcMethod.sym, name.getSimpleName()));
     }
@@ -1012,7 +1012,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
             for (int i = 0; i < node.getResources().size(); i++) {
                 Tree resource = node.getResources().get(i);
-                J.VariableDecls resourceVar = convert(resource);
+                J.VariableDeclarations resourceVar = convert(resource);
                 boolean semicolonPresent = true;
                 if (i == node.getResources().size() - 1) {
                     semicolonPresent = positionOfNext(";", ')') > 0;
@@ -1083,7 +1083,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             String part = parts[i];
             if (i == 0) {
                 fullName = part;
-                expr = J.Ident.build(randomId(), EMPTY, Markers.EMPTY, part, null);
+                expr = J.Identifier.build(randomId(), EMPTY, Markers.EMPTY, part, null);
             } else {
                 fullName += "." + part;
 
@@ -1100,7 +1100,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                         EMPTY,
                         Markers.EMPTY,
                         expr,
-                        padLeft(namePrefix, J.Ident.build(randomId(), identFmt, Markers.EMPTY, part.trim(), null)),
+                        padLeft(namePrefix, J.Identifier.build(randomId(), identFmt, Markers.EMPTY, part.trim(), null)),
                         (Character.isUpperCase(part.charAt(0)) || i == parts.length - 1) ?
                                 JavaType.Class.build(fullName) :
                                 null
@@ -1178,7 +1178,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 visitVariables(singletonList(node), fmt); // method arguments cannot be multi-declarations
     }
 
-    private J.VariableDecls visitVariables(List<VariableTree> nodes, Space fmt) {
+    private J.VariableDeclarations visitVariables(List<VariableTree> nodes, Space fmt) {
         JCTree.JCVariableDecl node = (JCVariableDecl) nodes.get(0);
         List<J.Annotation> annotations = convertAll(node.getModifiers().annotations);
 
@@ -1228,7 +1228,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             varargs = format(varargMatcher.group(1));
         }
 
-        List<JRightPadded<J.VariableDecls.NamedVar>> vars = new ArrayList<>();
+        List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>();
 
         for (int i = 0; i < nodes.size(); i++) {
             VariableTree n = nodes.get(i);
@@ -1236,12 +1236,12 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             Space namedVarPrefix = sourceBefore(n.getName().toString());
             JCVariableDecl vd = (JCVariableDecl) n;
 
-            J.Ident name = J.Ident.build(randomId(), EMPTY, Markers.EMPTY, n.getName().toString(), type(node));
+            J.Identifier name = J.Identifier.build(randomId(), EMPTY, Markers.EMPTY, n.getName().toString(), type(node));
             List<JLeftPadded<Space>> dimensionsAfterName = dimensions.get();
 
             vars.add(
                     padRight(
-                            new J.VariableDecls.NamedVar(randomId(), namedVarPrefix, Markers.EMPTY,
+                            new J.VariableDeclarations.NamedVariable(randomId(), namedVarPrefix, Markers.EMPTY,
                                     name,
                                     dimensionsAfterName,
                                     vd.init != null ? padLeft(sourceBefore("="), convertOrNull(vd.init)) : null,
@@ -1252,7 +1252,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             );
         }
 
-        return new J.VariableDecls(randomId(), fmt, Markers.EMPTY, annotations, modifiers, typeExpr, varargs, beforeDimensions, vars);
+        return new J.VariableDeclarations(randomId(), fmt, Markers.EMPTY, annotations, modifiers, typeExpr, varargs, beforeDimensions, vars);
     }
 
     @Override
@@ -1436,7 +1436,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 Tree last = treeGroup.get(treeGroup.size() - 1);
 
                 @SuppressWarnings("unchecked")
-                J.VariableDecls vars = visitVariables((List<VariableTree>) treeGroup, format(prefix));
+                J.VariableDeclarations vars = visitVariables((List<VariableTree>) treeGroup, format(prefix));
                 JRightPadded<Statement> paddedVars = padRight(vars, semiDelim.apply(last));
                 cursor(max(endPos(last), cursor));
                 converted.add(paddedVars);

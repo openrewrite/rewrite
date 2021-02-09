@@ -21,26 +21,26 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.Space;
 
-public class MethodDeclToString {
-    public static String toString(J.MethodDecl method) {
+public class MethodDeclarationToString {
+    public static String toString(J.MethodDeclaration method) {
         //noinspection ConstantConditions
         return METHOD_PRINTER.print(method, null);
     }
 
     private static final JavaPrinter<Void> METHOD_PRINTER = new JavaPrinter<Void>(TreePrinter.identity()) {
         @Override
-        public J visitMethod(J.MethodDecl method, Void unused) {
+        public J visitMethodDeclaration(J.MethodDeclaration method, Void unused) {
             visitModifiers(Space.formatFirstPrefix(method.getModifiers(), Space.EMPTY), unused);
             StringBuilder acc = getPrinter();
             if (!method.getModifiers().isEmpty()) {
                 acc.append(' ');
             }
             visitContainer("<", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", unused);
-            if (method.getReturnTypeExpr() != null) {
-                acc.append(method.getReturnTypeExpr().printTrimmed()).append(' ');
+            if (method.getReturnTypeExpression() != null) {
+                acc.append(method.getReturnTypeExpression().printTrimmed()).append(' ');
             }
             acc.append(method.getSimpleName());
-            visitContainer("(", method.getPadding().getParams(), JContainer.Location.METHOD_DECL_PARAMETERS, ",", ")", unused);
+            visitContainer("(", method.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",", ")", unused);
             visitContainer("throws", method.getPadding().getThrows(), JContainer.Location.THROWS, ",", "", unused);
             return method;
         }

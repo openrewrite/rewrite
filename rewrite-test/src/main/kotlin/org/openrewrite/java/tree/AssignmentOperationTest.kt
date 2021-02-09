@@ -20,7 +20,7 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTreeTest
 import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
 
-interface AssignOpTest : JavaTreeTest {
+interface AssignmentOperationTest : JavaTreeTest {
 
     @Test
     fun compoundAssignment(jp: JavaParser) = assertParsePrintAndProcess(

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java
 
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
@@ -23,7 +22,6 @@ import org.openrewrite.Issue
 import org.openrewrite.RecipeTest
 import org.openrewrite.java.tree.J
 import org.slf4j.LoggerFactory
-import java.text.RuleBasedCollator
 import java.util.function.Consumer
 
 interface JavaTemplateTest : RecipeTest {
@@ -37,12 +35,12 @@ interface JavaTemplateTest : RecipeTest {
     fun addMethodAnnotationTest(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.classpath("junit-jupiter-api").build(),
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            override fun visitMethod(method: J.MethodDecl, p: ExecutionContext): J.MethodDecl {
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
                 val tagComp = Comparator<J.Annotation> { a1, a2 -> a1.simpleName.compareTo(a2.simpleName) }
                     .reversed()
-                val m = super.visitMethod(method, p)
+                val m = super.visitMethodDeclaration(method, p)
                 return m
-                    .withTemplate<J.MethodDecl>(template("@Tag(\"tag1\")").build(),
+                    .withTemplate<J.MethodDeclaration>(template("@Tag(\"tag1\")").build(),
                         m.coordinates.addAnnotation(tagComp))
                     .withTemplate(template("@Tag(\"tag2\")").build(),
                         m.coordinates.addAnnotation(tagComp))
@@ -124,11 +122,11 @@ interface JavaTemplateTest : RecipeTest {
             override fun visitBlock(block: J.Block, p: ExecutionContext): J {
                 var b = super.visitBlock(block, p)
                 val parent = cursor.dropParentUntil { it is J }.getValue<J>()
-                if (parent is J.MethodDecl) {
+                if (parent is J.MethodDeclaration) {
                     b = b.withTemplate(
                         template,
                         block.statements[1].coordinates.before(),
-                        (parent.params[0] as J.VariableDecls).vars[0]
+                        (parent.parameters[0] as J.VariableDeclarations).variables[0]
                     )
                 }
                 return b
@@ -172,11 +170,11 @@ interface JavaTemplateTest : RecipeTest {
             override fun visitBlock(block: J.Block, p: ExecutionContext): J {
                 var b = super.visitBlock(block, p)
                 val parent = cursor.dropParentUntil { it is J }.getValue<J>()
-                if (parent is J.MethodDecl) {
+                if (parent is J.MethodDeclaration) {
                     b = b.withTemplate(
                         template,
                         block.coordinates.lastStatement(),
-                        (parent.params[0] as J.VariableDecls).vars[0]
+                        (parent.parameters[0] as J.VariableDeclarations).variables[0]
                     )
                 }
                 return b
@@ -220,11 +218,11 @@ interface JavaTemplateTest : RecipeTest {
             override fun visitBlock(block: J.Block, p: ExecutionContext): J {
                 var b = super.visitBlock(block, p)
                 val parent = cursor.dropParentUntil { it is J }.getValue<J>()
-                if (parent is J.MethodDecl) {
+                if (parent is J.MethodDeclaration) {
                     b = b.withTemplate(
                         template,
                         block.coordinates.lastStatement(),
-                        (parent.params[0] as J.VariableDecls).vars[0]
+                        (parent.parameters[0] as J.VariableDeclarations).variables[0]
                     )
                 }
                 return b
@@ -271,7 +269,7 @@ interface JavaTemplateTest : RecipeTest {
             override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
                 var b = super.visitBlock(block, p)
                 val parent = cursor.dropParentUntil { it is J }.getValue<J>()
-                if (parent is J.ClassDecl) {
+                if (parent is J.ClassDeclaration) {
                     b = b.withTemplate(template, block.coordinates.lastStatement())
                 }
                 return b
@@ -326,7 +324,7 @@ interface JavaTemplateTest : RecipeTest {
             override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
                 var b = super.visitBlock(block, p)
                 val parent = cursor.dropParentUntil { it is J }.getValue<J>()
-                if (parent is J.ClassDecl) {
+                if (parent is J.ClassDeclaration) {
                     b = b.withTemplate(template, block.coordinates.lastStatement())
                 }
                 return b
@@ -376,10 +374,10 @@ interface JavaTemplateTest : RecipeTest {
 
             override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J {
                 val m = super.visitMethodInvocation(method, p) as J.MethodInvocation
-                if (m.name.ident.simpleName != "countLetters") {
+                if (m.name.typeInformation.simpleName != "countLetters") {
                     return m
                 }
-                return m.withTemplate(template, m.coordinates.replace(), m.args[0])
+                return m.withTemplate(template, m.coordinates.replace(), m.arguments[0])
             }
         }.toRecipe(),
         before = """
@@ -497,8 +495,8 @@ interface JavaTemplateTest : RecipeTest {
                 setCursoringOn()
             }
 
-            override fun visitMethod(method: J.MethodDecl, p: ExecutionContext): J.MethodDecl {
-                val m = super.visitMethod(method, p)
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
+                val m = super.visitMethodDeclaration(method, p)
                 return m.withTemplate(template, m.coordinates.replaceAnnotations())
             }
         }.toRecipe(),
@@ -565,8 +563,8 @@ interface JavaTemplateTest : RecipeTest {
                 setCursoringOn()
             }
 
-            override fun visitClassDecl(clazz: J.ClassDecl, p: ExecutionContext): J.ClassDecl {
-                val c = super.visitClassDecl(clazz, p)
+            override fun visitClassDeclaration(clazz: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
+                val c = super.visitClassDeclaration(clazz, p)
                 return c.withTemplate(template, c.coordinates.replaceAnnotations())
             }
         }.toRecipe(),
@@ -598,8 +596,8 @@ interface JavaTemplateTest : RecipeTest {
                 setCursoringOn()
             }
 
-            override fun visitClassDecl(clazz: J.ClassDecl, p: ExecutionContext): J.ClassDecl {
-                val c = super.visitClassDecl(clazz, p)
+            override fun visitClassDeclaration(clazz: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
+                val c = super.visitClassDeclaration(clazz, p)
                 return c.withTemplate(template, c.coordinates.replaceAnnotations())
             }
         }.toRecipe(),
@@ -638,7 +636,7 @@ interface JavaTemplateTest : RecipeTest {
             override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
                 var b = super.visitBlock(block, p)
                 val parent = cursor.dropParentUntil { it is J }.getValue<J>()
-                if (parent is J.MethodDecl && parent.name.ident.simpleName == "foo") {
+                if (parent is J.MethodDeclaration && parent.name.typeInformation.simpleName == "foo") {
                     b = b.withTemplate(
                         template, b.statements[0].coordinates.before(),
                         b.statements[1] as J,
@@ -788,8 +786,8 @@ interface JavaTemplateTest : RecipeTest {
                 setCursoringOn()
             }
 
-            override fun visitClassDecl(classDecl: J.ClassDecl, p: ExecutionContext): J.ClassDecl {
-                val c = super.visitClassDecl(classDecl, p)
+            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
+                val c = super.visitClassDeclaration(classDecl, p)
                 return c.withTemplate(template, c.coordinates.replaceTypeParameters())
             }
         }.toRecipe(),
@@ -819,8 +817,8 @@ interface JavaTemplateTest : RecipeTest {
                 setCursoringOn()
             }
 
-            override fun visitClassDecl(classDecl: J.ClassDecl, p: ExecutionContext): J.ClassDecl {
-                val c = super.visitClassDecl(classDecl, p)
+            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
+                val c = super.visitClassDeclaration(classDecl, p)
                 return c.withTemplate(template, c.coordinates.replaceExtendsClause())
             }
         }.toRecipe(),
@@ -850,8 +848,8 @@ interface JavaTemplateTest : RecipeTest {
                 setCursoringOn()
             }
 
-            override fun visitClassDecl(classDecl: J.ClassDecl, p: ExecutionContext): J.ClassDecl {
-                val c = super.visitClassDecl(classDecl, p)
+            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
+                val c = super.visitClassDeclaration(classDecl, p)
                 return c.withTemplate(template, c.coordinates.replaceImplementsClause())
             }
         }.toRecipe(),
@@ -886,8 +884,8 @@ interface JavaTemplateTest : RecipeTest {
                 setCursoringOn()
             }
 
-            override fun visitClassDecl(classDecl: J.ClassDecl, p: ExecutionContext): J.ClassDecl {
-                val c = super.visitClassDecl(classDecl, p)
+            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
+                val c = super.visitClassDeclaration(classDecl, p)
                 return c.withTemplate(template, c.coordinates.replaceBody())
             }
         }.toRecipe(),
@@ -918,8 +916,8 @@ interface JavaTemplateTest : RecipeTest {
                 setCursoringOn()
             }
 
-            override fun visitMethod(method: J.MethodDecl, p: ExecutionContext): J.MethodDecl {
-                val m = super.visitMethod(method, p)
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
+                val m = super.visitMethodDeclaration(method, p)
                 return m.withTemplate(template, m.coordinates.replaceTypeParameters())
             }
         }.toRecipe(),
@@ -950,8 +948,8 @@ interface JavaTemplateTest : RecipeTest {
                 setCursoringOn()
             }
 
-            override fun visitMethod(method: J.MethodDecl, p: ExecutionContext): J.MethodDecl {
-                val m = super.visitMethod(method, p)
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
+                val m = super.visitMethodDeclaration(method, p)
                 return m.withTemplate(template, m.coordinates.replaceParameters())
             }
         }.toRecipe(),
@@ -982,8 +980,8 @@ interface JavaTemplateTest : RecipeTest {
                 setCursoringOn()
             }
 
-            override fun visitMethod(method: J.MethodDecl, p: ExecutionContext): J.MethodDecl {
-                val m = super.visitMethod(method, p)
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
+                val m = super.visitMethodDeclaration(method, p)
                 return m.withTemplate(template, m.coordinates.replaceThrows())
             }
         }.toRecipe(),

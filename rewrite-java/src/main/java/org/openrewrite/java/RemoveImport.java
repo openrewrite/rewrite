@@ -43,7 +43,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
     private J.Import staticStarImport;
 
     private final Set<String> referencedTypes = new HashSet<>();
-    private final Set<J.Ident> referencedMethods = new HashSet<>();
+    private final Set<J.Identifier> referencedMethods = new HashSet<>();
     private final Set<String> referencedFields = new HashSet<>();
     private final Set<J.Import> staticNamedImports = Collections.newSetFromMap(new IdentityHashMap<>());
 
@@ -73,13 +73,13 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             }
         }
         if (c.getImports().size() == 1) {
-            if (c.getPackageDecl() == null) {
+            if (c.getPackageDeclaration() == null) {
                 c = c.getPadding().withImports(
                         ListUtils.mapFirst(c.getPadding().getImports(),
-                                i -> i.withElem(
-                                        i.getElem().withPrefix(
-                                                i.getElem().getPrefix().withWhitespace(
-                                                        i.getElem().getPrefix().getWhitespace().replace("\n", "")
+                                i -> i.withElement(
+                                        i.getElement().withPrefix(
+                                                i.getElement().getPrefix().withWhitespace(
+                                                        i.getElement().getPrefix().getWhitespace().replace("\n", "")
                                                 )
                                         )
                                 )
@@ -122,7 +122,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.Ident visitIdentifier(J.Ident ident, P p) {
+    public J.Identifier visitIdentifier(J.Identifier ident, P p) {
         if (getCursor().getPathAsStream().noneMatch(J.Import.class::isInstance)) {
             referencedFields.add(ident.getSimpleName());
         }
@@ -189,6 +189,6 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
     }
 
     private J.CompilationUnit delete(J.CompilationUnit cu, J.Import impoort) {
-        return cu.getPadding().withImports(ListUtils.map(cu.getPadding().getImports(), i -> i.getElem() == impoort ? null : i));
+        return cu.getPadding().withImports(ListUtils.map(cu.getPadding().getImports(), i -> i.getElement() == impoort ? null : i));
     }
 }

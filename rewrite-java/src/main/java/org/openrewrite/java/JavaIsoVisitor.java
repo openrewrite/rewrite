@@ -69,13 +69,13 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
-    public J.Assign visitAssign(J.Assign assign, P p) {
-        return (J.Assign) super.visitAssign(assign, p);
+    public J.Assignment visitAssignment(J.Assignment assignment, P p) {
+        return (J.Assignment) super.visitAssignment(assignment, p);
     }
 
     @Override
-    public J.AssignOp visitAssignOp(J.AssignOp assignOp, P p) {
-        return (J.AssignOp) super.visitAssignOp(assignOp, p);
+    public J.AssignmentOperation visitAssignmentOperation(J.AssignmentOperation assignOp, P p) {
+        return (J.AssignmentOperation) super.visitAssignmentOperation(assignOp, p);
     }
 
     @Override
@@ -104,8 +104,8 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
-    public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, P p) {
-        return (J.ClassDecl) super.visitClassDecl(classDecl, p);
+    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
+        return (J.ClassDeclaration) super.visitClassDeclaration(classDecl, p);
     }
 
     @Override
@@ -165,8 +165,8 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
-    public J.Ident visitIdentifier(J.Ident identifier, P p) {
-        return (J.Ident) super.visitIdentifier(identifier, p);
+    public J.Identifier visitIdentifier(J.Identifier identifier, P p) {
+        return (J.Identifier) super.visitIdentifier(identifier, p);
     }
 
     @Override
@@ -205,8 +205,8 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
-    public J.MethodDecl visitMethod(J.MethodDecl method, P p) {
-        return (J.MethodDecl) super.visitMethod(method, p);
+    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
+        return (J.MethodDeclaration) super.visitMethodDeclaration(method, p);
     }
 
     @Override
@@ -220,8 +220,8 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
-    public J.VariableDecls visitMultiVariable(J.VariableDecls multiVariable, P p) {
-        return (J.VariableDecls) super.visitMultiVariable(multiVariable, p);
+    public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
+        return (J.VariableDeclarations) super.visitVariableDeclarations(multiVariable, p);
     }
 
     @Override
@@ -301,8 +301,8 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
-    public J.VariableDecls.NamedVar visitVariable(J.VariableDecls.NamedVar variable, P p) {
-        return (J.VariableDecls.NamedVar) super.visitVariable(variable, p);
+    public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
+        return (J.VariableDeclarations.NamedVariable) super.visitVariable(variable, p);
     }
 
     @Override

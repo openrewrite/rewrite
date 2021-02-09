@@ -25,8 +25,8 @@ import org.openrewrite.java.tree.Space;
  */
 public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
     @Override
-    public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, P p) {
-        J.ClassDecl c = super.visitClassDecl(classDecl, p);
+    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
+        J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
 
         if (!c.getAnnotations().isEmpty()) {
             c = concatenatePrefix(c, Space.firstPrefix(c.getAnnotations()));
@@ -47,7 +47,7 @@ public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         JContainer<J.TypeParameter> typeParameters = c.getPadding().getTypeParameters();
-        if (typeParameters != null && !typeParameters.getElems().isEmpty()) {
+        if (typeParameters != null && !typeParameters.getElements().isEmpty()) {
             c = concatenatePrefix(c, typeParameters.getBefore());
             c = c.getPadding().withTypeParameters(typeParameters.withBefore(Space.EMPTY));
             return c;
@@ -58,8 +58,8 @@ public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
 
     @SuppressWarnings("ConstantConditions")
     @Override
-    public J.MethodDecl visitMethod(J.MethodDecl method, P p) {
-        J.MethodDecl m = super.visitMethod(method, p);
+    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
+        J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
 
         if (!m.getAnnotations().isEmpty()) {
             m = concatenatePrefix(m, Space.firstPrefix(m.getAnnotations()));
@@ -73,15 +73,15 @@ public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
             return m;
         }
 
-        if (m.getPadding().getTypeParameters() != null && !m.getPadding().getTypeParameters().getElems().isEmpty()) {
+        if (m.getPadding().getTypeParameters() != null && !m.getPadding().getTypeParameters().getElements().isEmpty()) {
             m = concatenatePrefix(m, m.getPadding().getTypeParameters().getBefore());
             m = m.getPadding().withTypeParameters(m.getPadding().getTypeParameters().withBefore(Space.EMPTY));
             return m;
         }
 
-        if (m.getReturnTypeExpr() != null && m.getReturnTypeExpr().getPrefix().getWhitespace().isEmpty()) {
-            m = concatenatePrefix(m, m.getReturnTypeExpr().getPrefix());
-            m = m.withReturnTypeExpr(m.getReturnTypeExpr().withPrefix(Space.EMPTY));
+        if (m.getReturnTypeExpression() != null && m.getReturnTypeExpression().getPrefix().getWhitespace().isEmpty()) {
+            m = concatenatePrefix(m, m.getReturnTypeExpression().getPrefix());
+            m = m.withReturnTypeExpression(m.getReturnTypeExpression().withPrefix(Space.EMPTY));
             return m;
         }
 
@@ -92,8 +92,8 @@ public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
 
     @SuppressWarnings("ConstantConditions")
     @Override
-    public J.VariableDecls visitMultiVariable(J.VariableDecls multiVariable, P p) {
-        J.VariableDecls v = super.visitMultiVariable(multiVariable, p);
+    public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
+        J.VariableDeclarations v = super.visitVariableDeclarations(multiVariable, p);
 
         if (!v.getAnnotations().isEmpty()) {
             v = concatenatePrefix(v, Space.firstPrefix(v.getAnnotations()));
@@ -107,9 +107,9 @@ public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
             return v;
         }
 
-        if (v.getTypeExpr() != null) {
-            v = concatenatePrefix(v, v.getTypeExpr().getPrefix());
-            v = v.withTypeExpr(v.getTypeExpr().withPrefix(Space.EMPTY));
+        if (v.getTypeExpression() != null) {
+            v = concatenatePrefix(v, v.getTypeExpression().getPrefix());
+            v = v.withTypeExpression(v.getTypeExpression().withPrefix(Space.EMPTY));
             return v;
         }
 

@@ -71,7 +71,7 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
     @Override
     public J visitBlock(J.Block block, Cursor insertionScope) {
         Cursor parent = getCursor().dropParentUntil(J.class::isInstance);
-        if (!insertionScope.isScopeInPath(block) && !(parent.getValue() instanceof J.ClassDecl)) {
+        if (!insertionScope.isScopeInPath(block) && !(parent.getValue() instanceof J.ClassDeclaration)) {
             J.Block b = block.withStatements(emptyList());
             return super.visitBlock(b, insertionScope);
         }
@@ -82,7 +82,7 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
         }
 
         J.Block b = block;
-        if (!(parent.getValue() instanceof J.ClassDecl)) {
+        if (!(parent.getValue() instanceof J.ClassDeclaration)) {
 
             if (b.getStatements().stream().anyMatch(insertionScope::isScopeInPath)) {
                 // If a statement in the block is in insertion scope, then this will render each statement
@@ -111,9 +111,9 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
     }
 
     @Override
-    public J visitClassDecl(J.ClassDecl classDecl, Cursor insertionScope) {
+    public J visitClassDeclaration(J.ClassDeclaration classDecl, Cursor insertionScope) {
         if (!insertionScope.isScopeInPath(classDecl) || !classDecl.getId().equals(coordinates.getTree().getId())) {
-            return super.visitClassDecl(classDecl.withAnnotations(emptyList()), insertionScope);
+            return super.visitClassDeclaration(classDecl.withAnnotations(emptyList()), insertionScope);
         }
 
         String kind = "";
@@ -132,7 +132,7 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
                 break;
         }
 
-        visitSpace(classDecl.getPrefix(), Space.Location.CLASS_DECL_PREFIX, insertionScope);
+        visitSpace(classDecl.getPrefix(), Space.Location.CLASS_DECLARATION_PREFIX, insertionScope);
 
         if (coordinates.getSpaceLocation().equals(Space.Location.ANNOTATION_PREFIX)) {
             getPrinter().append(code);
@@ -161,7 +161,7 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
         if (coordinates.getSpaceLocation().equals(Space.Location.IMPLEMENTS)) {
             getPrinter().append(code);
         } else {
-            visitContainer(classDecl.getKind().equals(J.ClassDecl.Kind.Interface) ? "extends" : "implements",
+            visitContainer(classDecl.getKind().equals(J.ClassDeclaration.Kind.Interface) ? "extends" : "implements",
                     classDecl.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, ",", null, insertionScope);
         }
 
@@ -175,12 +175,12 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
     }
 
     @Override
-    public J visitMethod(J.MethodDecl method, Cursor insertionScope) {
+    public J visitMethodDeclaration(J.MethodDeclaration method, Cursor insertionScope) {
         if (!insertionScope.isScopeInPath(method)) {
-            return super.visitMethod(method.withAnnotations(emptyList()).withBody(EMPTY_BLOCK), insertionScope);
+            return super.visitMethodDeclaration(method.withAnnotations(emptyList()).withBody(EMPTY_BLOCK), insertionScope);
         }
 
-        visitSpace(method.getPrefix(), Space.Location.METHOD_DECL_PREFIX, insertionScope);
+        visitSpace(method.getPrefix(), Space.Location.METHOD_DECLARATION_PREFIX, insertionScope);
 
         if (coordinates.getSpaceLocation().equals(Space.Location.ANNOTATION_PREFIX)) {
             getPrinter().append(code);
@@ -196,13 +196,13 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
             visitContainer("<", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", insertionScope);
         }
 
-        visit(method.getReturnTypeExpr(), insertionScope);
+        visit(method.getReturnTypeExpression(), insertionScope);
         visit(method.getName(), insertionScope);
 
-        if (coordinates.getSpaceLocation().equals(Space.Location.METHOD_DECL_PARAMETERS)) {
+        if (coordinates.getSpaceLocation().equals(Space.Location.METHOD_DECLARATION_PARAMETERS)) {
             getPrinter().append(code);
         } else {
-            visitContainer("(", method.getPadding().getParams(), JContainer.Location.METHOD_DECL_PARAMETERS, ",", ")", insertionScope);
+            visitContainer("(", method.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",", ")", insertionScope);
         }
 
         if (coordinates.getSpaceLocation().equals(Space.Location.THROWS)) {
@@ -217,7 +217,7 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
             visit(method.getBody(), insertionScope);
         }
 
-        visitLeftPadded("default", method.getPadding().getDefaultValue(), JLeftPadded.Location.METHOD_DECL_DEFAULT_VALUE, insertionScope);
+        visitLeftPadded("default", method.getPadding().getDefaultValue(), JLeftPadded.Location.METHOD_DECLARATION_DEFAULT_VALUE, insertionScope);
 
         return method;
     }
@@ -241,21 +241,21 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
         if (coordinates.getSpaceLocation().equals(Space.Location.METHOD_INVOCATION_ARGUMENTS)) {
             getPrinter().append(code);
         } else {
-            visitContainer("(", method.getPadding().getArgs(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, ",", ")", insertionScope);
+            visitContainer("(", method.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, ",", ")", insertionScope);
         }
         return method;
     }
 
     @Override
-    public J visitMultiVariable(J.VariableDecls multiVariable, Cursor insertionScope) {
+    public J visitVariableDeclarations(J.VariableDeclarations multiVariable, Cursor insertionScope) {
         if (!insertionScope.isScopeInPath(multiVariable)) {
-            return super.visitMultiVariable(multiVariable.withAnnotations(emptyList()), insertionScope);
+            return super.visitVariableDeclarations(multiVariable.withAnnotations(emptyList()), insertionScope);
         } else if (!multiVariable.getId().equals(coordinates.getTree().getId())) {
-            return super.visitMultiVariable(multiVariable.withAnnotations(emptyList()), insertionScope);
+            return super.visitVariableDeclarations(multiVariable.withAnnotations(emptyList()), insertionScope);
         }
 
         StringBuilder acc = getPrinter();
-        visitSpace(multiVariable.getPrefix(), Space.Location.MULTI_VARIABLE_PREFIX, insertionScope);
+        visitSpace(multiVariable.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, insertionScope);
 
         if (coordinates.getSpaceLocation().equals(Space.Location.ANNOTATION_PREFIX)) {
             getPrinter().append(code);
@@ -264,11 +264,11 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
         }
 
         visitModifiers(multiVariable.getModifiers(), insertionScope);
-        visit(multiVariable.getTypeExpr(), insertionScope);
+        visit(multiVariable.getTypeExpression(), insertionScope);
         for (JLeftPadded<Space> dim : multiVariable.getDimensionsBeforeName()) {
             visitSpace(dim.getBefore(), Space.Location.DIMENSION_PREFIX, insertionScope);
             acc.append('[');
-            visitSpace(dim.getElem(), Space.Location.DIMENSION, insertionScope);
+            visitSpace(dim.getElement(), Space.Location.DIMENSION, insertionScope);
             acc.append(']');
         }
         if (multiVariable.getVarargs() != null) {
@@ -280,11 +280,11 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
     }
 
     @Override
-    public J.VariableDecls.NamedVar visitVariable(J.VariableDecls.NamedVar variable, Cursor insertionScope) {
+    public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Cursor insertionScope) {
         if (!insertionScope.isScopeInPath(variable)) {
             // Variables in the original AST only need to be declared, nulls out the initializers.
-            return (J.VariableDecls.NamedVar) super.visitVariable(variable.withInitializer(null), insertionScope);
+            return (J.VariableDeclarations.NamedVariable) super.visitVariable(variable.withInitializer(null), insertionScope);
         }
-        return (J.VariableDecls.NamedVar) super.visitVariable(variable, insertionScope);
+        return (J.VariableDeclarations.NamedVariable) super.visitVariable(variable, insertionScope);
     }
 }

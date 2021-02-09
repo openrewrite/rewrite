@@ -27,7 +27,7 @@ interface ImplementInterfaceTest : RecipeTest {
         get() = object : Recipe() {
             override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
                 return object : JavaVisitor<ExecutionContext>() {
-                    override fun visitClassDecl(classDecl: J.ClassDecl, ctx: ExecutionContext): J {
+                    override fun visitClassDeclaration(classDecl: J.ClassDeclaration, ctx: ExecutionContext): J {
                         doAfterVisit(ImplementInterface(classDecl, "b.B"))
                         return classDecl
                     }

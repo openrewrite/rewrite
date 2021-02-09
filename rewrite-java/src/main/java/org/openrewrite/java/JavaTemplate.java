@@ -28,14 +28,11 @@ import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.JavaCoordinates;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-
-import static java.util.stream.Collectors.toList;
 
 /**
  * Build ASTs from the text of Java source code without knowing how to build the AST
@@ -128,9 +125,9 @@ public class JavaTemplate {
         if (parameter instanceof Tree) {
             return ((Tree) parameter).printTrimmed();
         } else if (parameter instanceof JRightPadded) {
-            return substituteParameter(((JRightPadded<?>) parameter).getElem());
+            return substituteParameter(((JRightPadded<?>) parameter).getElement());
         } else if (parameter instanceof JLeftPadded) {
-            return substituteParameter(((JLeftPadded<?>) parameter).getElem());
+            return substituteParameter(((JLeftPadded<?>) parameter).getElement());
         }
         return parameter.toString();
     }

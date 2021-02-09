@@ -92,7 +92,7 @@ public class ReorderMethodArguments extends Recipe {
                             "." + m.getSimpleName() + "(..). Provide a reference for original parameter names by calling setOriginalParamNames(..)");
                 }
 
-                List<JRightPadded<Expression>> originalArgs = m.getPadding().getArgs().getPadding().getElems();
+                List<JRightPadded<Expression>> originalArgs = m.getPadding().getArguments().getPadding().getElements();
 
                 int resolvedParamCount = m.getType().getResolvedSignature() == null ? originalArgs.size() :
                         m.getType().getResolvedSignature().getParamTypes().size();
@@ -109,12 +109,12 @@ public class ReorderMethodArguments extends Recipe {
                         List<JRightPadded<Expression>> varargs = originalArgs.subList(fromPos, originalArgs.size());
                         reordered.addAll(varargs);
                         for (JRightPadded<Expression> exp : originalArgs.subList(i, (i++) + varargs.size())) {
-                            formattings.add(exp.getElem().getPrefix());
+                            formattings.add(exp.getElement().getPrefix());
                             rightFormattings.add(exp.getAfter());
                         }
                     } else if (fromPos >= 0 && originalArgs.size() > fromPos) {
                         reordered.add(originalArgs.get(fromPos));
-                        formattings.add(originalArgs.get(i).getElem().getPrefix());
+                        formattings.add(originalArgs.get(i).getElement().getPrefix());
                         rightFormattings.add(originalArgs.get(i++).getAfter());
                     }
                 }
@@ -133,7 +133,7 @@ public class ReorderMethodArguments extends Recipe {
                 }
 
                 if (changed) {
-                    m = m.getPadding().withArgs(m.getPadding().getArgs().getPadding().withElems(reordered));
+                    m = m.getPadding().withArguments(m.getPadding().getArguments().getPadding().withElements(reordered));
                 }
             }
             return m;
