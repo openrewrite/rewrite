@@ -2451,4 +2451,668 @@ interface SpacesTest : RecipeTest {
                 }
             """
     )
+
+    @Test
+    fun withinMethodDeclarationParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withMethodDeclarationParentheses(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo(int x) {
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo( int x ) {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinMethodDeclarationParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withMethodDeclarationParentheses(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo( int x ) {
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo(int x) {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinEmptyMethodDeclarationParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withEmptyMethodDeclarationParentheses(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo( ) {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinEmptyMethodDeclarationParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withEmptyMethodDeclarationParentheses(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo( ) {
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinMethodCallParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withMethodCallParentheses(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void bar(int x) {
+                    }
+                    public void foo() {
+                        bar(1);
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void bar(int x) {
+                    }
+                    public void foo() {
+                        bar( 1 );
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinMethodCallParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withMethodCallParentheses(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void bar(int x) {
+                    }
+                    public void foo() {
+                        bar( 1 );
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void bar(int x) {
+                    }
+                    public void foo() {
+                        bar(1);
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinEmptyMethodCallParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withEmptyMethodCallParentheses(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void bar() {
+                    }
+                    public void foo() {
+                        bar();
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void bar() {
+                    }
+                    public void foo() {
+                        bar( );
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinEmptyMethodCallParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withEmptyMethodCallParentheses(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void bar() {
+                    }
+                    public void foo() {
+                        bar( );
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void bar() {
+                    }
+                    public void foo() {
+                        bar();
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinIfParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withIfParentheses(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        if (true) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        if ( true ) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinIfParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withIfParentheses(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        if ( true ) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        if (true) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinForParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withForParentheses(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        for (int i = 0; i < 10; i++) {
+                        }
+                        for (int j : new int[]{1, 2, 3}) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        for ( int i = 0; i < 10; i++ ) {
+                        }
+                        for ( int j : new int[]{1, 2, 3} ) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinForParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withForParentheses(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        for ( int i = 0; i < 10; i++ ) {
+                        }
+                        for ( int j : new int[]{1, 2, 3} ) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        for (int i = 0; i < 10; i++) {
+                        }
+                        for (int j : new int[]{1, 2, 3}) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinWhileParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withWhileParentheses(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        while (true) {
+                        }
+                        do {
+                        } while (true);
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        while ( true ) {
+                        }
+                        do {
+                        } while ( true );
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinWhileParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withWhileParentheses(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        while ( true ) {
+                        }
+                        do {
+                        } while ( true );
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        while (true) {
+                        }
+                        do {
+                        } while (true);
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinSwitchParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withSwitchParentheses(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        switch (1) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        switch ( 1 ) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinSwitchParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withSwitchParentheses(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        switch ( 1 ) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        switch (1) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinTryParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withTryParentheses(true)
+                        })
+                    })))
+            ).build(),
+            dependsOn = arrayOf("""
+                class MyResource implements Closeable {
+                }
+            """),
+            before = """
+                class Test {
+                    public void foo() {
+                        try (MyResource res = new MyResource()) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        try ( MyResource res = new MyResource() ) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinTryParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withTryParentheses(false)
+                        })
+                    })))
+            ).build(),
+            dependsOn = arrayOf("""
+                class MyResource implements Closeable {
+                }
+            """),
+            before = """
+                class Test {
+                    public void foo() {
+                        try ( MyResource res = new MyResource() ) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        try (MyResource res = new MyResource()) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinCatchParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withCatchParentheses(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        try {
+                        } catch (Exception e) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        try {
+                        } catch ( Exception e ) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinCatchParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withCatchParentheses(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        try {
+                        } catch ( Exception e ) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        try {
+                        } catch (Exception e) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinSynchronizedParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withSynchronizedParentheses(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        synchronized (this) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        synchronized ( this ) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinSynchronizedParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withSynchronizedParentheses(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        synchronized ( this ) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        synchronized (this) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinTypeCastParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withTypeCastParentheses(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        int i = (int) 0.0d;
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        int i = ( int ) 0.0d;
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinTypeCastParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withTypeCastParentheses(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        int i = ( int ) 0.0d;
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        int i = (int) 0.0d;
+                    }
+                }
+            """
+    )
 }
