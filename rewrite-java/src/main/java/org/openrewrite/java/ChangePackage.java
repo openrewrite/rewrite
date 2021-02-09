@@ -47,7 +47,7 @@ public class ChangePackage extends Recipe {
 
             @Override
             public J.Package visitPackage(J.Package pkg, ExecutionContext context) {
-                if (pkg.getExpr().printTrimmed()
+                if (pkg.getExpression().printTrimmed()
                         .replaceAll("\\s", "")
                         .equals(oldFullyQualifiedPackageName)) {
                     getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "changing", true);
@@ -57,14 +57,14 @@ public class ChangePackage extends Recipe {
             }
 
             @Override
-            public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, ExecutionContext context) {
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext context) {
                 Boolean changing = getCursor().<Boolean>peekNearestMessage("changing");
                 if(changing != null && changing && classDecl.getType() != null) {
                     String fqn = classDecl.getType().getFullyQualifiedName();
                     doNext(new ChangeType(fqn, fqn.replaceFirst("^" + oldFullyQualifiedPackageName,
                             newFullyQualifiedPackageName)));
                 }
-                return super.visitClassDecl(classDecl, context);
+                return super.visitClassDeclaration(classDecl, context);
             }
         };
     }
