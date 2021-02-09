@@ -204,7 +204,8 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
     }
 
     @SuppressWarnings("unchecked")
-    private <T extends J> @Nullable List<T> maybeMergeList(@Nullable List<T> originalList, List<? extends J> generated) {
+    @Nullable
+    private <T extends J> List<T> maybeMergeList(@Nullable List<T> originalList, List<? extends J> generated) {
         if (originalList != null) {
             for (int index = 0; index < originalList.size(); index++) {
                 if (insertId.equals(originalList.get(index).getId())) {
