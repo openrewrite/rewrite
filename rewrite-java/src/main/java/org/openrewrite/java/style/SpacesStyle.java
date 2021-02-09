@@ -126,6 +126,9 @@ public class SpacesStyle implements JavaStyle {
         boolean typeCastParentheses;
         boolean annotationParentheses;
         boolean angleBrackets;
+
+        // Records are a java 14 preview feature (and still a preview language feature in java 15)
+        // rewrite does not consult this style setting for now
         boolean recordHeader;
     }
 

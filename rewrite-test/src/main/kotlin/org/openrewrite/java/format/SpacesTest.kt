@@ -570,32 +570,6 @@ interface SpacesTest : RecipeTest {
             """
     )
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/234")
-    @Test
-    fun withinAnnotationParametersSpaces(jp: JavaParser.Builder<*, *>) = assertChanged(
-            parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
-                        withWithin(within.withAnnotationParentheses(true))
-                    })))
-            ).build(),
-            dependsOn = arrayOf("""
-                @interface Foo {
-                    String[] exclude() default {};
-                    boolean callSuper() default false;
-                }
-            """),
-            before = """
-                @Foo(exclude = {"this","that"},callSuper=false)
-                class Test {
-                }
-            """,
-            after = """
-                @Foo(exclude = {"this", "that"}, callSuper = false)
-                class Test {
-                }
-            """
-    )
-
     @Test
     fun aroundOperatorsAssignmentFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
@@ -2901,10 +2875,7 @@ interface SpacesTest : RecipeTest {
                         })
                     })))
             ).build(),
-            dependsOn = arrayOf("""
-                class MyResource implements Closeable {
-                }
-            """),
+            dependsOn = tryResource,
             before = """
                 class Test {
                     public void foo() {
@@ -2932,10 +2903,7 @@ interface SpacesTest : RecipeTest {
                         })
                     })))
             ).build(),
-            dependsOn = arrayOf("""
-                class MyResource implements Closeable {
-                }
-            """),
+            dependsOn = tryResource,
             before = """
                 class Test {
                     public void foo() {
@@ -3115,4 +3083,117 @@ interface SpacesTest : RecipeTest {
                 }
             """
     )
+
+    @Test
+    fun withinAnnotationParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                                withAnnotationParentheses(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                @SuppressWarnings({"ALL"})
+                class Test {
+                }
+            """,
+            after = """
+                @SuppressWarnings( {"ALL"} )
+                class Test {
+                }
+            """
+    )
+
+    @Test
+    fun withinAnnotationParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withAnnotationParentheses(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                @SuppressWarnings( {"ALL"} )
+                class Test {
+                }
+            """,
+            after = """
+                @SuppressWarnings({"ALL"})
+                class Test {
+                }
+            """
+    )
+
+    @Test
+    fun withinAngleBracketsTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withAngleBrackets(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                import java.util.ArrayList;
+                import java.util.List;
+                
+                class Test<T> {
+                
+                    <T2 extends T> T2 foo() {
+                        List<T2> myList = new ArrayList<>();
+                        return null;
+                    }
+                }
+            """,
+            after = """
+                import java.util.ArrayList;
+                import java.util.List;
+                
+                class Test< T > {
+                
+                    < T2 extends T > T2 foo() {
+                        List< T2 > myList = new ArrayList<>();
+                        return null;
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun withinAngleBracketsFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withWithin(within.run {
+                            withAngleBrackets(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                import java.util.ArrayList;
+                import java.util.List;
+                
+                class Test< T > {
+                
+                    < T2 extends T > T2 foo() {
+                        List< T2 > myList = new ArrayList<>();
+                        return null;
+                    }
+                }
+            """,
+            after = """
+                import java.util.ArrayList;
+                import java.util.List;
+                
+                class Test<T> {
+                
+                    <T2 extends T> T2 foo() {
+                        List<T2> myList = new ArrayList<>();
+                        return null;
+                    }
+                }
+            """
+    )
+
 }

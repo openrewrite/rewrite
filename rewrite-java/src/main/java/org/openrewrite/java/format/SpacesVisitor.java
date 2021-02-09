@@ -100,6 +100,27 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     )
             );
         }
+        if (c.getPadding().getTypeParameters() != null) {
+            boolean spaceWithinAngleBrackets = style.getWithin().isAngleBrackets();
+            int typeParametersSize = c.getPadding().getTypeParameters().getElems().size();
+            c = c.getPadding().withTypeParameters(
+                    c.getPadding().getTypeParameters().getPadding().withElems(
+                            ListUtils.map(c.getPadding().getTypeParameters().getPadding().getElems(),
+                                    (index, elemContainer) -> {
+                                        if (index == 0) {
+                                            elemContainer = elemContainer.withElem(
+                                                    spaceBefore(elemContainer.getElem(), spaceWithinAngleBrackets)
+                                            );
+                                        }
+                                        if (index == typeParametersSize - 1) {
+                                            elemContainer = spaceAfter(elemContainer, spaceWithinAngleBrackets);
+                                        }
+                                        return elemContainer;
+                                    }
+                            )
+                    )
+            );
+        }
         return c;
     }
 
@@ -135,6 +156,27 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                                             param = spaceAfter(param, useSpace);
                                         }
                                         return param;
+                                    }
+                            )
+                    )
+            );
+        }
+        if (m.getPadding().getTypeParameters() != null) {
+            boolean spaceWithinAngleBrackets = style.getWithin().isAngleBrackets();
+            int typeParametersSize = m.getPadding().getTypeParameters().getElems().size();
+            m = m.getPadding().withTypeParameters(
+                    m.getPadding().getTypeParameters().getPadding().withElems(
+                            ListUtils.map(m.getPadding().getTypeParameters().getPadding().getElems(),
+                                    (index, elemContainer) -> {
+                                        if (index == 0) {
+                                            elemContainer = elemContainer.withElem(
+                                                    spaceBefore(elemContainer.getElem(), spaceWithinAngleBrackets)
+                                            );
+                                        }
+                                        if (index == typeParametersSize - 1) {
+                                            elemContainer = spaceAfter(elemContainer, spaceWithinAngleBrackets);
+                                        }
+                                        return elemContainer;
                                     }
                             )
                     )
@@ -376,13 +418,35 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.Annotation visitAnnotation(J.Annotation annotation, P p) {
         J.Annotation a = super.visitAnnotation(annotation, p);
-        J.Annotation.Padding padding = a.getPadding();
-        if (padding.getArgs() != null) {
-            a = padding.withArgs(spaceBefore(padding.getArgs(),
+        if (a.getPadding().getArgs() != null) {
+            a = a.getPadding().withArgs(spaceBefore(a.getPadding().getArgs(),
                     style.getBeforeParentheses().isAnnotationParameters()));
-            if (a.getArgs() != null) {
-                a = a.withArgs(ListUtils.map(a.getArgs(), (i, arg) -> i == 0 ? arg : spaceBefore(arg, style.getWithin().isAnnotationParentheses())));
-            }
+        }
+        boolean spaceWithinAnnotationParentheses = style.getWithin().isAnnotationParentheses();
+        if (a.getPadding().getArgs() != null) {
+            int argsSize = a.getPadding().getArgs().getElems().size();
+            a = a.getPadding().withArgs(
+                    a.getPadding().getArgs().getPadding().withElems(
+                            ListUtils.map(a.getPadding().getArgs().getPadding().getElems(),
+                                    (index, arg) -> {
+                                        if (index == 0) {
+                                            // don't overwrite changes made by before left brace annotation array
+                                            // initializer setting when space within annotation parens is false
+                                            if (spaceWithinAnnotationParentheses ||
+                                                    !style.getBeforeLeftBrace().isAnnotationArrayInitializerLeftBrace()) {
+                                                arg = arg.withElem(
+                                                        spaceBefore(arg.getElem(), spaceWithinAnnotationParentheses)
+                                                );
+                                            }
+                                        }
+                                        if (index == argsSize - 1) {
+                                            arg = spaceAfter(arg, spaceWithinAnnotationParentheses);
+                                        }
+                                        return arg;
+                                    }
+                            )
+                    )
+            );
         }
         return a;
     }
@@ -611,7 +675,15 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     public J.NewArray visitNewArray(J.NewArray newArray, P p) {
         J.NewArray n = super.visitNewArray(newArray, p);
         if (getCursor().getParent() != null && getCursor().getParent().firstEnclosing(J.class) instanceof J.Annotation) {
-            n = spaceBefore(n, style.getBeforeLeftBrace().isAnnotationArrayInitializerLeftBrace());
+            /*
+             * IntelliJ setting
+             * Spaces -> Within -> Annotation parentheses
+             * when enabled supercedes
+             * Spaces -> Before left brace -> Annotation array initializer left brace
+             */
+            if (!style.getWithin().isAnnotationParentheses()) {
+                n = spaceBefore(n, style.getBeforeLeftBrace().isAnnotationArrayInitializerLeftBrace());
+            }
         } else {
             if (n.getPadding().getInitializer() != null) {
                 JContainer<Expression> initializer = spaceBefore(n.getPadding().getInitializer(), style.getBeforeLeftBrace().isArrayInitializerLeftBrace());
@@ -777,5 +849,33 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                 )
         );
         return tc;
+    }
+
+    @Override
+    public J.ParameterizedType visitParameterizedType(J.ParameterizedType type, P p) {
+        J.ParameterizedType pt = super.visitParameterizedType(type, p);
+        boolean spaceWithinAngleBrackets = style.getWithin().isAngleBrackets();
+        if (pt.getPadding().getTypeParameters() != null &&
+                !(pt.getPadding().getTypeParameters().getElems().iterator().next() instanceof J.Empty)) {
+            int typeParametersSize = pt.getPadding().getTypeParameters().getElems().size();
+            pt = pt.getPadding().withTypeParameters(
+                    pt.getPadding().getTypeParameters().getPadding().withElems(
+                            ListUtils.map(pt.getPadding().getTypeParameters().getPadding().getElems(),
+                                    (index, elemContainer) -> {
+                                        if (index == 0) {
+                                            elemContainer = elemContainer.withElem(
+                                                    spaceBefore(elemContainer.getElem(), spaceWithinAngleBrackets)
+                                            );
+                                        }
+                                        if (index == typeParametersSize - 1) {
+                                            elemContainer = spaceAfter(elemContainer, spaceWithinAngleBrackets);
+                                        }
+                                        return elemContainer;
+                                    }
+                            )
+                    )
+            );
+        }
+        return pt;
     }
 }
