@@ -15,12 +15,34 @@
  */
 package org.openrewrite.java.tree
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.java.JavaIsoVisitor
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTreeTest
 import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
 
 interface TryCatchTest : JavaTreeTest {
+
+    @Test
+    fun catchRightPadding(jp: JavaParser) {
+        val j = jp.parse("""
+            class Test {
+                void method() {
+                    try {
+                    } catch( Exception e ) {
+                    }
+                }
+            }
+        """.trimIndent())[0]
+
+        object: JavaIsoVisitor<Int>() {
+            override fun visitCatch(c: J.Try.Catch, p: Int): J.Try.Catch {
+                assertThat(c.param.padding.tree.after.whitespace).isEqualTo(" ")
+                return super.visitCatch(c, p)
+            }
+        }.visit(j, 0)
+    }
 
     @Test
     fun tryFinally(jp: JavaParser) = assertParsePrintAndProcess(

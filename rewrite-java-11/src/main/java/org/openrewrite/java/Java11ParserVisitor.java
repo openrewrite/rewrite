@@ -331,10 +331,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
         Space paramPrefix = sourceBefore("(");
         J.VariableDecls paramDecl = convert(node.getParameter());
-        paramDecl = paramDecl.getPadding().withVars(Space.formatLastSuffix(paramDecl.getPadding().getVars(), sourceBefore(")")));
 
         J.ControlParentheses<J.VariableDecls> param = new J.ControlParentheses<>(randomId(), paramPrefix,
-                Markers.EMPTY, padRight(paramDecl, EMPTY));
+                Markers.EMPTY, padRight(paramDecl, sourceBefore(")")));
 
         return new J.Try.Catch(randomId(), fmt, Markers.EMPTY, param, convert(node.getBlock()));
     }
