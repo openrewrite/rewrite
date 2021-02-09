@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.RecipeTest
 
@@ -35,7 +36,10 @@ interface ChangePackageTest: RecipeTest {
             package org.openrewrite.test;
             class Test {
             }
-        """
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.sourcePath.toString()).contains("org/openrewrite/test")
+        }
     )
 
     @Test
