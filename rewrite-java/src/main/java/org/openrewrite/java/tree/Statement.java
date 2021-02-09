@@ -23,16 +23,16 @@ public interface Statement extends J {
             return false;
         }
 
-        if (!(this instanceof J.VariableDecls)) {
+        if (!(this instanceof VariableDeclarations)) {
             return false;
         }
 
-        J.VariableDecls variable = (J.VariableDecls) this;
+        VariableDeclarations variable = (VariableDeclarations) this;
 
-        if (variable.getTypeExpr() == null) {
+        if (variable.getTypeExpression() == null) {
             return false;
         }
 
-        return TypeUtils.isOfClassType(variable.getTypeExpr().getType(), classType.getFullyQualifiedName());
+        return TypeUtils.isOfClassType(variable.getTypeExpression().getType(), classType.getFullyQualifiedName());
     }
 }

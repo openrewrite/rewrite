@@ -30,25 +30,25 @@ public class ChangeFieldType<P> extends JavaIsoVisitor<P> {
     private final String targetType;
 
     @Override
-    public J.VariableDecls visitMultiVariable(J.VariableDecls multiVariable, P p) {
+    public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
         JavaType.Class typeAsClass = multiVariable.getTypeAsClass();
-        J.VariableDecls mv = super.visitMultiVariable(multiVariable, p);
+        J.VariableDeclarations mv = super.visitVariableDeclarations(multiVariable, p);
         if (typeAsClass != null && typeAsClass.equals(type)) {
             JavaType.Class type = JavaType.Class.build(targetType);
 
             maybeAddImport(targetType);
             maybeRemoveImport(typeAsClass);
 
-            mv = mv.withTypeExpr(mv.getTypeExpr() == null ?
+            mv = mv.withTypeExpression(mv.getTypeExpression() == null ?
                     null :
-                    J.Ident.build(mv.getTypeExpr().getId(),
-                            mv.getTypeExpr().getPrefix(),
+                    J.Identifier.build(mv.getTypeExpression().getId(),
+                            mv.getTypeExpression().getPrefix(),
                             Markers.EMPTY,
                             type.getClassName(),
                             type)
             );
 
-            mv = mv.withVars(ListUtils.map(mv.getVars(), var -> {
+            mv = mv.withVariables(ListUtils.map(mv.getVariables(), var -> {
                 JavaType.Class varType = TypeUtils.asClass(var.getType());
                 if (varType != null && !varType.equals(type)) {
                     return var.withType(type).withName(var.getName().withType(type));

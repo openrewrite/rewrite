@@ -50,7 +50,7 @@ public final class FindTypesInNameScope {
         }
 
         @Override
-        public J visitVariable(J.VariableDecls.NamedVar variable, Set<JavaType> ctx) {
+        public J visitVariable(J.VariableDeclarations.NamedVariable variable, Set<JavaType> ctx) {
             if (variable.getType() != null) {
                 ctx.add(variable.getType());
             }

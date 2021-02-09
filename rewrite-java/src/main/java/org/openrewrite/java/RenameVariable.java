@@ -19,17 +19,17 @@ import org.openrewrite.Cursor;
 import org.openrewrite.java.tree.J;
 
 public class RenameVariable<P> extends JavaIsoVisitor<P> {
-    private final J.VariableDecls.NamedVar variable;
+    private final J.VariableDeclarations.NamedVariable variable;
     private final String toName;
 
-    public RenameVariable(J.VariableDecls.NamedVar variable, String toName) {
+    public RenameVariable(J.VariableDeclarations.NamedVariable variable, String toName) {
         this.variable = variable;
         this.toName = toName;
         setCursoringOn();
     }
 
     @Override
-    public J.VariableDecls.NamedVar visitVariable(J.VariableDecls.NamedVar variable, P p) {
+    public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
         if (variable.equals(this.variable)) {
             doAfterVisit(new RenameVariableByCursor(getCursor()));
             return variable;
@@ -51,7 +51,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
         }
 
         @Override
-        public J.Ident visitIdentifier(J.Ident ident, P p) {
+        public J.Identifier visitIdentifier(J.Identifier ident, P p) {
             if (ident.getSimpleName().equals(variable.getSimpleName()) &&
                     isInSameNameScope(scope, getCursor()) &&
                     !(getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.FieldAccess)) {

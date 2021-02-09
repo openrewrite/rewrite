@@ -48,8 +48,8 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         return j;
     }
 
-    @Override public J.MethodDecl visitMethod(J.MethodDecl method, P p) {
-        J.MethodDecl m = super.visitMethod(method, p);
+    @Override public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
+        J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
         // TODO make annotation wrapping configurable
         m = m.withAnnotations(withNewlines(m.getAnnotations()));
         if (!m.getAnnotations().isEmpty()) {
@@ -63,11 +63,11 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                             )
                     );
                 }
-            } else if (m.getReturnTypeExpr() != null) {
-                if (!m.getReturnTypeExpr().getPrefix().getWhitespace().contains("\n")) {
-                    m = m.withReturnTypeExpr(
-                            m.getReturnTypeExpr().withPrefix(
-                                    withNewline(m.getReturnTypeExpr().getPrefix())
+            } else if (m.getReturnTypeExpression() != null) {
+                if (!m.getReturnTypeExpression().getPrefix().getWhitespace().contains("\n")) {
+                    m = m.withReturnTypeExpression(
+                            m.getReturnTypeExpression().withPrefix(
+                                    withNewline(m.getReturnTypeExpression().getPrefix())
                             )
                     );
                 }
@@ -84,16 +84,16 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         return m;
     }
 
-    @Override public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, P p) {
-        J.ClassDecl j = super.visitClassDecl(classDecl, p);
+    @Override public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
+        J.ClassDeclaration j = super.visitClassDeclaration(classDecl, p);
         // TODO make annotation wrapping configurable
         j = j.withAnnotations(withNewlines(j.getAnnotations()));
         if (!j.getAnnotations().isEmpty()) {
             if (!j.getModifiers().isEmpty()) {
                 j = j.withModifiers(withNewline(j.getModifiers()));
             } else {
-                J.ClassDecl.Padding padding = j.getPadding();
-                JLeftPadded<J.ClassDecl.Kind> kind = padding.getKind();
+                J.ClassDeclaration.Padding padding = j.getPadding();
+                JLeftPadded<J.ClassDeclaration.Kind> kind = padding.getKind();
                 j = padding.withKind(
                         kind.withBefore(
                                 kind.getBefore().withWhitespace(

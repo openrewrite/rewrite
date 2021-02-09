@@ -16,7 +16,6 @@
 package org.openrewrite.java.format
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.java.JavaParser

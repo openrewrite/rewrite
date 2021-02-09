@@ -37,11 +37,11 @@ class Java11AssertTest: Java11Test, AssertTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11AssignOpTest: Java11Test, AssignOpTest
+class Java11AssignmentOperationTest: Java11Test, AssignmentOperationTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11AssignTest: Java11Test, AssignTest
+class Java11AssignmentTest: Java11Test, AssignmentTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
@@ -53,7 +53,7 @@ class Java11BreakTest: Java11Test, BreakTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11ClassDeclTest: Java11Test, ClassDeclTest
+class Java11ClassDeclarationTest: Java11Test, ClassDeclarationTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
@@ -85,7 +85,7 @@ class Java11ForEachLoopTest: Java11Test, ForEachLoopTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11IdentTest: Java11Test, IdentTest
+class Java11IdentifierTest: Java11Test, IdentifierTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
@@ -117,7 +117,7 @@ class Java11MemberReferenceTest: Java11Test, MemberReferenceTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11MethodDeclTest: Java11Test, MethodDeclTest
+class Java11MethodDeclarationTest: Java11Test, MethodDeclarationTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
@@ -185,7 +185,7 @@ class Java11UnaryTest: Java11Test, UnaryTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11VariableDeclsTest: Java11Test, VariableDeclsTest
+class Java11VariableDeclarationsTest: Java11Test, VariableDeclarationsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

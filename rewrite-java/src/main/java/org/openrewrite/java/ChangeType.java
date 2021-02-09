@@ -96,8 +96,8 @@ public class ChangeType extends Recipe {
         }
 
         @Override
-        public J visitClassDecl(J.ClassDecl classDecl, ExecutionContext ctx) {
-            J.ClassDecl c = visitAndCast(classDecl, ctx, super::visitClassDecl);
+        public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+            J.ClassDeclaration c = visitAndCast(classDecl, ctx, super::visitClassDeclaration);
 
             if (c.getExtends() != null) {
                 c = c.withExtends(transformName(c.getExtends()));
@@ -130,10 +130,10 @@ public class ChangeType extends Recipe {
         }
 
         @Override
-        public J visitIdentifier(J.Ident ident, ExecutionContext ctx) {
+        public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
             // if the ident's type is equal to the type we're looking for, and the classname of the type we're looking for is equal to the ident's string representation
             // Then transform it, otherwise leave it alone
-            J.Ident i = visitAndCast(ident, ctx, super::visitIdentifier);
+            J.Identifier i = visitAndCast(ident, ctx, super::visitIdentifier);
             JavaType.Class original = JavaType.Class.build(oldFullyQualifiedTypeName);
 
             if (TypeUtils.isOfClassType(i.getType(), oldFullyQualifiedTypeName) && i.getSimpleName().equals(original.getClassName())) {
@@ -149,9 +149,9 @@ public class ChangeType extends Recipe {
         }
 
         @Override
-        public J visitMethod(J.MethodDecl method, ExecutionContext ctx) {
-            J.MethodDecl m = visitAndCast(method, ctx, super::visitMethod);
-            m = m.withReturnTypeExpr(transformName(m.getReturnTypeExpr()));
+        public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+            J.MethodDeclaration m = visitAndCast(method, ctx, super::visitMethodDeclaration);
+            m = m.withReturnTypeExpression(transformName(m.getReturnTypeExpression()));
             return m.withThrows(m.getThrows() == null ? null : ListUtils.map(m.getThrows(), this::transformName));
         }
 
@@ -187,17 +187,17 @@ public class ChangeType extends Recipe {
         }
 
         @Override
-        public J visitMultiVariable(J.VariableDecls multiVariable, ExecutionContext ctx) {
-            J.VariableDecls m = visitAndCast(multiVariable, ctx, super::visitMultiVariable);
-            if (!(multiVariable.getTypeExpr() instanceof J.MultiCatch)) {
-                m = m.withTypeExpr(transformName(m.getTypeExpr()));
+        public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+            J.VariableDeclarations m = visitAndCast(multiVariable, ctx, super::visitVariableDeclarations);
+            if (!(multiVariable.getTypeExpression() instanceof J.MultiCatch)) {
+                m = m.withTypeExpression(transformName(m.getTypeExpression()));
             }
             return m;
         }
 
         @Override
-        public J.VariableDecls.NamedVar visitVariable(J.VariableDecls.NamedVar variable, ExecutionContext ctx) {
-            J.VariableDecls.NamedVar v = visitAndCast(variable, ctx, super::visitVariable);
+        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
+            J.VariableDeclarations.NamedVariable v = visitAndCast(variable, ctx, super::visitVariable);
 
             JavaType.Class varType = TypeUtils.asClass(variable.getType());
             if (varType != null && varType.getFullyQualifiedName().equals(oldFullyQualifiedTypeName)) {
@@ -210,7 +210,7 @@ public class ChangeType extends Recipe {
         @Override
         public J visitNewArray(J.NewArray newArray, ExecutionContext ctx) {
             J.NewArray n = visitAndCast(newArray, ctx, super::visitNewArray);
-            return n.withTypeExpr(transformName(n.getTypeExpr()));
+            return n.withTypeExpression(transformName(n.getTypeExpression()));
         }
 
         @Override
@@ -249,7 +249,7 @@ public class ChangeType extends Recipe {
                     name = ((JavaType.Primitive) targetType).getKeyword();
                 }
                 if (nameTreeClass != null && nameTreeClass.getFullyQualifiedName().equals(oldFullyQualifiedTypeName)) {
-                    return (T) J.Ident.build(randomId(),
+                    return (T) J.Identifier.build(randomId(),
                             nameField.getPrefix(),
                             Markers.EMPTY,
                             name,

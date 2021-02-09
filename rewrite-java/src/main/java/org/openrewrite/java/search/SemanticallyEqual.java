@@ -61,13 +61,13 @@ public class SemanticallyEqual {
             }
             J.Annotation secondAnnotation = (J.Annotation) second;
 
-            if (firstAnnotation.getArgs() != null && secondAnnotation.getArgs() != null) {
-                if (firstAnnotation.getArgs() != null &&
-                        secondAnnotation.getArgs() != null &&
-                        firstAnnotation.getArgs().size() == secondAnnotation.getArgs().size()) {
+            if (firstAnnotation.getArguments() != null && secondAnnotation.getArguments() != null) {
+                if (firstAnnotation.getArguments() != null &&
+                        secondAnnotation.getArguments() != null &&
+                        firstAnnotation.getArguments().size() == secondAnnotation.getArguments().size()) {
 
-                    List<Expression> firstArgs = firstAnnotation.getArgs();
-                    List<Expression> secondArgs = secondAnnotation.getArgs();
+                    List<Expression> firstArgs = firstAnnotation.getArguments();
+                    List<Expression> secondArgs = secondAnnotation.getArguments();
 
                     for (int i = 0; i < firstArgs.size(); i++) {
                         this.visit(firstArgs.get(i), secondArgs.get(i));
@@ -83,12 +83,12 @@ public class SemanticallyEqual {
         }
 
         @Override
-        public J visitIdentifier(J.Ident firstIdent, J second) {
-            if (!(second instanceof J.Ident)) {
+        public J visitIdentifier(J.Identifier firstIdent, J second) {
+            if (!(second instanceof J.Identifier)) {
                 isEqual = false;
                 return null;
             }
-            J.Ident secondIdent = (J.Ident) second;
+            J.Identifier secondIdent = (J.Identifier) second;
 
             isEqual = isEqual && Objects.equals(firstIdent.getType(), secondIdent.getType()) &&
                     firstIdent.getSimpleName().equals(secondIdent.getSimpleName());
@@ -121,17 +121,17 @@ public class SemanticallyEqual {
         }
 
         @Override
-        public J visitAssign(J.Assign firstAssign, J second) {
-            if (!(second instanceof J.Assign)) {
+        public J visitAssignment(J.Assignment firstAssignment, J second) {
+            if (!(second instanceof J.Assignment)) {
                 isEqual = false;
                 return null;
             }
-            J.Assign secondAssign = (J.Assign) second;
+            J.Assignment secondAssignment = (J.Assignment) second;
 
             isEqual = isEqual &&
-                    Objects.equals(firstAssign.getType(), secondAssign.getType()) &&
-                    SemanticallyEqual.areEqual(firstAssign.getVariable(), secondAssign.getVariable()) &&
-                    SemanticallyEqual.areEqual(firstAssign.getAssignment(), secondAssign.getAssignment());
+                    Objects.equals(firstAssignment.getType(), secondAssignment.getType()) &&
+                    SemanticallyEqual.areEqual(firstAssignment.getVariable(), secondAssignment.getVariable()) &&
+                    SemanticallyEqual.areEqual(firstAssignment.getAssignment(), secondAssignment.getAssignment());
 
             return null;
         }
@@ -157,12 +157,12 @@ public class SemanticallyEqual {
             }
             NameTree secondTypeName = (NameTree) second;
 
-            isEqual = isEqual && identEquals((J.Ident) firstTypeName, (J.Ident) secondTypeName);
+            isEqual = isEqual && identEquals((J.Identifier) firstTypeName, (J.Identifier) secondTypeName);
 
             return null;
         }
 
-        private static boolean identEquals(J.Ident thisIdent, J.Ident otherIdent) {
+        private static boolean identEquals(J.Identifier thisIdent, J.Identifier otherIdent) {
             return Objects.equals(thisIdent.getSimpleName(), otherIdent.getSimpleName()) && typeEquals(thisIdent.getType(), otherIdent.getType());
         }
 

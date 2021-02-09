@@ -57,6 +57,10 @@ class Java11ChangeMethodTargetToVariableTest : Java11Test, ChangeMethodTargetToV
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11ChangePackageTest : Java11Test, ChangePackageTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11ChangeTypeTest : Java11Test, ChangeTypeTest
 
 @DebugOnly

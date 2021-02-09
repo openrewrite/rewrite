@@ -30,9 +30,9 @@ interface DeleteStatementTest : RecipeTest {
         recipe = object: Recipe() {
             override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
                 return object: JavaVisitor<ExecutionContext>() {
-                    override fun visitMultiVariable(multiVariable: J.VariableDecls, p: ExecutionContext): J {
+                    override fun visitVariableDeclarations(multiVariable: J.VariableDeclarations, p: ExecutionContext): J {
                         doAfterVisit(DeleteStatement(multiVariable))
-                        return super.visitMultiVariable(multiVariable, p)
+                        return super.visitVariableDeclarations(multiVariable, p)
                     }
                 }
             }

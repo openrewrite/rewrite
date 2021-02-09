@@ -22,22 +22,22 @@ import org.openrewrite.java.tree.Space;
 
 import java.util.stream.Collectors;
 
-public class VariableDeclsToString {
-    public static String toString(J.VariableDecls v) {
+public class VariableDeclarationsToString {
+    public static String toString(J.VariableDeclarations v) {
         //noinspection ConstantConditions
         return VARIABLE_PRINTER.print(v, null);
     }
 
     private static final JavaPrinter<Void> VARIABLE_PRINTER = new JavaPrinter<Void>(TreePrinter.identity()) {
         @Override
-        public J visitMultiVariable(J.VariableDecls multiVariable, Void unused) {
+        public J visitVariableDeclarations(J.VariableDeclarations multiVariable, Void unused) {
             visitModifiers(Space.formatFirstPrefix(multiVariable.getModifiers(), Space.EMPTY), unused);
             StringBuilder acc = getPrinter();
             if (!multiVariable.getModifiers().isEmpty()) {
                 acc.append(' ');
             }
-            if (multiVariable.getTypeExpr() != null) {
-                acc.append(multiVariable.getTypeExpr().printTrimmed())
+            if (multiVariable.getTypeExpression() != null) {
+                acc.append(multiVariable.getTypeExpression().printTrimmed())
                         .append(' ');
             }
             acc.append(multiVariable.getDimensionsBeforeName().stream()
@@ -46,8 +46,8 @@ public class VariableDeclsToString {
             if (multiVariable.getVarargs() != null) {
                 acc.append("...");
             }
-            acc.append(multiVariable.getVars().stream()
-                    .map(J.VariableDecls.NamedVar::getSimpleName)
+            acc.append(multiVariable.getVariables().stream()
+                    .map(J.VariableDeclarations.NamedVariable::getSimpleName)
                     .collect(Collectors.joining(", ")));
             return multiVariable;
         }

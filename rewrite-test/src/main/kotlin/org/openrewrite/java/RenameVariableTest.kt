@@ -16,7 +16,6 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.Cursor
 import org.openrewrite.ExecutionContext
 import org.openrewrite.RecipeTest
 import org.openrewrite.java.tree.J
@@ -26,16 +25,17 @@ interface RenameVariableTest : RecipeTest {
     fun renameVariable(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaVisitor<ExecutionContext>() {
-            override fun visitMultiVariable(multiVariable: J.VariableDecls, p: ExecutionContext): J {
-                if (cursor.dropParentUntil { it is J }.getValue<J>() is J.MethodDecl) {
-                    doAfterVisit(RenameVariable(multiVariable.vars[0], "n2"))
+            override fun visitVariableDeclarations(multiVariable: J.VariableDeclarations, p: ExecutionContext): J {
+                if (cursor.dropParentUntil { it is J }.getValue<J>() is J.MethodDeclaration) {
+                    doAfterVisit(RenameVariable(multiVariable.variables[0], "n2"))
                 } else if (cursor
                         .dropParentUntil { it is J }
                         .dropParentUntil { it is J }
-                        .getValue<J>() !is J.ClassDecl) {
-                    doAfterVisit(RenameVariable(multiVariable.vars[0], "n1"))
+                        .getValue<J>() !is J.ClassDeclaration
+                ) {
+                    doAfterVisit(RenameVariable(multiVariable.variables[0], "n1"))
                 }
-                return super.visitMultiVariable(multiVariable, p)
+                return super.visitVariableDeclarations(multiVariable, p)
             }
         }.toRecipe(cursored = true),
         before = """

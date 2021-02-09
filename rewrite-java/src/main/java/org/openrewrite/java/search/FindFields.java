@@ -24,7 +24,6 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.RecipeSearchResult;
-import org.openrewrite.marker.SearchResult;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -41,11 +40,11 @@ public class FindFields extends Recipe {
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.VariableDecls visitMultiVariable(J.VariableDecls multiVariable, ExecutionContext ctx) {
-                if (multiVariable.getTypeExpr() instanceof J.MultiCatch) {
+            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                if (multiVariable.getTypeExpression() instanceof J.MultiCatch) {
                     return multiVariable;
                 }
-                if (multiVariable.getTypeExpr() != null && TypeUtils.hasElementType(multiVariable.getTypeExpr()
+                if (multiVariable.getTypeExpression() != null && TypeUtils.hasElementType(multiVariable.getTypeExpression()
                         .getType(), fullyQualifiedTypeName)) {
                     return multiVariable.withMarker(new RecipeSearchResult(FindFields.this));
                 }
@@ -54,14 +53,14 @@ public class FindFields extends Recipe {
         };
     }
 
-    public static Set<J.VariableDecls> find(J j, String fullyQualifiedTypeName) {
-        JavaIsoVisitor<Set<J.VariableDecls>> findVisitor = new JavaIsoVisitor<Set<J.VariableDecls>>() {
+    public static Set<J.VariableDeclarations> find(J j, String fullyQualifiedTypeName) {
+        JavaIsoVisitor<Set<J.VariableDeclarations>> findVisitor = new JavaIsoVisitor<Set<J.VariableDeclarations>>() {
             @Override
-            public J.VariableDecls visitMultiVariable(J.VariableDecls multiVariable, Set<J.VariableDecls> vs) {
-                if (multiVariable.getTypeExpr() instanceof J.MultiCatch) {
+            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Set<J.VariableDeclarations> vs) {
+                if (multiVariable.getTypeExpression() instanceof J.MultiCatch) {
                     return multiVariable;
                 }
-                if (multiVariable.getTypeExpr() != null && TypeUtils.hasElementType(multiVariable.getTypeExpr()
+                if (multiVariable.getTypeExpression() != null && TypeUtils.hasElementType(multiVariable.getTypeExpression()
                         .getType(), fullyQualifiedTypeName)) {
                     vs.add(multiVariable);
                 }
@@ -69,7 +68,7 @@ public class FindFields extends Recipe {
             }
         };
 
-        Set<J.VariableDecls> vs = new HashSet<>();
+        Set<J.VariableDeclarations> vs = new HashSet<>();
         findVisitor.visit(j, vs);
         return vs;
     }

@@ -126,8 +126,8 @@ interface MethodMatcherTest {
         assertTrue(
             MethodMatcher("a.A A()").matches(
                 ((cu.classes.first().body.statements.first() as J.Block)
-                    .statements.first() as J.VariableDecls)
-                    .vars.first().initializer as J.NewClass
+                    .statements.first() as J.VariableDeclarations)
+                    .variables.first().initializer as J.NewClass
             )
         )
     }
@@ -147,10 +147,10 @@ interface MethodMatcherTest {
         """.trimIndent()
         ).first()
         val classDecl = cu.classes.first()
-        val setIntMethod = classDecl.body.statements[0] as J.MethodDecl
-        val getIntMethod = classDecl.body.statements[1] as J.MethodDecl
-        val setIntegerMethod = classDecl.body.statements[2] as J.MethodDecl
-        val getIntegerMethod = classDecl.body.statements[3] as J.MethodDecl
+        val setIntMethod = classDecl.body.statements[0] as J.MethodDeclaration
+        val getIntMethod = classDecl.body.statements[1] as J.MethodDeclaration
+        val setIntegerMethod = classDecl.body.statements[2] as J.MethodDeclaration
+        val getIntegerMethod = classDecl.body.statements[3] as J.MethodDeclaration
         assertTrue(MethodMatcher("a.A setInt(int)").matches(setIntMethod, classDecl))
         assertTrue(MethodMatcher("a.A getInt()").matches(getIntMethod, classDecl))
         assertTrue(MethodMatcher("a.A setInteger(Integer)").matches(setIntegerMethod, classDecl))

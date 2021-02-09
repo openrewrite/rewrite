@@ -22,15 +22,15 @@ import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.Space;
 
-public class ClassDeclToString {
-    public static String toString(J.ClassDecl clazz) {
+public class ClassDeclarationToString {
+    public static String toString(J.ClassDeclaration clazz) {
         //noinspection ConstantConditions
         return CLASS_DECL_PRINTER.print(clazz, null);
     }
 
     private static final JavaPrinter<Void> CLASS_DECL_PRINTER = new JavaPrinter<Void>(TreePrinter.identity()) {
         @Override
-        public J visitClassDecl(J.ClassDecl classDecl, Void unused) {
+        public J visitClassDeclaration(J.ClassDeclaration classDecl, Void unused) {
             visitModifiers(Space.formatFirstPrefix(classDecl.getModifiers(), Space.EMPTY), unused);
             StringBuilder acc = getPrinter();
             if (!classDecl.getModifiers().isEmpty()) {
@@ -57,7 +57,7 @@ public class ClassDeclToString {
             }
             visitLeftPadded("extends", classDecl.getPadding().getExtends(), JLeftPadded.Location.EXTENDS, unused);
             if (classDecl.getImplements() != null) {
-                if (J.ClassDecl.Kind.Interface.equals(classDecl.getKind())) {
+                if (J.ClassDeclaration.Kind.Interface.equals(classDecl.getKind())) {
                     acc.append("extends");
                 } else {
                     acc.append("implements");

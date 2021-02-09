@@ -23,7 +23,7 @@ import org.openrewrite.java.JavaTreeTest
 import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
 import org.openrewrite.java.JavaTreeTest.NestingLevel.Class
 
-interface VariableDeclsTest : JavaTreeTest {
+interface VariableDeclarationsTest : JavaTreeTest {
 
     @Test
     fun fieldDefinition(jp: JavaParser) = assertParsePrintAndProcess(
@@ -90,7 +90,7 @@ interface VariableDeclsTest : JavaTreeTest {
         """
         )[0]
 
-        val inv = a.classes[0].body.statements.filterIsInstance<J.VariableDecls>().first()
+        val inv = a.classes[0].body.statements.filterIsInstance<J.VariableDeclarations>().first()
         assertThat(inv.modifiers).hasSize(3)
         assertTrue(inv.hasModifier(J.Modifier.Type.Protected))
         assertTrue(inv.hasModifier(J.Modifier.Type.Static))

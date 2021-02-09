@@ -102,25 +102,25 @@ public abstract class Coordinates<J2 extends J> {
         }
     }
 
-    public static class Assign extends Coordinates<J.Assign> {
-        Assign(J.Assign tree) {
+    public static class Assignment extends Coordinates<J.Assignment> {
+        Assignment(J.Assignment tree) {
             super(tree);
         }
 
         @Override
         public JavaCoordinates<?> before() {
-            return create(Space.Location.ASSIGN_PREFIX);
+            return create(Space.Location.ASSIGNMENT_PREFIX);
         }
     }
 
-    public static class AssignOp extends Coordinates<J.AssignOp> {
-        AssignOp(J.AssignOp tree) {
+    public static class AssignmentOperation extends Coordinates<J.AssignmentOperation> {
+        AssignmentOperation(J.AssignmentOperation tree) {
             super(tree);
         }
 
         @Override
         public JavaCoordinates<?> before() {
-            return create(Space.Location.ASSIGN_OP_PREFIX);
+            return create(Space.Location.ASSIGNMENT_OPERATION_PREFIX);
         }
     }
 
@@ -172,14 +172,14 @@ public abstract class Coordinates<J2 extends J> {
         }
     }
 
-    public static class ClassDecl extends Coordinates<J.ClassDecl> {
-        ClassDecl(J.ClassDecl tree) {
+    public static class ClassDeclaration extends Coordinates<J.ClassDeclaration> {
+        ClassDeclaration(J.ClassDeclaration tree) {
             super(tree);
         }
 
         @Override
         public JavaCoordinates<?> before() {
-            return create(Space.Location.CLASS_DECL_PREFIX);
+            return create(Space.Location.CLASS_DECLARATION_PREFIX);
         }
 
         /**
@@ -348,8 +348,8 @@ public abstract class Coordinates<J2 extends J> {
         }
     }
 
-    public static class Ident extends Coordinates<J.Ident> {
-        Ident(J.Ident tree) {
+    public static class Identifier extends Coordinates<J.Identifier> {
+        Identifier(J.Identifier tree) {
             super(tree);
         }
 
@@ -459,14 +459,14 @@ public abstract class Coordinates<J2 extends J> {
         }
     }
 
-    public static class MethodDecl extends Coordinates<J.MethodDecl> {
-        MethodDecl(J.MethodDecl tree) {
+    public static class MethodDeclaration extends Coordinates<J.MethodDeclaration> {
+        MethodDeclaration(J.MethodDeclaration tree) {
             super(tree);
         }
 
         @Override
         public JavaCoordinates<?> before() {
-            return create(Space.Location.METHOD_DECL_PREFIX);
+            return create(Space.Location.METHOD_DECLARATION_PREFIX);
         }
 
         /**
@@ -490,7 +490,7 @@ public abstract class Coordinates<J2 extends J> {
         }
 
         public JavaCoordinates<?> replaceParameters() {
-            return create(Space.Location.METHOD_DECL_PARAMETERS);
+            return create(Space.Location.METHOD_DECLARATION_PARAMETERS);
         }
 
         public JavaCoordinates<?> replaceThrows() {
@@ -731,14 +731,14 @@ public abstract class Coordinates<J2 extends J> {
         }
     }
 
-    public static class VariableDecls extends Coordinates<J.VariableDecls> {
-        VariableDecls(J.VariableDecls tree) {
+    public static class VariableDeclaration extends Coordinates<J.VariableDeclarations> {
+        VariableDeclaration(J.VariableDeclarations tree) {
             super(tree);
         }
 
         @Override
         public JavaCoordinates<?> before() {
-            return create(Space.Location.MULTI_VARIABLE_PREFIX);
+            return create(Space.Location.VARIABLE_DECLARATIONS_PREFIX);
         }
 
         /**
@@ -757,8 +757,8 @@ public abstract class Coordinates<J2 extends J> {
             return create(Space.Location.ANNOTATION_PREFIX);
         }
 
-        public static class NamedVar extends Coordinates<J.VariableDecls.NamedVar> {
-            NamedVar(J.VariableDecls.NamedVar tree) {
+        public static class NamedVar extends Coordinates<J.VariableDeclarations.NamedVariable> {
+            NamedVar(J.VariableDeclarations.NamedVariable tree) {
                 super(tree);
             }
 

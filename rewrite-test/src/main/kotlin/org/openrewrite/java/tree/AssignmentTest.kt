@@ -18,15 +18,15 @@ package org.openrewrite.java.tree
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTreeTest
-import org.openrewrite.java.JavaTreeTest.NestingLevel.Class
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
 
-interface IdentTest : JavaTreeTest {
+interface AssignmentTest : JavaTreeTest {
 
     @Test
-    fun referToField(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, Class, """
-                Integer n = 0;
-                Integer m = n;
+    fun assignment(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, Block, """
+            String s;
+            s = "foo";
         """
     )
 }

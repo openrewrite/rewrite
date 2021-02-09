@@ -80,35 +80,35 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
 
     @Override
     @SuppressWarnings("unchecked")
-    public J visitClassDecl(J.ClassDecl classDeclaration, List<? extends J> generated) {
-        J.ClassDecl c = visitAndCast(classDeclaration, generated, super::visitClassDecl);
+    public J visitClassDeclaration(J.ClassDeclaration classDeclaration, List<? extends J> generated) {
+        J.ClassDeclaration c = visitAndCast(classDeclaration, generated, super::visitClassDeclaration);
         if (insertId.equals(c.getId())) {
             AutoFormatVisitor<Integer> autoFormat = new AutoFormatVisitor<>();
             switch (location) {
                 case ANNOTATION_PREFIX: {
-                    J.ClassDecl temp = c.withAnnotations((List<J.Annotation>) generated);
-                    temp = (J.ClassDecl) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
+                    J.ClassDeclaration temp = c.withAnnotations((List<J.Annotation>) generated);
+                    temp = (J.ClassDeclaration) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
                     assert temp != null;
                     c = temp.withBody(c.getBody());
                     break;
                 }
                 case TYPE_PARAMETERS: {
-                    J.ClassDecl temp = c.withTypeParameters((List<J.TypeParameter>) generated);
-                    temp = (J.ClassDecl) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
+                    J.ClassDeclaration temp = c.withTypeParameters((List<J.TypeParameter>) generated);
+                    temp = (J.ClassDeclaration) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
                     assert temp != null;
                     c = c.getPadding().withTypeParameters(temp.getPadding().getTypeParameters());
                     break;
                 }
                 case EXTENDS: {
-                    J.ClassDecl temp = c.withExtends((TypeTree) generated.get(0));
-                    temp = (J.ClassDecl) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
+                    J.ClassDeclaration temp = c.withExtends((TypeTree) generated.get(0));
+                    temp = (J.ClassDeclaration) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
                     assert temp != null;
                     c = c.getPadding().withExtends(temp.getPadding().getExtends());
                     break;
                 }
                 case IMPLEMENTS: {
-                    J.ClassDecl temp = c.withImplements((List<TypeTree>) generated);
-                    temp = (J.ClassDecl) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
+                    J.ClassDeclaration temp = c.withImplements((List<TypeTree>) generated);
+                    temp = (J.ClassDeclaration) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
                     assert temp != null;
                     c = c.getPadding().withImplements(temp.getPadding().getImplements());
                     break;
@@ -127,35 +127,35 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
 
     @Override
     @SuppressWarnings("unchecked")
-    public J visitMethod(J.MethodDecl method, List<? extends J> generated) {
-        J.MethodDecl m = visitAndCast(method, generated, super::visitMethod);
+    public J visitMethodDeclaration(J.MethodDeclaration method, List<? extends J> generated) {
+        J.MethodDeclaration m = visitAndCast(method, generated, super::visitMethodDeclaration);
         AutoFormatVisitor<Integer> autoFormat = new AutoFormatVisitor<>();
         if (insertId.equals(m.getId())) {
             switch (location) {
                 case ANNOTATION_PREFIX: {
-                    J.MethodDecl temp = m.withAnnotations((List<J.Annotation>) generated);
-                    temp = (J.MethodDecl) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
+                    J.MethodDeclaration temp = m.withAnnotations((List<J.Annotation>) generated);
+                    temp = (J.MethodDeclaration) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
                     assert temp != null;
                     m = temp.withBody(m.getBody());
                     break;
                 }
                 case TYPE_PARAMETERS: {
-                    J.MethodDecl temp = m.withTypeParameters((List<J.TypeParameter>) generated);
-                    temp = (J.MethodDecl) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
+                    J.MethodDeclaration temp = m.withTypeParameters((List<J.TypeParameter>) generated);
+                    temp = (J.MethodDeclaration) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
                     assert temp != null;
                     m = m.getPadding().withTypeParameters(temp.getPadding().getTypeParameters());
                     break;
                 }
-                case METHOD_DECL_PARAMETERS: {
-                    J.MethodDecl temp = m.withParams((List<Statement>) generated);
-                    temp = (J.MethodDecl) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
+                case METHOD_DECLARATION_PARAMETERS: {
+                    J.MethodDeclaration temp = m.withParameters((List<Statement>) generated);
+                    temp = (J.MethodDeclaration) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
                     assert temp != null;
-                    m = m.getPadding().withParams(temp.getPadding().getParams());
+                    m = m.getPadding().withParameters(temp.getPadding().getParameters());
                     break;
                 }
                 case THROWS: {
-                    J.MethodDecl temp = m.withThrows((List<NameTree>) generated);
-                    temp = (J.MethodDecl) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
+                    J.MethodDeclaration temp = m.withThrows((List<NameTree>) generated);
+                    temp = (J.MethodDeclaration) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
                     assert temp != null;
                     m = m.getPadding().withThrows(temp.getPadding().getThrows());
                     break;
@@ -174,13 +174,13 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
 
     @SuppressWarnings("unchecked")
     @Override
-    public J visitMultiVariable(J.VariableDecls multiVariable, List<? extends J> generated) {
-        J.VariableDecls m = (J.VariableDecls) super.visitMultiVariable(multiVariable, generated);
+    public J visitVariableDeclarations(J.VariableDeclarations multiVariable, List<? extends J> generated) {
+        J.VariableDeclarations m = (J.VariableDeclarations) super.visitVariableDeclarations(multiVariable, generated);
         AutoFormatVisitor<Integer> autoFormat = new AutoFormatVisitor<>();
         if (insertId.equals(m.getId())) {
             if (location == Space.Location.ANNOTATION_PREFIX) {
                 m = m.withAnnotations((List<J.Annotation>) generated);
-                m = (J.VariableDecls) autoFormat.visit(m, 0, getCursor());
+                m = (J.VariableDeclarations) autoFormat.visit(m, 0, getCursor());
                 assert m != null;
             }
         } else {
@@ -194,10 +194,10 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
     public J visitMethodInvocation(J.MethodInvocation method, List<? extends J> generated) {
         J.MethodInvocation m = visitAndCast(method, generated, super::visitMethodInvocation);
         if (insertId.equals(m.getId()) && location == Space.Location.METHOD_INVOCATION_ARGUMENTS) {
-            m = m.withArgs((List<Expression>) generated);
+            m = m.withArguments((List<Expression>) generated);
         } else {
             //noinspection ConstantConditions
-            m = m.withArgs(maybeMergeList(m.getArgs(), generated));
+            m = m.withArguments(maybeMergeList(m.getArguments(), generated));
         }
 
         return m;

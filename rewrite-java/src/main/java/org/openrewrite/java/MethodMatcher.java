@@ -84,19 +84,19 @@ public class MethodMatcher {
         }.visit(parser.methodPattern());
     }
 
-    public boolean matches(J.MethodDecl method, J.ClassDecl enclosing) {
+    public boolean matches(J.MethodDeclaration method, J.ClassDeclaration enclosing) {
         if (enclosing.getType() == null) {
             return false;
         }
 
-        String signaturePattern = method.getParams().stream()
+        String signaturePattern = method.getParameters().stream()
                 .map(v -> {
-                    if (v instanceof J.VariableDecls) {
-                        J.VariableDecls vd = (J.VariableDecls) v;
+                    if (v instanceof J.VariableDeclarations) {
+                        J.VariableDeclarations vd = (J.VariableDeclarations) v;
                         if (vd.getTypeAsClass() != null) {
                             return vd.getTypeAsClass();
                         } else {
-                            return vd.getTypeExpr() != null ? vd.getTypeExpr().getType() : null;
+                            return vd.getTypeExpression() != null ? vd.getTypeExpression().getType() : null;
                         }
                     } else {
                         return null;
@@ -136,8 +136,8 @@ public class MethodMatcher {
         if (constructor.getType() == null) {
             return false;
         }
-        String signaturePattern = Optional.ofNullable(constructor.getArgs())
-                .map(args -> args.getElems().stream()
+        String signaturePattern = Optional.ofNullable(constructor.getArguments())
+                .map(args -> args.getElements().stream()
                         .map(Expression::getType)
                         .filter(Objects::nonNull)
                         .map(this::typePattern)
