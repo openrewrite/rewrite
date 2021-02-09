@@ -31,14 +31,6 @@ interface GenerateGetterTest : RecipeTest {
                     String field;
                 }
             """,
-
-            /*
-            Note: if a human added the getter, there would be an indent on the blank line after field,
-            from when the author hit enter after "String field;" but IntelliJ reformat does not
-            add that indent into the blank line if it's missing, and if IntelliJ adds the blank line it lacks the indent
-            so I think it's not a formatting behavior, it's an auto-indent while typing behavior.
-            */
-
             after = """
                 class A {
                     String field;
@@ -55,12 +47,12 @@ interface GenerateGetterTest : RecipeTest {
     fun checkValidation() {
         var recipe = GenerateGetter(null)
         var valid = recipe.validate()
-        assertThat(valid.isValid).isFalse()
+        assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("fieldName")
 
         recipe = GenerateGetter("foo")
         valid = recipe.validate()
-        assertThat(valid.isValid).isTrue()
+        assertThat(valid.isValid).isTrue
     }
 }
