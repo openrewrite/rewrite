@@ -42,7 +42,7 @@ import java.util.stream.Collectors;
 @Data
 public class JRightPadded<T> implements Markable {
     @With
-    T elem;
+    T element;
 
     @With
     Space after;
@@ -51,7 +51,7 @@ public class JRightPadded<T> implements Markable {
     Markers markers;
 
     public JRightPadded<T> map(UnaryOperator<T> map) {
-        return withElem(map.apply(elem));
+        return withElement(map.apply(element));
     }
 
     public enum Location {
@@ -74,14 +74,14 @@ public class JRightPadded<T> implements Markable {
         IMPORT(Space.Location.IMPORT_SUFFIX),
         INSTANCEOF(Space.Location.INSTANCEOF_SUFFIX),
         LABEL(Space.Location.LABEL_SUFFIX),
-        LAMBDA_PARAM(Space.Location.LAMBDA_PARAM),
-        METHOD_DECL_PARAMETER(Space.Location.METHOD_DECL_PARAMETER_SUFFIX),
+        LAMBDA_PARAM(Space.Location.LAMBDA_PARAMETER),
+        METHOD_DECLARATION_PARAMETER(Space.Location.METHOD_DECLARATION_PARAMETER_SUFFIX),
         METHOD_INVOCATION_ARGUMENT(Space.Location.METHOD_INVOCATION_ARGUMENT_SUFFIX),
         METHOD_SELECT(Space.Location.METHOD_SELECT_SUFFIX),
         NAMED_VARIABLE(Space.Location.NAMED_VARIABLE_SUFFIX),
         NEW_ARRAY_INITIALIZER(Space.Location.NEW_ARRAY_INITIALIZER_SUFFIX),
-        NEW_CLASS_ARGS(Space.Location.NEW_CLASS_ARGS_SUFFIX),
-        NEW_CLASS_ENCL(Space.Location.NEW_CLASS_ENCL_SUFFIX),
+        NEW_CLASS_ARGUMENTS(Space.Location.NEW_CLASS_ARGUMENTS_SUFFIX),
+        NEW_CLASS_ENCLOSING(Space.Location.NEW_CLASS_ENCLOSING_SUFFIX),
         PACKAGE(Space.Location.PACKAGE_SUFFIX),
         PARENTHESES(Space.Location.PARENTHESES_SUFFIX),
         STATIC_INIT(Space.Location.STATIC_INIT_SUFFIX),
@@ -102,38 +102,38 @@ public class JRightPadded<T> implements Markable {
         }
     }
 
-    public static <T> List<T> getElems(List<JRightPadded<T>> ls) {
+    public static <T> List<T> getElements(List<JRightPadded<T>> ls) {
         List<T> list = new ArrayList<>();
         for (JRightPadded<T> l : ls) {
-            T elem = l.getElem();
+            T elem = l.getElement();
             list.add(elem);
         }
         return list;
     }
 
     @Nullable
-    public static <T> JRightPadded<T> withElem(@Nullable JRightPadded<T> before, @Nullable T elems) {
+    public static <T> JRightPadded<T> withElement(@Nullable JRightPadded<T> before, @Nullable T elements) {
         if (before == null) {
-            if (elems == null) {
+            if (elements == null) {
                 return null;
             }
-            return new JRightPadded<>(elems, Space.EMPTY, Markers.EMPTY);
+            return new JRightPadded<>(elements, Space.EMPTY, Markers.EMPTY);
         }
-        if (elems == null) {
+        if (elements == null) {
             return null;
         }
-        return before.withElem(elems);
+        return before.withElement(elements);
     }
 
-    public static <J2 extends J> List<JRightPadded<J2>> withElems(List<JRightPadded<J2>> before, List<J2> elems) {
+    public static <J2 extends J> List<JRightPadded<J2>> withElements(List<JRightPadded<J2>> before, List<J2> elements) {
         List<JRightPadded<J2>> after = new ArrayList<>();
         Map<UUID, JRightPadded<J2>> beforeById = before.stream().collect(Collectors
-                .toMap(j -> j.getElem().getId(), Function.identity()));
+                .toMap(j -> j.getElement().getId(), Function.identity()));
 
-        for (J2 t : elems) {
+        for (J2 t : elements) {
             JRightPadded<J2> found = beforeById.get(t.getId());
             if (found != null) {
-                after.add(found.withElem(t));
+                after.add(found.withElement(t));
             } else {
                 after.add(new JRightPadded<>(t, Space.EMPTY, Markers.EMPTY));
             }
@@ -142,12 +142,12 @@ public class JRightPadded<T> implements Markable {
         return after;
     }
 
-    public static <T> JRightPadded<T> build(T elem) {
-        return new JRightPadded<>(elem, Space.EMPTY, Markers.EMPTY);
+    public static <T> JRightPadded<T> build(T element) {
+        return new JRightPadded<>(element, Space.EMPTY, Markers.EMPTY);
     }
 
     @Override
     public String toString() {
-        return "JRightPadded(elem=" + elem.getClass().getSimpleName() + ", after=" + after + ')';
+        return "JRightPadded(element=" + element.getClass().getSimpleName() + ", after=" + after + ')';
     }
 }

@@ -37,7 +37,7 @@ class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
         J.CompilationUnit j = super.visitCompilationUnit(cu, p);
-        if (j.getPackageDecl() != null) {
+        if (j.getPackageDeclaration() != null) {
             if (!j.getPrefix().getComments().isEmpty()) {
                 j = j.withComments(ListUtils.mapLast(j.getComments(), c -> {
                     String suffix = keepMaximumLines(c.getSuffix(), style.getKeepMaximum().getBetweenHeaderAndPackage());
@@ -53,7 +53,7 @@ class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
             }
         }
 
-        if (j.getPackageDecl() == null) {
+        if (j.getPackageDeclaration() == null) {
             if (j.getComments().isEmpty()) {
                 /*
                 if package decl and comments are null/empty, leading whitespace is on the
@@ -83,13 +83,13 @@ class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, P p) {
-        J.ClassDecl j = super.visitClassDecl(classDecl, p);
+    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
+        J.ClassDeclaration j = super.visitClassDeclaration(classDecl, p);
         List<JRightPadded<Statement>> statements = j.getBody().getPadding().getStatements();
         j = j.withBody(j.getBody().getPadding().withStatements(ListUtils.map(statements, (i, s) -> {
             if (i == 0) {
                 s = minimumLines(s, style.getMinimum().getAfterClassHeader());
-            } else if (statements.get(i - 1).getElem() instanceof J.Block) {
+            } else if (statements.get(i - 1).getElement() instanceof J.Block) {
                 s = minimumLines(s, style.getMinimum().getAroundInitializer());
             }
 
@@ -103,8 +103,8 @@ class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.MethodDecl visitMethod(J.MethodDecl method, P p) {
-        J.MethodDecl j = super.visitMethod(method, p);
+    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
+        J.MethodDeclaration j = super.visitMethodDeclaration(method, p);
         if (j.getBody() != null) {
             if (j.getBody().getStatements().isEmpty()) {
                 Space end = minimumLines(j.getBody().getEnd(),
@@ -139,22 +139,22 @@ class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
         Object parentTree = cursorPath.next();
         if (cursorPath.hasNext()) {
             Object grandparentTree = cursorPath.next();
-            if (grandparentTree instanceof J.ClassDecl && parentTree instanceof J.Block) {
+            if (grandparentTree instanceof J.ClassDeclaration && parentTree instanceof J.Block) {
                 J.Block block = (J.Block) parentTree;
-                J.ClassDecl classDecl = (J.ClassDecl) grandparentTree;
+                J.ClassDeclaration classDecl = (J.ClassDeclaration) grandparentTree;
 
                 j = keepMaximumLines(j, style.getKeepMaximum().getInDeclarations());
 
                 // don't adjust the first statement in a block
                 if (block.getStatements().iterator().next() != j) {
-                    if (j instanceof J.VariableDecls) {
-                        if (classDecl.getKind() == J.ClassDecl.Kind.Interface) {
+                    if (j instanceof J.VariableDeclarations) {
+                        if (classDecl.getKind() == J.ClassDeclaration.Kind.Interface) {
                             j = minimumLines(j, style.getMinimum().getAroundFieldInInterface());
                         } else {
                             j = minimumLines(j, style.getMinimum().getAroundField());
                         }
-                    } else if (j instanceof J.MethodDecl) {
-                        if (classDecl.getKind() == J.ClassDecl.Kind.Interface) {
+                    } else if (j instanceof J.MethodDeclaration) {
+                        if (classDecl.getKind() == J.ClassDeclaration.Kind.Interface) {
                             j = minimumLines(j, style.getMinimum().getAroundMethodInInterface());
                         } else {
                             j = minimumLines(j, style.getMinimum().getAroundMethod());
@@ -199,7 +199,7 @@ class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private <J2 extends J> JRightPadded<J2> minimumLines(JRightPadded<J2> tree, int min) {
-        return tree.withElem(minimumLines(tree.getElem(), min));
+        return tree.withElement(minimumLines(tree.getElement(), min));
     }
 
     private <J2 extends J> J2 minimumLines(J2 tree, int min) {

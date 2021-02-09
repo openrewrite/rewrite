@@ -143,11 +143,11 @@ public class ImportLayoutStyle implements JavaStyle {
                 }
             } else {
                 for (JRightPadded<J.Import> orderedImport : block.orderedImports()) {
-                    Space prefix = importIndex == 0 ? originalImports.get(0).getElem().getPrefix() :
-                            orderedImport.getElem().getPrefix().withWhitespace(extraLineSpace + "\n");
+                    Space prefix = importIndex == 0 ? originalImports.get(0).getElement().getPrefix() :
+                            orderedImport.getElement().getPrefix().withWhitespace(extraLineSpace + "\n");
 
-                    if (!orderedImport.getElem().getPrefix().equals(prefix)) {
-                        orderedImports.add(orderedImport.withElem(orderedImport.getElem()
+                    if (!orderedImport.getElement().getPrefix().equals(prefix)) {
+                        orderedImports.add(orderedImport.withElement(orderedImport.getElement()
                                 .withPrefix(prefix)));
                     } else {
                         orderedImports.add(orderedImport);
@@ -275,8 +275,8 @@ public class ImportLayoutStyle implements JavaStyle {
 
             // VisibleForTesting
             final static Comparator<JRightPadded<J.Import>> IMPORT_SORTING = (i1, i2) -> {
-                String[] import1 = i1.getElem().getQualid().printTrimmed().split("\\.");
-                String[] import2 = i2.getElem().getQualid().printTrimmed().split("\\.");
+                String[] import1 = i1.getElement().getQualid().printTrimmed().split("\\.");
+                String[] import2 = i2.getElement().getQualid().printTrimmed().split("\\.");
 
                 for (int i = 0; i < Math.min(import1.length, import2.length); i++) {
                     int diff = import1[i].compareTo(import2[i]);
@@ -319,8 +319,8 @@ public class ImportLayoutStyle implements JavaStyle {
 
             @Override
             public boolean accept(JRightPadded<J.Import> anImport) {
-                if (anImport.getElem().isStatic() == statik &&
-                        packageWildcard.matcher(anImport.getElem().getQualid().printTrimmed()).matches()) {
+                if (anImport.getElement().isStatic() == statik &&
+                        packageWildcard.matcher(anImport.getElement().getQualid().printTrimmed()).matches()) {
                     imports.add(anImport);
                     return true;
                 }
@@ -334,10 +334,10 @@ public class ImportLayoutStyle implements JavaStyle {
                         .sorted(IMPORT_SORTING)
                         .collect(groupingBy(
                                 anImport -> {
-                                    if (anImport.getElem().isStatic()) {
-                                        return anImport.getElem().getTypeName();
+                                    if (anImport.getElement().isStatic()) {
+                                        return anImport.getElement().getTypeName();
                                     } else {
-                                        return anImport.getElem().getPackageName();
+                                        return anImport.getElement().getPackageName();
                                     }
                                 },
                                 LinkedHashMap::new, // Use an ordered map to preserve sorting
@@ -347,18 +347,18 @@ public class ImportLayoutStyle implements JavaStyle {
                 return groupedImports.values().stream()
                         .flatMap(importGroup -> {
                             JRightPadded<J.Import> toStar = importGroup.get(0);
-                            boolean statik1 = toStar.getElem().isStatic();
+                            boolean statik1 = toStar.getElement().isStatic();
                             int threshold = statik1 ? nameCountToUseStarImport : classCountToUseStarImport;
                             boolean starImportExists = importGroup.stream()
-                                    .anyMatch(it -> it.getElem().getQualid().getSimpleName().equals("*"));
+                                    .anyMatch(it -> it.getElement().getQualid().getSimpleName().equals("*"));
                             if (importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1)) {
-                                J.FieldAccess qualid = toStar.getElem().getQualid();
-                                J.Ident name = qualid.getName();
-                                return Stream.of(toStar.withElem(toStar.getElem().withQualid(qualid.withName(
+                                J.FieldAccess qualid = toStar.getElement().getQualid();
+                                J.Identifier name = qualid.getName();
+                                return Stream.of(toStar.withElement(toStar.getElement().withQualid(qualid.withName(
                                         name.withName("*")))));
                             } else {
                                 return importGroup.stream()
-                                        .filter(distinctBy(t -> t.getElem().printTrimmed()));
+                                        .filter(distinctBy(t -> t.getElement().printTrimmed()));
                             }
                         }).collect(toList());
             }
@@ -387,7 +387,7 @@ public class ImportLayoutStyle implements JavaStyle {
                 if (packageImports.stream().noneMatch(pi -> pi.accept(anImport))) {
                     super.accept(anImport);
                 }
-                return anImport.getElem().isStatic() == statik;
+                return anImport.getElement().isStatic() == statik;
             }
         }
     }

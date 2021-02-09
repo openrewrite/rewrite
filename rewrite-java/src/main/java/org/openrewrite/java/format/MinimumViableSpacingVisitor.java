@@ -26,8 +26,8 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, P p) {
-        J.ClassDecl c = super.visitClassDecl(classDecl, p);
+    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
+        J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
 
         boolean first = true;
         if (!c.getAnnotations().isEmpty()) {
@@ -41,9 +41,9 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
             first = false;
         }
 
-        J.ClassDecl.Padding padding = c.getPadding();
+        J.ClassDeclaration.Padding padding = c.getPadding();
         JContainer<J.TypeParameter> typeParameters = padding.getTypeParameters();
-        if (typeParameters != null && !typeParameters.getElems().isEmpty()) {
+        if (typeParameters != null && !typeParameters.getElements().isEmpty()) {
             if (!first && !typeParameters.getBefore().getWhitespace().isEmpty()) {
                 c = padding.withTypeParameters(typeParameters.withBefore(typeParameters.getBefore().withWhitespace(" ")));
             }
@@ -72,7 +72,7 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     public J.Block visitBlock(J.Block block, P p) {
         J.Block b = super.visitBlock(block, p);
         @SuppressWarnings("ConstantConditions") Object parent = getCursor().getParent().getValue();
-        if (!b.isStatic() && (parent instanceof J.MethodDecl || parent instanceof J.ClassDecl) &&
+        if (!b.isStatic() && (parent instanceof J.MethodDeclaration || parent instanceof J.ClassDeclaration) &&
                 b.getPrefix().getWhitespace().isEmpty()) {
             b = b.withPrefix(b.getPrefix().withWhitespace(" "));
         }
@@ -80,8 +80,8 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.MethodDecl visitMethod(J.MethodDecl method, P p) {
-        J.MethodDecl m = super.visitMethod(method, p);
+    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
+        J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
 
         boolean first = true;
         if (!m.getAnnotations().isEmpty()) {
@@ -94,18 +94,18 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
             }
             first = false;
         }
-        J.MethodDecl.Padding padding = m.getPadding();
+        J.MethodDeclaration.Padding padding = m.getPadding();
         JContainer<J.TypeParameter> typeParameters = padding.getTypeParameters();
-        if (typeParameters != null && !typeParameters.getElems().isEmpty()) {
+        if (typeParameters != null && !typeParameters.getElements().isEmpty()) {
             if (!first && typeParameters.getBefore().getWhitespace().isEmpty()) {
                 m = padding.withTypeParameters(typeParameters.withBefore(typeParameters.getBefore().withWhitespace(" ")));
             }
             first = false;
         }
-        if (m.getReturnTypeExpr() != null && m.getReturnTypeExpr().getPrefix().getWhitespace().isEmpty()) {
+        if (m.getReturnTypeExpression() != null && m.getReturnTypeExpression().getPrefix().getWhitespace().isEmpty()) {
             if (!first) {
-                m = m.withReturnTypeExpr(m.getReturnTypeExpr()
-                        .withPrefix(m.getReturnTypeExpr().getPrefix().withWhitespace(" ")));
+                m = m.withReturnTypeExpression(m.getReturnTypeExpression()
+                        .withPrefix(m.getReturnTypeExpression().getPrefix().withWhitespace(" ")));
             }
             first = false;
         }
@@ -126,8 +126,8 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.Return visitReturn(J.Return retrn, P p) {
         J.Return r = super.visitReturn(retrn, p);
-        if (r.getExpr() != null && r.getExpr().getPrefix().getWhitespace().isEmpty()) {
-            r = r.withExpr(r.getExpr().withPrefix(r.getExpr().getPrefix().withWhitespace(" ")));
+        if (r.getExpression() != null && r.getExpression().getPrefix().getWhitespace().isEmpty()) {
+            r = r.withExpression(r.getExpression().withPrefix(r.getExpression().getPrefix().withWhitespace(" ")));
         }
         return r;
     }

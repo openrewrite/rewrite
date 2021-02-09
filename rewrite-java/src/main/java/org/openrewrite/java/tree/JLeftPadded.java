@@ -44,7 +44,7 @@ import java.util.function.UnaryOperator;
 /**
  * A Java element that could have space preceding some delimiter.
  * For example an array dimension could have space before the opening
- * bracket, and the containing {@link #elem} could have a prefix that occurs
+ * bracket, and the containing {@link #element} could have a prefix that occurs
  * after the bracket.
  *
  * @param <T>
@@ -57,24 +57,24 @@ public class JLeftPadded<T> implements Markable {
     Space before;
 
     @With
-    T elem;
+    T element;
 
     @With
     Markers markers;
 
     public JLeftPadded<T> map(UnaryOperator<T> map) {
-        return withElem(map.apply(elem));
+        return withElement(map.apply(element));
     }
 
     public enum Location {
         ASSIGNMENT(Space.Location.ASSIGNMENT),
-        ASSIGN_OP_OPERATOR(Space.Location.ASSIGN_OP_OPERATOR),
+        ASSIGNMENT_OPERATION_OPERATOR(Space.Location.ASSIGNMENT_OPERATION_OPERATOR),
         BINARY_OPERATOR(Space.Location.BINARY_OPERATOR),
         CLASS_KIND(Space.Location.CLASS_KIND),
         EXTENDS(Space.Location.EXTENDS),
         FIELD_ACCESS_NAME(Space.Location.FIELD_ACCESS_NAME),
         MEMBER_REFERENCE_NAME(Space.Location.MEMBER_REFERENCE_NAME),
-        METHOD_DECL_DEFAULT_VALUE(Space.Location.METHOD_DECL_DEFAULT_VALUE),
+        METHOD_DECLARATION_DEFAULT_VALUE(Space.Location.METHOD_DECLARATION_DEFAULT_VALUE),
         STATIC_IMPORT(Space.Location.STATIC_IMPORT),
         TERNARY_TRUE(Space.Location.TERNARY_TRUE),
         TERNARY_FALSE(Space.Location.TERNARY_FALSE),
@@ -95,25 +95,25 @@ public class JLeftPadded<T> implements Markable {
     }
 
     @Nullable
-    public static <T> JLeftPadded<T> withElem(@Nullable JLeftPadded<T> before, @Nullable T elems) {
+    public static <T> JLeftPadded<T> withElement(@Nullable JLeftPadded<T> before, @Nullable T elements) {
         if (before == null) {
-            if (elems == null) {
+            if (elements == null) {
                 return null;
             }
-            return new JLeftPadded<>(Space.EMPTY, elems, Markers.EMPTY);
+            return new JLeftPadded<>(Space.EMPTY, elements, Markers.EMPTY);
         }
-        if (elems == null) {
+        if (elements == null) {
             return null;
         }
-        return before.withElem(elems);
+        return before.withElement(elements);
     }
 
     @Override
     public String toString() {
-        return "JLeftPadded(before=" + before + ", elem=" + elem.getClass().getSimpleName() + ')';
+        return "JLeftPadded(before=" + before + ", element=" + element.getClass().getSimpleName() + ')';
     }
 
-    public static <T> JLeftPadded<T> build(T elem) {
-        return new JLeftPadded<>(Space.EMPTY, elem, Markers.EMPTY);
+    public static <T> JLeftPadded<T> build(T element) {
+        return new JLeftPadded<>(Space.EMPTY, element, Markers.EMPTY);
     }
 }

@@ -106,15 +106,15 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
         J.Unary asUnary = (J.Unary) j;
 
         if (asUnary.getOperator() == J.Unary.Type.Not) {
-            if (isLiteralTrue(asUnary.getExpr())) {
+            if (isLiteralTrue(asUnary.getExpression())) {
                 maybeUnwrapParentheses();
-                j = ((J.Literal) asUnary.getExpr()).withValue(false).withValueSource("false");
-            } else if (isLiteralFalse(asUnary.getExpr())) {
+                j = ((J.Literal) asUnary.getExpression()).withValue(false).withValueSource("false");
+            } else if (isLiteralFalse(asUnary.getExpression())) {
                 maybeUnwrapParentheses();
-                j = ((J.Literal) asUnary.getExpr()).withValue(true).withValueSource("true");
-            } else if (asUnary.getExpr() instanceof J.Unary && ((J.Unary) asUnary.getExpr()).getOperator() == J.Unary.Type.Not) {
+                j = ((J.Literal) asUnary.getExpression()).withValue(true).withValueSource("true");
+            } else if (asUnary.getExpression() instanceof J.Unary && ((J.Unary) asUnary.getExpression()).getOperator() == J.Unary.Type.Not) {
                 maybeUnwrapParentheses();
-                j = ((J.Unary) asUnary.getExpr()).getExpr();
+                j = ((J.Unary) asUnary.getExpression()).getExpression();
             }
         }
 

@@ -71,7 +71,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 tree instanceof J.Label ||
                 tree instanceof J.DoWhileLoop ||
                 tree instanceof J.ArrayDimension ||
-                tree instanceof J.ClassDecl) {
+                tree instanceof J.ClassDeclaration) {
             getCursor().putMessage("indentType", IndentType.ALIGN);
         } else if (tree instanceof J.Block ||
                 tree instanceof J.If ||
@@ -151,19 +151,19 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     public <T> JRightPadded<T> visitRightPadded(JRightPadded<T> right, JRightPadded.Location loc, P p) {
         setCursor(new Cursor(getCursor(), right));
 
-        T t = right.getElem();
+        T t = right.getElement();
         Space after;
 
         int indent = Optional.ofNullable(getCursor().<Integer>peekNearestMessage("lastIndent")).orElse(0);
-        if (right.getElem() instanceof J) {
-            J elem = (J) right.getElem();
+        if (right.getElement() instanceof J) {
+            J elem = (J) right.getElement();
             if ((right.getAfter().getLastWhitespace().contains("\n") ||
                     elem.getPrefix().getLastWhitespace().contains("\n"))) {
                 switch (loc) {
                     case FOR_CONDITION:
                     case FOR_UPDATE: {
                         J.ForLoop.Control control = getCursor().getParentOrThrow().getValue();
-                        Space initPrefix = control.getPadding().getInit().getElem().getPrefix();
+                        Space initPrefix = control.getPadding().getInit().getElement().getPrefix();
                         if (!initPrefix.getLastWhitespace().contains("\n")) {
                             int initIndent = forInitColumn();
                             getCursor().getParentOrThrow().putMessage("lastIndent", initIndent - style.getContinuationIndent());
@@ -176,9 +176,9 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         }
                         break;
                     }
-                    case METHOD_DECL_PARAMETER: {
+                    case METHOD_DECLARATION_PARAMETER: {
                         JContainer<Expression> container = getCursor().getParentOrThrow().getValue();
-                        Expression firstArg = container.getElems().iterator().next();
+                        Expression firstArg = container.getElements().iterator().next();
                         if (firstArg.getPrefix().getLastWhitespace().contains("\n")) {
                             // if the first argument is on its own line, align all arguments to be continuation indented
                             elem = visitAndCast(elem, p);
@@ -197,7 +197,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         elem = visitAndCast(elem, p);
                         after = indentTo(right.getAfter(), indent);
                         break;
-                    case NEW_CLASS_ARGS:
+                    case NEW_CLASS_ARGUMENTS:
                     case ARRAY_INDEX:
                     case PARENTHESES:
                     case TYPE_PARAMETER: {
@@ -230,7 +230,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         elem = visitAndCast(elem, p);
 
                         // the end parentheses on an annotation is aligned to the annotation
-                        if (args.getPadding().getElems().get(args.getElems().size() - 1) == right) {
+                        if (args.getPadding().getElements().get(args.getElements().size() - 1) == right) {
                             getCursor().getParentOrThrow().putMessage("indentType", IndentType.ALIGN);
                         }
 
@@ -242,19 +242,19 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 }
             } else {
                 switch (loc) {
-                    case NEW_CLASS_ARGS:
+                    case NEW_CLASS_ARGUMENTS:
                     case METHOD_INVOCATION_ARGUMENT:
                         if (!elem.getPrefix().getLastWhitespace().contains("\n")) {
                             JContainer<J> args = getCursor().getParentOrThrow().getValue();
                             boolean seenArg = false;
                             boolean anyOtherArgOnOwnLine = false;
-                            for (JRightPadded<J> arg : args.getPadding().getElems()) {
+                            for (JRightPadded<J> arg : args.getPadding().getElements()) {
                                 if (arg == getCursor().getValue()) {
                                     seenArg = true;
                                     continue;
                                 }
                                 if (seenArg) {
-                                    if (arg.getElem().getPrefix().getLastWhitespace().contains("\n")) {
+                                    if (arg.getElement().getPrefix().getLastWhitespace().contains("\n")) {
                                         anyOtherArgOnOwnLine = true;
                                         break;
                                     }
@@ -274,7 +274,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                             } else {
                                 J.MethodInvocation methodInvocation = (J.MethodInvocation) elem;
                                 Expression select = methodInvocation.getSelect();
-                                if (select != null && (select instanceof J.FieldAccess || select instanceof J.Ident)) {
+                                if (select != null && (select instanceof J.FieldAccess || select instanceof J.Identifier)) {
                                     getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
                                 }
                             }
@@ -295,7 +295,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         setCursor(getCursor().getParent());
-        return (after == right.getAfter() && t == right.getElem()) ? right : new JRightPadded<>(t, after, right.getMarkers());
+        return (after == right.getAfter() && t == right.getElement()) ? right : new JRightPadded<>(t, after, right.getMarkers());
     }
 
     @Override
@@ -311,35 +311,35 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 case TYPE_PARAMETERS:
                 case IMPLEMENTS:
                 case THROWS:
-                case NEW_CLASS_ARGS:
+                case NEW_CLASS_ARGUMENTS:
                     before = indentTo(container.getBefore(), indent + style.getContinuationIndent());
                     getCursor().putMessage("indentType", IndentType.ALIGN);
                     getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
-                    js = ListUtils.map(container.getPadding().getElems(), t -> visitRightPadded(t, loc.getElemLocation(), p));
+                    js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
                     break;
                 default:
                     before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
-                    js = ListUtils.map(container.getPadding().getElems(), t -> visitRightPadded(t, loc.getElemLocation(), p));
+                    js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
             }
         } else {
             switch (loc) {
                 case IMPLEMENTS:
                 case METHOD_INVOCATION_ARGUMENTS:
-                case NEW_CLASS_ARGS:
+                case NEW_CLASS_ARGUMENTS:
                 case TYPE_PARAMETERS:
                 case THROWS:
                     getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
                     before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
-                    js = ListUtils.map(container.getPadding().getElems(), t -> visitRightPadded(t, loc.getElemLocation(), p));
+                    js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
                     break;
                 default:
                     before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
-                    js = ListUtils.map(container.getPadding().getElems(), t -> visitRightPadded(t, loc.getElemLocation(), p));
+                    js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
             }
         }
 
         setCursor(getCursor().getParent());
-        return js == container.getPadding().getElems() && before == container.getBefore() ?
+        return js == container.getPadding().getElements() && before == container.getBefore() ?
                 container :
                 JContainer.build(before, js, container.getMarkers());
     }

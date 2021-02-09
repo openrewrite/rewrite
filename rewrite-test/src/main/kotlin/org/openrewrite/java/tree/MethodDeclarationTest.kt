@@ -23,7 +23,7 @@ import org.openrewrite.java.JavaTreeTest
 import org.openrewrite.java.JavaTreeTest.NestingLevel.Class
 import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
 
-interface MethodDeclTest : JavaTreeTest {
+interface MethodDeclarationTest : JavaTreeTest {
 
     @Test
     fun default(jp: JavaParser) = assertParsePrintAndProcess(
@@ -92,7 +92,7 @@ interface MethodDeclTest : JavaTreeTest {
         """
         )[0]
 
-        val inv = a.classes[0].body.statements.filterIsInstance<J.MethodDecl>().first()
+        val inv = a.classes[0].body.statements.filterIsInstance<J.MethodDeclaration>().first()
         assertThat(inv.modifiers).hasSize(2)
         assertTrue(inv.hasModifier(J.Modifier.Type.Private))
         assertTrue(inv.hasModifier(J.Modifier.Type.Static))

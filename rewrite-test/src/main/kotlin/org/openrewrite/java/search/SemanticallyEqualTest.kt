@@ -104,14 +104,14 @@ interface SemanticallyEqualTest {
         )
 
         val firstIdent = cu[0].classes[0].annotations[0].annotationType
-        val secondIdent = J.Ident.build(
+        val secondIdent = J.Identifier.build(
                 randomId(),
                 Space.EMPTY,
                 Markers.EMPTY,
                 "MyAnnotation",
                 JavaType.buildType("MyAnnotation")
         )
-        val thirdIdent = J.Ident.build(
+        val thirdIdent = J.Identifier.build(
                 randomId(),
                 Space.EMPTY,
                 Markers.EMPTY,
@@ -148,12 +148,12 @@ interface SemanticallyEqualTest {
                 "class SlowTest {}"
         )
 
-        val firstFieldAccess = cu[0].classes[0].annotations[0].args!!.first()
+        val firstFieldAccess = cu[0].classes[0].annotations[0].arguments!!.first()
         val secondFieldAccess = J.FieldAccess(
                 randomId(),
                 Space.EMPTY,
                 Markers.EMPTY,
-                J.Ident.build(
+                J.Identifier.build(
                         randomId(),
                         Space.EMPTY,
                         Markers.EMPTY,
@@ -162,7 +162,7 @@ interface SemanticallyEqualTest {
                 ),
                 JLeftPadded(
                         Space.EMPTY,
-                        J.Ident.build(
+                        J.Identifier.build(
                                 randomId(),
                                 Space.EMPTY,
                                 Markers.EMPTY,
@@ -173,7 +173,7 @@ interface SemanticallyEqualTest {
                 ),
                 JavaType.Class.build("java.lang.Class")
         )
-        val thirdFieldAccess = cu[0].classes[0].annotations[1].args!!.first()
+        val thirdFieldAccess = cu[0].classes[0].annotations[1].arguments!!.first()
 
         assertThat(
                 SemanticallyEqual
@@ -202,12 +202,12 @@ interface SemanticallyEqualTest {
                 "@interface MyAnnotation { boolean value(); }"
         )
 
-        val firstAssign = cu[0].classes[0].annotations[0].args!!.first()
-        val secondAssign = J.Assign(
+        val firstAssign = cu[0].classes[0].annotations[0].arguments!!.first()
+        val secondAssign = J.Assignment(
                 randomId(),
                 Space.EMPTY,
                 Markers.EMPTY,
-                J.Ident.build(
+                J.Identifier.build(
                         randomId(),
                         Space.EMPTY,
                         Markers.EMPTY,
@@ -229,7 +229,7 @@ interface SemanticallyEqualTest {
                 JavaType.Primitive.Boolean
         )
         val thirdAssign = secondAssign.withVariable(
-                (secondAssign.variable as J.Ident).withName("otherValue")
+                (secondAssign.variable as J.Identifier).withName("otherValue")
         )
         val fourthAssign = secondAssign.withAssignment(
                 (secondAssign.assignment as J.Literal).withValue(false)
@@ -272,9 +272,9 @@ interface SemanticallyEqualTest {
             """
         )
 
-        val intLiteral = (cu[0].classes[0].body.statements[0] as J.VariableDecls).vars[0].initializer
-        val strLiteral = (cu[0].classes[0].body.statements[1] as J.VariableDecls).vars[0].initializer
-        val nullLiteral = (cu[0].classes[0].body.statements[2] as J.VariableDecls).vars[0].initializer
+        val intLiteral = (cu[0].classes[0].body.statements[0] as J.VariableDeclarations).variables[0].initializer
+        val strLiteral = (cu[0].classes[0].body.statements[1] as J.VariableDeclarations).variables[0].initializer
+        val nullLiteral = (cu[0].classes[0].body.statements[2] as J.VariableDeclarations).variables[0].initializer
 
         assertThat(
                 SemanticallyEqual
@@ -339,14 +339,14 @@ interface SemanticallyEqualTest {
 
     @Test
     fun typeEqualityDependsOnlyOnFqn(jp: JavaParser) {
-        val nameA = J.Ident.build(
+        val nameA = J.Identifier.build(
                 randomId(),
                 Space.EMPTY,
                 Markers.EMPTY,
                 "name",
                 JavaType.Class.build("org.foo.Bar")
         )
-        val nameB = J.Ident.build(
+        val nameB = J.Identifier.build(
                 randomId(),
                 Space.EMPTY,
                 Markers.EMPTY,

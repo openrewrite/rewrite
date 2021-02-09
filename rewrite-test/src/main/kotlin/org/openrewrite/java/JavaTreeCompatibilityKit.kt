@@ -36,10 +36,10 @@ abstract class JavaTreeCompatibilityKit {
     inner class AssertTck : AssertTest
 
     @Nested
-    inner class AssignOpTck : AssignOpTest
+    inner class AssignmentOperationTck : AssignmentOperationTest
 
     @Nested
-    inner class AssignTck : AssignTest
+    inner class AssignmentTck : AssignmentTest
 
     @Nested
     inner class BlockTck : BlockTest
@@ -48,7 +48,7 @@ abstract class JavaTreeCompatibilityKit {
     inner class BreakTck : BreakTest
 
     @Nested
-    inner class ClassDeclTck : ClassDeclTest
+    inner class ClassDeclarationTck : ClassDeclarationTest
 
     @Nested
     inner class CompilationUnitTck : CompilationUnitTest
@@ -72,7 +72,7 @@ abstract class JavaTreeCompatibilityKit {
     inner class ForEachLoopTck : ForEachLoopTest
 
     @Nested
-    inner class IdentTck : IdentTest
+    inner class IdentifierTck : IdentifierTest
 
     @Nested
     inner class IfTck : IfTest
@@ -96,7 +96,7 @@ abstract class JavaTreeCompatibilityKit {
     inner class MemberReferenceTck : MemberReferenceTest
 
     @Nested
-    inner class MethodDeclTck : MethodDeclTest
+    inner class MethodDeclarationTck : MethodDeclarationTest
 
     @Nested
     inner class MethodInvocationTck : MethodInvocationTest
@@ -147,7 +147,7 @@ abstract class JavaTreeCompatibilityKit {
     inner class UnaryTck : UnaryTest
 
     @Nested
-    inner class VariableDeclsTck : VariableDeclsTest
+    inner class VariableDeclarationsTck : VariableDeclarationsTest
 
     @Nested
     inner class WhileLoopTck : WhileLoopTest
