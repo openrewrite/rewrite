@@ -30,7 +30,6 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.*;
 import org.openrewrite.java.search.FindTypes;
-import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
 import java.io.Serializable;
@@ -159,6 +158,12 @@ public interface J extends Serializable, Tree {
         @With
         @Getter
         NameTree annotationType;
+
+        public String getSimpleName() {
+            return annotationType instanceof J.Ident ?
+                    ((Ident) annotationType).getSimpleName() :
+                    ((J.FieldAccess) annotationType).getSimpleName();
+        }
 
         @Nullable
         JContainer<Expression> args;

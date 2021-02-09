@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
@@ -22,6 +23,7 @@ import org.openrewrite.Issue
 import org.openrewrite.RecipeTest
 import org.openrewrite.java.tree.J
 import org.slf4j.LoggerFactory
+import java.text.RuleBasedCollator
 import java.util.function.Consumer
 
 interface JavaTemplateTest : RecipeTest {
@@ -29,6 +31,42 @@ interface JavaTemplateTest : RecipeTest {
         private val logger = LoggerFactory.getLogger(JavaTemplateTest::class.java)
         private val logEvent = Consumer<String> { s -> logger.info(s) }
     }
+
+    @Test
+    @Disabled
+    fun addMethodAnnotationTest(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.classpath("junit-jupiter-api").build(),
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            override fun visitMethod(method: J.MethodDecl, p: ExecutionContext): J.MethodDecl {
+                val tagComp = Comparator<J.Annotation> { a1, a2 -> a1.simpleName.compareTo(a2.simpleName) }
+                    .reversed()
+                val m = super.visitMethod(method, p)
+                return m
+                    .withTemplate<J.MethodDecl>(template("@Tag(\"tag1\")").build(),
+                        m.coordinates.addAnnotation(tagComp))
+                    .withTemplate(template("@Tag(\"tag2\")").build(),
+                        m.coordinates.addAnnotation(tagComp))
+            }
+        }.toRecipe(),
+        before = """
+            import org.junit.jupiter.api.*;
+            class Test {
+                @Test
+                void method() {
+                }
+            }
+        """,
+        after = """
+            import org.junit.jupiter.api.*;           
+            class Test {
+                @Test
+                @Tag("tag1")
+                @Tag("tag2")
+                void method() {
+                }
+            }
+        """
+    )
 
     @Test
     fun replaceMethodArgumentsTest(jp: JavaParser) = assertChanged(
