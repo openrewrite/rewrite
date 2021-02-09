@@ -41,9 +41,10 @@ interface RecipeTest {
         recipe: Recipe? = this.recipe,
         before: String,
         dependsOn: Array<String> = emptyArray(),
+        cycles: Int = 1,
         after: String
     ) {
-        assertChanged(parser, recipe, before, dependsOn, after) {}
+        assertChanged(parser, recipe, before, dependsOn, after, cycles) {}
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -53,6 +54,7 @@ interface RecipeTest {
         before: String,
         dependsOn: Array<String> = emptyArray(),
         after: String,
+        cycles: Int = 1,
         afterConditions: (T) -> Unit = { }
     ) {
         assertThat(recipe).`as`("A recipe must be specified").isNotNull
@@ -78,19 +80,22 @@ interface RecipeTest {
                 .isEqualTo(recipe)
         }
 
-        val source = parser!!.parse(*(arrayOf(before.trimIndent()) + dependsOn)).first()
+        val sources = parser!!.parse(*(arrayOf(before.trimIndent()) + dependsOn))
 
-        val results = recipe.run(listOf(source),
-            ExecutionContext.builder()
-                .maxCycles(1)
-                .doOnError { t: Throwable? -> fail<Any>("Recipe threw an exception", t) }
-                .build())
+        val results = recipe
+            .run(sources,
+                ExecutionContext.builder()
+                    .maxCycles(cycles)
+                    .doOnError { t: Throwable? -> fail<Any>("Recipe threw an exception", t) }
+                    .build()
+            )
+            .filter { it.before == sources.first() }
 
         if (results.isEmpty()) {
             fail<Any>("The recipe must make changes")
         }
 
-        val result = results.find { s -> source === s.before }
+        val result = results.first()
 
         assertThat(result).`as`("The recipe must make changes").isNotNull
         assertThat(result!!.after).isNotNull
@@ -103,9 +108,10 @@ interface RecipeTest {
         recipe: Recipe? = this.recipe,
         before: File,
         dependsOn: Array<File> = emptyArray(),
-        after: String
+        after: String,
+        cycles: Int = 1
     ) {
-        assertChanged(parser, recipe, before, dependsOn, after) {}
+        assertChanged(parser, recipe, before, dependsOn, after, cycles) {}
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -115,6 +121,7 @@ interface RecipeTest {
         before: File,
         dependsOn: Array<File> = emptyArray(),
         after: String,
+        cycles: Int = 1,
         afterConditions: (T) -> Unit = { }
     ) {
         assertThat(recipe).`as`("A recipe must be specified").isNotNull
@@ -123,7 +130,7 @@ interface RecipeTest {
 
         val results = recipe!!.run(listOf(source),
             ExecutionContext.builder()
-                .maxCycles(2)
+                .maxCycles(cycles)
                 .doOnError { t: Throwable? -> fail<Any>("Recipe threw an exception", t) }
                 .build())
 
