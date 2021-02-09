@@ -38,7 +38,7 @@ interface TryCatchTest : JavaTreeTest {
 
         object: JavaIsoVisitor<Int>() {
             override fun visitCatch(c: J.Try.Catch, p: Int): J.Try.Catch {
-                assertThat(c.param.padding.tree.after.whitespace).isEqualTo(" ")
+                assertThat(c.parameter.padding.tree.after.whitespace).isEqualTo(" ")
                 return super.visitCatch(c, p)
             }
         }.visit(j, 0)
