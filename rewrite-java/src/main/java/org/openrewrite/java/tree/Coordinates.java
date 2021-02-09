@@ -17,6 +17,8 @@ package org.openrewrite.java.tree;
 
 import org.openrewrite.internal.lang.Nullable;
 
+import java.util.Comparator;
+
 public abstract class Coordinates<J2 extends J> {
     J2 tree;
 
@@ -178,6 +180,18 @@ public abstract class Coordinates<J2 extends J> {
         @Override
         public JavaCoordinates<?> before() {
             return create(Space.Location.CLASS_DECL_PREFIX);
+        }
+
+        /**
+         * @param idealOrdering The new annotation will be inserted in as close to an ideal ordering
+         *                      as possible, understanding that the existing annotations may not be
+         *                      ordered according to the comparator.
+         * @return A variable with a new annotation, inserted before the annotation it would appear
+         * before in an ideal ordering, or as the last annotation if it would not appear before any
+         * existing annotations in an ideal ordering.
+         */
+        public JavaCoordinates<?> addAnnotation(Comparator<J.Annotation> idealOrdering) {
+            throw new UnsupportedOperationException("");
         }
 
         public JavaCoordinates<?> replaceAnnotations() {
@@ -455,6 +469,18 @@ public abstract class Coordinates<J2 extends J> {
             return create(Space.Location.METHOD_DECL_PREFIX);
         }
 
+        /**
+         * @param idealOrdering The new annotation will be inserted in as close to an ideal ordering
+         *                      as possible, understanding that the existing annotations may not be
+         *                      ordered according to the comparator.
+         * @return A method with a new annotation, inserted before the annotation it would appear
+         * before in an ideal ordering, or as the last annotation if it would not appear before any
+         * existing annotations in an ideal ordering.
+         */
+        public JavaCoordinates<?> addAnnotation(Comparator<J.Annotation> idealOrdering) {
+            throw new UnsupportedOperationException("");
+        }
+
         public JavaCoordinates<?> replaceAnnotations() {
             return create(Space.Location.ANNOTATION_PREFIX);
         }
@@ -713,6 +739,18 @@ public abstract class Coordinates<J2 extends J> {
         @Override
         public JavaCoordinates<?> before() {
             return create(Space.Location.MULTI_VARIABLE_PREFIX);
+        }
+
+        /**
+         * @param idealOrdering The new annotation will be inserted in as close to an ideal ordering
+         *                      as possible, understanding that the existing annotations may not be
+         *                      ordered according to the comparator.
+         * @return A variable with a new annotation, inserted before the annotation it would appear
+         * before in an ideal ordering, or as the last annotation if it would not appear before any
+         * existing annotations in an ideal ordering.
+         */
+        public JavaCoordinates<?> addAnnotation(Comparator<J.Annotation> idealOrdering) {
+            throw new UnsupportedOperationException("");
         }
 
         public JavaCoordinates<?> replaceAnnotations() {
