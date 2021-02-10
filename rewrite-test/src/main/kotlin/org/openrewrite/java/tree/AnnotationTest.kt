@@ -15,7 +15,9 @@
  */
 package org.openrewrite.java.tree
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTreeTest
 import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
@@ -56,4 +58,25 @@ interface AnnotationTest : JavaTreeTest {
             public @interface Annotation {}
         """
     )
+
+    @Test
+    @Issue("#254")
+    @Disabled
+    fun annotationAfterTypeParameters(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, CompilationUnit, """
+           import java.util.List;
+           import java.lang.annotation.*;
+
+            @Target({ElementType.TYPE_USE})
+            @Retention(RetentionPolicy.RUNTIME)
+            public @interface Yo {}
+
+            public class A {
+                <T> @Yo T method(List<T> list, int element) {
+                    return list.get(element);
+                }
+            }
+        """
+    )
+
 }
