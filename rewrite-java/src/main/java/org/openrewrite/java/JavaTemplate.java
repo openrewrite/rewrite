@@ -74,7 +74,7 @@ public class JavaTemplate {
      * @param <J2>        The type of the changing tree.
      * @return A modified form of the changing tree.
      */
-    public <J2 extends J> J2 withTemplate(Tree changing, JavaCoordinates<?> coordinates, Object... parameters) {
+    public <J2 extends J> J2 withTemplate(Tree changing, JavaCoordinates coordinates, Object... parameters) {
         Cursor parentScope = parentScopeGetter.get();
 
         if (parameters.length != parameterCount) {

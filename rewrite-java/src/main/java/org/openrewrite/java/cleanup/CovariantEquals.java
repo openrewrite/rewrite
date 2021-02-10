@@ -13,21 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.tree;
+package org.openrewrite.java.cleanup;
 
-import lombok.AccessLevel;
-import lombok.Data;
-import lombok.experimental.FieldDefaults;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Incubating;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 
-import java.util.Comparator;
-
-@Data
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-public class JavaCoordinates {
-    J tree;
-    Space.Location spaceLocation;
-
-    @Nullable
-    Comparator<? extends J> comparator;
+@Incubating(since = "7.0.0")
+public class CovariantEquals extends Recipe {
+    @Override
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new CovariantEqualsVisitor<>();
+    }
 }

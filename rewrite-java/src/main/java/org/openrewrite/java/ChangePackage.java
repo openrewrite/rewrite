@@ -22,6 +22,8 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.J;
 
+import java.nio.file.Paths;
+
 @EqualsAndHashCode(callSuper = true)
 @Data
 public class ChangePackage extends Recipe {
@@ -44,6 +46,20 @@ public class ChangePackage extends Recipe {
 
             final JavaTemplate newPackageExpr = template("package " + newFullyQualifiedPackageName)
                     .build();
+
+            @Override
+            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext context) {
+                J.CompilationUnit c = super.visitCompilationUnit(cu, context);
+                Boolean changing = getCursor().<Boolean>peekMessage("changing");
+                if(changing != null && changing) {
+                    String path = c.getSourcePath().toString();
+                    c = c.withSourcePath(Paths.get(path.replaceFirst(
+                            oldFullyQualifiedPackageName.replace('.', '/'),
+                            newFullyQualifiedPackageName.replace('.', '/')
+                    )));
+                }
+                return c;
+            }
 
             @Override
             public J.Package visitPackage(J.Package pkg, ExecutionContext context) {

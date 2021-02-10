@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.*;
@@ -105,23 +106,12 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                     importToAdd.withPrefix(Space.format("\n\n"));
         }
 
-        // Add just enough newlines to yield a blank line between imports and the first class declaration
-        if (cu.getClasses().iterator().hasNext()) {
-            while (true) {
-                Space firstPrefix = Space.firstPrefix(cu.getClasses());
-                if (firstPrefix.getWhitespace().chars().filter(c -> c == '\n').count() >= 2) {
-                    break;
-                }
-                cu = cu.withClasses(Space.formatFirstPrefix(cu.getClasses(),
-                        firstPrefix.withWhitespace("\n" + firstPrefix.getWhitespace())));
-            }
-        }
-
         imports.add(new JRightPadded<>(importToAdd, Space.EMPTY, Markers.EMPTY));
         cu = cu.getPadding().withImports(imports);
 
         OrderImports orderImports = new OrderImports(false);
         doAfterVisit(orderImports);
+        doAfterVisit(new FormatFirstClassPrefix<>());
 
         return cu;
     }

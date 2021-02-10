@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.RecipeTest
 
-interface RemoveImportTest : RecipeTest {
+interface RemoveUnusedImportsTest : RecipeTest {
     fun removeImport(type: String) =
         RemoveImport<ExecutionContext>(type).toRecipe()
 
@@ -63,12 +63,14 @@ interface RemoveImportTest : RecipeTest {
         recipe = removeImport("java.util.List"),
         before = """
             import java.util.*;
+            
             class A {
                Collection c;
             }
         """,
         after = """
             import java.util.Collection;
+            
             class A {
                Collection c;
             }
@@ -145,12 +147,14 @@ interface RemoveImportTest : RecipeTest {
         before = """
             import static java.util.Collections.emptyList;
             import static java.util.Collections.emptySet;
+            
             class A {
                Object o = emptyList();
             }
         """,
         after = """
             import static java.util.Collections.emptyList;
+            
             class A {
                Object o = emptyList();
             }
@@ -181,12 +185,14 @@ interface RemoveImportTest : RecipeTest {
             import static foo.B.STRING;
             import static foo.B.STRING2;
             import static foo.C.*;
+            
             public class A {
                 String a = STRING;
             }
         """,
         after = """
             import static foo.B.STRING;
+            
             public class A {
                 String a = STRING;
             }

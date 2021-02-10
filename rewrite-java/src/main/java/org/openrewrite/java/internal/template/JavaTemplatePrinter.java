@@ -38,11 +38,11 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
     static final String SNIPPET_MARKER_START = "<<<<START>>>>";
     static final String SNIPPET_MARKER_END = "<<<<END>>>>";
 
-    private final JavaCoordinates<?> coordinates;
+    private final JavaCoordinates coordinates;
     private final Set<String> imports;
     private final String code;
 
-    public JavaTemplatePrinter(String code, JavaCoordinates<?> coordinates, Set<String> imports) {
+    public JavaTemplatePrinter(String code, JavaCoordinates coordinates, Set<String> imports) {
         super(TreePrinter.identity());
         this.code = "/*" + SNIPPET_MARKER_START + "*/" + code + "/*" + SNIPPET_MARKER_END + "*/";
         this.coordinates = coordinates;

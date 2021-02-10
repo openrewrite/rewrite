@@ -19,6 +19,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
@@ -31,13 +32,16 @@ import java.util.*;
  * drop below the configured values.
  */
 public class RemoveUnusedImports extends Recipe {
-
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new RemoveUnusedImportsVisitor();
     }
 
     private static class RemoveUnusedImportsVisitor extends JavaIsoVisitor<ExecutionContext> {
+        RemoveUnusedImportsVisitor() {
+            setCursoringOn();
+        }
+
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
 
@@ -101,21 +105,15 @@ public class RemoveUnusedImports extends Recipe {
                 }
             }
             cu = changed ? cu.getPadding().withImports(importsWithUsage) : cu;
-            if (cu.getImports().isEmpty()) {
-                cu = cu.withClasses(
-                        ListUtils.mapFirst(cu.getClasses(),
-                                cl -> cl.withPrefix(
-                                        cl.getPrefix().withWhitespace(
-                                                cl.getPrefix().getWhitespace().replace("\n\n", "")
-                                        )
-                                )
-                        )
-                );
-            } else {
+
+            if (changed) {
+                doAfterVisit(new FormatFirstClassPrefix<>());
                 if (cu.getPackageDeclaration() == null) {
-                    cu = cu.getPadding().withImports(ListUtils.mapFirst(cu.getPadding().getImports(), i -> i.withElement(i.getElement().withPrefix(Space.EMPTY))));
+                    cu = cu.withImports(ListUtils.mapFirst(cu.getImports(), i ->
+                            autoFormat(i, ctx)));
                 }
             }
+
             return cu;
         }
 

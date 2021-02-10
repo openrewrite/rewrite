@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
@@ -60,22 +61,22 @@ interface BlankLinesTest : RecipeTest {
         jp.styles(blankLines { withKeepMaximum(keepMaximum.withInDeclarations(0)) }).build(),
         before = """
             public class Test {
-
-
+            
+            
                 private int field1;
                 private int field2;
-
+            
                 {
                     field1 = 2;
                 }
-
+            
                 public void test1() {
                     new Runnable() {
                         public void run() {
                         }
                     };
                 }
-
+            
                 public class InnerClass {
                 }
             }
@@ -95,6 +96,7 @@ interface BlankLinesTest : RecipeTest {
                         }
                     };
                 }
+            
                 public class InnerClass {
                 }
             }
@@ -378,6 +380,21 @@ interface BlankLinesTest : RecipeTest {
             public class Test {
             }
         """.trimIndent()
+    )
+
+    @Test
+    fun noImportsNoPackage(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            
+            class Test {
+            }
+        """,
+        after = """
+            class Test {
+            }
+        """,
+        afterConditions = { cu -> assertThat(cu.classes[0].prefix.whitespace).isEmpty() }
     )
 
     @Test

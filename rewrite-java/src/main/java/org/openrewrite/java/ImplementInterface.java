@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 

@@ -39,7 +39,7 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
     private final UUID insertId;
     private final Space.Location location;
 
-    public InsertAtCoordinates(JavaCoordinates<?> coordinates) {
+    public InsertAtCoordinates(JavaCoordinates coordinates) {
         this.insertId = coordinates.getTree().getId();
         this.location = coordinates.getSpaceLocation();
         setCursoringOn();

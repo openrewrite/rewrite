@@ -52,6 +52,7 @@ interface ChangeMethodTargetToVariableTest : RecipeTest {
         """,
         after = """
             import a.A;
+            
             public class C {
                A a;
                public void test() {
@@ -91,6 +92,7 @@ interface ChangeMethodTargetToVariableTest : RecipeTest {
         """,
         after = """
             import a.A;
+            
             public class C {
                A a;
                public void test() {

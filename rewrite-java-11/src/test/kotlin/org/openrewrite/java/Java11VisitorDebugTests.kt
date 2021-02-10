@@ -65,6 +65,10 @@ class Java11ChangeTypeTest : Java11Test, ChangeTypeTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11CovariantEqualsTest : Java11Test, CovariantEqualsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11DeleteMethodArgumentTest : Java11Test, DeleteMethodArgumentTest
 
 @DebugOnly
@@ -121,7 +125,7 @@ class Java11OrderImportsTest : Java11Test, OrderImportsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11RemoveImportTest : Java11Test, RemoveImportTest
+class Java11RemoveUnusedImportsTest : Java11Test, RemoveUnusedImportsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

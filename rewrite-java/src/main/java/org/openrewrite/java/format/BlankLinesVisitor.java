@@ -36,7 +36,7 @@ class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
-        J.CompilationUnit j = super.visitCompilationUnit(cu, p);
+        J.CompilationUnit j = cu;
         if (j.getPackageDeclaration() != null) {
             if (!j.getPrefix().getComments().isEmpty()) {
                 j = j.withComments(ListUtils.mapLast(j.getComments(), c -> {
@@ -67,19 +67,8 @@ class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
         } else {
             j = j.getPadding().withImports(ListUtils.mapFirst(j.getPadding().getImports(), i ->
                     minimumLines(i, style.getMinimum().getAfterPackage())));
-
-            if (j.getImports().isEmpty()) {
-                j = j.withClasses(ListUtils.mapFirst(j.getClasses(), c ->
-                        minimumLines(c, style.getMinimum().getAfterPackage())));
-            }
         }
-        boolean hasImports = !j.getImports().isEmpty();
-        j = j.withClasses(ListUtils.map(j.getClasses(), (i, c) -> i == 0 ?
-                (hasImports ? minimumLines(c, style.getMinimum().getAfterImports()) : c) :
-                minimumLines(c, style.getMinimum().getAroundClass())
-        ));
-
-        return j;
+        return super.visitCompilationUnit(j, p);
     }
 
     @Override
@@ -99,7 +88,33 @@ class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
         j = j.withBody(j.getBody().withEnd(minimumLines(j.getBody().getEnd(),
                 style.getMinimum().getBeforeClassEnd())));
 
+        J.CompilationUnit cu = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
+        boolean hasImports = !cu.getImports().isEmpty();
+        boolean firstClass = j.equals(cu.getClasses().get(0));
+
+        j = firstClass ?
+                (hasImports ? minimumLines(j, style.getMinimum().getAfterImports()) : j) :
+                minimumLines(j, style.getMinimum().getAroundClass());
+
+        if (!hasImports && firstClass) {
+            j = minimumLines(j, style.getMinimum().getAfterPackage());
+        }
+
+        if(!hasImports && firstClass && cu.getPackageDeclaration() == null) {
+                j = j.withPrefix(j.getPrefix().withWhitespace(""));
+        }
+
         return j;
+    }
+
+    @Override
+    public J.Import visitImport(J.Import impoort, P p) {
+        J.Import i = super.visitImport(impoort, p);
+        J.CompilationUnit cu = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
+        if(i.equals(cu.getImports().get(0)) && cu.getPackageDeclaration() == null && cu.getPrefix().equals(Space.EMPTY)) {
+            i = i.withPrefix(i.getPrefix().withWhitespace(""));
+        }
+        return i;
     }
 
     @Override
