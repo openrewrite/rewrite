@@ -59,8 +59,8 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
             getPrinter().append(code);
             return (J) tree;
         } else if (tree != null &&tree.getId().equals(changing.getId())) {
-            //Once the Id of the tree matches the ID of possible mutated tree, navigation
-            //for the sake of printing the synthetic class uses the "changing" class.
+            //Once the Id of the tree matches the ID of possible mutated tree navigation ,for the sake of printing the
+            //synthetic class, swaps to the "changing" class.
             return super.visit(changing, insertionScope);
         } else {
             return super.visit(tree, insertionScope);
@@ -299,11 +299,11 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
 
     /**
      * This method will extends the insertion scope cursor by starting at the parent cursor and then walking into the
-     * possibly mutated tree "changing" until the coordinates are found.
+     * possibly mutated tree until the coordinates are found.
      *
      * @param parentScope The parent scope is root from the original AST
-     * @param changing The possibly mutated (from a previous operation) branch
-     * @param coordinates The coordinates within the changing branch to search for
+     * @param changing The possibly mutated tree
+     * @param coordinates The coordinates to search for
      * @return A cursor representing the path from the original compilation unit to the coordinates element in the mutated tree
      */
     public static Cursor findCoordinateCursor(Cursor parentScope, Tree changing, JavaCoordinates coordinates) {
