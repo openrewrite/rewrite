@@ -41,6 +41,7 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
         Stream<J.MethodDeclaration> mds = cd.getBody().getStatements().stream().filter(J.MethodDeclaration.class::isInstance).map(J.MethodDeclaration.class::cast);
         if (mds.noneMatch(m -> OBJECT_EQUALS_SIGNATURE.matches(m, classDecl))) {
             cd = (J.ClassDeclaration) new ChangeCovariantEqualsMethodVisitor<>(cd).visit(cd, p, getCursor());
+            assert cd != null;
         }
         return cd;
     }
@@ -66,11 +67,16 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
             J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
 
-            /**
+            /*
              * Looking for "public boolean equals(EnclosingClassType)" as the method signature match.
              * We'll replace it with "public boolean equals(Object)"
              */
-            String ecfqn = enclosingClass.getType().getFullyQualifiedName();
+            JavaType.Class type = enclosingClass.getType();
+            if(type == null) {
+                return m;
+            }
+
+            String ecfqn = type.getFullyQualifiedName();
             if (new MethodMatcher(String.format("%s equals(%s)", ecfqn, ecfqn)).matches(m, enclosingClass) &&
                     m.hasModifier(J.Modifier.Type.Public) &&
                     m.getReturnTypeExpression() != null &&
@@ -84,7 +90,7 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
                             ), p, getCursor().getParentOrThrow());
                 }
 
-                /**
+                /*
                  * Change parameter type to Object, and maybe change input parameter name representing the other object.
                  * This is because we prepend these type-checking replacement statements to the existing "equals(..)" body.
                  * Therefore we don't want to collide with any existing variable names.
@@ -98,12 +104,13 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
                                 paramName
                         ), p, getCursor().getParentOrThrow());
 
-                /**
+                /*
                  * We'll prepend this type-check and type-cast to the beginning of the existing
                  * equals(..) method body statements, and let the existing equals(..) method definition continue
                  * with the logic doing what it was doing.
                  */
                 JavaTemplate equalsBodySnippet = template(EQUALS_BODY_PREFIX_TEMPLATE).build();
+                assert m.getBody() != null;
                 Object[] params = new Object[]{
                         paramName,
                         paramName,
