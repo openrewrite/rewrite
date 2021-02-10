@@ -61,6 +61,15 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return after;
     }
 
+    public <J2 extends J> J2 autoFormat(J2 j, P p) {
+        return autoFormat(j, p, getCursor());
+    }
+
+    @SuppressWarnings({"ConstantConditions", "unchecked"})
+    public <J2 extends J> J2 autoFormat(J2 j, P p, Cursor cursor) {
+        return (J2) new AutoFormatVisitor<>().visit(j, p, cursor);
+    }
+
     /**
      * This method will add an import to the compilation unit if there is a reference to the type. It adds an additional
      * visitor which means the "add import" is deferred and does not complete immediately. This operation is idempotent

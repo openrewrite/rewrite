@@ -16,6 +16,8 @@
 package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
+import org.openrewrite.Cursor;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
@@ -27,6 +29,9 @@ import static org.openrewrite.Tree.randomId;
 
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class RemoveImport<P> extends JavaIsoVisitor<P> {
+    private static final J.Block EMPTY_BLOCK = new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+            new JRightPadded<>(false, Space.EMPTY, Markers.EMPTY), Collections.emptyList(), Space.EMPTY);
+
     @EqualsAndHashCode.Include
     private final String type;
 
@@ -65,27 +70,17 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         staticNamedImports.clear();
 
         J.CompilationUnit c = super.visitCompilationUnit(cu, p);
-        c = staticImportDeletions(classImportDeletions(c));
-        if (c.getImports().isEmpty()) {
-            if (c.getClasses().iterator().next().getPrefix().getWhitespace().startsWith("\n")) {
-                c = c.withClasses(ListUtils.mapFirst(c.getClasses(), cl -> cl.withPrefix(cl.getPrefix().withWhitespace(
-                        cl.getPrefix().getWhitespace().replaceFirst("\n", "")))));
+        J.CompilationUnit temp = staticImportDeletions(classImportDeletions(c));
+        if (temp != c) {
+            Cursor cursor = new Cursor(null, temp);
+            temp = temp.withImports(ListUtils.map(temp.getImports(), i -> autoFormat(i, p, cursor)));
+            if (!temp.getClasses().isEmpty()) {
+                temp = temp.withClasses(ListUtils.mapFirst(temp.getClasses(), firstClass -> {
+                    J.ClassDeclaration tempClass = autoFormat(firstClass.withBody(EMPTY_BLOCK), p, cursor);
+                    return firstClass.withPrefix(tempClass.getPrefix());
+                }));
             }
-        }
-        if (c.getImports().size() == 1) {
-            if (c.getPackageDeclaration() == null) {
-                c = c.getPadding().withImports(
-                        ListUtils.mapFirst(c.getPadding().getImports(),
-                                i -> i.withElement(
-                                        i.getElement().withPrefix(
-                                                i.getElement().getPrefix().withWhitespace(
-                                                        i.getElement().getPrefix().getWhitespace().replace("\n", "")
-                                                )
-                                        )
-                                )
-                        )
-                );
-            }
+            c = temp;
         }
         return c;
     }
