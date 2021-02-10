@@ -140,8 +140,14 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
 
         visitSpace(classDecl.getPrefix(), Space.Location.CLASS_DECLARATION_PREFIX, insertionScope);
 
-        if (coordinates.isReplacement() && Space.Location.ANNOTATION_PREFIX.equals(coordinates.getSpaceLocation())) {
-            printTemplate();
+        if (Space.Location.ANNOTATIONS.equals(coordinates.getSpaceLocation())) {
+            if (coordinates.isReplacement()) {
+                printTemplate();
+            }
+            else {
+                printTemplate();
+                visit(classDecl.getAnnotations(), insertionScope);
+            }
         } else {
             visit(classDecl.getAnnotations(), insertionScope);
         }
@@ -188,8 +194,14 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
 
         visitSpace(method.getPrefix(), Space.Location.METHOD_DECLARATION_PREFIX, insertionScope);
 
-        if (coordinates.isReplacement() && Space.Location.ANNOTATION_PREFIX.equals(coordinates.getSpaceLocation())) {
-            printTemplate();
+        if (Space.Location.ANNOTATIONS.equals(coordinates.getSpaceLocation())) {
+            if (coordinates.isReplacement()) {
+                printTemplate();
+            }
+            else {
+                printTemplate();
+                visit(method.getAnnotations(), insertionScope);
+            }
         } else {
             visit(method.getAnnotations(), insertionScope);
         }
@@ -263,8 +275,14 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
         StringBuilder acc = getPrinter();
         visitSpace(multiVariable.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, insertionScope);
 
-        if (coordinates.isReplacement() && Space.Location.ANNOTATION_PREFIX.equals(coordinates.getSpaceLocation())) {
-            printTemplate();
+        if (Space.Location.ANNOTATIONS.equals(coordinates.getSpaceLocation())) {
+            if (coordinates.isReplacement()) {
+                printTemplate();
+            }
+            else {
+                printTemplate();
+                visit(multiVariable.getAnnotations(), insertionScope);
+            }
         } else {
             visit(multiVariable.getAnnotations(), insertionScope);
         }

@@ -296,6 +296,7 @@ public class Space implements Markable {
         ANNOTATED_TYPE_PREFIX,
         ANNOTATION_ARGUMENTS,
         ANNOTATION_ARGUMENT_SUFFIX,
+        ANNOTATIONS,
         ANNOTATION_PREFIX,
         ARRAY_ACCESS_PREFIX,
         ARRAY_INDEX_SUFFIX,

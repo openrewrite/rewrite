@@ -18,6 +18,8 @@ package org.openrewrite.internal;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
@@ -27,6 +29,45 @@ import java.util.function.UnaryOperator;
 
 public final class ListUtils {
     private ListUtils() {
+    }
+
+    /**
+     * Insert into as-near of a location representing the natural ordering of the list without assuming
+     * the list is already sorted according to its natural ordering AND without changing the position of any
+     * other element. This provides a means of both inserting in a natural order but also making the least invasive
+     * change.
+     *
+     * @param ls              The original list, which may not be ordered.
+     * @param insert          The element to add.
+     * @param naturalOrdering The natural or idiomatic ordering of the list.
+     * @param <T>             The type of elements in the list.
+     * @return A new list with the element inserted in an approximately ordered place.
+     */
+    public static <T> List<T> insertInOrder(List<T> ls, T insert, Comparator<T> naturalOrdering) {
+        List<T> ordered = new ArrayList<>(ls);
+        ordered.add(insert);
+        ordered.sort(naturalOrdering);
+
+        T comesAfter = null;
+        for (T t : ordered) {
+            if (t == insert) {
+                break;
+            }
+            comesAfter = t;
+        }
+
+        List<T> newLs = new ArrayList<>(ls);
+        if (comesAfter == null) {
+            newLs.add(0, insert);
+        } else {
+            for (int i = 0; i < newLs.size(); i++) {
+                if (newLs.get(i) == comesAfter) {
+                    newLs.add(i + 1, insert);
+                }
+            }
+        }
+
+        return newLs;
     }
 
     public static <T> List<T> mapLast(List<T> ls, UnaryOperator<T> mapLast) {
@@ -147,7 +188,7 @@ public final class ListUtils {
     }
 
     public static <T> List<T> concatAll(@Nullable List<T> ls, List<T> t) {
-        if(ls == null) {
+        if (ls == null) {
             return t;
         }
         List<T> newLs = new ArrayList<>(ls);

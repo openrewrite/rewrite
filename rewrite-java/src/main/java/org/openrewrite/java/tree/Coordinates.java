@@ -193,11 +193,11 @@ public abstract class Coordinates {
          * existing annotations in an ideal ordering.
          */
         public JavaCoordinates addAnnotation(Comparator<J.Annotation> idealOrdering) {
-            return new JavaCoordinates(tree, Space.Location.ANNOTATION_PREFIX, JavaCoordinates.Mode.INSERTION, idealOrdering);
+            return new JavaCoordinates(tree, Space.Location.ANNOTATIONS, JavaCoordinates.Mode.INSERTION, idealOrdering);
         }
 
         public JavaCoordinates replaceAnnotations() {
-            return replace(Space.Location.ANNOTATION_PREFIX);
+            return replace(Space.Location.ANNOTATIONS);
         }
 
         public JavaCoordinates replaceTypeParameters() {
@@ -480,11 +480,11 @@ public abstract class Coordinates {
          * existing annotations in an ideal ordering.
          */
         public JavaCoordinates addAnnotation(Comparator<J.Annotation> idealOrdering) {
-            return new JavaCoordinates(tree, Space.Location.ANNOTATION_PREFIX, JavaCoordinates.Mode.INSERTION, idealOrdering);
+            return new JavaCoordinates(tree, Space.Location.ANNOTATIONS, JavaCoordinates.Mode.INSERTION, idealOrdering);
         }
 
         public JavaCoordinates replaceAnnotations() {
-            return replace(Space.Location.ANNOTATION_PREFIX);
+            return replace(Space.Location.ANNOTATIONS);
         }
 
         public JavaCoordinates replaceTypeParameters() {
@@ -752,11 +752,11 @@ public abstract class Coordinates {
          * existing annotations in an ideal ordering.
          */
         public JavaCoordinates addAnnotation(Comparator<J.Annotation> idealOrdering) {
-            return new JavaCoordinates(tree, Space.Location.ANNOTATION_PREFIX, JavaCoordinates.Mode.INSERTION, idealOrdering);
+            return new JavaCoordinates(tree, Space.Location.ANNOTATIONS, JavaCoordinates.Mode.INSERTION, idealOrdering);
         }
 
         public JavaCoordinates replaceAnnotations() {
-            return replace(Space.Location.ANNOTATION_PREFIX);
+            return replace(Space.Location.ANNOTATIONS);
         }
 
         public static class NamedVar extends Coordinates {

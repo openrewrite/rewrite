@@ -28,6 +28,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import static org.openrewrite.java.tree.JavaCoordinates.Mode.INSERTION;
+
 /**
  * This visitor will insert the generated elements into the correct location within an AST and return the mutated
  * version.
@@ -87,8 +89,14 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
         if (insertId.equals(c.getId())) {
             AutoFormatVisitor<Integer> autoFormat = new AutoFormatVisitor<>();
             switch (location) {
-                case ANNOTATION_PREFIX: {
-                    J.ClassDeclaration temp = c.withAnnotations((List<J.Annotation>) generated);
+                case ANNOTATIONS: {
+                    J.ClassDeclaration temp;
+                    if (INSERTION.equals(coordinates.getMode())) {
+                        temp = c.withAnnotations(ListUtils.insertInOrder(c.getAnnotations(), (J.Annotation) generated.get(0),
+                                coordinates.getComparator()));
+                    } else {
+                        temp = c.withAnnotations((List<J.Annotation>) generated);
+                    }
                     temp = (J.ClassDeclaration) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
                     assert temp != null;
                     c = temp.withBody(c.getBody());
@@ -134,8 +142,14 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
         AutoFormatVisitor<Integer> autoFormat = new AutoFormatVisitor<>();
         if (insertId.equals(m.getId())) {
             switch (location) {
-                case ANNOTATION_PREFIX: {
-                    J.MethodDeclaration temp = m.withAnnotations((List<J.Annotation>) generated);
+                case ANNOTATIONS: {
+                    J.MethodDeclaration temp;
+                    if (INSERTION.equals(coordinates.getMode())) {
+                        temp = m.withAnnotations(ListUtils.insertInOrder(m.getAnnotations(), (J.Annotation) generated.get(0),
+                                coordinates.getComparator()));
+                    } else {
+                        temp = m.withAnnotations((List<J.Annotation>) generated);
+                    }
                     temp = (J.MethodDeclaration) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
                     assert temp != null;
                     m = temp.withBody(m.getBody());
@@ -180,8 +194,13 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
         J.VariableDeclarations m = (J.VariableDeclarations) super.visitVariableDeclarations(multiVariable, generated);
         AutoFormatVisitor<Integer> autoFormat = new AutoFormatVisitor<>();
         if (insertId.equals(m.getId())) {
-            if (location == Space.Location.ANNOTATION_PREFIX) {
-                m = m.withAnnotations((List<J.Annotation>) generated);
+            if (location == Space.Location.ANNOTATIONS) {
+                if (INSERTION.equals(coordinates.getMode())) {
+                    m = m.withAnnotations(ListUtils.insertInOrder(m.getAnnotations(), (J.Annotation) generated.get(0),
+                            coordinates.getComparator()));
+                } else {
+                    m = m.withAnnotations((List<J.Annotation>) generated);
+                }
                 m = (J.VariableDeclarations) autoFormat.visit(m, 0, getCursor());
                 assert m != null;
             }

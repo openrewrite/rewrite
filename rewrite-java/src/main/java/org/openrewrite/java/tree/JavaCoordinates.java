@@ -49,4 +49,9 @@ public class JavaCoordinates {
         INSERTION,
         REPLACEMENT
     }
+
+    @SuppressWarnings({"ConstantConditions", "unchecked"})
+    public <J2 extends J> Comparator<J2> getComparator() {
+        return (Comparator<J2>) comparator;
+    }
 }

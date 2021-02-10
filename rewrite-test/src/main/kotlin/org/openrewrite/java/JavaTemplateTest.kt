@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
@@ -31,32 +30,46 @@ interface JavaTemplateTest : RecipeTest {
     }
 
     @Test
-    @Disabled
     fun addMethodAnnotationTest(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.classpath("junit-jupiter-api").build(),
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            init {
+                setCursoringOn()
+            }
+
             override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
                 val tagComp = Comparator<J.Annotation> { a1, a2 -> a1.simpleName.compareTo(a2.simpleName) }
                     .reversed()
+
                 val m = super.visitMethodDeclaration(method, p)
                 return m
-                    .withTemplate<J.MethodDeclaration>(template("@Tag(\"tag1\")").build(),
-                        m.coordinates.addAnnotation(tagComp))
-                    .withTemplate(template("@Tag(\"tag2\")").build(),
-                        m.coordinates.addAnnotation(tagComp))
+                    .withTemplate<J.MethodDeclaration>(
+                        template("@Tag(\"tag1\")")
+                            .doBeforeParseTemplate(logEvent)
+                            .doAfterVariableSubstitution(logEvent)
+                            .build(),
+                        m.coordinates.addAnnotation(tagComp)
+                    )
+                    .withTemplate(
+                        template("@Tag(\"tag2\")")
+                            .doBeforeParseTemplate(logEvent)
+                            .doAfterVariableSubstitution(logEvent)
+                            .build(),
+                        m.coordinates.addAnnotation(tagComp)
+                    )
             }
         }.toRecipe(),
         before = """
             import org.junit.jupiter.api.*;
-            class Test {
+            class A {
                 @Test
                 void method() {
                 }
             }
         """,
         after = """
-            import org.junit.jupiter.api.*;           
-            class Test {
+            import org.junit.jupiter.api.*;
+            class A {
                 @Test
                 @Tag("tag1")
                 @Tag("tag2")

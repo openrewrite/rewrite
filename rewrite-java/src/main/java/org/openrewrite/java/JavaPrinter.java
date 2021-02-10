@@ -480,6 +480,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
         }
 
         visitSpace(classDecl.getPrefix(), Space.Location.CLASS_DECLARATION_PREFIX, p);
+        visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
         visit(classDecl.getAnnotations(), p);
         visitModifiers(classDecl.getModifiers(), p);
         visitSpace(classDecl.getPadding().getKind().getBefore(), Space.Location.CLASS_KIND, p);
@@ -695,6 +696,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
     @Override
     public J visitMethodDeclaration(MethodDeclaration method, P p) {
         visitSpace(method.getPrefix(), Space.Location.METHOD_DECLARATION_PREFIX, p);
+        visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
         visit(method.getAnnotations(), p);
         visitModifiers(method.getModifiers(), p);
         visitContainer("<", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
@@ -728,6 +730,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
     public J visitVariableDeclarations(VariableDeclarations multiVariable, P p) {
         StringBuilder acc = getPrinter();
         visitSpace(multiVariable.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
+        visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
         visit(multiVariable.getAnnotations(), p);
         visitModifiers(multiVariable.getModifiers(), p);
         visit(multiVariable.getTypeExpression(), p);
