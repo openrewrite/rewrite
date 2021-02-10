@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.*;
@@ -110,6 +111,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
         OrderImports orderImports = new OrderImports(false);
         doAfterVisit(orderImports);
+        doAfterVisit(new FormatFirstClassPrefix<>());
 
         return cu;
     }

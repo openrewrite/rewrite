@@ -82,7 +82,7 @@ public class OrderImports extends Recipe {
                 doAfterVisit(new RemoveUnusedImports());
             }
             else if(changed) {
-                doAfterVisit(new FormatFirstClassPrefix());
+                doAfterVisit(new FormatFirstClassPrefix<>());
             }
 
             return cu;

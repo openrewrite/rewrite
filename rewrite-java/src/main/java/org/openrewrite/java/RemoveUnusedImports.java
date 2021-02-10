@@ -107,7 +107,7 @@ public class RemoveUnusedImports extends Recipe {
             cu = changed ? cu.getPadding().withImports(importsWithUsage) : cu;
 
             if (changed) {
-                doAfterVisit(new FormatFirstClassPrefix());
+                doAfterVisit(new FormatFirstClassPrefix<>());
                 if (cu.getPackageDeclaration() == null) {
                     cu = cu.withImports(ListUtils.mapFirst(cu.getImports(), i ->
                             autoFormat(i, ctx)));
