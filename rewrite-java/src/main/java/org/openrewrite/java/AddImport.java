@@ -105,18 +105,6 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                     importToAdd.withPrefix(Space.format("\n\n"));
         }
 
-        // Add just enough newlines to yield a blank line between imports and the first class declaration
-        if (cu.getClasses().iterator().hasNext()) {
-            while (true) {
-                Space firstPrefix = Space.firstPrefix(cu.getClasses());
-                if (firstPrefix.getWhitespace().chars().filter(c -> c == '\n').count() >= 2) {
-                    break;
-                }
-                cu = cu.withClasses(Space.formatFirstPrefix(cu.getClasses(),
-                        firstPrefix.withWhitespace("\n" + firstPrefix.getWhitespace())));
-            }
-        }
-
         imports.add(new JRightPadded<>(importToAdd, Space.EMPTY, Markers.EMPTY));
         cu = cu.getPadding().withImports(imports);
 

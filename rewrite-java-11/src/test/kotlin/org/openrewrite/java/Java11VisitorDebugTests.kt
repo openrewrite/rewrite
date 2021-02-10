@@ -121,7 +121,7 @@ class Java11OrderImportsTest : Java11Test, OrderImportsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11RemoveImportTest : Java11Test, RemoveImportTest
+class Java11RemoveUnusedImportsTest : Java11Test, RemoveUnusedImportsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

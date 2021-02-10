@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.RecipeTest
 
-interface RemoveImportTest : RecipeTest {
+interface RemoveUnusedImportsTest : RecipeTest {
     fun removeImport(type: String) =
         RemoveImport<ExecutionContext>(type).toRecipe()
 

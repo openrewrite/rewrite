@@ -93,7 +93,7 @@ abstract class JavaVisitorCompatibilityKit {
     inner class OrderImportsTck : OrderImportsTest
 
     @Nested
-    inner class RemoveImportTck : RemoveImportTest
+    inner class RemoveUnusedImportsTck : RemoveUnusedImportsTest
 
     @Nested
     inner class RenameVariableTck : RenameVariableTest

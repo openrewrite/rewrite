@@ -21,12 +21,17 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.marker.Markers;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,7 +48,6 @@ import java.util.Optional;
 @AllArgsConstructor
 @NoArgsConstructor
 public class OrderImports extends Recipe {
-
     private boolean removeUnused = true;
 
     @Override
@@ -60,12 +64,15 @@ public class OrderImports extends Recipe {
 
             List<JRightPadded<J.Import>> orderedImports = layoutStyle.orderImports(cu.getPadding().getImports());
 
+            boolean changed = false;
             if (orderedImports.size() != cu.getImports().size()) {
                 cu = cu.getPadding().withImports(orderedImports);
+                changed = true;
             } else {
                 for (int i = 0; i < orderedImports.size(); i++) {
                     if (orderedImports.get(i) != cu.getPadding().getImports().get(i)) {
                         cu = cu.getPadding().withImports(orderedImports);
+                        changed = true;
                         break;
                     }
                 }
@@ -73,6 +80,9 @@ public class OrderImports extends Recipe {
 
             if (removeUnused) {
                 doAfterVisit(new RemoveUnusedImports());
+            }
+            else if(changed) {
+                doAfterVisit(new FormatFirstClassPrefix());
             }
 
             return cu;
