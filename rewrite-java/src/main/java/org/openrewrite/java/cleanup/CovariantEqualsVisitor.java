@@ -23,7 +23,6 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Incubating(since = "7.0.0")
@@ -49,12 +48,10 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
     private static class ChangeCovariantEqualsMethodVisitor<P> extends JavaIsoVisitor<P> {
 
         private static final AnnotationMatcher OVERRIDE_ANNOTATION_SIGNATURE = new AnnotationMatcher("@java.lang.Override");
-        private static final String EQUALS_BODY_PREFIX_TEMPLATE = "{\n" +
+        private static final String EQUALS_BODY_PREFIX_TEMPLATE =
                 "if (#{} == this) return true;\n" +
-                "if (#{} == null || getClass() != #{}.getClass()) return false;\n" +
-                "#{} #{} = (#{}) #{};\n" +
-                "#{}\n" +
-                "}";
+                        "if (#{} == null || getClass() != #{}.getClass()) return false;\n" +
+                        "#{} #{} = (#{}) #{};\n";
 
         private final J.ClassDeclaration enclosingClass;
 
@@ -72,7 +69,7 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
              * We'll replace it with "public boolean equals(Object)"
              */
             JavaType.Class type = enclosingClass.getType();
-            if(type == null) {
+            if (type == null) {
                 return m;
             }
 
@@ -118,14 +115,13 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
                         enclosingClass.getSimpleName(),
                         oldParamName.printTrimmed(),
                         enclosingClass.getSimpleName(),
-                        paramName,
-                        m.getBody().getStatements().stream().map(J::printTrimmed).collect(Collectors.joining(";"))
+                        paramName
                 };
 
                 m = maybeAutoFormat(m,
                         m.withTemplate(
                                 equalsBodySnippet,
-                                m.getCoordinates().replaceBody(),
+                                m.getBody().getStatements().get(0).getCoordinates().before(),
                                 params
                         ), p, getCursor().getParentOrThrow());
             }
