@@ -129,7 +129,4 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
             return m;
         }
     }
-
 }
-
-

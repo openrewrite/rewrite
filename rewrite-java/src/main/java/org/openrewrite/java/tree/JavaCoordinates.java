@@ -27,7 +27,26 @@ import java.util.Comparator;
 public class JavaCoordinates {
     J tree;
     Space.Location spaceLocation;
+    Mode mode;
 
     @Nullable
     Comparator<? extends J> comparator;
+
+    public boolean isReplacement() {
+        return Mode.REPLACEMENT.equals(mode);
+    }
+
+    /**
+     * Determines whether we are replacing a whole tree element, and not either
+     * (1) replacing just a piece of a method, class, or variable declaration signature or
+     * (2) inserting a new element
+     */
+    public boolean isReplaceWholeCursorValue() {
+        return isReplacement() && spaceLocation == null;
+    }
+
+    public enum Mode {
+        INSERTION,
+        REPLACEMENT
+    }
 }

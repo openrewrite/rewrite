@@ -38,8 +38,10 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
 
     private final UUID insertId;
     private final Space.Location location;
+    private final JavaCoordinates coordinates;
 
     public InsertAtCoordinates(JavaCoordinates coordinates) {
+        this.coordinates = coordinates;
         this.insertId = coordinates.getTree().getId();
         this.location = coordinates.getSpaceLocation();
         setCursoringOn();
@@ -48,7 +50,7 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
     @Nullable
     @Override
     public J preVisit(@Nullable J tree, List<? extends J> generated) {
-        if (tree == null || location != Space.Location.REPLACE || !tree.getId().equals(insertId)) {
+        if (tree == null || !coordinates.isReplaceWholeCursorValue() || !tree.getId().equals(insertId)) {
             return tree;
         }
         // Handles all cases where there is a replace on the current element.
@@ -195,7 +197,7 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
         J.MethodInvocation m = visitAndCast(method, generated, super::visitMethodInvocation);
         if (insertId.equals(m.getId()) && location == Space.Location.METHOD_INVOCATION_ARGUMENTS) {
             m = m.withArguments((List<Expression>) generated);
-        } else {
+        } else if (!coordinates.isReplacement()) {
             //noinspection ConstantConditions
             m = m.withArguments(maybeMergeList(m.getArguments(), generated));
         }
@@ -210,7 +212,7 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
             for (int index = 0; index < originalList.size(); index++) {
                 if (insertId.equals(originalList.get(index).getId())) {
                     List<T> newList = new ArrayList<>();
-                    if (location == Space.Location.REPLACE) {
+                    if (coordinates.isReplacement()) {
                         newList.addAll(originalList.subList(0, index + 1));
                         newList.addAll((List<T>) generated);
                         newList.addAll(originalList.subList(index + 1, originalList.size()));

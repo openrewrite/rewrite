@@ -15,8 +15,6 @@
  */
 package org.openrewrite.java.tree;
 
-import org.openrewrite.internal.lang.Nullable;
-
 import java.util.Comparator;
 
 public abstract class Coordinates {
@@ -26,12 +24,16 @@ public abstract class Coordinates {
         this.tree = tree;
     }
 
-    JavaCoordinates create(@Nullable Space.Location location) {
-        return new JavaCoordinates(tree, location, null);
+    JavaCoordinates insert(Space.Location location) {
+        return new JavaCoordinates(tree, location, JavaCoordinates.Mode.INSERTION, null);
+    }
+
+    JavaCoordinates replace(Space.Location location) {
+        return new JavaCoordinates(tree, location, JavaCoordinates.Mode.REPLACEMENT, null);
     }
 
     public JavaCoordinates replace() {
-        return create(Space.Location.REPLACE);
+        return new JavaCoordinates(tree, null, JavaCoordinates.Mode.REPLACEMENT, null);
     }
 
     public abstract JavaCoordinates before();
@@ -43,7 +45,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.ANNOTATED_TYPE_PREFIX);
+            return insert(Space.Location.ANNOTATED_TYPE_PREFIX);
         }
     }
 
@@ -54,7 +56,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.ANNOTATION_PREFIX);
+            return insert(Space.Location.ANNOTATION_PREFIX);
         }
     }
 
@@ -65,7 +67,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.ARRAY_ACCESS_PREFIX);
+            return insert(Space.Location.ARRAY_ACCESS_PREFIX);
         }
     }
 
@@ -76,7 +78,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.DIMENSION_PREFIX);
+            return insert(Space.Location.DIMENSION_PREFIX);
         }
     }
 
@@ -87,7 +89,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.ARRAY_TYPE_PREFIX);
+            return insert(Space.Location.ARRAY_TYPE_PREFIX);
         }
     }
 
@@ -98,7 +100,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.ASSERT_PREFIX);
+            return insert(Space.Location.ASSERT_PREFIX);
         }
     }
 
@@ -109,7 +111,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.ASSIGNMENT_PREFIX);
+            return insert(Space.Location.ASSIGNMENT_PREFIX);
         }
     }
 
@@ -120,7 +122,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.ASSIGNMENT_OPERATION_PREFIX);
+            return insert(Space.Location.ASSIGNMENT_OPERATION_PREFIX);
         }
     }
 
@@ -131,7 +133,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.BINARY_PREFIX);
+            return insert(Space.Location.BINARY_PREFIX);
         }
     }
 
@@ -142,11 +144,11 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.BLOCK_PREFIX);
+            return insert(Space.Location.BLOCK_PREFIX);
         }
 
         public JavaCoordinates lastStatement() {
-            return create(Space.Location.BLOCK_END);
+            return insert(Space.Location.BLOCK_END);
         }
     }
 
@@ -157,7 +159,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.BREAK_PREFIX);
+            return insert(Space.Location.BREAK_PREFIX);
         }
     }
 
@@ -168,7 +170,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.CASE_PREFIX);
+            return insert(Space.Location.CASE_PREFIX);
         }
     }
 
@@ -179,7 +181,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.CLASS_DECLARATION_PREFIX);
+            return insert(Space.Location.CLASS_DECLARATION_PREFIX);
         }
 
         /**
@@ -191,27 +193,27 @@ public abstract class Coordinates {
          * existing annotations in an ideal ordering.
          */
         public JavaCoordinates addAnnotation(Comparator<J.Annotation> idealOrdering) {
-            return new JavaCoordinates(tree, Space.Location.ANNOTATION_PREFIX, idealOrdering);
+            return new JavaCoordinates(tree, Space.Location.ANNOTATION_PREFIX, JavaCoordinates.Mode.INSERTION, idealOrdering);
         }
 
         public JavaCoordinates replaceAnnotations() {
-            return create(Space.Location.ANNOTATION_PREFIX);
+            return replace(Space.Location.ANNOTATION_PREFIX);
         }
 
         public JavaCoordinates replaceTypeParameters() {
-            return create(Space.Location.TYPE_PARAMETERS);
+            return replace(Space.Location.TYPE_PARAMETERS);
         }
 
         public JavaCoordinates replaceExtendsClause() {
-            return create(Space.Location.EXTENDS);
+            return replace(Space.Location.EXTENDS);
         }
 
         public JavaCoordinates replaceImplementsClause() {
-            return create(Space.Location.IMPLEMENTS);
+            return replace(Space.Location.IMPLEMENTS);
         }
 
         public JavaCoordinates replaceBody() {
-            return create(Space.Location.BLOCK_PREFIX);
+            return replace(Space.Location.BLOCK_PREFIX);
         }
     }
 
@@ -222,7 +224,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.COMPILATION_UNIT_PREFIX);
+            return insert(Space.Location.COMPILATION_UNIT_PREFIX);
         }
     }
 
@@ -233,7 +235,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.CONTINUE_PREFIX);
+            return insert(Space.Location.CONTINUE_PREFIX);
         }
     }
 
@@ -244,7 +246,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.CONTROL_PARENTHESES_PREFIX);
+            return insert(Space.Location.CONTROL_PARENTHESES_PREFIX);
         }
     }
 
@@ -255,7 +257,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.DO_WHILE_PREFIX);
+            return insert(Space.Location.DO_WHILE_PREFIX);
         }
     }
 
@@ -266,7 +268,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.EMPTY_PREFIX);
+            return insert(Space.Location.EMPTY_PREFIX);
         }
     }
 
@@ -277,7 +279,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.ENUM_VALUE_PREFIX);
+            return insert(Space.Location.ENUM_VALUE_PREFIX);
         }
     }
 
@@ -288,7 +290,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.ENUM_VALUE_SET_PREFIX);
+            return insert(Space.Location.ENUM_VALUE_SET_PREFIX);
         }
     }
 
@@ -299,7 +301,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.FIELD_ACCESS_PREFIX);
+            return insert(Space.Location.FIELD_ACCESS_PREFIX);
         }
     }
 
@@ -310,7 +312,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.FOR_EACH_LOOP_PREFIX);
+            return insert(Space.Location.FOR_EACH_LOOP_PREFIX);
         }
 
         public static class Control extends Coordinates {
@@ -320,7 +322,7 @@ public abstract class Coordinates {
 
             @Override
             public JavaCoordinates before() {
-                return create(Space.Location.FOR_EACH_CONTROL_PREFIX);
+                return insert(Space.Location.FOR_EACH_CONTROL_PREFIX);
             }
         }
     }
@@ -332,7 +334,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.FOR_PREFIX);
+            return insert(Space.Location.FOR_PREFIX);
         }
 
 
@@ -343,7 +345,7 @@ public abstract class Coordinates {
 
             @Override
             public JavaCoordinates before() {
-                return create(Space.Location.FOR_CONTROL_PREFIX);
+                return insert(Space.Location.FOR_CONTROL_PREFIX);
             }
         }
     }
@@ -355,7 +357,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.IDENTIFIER_PREFIX);
+            return insert(Space.Location.IDENTIFIER_PREFIX);
         }
     }
 
@@ -366,7 +368,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.IF_PREFIX);
+            return insert(Space.Location.IF_PREFIX);
         }
 
         public static class Else extends Coordinates {
@@ -376,7 +378,7 @@ public abstract class Coordinates {
 
             @Override
             public JavaCoordinates before() {
-                return create(Space.Location.FOR_CONTROL_PREFIX);
+                return insert(Space.Location.FOR_CONTROL_PREFIX);
             }
         }
     }
@@ -388,7 +390,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.IMPORT_PREFIX);
+            return insert(Space.Location.IMPORT_PREFIX);
         }
     }
 
@@ -399,7 +401,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.INSTANCEOF_PREFIX);
+            return insert(Space.Location.INSTANCEOF_PREFIX);
         }
     }
 
@@ -410,7 +412,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.LABEL_PREFIX);
+            return insert(Space.Location.LABEL_PREFIX);
         }
     }
 
@@ -421,7 +423,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.LAMBDA_PREFIX);
+            return insert(Space.Location.LAMBDA_PREFIX);
         }
 
         public static class Parameters extends Coordinates {
@@ -432,7 +434,7 @@ public abstract class Coordinates {
 
             @Override
             public JavaCoordinates before() {
-                return create(Space.Location.LAMBDA_PARAMETERS_PREFIX);
+                return insert(Space.Location.LAMBDA_PARAMETERS_PREFIX);
             }
         }
     }
@@ -444,7 +446,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.LITERAL_PREFIX);
+            return insert(Space.Location.LITERAL_PREFIX);
         }
     }
 
@@ -455,7 +457,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.MEMBER_REFERENCE_PREFIX);
+            return insert(Space.Location.MEMBER_REFERENCE_PREFIX);
         }
     }
 
@@ -466,7 +468,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.METHOD_DECLARATION_PREFIX);
+            return insert(Space.Location.METHOD_DECLARATION_PREFIX);
         }
 
         /**
@@ -478,27 +480,27 @@ public abstract class Coordinates {
          * existing annotations in an ideal ordering.
          */
         public JavaCoordinates addAnnotation(Comparator<J.Annotation> idealOrdering) {
-            return new JavaCoordinates(tree, Space.Location.ANNOTATION_PREFIX, idealOrdering);
+            return new JavaCoordinates(tree, Space.Location.ANNOTATION_PREFIX, JavaCoordinates.Mode.INSERTION, idealOrdering);
         }
 
         public JavaCoordinates replaceAnnotations() {
-            return create(Space.Location.ANNOTATION_PREFIX);
+            return replace(Space.Location.ANNOTATION_PREFIX);
         }
 
         public JavaCoordinates replaceTypeParameters() {
-            return create(Space.Location.TYPE_PARAMETERS);
+            return replace(Space.Location.TYPE_PARAMETERS);
         }
 
         public JavaCoordinates replaceParameters() {
-            return create(Space.Location.METHOD_DECLARATION_PARAMETERS);
+            return replace(Space.Location.METHOD_DECLARATION_PARAMETERS);
         }
 
         public JavaCoordinates replaceThrows() {
-            return create(Space.Location.THROWS);
+            return replace(Space.Location.THROWS);
         }
 
         public JavaCoordinates replaceBody() {
-            return create(Space.Location.BLOCK_PREFIX);
+            return replace(Space.Location.BLOCK_PREFIX);
         }
     }
 
@@ -509,11 +511,11 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.METHOD_INVOCATION_PREFIX);
+            return insert(Space.Location.METHOD_INVOCATION_PREFIX);
         }
 
         public JavaCoordinates replaceArguments() {
-            return create(Space.Location.METHOD_INVOCATION_ARGUMENTS);
+            return replace(Space.Location.METHOD_INVOCATION_ARGUMENTS);
         }
 
     }
@@ -525,7 +527,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.MODIFIER_PREFIX);
+            return insert(Space.Location.MODIFIER_PREFIX);
         }
     }
 
@@ -536,7 +538,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.MULTI_CATCH_PREFIX);
+            return insert(Space.Location.MULTI_CATCH_PREFIX);
         }
     }
 
@@ -547,7 +549,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.NEW_ARRAY_PREFIX);
+            return insert(Space.Location.NEW_ARRAY_PREFIX);
         }
     }
 
@@ -558,7 +560,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.NEW_CLASS_PREFIX);
+            return insert(Space.Location.NEW_CLASS_PREFIX);
         }
     }
 
@@ -569,7 +571,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.PACKAGE_PREFIX);
+            return insert(Space.Location.PACKAGE_PREFIX);
         }
     }
 
@@ -580,7 +582,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.PARAMETERIZED_TYPE_PREFIX);
+            return insert(Space.Location.PARAMETERIZED_TYPE_PREFIX);
         }
     }
 
@@ -591,7 +593,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.PARENTHESES_PREFIX);
+            return insert(Space.Location.PARENTHESES_PREFIX);
         }
     }
 
@@ -602,7 +604,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.PRIMITIVE_PREFIX);
+            return insert(Space.Location.PRIMITIVE_PREFIX);
         }
     }
 
@@ -613,7 +615,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.RETURN_PREFIX);
+            return insert(Space.Location.RETURN_PREFIX);
         }
     }
 
@@ -624,7 +626,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.SWITCH_PREFIX);
+            return insert(Space.Location.SWITCH_PREFIX);
         }
     }
 
@@ -635,7 +637,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.SYNCHRONIZED_PREFIX);
+            return insert(Space.Location.SYNCHRONIZED_PREFIX);
         }
     }
 
@@ -646,7 +648,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.TERNARY_PREFIX);
+            return insert(Space.Location.TERNARY_PREFIX);
         }
     }
 
@@ -657,7 +659,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.THROW_PREFIX);
+            return insert(Space.Location.THROW_PREFIX);
         }
     }
 
@@ -668,7 +670,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.TRY_PREFIX);
+            return insert(Space.Location.TRY_PREFIX);
         }
 
         public static class Catch extends Coordinates {
@@ -678,7 +680,7 @@ public abstract class Coordinates {
 
             @Override
             public JavaCoordinates before() {
-                return create(Space.Location.CATCH_PREFIX);
+                return insert(Space.Location.CATCH_PREFIX);
             }
         }
 
@@ -689,7 +691,7 @@ public abstract class Coordinates {
 
             @Override
             public JavaCoordinates before() {
-                return create(Space.Location.TRY_RESOURCE);
+                return insert(Space.Location.TRY_RESOURCE);
             }
         }
     }
@@ -701,7 +703,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.TYPE_CAST_PREFIX);
+            return insert(Space.Location.TYPE_CAST_PREFIX);
         }
     }
 
@@ -712,11 +714,11 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.TYPE_PARAMETERS_PREFIX);
+            return insert(Space.Location.TYPE_PARAMETERS_PREFIX);
         }
 
         public JavaCoordinates bounds() {
-            return create(Space.Location.TYPE_BOUNDS);
+            return insert(Space.Location.TYPE_BOUNDS);
         }
     }
 
@@ -727,7 +729,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.UNARY_PREFIX);
+            return insert(Space.Location.UNARY_PREFIX);
         }
     }
 
@@ -738,7 +740,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.VARIABLE_DECLARATIONS_PREFIX);
+            return insert(Space.Location.VARIABLE_DECLARATIONS_PREFIX);
         }
 
         /**
@@ -750,11 +752,11 @@ public abstract class Coordinates {
          * existing annotations in an ideal ordering.
          */
         public JavaCoordinates addAnnotation(Comparator<J.Annotation> idealOrdering) {
-            return new JavaCoordinates(tree, Space.Location.ANNOTATION_PREFIX, idealOrdering);
+            return new JavaCoordinates(tree, Space.Location.ANNOTATION_PREFIX, JavaCoordinates.Mode.INSERTION, idealOrdering);
         }
 
         public JavaCoordinates replaceAnnotations() {
-            return create(Space.Location.ANNOTATION_PREFIX);
+            return replace(Space.Location.ANNOTATION_PREFIX);
         }
 
         public static class NamedVar extends Coordinates {
@@ -764,7 +766,7 @@ public abstract class Coordinates {
 
             @Override
             public JavaCoordinates before() {
-                return create(Space.Location.VARIABLE_PREFIX);
+                return insert(Space.Location.VARIABLE_PREFIX);
             }
         }
     }
@@ -776,7 +778,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.WHILE_PREFIX);
+            return insert(Space.Location.WHILE_PREFIX);
         }
     }
 
@@ -787,7 +789,7 @@ public abstract class Coordinates {
 
         @Override
         public JavaCoordinates before() {
-            return create(Space.Location.WILDCARD_PREFIX);
+            return insert(Space.Location.WILDCARD_PREFIX);
         }
     }
 }

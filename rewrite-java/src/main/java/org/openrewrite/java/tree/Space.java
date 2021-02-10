@@ -421,6 +421,5 @@ public class Space implements Markable {
         WHILE_PREFIX,
         WILDCARD_BOUND,
         WILDCARD_PREFIX,
-        REPLACE, //Used ONLY to indicate replace semantics in JavaTemplate
     }
 }

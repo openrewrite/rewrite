@@ -54,11 +54,10 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
 
     @Override
     public @Nullable J visit(@Nullable Tree tree, Cursor insertionScope) {
-
-        if (coordinates.getSpaceLocation() == Space.Location.REPLACE && tree != null && tree.getId().equals(coordinates.getTree().getId())) {
-            getPrinter().append(code);
+        if (coordinates.isReplaceWholeCursorValue() && tree != null && tree.getId().equals(coordinates.getTree().getId())) {
+            printTemplate();
             return (J) tree;
-        } else if (tree != null &&tree.getId().equals(changing.getId())) {
+        } else if (tree != null && tree.getId().equals(changing.getId())) {
             //Once the Id of the tree matches the ID of possible mutated tree navigation ,for the sake of printing the
             //synthetic class, swaps to the "changing" class.
             return super.visit(changing, insertionScope);
@@ -66,7 +65,6 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
             return super.visit(tree, insertionScope);
         }
     }
-
 
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu, Cursor insertionScope) {
@@ -84,7 +82,7 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
             return super.visitBlock(b, insertionScope);
         }
 
-        if(coordinates.getTree().getId().equals(block.getId()) && coordinates.getSpaceLocation().equals(Space.Location.BLOCK_PREFIX)) {
+        if (coordinates.getTree().getId().equals(block.getId()) && Space.Location.BLOCK_PREFIX.equals(coordinates.getSpaceLocation())) {
             J.Block b = block.withStatements(emptyList());
             return super.visitBlock(b, insertionScope);
         }
@@ -113,7 +111,7 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
     public Space visitSpace(Space space, Space.Location loc, Cursor cursor) {
         J j = getCursor().firstEnclosing(J.class);
         if (loc == coordinates.getSpaceLocation() && j != null && coordinates.getTree().getId().equals(j.getId())) {
-            getPrinter().append(code);
+            printTemplate();
         }
         return super.visitSpace(space, loc, cursor);
     }
@@ -142,8 +140,8 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
 
         visitSpace(classDecl.getPrefix(), Space.Location.CLASS_DECLARATION_PREFIX, insertionScope);
 
-        if (coordinates.getSpaceLocation().equals(Space.Location.ANNOTATION_PREFIX)) {
-            getPrinter().append(code);
+        if (coordinates.isReplacement() && Space.Location.ANNOTATION_PREFIX.equals(coordinates.getSpaceLocation())) {
+            printTemplate();
         } else {
             visit(classDecl.getAnnotations(), insertionScope);
         }
@@ -154,27 +152,27 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
         acc.append(kind);
         visit(classDecl.getName(), insertionScope);
 
-        if (coordinates.getSpaceLocation().equals(Space.Location.TYPE_PARAMETERS)) {
-            getPrinter().append(code);
+        if (coordinates.isReplacement() && Space.Location.TYPE_PARAMETERS.equals(coordinates.getSpaceLocation())) {
+            printTemplate();
         } else {
             visitContainer("<", classDecl.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", insertionScope);
         }
 
-        if (coordinates.getSpaceLocation().equals(Space.Location.EXTENDS)) {
-            getPrinter().append(code);
+        if (coordinates.isReplacement() && Space.Location.EXTENDS.equals(coordinates.getSpaceLocation())) {
+            printTemplate();
         } else {
             visitLeftPadded("extends", classDecl.getPadding().getExtends(), JLeftPadded.Location.EXTENDS, insertionScope);
         }
 
-        if (coordinates.getSpaceLocation().equals(Space.Location.IMPLEMENTS)) {
-            getPrinter().append(code);
+        if (coordinates.isReplacement() && Space.Location.IMPLEMENTS.equals(coordinates.getSpaceLocation())) {
+            printTemplate();
         } else {
             visitContainer(classDecl.getKind().equals(J.ClassDeclaration.Kind.Interface) ? "extends" : "implements",
                     classDecl.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, ",", null, insertionScope);
         }
 
-        if (coordinates.getSpaceLocation().equals(Space.Location.BLOCK_PREFIX)) {
-            getPrinter().append(code);
+        if (coordinates.isReplacement() && Space.Location.BLOCK_PREFIX.equals(coordinates.getSpaceLocation())) {
+            printTemplate();
         } else {
             visit(classDecl.getBody(), insertionScope);
         }
@@ -190,16 +188,16 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
 
         visitSpace(method.getPrefix(), Space.Location.METHOD_DECLARATION_PREFIX, insertionScope);
 
-        if (coordinates.getSpaceLocation().equals(Space.Location.ANNOTATION_PREFIX)) {
-            getPrinter().append(code);
+        if (coordinates.isReplacement() && Space.Location.ANNOTATION_PREFIX.equals(coordinates.getSpaceLocation())) {
+            printTemplate();
         } else {
             visit(method.getAnnotations(), insertionScope);
         }
 
         visitModifiers(method.getModifiers(), insertionScope);
 
-        if (coordinates.getSpaceLocation().equals(Space.Location.TYPE_PARAMETERS)) {
-            getPrinter().append(code);
+        if (coordinates.isReplacement() && Space.Location.TYPE_PARAMETERS.equals(coordinates.getSpaceLocation())) {
+            printTemplate();
         } else {
             visitContainer("<", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", insertionScope);
         }
@@ -207,20 +205,20 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
         visit(method.getReturnTypeExpression(), insertionScope);
         visit(method.getName(), insertionScope);
 
-        if (coordinates.getSpaceLocation().equals(Space.Location.METHOD_DECLARATION_PARAMETERS)) {
-            getPrinter().append(code);
+        if (coordinates.isReplacement() && Space.Location.METHOD_DECLARATION_PARAMETERS.equals(coordinates.getSpaceLocation())) {
+            printTemplate();
         } else {
             visitContainer("(", method.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",", ")", insertionScope);
         }
 
-        if (coordinates.getSpaceLocation().equals(Space.Location.THROWS)) {
-            getPrinter().append(code);
+        if (coordinates.isReplacement() && Space.Location.THROWS.equals(coordinates.getSpaceLocation())) {
+            printTemplate();
         } else {
             visitContainer("throws", method.getPadding().getThrows(), JContainer.Location.THROWS, ",", null, insertionScope);
         }
 
-        if (coordinates.getSpaceLocation().equals(Space.Location.BLOCK_PREFIX)) {
-            getPrinter().append(code);
+        if (coordinates.isReplacement() && Space.Location.BLOCK_PREFIX.equals(coordinates.getSpaceLocation())) {
+            printTemplate();
         } else {
             visit(method.getBody(), insertionScope);
         }
@@ -240,14 +238,14 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
         visitSpace(method.getPrefix(), Space.Location.METHOD_INVOCATION_PREFIX, insertionScope);
         visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, ".", insertionScope);
 
-        if (coordinates.getSpaceLocation().equals(Space.Location.TYPE_PARAMETERS)) {
-            getPrinter().append(code);
+        if (coordinates.isReplacement() && Space.Location.TYPE_PARAMETERS.equals(coordinates.getSpaceLocation())) {
+            printTemplate();
         } else {
             visitContainer("<", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", insertionScope);
         }
         visit(method.getName(), insertionScope);
-        if (coordinates.getSpaceLocation().equals(Space.Location.METHOD_INVOCATION_ARGUMENTS)) {
-            getPrinter().append(code);
+        if (coordinates.isReplacement() && Space.Location.METHOD_INVOCATION_ARGUMENTS.equals(coordinates.getSpaceLocation())) {
+            printTemplate();
         } else {
             visitContainer("(", method.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, ",", ")", insertionScope);
         }
@@ -265,8 +263,8 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
         StringBuilder acc = getPrinter();
         visitSpace(multiVariable.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, insertionScope);
 
-        if (coordinates.getSpaceLocation().equals(Space.Location.ANNOTATION_PREFIX)) {
-            getPrinter().append(code);
+        if (coordinates.isReplacement() && Space.Location.ANNOTATION_PREFIX.equals(coordinates.getSpaceLocation())) {
+            printTemplate();
         } else {
             visit(multiVariable.getAnnotations(), insertionScope);
         }
@@ -302,7 +300,7 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
      * possibly mutated tree until the coordinates are found.
      *
      * @param parentScope The parent scope is root from the original AST
-     * @param changing The possibly mutated tree
+     * @param changing    The possibly mutated tree
      * @param coordinates The coordinates to search for
      * @return A cursor representing the path from the original compilation unit to the coordinates element in the mutated tree
      */
@@ -312,13 +310,19 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
         return cursorReference.get();
     }
 
+    private void printTemplate() {
+        getPrinter().append(code);
+    }
+
     private static class ExtractInsertionCursor extends JavaVisitor<AtomicReference<Cursor>> {
         private final UUID insertionId;
+
         private ExtractInsertionCursor(JavaCoordinates coordinates, Cursor parent) {
             insertionId = coordinates.getTree().getId();
             setCursoringOn();
             setCursor(parent);
         }
+
         @Override
         public @Nullable J visit(@Nullable Tree tree, AtomicReference<Cursor> cursorReference) {
             if (tree != null && tree.getId().equals(insertionId)) {
@@ -327,5 +331,4 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
             return super.visit(tree, cursorReference);
         }
     }
-
 }
