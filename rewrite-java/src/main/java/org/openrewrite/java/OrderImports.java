@@ -52,13 +52,20 @@ public class OrderImports extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new OrderImportsVisitor();
+        return new OrderImportsVisitor<>(removeUnused);
     }
 
-    private class OrderImportsVisitor extends JavaIsoVisitor<ExecutionContext> {
+    /**
+     * This visitor is used directly by AddImport, which is why this class is both static and package private
+     */
+    static class OrderImportsVisitor<P> extends JavaIsoVisitor<P> {
+        private final boolean removeUnused;
+        OrderImportsVisitor(boolean removeUnused) {
+            this.removeUnused = removeUnused;
+        }
 
         @Override
-        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P ctx) {
             ImportLayoutStyle layoutStyle = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
                     .orElse(IntelliJ.importLayout());
 

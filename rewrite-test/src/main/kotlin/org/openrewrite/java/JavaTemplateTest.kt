@@ -305,6 +305,33 @@ interface JavaTemplateTest : RecipeTest {
     )
 
     @Test
+    fun addImportToTemplate(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val template = template("extends List<String>")
+                .imports("java.util.List")
+                .doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
+            init {
+                setCursoringOn()
+            }
+            override fun visitClassDeclaration(clazz: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
+                val c = super.visitClassDeclaration(clazz, p)
+                return c.withTemplate(template, c.coordinates.replaceExtendsClause())
+            }
+        }.toRecipe(),
+        before = """
+            public class A {
+            }
+        """,
+        after = """
+            public class A extends List<String> {
+            }
+        """
+    )
+
+    @Test
     fun addStaticMethodToClass(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {

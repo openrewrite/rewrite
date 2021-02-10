@@ -109,8 +109,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         imports.add(new JRightPadded<>(importToAdd, Space.EMPTY, Markers.EMPTY));
         cu = cu.getPadding().withImports(imports);
 
-        OrderImports orderImports = new OrderImports(false);
-        doAfterVisit(orderImports);
+        doAfterVisit(new OrderImports.OrderImportsVisitor<>(false));
         doAfterVisit(new FormatFirstClassPrefix<>());
 
         return cu;
