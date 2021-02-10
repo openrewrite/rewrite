@@ -68,10 +68,23 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
 
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu, Cursor insertionScope) {
-        for (String impoort : imports) {
-            doAfterVisit(new AddImport<>(impoort, null, false));
+        visitSpace(cu.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, insertionScope);
+        visitRightPadded(cu.getPadding().getPackageDeclaration(), JRightPadded.Location.PACKAGE, ";", insertionScope);
+
+        if (!imports.isEmpty()) {
+            getPrinter().append("\n\n");
+            for (String impoort : imports) {
+                getPrinter().append(impoort);
+            }
         }
-        return super.visitCompilationUnit(cu, insertionScope);
+        visitRightPadded(cu.getPadding().getImports(), JRightPadded.Location.IMPORT, ";", insertionScope);
+        StringBuilder acc = getPrinter();
+        if (!cu.getImports().isEmpty()) {
+            acc.append(";");
+        }
+        visit(cu.getClasses(), insertionScope);
+        visitSpace(cu.getEof(), Space.Location.COMPILATION_UNIT_EOF, insertionScope);
+        return cu;
     }
 
     @Override
