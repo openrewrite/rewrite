@@ -86,9 +86,15 @@ public class JavaTemplate {
         onAfterVariableSubstitution.accept(substitutedTemplate);
 
         J.CompilationUnit cu = parentScope.firstEnclosingOrThrow(J.CompilationUnit.class);
+        //The tree printer uses the cursor path from the compilation unit down to the tree element within the coordinates
+        //to generate the synthetic compilation unit. It is possible that the coordinates exist only in the "changed"
+        //tree. To accommodate this, we compute the cursor path from the parent into the CHANGED/mutated tree until we
+        //find the coordinates.
 
-        String generatedSource = new JavaTemplatePrinter(substitutedTemplate, coordinates, imports)
-                .print(cu, parentScope);
+        Cursor insertionScope = JavaTemplatePrinter.findCoordinateCursor(parentScope, changing, coordinates);
+
+        String generatedSource = new JavaTemplatePrinter(substitutedTemplate, changing, coordinates, imports)
+                .print(cu, insertionScope);
         onBeforeParseTemplate.accept(generatedSource);
 
         parser.reset();

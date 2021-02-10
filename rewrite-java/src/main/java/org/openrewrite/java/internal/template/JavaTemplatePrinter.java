@@ -21,13 +21,12 @@ import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.AddImport;
 import org.openrewrite.java.JavaPrinter;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 
@@ -39,24 +38,33 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
     static final String SNIPPET_MARKER_END = "<<<<END>>>>";
 
     private final JavaCoordinates coordinates;
+    private final Tree changing;
     private final Set<String> imports;
     private final String code;
 
-    public JavaTemplatePrinter(String code, JavaCoordinates coordinates, Set<String> imports) {
+
+    public JavaTemplatePrinter(String code, Tree changing, JavaCoordinates coordinates, Set<String> imports) {
         super(TreePrinter.identity());
         this.code = "/*" + SNIPPET_MARKER_START + "*/" + code + "/*" + SNIPPET_MARKER_END + "*/";
         this.coordinates = coordinates;
+        this.changing = changing;
         this.imports = imports;
         setCursoringOn();
     }
 
     @Override
-    public @Nullable J visit(@Nullable Tree tree, Cursor cursor) {
+    public @Nullable J visit(@Nullable Tree tree, Cursor insertionScope) {
+
         if (coordinates.getSpaceLocation() == Space.Location.REPLACE && tree != null && tree.getId().equals(coordinates.getTree().getId())) {
             getPrinter().append(code);
             return (J) tree;
+        } else if (tree != null &&tree.getId().equals(changing.getId())) {
+            //Once the Id of the tree matches the ID of possible mutated tree, navigation
+            //for the sake of printing the synthetic class uses the "changing" class.
+            return super.visit(changing, insertionScope);
+        } else {
+            return super.visit(tree, insertionScope);
         }
-        return super.visit(tree, cursor);
     }
 
 
@@ -104,7 +112,7 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
     @Override
     public Space visitSpace(Space space, Space.Location loc, Cursor cursor) {
         J j = getCursor().firstEnclosing(J.class);
-        if (loc.equals(coordinates.getSpaceLocation()) && coordinates.getTree().equals(j)) {
+        if (loc == coordinates.getSpaceLocation() && j != null && coordinates.getTree().getId().equals(j.getId())) {
             getPrinter().append(code);
         }
         return super.visitSpace(space, loc, cursor);
@@ -287,4 +295,37 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
         }
         return (J.VariableDeclarations.NamedVariable) super.visitVariable(variable, insertionScope);
     }
+
+
+    /**
+     * This method will extends the insertion scope cursor by starting at the parent cursor and then walking into the
+     * possibly mutated tree "changing" until the coordinates are found.
+     *
+     * @param parentScope The parent scope is root from the original AST
+     * @param changing The possibly mutated (from a previous operation) branch
+     * @param coordinates The coordinates within the changing branch to search for
+     * @return A cursor representing the path from the original compilation unit to the coordinates element in the mutated tree
+     */
+    public static Cursor findCoordinateCursor(Cursor parentScope, Tree changing, JavaCoordinates coordinates) {
+        AtomicReference<Cursor> cursorReference = new AtomicReference<>(parentScope);
+        new ExtractInsertionCursor(coordinates, parentScope).visit(changing, cursorReference);
+        return cursorReference.get();
+    }
+
+    private static class ExtractInsertionCursor extends JavaVisitor<AtomicReference<Cursor>> {
+        private final UUID insertionId;
+        private ExtractInsertionCursor(JavaCoordinates coordinates, Cursor parent) {
+            insertionId = coordinates.getTree().getId();
+            setCursoringOn();
+            setCursor(parent);
+        }
+        @Override
+        public @Nullable J visit(@Nullable Tree tree, AtomicReference<Cursor> cursorReference) {
+            if (tree != null && tree.getId().equals(insertionId)) {
+                cursorReference.set(getCursor());
+            }
+            return super.visit(tree, cursorReference);
+        }
+    }
+
 }
