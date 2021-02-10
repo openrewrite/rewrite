@@ -19,166 +19,166 @@ import org.openrewrite.internal.lang.Nullable;
 
 import java.util.Comparator;
 
-public abstract class Coordinates<J2 extends J> {
-    J2 tree;
+public abstract class Coordinates {
+    J tree;
 
-    Coordinates(J2 tree) {
+    Coordinates(J tree) {
         this.tree = tree;
     }
 
-    JavaCoordinates<?> create(@Nullable Space.Location location) {
-        return new JavaCoordinates<>(tree, location);
+    JavaCoordinates create(@Nullable Space.Location location) {
+        return new JavaCoordinates(tree, location, null);
     }
 
-    public JavaCoordinates<?> replace() {
+    public JavaCoordinates replace() {
         return create(Space.Location.REPLACE);
     }
 
-    public abstract JavaCoordinates<?> before();
+    public abstract JavaCoordinates before();
 
-    public static class AnnotatedType extends Coordinates<J.AnnotatedType> {
+    public static class AnnotatedType extends Coordinates {
         AnnotatedType(J.AnnotatedType tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.ANNOTATED_TYPE_PREFIX);
         }
     }
 
-    public static class Annotation extends Coordinates<J.Annotation> {
+    public static class Annotation extends Coordinates {
         Annotation(J.Annotation tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.ANNOTATION_PREFIX);
         }
     }
 
-    public static class ArrayAccess extends Coordinates<J.ArrayAccess> {
+    public static class ArrayAccess extends Coordinates {
         ArrayAccess(J.ArrayAccess tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.ARRAY_ACCESS_PREFIX);
         }
     }
 
-    public static class ArrayDimension extends Coordinates<J.ArrayDimension> {
+    public static class ArrayDimension extends Coordinates {
         ArrayDimension(J.ArrayDimension tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.DIMENSION_PREFIX);
         }
     }
 
-    public static class ArrayType extends Coordinates<J.ArrayType> {
+    public static class ArrayType extends Coordinates {
         ArrayType(J.ArrayType tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.ARRAY_TYPE_PREFIX);
         }
     }
 
-    public static class Assert extends Coordinates<J.Assert> {
+    public static class Assert extends Coordinates {
         Assert(J.Assert tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.ASSERT_PREFIX);
         }
     }
 
-    public static class Assignment extends Coordinates<J.Assignment> {
+    public static class Assignment extends Coordinates {
         Assignment(J.Assignment tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.ASSIGNMENT_PREFIX);
         }
     }
 
-    public static class AssignmentOperation extends Coordinates<J.AssignmentOperation> {
+    public static class AssignmentOperation extends Coordinates {
         AssignmentOperation(J.AssignmentOperation tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.ASSIGNMENT_OPERATION_PREFIX);
         }
     }
 
-    public static class Binary extends Coordinates<J.Binary> {
+    public static class Binary extends Coordinates {
         Binary(J.Binary tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.BINARY_PREFIX);
         }
     }
 
-    public static class Block extends Coordinates<J.Block> {
+    public static class Block extends Coordinates {
         Block(J.Block tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.BLOCK_PREFIX);
         }
 
-        public JavaCoordinates<?> lastStatement() {
+        public JavaCoordinates lastStatement() {
             return create(Space.Location.BLOCK_END);
         }
     }
 
-    public static class Break extends Coordinates<J.Break> {
+    public static class Break extends Coordinates {
         Break(J.Break tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.BREAK_PREFIX);
         }
     }
 
-    public static class Case extends Coordinates<J.Case> {
+    public static class Case extends Coordinates {
         Case(J.Case tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.CASE_PREFIX);
         }
     }
 
-    public static class ClassDeclaration extends Coordinates<J.ClassDeclaration> {
+    public static class ClassDeclaration extends Coordinates {
         ClassDeclaration(J.ClassDeclaration tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.CLASS_DECLARATION_PREFIX);
         }
 
@@ -190,282 +190,282 @@ public abstract class Coordinates<J2 extends J> {
          * before in an ideal ordering, or as the last annotation if it would not appear before any
          * existing annotations in an ideal ordering.
          */
-        public JavaCoordinates<?> addAnnotation(Comparator<J.Annotation> idealOrdering) {
-            throw new UnsupportedOperationException("");
+        public JavaCoordinates addAnnotation(Comparator<J.Annotation> idealOrdering) {
+            return new JavaCoordinates(tree, Space.Location.ANNOTATION_PREFIX, idealOrdering);
         }
 
-        public JavaCoordinates<?> replaceAnnotations() {
+        public JavaCoordinates replaceAnnotations() {
             return create(Space.Location.ANNOTATION_PREFIX);
         }
 
-        public JavaCoordinates<?> replaceTypeParameters() {
+        public JavaCoordinates replaceTypeParameters() {
             return create(Space.Location.TYPE_PARAMETERS);
         }
 
-        public JavaCoordinates<?> replaceExtendsClause() {
+        public JavaCoordinates replaceExtendsClause() {
             return create(Space.Location.EXTENDS);
         }
 
-        public JavaCoordinates<?> replaceImplementsClause() {
+        public JavaCoordinates replaceImplementsClause() {
             return create(Space.Location.IMPLEMENTS);
         }
 
-        public JavaCoordinates<?> replaceBody() {
+        public JavaCoordinates replaceBody() {
             return create(Space.Location.BLOCK_PREFIX);
         }
     }
 
-    public static class CompilationUnit extends Coordinates<J.CompilationUnit> {
+    public static class CompilationUnit extends Coordinates {
         CompilationUnit(J.CompilationUnit tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.COMPILATION_UNIT_PREFIX);
         }
     }
 
-    public static class Continue extends Coordinates<J.Continue> {
+    public static class Continue extends Coordinates {
         Continue(J.Continue tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.CONTINUE_PREFIX);
         }
     }
 
-    public static class ControlParentheses<J2 extends J> extends Coordinates<J.ControlParentheses<J2>> {
-        ControlParentheses(J.ControlParentheses<J2> tree) {
+    public static class ControlParentheses extends Coordinates {
+        ControlParentheses(J.ControlParentheses<?> tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.CONTROL_PARENTHESES_PREFIX);
         }
     }
 
-    public static class DoWhileLoop extends Coordinates<J.DoWhileLoop> {
+    public static class DoWhileLoop extends Coordinates {
         DoWhileLoop(J.DoWhileLoop tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.DO_WHILE_PREFIX);
         }
     }
 
-    public static class Empty extends Coordinates<J.Empty> {
+    public static class Empty extends Coordinates {
         Empty(J.Empty tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.EMPTY_PREFIX);
         }
     }
 
-    public static class EnumValue extends Coordinates<J.EnumValue> {
+    public static class EnumValue extends Coordinates {
         EnumValue(J.EnumValue tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.ENUM_VALUE_PREFIX);
         }
     }
 
-    public static class EnumValueSet extends Coordinates<J.EnumValueSet> {
+    public static class EnumValueSet extends Coordinates {
         EnumValueSet(J.EnumValueSet tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.ENUM_VALUE_SET_PREFIX);
         }
     }
 
-    public static class FieldAccess extends Coordinates<J.FieldAccess> {
+    public static class FieldAccess extends Coordinates {
         FieldAccess(J.FieldAccess tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.FIELD_ACCESS_PREFIX);
         }
     }
 
-    public static class ForEachLoop extends Coordinates<J.ForEachLoop> {
+    public static class ForEachLoop extends Coordinates {
         ForEachLoop(J.ForEachLoop tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.FOR_EACH_LOOP_PREFIX);
         }
 
-        public static class Control extends Coordinates<J.ForEachLoop.Control> {
+        public static class Control extends Coordinates {
             Control(J.ForEachLoop.Control tree) {
                 super(tree);
             }
 
             @Override
-            public JavaCoordinates<?> before() {
+            public JavaCoordinates before() {
                 return create(Space.Location.FOR_EACH_CONTROL_PREFIX);
             }
         }
     }
 
-    public static class ForLoop extends Coordinates<J.ForLoop> {
+    public static class ForLoop extends Coordinates {
         ForLoop(J.ForLoop tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.FOR_PREFIX);
         }
 
 
-        public static class Control extends Coordinates<J.ForLoop.Control> {
+        public static class Control extends Coordinates {
             Control(J.ForLoop.Control tree) {
                 super(tree);
             }
 
             @Override
-            public JavaCoordinates<?> before() {
+            public JavaCoordinates before() {
                 return create(Space.Location.FOR_CONTROL_PREFIX);
             }
         }
     }
 
-    public static class Identifier extends Coordinates<J.Identifier> {
+    public static class Identifier extends Coordinates {
         Identifier(J.Identifier tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.IDENTIFIER_PREFIX);
         }
     }
 
-    public static class If extends Coordinates<J.If> {
+    public static class If extends Coordinates {
         If(J.If tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.IF_PREFIX);
         }
 
-        public static class Else extends Coordinates<J.If.Else> {
+        public static class Else extends Coordinates {
             Else(J.If.Else tree) {
                 super(tree);
             }
 
             @Override
-            public JavaCoordinates<?> before() {
+            public JavaCoordinates before() {
                 return create(Space.Location.FOR_CONTROL_PREFIX);
             }
         }
     }
 
-    public static class Import extends Coordinates<J.Import> {
+    public static class Import extends Coordinates {
         Import(J.Import tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.IMPORT_PREFIX);
         }
     }
 
-    public static class InstanceOf extends Coordinates<J.InstanceOf> {
+    public static class InstanceOf extends Coordinates {
         InstanceOf(J.InstanceOf tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.INSTANCEOF_PREFIX);
         }
     }
 
-    public static class Label extends Coordinates<J.Label> {
+    public static class Label extends Coordinates {
         Label(J.Label tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.LABEL_PREFIX);
         }
     }
 
-    public static class Lambda extends Coordinates<J.Lambda> {
+    public static class Lambda extends Coordinates {
         Lambda(J.Lambda tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.LAMBDA_PREFIX);
         }
 
-        public static class Parameters extends Coordinates<J.Lambda.Parameters> {
+        public static class Parameters extends Coordinates {
 
             Parameters(J.Lambda.Parameters tree) {
                 super(tree);
             }
 
             @Override
-            public JavaCoordinates<?> before() {
+            public JavaCoordinates before() {
                 return create(Space.Location.LAMBDA_PARAMETERS_PREFIX);
             }
         }
     }
 
-    public static class Literal extends Coordinates<J.Literal> {
+    public static class Literal extends Coordinates {
         Literal(J.Literal tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.LITERAL_PREFIX);
         }
     }
 
-    public static class MemberReference extends Coordinates<J.MemberReference> {
+    public static class MemberReference extends Coordinates {
         MemberReference(J.MemberReference tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.MEMBER_REFERENCE_PREFIX);
         }
     }
 
-    public static class MethodDeclaration extends Coordinates<J.MethodDeclaration> {
+    public static class MethodDeclaration extends Coordinates {
         MethodDeclaration(J.MethodDeclaration tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.METHOD_DECLARATION_PREFIX);
         }
 
@@ -477,267 +477,267 @@ public abstract class Coordinates<J2 extends J> {
          * before in an ideal ordering, or as the last annotation if it would not appear before any
          * existing annotations in an ideal ordering.
          */
-        public JavaCoordinates<?> addAnnotation(Comparator<J.Annotation> idealOrdering) {
-            throw new UnsupportedOperationException("");
+        public JavaCoordinates addAnnotation(Comparator<J.Annotation> idealOrdering) {
+            return new JavaCoordinates(tree, Space.Location.ANNOTATION_PREFIX, idealOrdering);
         }
 
-        public JavaCoordinates<?> replaceAnnotations() {
+        public JavaCoordinates replaceAnnotations() {
             return create(Space.Location.ANNOTATION_PREFIX);
         }
 
-        public JavaCoordinates<?> replaceTypeParameters() {
+        public JavaCoordinates replaceTypeParameters() {
             return create(Space.Location.TYPE_PARAMETERS);
         }
 
-        public JavaCoordinates<?> replaceParameters() {
+        public JavaCoordinates replaceParameters() {
             return create(Space.Location.METHOD_DECLARATION_PARAMETERS);
         }
 
-        public JavaCoordinates<?> replaceThrows() {
+        public JavaCoordinates replaceThrows() {
             return create(Space.Location.THROWS);
         }
 
-        public JavaCoordinates<?> replaceBody() {
+        public JavaCoordinates replaceBody() {
             return create(Space.Location.BLOCK_PREFIX);
         }
     }
 
-    public static class MethodInvocation extends Coordinates<J.MethodInvocation> {
+    public static class MethodInvocation extends Coordinates {
         MethodInvocation(J.MethodInvocation tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.METHOD_INVOCATION_PREFIX);
         }
 
-        public JavaCoordinates<?> replaceArguments() {
+        public JavaCoordinates replaceArguments() {
             return create(Space.Location.METHOD_INVOCATION_ARGUMENTS);
         }
 
     }
 
-    public static class Modifier extends Coordinates<J.Modifier> {
+    public static class Modifier extends Coordinates {
         Modifier(J.Modifier tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.MODIFIER_PREFIX);
         }
     }
 
-    public static class MultiCatch extends Coordinates<J.MultiCatch> {
+    public static class MultiCatch extends Coordinates {
         MultiCatch(J.MultiCatch tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.MULTI_CATCH_PREFIX);
         }
     }
 
-    public static class NewArray extends Coordinates<J.NewArray> {
+    public static class NewArray extends Coordinates {
         NewArray(J.NewArray tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.NEW_ARRAY_PREFIX);
         }
     }
 
-    public static class NewClass extends Coordinates<J.NewClass> {
+    public static class NewClass extends Coordinates {
         NewClass(J.NewClass tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.NEW_CLASS_PREFIX);
         }
     }
 
-    public static class Package extends Coordinates<J.Package> {
+    public static class Package extends Coordinates {
         Package(J.Package tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.PACKAGE_PREFIX);
         }
     }
 
-    public static class ParameterizedType extends Coordinates<J.ParameterizedType> {
+    public static class ParameterizedType extends Coordinates {
         ParameterizedType(J.ParameterizedType tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.PARAMETERIZED_TYPE_PREFIX);
         }
     }
 
-    public static class Parentheses<J2 extends J> extends Coordinates<J.Parentheses<J2>> {
-        Parentheses(J.Parentheses<J2> tree) {
+    public static class Parentheses extends Coordinates {
+        Parentheses(J.Parentheses<?> tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.PARENTHESES_PREFIX);
         }
     }
 
-    public static class Primitive extends Coordinates<J.Primitive> {
+    public static class Primitive extends Coordinates {
         Primitive(J.Primitive tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.PRIMITIVE_PREFIX);
         }
     }
 
-    public static class Return extends Coordinates<J.Return> {
+    public static class Return extends Coordinates {
         Return(J.Return tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.RETURN_PREFIX);
         }
     }
 
-    public static class Switch extends Coordinates<J.Switch> {
+    public static class Switch extends Coordinates {
         Switch(J.Switch tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.SWITCH_PREFIX);
         }
     }
 
-    public static class Synchronized extends Coordinates<J.Synchronized> {
+    public static class Synchronized extends Coordinates {
         Synchronized(J.Synchronized tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.SYNCHRONIZED_PREFIX);
         }
     }
 
-    public static class Ternary extends Coordinates<J.Ternary> {
+    public static class Ternary extends Coordinates {
         Ternary(J.Ternary tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.TERNARY_PREFIX);
         }
     }
 
-    public static class Throw extends Coordinates<J.Throw> {
+    public static class Throw extends Coordinates {
         Throw(J.Throw tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.THROW_PREFIX);
         }
     }
 
-    public static class Try extends Coordinates<J.Try> {
+    public static class Try extends Coordinates {
         Try(J.Try tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.TRY_PREFIX);
         }
 
-        public static class Catch extends Coordinates<J.Try.Catch> {
+        public static class Catch extends Coordinates {
             Catch(J.Try.Catch catzch) {
                 super(catzch);
             }
 
             @Override
-            public JavaCoordinates<?> before() {
+            public JavaCoordinates before() {
                 return create(Space.Location.CATCH_PREFIX);
             }
         }
 
-        public static class Resource extends Coordinates<J.Try.Resource> {
+        public static class Resource extends Coordinates {
             Resource(J.Try.Resource tree) {
                 super(tree);
             }
 
             @Override
-            public JavaCoordinates<?> before() {
+            public JavaCoordinates before() {
                 return create(Space.Location.TRY_RESOURCE);
             }
         }
     }
 
-    public static class TypeCast extends Coordinates<J.TypeCast> {
+    public static class TypeCast extends Coordinates {
         TypeCast(J.TypeCast tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.TYPE_CAST_PREFIX);
         }
     }
 
-    public static class TypeParameter extends Coordinates<J.TypeParameter> {
+    public static class TypeParameter extends Coordinates {
         TypeParameter(J.TypeParameter tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.TYPE_PARAMETERS_PREFIX);
         }
 
-        public JavaCoordinates<?> bounds() {
+        public JavaCoordinates bounds() {
             return create(Space.Location.TYPE_BOUNDS);
         }
     }
 
-    public static class Unary extends Coordinates<J.Unary> {
+    public static class Unary extends Coordinates {
         Unary(J.Unary tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.UNARY_PREFIX);
         }
     }
 
-    public static class VariableDeclaration extends Coordinates<J.VariableDeclarations> {
-        VariableDeclaration(J.VariableDeclarations tree) {
+    public static class VariableDeclarations extends Coordinates {
+        VariableDeclarations(J.VariableDeclarations tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.VARIABLE_DECLARATIONS_PREFIX);
         }
 
@@ -749,44 +749,44 @@ public abstract class Coordinates<J2 extends J> {
          * before in an ideal ordering, or as the last annotation if it would not appear before any
          * existing annotations in an ideal ordering.
          */
-        public JavaCoordinates<?> addAnnotation(Comparator<J.Annotation> idealOrdering) {
-            throw new UnsupportedOperationException("");
+        public JavaCoordinates addAnnotation(Comparator<J.Annotation> idealOrdering) {
+            return new JavaCoordinates(tree, Space.Location.ANNOTATION_PREFIX, idealOrdering);
         }
 
-        public JavaCoordinates<?> replaceAnnotations() {
+        public JavaCoordinates replaceAnnotations() {
             return create(Space.Location.ANNOTATION_PREFIX);
         }
 
-        public static class NamedVar extends Coordinates<J.VariableDeclarations.NamedVariable> {
+        public static class NamedVar extends Coordinates {
             NamedVar(J.VariableDeclarations.NamedVariable tree) {
                 super(tree);
             }
 
             @Override
-            public JavaCoordinates<?> before() {
+            public JavaCoordinates before() {
                 return create(Space.Location.VARIABLE_PREFIX);
             }
         }
     }
 
-    public static class WhileLoop extends Coordinates<J.WhileLoop> {
+    public static class WhileLoop extends Coordinates {
         WhileLoop(J.WhileLoop tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.WHILE_PREFIX);
         }
     }
 
-    public static class Wildcard extends Coordinates<J.Wildcard> {
+    public static class Wildcard extends Coordinates {
         Wildcard(J.Wildcard tree) {
             super(tree);
         }
 
         @Override
-        public JavaCoordinates<?> before() {
+        public JavaCoordinates before() {
             return create(Space.Location.WILDCARD_PREFIX);
         }
     }
