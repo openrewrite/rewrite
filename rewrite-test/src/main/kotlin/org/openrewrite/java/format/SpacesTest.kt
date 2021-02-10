@@ -4177,7 +4177,7 @@ interface SpacesTest : RecipeTest {
             before = """
                 class Test {
                     void foo() {
-                        for (int n = 0; n < 100; n++, x++) {
+                        for (int n = 0, x = 0; n < 100; n++, x++) {
                         }
                     }
                 }
@@ -4185,7 +4185,7 @@ interface SpacesTest : RecipeTest {
             after = """
                 class Test {
                     void foo() {
-                        for (int n = 0; n < 100; n++ , x++) {
+                        for (int n = 0, x = 0; n < 100; n++ , x++) {
                         }
                     }
                 }
@@ -4204,7 +4204,7 @@ interface SpacesTest : RecipeTest {
             before = """
                 class Test {
                     void foo() {
-                        for (int n = 0; n < 100; n++ , x++) {
+                        for (int n = 0, x = 0; n < 100; n++ , x++) {
                         }
                     }
                 }
@@ -4212,7 +4212,7 @@ interface SpacesTest : RecipeTest {
             after = """
                 class Test {
                     void foo() {
-                        for (int n = 0; n < 100; n++, x++) {
+                        for (int n = 0, x = 0; n < 100; n++, x++) {
                         }
                     }
                 }
@@ -4231,7 +4231,7 @@ interface SpacesTest : RecipeTest {
             before = """
                 class Test {
                     void foo() {
-                        for (int n = 0; n < 100; n++, x++) {
+                        for (int n = 0, x = 0; n < 100; n++, x++) {
                         }
                     }
                 }
@@ -4239,7 +4239,7 @@ interface SpacesTest : RecipeTest {
             after = """
                 class Test {
                     void foo() {
-                        for (int n = 0; n < 100; n++,x++) {
+                        for (int n = 0, x = 0; n < 100; n++,x++) {
                         }
                     }
                 }
@@ -4258,7 +4258,7 @@ interface SpacesTest : RecipeTest {
             before = """
                 class Test {
                     void foo() {
-                        for (int n = 0; n < 100; n++,x++) {
+                        for (int n = 0, x = 0; n < 100; n++,x++) {
                         }
                     }
                 }
@@ -4266,7 +4266,7 @@ interface SpacesTest : RecipeTest {
             after = """
                 class Test {
                     void foo() {
-                        for (int n = 0; n < 100; n++, x++) {
+                        for (int n = 0, x = 0; n < 100; n++, x++) {
                         }
                     }
                 }
@@ -4284,8 +4284,8 @@ interface SpacesTest : RecipeTest {
             ).build(),
             before = """
                 enum Test {
-                    TEST1("str1", num1),
-                    TEST2("str2", num2);
+                    TEST1("str1", 1),
+                    TEST2("str2", 2);
                     
                     Test(String str, int num) {
                     }
@@ -4293,8 +4293,8 @@ interface SpacesTest : RecipeTest {
             """,
             after = """
                 enum Test {
-                    TEST1("str1" , num1),
-                    TEST2("str2" , num2);
+                    TEST1("str1" , 1),
+                    TEST2("str2" , 2);
                     
                     Test(String str , int num) {
                     }
@@ -4313,8 +4313,8 @@ interface SpacesTest : RecipeTest {
             ).build(),
             before = """
                 enum Test {
-                    TEST1("str1" , num1),
-                    TEST2("str2" , num2);
+                    TEST1("str1" , 1),
+                    TEST2("str2" , 2);
                     
                     Test(String str , int num) {
                     }
@@ -4322,8 +4322,8 @@ interface SpacesTest : RecipeTest {
             """,
             after = """
                 enum Test {
-                    TEST1("str1", num1),
-                    TEST2("str2", num2);
+                    TEST1("str1", 1),
+                    TEST2("str2", 2);
                     
                     Test(String str, int num) {
                     }
@@ -4342,8 +4342,8 @@ interface SpacesTest : RecipeTest {
             ).build(),
             before = """
                 enum Test {
-                    TEST1("str1", num1),
-                    TEST2("str2", num2);
+                    TEST1("str1", 1),
+                    TEST2("str2", 2);
                     
                     Test(String str, int num) {
                     }
@@ -4351,8 +4351,8 @@ interface SpacesTest : RecipeTest {
             """,
             after = """
                 enum Test {
-                    TEST1("str1",num1),
-                    TEST2("str2",num2);
+                    TEST1("str1",1),
+                    TEST2("str2",2);
                     
                     Test(String str,int num) {
                     }
@@ -4371,8 +4371,8 @@ interface SpacesTest : RecipeTest {
             ).build(),
             before = """
                 enum Test {
-                    TEST1("str1",num1),
-                    TEST2("str2",num2);
+                    TEST1("str1",1),
+                    TEST2("str2",2);
                     
                     Test(String str,int num) {
                     }
@@ -4380,8 +4380,8 @@ interface SpacesTest : RecipeTest {
             """,
             after = """
                 enum Test {
-                    TEST1("str1", num1),
-                    TEST2("str2", num2);
+                    TEST1("str1", 1),
+                    TEST2("str2", 2);
                     
                     Test(String str, int num) {
                     }
@@ -4683,11 +4683,11 @@ interface SpacesTest : RecipeTest {
                     })))
             ).build(),
             before = """
-                class Test<T extends Integer & Object> {
+                class Test<T extends Integer & Appendable> {
                 }
             """,
             after = """
-                class Test<T extends Integer&Object> {
+                class Test<T extends Integer&Appendable> {
                 }
             """
     )
@@ -4702,11 +4702,11 @@ interface SpacesTest : RecipeTest {
                     })))
             ).build(),
             before = """
-                class Test<T extends Integer&Object> {
+                class Test<T extends Integer&Appendable> {
                 }
             """,
             after = """
-                class Test<T extends Integer & Object> {
+                class Test<T extends Integer & Appendable> {
                 }
             """
     )
