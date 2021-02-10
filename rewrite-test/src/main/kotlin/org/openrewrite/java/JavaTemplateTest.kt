@@ -792,13 +792,13 @@ interface JavaTemplateTest : RecipeTest {
             }
         }.toRecipe(),
         before = """
-            public class A <T> {
+            public class A<T> {
                 void foo() {
                 }
             }
         """,
         after = """
-            public class A <T,P> {
+            public class A<T, P> {
                 void foo() {
                 }
             }
@@ -929,7 +929,7 @@ interface JavaTemplateTest : RecipeTest {
         """,
         after = """
             public class A {
-                <T,P> void foo() {
+                <T, P> void foo() {
                 }
             }
         """

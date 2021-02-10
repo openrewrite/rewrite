@@ -201,7 +201,7 @@ interface SpacesTest : RecipeTest {
             before = """
                 class Test {
                     void foo() {
-                        for (;;) {
+                        for (; ; ) {
                         }
                     }
                 }
@@ -209,7 +209,7 @@ interface SpacesTest : RecipeTest {
             after = """
                 class Test {
                     void foo() {
-                        for(;;) {
+                        for(; ; ) {
                         }
                     }
                 }
@@ -228,7 +228,7 @@ interface SpacesTest : RecipeTest {
             before = """
                 class Test {
                     void foo() {
-                        for(;;) {
+                        for(; ; ) {
                         }
                     }
                 }
@@ -236,7 +236,7 @@ interface SpacesTest : RecipeTest {
             after = """
                 class Test {
                     void foo() {
-                        for (;;) {
+                        for (; ; ) {
                         }
                     }
                 }
@@ -3088,7 +3088,7 @@ interface SpacesTest : RecipeTest {
             parser = jp.styles(
                     listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
-                                withAnnotationParentheses(true)
+                            withAnnotationParentheses(true)
                         })
                     })))
             ).build(),
@@ -3138,7 +3138,7 @@ interface SpacesTest : RecipeTest {
                 import java.util.ArrayList;
                 import java.util.List;
                 
-                class Test<T> {
+                class Test<T, U> {
                 
                     <T2 extends T> T2 foo() {
                         List<T2> myList = new ArrayList<>();
@@ -3150,7 +3150,7 @@ interface SpacesTest : RecipeTest {
                 import java.util.ArrayList;
                 import java.util.List;
                 
-                class Test< T > {
+                class Test< T, U > {
                 
                     < T2 extends T > T2 foo() {
                         List< T2 > myList = new ArrayList<>();
@@ -3173,7 +3173,7 @@ interface SpacesTest : RecipeTest {
                 import java.util.ArrayList;
                 import java.util.List;
                 
-                class Test< T > {
+                class Test< T, U > {
                 
                     < T2 extends T > T2 foo() {
                         List< T2 > myList = new ArrayList<>();
@@ -3185,7 +3185,7 @@ interface SpacesTest : RecipeTest {
                 import java.util.ArrayList;
                 import java.util.List;
                 
-                class Test<T> {
+                class Test<T, U> {
                 
                     <T2 extends T> T2 foo() {
                         List<T2> myList = new ArrayList<>();
@@ -3195,4 +3195,1519 @@ interface SpacesTest : RecipeTest {
             """
     )
 
+    @Test
+    fun ternaryOperatorBeforeQuestionMarkFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withTernaryOperator(ternaryOperator.run {
+                            withBeforeQuestionMark(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        boolean b = true;
+                        int x = b ? 1 : 0;
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        boolean b = true;
+                        int x = b? 1 : 0;
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun ternaryOperatorBeforeQuestionMarkTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withTernaryOperator(ternaryOperator.run {
+                            withBeforeQuestionMark(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        boolean b = true;
+                        int x = b? 1 : 0;
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        boolean b = true;
+                        int x = b ? 1 : 0;
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun ternaryOperatorAfterQuestionMarkFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withTernaryOperator(ternaryOperator.run {
+                            withAfterQuestionMark(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        boolean b = true;
+                        int x = b ? 1 : 0;
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        boolean b = true;
+                        int x = b ?1 : 0;
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun ternaryOperatorAfterQuestionMarkTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withTernaryOperator(ternaryOperator.run {
+                            withAfterQuestionMark(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        boolean b = true;
+                        int x = b ?1 : 0;
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        boolean b = true;
+                        int x = b ? 1 : 0;
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun ternaryOperatorBeforeColonFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withTernaryOperator(ternaryOperator.run {
+                            withBeforeColon(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        boolean b = true;
+                        int x = b ? 1 : 0;
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        boolean b = true;
+                        int x = b ? 1: 0;
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun ternaryOperatorBeforeColonTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withTernaryOperator(ternaryOperator.run {
+                            withBeforeColon(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        boolean b = true;
+                        int x = b ? 1: 0;
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        boolean b = true;
+                        int x = b ? 1 : 0;
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun ternaryOperatorAfterColonFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withTernaryOperator(ternaryOperator.run {
+                            withAfterColon(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        boolean b = true;
+                        int x = b ? 1 : 0;
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        boolean b = true;
+                        int x = b ? 1 :0;
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun ternaryOperatorAfterColonTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withTernaryOperator(ternaryOperator.run {
+                            withAfterColon(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    public void foo() {
+                        boolean b = true;
+                        int x = b ? 1 :0;
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    public void foo() {
+                        boolean b = true;
+                        int x = b ? 1 : 0;
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun typeArgumentsAfterCommaFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withTypeArguments(typeArguments.run {
+                            withAfterComma(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                import java.util.Map;
+                import java.util.HashMap;
+
+                class Test {
+                    void foo() {
+                        Map<String, String> m = new HashMap<String, String>();
+                        Test.<String, Integer>bar();
+                    }
+                    static <A, B> void bar() {
+                    }
+                }
+            """,
+            after = """
+                import java.util.Map;
+                import java.util.HashMap;
+
+                class Test {
+                    void foo() {
+                        Map<String,String> m = new HashMap<String,String>();
+                        Test.<String,Integer>bar();
+                    }
+                    static <A, B> void bar() {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun typeArgumentsAfterCommaTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withTypeArguments(typeArguments.run {
+                            withAfterComma(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                import java.util.Map;
+                import java.util.HashMap;
+
+                class Test {
+                    void foo() {
+                        Map<String,String> m = new HashMap<String,String>();
+                        Test.<String,Integer>bar();
+                    }
+                    static <A, B> void bar() {
+                    }
+                }
+            """,
+            after = """
+                import java.util.Map;
+                import java.util.HashMap;
+
+                class Test {
+                    void foo() {
+                        Map<String, String> m = new HashMap<String, String>();
+                        Test.<String, Integer>bar();
+                    }
+                    static <A, B> void bar() {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun typeArgumentsBeforeOpeningAngleBracketTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withTypeArguments(typeArguments.run {
+                            withBeforeOpeningAngleBracket(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                import java.util.Map;
+                import java.util.HashMap;
+
+                class Test {
+                    void foo() {
+                        Map<String, String> m = new HashMap<String, String>();
+                        Test.<String, Integer>bar();
+                    }
+                    static <A, B> void bar() {
+                    }
+                }
+            """,
+            after = """
+                import java.util.Map;
+                import java.util.HashMap;
+
+                class Test {
+                    void foo() {
+                        Map <String, String> m = new HashMap <String, String>();
+                        Test. <String, Integer>bar();
+                    }
+                    static <A, B> void bar() {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun typeArgumentsBeforeOpeningAngleBracketFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withTypeArguments(typeArguments.run {
+                            withBeforeOpeningAngleBracket(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                import java.util.Map;
+                import java.util.HashMap;
+
+                class Test {
+                    void foo() {
+                        Map <String, String> m = new HashMap <String, String>();
+                        Test. <String, Integer>bar();
+                    }
+                    static <A, B> void bar() {
+                    }
+                }
+            """,
+            after = """
+                import java.util.Map;
+                import java.util.HashMap;
+
+                class Test {
+                    void foo() {
+                        Map<String, String> m = new HashMap<String, String>();
+                        Test.<String, Integer>bar();
+                    }
+                    static <A, B> void bar() {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun typeArgumentsAfterClosingAngleBracketTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withTypeArguments(typeArguments.run {
+                            withAfterClosingAngleBracket(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                import java.util.Map;
+                import java.util.HashMap;
+
+                class Test {
+                    void foo() {
+                        Map<String, String> m = new HashMap<String, String>();
+                        Test.<String, Integer>bar();
+                    }
+                    static <A, B> void bar() {
+                    }
+                }
+            """,
+            after = """
+                import java.util.Map;
+                import java.util.HashMap;
+
+                class Test {
+                    void foo() {
+                        Map<String, String> m = new HashMap<String, String>();
+                        Test.<String, Integer> bar();
+                    }
+                    static <A, B> void bar() {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun typeArgumentsAfterClosingAngleBracketFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withTypeArguments(typeArguments.run {
+                            withAfterClosingAngleBracket(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                import java.util.Map;
+                import java.util.HashMap;
+
+                class Test {
+                    void foo() {
+                        Map<String, String> m = new HashMap<String, String>();
+                        Test.<String, Integer> bar();
+                    }
+                    static <A, B> void bar() {
+                    }
+                }
+            """,
+            after = """
+                import java.util.Map;
+                import java.util.HashMap;
+
+                class Test {
+                    void foo() {
+                        Map<String, String> m = new HashMap<String, String>();
+                        Test.<String, Integer>bar();
+                    }
+                    static <A, B> void bar() {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherBeforeCommaTrueNewArrayInitializer(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withBeforeComma(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    void foo() {
+                        int[] arr = new int[]{1, 2, 3};
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        int[] arr = new int[]{1 , 2 , 3};
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherBeforeCommaFalseNewArrayInitializer(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withBeforeComma(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    void foo() {
+                        int[] arr = new int[]{1 , 2 , 3};
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        int[] arr = new int[]{1, 2, 3};
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherAfterCommaFalseNewArrayInitializer(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withAfterComma(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    void foo() {
+                        int[] arr = new int[]{1, 2, 3};
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        int[] arr = new int[]{1,2,3};
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherAfterCommaTrueNewArrayInitializer(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withAfterComma(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    void foo() {
+                        int[] arr = new int[]{1,2,3};
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        int[] arr = new int[]{1, 2, 3};
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherBeforeCommaTrueMethodDeclArgs(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withBeforeComma(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    void bar(int x, int y) {
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void bar(int x , int y) {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherBeforeCommaFalseMethodDeclArgs(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withBeforeComma(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    void bar(int x , int y) {
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void bar(int x, int y) {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherAfterCommaFalseMethodDeclArgs(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withAfterComma(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    void bar(int x, int y) {
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void bar(int x,int y) {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherAfterCommaTrueMethodDeclArgs(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withAfterComma(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    void bar(int x,int y) {
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void bar(int x, int y) {
+                    }
+                }
+            """
+    )
+
+    val methodInvocationDependsOn
+        get() = arrayOf("""
+                class A {
+                    void bar(int x, int y) {
+                    }
+                }
+            """)
+
+    @Test
+    fun otherBeforeCommaTrueMethodInvocationParams(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withBeforeComma(true)
+                        })
+                    })))
+            ).build(),
+            dependsOn = methodInvocationDependsOn,
+            before = """
+                class Test {
+                    void foo() {
+                        new A().bar(1, 2);
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        new A().bar(1 , 2);
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherBeforeCommaFalseMethodInvocationParams(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withBeforeComma(false)
+                        })
+                    })))
+            ).build(),
+            dependsOn = methodInvocationDependsOn,
+            before = """
+                class Test {
+                    void foo() {
+                        new A().bar(1 , 2);
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        new A().bar(1, 2);
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherAfterCommaFalseMethodInvocationParams(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withAfterComma(false)
+                        })
+                    })))
+            ).build(),
+            dependsOn = methodInvocationDependsOn,
+            before = """
+                class Test {
+                    void foo() {
+                        new A().bar(1, 2);
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        new A().bar(1,2);
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherAfterCommaTrueMethodInvocationParams(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withAfterComma(true)
+                        })
+                    })))
+            ).build(),
+            dependsOn = methodInvocationDependsOn,
+            before = """
+                class Test {
+                    void foo() {
+                        new A().bar(1,2);
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        new A().bar(1, 2);
+                    }
+                }
+            """
+    )
+
+    val newClassArgsDependsOn
+        get() = arrayOf("""
+            class A {
+                A(String str, int num) {
+                }
+            }
+        """)
+
+    @Test
+    fun otherBeforeCommaTrueNewClassArgs(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withBeforeComma(true)
+                        })
+                    })))
+            ).build(),
+            dependsOn = newClassArgsDependsOn,
+            before = """
+                class Test {
+                    void foo() {
+                        new A("hello", 1);
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        new A("hello" , 1);
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherBeforeCommaFalseNewClassArgs(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withBeforeComma(false)
+                        })
+                    })))
+            ).build(),
+            dependsOn = newClassArgsDependsOn,
+            before = """
+                class Test {
+                    void foo() {
+                        new A("hello" , 1);
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        new A("hello", 1);
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherAfterCommaFalseNewClassArgs(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withAfterComma(false)
+                        })
+                    })))
+            ).build(),
+            dependsOn = newClassArgsDependsOn,
+            before = """
+                class Test {
+                    void foo() {
+                        new A("hello", 1);
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        new A("hello",1);
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherAfterCommaTrueNewClassArgs(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withAfterComma(true)
+                        })
+                    })))
+            ).build(),
+            dependsOn = newClassArgsDependsOn,
+            before = """
+                class Test {
+                    void foo() {
+                        new A("hello",1);
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        new A("hello", 1);
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherBeforeCommaTrueLambdaParameters(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withBeforeComma(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                import java.util.function.BiFunction;
+                
+                class Test {
+                    void foo() {
+                        BiFunction<String, String, String> f = (str1, str2) -> "Hello";
+                    }
+                }
+            """,
+            after = """
+                import java.util.function.BiFunction;
+                
+                class Test {
+                    void foo() {
+                        BiFunction<String, String, String> f = (str1 , str2) -> "Hello";
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherBeforeCommaFalseLambdaParameters(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withBeforeComma(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                import java.util.function.BiFunction;
+                
+                class Test {
+                    void foo() {
+                        BiFunction<String, String, String> f = (str1 , str2) -> "Hello";
+                    }
+                }
+            """,
+            after = """
+                import java.util.function.BiFunction;
+                
+                class Test {
+                    void foo() {
+                        BiFunction<String, String, String> f = (str1, str2) -> "Hello";
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherAfterCommaFalseLambdaParameters(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withAfterComma(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                import java.util.function.BiFunction;
+                
+                class Test {
+                    void foo() {
+                        BiFunction<String, String, String> f = (str1, str2) -> "Hello";
+                    }
+                }
+            """,
+            after = """
+                import java.util.function.BiFunction;
+                
+                class Test {
+                    void foo() {
+                        BiFunction<String, String, String> f = (str1,str2) -> "Hello";
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherAfterCommaTrueLambdaParameters(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withAfterComma(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                import java.util.function.BiFunction;
+                
+                class Test {
+                    void foo() {
+                        BiFunction<String, String, String> f = (str1,str2) -> "Hello";
+                    }
+                }
+            """,
+            after = """
+                import java.util.function.BiFunction;
+                
+                class Test {
+                    void foo() {
+                        BiFunction<String, String, String> f = (str1, str2) -> "Hello";
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherBeforeCommaTrueForLoopUpdate(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withBeforeComma(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    void foo() {
+                        for (int n = 0, x = 0; n < 100; n++, x++) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        for (int n = 0, x = 0; n < 100; n++ , x++) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherBeforeCommaFalseForLoopUpdate(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withBeforeComma(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    void foo() {
+                        for (int n = 0, x = 0; n < 100; n++ , x++) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        for (int n = 0, x = 0; n < 100; n++, x++) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherAfterCommaFalseForLoopUpdate(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withAfterComma(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    void foo() {
+                        for (int n = 0, x = 0; n < 100; n++, x++) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        for (int n = 0, x = 0; n < 100; n++,x++) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherAfterCommaTrueForLoopUpdate(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withAfterComma(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    void foo() {
+                        for (int n = 0, x = 0; n < 100; n++,x++) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        for (int n = 0, x = 0; n < 100; n++, x++) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherBeforeCommaTrueEnumValueInitArgs(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withBeforeComma(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                enum Test {
+                    TEST1("str1", 1),
+                    TEST2("str2", 2);
+                    
+                    Test(String str, int num) {
+                    }
+                }
+            """,
+            after = """
+                enum Test {
+                    TEST1("str1" , 1),
+                    TEST2("str2" , 2);
+                    
+                    Test(String str , int num) {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherBeforeCommaFalseEnumValueInitArgs(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withBeforeComma(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                enum Test {
+                    TEST1("str1" , 1),
+                    TEST2("str2" , 2);
+                    
+                    Test(String str , int num) {
+                    }
+                }
+            """,
+            after = """
+                enum Test {
+                    TEST1("str1", 1),
+                    TEST2("str2", 2);
+                    
+                    Test(String str, int num) {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherAfterCommaFalseEnumValueInitArgs(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withAfterComma(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                enum Test {
+                    TEST1("str1", 1),
+                    TEST2("str2", 2);
+                    
+                    Test(String str, int num) {
+                    }
+                }
+            """,
+            after = """
+                enum Test {
+                    TEST1("str1",1),
+                    TEST2("str2",2);
+                    
+                    Test(String str,int num) {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherAfterCommaTrueEnumValueInitArgs(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withAfterComma(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                enum Test {
+                    TEST1("str1",1),
+                    TEST2("str2",2);
+                    
+                    Test(String str,int num) {
+                    }
+                }
+            """,
+            after = """
+                enum Test {
+                    TEST1("str1", 1),
+                    TEST2("str2", 2);
+                    
+                    Test(String str, int num) {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherBeforeForSemicolonTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withBeforeForSemicolon(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    void foo() {
+                        for (int i = 0; i < 10; i++) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        for (int i = 0 ; i < 10 ; i++) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherBeforeForSemicolonFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withBeforeForSemicolon(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    void foo() {
+                        for (int i = 0 ; i < 10 ; i++) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        for (int i = 0; i < 10; i++) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherAfterForSemicolonFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withAfterForSemicolon(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    void foo() {
+                        for (int i = 0; i < 10; i++) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        for (int i = 0;i < 10;i++) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherAfterForSemicolonTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withAfterForSemicolon(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    void foo() {
+                        for (int i = 0;i < 10;i++) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        for (int i = 0; i < 10; i++) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherAfterTypeCastFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withAfterTypeCast(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    void foo() {
+                        int i = (int) 0.0d;
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        int i = (int)0.0d;
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherAfterTypeCastTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withAfterTypeCast(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    void foo() {
+                        int i = (int)0.0d;
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        int i = (int) 0.0d;
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherBeforeColonInForEachFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withBeforeColonInForEach(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    void foo() {
+                        for (int i : new int[]{1, 2, 3}) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        for (int i: new int[]{1, 2, 3}) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherBeforeColonInForEachTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withBeforeColonInForEach(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test {
+                    void foo() {
+                        for (int i: new int[]{1, 2, 3}) {
+                        }
+                    }
+                }
+            """,
+            after = """
+                class Test {
+                    void foo() {
+                        for (int i : new int[]{1, 2, 3}) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun otherInsideOneLineEnumBracesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withInsideOneLineEnumBraces(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                enum Test {}
+            """,
+            after = """
+                enum Test { }
+            """
+    )
+
+    @Test
+    fun otherInsideOneLineEnumBracesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withInsideOneLineEnumBraces(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                enum Test { }
+            """,
+            after = """
+                enum Test {}
+            """
+    )
+
+    @Test
+    fun typeParametersBeforeOpeningAngleBracketTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withTypeParameters(typeParameters.run {
+                            withBeforeOpeningAngleBracket(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test<T> {
+                }
+            """,
+            after = """
+                class Test <T> {
+                }
+            """
+    )
+
+    @Test
+    fun typeParametersBeforeOpeningAngleBracketFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withTypeParameters(typeParameters.run {
+                            withBeforeOpeningAngleBracket(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test <T> {
+                }
+            """,
+            after = """
+                class Test<T> {
+                }
+            """
+    )
+
+    @Test
+    fun typeParametersAroundTypeBoundsFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withTypeParameters(typeParameters.run {
+                            withAroundTypeBounds(false)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test<T extends Integer & Appendable> {
+                }
+            """,
+            after = """
+                class Test<T extends Integer&Appendable> {
+                }
+            """
+    )
+
+    @Test
+    fun typeParametersAroundTypeBoundsTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                        withTypeParameters(typeParameters.run {
+                            withAroundTypeBounds(true)
+                        })
+                    })))
+            ).build(),
+            before = """
+                class Test<T extends Integer&Appendable> {
+                }
+            """,
+            after = """
+                class Test<T extends Integer & Appendable> {
+                }
+            """
+    )
 }
