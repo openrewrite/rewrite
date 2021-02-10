@@ -53,7 +53,7 @@ public interface Properties extends Serializable, Tree {
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
         return v instanceof PropertiesVisitor ?
-                (R) acceptProperties((PropertiesVisitor<P>) v, p) : v.defaultValue(null, p);
+                (R) acceptProperties((PropertiesVisitor<P>) v, p) : v.defaultValue(this, p);
     }
 
     @Nullable

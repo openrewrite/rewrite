@@ -56,7 +56,7 @@ public interface J extends Serializable, Tree {
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
         return v instanceof JavaVisitor ?
                 (R) acceptJava((JavaVisitor<P>) v, p) :
-                v.defaultValue(null, p);
+                v.defaultValue(this, p);
     }
 
     @Nullable

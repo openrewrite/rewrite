@@ -51,7 +51,7 @@ public interface Xml extends Serializable, Tree {
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
         return v instanceof XmlVisitor ?
-                (R) acceptXml((XmlVisitor<P>) v, p) : v.defaultValue(null, p);
+                (R) acceptXml((XmlVisitor<P>) v, p) : v.defaultValue(this, p);
     }
 
     @Nullable

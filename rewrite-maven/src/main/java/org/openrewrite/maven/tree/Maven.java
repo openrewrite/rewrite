@@ -131,7 +131,7 @@ public class Maven extends Xml.Document {
         } else if (v instanceof XmlVisitor) {
             return super.accept(v, p);
         }
-        return v.defaultValue(null, p);
+        return v.defaultValue(this, p);
     }
 
     @Override
