@@ -57,21 +57,21 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
-        J.CompilationUnit t = new BlankLinesVisitor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
+        J.CompilationUnit t = (J.CompilationUnit) new BlankLinesVisitor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
                 .orElse(IntelliJ.blankLines()))
-                .visitCompilationUnit(cu, p);
+                .visit(cu, p);
 
-        t = new SpacesVisitor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
+        t = (J.CompilationUnit) new SpacesVisitor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
                 .orElse(IntelliJ.spaces()))
-                .visitCompilationUnit(t, p);
+                .visit(t, p);
 
-        t = new WrappingAndBracesVisitor<>(Optional.ofNullable(cu.getStyle(WrappingAndBracesStyle.class))
+        t = (J.CompilationUnit) new WrappingAndBracesVisitor<>(Optional.ofNullable(cu.getStyle(WrappingAndBracesStyle.class))
                 .orElse(IntelliJ.wrappingAndBraces()))
-                .visitCompilationUnit(t, p);
+                .visit(t, p);
 
-        t = new TabsAndIndentsVisitor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
+        t = (J.CompilationUnit) new TabsAndIndentsVisitor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
                 .orElse(IntelliJ.tabsAndIndents()))
-                .visitCompilationUnit(t, p);
+                .visit(t, p);
 
         return t;
     }
