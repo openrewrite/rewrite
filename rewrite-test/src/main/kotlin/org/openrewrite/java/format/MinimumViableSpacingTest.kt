@@ -59,4 +59,62 @@ interface MinimumViableSpacingTest : RecipeTest {
             class A {public String foo() {return "foo";}}
         """
     )
+
+    @Test
+    fun variableDeclarationsInClass(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            class A {
+                int unassigned;
+                int zero = 0;
+                final int one = 1;
+                public static final int ONE = 1;
+                public static final int TWO = 1, THREE = 3;
+            }
+        """,
+        after = """
+            class A {int unassigned;int zero=0;final int one=1;public static final int ONE=1;public static final int TWO=1,THREE=3;}
+        """
+    )
+
+    @Test
+    fun variableDeclarationsInMethod(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            class A {
+                public void foo(int paramA, final int paramB) {
+                    int unassigned;
+                    int a = 1;
+                    int b, c = 5;
+                    final int d = 10;
+                    final int e, f = 20;
+                }
+            }
+        """,
+        after = """
+            class A {public void foo(int paramA,final int paramB) {int unassigned;int a=1;int b,c=5;final int d=10;final int e,f=20;}}
+        """
+    )
+
+    @Test
+    fun variableDeclarationsInForLoops(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            class Test {
+                void foo(final int[] arr) {
+                    for (int n = 0, x = 0; n < 100; n++, x++) {
+                    }
+                    
+                    for (int i: arr) {
+                    }
+                    
+                    for (final int i: arr) {
+                    }
+                }
+            }
+        """,
+        after = """
+            class Test {void foo(final int[] arr) {for(int n=0,x=0;n<100;n++,x++){}for(int i:arr){}for(final int i:arr){}}}
+        """
+    )
 }
