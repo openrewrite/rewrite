@@ -34,7 +34,7 @@ interface MinimumViableSpacingTest : RecipeTest {
     @Test
     fun method(jp: JavaParser) = assertChanged(
         jp,
-        before = """,
+        before = """
             class A {
                 public <T> void foo() {
                 }
@@ -42,6 +42,21 @@ interface MinimumViableSpacingTest : RecipeTest {
         """,
         after = """
             class A {public <T> void foo() {}}
+        """
+    )
+
+    @Test
+    fun returnExpression(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            class A {
+                public String foo() {
+                    return"foo";
+                }
+            }
+        """,
+        after = """
+            class A {public String foo() {return "foo";}}
         """
     )
 }
