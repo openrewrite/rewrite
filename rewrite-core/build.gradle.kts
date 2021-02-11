@@ -29,11 +29,9 @@ tasks.withType<ShadowJar> {
     }
 }
 
-tasks.withType<Jar> {
-    if(name != "shadowJar") {
-        enabled = false
-        setDependsOn(tasks.withType<ShadowJar>())
-    }
+tasks.named("jar") {
+    enabled = false;
+    dependsOn(tasks.named("shadowJar"))
 }
 
 configure<PublishingExtension> {

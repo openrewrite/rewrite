@@ -194,6 +194,16 @@ subprojects {
             repository.setPassword(project.findProperty("bintrayKey"))
         }
     }
+    
+    val sourcesJarTask = tasks.register("sourcesJar", Jar::class.java) {
+        archiveClassifier.set("sources")
+    }
+    artifacts {
+        add("archives", sourcesJarTask)
+    }
+    tasks.named("assemble").configure {
+        dependsOn(sourcesJarTask)
+    }
 
     tasks.withType<GenerateMavenPom> {
         doLast {
