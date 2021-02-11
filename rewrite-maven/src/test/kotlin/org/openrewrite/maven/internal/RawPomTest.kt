@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.mapdb.DBMaker
 import org.mapdb.serializer.SerializerString
-import org.openrewrite.ExecutionContext
+import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Parser
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -65,7 +65,7 @@ class RawPomTest {
                 </dependencies>
             </project>
             """.trimIndent().byteInputStream()
-        }, null, null, ExecutionContext.builder().build()).pom
+        }, null, null, InMemoryExecutionContext()).pom
 
         assertSerializationRoundTrip(tempDir, pom)
     }
@@ -90,7 +90,7 @@ class RawPomTest {
                   </repositories>
                 </project>
             """.trimIndent().byteInputStream()
-        }, null, null, ExecutionContext.builder().build()).pom
+        }, null, null, InMemoryExecutionContext()).pom
 
         val rawPom = assertSerializationRoundTrip(tempDir, pom)
         assertThat(rawPom.getActiveRepositories(emptyList())).hasSize(1)

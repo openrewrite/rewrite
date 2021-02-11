@@ -17,6 +17,7 @@ package org.openrewrite.xml
 
 import org.assertj.core.api.Assertions
 import org.openrewrite.ExecutionContext
+import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.TreePrinter
 import org.openrewrite.xml.tree.Xml
 
@@ -31,10 +32,7 @@ open class XmlVisitorTest {
     ) {
         val source = parser.parse(*(arrayOf(before.trimIndent()))).first()
         val result = visitorMapped(source).visit(source,
-                ExecutionContext.builder()
-                        .maxCycles(2)
-                        .doOnError { t: Throwable? -> Assertions.fail<Any>("Visitor threw an exception", t) }
-                        .build())
+                InMemoryExecutionContext { t: Throwable? -> Assertions.fail<Any>("Visitor threw an exception", t) })
         Assertions.assertThat(result).isNotNull
         Assertions.assertThat(result!!.printTrimmed(TreePrinter.identity<Any>())).isEqualTo(after.trimIndent())
     }

@@ -17,103 +17,20 @@ package org.openrewrite;
 
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ForkJoinPool;
 import java.util.function.Consumer;
 
 /**
- * Passes messages between individual TreeVisitor / Recipes / Parse in a chain.
- * Controls execution and lifecycle by providing a ForkJoinPool and max number of cycles.
+ * Passes messages between individual visitors or parsing operations and allows errors to be propagated
+ * back to the process controlling parsing or recipe execution.
  */
-public final class ExecutionContext {
-    private volatile boolean needAnotherCycle = false;
-
-    private final int maxCycles;
-
-    private final Consumer<Throwable> onError;
-
-    private final ForkJoinPool forkJoinPool;
-
-    private final Map<String, Object> messages = new ConcurrentHashMap<>();
-
-    private ExecutionContext(int maxCycles, @Nullable Consumer<Throwable> onError, ForkJoinPool forkJoinPool) {
-        this.maxCycles = maxCycles;
-        this.onError = onError == null ? t -> {} : onError;
-        this.forkJoinPool = forkJoinPool;
-    }
-
-    public static Builder builder() {
-        return new Builder();
-    }
-
-    public void putMessage(String key, Object value) {
-        needAnotherCycle = true;
-        messages.put(key, value);
-    }
+public interface ExecutionContext {
+    void putMessage(String key, Object value);
 
     @Nullable
-    public <T> T peekMessage(String key) {
-        //noinspection unchecked
-        return (T) messages.get(key);
-    }
+    <T> T peekMessage(String key);
 
     @Nullable
-    public <T> T pollMessage(String key) {
-        //noinspection unchecked
-        return (T) messages.remove(key);
-    }
+    <T> T pollMessage(String key);
 
-    boolean isNeedAnotherCycle() {
-        return needAnotherCycle;
-    }
-
-    /**
-     * Break the {@link org.openrewrite.Recipe} execution cycle for the current visitor
-     */
-    void nextCycle() {
-        needAnotherCycle = false;
-    }
-
-    int getMaxCycles() {
-        return maxCycles;
-    }
-
-    public Consumer<Throwable> getOnError() {
-        return onError;
-    }
-
-    public ForkJoinPool getForkJoinPool() {
-        return forkJoinPool;
-    }
-
-    public static class Builder {
-        private int maxCycles = 3;
-
-        @Nullable
-        private Consumer<Throwable> onError;
-
-        private ForkJoinPool forkJoinPool = ForkJoinPool.commonPool();
-
-        public Builder maxCycles(int maxCycles) {
-            this.maxCycles = maxCycles;
-            return this;
-        }
-
-        public Builder doOnError(@Nullable Consumer<Throwable> onError) {
-            this.onError = onError;
-            return this;
-        }
-
-        public Builder forkJoinPool(ForkJoinPool forkJoinPool) {
-            this.forkJoinPool = forkJoinPool;
-            return this;
-        }
-
-        public ExecutionContext build() {
-            return new ExecutionContext(maxCycles, onError, forkJoinPool);
-        }
-    }
+    Consumer<Throwable> getOnError();
 }

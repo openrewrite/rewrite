@@ -19,7 +19,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import org.openrewrite.ExecutionContext
+import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Parser
 import org.openrewrite.maven.cache.LocalMavenArtifactCache
 import org.openrewrite.maven.cache.ReadOnlyLocalMavenArtifactCache
@@ -29,9 +29,7 @@ import java.nio.file.Path
 import java.nio.file.Paths
 
 class MavenDependencyDownloadIntegTest {
-    private val ctx = ExecutionContext.builder()
-        .doOnError { t -> t.printStackTrace() }
-        .build()
+    private val ctx = InMemoryExecutionContext { t -> t.printStackTrace() }
 
     private fun downloader(path: Path) = MavenArtifactDownloader(
         ReadOnlyLocalMavenArtifactCache.MAVEN_LOCAL.orElse(

@@ -15,7 +15,7 @@
  */
 package org.openrewrite.maven
 
-import org.openrewrite.ExecutionContext
+import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.java.JavaParser
 import org.openrewrite.maven.cache.LocalMavenArtifactCache
 import org.openrewrite.maven.cache.ReadOnlyLocalMavenArtifactCache
@@ -37,9 +37,8 @@ object ParseMavenProjectOnDisk {
         )
 
         val parser = MavenProjectParser(downloader, JavaParser.fromJavaVersion(),
-            ExecutionContext.builder()
-                .doOnError(errorConsumer)
-                .build())
+            InMemoryExecutionContext(errorConsumer)
+        )
 
         parser.parse(Paths.get(args.first())).forEach {
             println(it.sourcePath)

@@ -44,7 +44,7 @@ public class CoordinatesPrinter {
      * @return The printed tree.
      */
     public static String printCoordinates(J.CompilationUnit cu, @Nullable Class<? extends J> cursorFilter) {
-        cu = new MapSpaces(cursorFilter, false).visitCompilationUnit(cu, ExecutionContext.builder().build());
+        cu = new MapSpaces(cursorFilter, false).visitCompilationUnit(cu, new InMemoryExecutionContext());
         return cu.print();
     }
 
@@ -58,7 +58,7 @@ public class CoordinatesPrinter {
      * @return The printed tree.
      */
     public static String printCoordinatesWithColor(J.CompilationUnit cu, Class<? extends J> cursorFilter) {
-        cu = new MapSpaces(cursorFilter, true).visitCompilationUnit(cu, ExecutionContext.builder().build());
+        cu = new MapSpaces(cursorFilter, true).visitCompilationUnit(cu, new InMemoryExecutionContext());
         return cu.print();
     }
 

@@ -71,7 +71,7 @@ public interface Parser<S extends SourceFile> {
      * @return Parsed list of {@link SourceFile}.
      */
     default List<S> parse(String... sources) {
-        return parse(ExecutionContext.builder().build(), sources);
+        return parse(new InMemoryExecutionContext(), sources);
     }
 
     /**

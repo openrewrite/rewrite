@@ -23,38 +23,44 @@ class ResultTest {
     private val filePath = Paths.get("com/netflix/MyJavaClass.java")
 
     private fun ab(which: String) = ("$which/" + filePath.toString().replace("\\", "\\\\")).apply {
-        return if(contains("\\")) "\"$this\"" else this
+        return if (contains("\\")) "\"$this\"" else this
     }
 
     @Test
     fun idempotent() {
-        val diff = Result.InMemoryDiffEntry(Paths.get("com/netflix/MyJavaClass.java"), null,
-                "public class A {}",
-                "public class A {}",
-                emptySet())
+        val diff = Result.InMemoryDiffEntry(
+            Paths.get("com/netflix/MyJavaClass.java"), null,
+            "public class A {}",
+            "public class A {}",
+            emptySet()
+        )
 
         assertThat(diff.diff).isEmpty()
     }
 
     @Test
     fun singleLineChange() {
-        val diff = Result.InMemoryDiffEntry(filePath, null,
-                """
+        val diff = Result.InMemoryDiffEntry(
+            filePath, null,
+            """
                 |public void test() {
                 |   logger.infof("some %s", 1);
                 |}
                 |
             """.trimMargin(),
-                """
+            """
                 |public void test() {
                 |   logger.info("some {}", 1);
                 |}
                 |
             """.trimMargin(),
-                setOf("logger.Fix")
+            setOf(object : Recipe() {
+                override fun getName(): String = "logger.Fix"
+            })
         ).diff
 
-        assertThat("""
+        assertThat(
+            """
             |diff --git ${ab("a")} ${ab("b")}
             |index 3490cbf..5d64ae4 100644
             |--- ${ab("a")}
@@ -65,13 +71,15 @@ class ResultTest {
             |+   logger.info("some {}", 1);
             | }
             |
-        """.trimMargin()).isEqualTo(diff)
+        """.trimMargin()
+        ).isEqualTo(diff)
     }
 
     @Test
     fun multipleChangesMoreThanThreeLinesApart() {
-        val diff = Result.InMemoryDiffEntry(filePath, null,
-                """
+        val diff = Result.InMemoryDiffEntry(
+            filePath, null,
+            """
                 |public void test() {
                 |   logger.infof("some %s", 1);
                 |   System.out.println("1");
@@ -86,7 +94,7 @@ class ResultTest {
                 |}
                 |
             """.trimMargin(),
-                """
+            """
                 |public void test() {
                 |   logger.info("some {}", 1);
                 |   System.out.println("1");
@@ -101,10 +109,19 @@ class ResultTest {
                 |}
                 |
             """.trimMargin(),
-                setOf("logger.Fix1", "logger.Fix2")
+
+            setOf(
+                object : Recipe() {
+                    override fun getName(): String = "logger.Fix1"
+                },
+                object : Recipe() {
+                    override fun getName(): String = "logger.Fix2"
+                }
+            )
         ).diff
 
-        assertThat("""
+        assertThat(
+            """
                 |diff --git ${ab("a")} ${ab("b")}
                 |index c17f051..bb2dfba 100644
                 |--- ${ab("a")}
@@ -124,6 +141,7 @@ class ResultTest {
                 |+   logger.info("some %s", 2);
                 | }
                 |
-        """.trimMargin()).isEqualTo(diff)
+        """.trimMargin()
+        ).isEqualTo(diff)
     }
 }

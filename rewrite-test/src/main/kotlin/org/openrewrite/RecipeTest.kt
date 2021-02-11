@@ -83,11 +83,10 @@ interface RecipeTest {
         val sources = parser!!.parse(*(arrayOf(before.trimIndent()) + dependsOn))
 
         val results = recipe
-            .run(sources,
-                ExecutionContext.builder()
-                    .maxCycles(cycles)
-                    .doOnError { t: Throwable? -> fail<Any>("Recipe threw an exception", t) }
-                    .build()
+            .run(
+                sources,
+                InMemoryExecutionContext { t: Throwable? -> fail<Any>("Recipe threw an exception", t) },
+                cycles
             )
             .filter { it.before == sources.first() }
 
@@ -129,14 +128,14 @@ interface RecipeTest {
         val source = parser!!.parse(
             (listOf(before) + dependsOn).map { it.toPath() },
             null,
-            ExecutionContext.builder().build()
+            InMemoryExecutionContext()
         ).first()
 
-        val results = recipe!!.run(listOf(source),
-            ExecutionContext.builder()
-                .maxCycles(cycles)
-                .doOnError { t: Throwable? -> fail<Any>("Recipe threw an exception", t) }
-                .build())
+        val results = recipe!!.run(
+            listOf(source),
+            InMemoryExecutionContext { t: Throwable? -> fail<Any>("Recipe threw an exception", t) },
+            cycles
+        )
 
         if (results.isEmpty()) {
             fail<Any>("The recipe must make changes")
@@ -185,7 +184,7 @@ interface RecipeTest {
         val source = parser!!.parse(
             (listOf(before) + dependsOn).map { it.toPath() },
             null,
-            ExecutionContext.builder().build()
+            InMemoryExecutionContext()
         ).first()
         val results = recipe!!.run(listOf(source))
 

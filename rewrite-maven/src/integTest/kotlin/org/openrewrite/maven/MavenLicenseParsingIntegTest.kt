@@ -18,7 +18,7 @@ package org.openrewrite.maven
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import org.openrewrite.ExecutionContext
+import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.maven.cache.InMemoryMavenPomCache
 import org.openrewrite.maven.tree.Maven
 import org.openrewrite.maven.tree.Pom
@@ -68,7 +68,7 @@ class MavenLicenseParsingIntegTest {
                 .pomCache(mavenCache)
                 .resolveOptional(false)
                 .build()
-                .parse(listOf(pomFile.toPath()), null, ExecutionContext.builder().build())
+                .parse(listOf(pomFile.toPath()), null, InMemoryExecutionContext())
                 .first()
 
         val unknownLicenses = pomAst.model.getDependencies(Scope.Test)

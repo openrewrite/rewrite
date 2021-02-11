@@ -18,16 +18,14 @@ package org.openrewrite.maven
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
-import org.openrewrite.ExecutionContext
+import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.maven.tree.Pom
 import org.openrewrite.maven.tree.Scope
 
 class MavenParserTest {
     private val parser = MavenParser.builder().resolveOptional(false).build()
-    private val ctx = ExecutionContext.builder()
-        .doOnError { t -> throw t }
-        .build()
+    private val ctx = InMemoryExecutionContext { t -> throw t }
 
     @Test
     fun parse() {

@@ -26,6 +26,8 @@ import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
 import java.util.*;
+import java.util.concurrent.ForkJoinPool;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
@@ -108,11 +110,14 @@ public class Recipe {
     }
 
     @SuppressWarnings("SuspiciousMethodCalls")
-    private <S extends SourceFile> List<SourceFile> visitInternal(List<S> before, ExecutionContext ctx, Map<UUID, Recipe> recipeThatDeletedSourceFile) {
+    private <S extends SourceFile> List<SourceFile> visitInternal(List<S> before,
+                                                                  ExecutionContext ctx,
+                                                                  ForkJoinPool forkJoinPool,
+                                                                  Map<UUID, Recipe> recipeThatDeletedSourceFile) {
         List<S> after = before;
         // if this recipe isn't valid we just skip it and proceed to next
         if (validate(ctx).isValid()) {
-            after = ListUtils.map(after, ctx.getForkJoinPool(), s -> {
+            after = ListUtils.map(after, forkJoinPool, s -> {
                 try {
                     @SuppressWarnings("unchecked") S afterFile = (S) getVisitor().visit(s, ctx);
                     if (afterFile != null && afterFile != s) {
@@ -156,7 +161,7 @@ public class Recipe {
         }
 
         if (next != null) {
-            afterWidened = next.visitInternal(afterWidened, ctx, recipeThatDeletedSourceFile);
+            afterWidened = next.visitInternal(afterWidened, ctx, forkJoinPool, recipeThatDeletedSourceFile);
         }
         return afterWidened;
     }
@@ -174,20 +179,33 @@ public class Recipe {
     }
 
     public final List<Result> run(List<? extends SourceFile> before) {
-        return run(before, ExecutionContext.builder().build());
+        return run(before, new InMemoryExecutionContext());
     }
 
     public final List<Result> run(List<? extends SourceFile> before, ExecutionContext ctx) {
+        return run(before, ctx, 3);
+    }
+
+    public final List<Result> run(List<? extends SourceFile> before, ExecutionContext ctx, int maxCycles) {
+        return run(before, ctx, ForkJoinPool.commonPool(), maxCycles);
+    }
+
+    public final List<Result> run(List<? extends SourceFile> before,
+                                  ExecutionContext ctx,
+                                  ForkJoinPool forkJoinPool,
+                                  int maxCycles) {
         Map<UUID, Recipe> recipeThatDeletedSourceFile = new HashMap<>();
         List<? extends SourceFile> acc = before;
         List<? extends SourceFile> after = acc;
-        for (int i = 0; i < ctx.getMaxCycles(); i++) {
-            after = visitInternal(before, ctx, recipeThatDeletedSourceFile);
-            if (after == acc && !ctx.isNeedAnotherCycle()) {
+
+        WatchForNewMessageExecutionContext ctxWithWatch = new WatchForNewMessageExecutionContext(ctx);
+        for (int i = 0; i < maxCycles; i++) {
+            after = visitInternal(before, ctx, forkJoinPool, recipeThatDeletedSourceFile);
+            if (after == acc && !ctxWithWatch.needAnotherCycle) {
                 break;
             }
             acc = after;
-            ctx.nextCycle();
+            ctxWithWatch.needAnotherCycle = false;
         }
 
         if (after == before) {
@@ -264,7 +282,7 @@ public class Recipe {
     }
 
     public final Collection<Validated> validateAll() {
-        return validateAll(ExecutionContext.builder().build(), new ArrayList<>());
+        return validateAll(new InMemoryExecutionContext(), new ArrayList<>());
     }
 
     private Collection<Validated> validateAll(ExecutionContext ctx, Collection<Validated> acc) {
@@ -300,5 +318,35 @@ public class Recipe {
     @Override
     public int hashCode() {
         return Objects.hash(getName());
+    }
+
+    private static class WatchForNewMessageExecutionContext implements ExecutionContext {
+        private boolean needAnotherCycle = true;
+        private final ExecutionContext delegate;
+
+        private WatchForNewMessageExecutionContext(ExecutionContext delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public void putMessage(String key, Object value) {
+            needAnotherCycle = true;
+            delegate.putMessage(key, value);
+        }
+
+        @Override
+        public <T> @Nullable T peekMessage(String key) {
+            return delegate.peekMessage(key);
+        }
+
+        @Override
+        public <T> @Nullable T pollMessage(String key) {
+            return delegate.pollMessage(key);
+        }
+
+        @Override
+        public Consumer<Throwable> getOnError() {
+            return delegate.getOnError();
+        }
     }
 }

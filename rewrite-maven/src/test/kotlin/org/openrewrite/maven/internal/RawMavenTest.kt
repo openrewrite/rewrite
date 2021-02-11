@@ -17,7 +17,7 @@ package org.openrewrite.maven.internal
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.ExecutionContext
+import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Parser
 import java.nio.file.Paths
 
@@ -44,7 +44,7 @@ class RawMavenTest {
                     </profiles>
                 </project>
             """.trimIndent().byteInputStream()
-        }, null, null, ExecutionContext.builder().build())
+        }, null, null, InMemoryExecutionContext())
 
         assertThat(maven.pom.dependencyManagement?.dependencies).isNull()
         assertThat(maven.pom.getActiveRepositories(emptyList())).isEmpty()
@@ -72,7 +72,7 @@ class RawMavenTest {
                   </dependencyManagement>
                 </project>
             """.trimIndent().byteInputStream()
-        }, null, null, ExecutionContext.builder().build())
+        }, null, null, InMemoryExecutionContext())
 
         assertThat(maven.pom.dependencyManagement?.dependencies?.dependencies).isNotEmpty()
     }
