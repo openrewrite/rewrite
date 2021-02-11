@@ -18,11 +18,16 @@ package org.openrewrite.maven
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.maven.tree.Pom
 import org.openrewrite.maven.tree.Scope
 
 class MavenParserTest {
+    private val parser = MavenParser.builder().resolveOptional(false).build()
+    private val ctx = ExecutionContext.builder()
+        .doOnError { t -> throw t }
+        .build()
 
     @Test
     fun parse() {
@@ -143,9 +148,6 @@ class MavenParserTest {
         assertThat(maven.model.dependencies.first()).matches{ it.scope == Scope.Compile}
     }
 
-    private val parserStrict = MavenParser.builder().doOnError { t -> throw t }.resolveOptional(false).build()
-    private val parserLenient = MavenParser.builder().resolveOptional(false).build()
-
     @Issue("https://github.com/openrewrite/rewrite/issues/199")
     @Test
     fun continueOnErrorInvalidScope() {
@@ -167,8 +169,8 @@ class MavenParserTest {
                 </dependencies>
             </project>
         """
-        assertThatThrownBy { parserStrict.parse(invalidPom) }
-        parserLenient.parse(invalidPom)
+        assertThatThrownBy { parser.parse(ctx, invalidPom) }
+        parser.parse(invalidPom)
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/199")
@@ -190,8 +192,8 @@ class MavenParserTest {
                 </dependencies>
             </project>
         """
-        assertThatThrownBy { parserStrict.parse(invalidPom) }
-        parserLenient.parse(invalidPom)
+        assertThatThrownBy { parser.parse(ctx, invalidPom) }
+        parser.parse(invalidPom)
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/199")
@@ -213,8 +215,8 @@ class MavenParserTest {
                 </dependencies>
             </project>
         """
-        assertThatThrownBy { parserStrict.parse(invalidPom) }
-        parserLenient.parse(invalidPom)
+        assertThatThrownBy { parser.parse(ctx, invalidPom) }
+        parser.parse(invalidPom)
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/199")
@@ -241,8 +243,8 @@ class MavenParserTest {
                 </dependencies>
             </project>
         """
-        assertThatThrownBy { parserStrict.parse(invalidPom) }
-        parserLenient.parse(invalidPom)
+        assertThatThrownBy { parser.parse(ctx, invalidPom) }
+        parser.parse(invalidPom)
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/135")

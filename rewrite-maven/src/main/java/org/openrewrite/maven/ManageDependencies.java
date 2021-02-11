@@ -70,7 +70,7 @@ public class ManageDependencies extends Recipe {
         );
     }
 
-    private class ManageDependenciesVisitor extends MavenVisitor<ExecutionContext> {
+    private class ManageDependenciesVisitor extends MavenVisitor {
 
         private final Pattern groupPattern;
 
@@ -147,7 +147,7 @@ public class ManageDependencies extends Recipe {
                             .orElse(model.getArtifactId())).matches());
         }
 
-        private class InsertDependencyInOrder extends MavenVisitor<ExecutionContext> {
+        private class InsertDependencyInOrder extends MavenVisitor {
 
             private final String groupId;
             private final String artifactId;

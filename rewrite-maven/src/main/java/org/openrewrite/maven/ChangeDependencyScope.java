@@ -45,7 +45,7 @@ public class ChangeDependencyScope extends Recipe {
         return new ChangeDependencyScopeVisitor();
     }
 
-    private class ChangeDependencyScopeVisitor extends MavenVisitor<ExecutionContext> {
+    private class ChangeDependencyScopeVisitor extends MavenVisitor {
 
         private ChangeDependencyScopeVisitor() {
             setCursoringOn();

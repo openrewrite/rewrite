@@ -44,7 +44,7 @@ public class ChangePropertyValue extends Recipe {
         this.newValue = newValue;
     }
 
-    private class ChangePropertyValueVisitor extends MavenVisitor<ExecutionContext> {
+    private class ChangePropertyValueVisitor extends MavenVisitor {
 
         public ChangePropertyValueVisitor() {
             setCursoringOn();

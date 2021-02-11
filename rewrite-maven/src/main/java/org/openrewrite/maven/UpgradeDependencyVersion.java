@@ -79,7 +79,7 @@ public class UpgradeDependencyVersion extends Recipe {
         return new UpgradeDependencyVersionVisitor();
     }
 
-    private class UpgradeDependencyVersionVisitor extends MavenVisitor<ExecutionContext> {
+    private class UpgradeDependencyVersionVisitor extends MavenVisitor {
         @Nullable
         private Collection<String> availableVersions;
 
@@ -95,19 +95,19 @@ public class UpgradeDependencyVersion extends Recipe {
         public Maven visitMaven(Maven maven, ExecutionContext ctx) {
             settings = maven.getSettings();
 
-            maybeChangeDependencyVersion(maven.getModel());
+            maybeChangeDependencyVersion(maven.getModel(), ctx);
 
             for (Pom module : maven.getModules()) {
-                maybeChangeDependencyVersion(module);
+                maybeChangeDependencyVersion(module, ctx);
             }
 
             return super.visitMaven(maven, ctx);
         }
 
-        private void maybeChangeDependencyVersion(Pom model) {
+        private void maybeChangeDependencyVersion(Pom model, ExecutionContext ctx) {
             for (Pom.Dependency dependency : model.getDependencies()) {
                 if (dependency.getGroupId().equals(groupId) && (artifactId == null || dependency.getArtifactId().equals(artifactId))) {
-                    findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion()).ifPresent(newer -> {
+                    findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion(), ctx).ifPresent(newer -> {
                         ChangeDependencyVersion changeDependencyVersion = new ChangeDependencyVersion(groupId, dependency.getArtifactId(), newer);
                         doAfterVisit(changeDependencyVersion);
                     });
@@ -116,7 +116,7 @@ public class UpgradeDependencyVersion extends Recipe {
 
             for (DependencyManagementDependency dependency : model.getDependencyManagement().getDependencies()) {
                 if (dependency.getGroupId().equals(groupId) && (artifactId == null || dependency.getArtifactId().equals(artifactId))) {
-                    findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion()).ifPresent(newer -> {
+                    findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion(), ctx).ifPresent(newer -> {
                         ChangeDependencyVersion changeDependencyVersion = new ChangeDependencyVersion(groupId, dependency.getArtifactId(), newer);
                         doAfterVisit(changeDependencyVersion);
                     });
@@ -124,13 +124,11 @@ public class UpgradeDependencyVersion extends Recipe {
             }
         }
 
-        private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion) {
+        private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion,
+                                                            ExecutionContext ctx) {
             if (availableVersions == null) {
                 MavenMetadata mavenMetadata = new MavenPomDownloader(MavenPomCache.NOOP,
-                        emptyMap(), settings,
-                        t -> {
-                            throw new RecipeException(t);
-                        }).downloadMetadata(groupId, artifactId, emptyList());
+                        emptyMap(), settings, ctx).downloadMetadata(groupId, artifactId, emptyList());
                 availableVersions = mavenMetadata.getVersioning().getVersions().stream()
                         .filter(versionComparator::isValid)
                         .collect(Collectors.toList());

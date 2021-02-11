@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml;
 
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
@@ -44,7 +45,7 @@ import static org.openrewrite.Tree.randomId;
 public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
 
     @Override
-    public List<Yaml.Documents> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo) {
+    public List<Yaml.Documents> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
                     try (InputStream is = sourceFile.getSource()) {

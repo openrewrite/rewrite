@@ -40,7 +40,7 @@ public class RemoveDependency extends Recipe {
         return new RemoveDependencyVisitor();
     }
 
-    private class RemoveDependencyVisitor extends MavenVisitor<ExecutionContext> {
+    private class RemoveDependencyVisitor extends MavenVisitor {
 
         public RemoveDependencyVisitor() {
             setCursoringOn();

@@ -30,11 +30,10 @@ import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.stream.StreamSupport;
 
-import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
 public interface Parser<S extends SourceFile> {
-    default List<S> parse(Iterable<Path> sourceFiles, @Nullable Path relativeTo) {
+    default List<S> parse(Iterable<Path> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         return parseInputs(StreamSupport
                         .stream(sourceFiles.spliterator(), false)
                         .map(sourceFile -> new Input(sourceFile, () -> {
@@ -46,12 +45,23 @@ public interface Parser<S extends SourceFile> {
                                 })
                         )
                         .collect(toList()),
-                relativeTo
+                relativeTo,
+                ctx
         );
     }
 
-    default S parse(Path sourceFile, @Nullable Path relativeTo) {
-        return parse(singletonList(sourceFile), relativeTo).iterator().next();
+    default List<S> parse(ExecutionContext ctx, String... sources) {
+        return parseInputs(
+                Arrays.stream(sources).map(source ->
+                        new Input(
+                                Paths.get(Long.toString(System.nanoTime())),
+                                () -> new ByteArrayInputStream(source.getBytes()),
+                                true
+                        )
+                ).collect(toList()),
+                null,
+                ctx
+        );
     }
 
     /**
@@ -61,25 +71,17 @@ public interface Parser<S extends SourceFile> {
      * @return Parsed list of {@link SourceFile}.
      */
     default List<S> parse(String... sources) {
-        return parseInputs(
-                Arrays.stream(sources).map(source ->
-                        new Input(
-                                Paths.get(Long.toString(System.nanoTime())),
-                                () -> new ByteArrayInputStream(source.getBytes()),
-                                true
-                        )
-                ).collect(toList()),
-                null
-        );
+        return parse(ExecutionContext.builder().build(), sources);
     }
 
     /**
      * @param sources    A collection of inputs. At the conclusion of parsing all sources' {@link Input#source}
      *                   are closed.
      * @param relativeTo A common relative path for all {@link Input#path}.
+     * @param ctx
      * @return A list of {@link SourceFile}.
      */
-    List<S> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo);
+    List<S> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx);
 
     boolean accept(Path path);
 

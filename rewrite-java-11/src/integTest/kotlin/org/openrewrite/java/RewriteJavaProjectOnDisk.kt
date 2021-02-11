@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java
 
+import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.SourceFile
 import java.nio.file.Files
@@ -46,7 +47,7 @@ object RewriteJavaProjectOnDisk {
             .logCompilationWarningsAndErrors(false) // optional, for quiet parsing
             .build()
 
-        val sourceFiles: List<SourceFile> = parser.parse(paths, srcDir)
+        val sourceFiles: List<SourceFile> = parser.parse(paths, srcDir, ExecutionContext.builder().build())
         recipe.run(sourceFiles).map {
             println(it.diff())
             if(System.getenv("rewrite.autofix")?.equals("true") == true) {

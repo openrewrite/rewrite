@@ -39,7 +39,7 @@ public class ChangeParentVersion extends Recipe {
         return new ChangeParentVersionVisitor();
     }
 
-    private class ChangeParentVersionVisitor extends MavenVisitor<ExecutionContext> {
+    private class ChangeParentVersionVisitor extends MavenVisitor {
 
         private ChangeParentVersionVisitor() {
             setCursoringOn();

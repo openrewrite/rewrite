@@ -126,7 +126,11 @@ interface RecipeTest {
     ) {
         assertThat(recipe).`as`("A recipe must be specified").isNotNull
 
-        val source = parser!!.parse((listOf(before) + dependsOn).map { it.toPath() }, null).first()
+        val source = parser!!.parse(
+            (listOf(before) + dependsOn).map { it.toPath() },
+            null,
+            ExecutionContext.builder().build()
+        ).first()
 
         val results = recipe!!.run(listOf(source),
             ExecutionContext.builder()
@@ -178,7 +182,11 @@ interface RecipeTest {
     ) {
         assertThat(recipe).`as`("A recipe must be specified").isNotNull
 
-        val source = parser!!.parse((listOf(before) + dependsOn).map { it.toPath() }, null).first()
+        val source = parser!!.parse(
+            (listOf(before) + dependsOn).map { it.toPath() },
+            null,
+            ExecutionContext.builder().build()
+        ).first()
         val results = recipe!!.run(listOf(source))
 
         results.forEach { result ->

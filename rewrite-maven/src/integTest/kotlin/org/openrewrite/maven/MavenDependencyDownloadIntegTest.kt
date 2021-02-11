@@ -19,6 +19,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.openrewrite.ExecutionContext
 import org.openrewrite.Parser
 import org.openrewrite.maven.cache.LocalMavenArtifactCache
 import org.openrewrite.maven.cache.ReadOnlyLocalMavenArtifactCache
@@ -28,6 +29,10 @@ import java.nio.file.Path
 import java.nio.file.Paths
 
 class MavenDependencyDownloadIntegTest {
+    private val ctx = ExecutionContext.builder()
+        .doOnError { t -> t.printStackTrace() }
+        .build()
+
     private fun downloader(path: Path) = MavenArtifactDownloader(
         ReadOnlyLocalMavenArtifactCache.MAVEN_LOCAL.orElse(
             LocalMavenArtifactCache(path)
@@ -38,10 +43,9 @@ class MavenDependencyDownloadIntegTest {
     @Test
     fun springWebMvc(@TempDir tempDir: Path) {
         val maven: Maven = MavenParser.builder()
-            .doOnError { t -> t.printStackTrace() }
             .resolveOptional(false)
             .build()
-            .parse(singleDependencyPom("org.springframework:spring-webmvc:5.3.2"))
+            .parse(ctx, singleDependencyPom("org.springframework:spring-webmvc:5.3.2"))
             .first()
 
         val compileDependencies = maven.model.getDependencies(Scope.Compile)
@@ -59,10 +63,9 @@ class MavenDependencyDownloadIntegTest {
     @Test
     fun rewriteCore(@TempDir tempDir: Path) {
         val maven: Maven = MavenParser.builder()
-            .doOnError { t -> t.printStackTrace() }
             .resolveOptional(false)
             .build()
-            .parse(singleDependencyPom("org.openrewrite:rewrite-core:6.0.1"))
+            .parse(ctx, singleDependencyPom("org.openrewrite:rewrite-core:6.0.1"))
             .first()
 
         val runtimeDependencies = maven.model.getDependencies(Scope.Runtime)
@@ -102,6 +105,7 @@ class MavenDependencyDownloadIntegTest {
             })
             .build()
             .parse(
+                ctx,
                 """
                 <project>
                     <modelVersion>4.0.0</modelVersion>

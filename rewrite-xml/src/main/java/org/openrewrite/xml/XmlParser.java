@@ -17,6 +17,7 @@ package org.openrewrite.xml;
 
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -34,7 +35,7 @@ import static java.util.stream.Collectors.toList;
 
 public class XmlParser implements Parser<Xml.Document> {
     @Override
-    public List<Xml.Document> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo) {
+    public List<Xml.Document> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
                     try {

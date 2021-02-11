@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.tree;
 
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
@@ -32,7 +33,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.function.BiPredicate;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
@@ -63,49 +63,49 @@ public class Maven extends Xml.Document {
                 .orElse(emptyList());
     }
 
-    public static List<Path> getMavenPoms(Path projectDir, Consumer<Throwable> onError) {
-        return getSources(projectDir, onError, "pom.xml");
+    public static List<Path> getMavenPoms(Path projectDir, ExecutionContext ctx) {
+        return getSources(projectDir, ctx, "pom.xml");
     }
 
-    public List<Path> getJavaSources(Consumer<Throwable> onError) {
+    public List<Path> getJavaSources(ExecutionContext ctx) {
         if (!"jar".equals(model.getPackaging())) {
             return emptyList();
         }
         return getSources(getSourcePath().getParent().resolve(Paths.get("src", "main", "java")),
-                onError, ".java");
+                ctx, ".java");
     }
 
-    public List<Path> getTestJavaSources(Consumer<Throwable> onError) {
+    public List<Path> getTestJavaSources(ExecutionContext ctx) {
         if (!"jar".equals(model.getPackaging())) {
             return emptyList();
         }
         return getSources(getSourcePath().getParent().resolve(Paths.get("src", "test", "java")),
-                onError, ".java");
+                ctx, ".java");
     }
 
-    public List<Path> getResources(Consumer<Throwable> onError) {
+    public List<Path> getResources(ExecutionContext ctx) {
         if (!"jar".equals(model.getPackaging())) {
             return emptyList();
         }
         return getSources(getSourcePath().getParent().resolve(Paths.get("src", "main", "resources")),
-                onError, ".properties", ".xml", ".yml", ".yaml");
+                ctx, ".properties", ".xml", ".yml", ".yaml");
     }
 
-    public List<Path> getTestResources(Consumer<Throwable> onError) {
+    public List<Path> getTestResources(ExecutionContext ctx) {
         if (!"jar".equals(model.getPackaging())) {
             return emptyList();
         }
         return getSources(getSourcePath().getParent().resolve(Paths.get("src", "test", "resources")),
-                onError, ".properties", ".xml", ".yml", ".yaml");
+                ctx, ".properties", ".xml", ".yml", ".yaml");
     }
 
-    private static List<Path> getSources(Path srcDir, Consumer<Throwable> onError, String... fileTypes) {
+    private static List<Path> getSources(Path srcDir, ExecutionContext ctx, String... fileTypes) {
         BiPredicate<Path, java.nio.file.attribute.BasicFileAttributes> predicate = (p, bfa) ->
                 bfa.isRegularFile() && Arrays.stream(fileTypes).anyMatch(type -> p.getFileName().toString().endsWith(type));
         try {
             return Files.find(srcDir, 999, predicate).collect(Collectors.toList());
         } catch (IOException e) {
-            onError.accept(e);
+            ctx.getOnError().accept(e);
             return emptyList();
         }
     }
@@ -126,8 +126,8 @@ public class Maven extends Xml.Document {
     @Override
     @Nullable
     public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
-        if (v instanceof MavenVisitor) {
-            return (R) ((MavenVisitor<P>) v).visitMaven(this, p);
+        if (v instanceof MavenVisitor && p instanceof ExecutionContext) {
+            return (R) ((MavenVisitor) v).visitMaven(this, (ExecutionContext) p);
         } else if (v instanceof XmlVisitor) {
             return super.accept(v, p);
         }

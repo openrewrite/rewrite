@@ -38,7 +38,7 @@ public class ExcludeDependency extends Recipe {
         return new ExcludeDependencyVisitor();
     }
 
-    private class ExcludeDependencyVisitor extends MavenVisitor<ExecutionContext> {
+    private class ExcludeDependencyVisitor extends MavenVisitor {
 
         public ExcludeDependencyVisitor() {
             setCursoringOn();

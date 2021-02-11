@@ -17,6 +17,7 @@ package org.openrewrite.maven.internal;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.XmlParser;
@@ -71,8 +72,9 @@ public class RawMaven {
                 '}';
     }
 
-    public static RawMaven parse(Parser.Input source, @Nullable Path relativeTo, @Nullable String snapshotVersion) {
-        Xml.Document document = new MavenXmlParser().parseInputs(singletonList(source), relativeTo)
+    public static RawMaven parse(Parser.Input source, @Nullable Path relativeTo, @Nullable String snapshotVersion,
+                                 ExecutionContext ctx) {
+        Xml.Document document = new MavenXmlParser().parseInputs(singletonList(source), relativeTo, ctx)
                 .iterator().next();
 
         try {

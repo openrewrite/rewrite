@@ -22,6 +22,7 @@ import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import io.vavr.CheckedFunction1;
 import okhttp3.*;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -39,7 +40,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -73,7 +73,7 @@ public class MavenPomDownloader {
     @Nullable
     private final MavenSettings settings;
 
-    private final Consumer<Throwable> onError;
+    private final ExecutionContext ctx;
     private final Map<String, MavenSettings.Server> serverIdToServer;
 
     /**
@@ -83,11 +83,11 @@ public class MavenPomDownloader {
      */
     public MavenPomDownloader(MavenPomCache mavenPomCache, Map<Path, RawMaven> projectPoms,
                               @Nullable MavenSettings settings,
-                              Consumer<Throwable> onError) {
+                              ExecutionContext ctx) {
         this.mavenPomCache = mavenPomCache;
         this.projectPoms = projectPoms;
         this.settings = settings;
-        this.onError = onError;
+        this.ctx = ctx;
         this.serverIdToServer = settings == null || settings.getServers() == null ?
                 new HashMap<>() :
                 settings.getServers().getServers().stream()
@@ -186,7 +186,7 @@ public class MavenPomDownloader {
                              @Nullable String relativePath,
                              @Nullable RawMaven containingPom,
                              List<RawRepositories.Repository> repositories,
-                             Consumer<Throwable> onError) {
+                             ExecutionContext ctx) {
         try {
             String versionMaybeDatedSnapshot = findDatedSnapshotVersionIfNecessary(groupId, artifactId, version, repositories);
             if (versionMaybeDatedSnapshot == null) {
@@ -253,7 +253,8 @@ public class MavenPomDownloader {
                                                 return RawMaven.parse(
                                                         new Parser.Input(inputPath, () -> new ByteArrayInputStream(responseBody), true),
                                                         null,
-                                                        versionMaybeDatedSnapshot.equals(version) ? null : versionMaybeDatedSnapshot
+                                                        versionMaybeDatedSnapshot.equals(version) ? null : versionMaybeDatedSnapshot,
+                                                        ctx
                                                 ).withRepository(repo);
                                             }
                                         } catch (Throwable throwable) {
@@ -275,7 +276,7 @@ public class MavenPomDownloader {
                     .findFirst()
                     .orElse(null);
         } catch (Throwable t) {
-            onError.accept(t);
+            ctx.getOnError().accept(t);
             return null;
         }
     }
@@ -292,7 +293,7 @@ public class MavenPomDownloader {
                         try {
                             return forceDownloadMetadata(groupId, artifactId, version, repo);
                         } catch (IOException e) {
-                            onError.accept(e);
+                            ctx.getOnError().accept(e);
                             return null;
                         }
                     })

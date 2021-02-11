@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
@@ -28,7 +29,8 @@ import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toList;
 
-public class MavenVisitor<P> extends XmlVisitor<P> {
+@SuppressWarnings("NotNullFieldNotInitialized")
+public class MavenVisitor extends XmlVisitor<ExecutionContext> {
     private static final XPathMatcher DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencies/dependency");
     private static final XPathMatcher MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies/dependency");
     private static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
@@ -38,16 +40,16 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     protected Collection<Pom> modules;
     protected MavenSettings settings;
 
-    public Maven visitMaven(Maven maven, P p) {
+    public Maven visitMaven(Maven maven, ExecutionContext ctx) {
         this.model = maven.getModel();
         this.modules = maven.getModules();
         this.settings = maven.getSettings();
-        return (Maven) visitDocument(maven, p);
+        return (Maven) visitDocument(maven, ctx);
     }
 
     @Override
-    public final Xml visitDocument(Xml.Document document, P p) {
-        Xml.Document refactored = (Xml.Document) super.visitDocument(document, p);
+    public final Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
+        Xml.Document refactored = (Xml.Document) super.visitDocument(document, ctx);
         if (refactored != document) {
             return new Maven(refactored, settings);
         }
@@ -122,7 +124,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
 
     public void maybeAddDependency(String groupId, String artifactId, String version,
                                    @Nullable String classifier, @Nullable String scope, @Nullable String type) {
-        AddDependencyVisitor<P> op = new AddDependencyVisitor<>(
+        AddDependencyVisitor op = new AddDependencyVisitor(
                 groupId,
                 artifactId,
                 version,

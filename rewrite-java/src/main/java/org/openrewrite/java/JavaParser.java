@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
@@ -99,7 +100,8 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
                             );
                         })
                         .collect(toList()),
-                null
+                null,
+                ExecutionContext.builder().build()
         );
     }
 

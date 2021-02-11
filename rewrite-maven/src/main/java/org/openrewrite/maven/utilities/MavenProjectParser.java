@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.utilities;
 
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.maven.MavenArtifactDownloader;
@@ -30,7 +31,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
@@ -41,22 +41,21 @@ public class MavenProjectParser {
     private final MavenParser mavenParser;
     private final MavenArtifactDownloader artifactDownloader;
     private final JavaParser.Builder<?, ?> javaParserBuilder;
-    private final Consumer<Throwable> onError;
+    private final ExecutionContext ctx;
 
     public MavenProjectParser(MavenArtifactDownloader artifactDownloader,
                               JavaParser.Builder<?, ?> javaParserBuilder,
-                              Consumer<Throwable> onError) {
+                              ExecutionContext ctx) {
         this.mavenParser = MavenParser.builder()
                 .resolveOptional(false)
-                .doOnError(onError)
                 .build();
         this.artifactDownloader = artifactDownloader;
         this.javaParserBuilder = javaParserBuilder;
-        this.onError = onError;
+        this.ctx = ctx;
     }
 
     public List<SourceFile> parse(Path projectDirectory) {
-        List<Maven> mavens = mavenParser.parse(Maven.getMavenPoms(projectDirectory, onError), projectDirectory);
+        List<Maven> mavens = mavenParser.parse(Maven.getMavenPoms(projectDirectory, ctx), projectDirectory, ctx);
         List<SourceFile> sourceFiles = new ArrayList<>(mavens);
 
         for (Maven maven : mavens) {
@@ -64,25 +63,26 @@ public class MavenProjectParser {
                     javaParserBuilder
                             .classpath(downloadArtifacts(maven.getModel().getDependencies(Scope.Compile)))
                             .build()
-                            .parse(maven.getJavaSources(onError), projectDirectory)
+                            .parse(maven.getJavaSources(ctx), projectDirectory, ctx)
             );
 
             sourceFiles.addAll(
                     javaParserBuilder
                             .classpath(downloadArtifacts(maven.getModel().getDependencies(Scope.Test)))
                             .build()
-                            .parse(maven.getTestJavaSources(onError), projectDirectory)
+                            .parse(maven.getTestJavaSources(ctx), projectDirectory, ctx)
             );
 
-            List<Path> resources = new ArrayList<>(maven.getResources(onError));
-            resources.addAll(maven.getTestResources(onError));
+            List<Path> resources = new ArrayList<>(maven.getResources(ctx));
+            resources.addAll(maven.getTestResources(ctx));
 
             sourceFiles.addAll(
                     new XmlParser().parse(
                             resources.stream()
                                     .filter(p -> p.getFileName().toString().endsWith(".xml"))
                                     .collect(Collectors.toList()),
-                            projectDirectory
+                            projectDirectory,
+                            ctx
                     )
             );
 
@@ -91,7 +91,8 @@ public class MavenProjectParser {
                             resources.stream()
                                     .filter(p -> p.getFileName().toString().endsWith(".yml") || p.getFileName().toString().endsWith(".yaml"))
                                     .collect(Collectors.toList()),
-                            projectDirectory
+                            projectDirectory,
+                            ctx
                     )
             );
 
@@ -100,7 +101,8 @@ public class MavenProjectParser {
                             resources.stream()
                                     .filter(p -> p.getFileName().toString().endsWith(".properties"))
                                     .collect(Collectors.toList()),
-                            projectDirectory
+                            projectDirectory,
+                            ctx
                     )
             );
         }

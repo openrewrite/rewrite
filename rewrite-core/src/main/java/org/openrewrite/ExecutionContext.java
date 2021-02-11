@@ -25,15 +25,14 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.function.Consumer;
 
 /**
- * Passes messages between individual TreeVisitor / Recipes in the chain
- * controls execution and lifecycle by providing a ForkJoinPool and max number of cycles
+ * Passes messages between individual TreeVisitor / Recipes / Parse in a chain.
+ * Controls execution and lifecycle by providing a ForkJoinPool and max number of cycles.
  */
 public final class ExecutionContext {
     private volatile boolean needAnotherCycle = false;
 
     private final int maxCycles;
 
-    @Nullable
     private final Consumer<Throwable> onError;
 
     private final ForkJoinPool forkJoinPool;
@@ -44,7 +43,7 @@ public final class ExecutionContext {
 
     private ExecutionContext(int maxCycles, @Nullable Consumer<Throwable> onError, ForkJoinPool forkJoinPool) {
         this.maxCycles = maxCycles;
-        this.onError = onError;
+        this.onError = onError == null ? t -> {} : onError;
         this.forkJoinPool = forkJoinPool;
     }
 
@@ -84,12 +83,11 @@ public final class ExecutionContext {
         return maxCycles;
     }
 
-    @Nullable
-    Consumer<Throwable> getOnError() {
+    public Consumer<Throwable> getOnError() {
         return onError;
     }
 
-    ForkJoinPool getForkJoinPool() {
+    public ForkJoinPool getForkJoinPool() {
         return forkJoinPool;
     }
 

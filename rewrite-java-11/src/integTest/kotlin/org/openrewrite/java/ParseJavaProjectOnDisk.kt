@@ -18,6 +18,7 @@ package org.openrewrite.java
 import io.micrometer.core.instrument.Meter
 import io.micrometer.core.instrument.config.MeterFilter
 import io.micrometer.core.instrument.distribution.DistributionStatisticConfig
+import org.openrewrite.ExecutionContext
 import org.openrewrite.MetricsDestinations
 import java.nio.file.Files
 import java.nio.file.Path
@@ -60,7 +61,7 @@ object ParseJavaProjectOnDisk {
         println("Loaded ${paths.size} files in ${(System.nanoTime() - start) * 1e-6}ms")
 
         start = System.nanoTime()
-        parser.parse(paths, srcDir)
+        parser.parse(paths, srcDir, ExecutionContext.builder().build())
         println("Parsed ${paths.size} files in ${(System.nanoTime() - start) * 1e-6}ms")
 
         //Sleep long enough for prometheus to scape the final metrics.

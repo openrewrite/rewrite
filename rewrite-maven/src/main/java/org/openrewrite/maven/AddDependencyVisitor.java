@@ -16,13 +16,13 @@
 package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
-import org.openrewrite.RecipeException;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
-import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.MavenMetadata;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.Version;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
@@ -50,7 +50,7 @@ import static java.util.Collections.*;
  * Places a new dependency as physically "near" to a group of similar dependencies as possible.
  */
 @EqualsAndHashCode(callSuper = false)
-public class AddDependencyVisitor<P> extends MavenVisitor<P> {
+public class AddDependencyVisitor extends MavenVisitor {
     private static final XPathMatcher DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencies");
 
     private final String groupId;
@@ -102,7 +102,7 @@ public class AddDependencyVisitor<P> extends MavenVisitor<P> {
     }
 
     @Override
-    public Maven visitMaven(Maven maven, P p) {
+    public Maven visitMaven(Maven maven, ExecutionContext ctx) {
         model = maven.getModel();
 
         Validated versionValidation = Semver.validate(version, metadataPattern);
@@ -145,13 +145,13 @@ public class AddDependencyVisitor<P> extends MavenVisitor<P> {
         return maven.withModel(maven.getModel().withDependencies(dependencies));
     }
 
-    private class InsertDependencyInOrder extends MavenVisitor<P> {
+    private class InsertDependencyInOrder extends MavenVisitor {
         public InsertDependencyInOrder() {
             setCursoringOn();
         }
 
         @Override
-        public Xml visitTag(Xml.Tag tag, P p) {
+        public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (DEPENDENCIES_MATCHER.matches(getCursor())) {
                 String versionToUse = null;
 
@@ -164,7 +164,7 @@ public class AddDependencyVisitor<P> extends MavenVisitor<P> {
                     }
 
                     if (versionToUse == null) {
-                        versionToUse = findVersionToUse(groupId, artifactId);
+                        versionToUse = findVersionToUse(groupId, artifactId, ctx);
                     }
                 }
 
@@ -187,20 +187,17 @@ public class AddDependencyVisitor<P> extends MavenVisitor<P> {
                 return tag;
             }
 
-            return super.visitTag(tag, p);
+            return super.visitTag(tag, ctx);
         }
     }
 
-    private String findVersionToUse(String groupId, String artifactId) {
+    private String findVersionToUse(String groupId, String artifactId, ExecutionContext ctx) {
         if (versionComparator == null) {
             return version;
         }
 
         MavenMetadata mavenMetadata = new MavenPomDownloader(MavenPomCache.NOOP,
-                emptyMap(), settings,
-                t -> {
-                    throw new RecipeException(t);
-                }).downloadMetadata(groupId, artifactId, emptyList());
+                emptyMap(), settings, ctx).downloadMetadata(groupId, artifactId, emptyList());
 
         LatestRelease latest = new LatestRelease(metadataPattern);
         return mavenMetadata.getVersioning().getVersions().stream()

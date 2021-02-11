@@ -15,6 +15,7 @@
  */
 package org.openrewrite.properties;
 
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
@@ -33,7 +34,7 @@ import static org.openrewrite.Tree.randomId;
 public class PropertiesParser implements Parser<Properties.File> {
 
     @Override
-    public List<Properties.File> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo) {
+    public List<Properties.File> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
                     try (InputStream is = sourceFile.getSource()) {

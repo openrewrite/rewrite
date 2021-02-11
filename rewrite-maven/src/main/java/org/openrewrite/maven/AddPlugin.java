@@ -43,7 +43,7 @@ public class AddPlugin extends Recipe {
         return new AddPluginVisitor();
     }
 
-    private class AddPluginVisitor extends MavenVisitor<ExecutionContext> {
+    private class AddPluginVisitor extends MavenVisitor {
 
         public AddPluginVisitor() {
             setCursoringOn();

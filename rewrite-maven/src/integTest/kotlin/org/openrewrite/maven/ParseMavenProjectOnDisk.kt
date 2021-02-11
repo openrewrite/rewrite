@@ -15,11 +15,11 @@
  */
 package org.openrewrite.maven
 
+import org.openrewrite.ExecutionContext
 import org.openrewrite.java.JavaParser
 import org.openrewrite.maven.cache.LocalMavenArtifactCache
 import org.openrewrite.maven.cache.ReadOnlyLocalMavenArtifactCache
 import org.openrewrite.maven.utilities.MavenProjectParser
-import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.function.Consumer
 
@@ -36,7 +36,10 @@ object ParseMavenProjectOnDisk {
             errorConsumer
         )
 
-        val parser = MavenProjectParser(downloader, JavaParser.fromJavaVersion(), errorConsumer)
+        val parser = MavenProjectParser(downloader, JavaParser.fromJavaVersion(),
+            ExecutionContext.builder()
+                .doOnError(errorConsumer)
+                .build())
 
         parser.parse(Paths.get(args.first())).forEach {
             println(it.sourcePath)

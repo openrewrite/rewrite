@@ -39,7 +39,7 @@ public class ChangeDependencyVersion extends Recipe {
     }
 
 
-    private class ChangeDependencyVersionVisitor extends MavenVisitor<ExecutionContext> {
+    private class ChangeDependencyVersionVisitor extends MavenVisitor {
 
         public ChangeDependencyVersionVisitor() {
             setCursoringOn();

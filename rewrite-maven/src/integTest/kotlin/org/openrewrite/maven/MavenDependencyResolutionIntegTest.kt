@@ -36,6 +36,7 @@ import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.maven.cache.InMemoryMavenPomCache
 import org.openrewrite.maven.tree.Maven
@@ -467,7 +468,7 @@ class MavenDependencyResolutionIntegTest {
                 .pomCache(mavenCache)
                 .resolveOptional(false)
                 .build()
-                .parse(listOf(pomFile.toPath()), null)
+                .parse(listOf(pomFile.toPath()), null, ExecutionContext.builder().build())
                 .first()
 
         val rewrite = printTreeRecursive(pomAst.model, ignoreScopes)

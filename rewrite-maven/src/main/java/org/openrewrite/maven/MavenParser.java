@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
@@ -25,15 +26,12 @@ import org.openrewrite.maven.internal.RawMavenResolver;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Modules;
 import org.openrewrite.maven.tree.Pom;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -42,8 +40,6 @@ import static java.util.stream.Collectors.*;
 import static java.util.stream.StreamSupport.stream;
 
 public class MavenParser implements Parser<Maven> {
-    private static final Logger logger = LoggerFactory.getLogger(MavenParser.class);
-
     private final MavenPomCache mavenPomCache;
     private final Collection<String> activeProfiles;
 
@@ -51,37 +47,34 @@ public class MavenParser implements Parser<Maven> {
     private final MavenSettings mavenSettings;
 
     private final boolean resolveOptional;
-    private final Consumer<Throwable> onError;
 
     /**
      * @param mavenPomCache   The cache to be used to speed up dependency resolution
      * @param activeProfiles  The maven profile names set to be active. Profiles are typically defined in the settings.xml
      * @param mavenSettings   The parsed settings.xml file to retrieve profiles, credentials, mirrors, etc. from
      * @param resolveOptional When set to 'true' resolve dependencies marked as optional
-     * @param onError         An optional, user supplied error handler. If a supplied onError handler does not re-throw exceptions they will be suppressed and execution will continue where possible.
      */
     private MavenParser(MavenPomCache mavenPomCache, Collection<String> activeProfiles,
-                        @Nullable MavenSettings mavenSettings, boolean resolveOptional, Consumer<Throwable> onError) {
+                        @Nullable MavenSettings mavenSettings, boolean resolveOptional) {
         this.mavenPomCache = mavenPomCache;
         this.activeProfiles = activeProfiles;
         this.mavenSettings = mavenSettings;
         this.resolveOptional = resolveOptional;
-        this.onError = onError;
     }
 
     @Override
-    public List<Maven> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo) {
+    public List<Maven> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         Collection<RawMaven> projectPoms = stream(sources.spliterator(), false)
-                .map(source -> RawMaven.parse(source, relativeTo, null))
+                .map(source -> RawMaven.parse(source, relativeTo, null, ctx))
                 .collect(toList());
 
         MavenPomDownloader downloader = new MavenPomDownloader(mavenPomCache,
                 projectPoms.stream().collect(toMap(RawMaven::getSourcePath, Function.identity())),
-                mavenSettings, onError);
+                mavenSettings, ctx);
 
         List<Maven> parsed = projectPoms.stream()
                 .map(raw -> new RawMavenResolver(downloader, activeProfiles,
-                        mavenSettings, resolveOptional, onError).resolve(raw))
+                        mavenSettings, resolveOptional, ctx).resolve(raw))
                 .filter(Objects::nonNull)
                 .map(xmlDoc -> new Maven(xmlDoc, mavenSettings))
                 .collect(toCollection(ArrayList::new));
@@ -124,14 +117,13 @@ public class MavenParser implements Parser<Maven> {
         @Nullable
         private MavenSettings mavenSettings;
 
-        private Consumer<Throwable> onError = t -> {};
-
         public Builder resolveOptional(@Nullable Boolean optional) {
             this.resolveOptional = optional == null || optional;
             return this;
         }
 
         public Builder activeProfiles(@Nullable String... profiles) {
+            //noinspection ConstantConditions
             if (profiles != null) {
                 Collections.addAll(this.activeProfiles, profiles);
             }
@@ -164,13 +156,8 @@ public class MavenParser implements Parser<Maven> {
             return this;
         }
 
-        public Builder doOnError(@Nullable Consumer<Throwable> onError) {
-            this.onError = onError == null ? t -> {} : onError;
-            return this;
-        }
-
         public MavenParser build() {
-            return new MavenParser(mavenPomCache, activeProfiles, mavenSettings, resolveOptional, onError);
+            return new MavenParser(mavenPomCache, activeProfiles, mavenSettings, resolveOptional);
         }
     }
 }

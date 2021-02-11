@@ -60,7 +60,7 @@ public class UpgradeParentVersion extends Recipe {
         return new UpgradeParentVersionVisitor(newVersion, versionPattern);
     }
 
-    private class UpgradeParentVersionVisitor extends MavenVisitor<ExecutionContext> {
+    private class UpgradeParentVersionVisitor extends MavenVisitor {
         @Nullable
         private Collection<String> availableVersions;
 
@@ -83,7 +83,7 @@ public class UpgradeParentVersion extends Recipe {
                 if (groupId.equals(tag.getChildValue("groupId").orElse(null)) &&
                         artifactId.equals(tag.getChildValue("artifactId").orElse(null))) {
                     tag.getChildValue("version")
-                            .flatMap(parentVersion -> findNewerDependencyVersion(groupId, artifactId, parentVersion))
+                            .flatMap(parentVersion -> findNewerDependencyVersion(groupId, artifactId, parentVersion, ctx))
                             .ifPresent(newer -> {
                                 ChangeParentVersion changeParentVersion = new ChangeParentVersion(groupId, artifactId, newer);
                                 doAfterVisit(changeParentVersion);
@@ -94,13 +94,11 @@ public class UpgradeParentVersion extends Recipe {
             return super.visitTag(tag, ctx);
         }
 
-        private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion) {
+        private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion,
+                                                            ExecutionContext ctx) {
             if (availableVersions == null) {
                 MavenMetadata mavenMetadata = new MavenPomDownloader(MavenPomCache.NOOP,
-                        emptyMap(), settings,
-                        t -> {
-                            throw new RecipeException(t);
-                        }).downloadMetadata(groupId, artifactId, emptyList());
+                        emptyMap(), settings, ctx).downloadMetadata(groupId, artifactId, emptyList());
                 availableVersions = mavenMetadata.getVersioning().getVersions().stream()
                         .filter(versionComparator::isValid)
                         .collect(Collectors.toList());
