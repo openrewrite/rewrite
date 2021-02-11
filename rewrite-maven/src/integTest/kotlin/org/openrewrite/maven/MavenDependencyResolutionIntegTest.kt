@@ -225,6 +225,13 @@ class MavenDependencyResolutionIntegTest {
         assertDependencyResolutionEqualsAether(tempDir, pom)
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/266")
+    @Test
+    fun openRange(@TempDir tempDir: Path) {
+        assertDependencyResolutionEqualsAether(tempDir,
+            singleDependencyPom("org.apache.tomee:javaee-api:[8.0,)"))
+    }
+
     @Test
     fun springBootParent(@TempDir tempDir: Path) {
         val pom = """
