@@ -23,6 +23,7 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
+import java.util.Comparator;
 import java.util.stream.Stream;
 
 @Incubating(since = "7.0.0")
@@ -83,7 +84,7 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
                     m = maybeAutoFormat(m,
                             m.withTemplate(
                                     template("@Override").build(),
-                                    m.getAnnotations().isEmpty() ? m.getCoordinates().replaceAnnotations() : m.getAnnotations().get(0).getCoordinates().before()
+                                    m.getCoordinates().addAnnotation(Comparator.comparing(J.Annotation::getSimpleName))
                             ), p, getCursor().getParentOrThrow());
                 }
 
