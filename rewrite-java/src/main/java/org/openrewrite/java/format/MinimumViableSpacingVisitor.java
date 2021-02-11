@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
@@ -130,5 +131,44 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
             r = r.withExpression(r.getExpression().withPrefix(r.getExpression().getPrefix().withWhitespace(" ")));
         }
         return r;
+    }
+
+    @Override
+    public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
+        J.VariableDeclarations v = super.visitVariableDeclarations(multiVariable, p);
+
+        if (Space.firstPrefix(v.getVariables()).getWhitespace().isEmpty()) {
+            v = v.withVariables(Space.formatFirstPrefix(v.getVariables(),
+                    v.getVariables().iterator().next().getPrefix().withWhitespace(" ")));
+        }
+
+        /**
+         * We need at least one space between multiple modifiers, otherwise we could get a run-on like "publicstaticfinal".
+         * Note, this is applicable anywhere that modifiers can exist, such as class declarations, etc.
+         */
+        if (!v.getModifiers().isEmpty()) {
+            v = v.withModifiers(
+                    ListUtils.map(v.getModifiers(), (index, modifier) -> {
+                        if (index == 0) {
+                            /**
+                             * Skip the first modifier in the modifier list (if any). We only
+                             * care about ensuring there is at least one space between multiple modifiers.
+                             */
+                        } else {
+                            if (modifier.getPrefix().getWhitespace().isEmpty())
+                                modifier = modifier.withPrefix(modifier.getPrefix().withWhitespace(" "));
+                        }
+                        return modifier;
+                    })
+            );
+        }
+
+        if (!v.getModifiers().isEmpty()) {
+            if (v.getTypeExpression() != null && v.getTypeExpression().getPrefix().isEmpty()) {
+                v = v.withTypeExpression(v.getTypeExpression().withPrefix(v.getTypeExpression().getPrefix().withWhitespace(" ")));
+            }
+        }
+
+        return v;
     }
 }
