@@ -47,6 +47,7 @@ import static java.util.stream.Collectors.*;
 public class Recipe {
     private static final Logger logger = LoggerFactory.getLogger(Recipe.class);
 
+    @SuppressWarnings("unused")
     @JsonProperty("@c")
     public String getJacksonPolymorphicTypeTag() {
         return getClass().getName();
@@ -107,7 +108,7 @@ public class Recipe {
     }
 
     @SuppressWarnings("SuspiciousMethodCalls")
-    private <S extends SourceFile> List<SourceFile> visitInternal(List<S> before, ExecutionContext ctx) {
+    private <S extends SourceFile> List<SourceFile> visitInternal(List<S> before, ExecutionContext ctx, Map<UUID, Recipe> recipeThatDeletedSourceFile) {
         List<S> after = before;
         // if this recipe isn't valid we just skip it and proceed to next
         if (validate(ctx).isValid()) {
@@ -116,20 +117,18 @@ public class Recipe {
                     @SuppressWarnings("unchecked") S afterFile = (S) getVisitor().visit(s, ctx);
                     if (afterFile != null && afterFile != s) {
                         afterFile = afterFile.withMarkers(afterFile.getMarkers().compute(
-                                new RecipeThatMadeChanges(getName()),
+                                new RecipeThatMadeChanges(this),
                                 (r1, r2) -> {
-                                    r1.names.addAll(r2.names);
+                                    r1.recipes.addAll(r2.recipes);
                                     return r1;
                                 }));
                     }
                     if (afterFile == null) {
-                        ctx.recordSourceFileModification(s, this);
+                        recipeThatDeletedSourceFile.put(s.getId(), this);
                     }
                     return afterFile;
                 } catch (Throwable t) {
-                    if (ctx.getOnError() != null) {
-                        ctx.getOnError().accept(t);
-                    }
+                    ctx.getOnError().accept(t);
                     return s;
                 }
             });
@@ -145,18 +144,19 @@ public class Recipe {
         for (SourceFile maybeGenerated : afterWidened) {
             if (!after.contains(maybeGenerated)) {
                 // a new source file generated
-                ctx.recordSourceFileModification(maybeGenerated, this);
+                recipeThatDeletedSourceFile.put(maybeGenerated.getId(), this);
             }
         }
+
         for (SourceFile maybeDeleted : after) {
             if (!afterWidened.contains(maybeDeleted)) {
                 // a source file deleted
-                ctx.recordSourceFileModification(maybeDeleted, this);
+                recipeThatDeletedSourceFile.put(maybeDeleted.getId(), this);
             }
         }
 
         if (next != null) {
-            afterWidened = next.visitInternal(afterWidened, ctx);
+            afterWidened = next.visitInternal(afterWidened, ctx, recipeThatDeletedSourceFile);
         }
         return afterWidened;
     }
@@ -178,10 +178,11 @@ public class Recipe {
     }
 
     public final List<Result> run(List<? extends SourceFile> before, ExecutionContext ctx) {
+        Map<UUID, Recipe> recipeThatDeletedSourceFile = new HashMap<>();
         List<? extends SourceFile> acc = before;
         List<? extends SourceFile> after = acc;
         for (int i = 0; i < ctx.getMaxCycles(); i++) {
-            after = visitInternal(before, ctx);
+            after = visitInternal(before, ctx, recipeThatDeletedSourceFile);
             if (after == acc && !ctx.isNeedAnotherCycle()) {
                 break;
             }
@@ -203,8 +204,7 @@ public class Recipe {
             SourceFile original = sourceFileIdentities.get(s.getId());
             if (original != s) {
                 if (original == null) {
-                    results.add(new Result(null, s,
-                            singleton(ctx.getRecipeThatModifiedSourceFile(s.getId()))));
+                    results.add(new Result(null, s, singleton(recipeThatDeletedSourceFile.get(s.getId()))));
                 } else {
                     //printing both the before and after (and including markers in the output) and then comparing the
                     //output to dermine if a change has been made.
@@ -212,7 +212,7 @@ public class Recipe {
                         results.add(new Result(original, s, s.getMarkers()
                                 .findFirst(RecipeThatMadeChanges.class)
                                 .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe reported making a change?"))
-                                .names));
+                                .recipes));
                     }
                 }
             }
@@ -225,8 +225,7 @@ public class Recipe {
         // removed files
         for (SourceFile s : before) {
             if (!afterIds.contains(s.getId())) {
-                results.add(new Result(s, null,
-                        singleton(ctx.getRecipeThatModifiedSourceFile(s.getId()))));
+                results.add(new Result(s, null, singleton(recipeThatDeletedSourceFile.get(s.getId()))));
             }
         }
 
@@ -282,11 +281,11 @@ public class Recipe {
 
     @EqualsAndHashCode
     private static class RecipeThatMadeChanges implements Marker {
-        private final Set<String> names;
+        private final Set<Recipe> recipes;
 
-        private RecipeThatMadeChanges(String name) {
-            this.names = new HashSet<>();
-            this.names.add(name);
+        private RecipeThatMadeChanges(Recipe recipe) {
+            this.recipes = new HashSet<>();
+            this.recipes.add(recipe);
         }
     }
 

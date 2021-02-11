@@ -39,8 +39,6 @@ public final class ExecutionContext {
 
     private final Map<String, Object> messages = new ConcurrentHashMap<>();
 
-    final Map<UUID, String> recipeThatModifiedSourceFile = new HashMap<>();
-
     private ExecutionContext(int maxCycles, @Nullable Consumer<Throwable> onError, ForkJoinPool forkJoinPool) {
         this.maxCycles = maxCycles;
         this.onError = onError == null ? t -> {} : onError;
@@ -89,14 +87,6 @@ public final class ExecutionContext {
 
     public ForkJoinPool getForkJoinPool() {
         return forkJoinPool;
-    }
-
-    void recordSourceFileModification(SourceFile sourceFile, Recipe recipe) {
-        recipeThatModifiedSourceFile.put(sourceFile.getId(), recipe.getName());
-    }
-
-    String getRecipeThatModifiedSourceFile(UUID sourceFileId) {
-        return recipeThatModifiedSourceFile.get(sourceFileId);
     }
 
     public static class Builder {

@@ -51,9 +51,9 @@ public class Result {
     private final SourceFile after;
 
     @Getter
-    private final Set<String> recipesThatMadeChanges;
+    private final Set<Recipe> recipesThatMadeChanges;
 
-    public Result(@Nullable SourceFile before, @Nullable SourceFile after, Set<String> recipesThatMadeChanges) {
+    public Result(@Nullable SourceFile before, @Nullable SourceFile after, Set<Recipe> recipesThatMadeChanges) {
         this.before = before;
         this.after = after;
         this.recipesThatMadeChanges = recipesThatMadeChanges;
@@ -101,9 +101,9 @@ public class Result {
 
     static class InMemoryDiffEntry extends DiffEntry {
         private final InMemoryRepository repo;
-        private final Set<String> recipesThatMadeChanges;
+        private final Set<Recipe> recipesThatMadeChanges;
 
-        InMemoryDiffEntry(Path filePath, @Nullable Path relativeTo, String oldSource, String newSource, Set<String> recipesThatMadeChanges) {
+        InMemoryDiffEntry(Path filePath, @Nullable Path relativeTo, String oldSource, String newSource, Set<Recipe> recipesThatMadeChanges) {
             this.changeType = ChangeType.MODIFY;
             this.recipesThatMadeChanges = recipesThatMadeChanges;
 
@@ -152,6 +152,7 @@ public class Result {
                         if (!addedComment.get() && l.startsWith("@@") && l.endsWith("@@")) {
                             addedComment.set(true);
                             return l + recipesThatMadeChanges.stream()
+                                    .map(Recipe::getName)
                                     .sorted()
                                     .collect(Collectors.joining(", ", " ", ""));
                         }
