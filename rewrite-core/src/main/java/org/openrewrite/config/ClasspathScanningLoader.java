@@ -89,20 +89,27 @@ public class ClasspathScanningLoader implements ResourceLoader {
             for (ClassInfo classInfo : result.getSubclasses(Recipe.class.getName())) {
                 Class<?> recipeClass = classInfo.loadClass();
                 try {
-                    Constructor<?> constructor = recipeClass.getConstructor();
-                    constructor.setAccessible(true);
-                    recipes.add((Recipe) constructor.newInstance());
+                    for (Constructor<?> constructor : recipeClass.getConstructors()) {
+                        if (constructor.getParameterCount() == 0) {
+                            constructor.setAccessible(true);
+                            recipes.add((Recipe) constructor.newInstance());
+                            break;
+                        }
+                    }
                 } catch (Exception e) {
                     logger.warn("Unable to configure {}", recipeClass.getName(), e);
                 }
             }
-
             for (ClassInfo classInfo : result.getSubclasses(NamedStyles.class.getName())) {
                 Class<?> styleClass = classInfo.loadClass();
                 try {
-                    Constructor<?> constructor = styleClass.getConstructor();
-                    constructor.setAccessible(true);
-                    styles.add((NamedStyles) constructor.newInstance());
+                    for (Constructor<?> constructor : styleClass.getConstructors()) {
+                        if (constructor.getParameterCount() == 0) {
+                            constructor.setAccessible(true);
+                            styles.add((NamedStyles) constructor.newInstance());
+                            break;
+                        }
+                    }
                 } catch (Exception e) {
                     logger.warn("Unable to configure {}", styleClass.getName(), e);
                 }
