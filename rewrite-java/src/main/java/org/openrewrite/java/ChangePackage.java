@@ -50,7 +50,7 @@ public class ChangePackage extends Recipe {
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext context) {
                 J.CompilationUnit c = super.visitCompilationUnit(cu, context);
-                Boolean changing = getCursor().<Boolean>peekMessage("changing");
+                Boolean changing = getCursor().<Boolean>getMessage("changing");
                 if(changing != null && changing) {
                     String path = c.getSourcePath().toString();
                     c = c.withSourcePath(Paths.get(path.replaceFirst(
@@ -74,7 +74,7 @@ public class ChangePackage extends Recipe {
 
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext context) {
-                Boolean changing = getCursor().<Boolean>peekNearestMessage("changing");
+                Boolean changing = getCursor().<Boolean>getNearestMessage("changing");
                 if(changing != null && changing && classDecl.getType() != null) {
                     String fqn = classDecl.getType().getFullyQualifiedName();
                     doNext(new ChangeType(fqn, fqn.replaceFirst("^" + oldFullyQualifiedPackageName,

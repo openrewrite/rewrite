@@ -117,10 +117,10 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             return space;
         }
 
-        int indent = Optional.ofNullable(getCursor().<Integer>peekNearestMessage("lastIndent")).orElse(0);
+        int indent = Optional.ofNullable(getCursor().<Integer>getNearestMessage("lastIndent")).orElse(0);
 
         IndentType indentType = Optional.ofNullable(getCursor().getParentOrThrow().
-                <IndentType>peekNearestMessage("indentType")).orElse(IndentType.ALIGN);
+                <IndentType>getNearestMessage("indentType")).orElse(IndentType.ALIGN);
 
         // block spaces are always aligned to their parent
         boolean alignBlockToParent = loc.equals(Space.Location.BLOCK_END);
@@ -154,7 +154,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         T t = right.getElement();
         Space after;
 
-        int indent = Optional.ofNullable(getCursor().<Integer>peekNearestMessage("lastIndent")).orElse(0);
+        int indent = Optional.ofNullable(getCursor().<Integer>getNearestMessage("lastIndent")).orElse(0);
         if (right.getElement() instanceof J) {
             J elem = (J) right.getElement();
             if ((right.getAfter().getLastWhitespace().contains("\n") ||
@@ -213,7 +213,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                             if (!(cursor.getValue() instanceof J.MethodInvocation)) {
                                 break;
                             }
-                            Integer methodIndent = cursor.peekNearestMessage("lastIndent");
+                            Integer methodIndent = cursor.getNearestMessage("lastIndent");
                             if (methodIndent != null) {
                                 indent = methodIndent;
                             }
@@ -305,7 +305,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         Space before;
         List<JRightPadded<J2>> js;
 
-        int indent = Optional.ofNullable(getCursor().<Integer>peekNearestMessage("lastIndent")).orElse(0);
+        int indent = Optional.ofNullable(getCursor().<Integer>getNearestMessage("lastIndent")).orElse(0);
         if (container.getBefore().getLastWhitespace().contains("\n")) {
             switch (loc) {
                 case TYPE_PARAMETERS:

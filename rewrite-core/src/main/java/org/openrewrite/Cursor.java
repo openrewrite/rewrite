@@ -220,9 +220,9 @@ public class Cursor {
      */
     @Incubating(since = "7.0.0")
     @Nullable
-    public <T> T peekNearestMessage(String key) {
+    public <T> T getNearestMessage(String key) {
         @SuppressWarnings("unchecked") T t = messages == null ? null : (T) messages.get(key);
-        return t == null && parent != null ? parent.peekNearestMessage(key) : t;
+        return t == null && parent != null ? parent.getNearestMessage(key) : t;
     }
 
     /**
@@ -248,7 +248,7 @@ public class Cursor {
      */
     @Incubating(since = "7.0.0")
     @Nullable
-    public <T> T peekMessage(String key) {
+    public <T> T getMessage(String key) {
         //noinspection unchecked
         return messages == null ? null : (T) messages.get(key);
     }

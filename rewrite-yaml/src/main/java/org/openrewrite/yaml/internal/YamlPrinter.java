@@ -38,7 +38,7 @@ public class YamlPrinter<P> extends YamlVisitor<P> {
 
     @NonNull
     protected StringBuilder getPrinter() {
-        StringBuilder acc = getCursor().getRoot().peekMessage(PRINTER_ACC_KEY);
+        StringBuilder acc = getCursor().getRoot().getMessage(PRINTER_ACC_KEY);
         if (acc == null) {
             acc = new StringBuilder();
             getCursor().getRoot().putMessage(PRINTER_ACC_KEY, acc);

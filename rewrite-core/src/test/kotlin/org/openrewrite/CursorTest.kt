@@ -29,10 +29,10 @@ class CursorTest {
         val cursor = Cursor(null, t)
 
         cursor.putMessage("key", 1)
-        assertThat(cursor.peekNearestMessage<Int>("key")!!).isEqualTo(1)
+        assertThat(cursor.getNearestMessage<Int>("key")!!).isEqualTo(1)
 
         val child = Cursor(cursor, t)
-        assertThat(child.peekNearestMessage<Int>("key")!!).isEqualTo(1)
+        assertThat(child.getNearestMessage<Int>("key")!!).isEqualTo(1)
     }
 
     @Test
@@ -48,7 +48,7 @@ class CursorTest {
 
         cursor.putMessage("key", 1)
         val child = Cursor(cursor, t)
-        assertThat(child.peekNearestMessage<Int>("key")!!).isEqualTo(1)
+        assertThat(child.getNearestMessage<Int>("key")!!).isEqualTo(1)
     }
 
     @Test
