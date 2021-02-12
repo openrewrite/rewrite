@@ -103,6 +103,19 @@ public class Pom implements Marker {
         return dependenciesForScope;
     }
 
+    /**
+     * Fetch transitive dependencies of some dependency given a particular scope.
+     *
+     * @param dependency The dependency to determine the transitive closure of. The result will include this dependency.
+     * @param scope      The scope to traverse.
+     * @return A set of transitive dependencies including the provided dependency.
+     */
+    public Set<Dependency> getDependencies(Dependency dependency, Scope scope) {
+        Set<Dependency> dependenciesForScope = new TreeSet<>(Comparator.comparing(Dependency::getCoordinates));
+        addDependenciesFromScope(scope, dependency, dependenciesForScope);
+        return dependenciesForScope;
+    }
+
     private void addDependenciesFromScope(Scope scope, Dependency dep, Set<Dependency> found) {
         if (dep.getScope().isInClasspathOf(scope)) {
             found.add(dep);
