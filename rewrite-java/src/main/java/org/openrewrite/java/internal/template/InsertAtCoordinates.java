@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.openrewrite.java.tree.JavaCoordinates.Mode.INSERTION;
 
@@ -69,13 +70,19 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
         J.Block b = visitAndCast(block, generated, super::visitBlock);
 
         if (b.getId().equals(insertId) && location == Space.Location.BLOCK_END) {
+            AutoFormatVisitor<Integer> autoFormat = new AutoFormatVisitor<>();
             for (J j : generated) {
                 if (!(j instanceof Statement)) {
                     throw new IllegalStateException("Attempted to insert a tree of type " + j.getClass().getSimpleName() + " as a block statement");
                 }
             }
+            List<Statement> formatted = generated.stream()
+                    .map(it -> autoFormat.visit(it, 0, getCursor()))
+                    .map(Statement.class::cast)
+                    .collect(Collectors.toList());
+
             //noinspection unchecked
-            return b.withStatements(ListUtils.concatAll(b.getStatements(), (List<Statement>) generated));
+            return b.withStatements(ListUtils.concatAll(b.getStatements(), formatted));
         }
         //noinspection ConstantConditions
         b = b.withStatements(maybeMergeList(b.getStatements(), generated));

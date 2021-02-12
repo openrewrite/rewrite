@@ -19,7 +19,9 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.RecipeTest
+import org.openrewrite.java.format.AutoFormatVisitor
 import org.openrewrite.java.tree.J
+import org.openrewrite.java.tree.Statement
 import org.slf4j.LoggerFactory
 import java.util.function.Consumer
 
@@ -839,6 +841,57 @@ interface JavaTemplateTest : RecipeTest {
 
                     private int hello = 0;
                     private String nope = "nothing here";
+                }
+            }
+        """
+    )
+    @Test
+    fun templateMethodIntoClass(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val template = template("""public String hello() { return "Hello!"; }""")
+                .doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
+
+            init {
+                setCursoringOn()
+            }
+
+            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
+                var cd = super.visitClassDeclaration(classDecl, p)
+                val helloMethodExists = cd.body.statements.asSequence()
+                    .filterIsInstance(J.MethodDeclaration::class.java)
+                    .find { it.name.simpleName == "hello" } != null
+
+                if (helloMethodExists) {
+                    return cd
+                }
+
+                cd = cd.withBody(
+                    cd.body.withTemplate(
+                        template,
+                        cd.body.coordinates.lastStatement())
+                )
+
+                return cd
+            }
+        }.toRecipe(),
+        before = """
+            package com.yourorg;
+
+            class A {
+            void foo() {}
+            }
+        """,
+        after = """
+            package com.yourorg;
+
+            class A {
+            void foo() {}
+            
+                public String hello() {
+                    return "Hello!";
                 }
             }
         """
