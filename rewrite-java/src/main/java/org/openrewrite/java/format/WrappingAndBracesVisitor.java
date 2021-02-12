@@ -94,13 +94,15 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
             } else {
                 J.ClassDeclaration.Padding padding = j.getPadding();
                 JLeftPadded<J.ClassDeclaration.Kind> kind = padding.getKind();
-                j = padding.withKind(
-                        kind.withBefore(
-                                kind.getBefore().withWhitespace(
-                                        "\n" + kind.getBefore().getWhitespace()
-                                )
-                        )
-                );
+                if (!kind.getBefore().getWhitespace().contains("\n")) {
+                    j = padding.withKind(
+                            kind.withBefore(
+                                    kind.getBefore().withWhitespace(
+                                            "\n" + kind.getBefore().getWhitespace()
+                                    )
+                            )
+                    );
+                }
             }
 
         }

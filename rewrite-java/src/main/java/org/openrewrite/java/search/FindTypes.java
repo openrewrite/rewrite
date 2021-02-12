@@ -56,6 +56,17 @@ public final class FindTypes extends Recipe {
                 }
                 return n;
             }
+
+            @Override
+            public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext executionContext) {
+                J.FieldAccess fa = (J.FieldAccess) super.visitFieldAccess(fieldAccess, executionContext);
+                JavaType.Class targetClass = TypeUtils.asClass(fa.getTarget().getType());
+                if (targetClass != null && targetClass.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
+                    fa.getName().getSimpleName().equals("class")) {
+                    return fa.withMarker(new RecipeSearchResult(FindTypes.this));
+                }
+                return fa;
+            }
         };
     }
 
@@ -74,6 +85,17 @@ public final class FindTypes extends Recipe {
                     ns.add(name);
                 }
                 return n;
+            }
+
+            @Override
+            public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Set<NameTree> ns) {
+                J.FieldAccess fa = super.visitFieldAccess(fieldAccess, ns);
+                JavaType.Class targetClass = TypeUtils.asClass(fa.getTarget().getType());
+                if (targetClass != null && targetClass.getFullyQualifiedName().equals(fullyQualifiedClassName) &&
+                        fa.getName().getSimpleName().equals("class")) {
+                    ns.add(fieldAccess);
+                }
+                return fa;
             }
         };
 

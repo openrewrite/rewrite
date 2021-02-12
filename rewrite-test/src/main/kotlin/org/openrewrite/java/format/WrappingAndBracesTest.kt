@@ -48,12 +48,12 @@ interface WrappingAndBracesTest : RecipeTest {
 
     @Test
     fun blockEndOnOwnLine(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+            jp,
+            before = """
             class Test {
                 int n = 0;}
         """,
-        after = """
+            after = """
             class Test {
                 int n = 0;
             }
@@ -190,6 +190,16 @@ interface WrappingAndBracesTest : RecipeTest {
             after = """
                 @SuppressWarnings({"ALL"})
                  class Test {
+                }
+            """
+    )
+
+    @Test
+    fun annotatedClassDeclAlreadyCorrect(jp: JavaParser) = assertUnchanged(
+            jp,
+            before = """
+                @SuppressWarnings({"ALL"}) 
+                class Test {
                 }
             """
     )

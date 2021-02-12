@@ -246,6 +246,24 @@ interface FindTypesTest : RecipeTest {
         dependsOn = arrayOf(a1)
     )
 
+    @Test
+    fun classReference(jp: JavaParser) = assertChanged(
+            jp,
+            before = """
+                import a.A1;
+                class B {
+                    Class<?> clazz = A1.class;
+                }
+            """,
+            after = """
+                import a.A1;
+                class B {
+                    Class<?> clazz = ~~>A1.class;
+                }
+            """,
+            dependsOn = arrayOf(a1)
+    )
+
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
