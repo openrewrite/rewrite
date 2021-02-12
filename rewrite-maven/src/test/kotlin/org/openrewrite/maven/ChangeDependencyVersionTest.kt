@@ -204,26 +204,26 @@ class ChangeDependencyVersionTest : RecipeTest {
                 File(myModuleProject, "pom.xml").apply {
                     writeText(
                         """
-                                <project>
-                                  <modelVersion>4.0.0</modelVersion>
-                                 
-                                  <parent>
-                                    <groupId>com.mycompany.app</groupId>
-                                    <artifactId>my-app</artifactId>
-                                    <version>1</version>
-                                  </parent>
-                                
-                                  <artifactId>my-module</artifactId>
-                                
-                                  <dependencies>
-                                    <dependency>
-                                      <groupId>com.google.guava</groupId>
-                                      <artifactId>guava</artifactId>
-                                      <version>${"$"}{guava.version}</version>
-                                    </dependency>
-                                  </dependencies>
-                                </project>
-                            """.trimIndent().trim()
+                            <project>
+                              <modelVersion>4.0.0</modelVersion>
+                             
+                              <parent>
+                                <groupId>com.mycompany.app</groupId>
+                                <artifactId>my-app</artifactId>
+                                <version>1</version>
+                              </parent>
+                            
+                              <artifactId>my-module</artifactId>
+                            
+                              <dependencies>
+                                <dependency>
+                                  <groupId>com.google.guava</groupId>
+                                  <artifactId>guava</artifactId>
+                                  <version>${"$"}{guava.version}</version>
+                                </dependency>
+                              </dependencies>
+                            </project>
+                        """.trimIndent().trim()
                     )
                 }
             ),
@@ -246,19 +246,19 @@ class ChangeDependencyVersionTest : RecipeTest {
                 )
             },
             after = """
-                    <project>
-                      <modelVersion>4.0.0</modelVersion>
-                     
-                      <packaging>pom</packaging>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      
-                      <properties>
-                        <guava.version>29.0-jre</guava.version>
-                      </properties>
-                    </project>
-                """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                 
+                  <packaging>pom</packaging>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  
+                  <properties>
+                    <guava.version>29.0-jre</guava.version>
+                  </properties>
+                </project>
+            """
         )
     }
 
@@ -347,5 +347,4 @@ class ChangeDependencyVersionTest : RecipeTest {
         valid = recipe.validate()
         Assertions.assertThat(valid.isValid).isTrue()
     }
-
 }

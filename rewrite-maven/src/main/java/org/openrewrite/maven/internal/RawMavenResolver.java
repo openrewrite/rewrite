@@ -677,7 +677,7 @@ public class RawMavenResolver {
                 }
 
                 for (Pom ancestor = parent; ancestor != null; ancestor = ancestor.getParent()) {
-                    value = ancestor.getValue(key);
+                    value = ancestor.getValue("${" + key + "}");
                     if (value != null) {
                         return value;
                     }

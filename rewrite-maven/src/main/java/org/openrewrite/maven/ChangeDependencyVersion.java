@@ -50,9 +50,13 @@ public class ChangeDependencyVersion extends Recipe {
             if (isDependencyTag(groupId, artifactId) || isManagedDependencyTag(groupId, artifactId)) {
                 Optional<Xml.Tag> versionTag = tag.getChild("version");
                 if (versionTag.isPresent()) {
-                    String version = model.getValue(versionTag.get().getValue().orElse(null));
-                    if (version != null && !newVersion.equals(version)) {
-                        doAfterVisit(new ChangePropertyValue(version, newVersion));
+                    String version = versionTag.get().getValue().orElse(null);
+                    if (version != null) {
+                        if (version.trim().startsWith("${") && !newVersion.equals(model.getValue(version.trim()))) {
+                            doAfterVisit(new ChangePropertyValue(version, newVersion));
+                        } else if (!newVersion.equals(version)) {
+                            doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), newVersion));
+                        }
                     }
                 }
             } else if (!modules.isEmpty() && isPropertyTag()) {
