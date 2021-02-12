@@ -18,13 +18,14 @@ package org.openrewrite.java.format;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
 
 import java.util.Optional;
 
-public class AutoFormatVisitor<P> extends JavaVisitor<P> {
+public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J visit(@Nullable Tree tree, P p, Cursor cursor) {
         J.CompilationUnit cu = cursor.firstEnclosingOrThrow(J.CompilationUnit.class);
@@ -55,22 +56,22 @@ public class AutoFormatVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
-    public J visitCompilationUnit(J.CompilationUnit cu, P p) {
-        J t = new BlankLinesVisitor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
+    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
+        J.CompilationUnit t = new BlankLinesVisitor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
                 .orElse(IntelliJ.blankLines()))
-                .visit(cu, p);
+                .visitCompilationUnit(cu, p);
 
         t = new SpacesVisitor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
                 .orElse(IntelliJ.spaces()))
-                .visit(t, p);
+                .visitCompilationUnit(t, p);
 
         t = new WrappingAndBracesVisitor<>(Optional.ofNullable(cu.getStyle(WrappingAndBracesStyle.class))
                 .orElse(IntelliJ.wrappingAndBraces()))
-                .visit(t, p);
+                .visitCompilationUnit(t, p);
 
         t = new TabsAndIndentsVisitor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
                 .orElse(IntelliJ.tabsAndIndents()))
-                .visit(t, p);
+                .visitCompilationUnit(t, p);
 
         return t;
     }
