@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 
@@ -32,6 +33,8 @@ import java.util.stream.Stream;
 @Getter
 @EqualsAndHashCode
 public class Pom implements Marker {
+    private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
+
     @Nullable
     String groupId;
 
@@ -110,11 +113,18 @@ public class Pom implements Marker {
     }
 
     @Nullable
-    public String getProperty(@Nullable String property) {
+    public String getValue(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        return placeholderHelper.replacePlaceholders(value, this::getProperty);
+    }
+
+    @Nullable
+    private String getProperty(@Nullable String property) {
         if (property == null) {
             return null;
         }
-
         String key = property.replace("${", "").replace("}", "");
         String value = properties.get(key);
         if (value == null) {

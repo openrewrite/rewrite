@@ -15,11 +15,9 @@
  */
 package org.openrewrite.marker;
 
-import lombok.Data;
+import lombok.*;
 import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
-import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.lang.Nullable;
 
 /**
@@ -28,7 +26,22 @@ import org.openrewrite.internal.lang.Nullable;
  * contextualized in the tree that they are found in.
  */
 @Incubating(since = "7.0.0")
-@Data
+@EqualsAndHashCode
+@ToString
+@Getter
 public class RecipeSearchResult implements SearchResult {
+    @EqualsAndHashCode.Include
     private final Recipe recipe;
+
+    @Nullable
+    private final String description;
+
+    public RecipeSearchResult(Recipe recipe, @Nullable String description) {
+        this.recipe = recipe;
+        this.description = description;
+    }
+
+    public RecipeSearchResult(Recipe recipe) {
+        this(recipe, null);
+    }
 }

@@ -18,6 +18,9 @@ package org.openrewrite.marker;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
+import org.openrewrite.internal.lang.Nullable;
+
+import java.util.Optional;
 
 /**
  * Mark any AST element with "paint". Used by search visitors to mark AST elements that
@@ -27,12 +30,15 @@ import org.openrewrite.TreePrinter;
 @Incubating(since = "7.0.0")
 public interface SearchResult extends Marker {
     TreePrinter<Void> PRINTER = new TreePrinter<Void>() {
-        private Integer mark = null;
+        private SearchResult marker;
+        private Integer mark;
 
         @Override
         public void doBefore(Tree tree, StringBuilder printerAcc, Void unused) {
-            if (tree.getMarkers().findFirst(SearchResult.class).isPresent()) {
-                mark = printerAcc.length();
+            Optional<SearchResult> marker = tree.getMarkers().findFirst(SearchResult.class);
+            if (marker.isPresent()) {
+                this.marker = marker.get();
+                this.mark = printerAcc.length();
             }
         }
 
@@ -41,7 +47,9 @@ public interface SearchResult extends Marker {
             if (mark != null) {
                 for (int i = mark; i < printerAcc.length(); i++) {
                     if (!Character.isWhitespace(printerAcc.charAt(i))) {
-                        printerAcc.insert(i, "~~>");
+                        printerAcc.insert(i, marker.getDescription() == null ?
+                                "~~>" :
+                                "~~(" + marker.getDescription() + ")~~>");
                         break;
                     }
                 }
@@ -49,4 +57,7 @@ public interface SearchResult extends Marker {
             }
         }
     };
+
+    @Nullable
+    String getDescription();
 }
