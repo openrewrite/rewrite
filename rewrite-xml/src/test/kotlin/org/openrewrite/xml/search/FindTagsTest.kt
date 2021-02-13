@@ -23,7 +23,7 @@ import org.openrewrite.marker.SearchResult
 import org.openrewrite.xml.XmlParser
 
 class FindTagsTest : RecipeTest {
-    override val parser = XmlParser()
+    override val parser = XmlParser.builder().build()
 
     override val treePrinter: TreePrinter<*>?
         get() = SearchResult.PRINTER

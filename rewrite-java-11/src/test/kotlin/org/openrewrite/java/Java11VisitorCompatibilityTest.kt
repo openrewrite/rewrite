@@ -16,5 +16,6 @@
 package org.openrewrite.java
 
 class Java11VisitorCompatibilityTest: JavaVisitorCompatibilityKit() {
-    override fun javaParser(): Java11Parser.Builder = Java11Parser.builder().loggingHandler(TestLoggingHandler())
+    override fun javaParser(): Java11Parser.Builder = Java11Parser.builder()
+        .doOnParse(TestParserListener())
 }

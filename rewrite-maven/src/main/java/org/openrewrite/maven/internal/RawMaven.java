@@ -75,7 +75,8 @@ public class RawMaven {
 
     public static RawMaven parse(Parser.Input source, @Nullable Path relativeTo, @Nullable String snapshotVersion,
                                  ExecutionContext ctx) {
-        Xml.Document document = new MavenXmlParser().parseInputs(singletonList(source), relativeTo, ctx)
+        Xml.Document document = MavenXmlParser.builder().build()
+                .parseInputs(singletonList(source), relativeTo, ctx)
                 .iterator().next();
 
         try {
@@ -98,6 +99,10 @@ public class RawMaven {
     }
 
     private static class MavenXmlParser extends XmlParser {
+        protected MavenXmlParser(Listener onParse) {
+            super(onParse);
+        }
+
         @Override
         public boolean accept(Path path) {
             return super.accept(path) || path.toString().endsWith(".pom");

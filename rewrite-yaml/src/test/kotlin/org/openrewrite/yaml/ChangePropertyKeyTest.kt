@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.RecipeTest
 
 class ChangePropertyKeyTest : RecipeTest {
-    override val parser = YamlParser()
+    override val parser = YamlParser.builder().build()
 
     private val changeProp = ChangePropertyKey("management.metrics.binders.files.enabled",
         "management.metrics.enable.process.files")

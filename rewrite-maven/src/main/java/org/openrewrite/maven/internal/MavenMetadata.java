@@ -20,6 +20,7 @@ import lombok.AccessLevel;
 import lombok.Data;
 import lombok.Getter;
 import lombok.experimental.FieldDefaults;
+import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.XmlParser;
 
@@ -33,7 +34,7 @@ import static java.util.Collections.emptyList;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Getter
 public class MavenMetadata {
-    private static final XmlParser xmlParser = new XmlParser() {
+    private static final XmlParser xmlParser = new XmlParser(Parser.Listener.NOOP) {
         @Override
         public boolean accept(Path path) {
             return super.accept(path) || path.toString().endsWith(".pom");

@@ -18,7 +18,7 @@ package org.openrewrite.yaml
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
-class DocumentTest : YamlParser() {
+class DocumentTest {
     @Test
     fun explicitStart() {
         val yText = """
@@ -29,7 +29,7 @@ class DocumentTest : YamlParser() {
             type: specs.openrewrite.org/v1beta/recipe
         """.trimIndent()
 
-        val y = parse(yText)[0]
+        val y = YamlParser.builder().build().parse(yText)[0]
 
         assertThat(y.documents).hasSize(2)
         assertThat(y.documents[0].isExplicit).isTrue()
@@ -47,7 +47,7 @@ class DocumentTest : YamlParser() {
             ...
         """.trimIndent()
 
-        val y = parse(yText)[0]
+        val y = YamlParser.builder().build().parse(yText)[0]
 
         assertThat(y.documents).hasSize(2)
         assertThat(y.documents[0].end).isNotNull()
@@ -57,7 +57,7 @@ class DocumentTest : YamlParser() {
     @Test
     fun implicitStart() {
         val yText = "type: specs.openrewrite.org/v1beta/visitor"
-        val y = parse(yText)[0]
+        val y = YamlParser.builder().build().parse(yText)[0]
 
         assertThat(y.documents).hasSize(1)
         assertThat(y.documents[0].isExplicit).isFalse()
@@ -67,7 +67,7 @@ class DocumentTest : YamlParser() {
     @Test
     fun implicitEnd() {
         val yText = "type: specs.openrewrite.org/v1beta/visitor"
-        val y = parse(yText)[0]
+        val y = YamlParser.builder().build().parse(yText)[0]
 
         assertThat(y.documents).hasSize(1)
         assertThat(y.documents[0].end).isNull()

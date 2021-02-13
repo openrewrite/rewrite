@@ -19,19 +19,20 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.xml.tree.Xml
 
-class XPathMatcherTest : XmlParser() {
+class XPathMatcherTest {
 
-    private val x = parse("""
+    private val x = XmlParser.builder().build().parse(
+        """
             <?xml version="1.0" encoding="UTF-8"?>
             <dependencies>
                 <dependency>
                     <artifactId scope="compile">org.openrewrite</artifactId>
                 </dependency>
             </dependency>
-        """.trimIndent()).iterator().next()
+        """.trimIndent()
+    ).iterator().next()
 
-
-    private fun visit(xpath: String) : Boolean {
+    private fun visit(xpath: String): Boolean {
         val matchElements = mutableListOf<Xml>()
         visitor(xpath).visit(x, matchElements)
         return matchElements.isNotEmpty()

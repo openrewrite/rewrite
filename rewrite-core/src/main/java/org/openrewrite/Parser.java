@@ -155,6 +155,30 @@ public interface Parser<S extends SourceFile> {
     }
 
     interface Builder<S extends SourceFile> {
+        Builder<S> doOnParse(Listener listener);
         Parser<S> build();
+    }
+
+    @Incubating(since = "7.0.0")
+    interface Listener {
+        Listener NOOP = new Listener() {
+        };
+
+        default void onParseStart(Path sourcePath) {
+        }
+
+        default void onParseSucceeded(Path sourcePath) {
+        }
+
+        default void onParseFailed(Path sourcePath) {
+        }
+
+        default void onError(String message) {}
+
+        default void onError(String message, Throwable t) {}
+
+        default void onWarn(String message) {}
+
+        default void onWarn(String message, Throwable t) {}
     }
 }

@@ -19,7 +19,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.yaml.tree.Yaml
 
-class SequenceTest : YamlParser() {
+class SequenceTest {
     @Test
     fun sequence() {
         val yText = """
@@ -27,7 +27,7 @@ class SequenceTest : YamlParser() {
             - oranges
         """.trimIndent()
 
-        val y = parse(yText)[0]
+        val y = YamlParser.builder().build().parse(yText)[0]
 
         assertThat((y.documents[0].blocks[0] as Yaml.Sequence).entries.map { it.block }.map { it as Yaml.Scalar }.map { it.value })
                 .containsExactly("apples", "oranges")

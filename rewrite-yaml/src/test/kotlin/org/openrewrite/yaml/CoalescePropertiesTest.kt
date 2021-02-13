@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.RecipeTest
 
 class CoalescePropertiesTest : RecipeTest {
-    override val parser = YamlParser()
+    override val parser: YamlParser = YamlParser.builder().build()
 
     @Test
     fun fold() = assertChanged(

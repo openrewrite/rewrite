@@ -26,7 +26,7 @@ class ChangePropertyKeyTest : RecipeTest {
 
     @Test
     fun changeKey() = assertChanged(
-        parser = PropertiesParser(),
+        parser = PropertiesParser.builder().build(),
         before = "management.metrics.binders.files.enabled=true",
         after = "management.metrics.enable.process.files=true"
     )

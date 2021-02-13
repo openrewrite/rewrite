@@ -27,40 +27,66 @@ import org.openrewrite.xml.internal.grammar.XMLParser;
 import org.openrewrite.xml.tree.Xml;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 
 import static java.util.stream.Collectors.toList;
 
 public class XmlParser implements Parser<Xml.Document> {
+    private final Listener onParse;
+
+    protected XmlParser(Listener onParse) {
+        this.onParse = onParse;
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
     @Override
     public List<Xml.Document> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
                     try {
+                        onParse.onParseStart(sourceFile.getPath());
                         XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
                                 CharStreams.fromStream(sourceFile.getSource()))));
 
-                        return new XmlParserVisitor(
+                        Xml.Document document = new XmlParserVisitor(
                                 sourceFile.getRelativePath(relativeTo),
                                 StringUtils.readFully(sourceFile.getSource())
                         ).visitDocument(parser.document());
+
+                        onParse.onParseSucceeded(sourceFile.getPath());
+                        return document;
                     } catch (IOException e) {
-                        throw new UncheckedIOException(e);
+                        onParse.onParseFailed(sourceFile.getPath());
+                        ctx.getOnError().accept(e);
+                        return null;
                     }
                 })
+                .filter(Objects::nonNull)
                 .collect(toList());
-    }
-
-    public Xml.Tag parseTag(String tag) {
-        XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
-                CharStreams.fromString(tag))));
-        return (Xml.Tag) new XmlParserVisitor(null, tag).visitContent(parser.content());
     }
 
     @Override
     public boolean accept(Path path) {
         return path.toString().endsWith(".xml");
+    }
+
+    public static class Builder implements Parser.Builder<Xml.Document> {
+        private Listener onParse = Listener.NOOP;
+
+        @Override
+        public XmlParser.Builder doOnParse(Listener onParse) {
+            this.onParse = onParse;
+            return this;
+        }
+
+        @Override
+        public XmlParser build() {
+            return new XmlParser(onParse);
+        }
     }
 }

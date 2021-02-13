@@ -35,6 +35,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Stack;
 import java.util.stream.Stream;
 
@@ -43,17 +44,33 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
+    private final Listener onParse;
+
+    protected YamlParser(Listener onParse) {
+        this.onParse = onParse;
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
 
     @Override
     public List<Yaml.Documents> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
                     try (InputStream is = sourceFile.getSource()) {
-                        return parseFromInput(sourceFile.getRelativePath(relativeTo), is);
+                        onParse.onParseStart(sourceFile.getPath());
+                        Yaml.Documents yaml = parseFromInput(sourceFile.getRelativePath(relativeTo), is);
+                        onParse.onParseSucceeded(sourceFile.getPath());
+                        return yaml;
                     } catch (IOException e) {
-                        throw new UncheckedIOException(e);
+                        onParse.onParseFailed(sourceFile.getPath());
+                        ctx.getOnError().accept(e);
+                        return null;
                     }
-                }).collect(toList());
+                })
+                .filter(Objects::nonNull)
+                .collect(toList());
     }
 
     private Yaml.Documents parseFromInput(Path sourceFile, InputStream source) {
@@ -73,7 +90,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
 
                 switch (event.getEventId()) {
                     case DocumentEnd:
-                        if(((DocumentEndEvent) event).getExplicit()) {
+                        if (((DocumentEndEvent) event).getExplicit()) {
                             assert document != null;
                             documents.add(document.withEnd(new Yaml.Document.End(
                                     randomId(),
@@ -218,6 +235,21 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
 
         public Yaml.Sequence build() {
             return new Yaml.Sequence(randomId(), prefix, Markers.EMPTY, entries);
+        }
+    }
+
+    public static class Builder implements org.openrewrite.Parser.Builder<Yaml.Documents> {
+        private Listener onParse = Listener.NOOP;
+
+        @Override
+        public Builder doOnParse(Listener onParse) {
+            this.onParse = onParse;
+            return this;
+        }
+
+        @Override
+        public YamlParser build() {
+            return new YamlParser(onParse);
         }
     }
 }

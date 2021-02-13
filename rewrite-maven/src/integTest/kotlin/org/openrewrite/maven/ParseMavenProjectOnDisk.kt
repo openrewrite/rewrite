@@ -16,18 +16,38 @@
 package org.openrewrite.maven
 
 import org.openrewrite.InMemoryExecutionContext
+import org.openrewrite.Parser
 import org.openrewrite.java.JavaParser
 import org.openrewrite.maven.cache.LocalMavenArtifactCache
 import org.openrewrite.maven.cache.ReadOnlyLocalMavenArtifactCache
+import org.openrewrite.maven.internal.MavenParsingException
 import org.openrewrite.maven.utilities.MavenArtifactDownloader
 import org.openrewrite.maven.utilities.MavenProjectParser
+import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.function.Consumer
 
 object ParseMavenProjectOnDisk {
     @JvmStatic
     fun main(args: Array<String>) {
-        val errorConsumer = Consumer<Throwable> { t -> throw t }
+        val errorConsumer = Consumer<Throwable> { t ->
+            if (t is MavenParsingException) {
+                println("  ${t.message}")
+            } else {
+                t.printStackTrace()
+            }
+        }
+
+        val onParse = object : Parser.Listener {
+            var n = 1
+            override fun onParseSucceeded(sourcePath: Path) {
+                println("${n++} SUCCESS - $sourcePath")
+            }
+
+            override fun onParseFailed(sourcePath: Path) {
+                println("${n++} FAILED - $sourcePath")
+            }
+        }
 
         val downloader = MavenArtifactDownloader(
             ReadOnlyLocalMavenArtifactCache.MAVEN_LOCAL.orElse(
@@ -37,7 +57,12 @@ object ParseMavenProjectOnDisk {
             errorConsumer
         )
 
-        val parser = MavenProjectParser(downloader, JavaParser.fromJavaVersion(),
+        val parser = MavenProjectParser(
+            downloader,
+            MavenParser.builder()
+                .doOnParse(onParse)
+                .resolveOptional(false),
+            JavaParser.fromJavaVersion(),
             InMemoryExecutionContext(errorConsumer)
         )
 

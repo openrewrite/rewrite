@@ -15,12 +15,12 @@
  */
 package org.openrewrite.java;
 
+import org.openrewrite.Parser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class TestLoggingHandler implements LoggingHandler {
-
-    private static final Logger logger = LoggerFactory.getLogger(TestLoggingHandler.class);
+public class TestParserListener implements Parser.Listener {
+    private static final Logger logger = LoggerFactory.getLogger(TestParserListener.class);
 
     @Override
     public void onError(String message, Throwable t) {

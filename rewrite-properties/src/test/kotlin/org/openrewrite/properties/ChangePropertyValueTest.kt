@@ -26,7 +26,7 @@ class ChangePropertyValueTest : RecipeTest {
 
     @Test
     fun changeValue() = assertChanged(
-            parser = PropertiesParser(),
+            parser = PropertiesParser.builder().build(),
             before = "management.metrics.binders.files.enabled=true",
             after = "management.metrics.binders.files.enabled=false"
     )

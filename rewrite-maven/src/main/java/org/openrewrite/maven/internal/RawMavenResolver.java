@@ -545,12 +545,12 @@ public class RawMavenResolver {
         }
         try {
             // Prevent malformed URLs from being used
-            return new MavenRepository(repo.getId(), URI.create(repo.getUrl()),
+            return new MavenRepository(repo.getId(), URI.create(repo.getUrl().trim()),
                     repo.getReleases() == null || repo.getReleases().isEnabled(),
                     repo.getSnapshots() != null && repo.getSnapshots().isEnabled(),
                     null, null);
         } catch (Throwable t) {
-            ctx.getOnError().accept(new MavenParsingException("Invalid repository URL %s", repo.getUrl()));
+            ctx.getOnError().accept(new MavenParsingException("Invalid repository URL %s", t, repo.getUrl()));
             return null;
         }
     }
@@ -631,67 +631,72 @@ public class RawMavenResolver {
                 return null;
             }
 
-            return placeholderHelper.replacePlaceholders(v, key -> {
-                switch (key) {
-                    case "project.groupId":
-                    case "pom.groupId":
-                        String groupId = rawPom.getGroupId();
-                        if (groupId != null) {
-                            return groupId;
-                        }
-                        return parent == null ? null : parent.getGroupId();
-                    case "project.parent.groupId":
-                        return parent != null ? parent.getGroupId() : null;
-                    case "project.artifactId":
-                    case "pom.artifactId":
-                        return rawPom.getArtifactId(); // cannot be inherited from parent
-                    case "project.parent.artifactId":
-                        return parent == null ? null : parent.getArtifactId();
-                    case "project.version":
-                    case "pom.version":
-                        String rawVersion = rawPom.getVersion();
-                        if (rawVersion != null) {
-                            return rawVersion;
-                        }
-                        return parent == null ? null : parent.getVersion();
-                    case "project.parent.version":
-                        return parent != null ? parent.getVersion() : null;
-                    case "project.basedir":
-                    case "basedir":
-                        return projectDir == null ? null : projectDir.toString();
-                }
+            try {
+                return placeholderHelper.replacePlaceholders(v, key -> {
+                    switch (key) {
+                        case "project.groupId":
+                        case "pom.groupId":
+                            String groupId = rawPom.getGroupId();
+                            if (groupId != null) {
+                                return groupId;
+                            }
+                            return parent == null ? null : parent.getGroupId();
+                        case "project.parent.groupId":
+                            return parent != null ? parent.getGroupId() : null;
+                        case "project.artifactId":
+                        case "pom.artifactId":
+                            return rawPom.getArtifactId(); // cannot be inherited from parent
+                        case "project.parent.artifactId":
+                            return parent == null ? null : parent.getArtifactId();
+                        case "project.version":
+                        case "pom.version":
+                            String rawVersion = rawPom.getVersion();
+                            if (rawVersion != null) {
+                                return rawVersion;
+                            }
+                            return parent == null ? null : parent.getVersion();
+                        case "project.parent.version":
+                            return parent != null ? parent.getVersion() : null;
+                        case "project.basedir":
+                        case "basedir":
+                            return projectDir == null ? null : projectDir.toString();
+                    }
 
-                String value = rawPom.getActiveProperties(activeProfiles).get(key);
-                if (value != null) {
-                    return value;
-                }
+                    String value = rawPom.getActiveProperties(activeProfiles).get(key);
+                    if (value != null) {
+                        return value;
+                    }
 
-                // will be null when processing dependencyManagement itself...
-                if (dependencyManagement != null) {
-                    for (DependencyManagementDependency managedDependency : dependencyManagement.getDependencies()) {
-                        value = managedDependency.getProperties().get(key);
+                    // will be null when processing dependencyManagement itself...
+                    if (dependencyManagement != null) {
+                        for (DependencyManagementDependency managedDependency : dependencyManagement.getDependencies()) {
+                            value = managedDependency.getProperties().get(key);
+                            if (value != null) {
+                                return value;
+                            }
+                        }
+                    }
+
+                    for (Pom ancestor = parent; ancestor != null; ancestor = ancestor.getParent()) {
+                        value = ancestor.getValue("${" + key + "}");
                         if (value != null) {
                             return value;
                         }
                     }
-                }
 
-                for (Pom ancestor = parent; ancestor != null; ancestor = ancestor.getParent()) {
-                    value = ancestor.getValue("${" + key + "}");
+                    value = System.getProperty(key);
                     if (value != null) {
                         return value;
                     }
-                }
 
-                value = System.getProperty(key);
-                if (value != null) {
-                    return value;
-                }
+                    ctx.getOnError().accept(new MavenParsingException("Unable to resolve property %s", v));
 
+                    return null;
+                });
+            } catch(Throwable t) {
                 ctx.getOnError().accept(new MavenParsingException("Unable to resolve property %s", v));
-
                 return null;
-            });
+            }
         }
     }
 

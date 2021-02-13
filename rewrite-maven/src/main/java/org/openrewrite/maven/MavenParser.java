@@ -26,6 +26,7 @@ import org.openrewrite.maven.internal.RawMavenResolver;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Modules;
 import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.xml.tree.Xml;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -36,39 +37,56 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static java.util.stream.Collectors.*;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 import static java.util.stream.StreamSupport.stream;
 
 public class MavenParser implements Parser<Maven> {
     private final MavenPomCache mavenPomCache;
     private final Collection<String> activeProfiles;
     private final boolean resolveOptional;
+    private final Listener onParse;
 
     /**
      * @param mavenPomCache   The cache to be used to speed up dependency resolution
      * @param activeProfiles  The maven profile names set to be active. Profiles are typically defined in the settings.xml
      * @param resolveOptional When set to 'true' resolve dependencies marked as optional
+     * @param onParse         Event handler for parsing events
      */
-    private MavenParser(MavenPomCache mavenPomCache, Collection<String> activeProfiles, boolean resolveOptional) {
+    private MavenParser(MavenPomCache mavenPomCache,
+                        Collection<String> activeProfiles,
+                        boolean resolveOptional,
+                        Listener onParse) {
         this.mavenPomCache = mavenPomCache;
         this.activeProfiles = activeProfiles;
         this.resolveOptional = resolveOptional;
+        this.onParse = onParse;
     }
 
     @Override
-    public List<Maven> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public List<Maven> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
+                                   ExecutionContext ctx) {
         Collection<RawMaven> projectPoms = stream(sources.spliterator(), false)
-                .map(source -> RawMaven.parse(source, relativeTo, null, ctx))
+                .map(source -> {
+                    onParse.onParseStart(source.getPath());
+                    return RawMaven.parse(source, relativeTo, null, ctx);
+                })
                 .collect(toList());
 
         MavenPomDownloader downloader = new MavenPomDownloader(mavenPomCache,
                 projectPoms.stream().collect(toMap(RawMaven::getSourcePath, Function.identity())), ctx);
 
-        List<Maven> parsed = projectPoms.stream()
-                .map(raw -> new RawMavenResolver(downloader, activeProfiles, resolveOptional, ctx, relativeTo).resolve(raw))
-                .filter(Objects::nonNull)
-                .map(Maven::new)
-                .collect(toCollection(ArrayList::new));
+        List<Maven> parsed = new ArrayList<>();
+        for (RawMaven raw : projectPoms) {
+            Xml.Document resolve = new RawMavenResolver(downloader, activeProfiles, resolveOptional, ctx, relativeTo).resolve(raw);
+            if (resolve != null) {
+                Maven maven1 = new Maven(resolve);
+                parsed.add(maven1);
+                onParse.onParseSucceeded(raw.getSourcePath());
+            } else {
+                onParse.onParseFailed(raw.getSourcePath());
+            }
+        }
 
         for (int i = 0; i < parsed.size(); i++) {
             Maven maven = parsed.get(i);
@@ -100,10 +118,11 @@ public class MavenParser implements Parser<Maven> {
         return new Builder();
     }
 
-    public static class Builder {
+    public static class Builder implements Parser.Builder<Maven> {
         private MavenPomCache mavenPomCache = new InMemoryMavenPomCache();
         private final Collection<String> activeProfiles = new HashSet<>();
         private boolean resolveOptional = true;
+        private Listener onParse = Listener.NOOP;
 
         public Builder resolveOptional(@Nullable Boolean optional) {
             this.resolveOptional = optional == null || optional;
@@ -139,8 +158,15 @@ public class MavenParser implements Parser<Maven> {
             return this;
         }
 
+        @Override
+        public MavenParser.Builder doOnParse(Listener onParse) {
+            this.onParse = onParse;
+            return this;
+        }
+
+        @Override
         public MavenParser build() {
-            return new MavenParser(mavenPomCache, activeProfiles, resolveOptional);
+            return new MavenParser(mavenPomCache, activeProfiles, resolveOptional, onParse);
         }
     }
 }

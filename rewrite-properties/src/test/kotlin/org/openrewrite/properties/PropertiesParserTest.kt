@@ -19,10 +19,10 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.properties.tree.Properties
 
-class PropertiesParserTest: PropertiesParser() {
+class PropertiesParserTest {
     @Test
     fun noEndOfLine() {
-        val props = parse("""
+        val props = PropertiesParser.builder().build().parse("""
             key=value
         """.trimIndent())[0]
 
@@ -36,7 +36,7 @@ class PropertiesParserTest: PropertiesParser() {
 
     @Test
     fun endOfLine() {
-        val props = parse("key=value\n")[0]
+        val props = PropertiesParser.builder().build().parse("key=value\n")[0]
 
         val entries = props.content.map { it as Properties.Entry }
         assertThat(entries).hasSize(1)
@@ -48,7 +48,7 @@ class PropertiesParserTest: PropertiesParser() {
 
     @Test
     fun endOfFile() {
-        val props = parse("key=value\n\n")[0]
+        val props = PropertiesParser.builder().build().parse("key=value\n\n")[0]
         val entries = props.content.map { it as Properties.Entry }
         assertThat(entries).hasSize(1)
         val entry = entries[0]
@@ -59,7 +59,7 @@ class PropertiesParserTest: PropertiesParser() {
 
     @Test
     fun garbageEndOfFile() {
-        val props = parse("key=value\nasdf\n")[0]
+        val props = PropertiesParser.builder().build().parse("key=value\nasdf\n")[0]
         val entries = props.content.map { it as Properties.Entry }
         assertThat(entries).hasSize(1)
         val entry = entries[0]
@@ -70,7 +70,7 @@ class PropertiesParserTest: PropertiesParser() {
 
     @Test
     fun commentThenEntry() {
-        val props = parse("""
+        val props = PropertiesParser.builder().build().parse("""
             # this is a comment
             key=value
         """.trimIndent())[0]
@@ -85,7 +85,7 @@ class PropertiesParserTest: PropertiesParser() {
 
     @Test
     fun entryCommentEntry() {
-        val props = parse("""
+        val props = PropertiesParser.builder().build().parse("""
             key1=value1
             # comment
             key2=value2
@@ -107,7 +107,7 @@ class PropertiesParserTest: PropertiesParser() {
 
     @Test
     fun multipleEntries() {
-        val props = parse("""
+        val props = PropertiesParser.builder().build().parse("""
             key=value
             key2 = value2
         """.trimIndent())[0]

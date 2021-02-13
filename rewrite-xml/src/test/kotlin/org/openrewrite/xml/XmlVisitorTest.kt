@@ -23,7 +23,7 @@ import org.openrewrite.xml.tree.Xml
 
 open class XmlVisitorTest {
 
-    private val parser = XmlParser()
+    private val parser = XmlParser.builder().build()
 
     fun assertChanged(
             visitorMapped: (Xml.Document) -> XmlVisitor<ExecutionContext>,

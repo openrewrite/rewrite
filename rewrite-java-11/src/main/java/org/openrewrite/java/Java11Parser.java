@@ -25,6 +25,7 @@ import com.sun.tools.javac.util.Options;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
@@ -68,11 +69,8 @@ public class Java11Parser implements JavaParser {
     private final Context context;
     private final JavaCompiler compiler;
     private final ResettableLog compilerLog;
-
     private final Collection<NamedStyles> styles;
-
-    @Nullable
-    private final LoggingHandler loggingHandler;
+    private final Listener onParse;
 
     private Java11Parser(@Nullable Collection<Path> classpath,
                          Charset charset,
@@ -80,12 +78,12 @@ public class Java11Parser implements JavaParser {
                          boolean suppressMappingErrors,
                          boolean logCompilationWarningsAndErrors,
                          Collection<NamedStyles> styles,
-                         @Nullable LoggingHandler loggingHandler) {
+                         Listener onParse) {
         this.classpath = classpath;
         this.relaxedClassTypeMatching = relaxedClassTypeMatching;
         this.suppressMappingErrors = suppressMappingErrors;
         this.styles = styles;
-        this.loggingHandler = loggingHandler;
+        this.onParse = onParse;
 
         this.context = new Context();
         this.compilerLog = new ResettableLog(context);
@@ -123,10 +121,10 @@ public class Java11Parser implements JavaParser {
         compilerLog.setWriters(new PrintWriter(new Writer() {
             @Override
             public void write(char[] cbuf, int off, int len) {
-                if (logCompilationWarningsAndErrors && loggingHandler != null) {
+                if (logCompilationWarningsAndErrors) {
                     String log = new String(Arrays.copyOfRange(cbuf, off, len));
                     if (!log.isBlank()) {
-                        loggingHandler.onWarn(log);
+                        onParse.onWarn(log);
                     }
                 }
             }
@@ -197,9 +195,7 @@ public class Java11Parser implements JavaParser {
         } catch (Throwable t) {
             // when symbol entering fails on problems like missing types, attribution can often times proceed
             // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
-            if (loggingHandler != null) {
-                loggingHandler.onWarn("Failed symbol entering or attribution", t);
-            }
+            onParse.onWarn("Failed symbol entering or attribution", t);
         }
 
         Map<String, JavaType.Class> sharedClassTypes = new HashMap<>();
@@ -211,7 +207,7 @@ public class Java11Parser implements JavaParser {
                         Java11ParserVisitor parser = new Java11ParserVisitor(
                                 input.getRelativePath(relativeTo),
                                 StringUtils.readFully(input.getSource()),
-                                relaxedClassTypeMatching, styles, sharedClassTypes, loggingHandler);
+                                relaxedClassTypeMatching, styles, sharedClassTypes, onParse);
                         J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
                         sample.stop(Timer.builder("rewrite.parse")
                                 .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
@@ -310,19 +306,18 @@ public class Java11Parser implements JavaParser {
     }
 
     public static class Builder extends JavaParser.Builder<Java11Parser, Builder> {
+        private Listener onParse = Listener.NOOP;
 
-        @Nullable
-        private LoggingHandler loggingHandler;
-
-        public Builder loggingHandler(LoggingHandler loggingHandler) {
-            this.loggingHandler = loggingHandler;
+        @Override
+        public Java11Parser.Builder doOnParse(Listener onParse) {
+            this.onParse = onParse;
             return this;
         }
 
         @Override
         public Java11Parser build() {
             return new Java11Parser(classpath, charset, relaxedClassTypeMatching,
-                    suppressMappingErrors, logCompilationWarningsAndErrors, styles, loggingHandler);
+                    suppressMappingErrors, logCompilationWarningsAndErrors, styles, onParse);
         }
     }
 }

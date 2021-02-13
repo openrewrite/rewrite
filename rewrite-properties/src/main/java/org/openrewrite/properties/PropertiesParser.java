@@ -27,22 +27,39 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 public class PropertiesParser implements Parser<Properties.File> {
+    private final Listener onParse;
+
+    protected PropertiesParser(Listener onParse) {
+        this.onParse = onParse;
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
 
     @Override
     public List<Properties.File> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
                     try (InputStream is = sourceFile.getSource()) {
-                        return parseFromInput(sourceFile.getRelativePath(relativeTo), is);
+                        onParse.onParseStart(sourceFile.getPath());
+                        Properties.File file = parseFromInput(sourceFile.getRelativePath(relativeTo), is);
+                        onParse.onParseSucceeded(sourceFile.getPath());
+                        return file;
                     } catch (IOException e) {
-                        throw new UncheckedIOException(e);
+                        onParse.onParseFailed(sourceFile.getPath());
+                        ctx.getOnError().accept(e);
+                        return null;
                     }
-                }).collect(toList());
+                })
+                .filter(Objects::nonNull)
+                .collect(toList());
     }
 
     private Properties.File parseFromInput(Path sourceFile, InputStream source) {
@@ -213,5 +230,20 @@ public class PropertiesParser implements Parser<Properties.File> {
     @Override
     public boolean accept(Path path) {
         return path.toString().endsWith(".properties");
+    }
+
+    public static class Builder implements Parser.Builder<Properties.File> {
+        private Listener onParse = Listener.NOOP;
+
+        @Override
+        public PropertiesParser.Builder doOnParse(Listener onParse) {
+            this.onParse = onParse;
+            return this;
+        }
+
+        @Override
+        public PropertiesParser build() {
+            return new PropertiesParser(onParse);
+        }
     }
 }

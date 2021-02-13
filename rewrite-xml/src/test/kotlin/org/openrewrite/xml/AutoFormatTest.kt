@@ -22,41 +22,41 @@ class AutoFormatTest : RecipeTest {
 
     @Test
     fun autoFormatTag() = assertChanged(
-            XmlParser(),
-            recipe = AutoFormat(),
-            before = """
-                <project>
-                  <dependencies>
-                    <dependency>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter-test</artifactId>
-                      <scope>test</scope>
-                      <exclusions>
-                        <exclusion>
-                  <groupId>org.junit.vintage</groupId>
-                  <artifactId>junit-vintage-engine</artifactId>
-                </exclusion>
-                      </exclusions>
-                    </dependency>
-                  </dependencies>
-                </project>
-            """,
-            after = """
-                <project>
-                  <dependencies>
-                    <dependency>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter-test</artifactId>
-                      <scope>test</scope>
-                      <exclusions>
-                        <exclusion>
-                          <groupId>org.junit.vintage</groupId>
-                          <artifactId>junit-vintage-engine</artifactId>
-                        </exclusion>
-                      </exclusions>
-                    </dependency>
-                  </dependencies>
-                </project>
-            """
+        XmlParser.builder().build(),
+        recipe = AutoFormat(),
+        before = """
+            <project>
+              <dependencies>
+                <dependency>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-test</artifactId>
+                  <scope>test</scope>
+                  <exclusions>
+                    <exclusion>
+              <groupId>org.junit.vintage</groupId>
+              <artifactId>junit-vintage-engine</artifactId>
+            </exclusion>
+                  </exclusions>
+                </dependency>
+              </dependencies>
+            </project>
+        """,
+        after = """
+            <project>
+              <dependencies>
+                <dependency>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-test</artifactId>
+                  <scope>test</scope>
+                  <exclusions>
+                    <exclusion>
+                      <groupId>org.junit.vintage</groupId>
+                      <artifactId>junit-vintage-engine</artifactId>
+                    </exclusion>
+                  </exclusions>
+                </dependency>
+              </dependencies>
+            </project>
+        """
     )
 }
