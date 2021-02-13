@@ -81,7 +81,6 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
                     .map(Statement.class::cast)
                     .collect(Collectors.toList());
 
-            //noinspection unchecked
             return b.withStatements(ListUtils.concatAll(b.getStatements(), formatted));
         }
         //noinspection ConstantConditions
@@ -190,6 +189,7 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
         } else {
             m = m.withAnnotations(maybeMergeList(m.getAnnotations(), generated));
             m = m.withTypeParameters(maybeMergeList(m.getTypeParameters(), generated));
+            m = m.withParameters(maybeMergeList(m.getParameters(), generated));
             m = m.withThrows(maybeMergeList(m.getThrows(), generated));
         }
         return m;
