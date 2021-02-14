@@ -56,9 +56,8 @@ public class RawMavenResolver {
     @Nullable
     private final Path projectDir;
 
-
-    public RawMavenResolver(MavenPomDownloader downloader, Collection<String> activeProfiles, boolean resolveOptional,
-                            ExecutionContext ctx, @Nullable Path projectDir) {
+    public RawMavenResolver(MavenPomDownloader downloader, Collection<String> activeProfiles,
+                            boolean resolveOptional, ExecutionContext ctx, @Nullable Path projectDir) {
         this.versionSelection = new TreeMap<>();
         for (Scope scope : Scope.values()) {
             versionSelection.putIfAbsent(scope, new HashMap<>());
@@ -615,6 +614,22 @@ public class RawMavenResolver {
         Collection<Pom.License> licenses = emptyList();
         Collection<MavenRepository> repositories = emptyList();
         Map<String, String> properties = emptyMap();
+
+        /**
+         * The order of repositories should be:
+         * 1. repos in profiles
+         * 2. my repos repos
+         * 3. parent pom repos
+         */
+        public List<MavenRepository> getRepositories() {
+            List<MavenRepository> allRepositories = new ArrayList<>(repositories);
+            Pom ancestor = parent;
+            while(ancestor != null) {
+                allRepositories.addAll(ancestor.getRepositories());
+                ancestor = ancestor.getParent();
+            }
+            return allRepositories;
+        }
 
         /**
          * Recursively substitutes properties for their values until the value is no longer

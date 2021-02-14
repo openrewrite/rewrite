@@ -30,6 +30,8 @@ import java.util.function.Consumer
 object ParseMavenProjectOnDisk {
     @JvmStatic
     fun main(args: Array<String>) {
+        val projectDir = Paths.get(args.first())
+
         val errorConsumer = Consumer<Throwable> { t ->
             if (t is MavenParsingException) {
                 println("  ${t.message}")
@@ -57,16 +59,19 @@ object ParseMavenProjectOnDisk {
             errorConsumer
         )
 
+        val mavenParserBuilder = MavenParser.builder()
+            .doOnParse(onParse)
+            .resolveOptional(false)
+            .mavenConfig(projectDir.resolve(".mvn/maven.config"))
+
         val parser = MavenProjectParser(
             downloader,
-            MavenParser.builder()
-                .doOnParse(onParse)
-                .resolveOptional(false),
+            mavenParserBuilder,
             JavaParser.fromJavaVersion(),
             InMemoryExecutionContext(errorConsumer)
         )
 
-        parser.parse(Paths.get(args.first())).forEach {
+        parser.parse(projectDir).forEach {
             println(it.sourcePath)
         }
     }
