@@ -7,5 +7,5 @@ commons-javaflow:commons-javaflow:20060411
 mondrian:mondrian:3.1.1.12687
 xerces:xerces-impl:2.6.2
 org.eclipse.swt:org.eclipse.swt.gtk.linux.x86_64:4.5.2
-stax:stax-api:1.0
+stax:stax-ri:1.0
 nl.jqno.equalsverifier:equalsverifier-signedjar-test:0.2

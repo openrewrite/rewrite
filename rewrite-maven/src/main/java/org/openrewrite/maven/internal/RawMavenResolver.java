@@ -204,16 +204,17 @@ public class RawMavenResolver {
                     String groupId = partialMaven.getValue(dep.getGroupId());
                     String artifactId = partialMaven.getValue(dep.getArtifactId());
 
+                    RawPom includingPom = rawMaven.getPom();
                     if (groupId == null) {
                         ctx.getOnError().accept(new MavenParsingException(
                                 "Problem resolving dependency of %s:%s:%s. Unable to determine groupId.",
-                                rawMaven.getPom().getGroupId(), rawMaven.getPom().getArtifactId(), rawMaven.getPom().getVersion()));
+                                includingPom.getGroupId(), includingPom.getArtifactId(), includingPom.getVersion()));
                         return null;
                     }
                     if (artifactId == null) {
                         ctx.getOnError().accept(new MavenParsingException(
                                 "Problem resolving dependency of %s:%s:%s. Unable to determine artifactId.",
-                                rawMaven.getPom().getGroupId(), rawMaven.getPom().getArtifactId(), rawMaven.getPom().getVersion()));
+                                includingPom.getGroupId(), includingPom.getArtifactId(), includingPom.getVersion()));
                         return null;
                     }
 
@@ -271,8 +272,18 @@ public class RawMavenResolver {
                     }
 
                     if (version == null) {
+                        String includingPath;
+                        if (rawMaven.getRepository() != null) {
+                            includingPath = rawMaven.getRepository().getUri().toString() + '/' +
+                                    includingPom.getGroupId().replace('.', '/') + '/' + includingPom.getArtifactId() + '/' +
+                                    includingPom.getVersion() + '/' +
+                                    includingPom.getArtifactId() + '-' +
+                                    (includingPom.getSnapshotVersion() == null ? includingPom.getVersion() : includingPom.getSnapshotVersion()) + ".pom";
+                        } else {
+                            includingPath = rawMaven.getSourcePath().toString();
+                        }
                         ctx.getOnError().accept(new MavenParsingException("Failed to determine version for %s:%s. Initial value was %s. Including POM is at %s",
-                                groupId, artifactId, dep.getVersion(), rawMaven.getSourcePath()));
+                                groupId, artifactId, dep.getVersion(), includingPath));
                         return null;
                     }
 
@@ -387,7 +398,7 @@ public class RawMavenResolver {
         Set<MavenRepository> repositories = new LinkedHashSet<>();
         for (RawRepositories.Repository repo : task.getRawMaven().getPom().getActiveRepositories(activeProfiles)) {
             MavenRepository mapped = processRepository(partialMaven, repo);
-            if(mapped == null) {
+            if (mapped == null) {
                 continue;
             }
             mapped = MavenRepositoryMirror.apply(ctx.getMirrors(), mapped);
@@ -693,7 +704,7 @@ public class RawMavenResolver {
 
                     return null;
                 });
-            } catch(Throwable t) {
+            } catch (Throwable t) {
                 ctx.getOnError().accept(new MavenParsingException("Unable to resolve property %s", v));
                 return null;
             }
