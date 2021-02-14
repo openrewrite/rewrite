@@ -28,9 +28,15 @@ import java.nio.file.Paths
 class RawPomTest {
     @Test
     fun profileActivationByJdk() {
-        assertThat(RawPom.ProfileActivation("11", emptyMap()).isActive).isTrue()
-        assertThat(RawPom.ProfileActivation("[,12)", emptyMap()).isActive).isTrue()
-        assertThat(RawPom.ProfileActivation("[,11]", emptyMap()).isActive).isFalse()
+        assertThat(ProfileActivation(false, "11", null).isActive).isTrue()
+        assertThat(ProfileActivation(false, "[,12)", null).isActive).isTrue()
+        assertThat(ProfileActivation(false, "[,11]", null).isActive).isFalse()
+    }
+
+    @Test
+    fun profileActivationByAbsenceOfProperty() {
+        assertThat(ProfileActivation(false, null,
+            ProfileActivation.Property("!inactive", null)).isActive).isTrue()
     }
 
     @Test

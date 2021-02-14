@@ -28,7 +28,6 @@ import javax.xml.bind.annotation.XmlRootElement;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
 
 /**
  * A value object deserialized directly from POM XML
@@ -84,7 +83,7 @@ public class RawPom {
     @Nullable
     Profiles profiles;
 
-    public Map<String, String> getActiveProperties(Collection<String> activeProfiles) {
+    public Map<String, String> getActiveProperties(Iterable<String> activeProfiles) {
         Map<String, String> activeProperties = new HashMap<>();
 
         if (properties != null) {
@@ -100,6 +99,25 @@ public class RawPom {
         }
 
         return activeProperties;
+    }
+
+    public Collection<Dependency> getActiveDependencyManagementDependencies(Iterable<String> activeProfiles) {
+        Collection<Dependency> activeDependencies = new ArrayList<>();
+
+        if (dependencyManagement != null && dependencyManagement.dependencies != null) {
+            activeDependencies.addAll(dependencyManagement.dependencies.getDependencies());
+        }
+
+        if (profiles != null) {
+            for (RawPom.Profile profile : getInnerProfiles()) {
+                if (profile.isActive(activeProfiles) && profile.getDependencyManagement() != null &&
+                        profile.getDependencyManagement().dependencies != null) {
+                    activeDependencies.addAll(profile.getDependencyManagement().dependencies.getDependencies());
+                }
+            }
+        }
+
+        return activeDependencies;
     }
 
     public List<Dependency> getActiveDependencies(Collection<String> activeProfiles) {
@@ -272,55 +290,13 @@ public class RawPom {
         Dependencies dependencies;
 
         @Nullable
+        DependencyManagement dependencyManagement;
+
+        @Nullable
         RawRepositories repositories;
 
-        public boolean isActive(Collection<String> activeProfiles) {
-            return (id != null && activeProfiles.contains(id)) || (activation != null && activation.isActive());
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
-    public static class ProfileActivation {
-        @Nullable
-        String jdk;
-
-        @Nullable
-        Map<String, String> property;
-
-        public boolean isActive() {
-            return isActiveByJdk() || isActiveByProperty();
-        }
-
-        private boolean isActiveByJdk() {
-            if (jdk == null) {
-                return false;
-            }
-
-            String version = System.getProperty("java.version");
-            RequestedVersion requestedVersion = new RequestedVersion(new GroupArtifact("", ""),
-                    null, jdk);
-
-            if (requestedVersion.isDynamic() || requestedVersion.isRange()) {
-                return requestedVersion.selectFrom(singletonList(version)) != null;
-            }
-
-            //noinspection ConstantConditions
-            return version.startsWith(requestedVersion.nearestVersion());
-        }
-
-        private boolean isActiveByProperty() {
-            if (property == null || property.isEmpty()) {
-                return false;
-            }
-
-            for (Map.Entry<String, String> prop : property.entrySet()) {
-                if (!prop.getValue().equals(System.getenv(prop.getKey()))) {
-                    return false;
-                }
-            }
-
-            return true;
+        public boolean isActive(Iterable<String> activeProfiles) {
+            return ProfileActivation.isActive(id, activeProfiles, activation);
         }
     }
 

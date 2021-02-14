@@ -66,13 +66,6 @@ public class RawMaven {
         return Objects.hash(getSourcePath());
     }
 
-    @Override
-    public String toString() {
-        return "RawMaven{" +
-                "pom=" + pom +
-                '}';
-    }
-
     public static RawMaven parse(Parser.Input source, @Nullable Path relativeTo, @Nullable String snapshotVersion,
                                  ExecutionContext ctx) {
         Xml.Document document = MavenXmlParser.builder().build()
@@ -107,5 +100,25 @@ public class RawMaven {
         public boolean accept(Path path) {
             return super.accept(path) || path.toString().endsWith(".pom");
         }
+    }
+
+    public String getSourceUri() {
+        String sourceUri;
+        if (repository != null) {
+            sourceUri = repository.getUri().toString() + '/' +
+                    (pom.getGroupId() == null ? "null" : pom.getGroupId().replace('.', '/')) + '/' +
+                    pom.getArtifactId() + '/' +
+                    pom.getVersion() + '/' +
+                    pom.getArtifactId() + '-' +
+                    (pom.getSnapshotVersion() == null ? pom.getVersion() : pom.getSnapshotVersion()) + ".pom";
+        } else {
+            sourceUri = "file://" + document.getSourcePath().toString();
+        }
+        return sourceUri;
+    }
+
+    @Override
+    public String toString() {
+        return "RawMaven{from=" + getSourceUri() + ",pom=" + pom + "}";
     }
 }

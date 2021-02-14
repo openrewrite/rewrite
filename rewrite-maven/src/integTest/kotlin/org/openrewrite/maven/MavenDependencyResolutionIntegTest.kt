@@ -34,11 +34,13 @@ import org.eclipse.aether.internal.impl.DefaultRemoteRepositoryManager
 import org.eclipse.aether.repository.RemoteRepository
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.maven.cache.InMemoryMavenPomCache
+import org.openrewrite.maven.internal.MavenParsingException
 import org.openrewrite.maven.tree.Maven
 import org.openrewrite.maven.tree.Pom
 import org.slf4j.Logger
@@ -53,17 +55,14 @@ import java.util.function.Consumer
 class MavenDependencyResolutionIntegTest {
     @Suppress("unused")
     companion object {
-//        private val meterRegistry = MetricsDestinations.prometheus()
         private val meterRegistry = Metrics.globalRegistry
-//        private val mavenCache = MapdbCache(File(System.getProperty("user.home") + "/.m2/rewrite"), null)
-//        private val mavenCache = NoopCache()
         private val mavenCache = InMemoryMavenPomCache()
 
         @JvmStatic
         @BeforeAll
         fun beforeAll() {
             (LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME) as ch.qos.logback.classic.Logger).level =
-                    Level.INFO
+                Level.INFO
 
             meterRegistry.config().meterFilter(MeterFilter.ignoreTags("artifact.id"))
         }
@@ -73,6 +72,15 @@ class MavenDependencyResolutionIntegTest {
         fun afterAll() {
             mavenCache.close()
         }
+    }
+
+    @Test
+    @Disabled
+    fun resteasyCore(@TempDir tempDir: Path) {
+        assertDependencyResolutionEqualsAether(
+            tempDir,
+            singleDependencyPom("org.jboss.resteasy:resteasy-core:4.5.8.SP1")
+        )
     }
 
     @Issue("#93")
@@ -106,11 +114,11 @@ class MavenDependencyResolutionIntegTest {
         """.trimIndent()
 
         val maven = MavenParser.builder()
-                .cache(mavenCache)
-                .resolveOptional(false)
-                .build()
-                .parse(pom)
-                .first()
+            .cache(mavenCache)
+            .resolveOptional(false)
+            .build()
+            .parse(pom)
+            .first()
 
         assertThat(maven.model.dependencies.first().version).isEqualTo("6.2.0-SNAPSHOT")
         assertThat(maven.model.dependencies.first().model.snapshotVersion).startsWith("6.2.0")
@@ -228,8 +236,10 @@ class MavenDependencyResolutionIntegTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/266")
     @Test
     fun openRange(@TempDir tempDir: Path) {
-        assertDependencyResolutionEqualsAether(tempDir,
-            singleDependencyPom("org.apache.tomee:javaee-api:[8.0,)"))
+        assertDependencyResolutionEqualsAether(
+            tempDir,
+            singleDependencyPom("org.apache.tomee:javaee-api:[8.0,)")
+        )
     }
 
     @Test
@@ -270,14 +280,18 @@ class MavenDependencyResolutionIntegTest {
 
     @Test
     fun missingAtEof(@TempDir tempDir: Path) {
-        assertDependencyResolutionEqualsAether(tempDir,
-            singleDependencyPom("com.fasterxml.jackson:jackson-base:2.12.0-rc2"))
+        assertDependencyResolutionEqualsAether(
+            tempDir,
+            singleDependencyPom("com.fasterxml.jackson:jackson-base:2.12.0-rc2")
+        )
     }
 
     @Test
     fun dearGoogleWhyDoesYourNameAppearWhenIHaveProblemsSoMuch(@TempDir tempDir: Path) {
-        assertDependencyResolutionEqualsAether(tempDir,
-                singleDependencyPom("com.google.cloud:google-cloud-shared-config:0.9.2"))
+        assertDependencyResolutionEqualsAether(
+            tempDir,
+            singleDependencyPom("com.google.cloud:google-cloud-shared-config:0.9.2")
+        )
     }
 
     /**
@@ -290,12 +304,18 @@ class MavenDependencyResolutionIntegTest {
 
     @Test
     fun springWeb(@TempDir tempDir: Path) {
-        assertDependencyResolutionEqualsAether(tempDir, singleDependencyPom("org.springframework:spring-web:4.0.9.RELEASE"))
+        assertDependencyResolutionEqualsAether(
+            tempDir,
+            singleDependencyPom("org.springframework:spring-web:4.0.9.RELEASE")
+        )
     }
 
     @Test
     fun springWebMvc(@TempDir tempDir: Path) {
-        assertDependencyResolutionEqualsAether(tempDir, singleDependencyPom("org.springframework:spring-webmvc:4.3.6.RELEASE"))
+        assertDependencyResolutionEqualsAether(
+            tempDir,
+            singleDependencyPom("org.springframework:spring-webmvc:4.3.6.RELEASE")
+        )
     }
 
     @Test
@@ -383,27 +403,42 @@ class MavenDependencyResolutionIntegTest {
     @Test
     fun jacksonCoreAsl(@TempDir tempDir: Path) {
         // empty dependencies block with a comment
-        assertDependencyResolutionEqualsAether(tempDir, singleDependencyPom("org.codehaus.jackson:jackson-core-asl:1.9.13"))
+        assertDependencyResolutionEqualsAether(
+            tempDir,
+            singleDependencyPom("org.codehaus.jackson:jackson-core-asl:1.9.13")
+        )
     }
 
     @Test
     fun springCloudSecurityOauth2(@TempDir tempDir: Path) {
-        assertDependencyResolutionEqualsAether(tempDir, singleDependencyPom("org.springframework.cloud:spring-cloud-starter-oauth2:2.2.4.RELEASE"))
+        assertDependencyResolutionEqualsAether(
+            tempDir,
+            singleDependencyPom("org.springframework.cloud:spring-cloud-starter-oauth2:2.2.4.RELEASE")
+        )
     }
 
     @Test
     fun springCloudStarterSecurity(@TempDir tempDir: Path) {
-        assertDependencyResolutionEqualsAether(tempDir, singleDependencyPom("org.springframework.cloud:spring-cloud-starter-security:2.2.4.RELEASE"))
+        assertDependencyResolutionEqualsAether(
+            tempDir,
+            singleDependencyPom("org.springframework.cloud:spring-cloud-starter-security:2.2.4.RELEASE")
+        )
     }
 
     @Test
     fun springBootStarterSecurity(@TempDir tempDir: Path) {
-        assertDependencyResolutionEqualsAether(tempDir, singleDependencyPom("org.springframework.boot:spring-boot-starter-security:2.3.2.RELEASE"))
+        assertDependencyResolutionEqualsAether(
+            tempDir,
+            singleDependencyPom("org.springframework.boot:spring-boot-starter-security:2.3.2.RELEASE")
+        )
     }
 
     @Test
     fun springBootStarterActuator(@TempDir tempDir: Path) {
-        assertDependencyResolutionEqualsAether(tempDir, singleDependencyPom("org.springframework.boot:spring-boot-starter-actuator:2.3.2.RELEASE"))
+        assertDependencyResolutionEqualsAether(
+            tempDir,
+            singleDependencyPom("org.springframework.boot:spring-boot-starter-actuator:2.3.2.RELEASE")
+        )
     }
 
     @Test
@@ -418,7 +453,10 @@ class MavenDependencyResolutionIntegTest {
 
     @Test
     fun istack(@TempDir tempDir: Path) {
-        assertDependencyResolutionEqualsAether(tempDir, singleDependencyPom("com.sun.istack:istack-commons-runtime:3.0.11"))
+        assertDependencyResolutionEqualsAether(
+            tempDir,
+            singleDependencyPom("com.sun.istack:istack-commons-runtime:3.0.11")
+        )
     }
 
     @Test
@@ -428,7 +466,10 @@ class MavenDependencyResolutionIntegTest {
 
     @Test
     fun springBoot(@TempDir tempDir: Path) {
-        assertDependencyResolutionEqualsAether(tempDir, singleDependencyPom("org.springframework.boot:spring-boot:2.1.2.RELEASE"))
+        assertDependencyResolutionEqualsAether(
+            tempDir,
+            singleDependencyPom("org.springframework.boot:spring-boot:2.1.2.RELEASE")
+        )
     }
 
     @Test
@@ -438,7 +479,10 @@ class MavenDependencyResolutionIntegTest {
 
     @Test
     fun parentDependencyManagementReliesOnPropertyDefinedInChild(@TempDir tempDir: Path) {
-        assertDependencyResolutionEqualsAether(tempDir, singleDependencyPom("org.springframework.security.oauth:spring-security-oauth2:2.3.4.RELEASE"))
+        assertDependencyResolutionEqualsAether(
+            tempDir,
+            singleDependencyPom("org.springframework.security.oauth:spring-security-oauth2:2.3.4.RELEASE")
+        )
     }
 
     /**
@@ -472,65 +516,77 @@ class MavenDependencyResolutionIntegTest {
         val pomFile = tempDir.resolve("pom.xml").toFile().apply { writeText(pom) }
 
         val pomAst: Maven = MavenParser.builder()
-                .cache(mavenCache)
-                .resolveOptional(false)
-                .build()
-                .parse(listOf(pomFile.toPath()), null, InMemoryExecutionContext())
-                .first()
+            .cache(mavenCache)
+            .resolveOptional(false)
+            .build()
+            .parse(listOf(pomFile.toPath()), null, InMemoryExecutionContext { t ->
+                if (t is MavenParsingException) {
+                    println(t.message)
+                } else {
+                    t.printStackTrace()
+                }
+            })
+            .first()
 
         val rewrite = printTreeRecursive(pomAst.model, ignoreScopes)
-
-//        println(rewrite)
-
         val aether = MavenAetherParser().dependencyTree(pomFile, ignoreScopes)
-
-//        println(aether)
-
         assertThat(rewrite).isEqualTo(aether)
     }
 
     private fun printTreeRecursive(maven: Pom, ignoreScopes: Boolean): String {
         return maven.dependencies
-                .filterNot { it.isOptional }
-                .sortedWith { d1, d2 ->
-                    if (d1.groupId == d2.groupId)
-                        d1.artifactId.compareTo(d2.artifactId)
-                    else
-                        d1.groupId.compareTo(d2.groupId)
-                }
-                .joinToString("\n") { dep ->
-                    dependencyString(dep, ignoreScopes) + printTreeRecursive(dep.model, ignoreScopes)
-                            .let { if (it.isBlank()) "" else "\n${it.prependIndent(" ")}" }
-                }
+            .filterNot { it.isOptional }
+            .sortedWith { d1, d2 ->
+                if (d1.groupId == d2.groupId)
+                    d1.artifactId.compareTo(d2.artifactId)
+                else
+                    d1.groupId.compareTo(d2.groupId)
+            }
+            .joinToString("\n") { dep ->
+                dependencyString(dep, ignoreScopes) + printTreeRecursive(dep.model, ignoreScopes)
+                    .let { if (it.isBlank()) "" else "\n${it.prependIndent(" ")}" }
+            }
     }
 
     private fun dependencyString(dep: Pom.Dependency, ignoreScopes: Boolean): String =
-            dep.run { "$groupId:$artifactId:$version${if (classifier?.isNotBlank() == true) ":${classifier}" else ""}" } +
-                    (if (ignoreScopes) "" else "[${dep.scope.toString().toLowerCase()}]") +
-                    dep.run { " https://repo1.maven.org/maven2/${groupId.replace(".", "/")}/$artifactId/$version/$artifactId-$version.pom" }
+        dep.run { "$groupId:$artifactId:$version${if (classifier?.isNotBlank() == true) ":${classifier}" else ""}" } +
+                (if (ignoreScopes) "" else "[${dep.scope.toString().toLowerCase()}]") +
+                dep.run {
+                    " https://repo1.maven.org/maven2/${
+                        groupId.replace(
+                            ".",
+                            "/"
+                        )
+                    }/$artifactId/$version/$artifactId-$version.pom"
+                }
 
     class MavenAetherParser {
         private val repositorySystem = MavenRepositorySystemUtils.getRepositorySystem()
         private val localRepository = File(System.getProperty("user.home") + "/.m2/rewrite-aether")
         private val repositorySystemSession: RepositorySystemSession = MavenRepositorySystemUtils
-                .getRepositorySystemSession(repositorySystem, localRepository)
+            .getRepositorySystemSession(repositorySystem, localRepository)
 
         // The type might be called "RemoteRepository" but file:// urls are perfectly acceptable
-        private val repositories = listOf(RemoteRepository.Builder("local", "default", localRepository.toURI().toString()).build())
+        private val repositories =
+            listOf(RemoteRepository.Builder("local", "default", localRepository.toURI().toString()).build())
 
         fun dependencyTree(pom: File, ignoreScopes: Boolean): String {
             val modelBuilder = DefaultModelBuilderFactory().newInstance()
 
             val modelBuildingRequest = DefaultModelBuildingRequest()
-                    .setModelResolver(ParentModelResolver(
-                            repositorySystemSession,
-                            repositorySystem,
-                            DefaultRemoteRepositoryManager(),
-                            repositories + RemoteRepository.Builder("central", "default",
-                                    "https://repo.maven.apache.org/maven2").build()
-                    ))
-                    .setSystemProperties(System.getProperties())
-                    .setPomFile(pom)
+                .setModelResolver(
+                    ParentModelResolver(
+                        repositorySystemSession,
+                        repositorySystem,
+                        DefaultRemoteRepositoryManager(),
+                        repositories + RemoteRepository.Builder(
+                            "central", "default",
+                            "https://repo.maven.apache.org/maven2"
+                        ).build()
+                    )
+                )
+                .setSystemProperties(System.getProperties())
+                .setPomFile(pom)
 
             val modelBuildingResult = modelBuilder.build(modelBuildingRequest)
 
@@ -540,10 +596,10 @@ class MavenDependencyResolutionIntegTest {
             collectRequest.repositories = remoteRepositoriesFromModel(model)
             collectRequest.dependencies = model.dependencies.map { d ->
                 Dependency(
-                        DefaultArtifact(d.groupId, d.artifactId, d.classifier, "jar", d.version),
-                        d.scope,
-                        d.optional == "true",
-                        d.exclusions.map { e -> Exclusion(e.groupId, e.artifactId, "*", "*") }
+                    DefaultArtifact(d.groupId, d.artifactId, d.classifier, "jar", d.version),
+                    d.scope,
+                    d.optional == "true",
+                    d.exclusions.map { e -> Exclusion(e.groupId, e.artifactId, "*", "*") }
                 )
             }
 
@@ -551,44 +607,66 @@ class MavenDependencyResolutionIntegTest {
             return printTreeRecursive(collectResult.root, ignoreScopes).trimIndent()
         }
 
-        private fun printTreeRecursive(node: DependencyNode, ignoreScopes: Boolean, originalScope: String = "compile"): String =
-                dependencyString(node, ignoreScopes, originalScope) + (node.children
-                        .filter { n -> n.dependency.scope != "system" }
-                        .sortedWith { n1, n2 ->
-                            val d1 = n1.dependency.artifact
-                            val d2 = n2.dependency.artifact
-                            if (d1.groupId == d2.groupId)
-                                d1.artifactId.compareTo(d2.artifactId)
-                            else
-                                d1.groupId.compareTo(d2.groupId)
-                        }
-                        .joinToString("\n") {
-                            val scope =
-                                    if (it.data["conflict.originalScope"] != it.dependency.scope)
-                                        it.data["conflict.originalScope"] as String
-                                    else it.dependency.scope
+        private fun printTreeRecursive(
+            node: DependencyNode,
+            ignoreScopes: Boolean,
+            originalScope: String = "compile"
+        ): String =
+            dependencyString(node, ignoreScopes, originalScope) + (node.children
+                .filter { n -> n.dependency.scope != "system" }
+                .sortedWith { n1, n2 ->
+                    val d1 = n1.dependency.artifact
+                    val d2 = n2.dependency.artifact
+                    if (d1.groupId == d2.groupId)
+                        d1.artifactId.compareTo(d2.artifactId)
+                    else
+                        d1.groupId.compareTo(d2.groupId)
+                }
+                .joinToString("\n") {
+                    val scope =
+                        if (it.data["conflict.originalScope"] != it.dependency.scope)
+                            it.data["conflict.originalScope"] as String
+                        else it.dependency.scope
 
-                            printTreeRecursive(it.data["conflict.winner"] as DefaultDependencyNode?
-                                    ?: it, ignoreScopes, scope)
-                        }
-                        .let { if (it.isBlank()) "" else "\n${it.prependIndent(" ")}" })
+                    printTreeRecursive(
+                        it.data["conflict.winner"] as DefaultDependencyNode?
+                            ?: it, ignoreScopes, scope
+                    )
+                }
+                .let { if (it.isBlank()) "" else "\n${it.prependIndent(" ")}" })
 
         private fun dependencyString(node: DependencyNode, ignoreScopes: Boolean, originalScope: String): String =
-                node.dependency?.run {
-                    artifact.run { "$groupId:$artifactId:$version${if (classifier.isNotBlank()) ":${classifier}" else ""}" } +
-                            (if (ignoreScopes) "" else "[$originalScope]") +
-                            " https://repo1.maven.org/maven2/${artifact.run { "${groupId.replace(".", "/")}/$artifactId/$version/$artifactId-$version.pom" }}"
-                } ?: ""
+            node.dependency?.run {
+                artifact.run { "$groupId:$artifactId:$version${if (classifier.isNotBlank()) ":${classifier}" else ""}" } +
+                        (if (ignoreScopes) "" else "[$originalScope]") +
+                        " https://repo1.maven.org/maven2/${
+                            artifact.run {
+                                "${
+                                    groupId.replace(
+                                        ".",
+                                        "/"
+                                    )
+                                }/$artifactId/$version/$artifactId-$version.pom"
+                            }
+                        }"
+            } ?: ""
 
         private fun remoteRepositoriesFromModel(model: Model): List<RemoteRepository> {
             val remotes: MutableList<RemoteRepository> = mutableListOf()
             model.repositories.forEach(Consumer { repo: Repository ->
-                remotes.add(RemoteRepository.Builder(repo.id, "default",
-                        repo.url).build())
+                remotes.add(
+                    RemoteRepository.Builder(
+                        repo.id, "default",
+                        repo.url
+                    ).build()
+                )
                 if (repo.url.contains("http://")) {
                     remotes.add(
-                            RemoteRepository.Builder(repo.id, "default",
-                                    repo.url.replace("http:", "https:")).build())
+                        RemoteRepository.Builder(
+                            repo.id, "default",
+                            repo.url.replace("http:", "https:")
+                        ).build()
+                    )
                 }
             })
             return remotes
@@ -599,8 +677,9 @@ class MavenDependencyResolutionIntegTest {
     @Test
     fun bomImportedFromParent() {
         val maven = MavenParser.builder()
-                .build()
-                .parse("""
+            .build()
+            .parse(
+                """
                     <project>
                       <groupId>com.mycompany.app</groupId>
                       <artifactId>my-app</artifactId>
@@ -619,7 +698,8 @@ class MavenDependencyResolutionIntegTest {
                         </dependency>
                       </dependencies>
                     </project>
-                """.trimIndent()).first()
+                """.trimIndent()
+            ).first()
 
         assertThat(maven.model.dependencies.first().version).isEqualTo("5.1.8.RELEASE")
     }
@@ -660,7 +740,8 @@ class MavenDependencyResolutionIntegTest {
                       </repository>
                     </repositories>
                 </project>
-                """.trimIndent())
+                """.trimIndent()
+            )
             .find { it.model.artifactId == "my-app" }!!
 
         assertThat(maven.model.dependencies.first().version).isNotBlank

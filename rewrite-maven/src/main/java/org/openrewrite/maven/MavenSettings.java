@@ -23,6 +23,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenXmlMapper;
+import org.openrewrite.maven.internal.ProfileActivation;
 import org.openrewrite.maven.internal.RawRepositories;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.MavenRepositoryCredentials;
@@ -136,17 +137,13 @@ public class MavenSettings {
         String id;
 
         @Nullable
+        ProfileActivation activation;
+
+        @Nullable
         RawRepositories repositories;
 
         public boolean isActive(Iterable<String> activeProfiles) {
-            if (id != null) {
-                for (String activeProfile : activeProfiles) {
-                    if (activeProfile.trim().equals(id)) {
-                        return true;
-                    }
-                }
-            }
-            return false;
+            return ProfileActivation.isActive(id, activeProfiles, activation);
         }
 
         public boolean isActive(String... activeProfiles) {
