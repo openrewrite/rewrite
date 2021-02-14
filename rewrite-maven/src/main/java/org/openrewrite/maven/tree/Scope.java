@@ -85,9 +85,9 @@ public enum Scope {
                 switch (this) {
                     case Compile:
                     case Runtime:
-                    case Test:
                         return Test;
                     case Provided:
+                    case Test:
                     default:
                         return null;
                 }
