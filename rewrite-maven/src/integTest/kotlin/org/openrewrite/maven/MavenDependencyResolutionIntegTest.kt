@@ -74,6 +74,16 @@ class MavenDependencyResolutionIntegTest {
         }
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/281")
+    @Test
+    @Disabled
+    fun jbossJaxbApi(@TempDir tempDir: Path) {
+        assertDependencyResolutionEqualsAether(
+            tempDir,
+            singleDependencyPom("org.jboss.spec.javax.xml.bind:jboss-jaxb-api_2.3_spec-parent:2.0.0.Final")
+        )
+    }
+
     @Test
     @Disabled
     fun resteasyCore(@TempDir tempDir: Path) {
