@@ -632,6 +632,7 @@ public class RawMavenResolver {
             try {
                 return placeholderHelper.replacePlaceholders(v, key -> {
                     switch (key) {
+                        case "groupId":
                         case "project.groupId":
                         case "pom.groupId":
                             String groupId = rawPom.getGroupId();
@@ -641,11 +642,13 @@ public class RawMavenResolver {
                             return parent == null ? null : parent.getGroupId();
                         case "project.parent.groupId":
                             return parent != null ? parent.getGroupId() : null;
+                        case "artifactId":
                         case "project.artifactId":
                         case "pom.artifactId":
                             return rawPom.getArtifactId(); // cannot be inherited from parent
                         case "project.parent.artifactId":
                             return parent == null ? null : parent.getArtifactId();
+                        case "version":
                         case "project.version":
                         case "pom.version":
                             String rawVersion = rawPom.getVersion();
@@ -687,12 +690,12 @@ public class RawMavenResolver {
                         return value;
                     }
 
-                    ctx.getOnError().accept(new MavenParsingException("Unable to resolve property %s", v));
+                    ctx.getOnError().accept(new MavenParsingException("Unable to resolve property %s. Including POM is at %s", v, rawPom));
 
                     return null;
                 });
             } catch (Throwable t) {
-                ctx.getOnError().accept(new MavenParsingException("Unable to resolve property %s", v));
+                ctx.getOnError().accept(new MavenParsingException("Unable to resolve property %s. Including POM is at %s", v, rawPom));
                 return null;
             }
         }

@@ -15,8 +15,7 @@
  */
 package org.openrewrite.xml;
 
-import org.antlr.v4.runtime.CharStreams;
-import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.*;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;
@@ -50,8 +49,12 @@ public class XmlParser implements Parser<Xml.Document> {
                 .map(sourceFile -> {
                     try {
                         onParse.onParseStart(sourceFile.getPath());
+
                         XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
                                 CharStreams.fromStream(sourceFile.getSource()))));
+
+                        parser.removeErrorListeners();
+                        parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath()));
 
                         Xml.Document document = new XmlParserVisitor(
                                 sourceFile.getRelativePath(relativeTo),
@@ -87,6 +90,21 @@ public class XmlParser implements Parser<Xml.Document> {
         @Override
         public XmlParser build() {
             return new XmlParser(onParse);
+        }
+    }
+
+    private class ForwardingErrorListener extends BaseErrorListener {
+        private final Path sourcePath;
+
+        private ForwardingErrorListener(Path sourcePath) {
+            this.sourcePath = sourcePath;
+        }
+
+        @Override
+        public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
+                                int line, int charPositionInLine, String msg, RecognitionException e) {
+            onParse.onWarn(String.format("Syntax error at line %d:%d %s. Including file at %s", line,
+                    charPositionInLine, msg, sourcePath), e);
         }
     }
 }

@@ -26,7 +26,6 @@ import org.openrewrite.maven.tree.MavenRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.URI;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -68,7 +67,7 @@ public class RequestedVersion {
                 CharStreams.fromString(requested))));
 
         parser.removeErrorListeners();
-        parser.addErrorListener(new LoggingErrorListener(URI.create("dontknow")));
+        parser.addErrorListener(new LoggingErrorListener());
 
         this.versionSpec = new VersionRangeParserBaseVisitor<VersionSpec>() {
             @Override
@@ -245,17 +244,10 @@ public class RequestedVersion {
     }
 
     private static class LoggingErrorListener extends BaseErrorListener {
-        @Nullable
-        private final URI uri;
-
-        private LoggingErrorListener(@Nullable URI uri) {
-            this.uri = uri;
-        }
-
         @Override
         public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
                                 int line, int charPositionInLine, String msg, RecognitionException e) {
-            logger.warn("Syntax error at line {}:{} {} {}", line, charPositionInLine, msg, uri);
+            logger.warn("Syntax error at line {}:{} {}", line, charPositionInLine, msg);
         }
     }
 }

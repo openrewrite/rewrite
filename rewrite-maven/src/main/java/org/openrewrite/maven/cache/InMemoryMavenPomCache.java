@@ -79,9 +79,8 @@ public class InMemoryMavenPomCache implements MavenPomCache {
     @Override
     public CacheResult<RawMaven> computeMaven(URI repo, String groupId, String artifactId, String version,
                                               Callable<RawMaven> orElseGet) throws Exception {
-
-        //There are a few exceptional artifacts that will never be resolved by the repositories. This will always
-        //result in an Unavailable response from the cache.
+        // There are a few exceptional artifacts that will never be resolved by the repositories. This will always
+        // result in an Unavailable response from the cache.
         String artifactCoordinates = groupId + ':' + artifactId + ':' + version;
         if (unresolvablePoms.contains(artifactCoordinates)) {
             return UNAVAILABLE_POM;
