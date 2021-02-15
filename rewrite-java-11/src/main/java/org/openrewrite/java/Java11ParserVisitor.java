@@ -695,6 +695,12 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 break;
         }
 
+        JavaType referenceType = null;
+        if (ref.sym != null && ref.sym instanceof Symbol.MethodSymbol) {
+            Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) ref.sym;
+            referenceType = methodType(methodSymbol.owner.type, methodSymbol, referenceName);
+        }
+
         return new J.MemberReference(randomId(),
                 fmt,
                 Markers.EMPTY,
@@ -705,7 +711,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                         Markers.EMPTY,
                         referenceName,
                         null)),
-                type(node));
+                type(node),
+                referenceType);
     }
 
     @Override

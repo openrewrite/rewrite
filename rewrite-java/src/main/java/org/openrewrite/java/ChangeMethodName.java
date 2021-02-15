@@ -74,6 +74,15 @@ public class ChangeMethodName extends Recipe {
             return m;
         }
 
+        @Override
+        public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext context) {
+            J.MemberReference m = super.visitMemberReference(memberRef, context);
+            if (methodMatcher.matches(m.getReferenceType()) && !m.getReference().getSimpleName().equals(newMethodName)) {
+                m = m.withReference(m.getReference().withName(newMethodName));
+            }
+            return m;
+        }
+
         /**
          * The only time field access should be relevant to changing method names is static imports.
          * This exists to turn

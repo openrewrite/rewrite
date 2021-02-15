@@ -2641,10 +2641,22 @@ public interface J extends Serializable, Tree {
             return getPadding().withReference(this.reference.withElement(reference));
         }
 
+        /**
+         * In the case of a method reference, this will be the type of the functional interface that
+         * this method reference is supplying.
+         */
         @With
         @Nullable
         @Getter
         JavaType type;
+
+        /**
+         * In the case of a method reference, this is the method type pointed to by {@link #reference}.
+         */
+        @With
+        @Nullable
+        @Getter
+        JavaType referenceType;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -2681,7 +2693,7 @@ public interface J extends Serializable, Tree {
             }
 
             public MemberReference withTypeParameters(@Nullable JContainer<Expression> typeParameters) {
-                return t.typeParameters == typeParameters ? t : new MemberReference(t.id, t.prefix, t.markers, t.containing, typeParameters, t.reference, t.type);
+                return t.typeParameters == typeParameters ? t : new MemberReference(t.id, t.prefix, t.markers, t.containing, typeParameters, t.reference, t.type, t.referenceType);
             }
 
             public JLeftPadded<Identifier> getReference() {
@@ -2689,7 +2701,7 @@ public interface J extends Serializable, Tree {
             }
 
             public MemberReference withReference(JLeftPadded<Identifier> reference) {
-                return t.reference == reference ? t : new MemberReference(t.id, t.prefix, t.markers, t.containing, t.typeParameters, reference, t.type);
+                return t.reference == reference ? t : new MemberReference(t.id, t.prefix, t.markers, t.containing, t.typeParameters, reference, t.type, t.referenceType);
             }
         }
     }

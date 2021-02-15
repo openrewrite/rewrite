@@ -40,17 +40,19 @@ interface ChangeMethodNameTest : JavaRecipeTest {
         before = """
             package com.abc;
             class A {
-               public void test() {
-                   new B().singleArg("boo");
-               }
+                public void test() {
+                    new B().singleArg("boo");
+                    new java.util.ArrayList<String>().forEach(new B()::singleArg);
+                }
             }
         """,
         after = """
             package com.abc;
             class A {
-               public void test() {
-                   new B().bar("boo");
-               }
+                public void test() {
+                    new B().bar("boo");
+                    new java.util.ArrayList<String>().forEach(new B()::bar);
+                }
             }
         """
     )

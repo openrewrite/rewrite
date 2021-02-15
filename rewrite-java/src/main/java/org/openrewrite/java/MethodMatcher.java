@@ -84,6 +84,23 @@ public class MethodMatcher {
         }.visit(parser.methodPattern());
     }
 
+    public boolean matches(@Nullable JavaType type) {
+        if (!(type instanceof JavaType.Method)) {
+            return false;
+        }
+
+        JavaType.Method methodType = (JavaType.Method) type;
+
+        String signaturePattern = methodType.getGenericSignature().getParamTypes().stream()
+                .map(this::typePattern)
+                .filter(Objects::nonNull)
+                .collect(joining(","));
+
+        return matchesTargetType(methodType.getDeclaringType()) &&
+                methodNamePattern.matcher(methodType.getName()).matches() &&
+                argumentPattern.matcher(signaturePattern).matches();
+    }
+
     public boolean matches(J.MethodDeclaration method, J.ClassDeclaration enclosing) {
         if (enclosing.getType() == null) {
             return false;
