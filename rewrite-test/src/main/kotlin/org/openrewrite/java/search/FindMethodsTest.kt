@@ -23,6 +23,31 @@ import org.openrewrite.java.JavaRecipeTest
 interface FindMethodsTest : JavaRecipeTest {
 
     @Test
+    fun findMethodReferences(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = FindMethods("A singleArg(String)"),
+        before = """
+            class Test {
+                void test() {
+                    new java.util.ArrayList<String>().forEach(new A()::singleArg);
+                }
+            }
+        """,
+        after = """
+            class Test {
+                void test() {
+                    new java.util.ArrayList<String>().forEach(new A()::/*~~>*/singleArg);
+                }
+            }
+        """,
+        dependsOn = arrayOf("""
+            class A {
+                public void singleArg(String s) {}
+            }
+        """)
+    )
+
+    @Test
     fun findStaticMethodCalls(jp: JavaParser) = assertChanged(
         jp,
         recipe = FindMethods("java.util.Collections emptyList()"),

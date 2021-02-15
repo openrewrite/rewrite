@@ -52,22 +52,44 @@ public final class FindMethods extends Recipe {
                 }
                 return m;
             }
+
+            @Override
+            public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext context) {
+                J.MemberReference m = super.visitMemberReference(memberRef, context);
+                if (methodMatcher.matches(m.getReferenceType())) {
+                    m = m.withReference(m.getReference().withMarker(new RecipeSearchResult(FindMethods.this)));
+                }
+                return m;
+            }
         };
     }
 
-    public static Set<J.MethodInvocation> find(J j, String methodPattern) {
+    /**
+     * @param j             The subtree to search.
+     * @param methodPattern A method pattern. See {@link MethodMatcher} for details about this syntax.
+     * @return A set of {@link J.MethodInvocation} and {@link J.MemberReference} representing calls to this method.
+     */
+    public static Set<J> find(J j, String methodPattern) {
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
-        JavaIsoVisitor<Set<J.MethodInvocation>> findVisitor = new JavaIsoVisitor<Set<J.MethodInvocation>>() {
+        JavaIsoVisitor<Set<J>> findVisitor = new JavaIsoVisitor<Set<J>>() {
             @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Set<J.MethodInvocation> ms) {
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Set<J> ms) {
                 if (methodMatcher.matches(method)) {
                     ms.add(method);
                 }
                 return super.visitMethodInvocation(method, ms);
             }
+
+            @Override
+            public J.MemberReference visitMemberReference(J.MemberReference memberRef, Set<J> ms) {
+                if (methodMatcher.matches(memberRef.getReferenceType())) {
+                    ms.add(memberRef);
+                }
+                return super.visitMemberReference(memberRef, ms);
+            }
         };
 
-        Set<J.MethodInvocation> ms = new HashSet<>();
+        Set<J> ms = new HashSet<>();
         findVisitor.visit(j, ms);
         return ms;
     }

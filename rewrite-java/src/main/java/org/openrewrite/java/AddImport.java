@@ -139,10 +139,13 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         }
 
         //For static imports, we are either looking for a specific method or a wildcard.
-        for (J.MethodInvocation invocation : FindMethods.find(compilationUnit, type + " *(..)")) {
-            if (invocation.getSelect() == null &&
-                    (statik.equals("*") || invocation.getName().getSimpleName().equals(statik))) {
-                return true;
+        for (J invocation : FindMethods.find(compilationUnit, type + " *(..)")) {
+            if(invocation instanceof J.MethodInvocation) {
+                J.MethodInvocation mi = (J.MethodInvocation) invocation;
+                if (mi.getSelect() == null &&
+                        (statik.equals("*") || mi.getName().getSimpleName().equals(statik))) {
+                    return true;
+                }
             }
         }
         return false;
