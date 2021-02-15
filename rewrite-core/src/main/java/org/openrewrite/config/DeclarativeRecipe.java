@@ -15,6 +15,7 @@
  */
 package org.openrewrite.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
 
@@ -31,6 +32,7 @@ public class DeclarativeRecipe extends Recipe {
     private final URI source;
     private final List<String> lazyNext = new ArrayList<>();
 
+    @JsonIgnore
     private Validated validation = Validated.test("initialization",
             "initialize(..) must be called on DeclarativeRecipe prior to use.",
             this, r -> lazyNext.isEmpty());
