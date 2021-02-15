@@ -16,10 +16,13 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.*
+import org.openrewrite.ExecutionContext
+import org.openrewrite.Issue
+import org.openrewrite.Recipe
+import org.openrewrite.TreeVisitor
 import org.openrewrite.java.tree.J
 
-interface AddImportTest : RecipeTest {
+interface AddImportTest : JavaRecipeTest {
     fun addImports(vararg adds: AddImport<ExecutionContext>): Recipe = adds
         .map { add -> add.toRecipe() }
         .reduce { r1, r2 -> return r1.doNext(r2) }

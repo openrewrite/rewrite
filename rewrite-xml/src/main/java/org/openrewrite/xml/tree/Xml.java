@@ -23,6 +23,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
+import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
@@ -193,7 +194,7 @@ public interface Xml extends Serializable, Tree {
          */
         String name;
 
-        public static Xml.Tag build(String tagSource) {
+        public static Xml.Tag build(@Language("xml") String tagSource) {
             return XmlParser.builder().build().parse(tagSource).get(0).getRoot();
         }
 

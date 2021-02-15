@@ -18,14 +18,9 @@ package org.openrewrite.maven
 import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import org.openrewrite.Parser
-import org.openrewrite.RecipeTest
-import org.openrewrite.maven.tree.Maven
 import java.nio.file.Path
 
-class UpgradeDependencyVersionTest : RecipeTest {
-    override val parser: Parser<Maven> = MavenParser.builder().resolveOptional(false).build()
-
+class UpgradeDependencyVersionTest : MavenRecipeTest {
     @Test
     fun upgradeVersion() = assertChanged(
         recipe = UpgradeDependencyVersion(

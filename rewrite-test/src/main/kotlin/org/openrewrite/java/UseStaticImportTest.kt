@@ -17,9 +17,8 @@ package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.RecipeTest
 
-interface UseStaticImportTest : RecipeTest {
+interface UseStaticImportTest : JavaRecipeTest {
     @Test
     fun replaceWithStaticImports(jp: JavaParser) = assertChanged(
         jp,

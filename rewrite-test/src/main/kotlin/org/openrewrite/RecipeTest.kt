@@ -23,7 +23,6 @@ import com.fasterxml.jackson.databind.json.JsonMapper
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule
 import org.assertj.core.api.Assertions.*
 import org.junit.jupiter.api.fail
-import org.openrewrite.java.JavaVisitor
 import java.io.File
 
 interface RecipeTest {
@@ -201,12 +200,9 @@ interface RecipeTest {
         }
     }
 
-    fun JavaVisitor<ExecutionContext>.toRecipe() =
-        AdHocRecipe(this)
+    fun TreeVisitor<*, ExecutionContext>.toRecipe() = AdHocRecipe(this)
 
-    class AdHocRecipe(
-        private val visitor: JavaVisitor<ExecutionContext>
-    ) : Recipe() {
+    class AdHocRecipe(private val visitor: TreeVisitor<*, ExecutionContext>) : Recipe() {
         override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
             return visitor
         }

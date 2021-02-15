@@ -17,14 +17,10 @@ package org.openrewrite.java.search
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.RecipeTest
-import org.openrewrite.TreePrinter
 import org.openrewrite.java.JavaParser
-import org.openrewrite.marker.SearchResult
+import org.openrewrite.java.JavaRecipeTest
 
-interface FindMethodsTest : RecipeTest {
-    override val treePrinter: TreePrinter<*>?
-        get() = SearchResult.PRINTER
+interface FindMethodsTest : JavaRecipeTest {
 
     @Test
     fun findStaticMethodCalls(jp: JavaParser) = assertChanged(
@@ -39,7 +35,7 @@ interface FindMethodsTest : RecipeTest {
         after = """
             import java.util.Collections;
             public class A {
-               Object o = ~~>Collections.emptyList();
+               Object o = /*~~>*/Collections.emptyList();
             }
         """
     )
@@ -57,7 +53,7 @@ interface FindMethodsTest : RecipeTest {
         after = """
             import static java.util.Collections.emptyList;
             public class A {
-               Object o = ~~>emptyList();
+               Object o = /*~~>*/emptyList();
             }
         """
     )
@@ -76,7 +72,7 @@ interface FindMethodsTest : RecipeTest {
         after = """
             public class B {
                public void test() {
-                   ~~>new A().foo("s", "a", 1);
+                   /*~~>*/new A().foo("s", "a", 1);
                }
             }
         """,
@@ -101,7 +97,7 @@ interface FindMethodsTest : RecipeTest {
         after = """
             public class A {
                void test() {
-                   ~~>new B.C().foo();
+                   /*~~>*/new B.C().foo();
                }
             }
         """,

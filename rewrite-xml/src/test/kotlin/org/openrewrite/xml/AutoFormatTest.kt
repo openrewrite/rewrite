@@ -16,13 +16,11 @@
 package org.openrewrite.xml
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.RecipeTest
 
-class AutoFormatTest : RecipeTest {
+class AutoFormatTest : XmlRecipeTest {
 
     @Test
     fun autoFormatTag() = assertChanged(
-        XmlParser.builder().build(),
         recipe = AutoFormat(),
         before = """
             <project>

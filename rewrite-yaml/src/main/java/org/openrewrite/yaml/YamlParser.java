@@ -15,7 +15,9 @@
  */
 package org.openrewrite.yaml;
 
+import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
@@ -52,6 +54,11 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
 
     public static Builder builder() {
         return new Builder();
+    }
+
+    @Override
+    public List<Yaml.Documents> parse(@Language("yml") String... sources) {
+        return parse(new InMemoryExecutionContext(), sources);
     }
 
     @Override

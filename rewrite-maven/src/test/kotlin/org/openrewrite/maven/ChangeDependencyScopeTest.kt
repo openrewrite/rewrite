@@ -17,11 +17,8 @@ package org.openrewrite.maven
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.RecipeTest
 
-class ChangeDependencyScopeTest : RecipeTest {
-    override val parser: MavenParser = MavenParser.builder().resolveOptional(false).build()
-
+class ChangeDependencyScopeTest : MavenRecipeTest {
     override val recipe: ChangeDependencyScope
         get() = ChangeDependencyScope("com.google.guava", "guava", "test")
 

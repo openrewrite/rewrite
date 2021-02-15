@@ -17,45 +17,43 @@ package org.openrewrite.yaml
 
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
-import org.openrewrite.RecipeTest
 
-class CoalescePropertiesTest : RecipeTest {
-    override val parser: YamlParser = YamlParser.builder().build()
+class CoalescePropertiesTest : YamlRecipeTest {
 
     @Test
     fun fold() = assertChanged(
-            recipe = CoalesceProperties(),
-            before = """
-                management:
-                    metrics:
-                        enable.process.files: true
-                    endpoint:
-                        health:
-                            show-components: always
-                            show-details: always
-            """,
-            after = """
-                management:
-                    metrics.enable.process.files: true
-                    endpoint.health:
+        recipe = CoalesceProperties(),
+        before = """
+            management:
+                metrics:
+                    enable.process.files: true
+                endpoint:
+                    health:
                         show-components: always
                         show-details: always
-            """
+        """,
+        after = """
+            management:
+                metrics.enable.process.files: true
+                endpoint.health:
+                    show-components: always
+                    show-details: always
+        """
     )
 
     @Test
     @Disabled
     fun group() = assertChanged(
-            recipe = CoalesceProperties(),
-            before = """
-                management.metrics.enable.process.files: true
-                management.metrics.enable.jvm: true
-            """,
-            after = """
-                management.metrics.enable:
-                    process.files: true
-                    jvm: true
-            """
+        recipe = CoalesceProperties(),
+        before = """
+            management.metrics.enable.process.files: true
+            management.metrics.enable.jvm: true
+        """,
+        after = """
+            management.metrics.enable:
+                process.files: true
+                jvm: true
+        """
     )
 
 }

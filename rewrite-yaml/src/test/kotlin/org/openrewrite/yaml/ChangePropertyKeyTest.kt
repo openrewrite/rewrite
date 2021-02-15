@@ -17,52 +17,51 @@ package org.openrewrite.yaml
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.RecipeTest
 
-class ChangePropertyKeyTest : RecipeTest {
-    override val parser = YamlParser.builder().build()
-
-    private val changeProp = ChangePropertyKey("management.metrics.binders.files.enabled",
-        "management.metrics.enable.process.files")
+class ChangePropertyKeyTest : YamlRecipeTest {
+    private val changeProp = ChangePropertyKey(
+        "management.metrics.binders.files.enabled",
+        "management.metrics.enable.process.files"
+    )
 
     @Test
     fun singleEntry() = assertChanged(
-            recipe = changeProp,
-            before = "management.metrics.binders.files.enabled: true",
-            after = "management.metrics.enable.process.files: true"
+        recipe = changeProp,
+        before = "management.metrics.binders.files.enabled: true",
+        after = "management.metrics.enable.process.files: true"
     )
 
     @Test
     fun nestedEntry() = assertChanged(
-            recipe = changeProp,
-            before = """
-                unrelated.property: true
-                management.metrics:
-                    binders:
-                        jvm.enabled: true
-                        files.enabled: true
-            """,
-            after = """
-                unrelated.property: true
-                management.metrics:
-                    binders.jvm.enabled: true
-                    enable.process.files: true
-            """
+        recipe = changeProp,
+        before = """
+            unrelated.property: true
+            management.metrics:
+                binders:
+                    jvm.enabled: true
+                    files.enabled: true
+        """,
+        after = """
+            unrelated.property: true
+            management.metrics:
+                binders.jvm.enabled: true
+                enable.process.files: true
+        """
     )
 
     @Test
     fun nestedEntryEmptyPartialPathRemoved() = assertChanged(
-            recipe = changeProp,
-            before = """
-                unrelated.property: true
-                management.metrics:
-                    binders:
-                        files.enabled: true
-            """,
-            after = """
-                unrelated.property: true
-                management.metrics.enable.process.files: true
-            """
+        recipe = changeProp,
+        before = """
+            unrelated.property: true
+            management.metrics:
+                binders:
+                    files.enabled: true
+        """,
+        after = """
+            unrelated.property: true
+            management.metrics.enable.process.files: true
+        """
     )
 
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
@@ -87,7 +86,8 @@ class ChangePropertyKeyTest : RecipeTest {
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("newPropertyKey")
 
-        recipe = ChangePropertyKey("management.metrics.binders.files.enabled", "management.metrics.enable.process.files")
+        recipe =
+            ChangePropertyKey("management.metrics.binders.files.enabled", "management.metrics.enable.process.files")
         valid = recipe.validate()
         assertThat(valid.isValid).isTrue()
     }

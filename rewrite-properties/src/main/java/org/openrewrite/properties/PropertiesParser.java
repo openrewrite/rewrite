@@ -15,7 +15,9 @@
  */
 package org.openrewrite.properties;
 
+import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
@@ -41,6 +43,11 @@ public class PropertiesParser implements Parser<Properties.File> {
 
     public static Builder builder() {
         return new Builder();
+    }
+
+    @Override
+    public List<Properties.File> parse(@Language("properties") String... sources) {
+        return parse(new InMemoryExecutionContext(), sources);
     }
 
     @Override

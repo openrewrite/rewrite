@@ -17,9 +17,8 @@ package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.RecipeTest
 
-interface ChangePackageTest: RecipeTest {
+interface ChangePackageTest: JavaRecipeTest {
     @Test
     fun changePackage(jp: JavaParser) = assertChanged(
         jp,

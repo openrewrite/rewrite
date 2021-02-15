@@ -18,11 +18,10 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
-import org.openrewrite.RecipeTest
 import org.openrewrite.TreeVisitor
 import org.openrewrite.java.tree.J
 
-interface ImplementInterfaceTest : RecipeTest {
+interface ImplementInterfaceTest : JavaRecipeTest {
     override val recipe: Recipe?
         get() = object : Recipe() {
             override fun getVisitor(): TreeVisitor<*, ExecutionContext> {

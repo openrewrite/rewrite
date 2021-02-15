@@ -16,10 +16,10 @@
 package org.openrewrite.java.format
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.RecipeTest
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaRecipeTest
 
-interface RemoveTrailingWhitespaceTest: RecipeTest {
+interface RemoveTrailingWhitespaceTest: JavaRecipeTest {
     @Test
     fun removeTrailing(jp: JavaParser) = assertChanged(
         jp,

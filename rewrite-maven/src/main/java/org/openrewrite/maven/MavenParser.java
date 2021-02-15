@@ -15,7 +15,9 @@
  */
 package org.openrewrite.maven;
 
+import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
@@ -61,6 +63,11 @@ public class MavenParser implements Parser<Maven> {
         this.activeProfiles = activeProfiles;
         this.resolveOptional = resolveOptional;
         this.onParse = onParse;
+    }
+
+    @Override
+    public List<Maven> parse(@Language("xml") String... sources) {
+        return parse(new InMemoryExecutionContext(), sources);
     }
 
     @Override

@@ -17,9 +17,8 @@ package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.RecipeTest
 
-interface DeleteMethodArgumentTest : RecipeTest {
+interface DeleteMethodArgumentTest : JavaRecipeTest {
     companion object {
         private const val b = """
             class B {

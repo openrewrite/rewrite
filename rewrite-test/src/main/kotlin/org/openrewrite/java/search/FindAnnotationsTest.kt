@@ -17,15 +17,10 @@ package org.openrewrite.java.search
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.RecipeTest
-import org.openrewrite.TreePrinter
 import org.openrewrite.java.JavaParser
-import org.openrewrite.marker.SearchResult
+import org.openrewrite.java.JavaRecipeTest
 
-interface FindAnnotationsTest: RecipeTest {
-    override val treePrinter: TreePrinter<*>?
-        get() = SearchResult.PRINTER
-
+interface FindAnnotationsTest: JavaRecipeTest {
     companion object {
         const val foo = """
             package com.netflix.foo;
@@ -41,7 +36,7 @@ interface FindAnnotationsTest: RecipeTest {
         jp,
         recipe = FindAnnotations("@java.lang.Deprecated"),
         before = "@Deprecated public class A {}",
-        after = "~~>@Deprecated public class A {}"
+        after = "/*~~>*/@Deprecated public class A {}"
     )
 
     @Test
@@ -56,7 +51,7 @@ interface FindAnnotationsTest: RecipeTest {
         """,
         after = """
             public class A {
-                ~~>@Deprecated
+                /*~~>*/@Deprecated
                 public void foo() {}
             }
         """
@@ -73,7 +68,7 @@ interface FindAnnotationsTest: RecipeTest {
         """,
         after = """
             public class A {
-                ~~>@Deprecated String s;
+                /*~~>*/@Deprecated String s;
             }
         """
     )
@@ -90,7 +85,7 @@ interface FindAnnotationsTest: RecipeTest {
         jp,
         recipe = FindAnnotations("""@java.lang.SuppressWarnings("deprecation")"""),
         before = "@SuppressWarnings(\"deprecation\") public class A {}",
-        after = "~~>@SuppressWarnings(\"deprecation\") public class A {}"
+        after = "/*~~>*/@SuppressWarnings(\"deprecation\") public class A {}"
     )
 
     @Test
@@ -111,7 +106,7 @@ interface FindAnnotationsTest: RecipeTest {
         """,
         after = """
             import com.netflix.foo.Foo;
-            ~~>@Foo(bar="quux", baz="bar")
+            /*~~>*/@Foo(bar="quux", baz="bar")
             public class A {}
         """,
         dependsOn = arrayOf(foo)
@@ -140,7 +135,7 @@ interface FindAnnotationsTest: RecipeTest {
         """,
         after = """
             import com.netflix.foo.Foo;
-            ~~>@Foo(bar="quux", baz="bar")
+            /*~~>*/@Foo(bar="quux", baz="bar")
             public class A {}
         """,
         dependsOn = arrayOf(foo)

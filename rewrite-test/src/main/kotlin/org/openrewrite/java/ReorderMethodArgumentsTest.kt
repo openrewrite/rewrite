@@ -19,12 +19,11 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
-import org.openrewrite.RecipeTest
 import org.openrewrite.TreeVisitor
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 
-interface ReorderMethodArgumentsTest : RecipeTest {
+interface ReorderMethodArgumentsTest : JavaRecipeTest {
 
     @Test
     fun reorderArguments(jp: JavaParser) = assertChanged(

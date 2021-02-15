@@ -15,6 +15,7 @@ dependencies {
     api(project(":rewrite-core"))
 
     api("io.micrometer:micrometer-core:latest.release")
+    api("org.jetbrains:annotations:latest.release")
 
     implementation("org.antlr:antlr4:4.8-1")
 

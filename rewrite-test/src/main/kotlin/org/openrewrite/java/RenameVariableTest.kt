@@ -17,10 +17,9 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
-import org.openrewrite.RecipeTest
 import org.openrewrite.java.tree.J
 
-interface RenameVariableTest : RecipeTest {
+interface RenameVariableTest : JavaRecipeTest {
     @Test
     fun renameVariable(jp: JavaParser) = assertChanged(
         jp,

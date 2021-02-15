@@ -16,7 +16,9 @@
 package org.openrewrite.xml;
 
 import org.antlr.v4.runtime.*;
+import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -71,6 +73,11 @@ public class XmlParser implements Parser<Xml.Document> {
                 })
                 .filter(Objects::nonNull)
                 .collect(toList());
+    }
+
+    @Override
+    public List<Xml.Document> parse(@Language("xml") String... sources) {
+        return parse(new InMemoryExecutionContext(), sources);
     }
 
     @Override

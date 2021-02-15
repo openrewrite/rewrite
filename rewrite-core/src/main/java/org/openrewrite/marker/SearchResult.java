@@ -29,34 +29,38 @@ import java.util.Optional;
  */
 @Incubating(since = "7.0.0")
 public interface SearchResult extends Marker {
-    TreePrinter<Void> PRINTER = new TreePrinter<Void>() {
-        private SearchResult marker;
-        private Integer mark;
+    TreePrinter<Void> PRINTER = printer("~~>", "~~(%s)~~>");
 
-        @Override
-        public void doBefore(Tree tree, StringBuilder printerAcc, Void unused) {
-            Optional<SearchResult> marker = tree.getMarkers().findFirst(SearchResult.class);
-            if (marker.isPresent()) {
-                this.marker = marker.get();
-                this.mark = printerAcc.length();
-            }
-        }
+    static TreePrinter<Void> printer(String markerText, String markerTextWithDescription) {
+        return new TreePrinter<Void>() {
+            private SearchResult marker;
+            private Integer mark;
 
-        @Override
-        public void doAfter(Tree tree, StringBuilder printerAcc, Void unused) {
-            if (mark != null) {
-                for (int i = mark; i < printerAcc.length(); i++) {
-                    if (!Character.isWhitespace(printerAcc.charAt(i))) {
-                        printerAcc.insert(i, marker.getDescription() == null ?
-                                "~~>" :
-                                "~~(" + marker.getDescription() + ")~~>");
-                        break;
-                    }
+            @Override
+            public void doBefore(Tree tree, StringBuilder printerAcc, Void unused) {
+                Optional<SearchResult> marker = tree.getMarkers().findFirst(SearchResult.class);
+                if (marker.isPresent()) {
+                    this.marker = marker.get();
+                    this.mark = printerAcc.length();
                 }
-                mark = null;
             }
-        }
-    };
+
+            @Override
+            public void doAfter(Tree tree, StringBuilder printerAcc, Void unused) {
+                if (mark != null) {
+                    for (int i = mark; i < printerAcc.length(); i++) {
+                        if (!Character.isWhitespace(printerAcc.charAt(i))) {
+                            printerAcc.insert(i, marker.getDescription() == null ?
+                                    markerText :
+                                    String.format(markerTextWithDescription, marker.getDescription()));
+                            break;
+                        }
+                    }
+                    mark = null;
+                }
+            }
+        };
+    }
 
     @Nullable
     String getDescription();

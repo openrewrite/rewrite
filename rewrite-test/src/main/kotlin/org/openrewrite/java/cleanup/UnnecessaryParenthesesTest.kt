@@ -18,13 +18,13 @@ package org.openrewrite.java.cleanup
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
-import org.openrewrite.RecipeTest
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.java.style.IntelliJ
 import org.openrewrite.java.style.UnnecessaryParenthesesStyle
 import org.openrewrite.style.NamedStyles
 
-interface UnnecessaryParenthesesTest : RecipeTest {
+interface UnnecessaryParenthesesTest : JavaRecipeTest {
     override val recipe: Recipe?
         get() = UnnecessaryParentheses()
 

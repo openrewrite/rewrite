@@ -16,20 +16,9 @@
 package org.openrewrite.maven.search
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
-import org.openrewrite.RecipeTest
-import org.openrewrite.TreePrinter
-import org.openrewrite.marker.SearchResult
-import org.openrewrite.maven.MavenParser
+import org.openrewrite.maven.MavenRecipeTest
 
-class FindPropertiesTest : RecipeTest {
-    override val parser: Parser<*>?
-        get() = MavenParser.builder()
-            .resolveOptional(false)
-            .build()
-
-    override val treePrinter: TreePrinter<*>?
-        get() = SearchResult.PRINTER
+class FindPropertiesTest : MavenRecipeTest {
 
     @Test
     fun findProperty() = assertChanged(
@@ -60,7 +49,7 @@ class FindPropertiesTest : RecipeTest {
               <modelVersion>4.0.0</modelVersion>
                
               <properties>
-                ~~><guava.version>28.2-jre</guava.version>
+                <!--~~>--><guava.version>28.2-jre</guava.version>
               </properties>
               
               <groupId>com.mycompany.app</groupId>
@@ -71,7 +60,7 @@ class FindPropertiesTest : RecipeTest {
                 <dependency>
                     <groupId>com.google.guava</groupId>
                     <artifactId>guava</artifactId>
-                    <version>~~(28.2-jre)~~>${'$'}{guava.version}</version>
+                    <version><!--~~(28.2-jre)~~>-->${'$'}{guava.version}</version>
                 </dependency>
               </dependencies>
             </project>

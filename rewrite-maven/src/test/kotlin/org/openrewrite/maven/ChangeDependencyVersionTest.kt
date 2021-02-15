@@ -18,13 +18,10 @@ package org.openrewrite.maven
 import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import org.openrewrite.RecipeTest
 import java.io.File
 import java.nio.file.Path
 
-class ChangeDependencyVersionTest : RecipeTest {
-    override val parser: MavenParser = MavenParser.builder().resolveOptional(false).build()
-
+class ChangeDependencyVersionTest : MavenRecipeTest {
     override val recipe = ChangeDependencyVersion("com.google.guava", "guava", "29.0-jre")
 
     @Test

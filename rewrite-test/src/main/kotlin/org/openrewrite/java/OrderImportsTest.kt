@@ -16,11 +16,10 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.RecipeTest
 import org.openrewrite.java.style.ImportLayoutStyle
 import org.openrewrite.style.NamedStyles
 
-interface OrderImportsTest : RecipeTest {
+interface OrderImportsTest : JavaRecipeTest {
     override val recipe: OrderImports
         get() = OrderImports().apply { setRemoveUnused(false) }
 

@@ -18,14 +18,11 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
-import org.openrewrite.RecipeTest
-import org.openrewrite.java.format.AutoFormatVisitor
 import org.openrewrite.java.tree.J
-import org.openrewrite.java.tree.Statement
 import org.slf4j.LoggerFactory
 import java.util.function.Consumer
 
-interface JavaTemplateTest : RecipeTest {
+interface JavaTemplateTest : JavaRecipeTest {
     companion object {
         private val logger = LoggerFactory.getLogger(JavaTemplateTest::class.java)
         private val logEvent = Consumer<String> { s -> logger.info(s) }

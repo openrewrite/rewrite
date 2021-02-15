@@ -18,10 +18,8 @@ package org.openrewrite.maven
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
-import org.openrewrite.RecipeTest
 
-class ExcludeDependencyTest : RecipeTest {
-    override val parser: MavenParser = MavenParser.builder().resolveOptional(false).build()
+class ExcludeDependencyTest : MavenRecipeTest {
     override val recipe = ExcludeDependency("org.junit.vintage","junit-vintage-engine")
 
     @Test
@@ -140,6 +138,7 @@ class ExcludeDependencyTest : RecipeTest {
             </project>
         """
     )
+
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {

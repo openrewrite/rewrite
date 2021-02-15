@@ -70,9 +70,7 @@ public interface Parser<S extends SourceFile> {
      * @param sources One or more sources.
      * @return Parsed list of {@link SourceFile}.
      */
-    default List<S> parse(String... sources) {
-        return parse(new InMemoryExecutionContext(), sources);
-    }
+    List<S> parse(String... sources);
 
     /**
      * @param sources    A collection of inputs. At the conclusion of parsing all sources' {@link Input#source}

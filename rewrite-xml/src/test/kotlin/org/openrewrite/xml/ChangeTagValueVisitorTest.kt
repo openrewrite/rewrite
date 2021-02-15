@@ -16,49 +16,52 @@
 package org.openrewrite.xml
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.ExecutionContext
 import org.openrewrite.xml.tree.Xml
 
-class ChangeTagValueVisitorTest : XmlVisitorTest() {
+class ChangeTagValueVisitorTest : XmlRecipeTest {
 
     @Test
     fun changeTagValue() = assertChanged(
-            visitorMapped = { x ->
-                ChangeTagValueVisitor(x.root.content[0] as Xml.Tag, "2.0")
-            },
-            before = """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <dependency>
-                    <version/>
-                </dependency>
-            """,
-            after = """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <dependency>
-                    <version>2.0</version>
-                </dependency>
-            """
+        recipe = object : XmlVisitor<ExecutionContext>() {
+            override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
+                doAfterVisit(ChangeTagValueVisitor(x.root.content[0] as Xml.Tag, "2.0"))
+                return super.visitDocument(x, p)
+            }
+        }.toRecipe(),
+        before = """
+            <dependency>
+                <version/>
+            </dependency>
+        """,
+        after = """
+            <dependency>
+                <version>2.0</version>
+            </dependency>
+        """
     )
 
     @Test
     fun preserveOriginalFormatting() = assertChanged(
-            visitorMapped = { x ->
-                ChangeTagValueVisitor(x.root.content[0] as Xml.Tag, "3.0")
-            },
-            before = """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <dependency>
-                    <version>
-                        2.0
-                    </version>
-                </dependency>
-            """,
-            after = """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <dependency>
-                    <version>
-                        3.0
-                    </version>
-                </dependency>
-            """
+        recipe = object : XmlVisitor<ExecutionContext>() {
+            override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
+                doAfterVisit(ChangeTagValueVisitor(x.root.content[0] as Xml.Tag, "3.0"))
+                return super.visitDocument(x, p)
+            }
+        }.toRecipe(),
+        before = """
+            <dependency>
+                <version>
+                    2.0
+                </version>
+            </dependency>
+        """,
+        after = """
+            <dependency>
+                <version>
+                    3.0
+                </version>
+            </dependency>
+        """
     )
 }

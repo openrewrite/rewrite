@@ -17,11 +17,10 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
-import org.openrewrite.RecipeTest
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 
-interface ChangeFieldNameTest : RecipeTest {
+interface ChangeFieldNameTest : JavaRecipeTest {
     fun changeFieldName(from: String, to: String) = object : JavaIsoVisitor<ExecutionContext>() {
         override fun visitVariableDeclarations(v: J.VariableDeclarations, p: ExecutionContext): J.VariableDeclarations {
             if (cursor.dropParentUntil { it is J }.dropParentUntil { it is J }.getValue<J>() is J.ClassDeclaration) {

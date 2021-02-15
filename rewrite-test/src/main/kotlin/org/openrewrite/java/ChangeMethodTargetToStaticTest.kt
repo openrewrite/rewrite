@@ -17,9 +17,8 @@ package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.RecipeTest
 
-interface ChangeMethodTargetToStaticTest : RecipeTest {
+interface ChangeMethodTargetToStaticTest : JavaRecipeTest {
 
     @Test
     fun targetToStatic(jp: JavaParser) = assertChanged(

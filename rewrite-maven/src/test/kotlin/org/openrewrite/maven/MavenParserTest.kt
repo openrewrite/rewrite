@@ -29,7 +29,9 @@ class MavenParserTest {
 
     @Test
     fun parse() {
-        val pom = """
+        val parser = MavenParser.builder().build()
+
+        val maven = parser.parse("""
             <project>
                 <modelVersion>4.0.0</modelVersion>
             
@@ -53,11 +55,7 @@ class MavenParserTest {
                   </dependency>
                 </dependencies>
             </project>
-        """.trimIndent()
-
-        val parser = MavenParser.builder().build()
-
-        val maven = parser.parse(pom)[0]
+        """)[0]
 
         assertThat(maven.model.dependencies.first().model.licenses.first()?.type)
                 .isEqualTo(Pom.LicenseType.Eclipse)

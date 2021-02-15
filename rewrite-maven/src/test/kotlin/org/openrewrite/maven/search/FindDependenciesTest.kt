@@ -16,20 +16,9 @@
 package org.openrewrite.maven.search
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
-import org.openrewrite.RecipeTest
-import org.openrewrite.TreePrinter
-import org.openrewrite.marker.SearchResult
-import org.openrewrite.maven.MavenParser
+import org.openrewrite.maven.MavenRecipeTest
 
-class FindDependenciesTest : RecipeTest {
-    override val parser: Parser<*>?
-        get() = MavenParser.builder()
-            .resolveOptional(false)
-            .build()
-
-    override val treePrinter: TreePrinter<*>?
-        get() = SearchResult.PRINTER
+class FindDependenciesTest : MavenRecipeTest {
 
     @Test
     fun findDependency() = assertChanged(
@@ -60,7 +49,7 @@ class FindDependenciesTest : RecipeTest {
               <version>1</version>
               
               <dependencies>
-                ~~><dependency>
+                <!--~~>--><dependency>
                     <groupId>com.google.guava</groupId>
                     <artifactId>guava</artifactId>
                     <version>29.0-jre</version>
@@ -99,7 +88,7 @@ class FindDependenciesTest : RecipeTest {
               <version>1</version>
               
               <dependencies>
-                ~~(io.prometheus:simpleclient:0.9.0)~~><dependency>
+                <!--~~(io.prometheus:simpleclient:0.9.0)~~>--><dependency>
                     <groupId>io.micrometer</groupId>
                     <artifactId>micrometer-registry-prometheus</artifactId>
                     <version>1.6.3</version>

@@ -17,12 +17,12 @@ package org.openrewrite.java.format
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
-import org.openrewrite.RecipeTest
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.java.style.IntelliJ
 import org.openrewrite.style.NamedStyles
 
-interface SpacesTest : RecipeTest {
+interface SpacesTest : JavaRecipeTest {
     override val recipe: Recipe?
         get() = Spaces()
 

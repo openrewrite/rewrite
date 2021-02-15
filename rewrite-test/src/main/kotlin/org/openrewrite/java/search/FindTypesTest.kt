@@ -17,17 +17,12 @@ package org.openrewrite.java.search
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.RecipeTest
-import org.openrewrite.TreePrinter
 import org.openrewrite.java.JavaParser
-import org.openrewrite.marker.SearchResult
+import org.openrewrite.java.JavaRecipeTest
 
-interface FindTypesTest : RecipeTest {
+interface FindTypesTest : JavaRecipeTest {
     override val recipe: FindTypes
         get() = FindTypes("a.A1")
-
-    override val treePrinter: TreePrinter<*>?
-        get() = SearchResult.PRINTER
 
     companion object {
         private const val a1 = """
@@ -47,7 +42,7 @@ interface FindTypesTest : RecipeTest {
         """,
         after = """
             import a.A1;
-            public class B extends ~~>A1 {}
+            public class B extends /*~~>*/A1 {}
         """,
         dependsOn = arrayOf(a1)
     )
@@ -56,7 +51,7 @@ interface FindTypesTest : RecipeTest {
     fun fullyQualifiedName(jp: JavaParser) = assertChanged(
         jp,
         before = "public class B extends a.A1 {}",
-        after = "public class B extends ~~>a.A1 {}",
+        after = "public class B extends /*~~>*/a.A1 {}",
         dependsOn = arrayOf(a1)
     )
 
@@ -65,7 +60,7 @@ interface FindTypesTest : RecipeTest {
         jp,
         recipe = FindTypes("A1"),
         before = "@A1 public class B {}",
-        after = "@~~>A1 public class B {}",
+        after = "@/*~~>*/A1 public class B {}",
         dependsOn = arrayOf("public @interface A1 {}")
     )
 
@@ -81,7 +76,7 @@ interface FindTypesTest : RecipeTest {
         after = """
             import a.A1;
             public class B {
-               ~~>A1[] a = new ~~>A1[0];
+               /*~~>*/A1[] a = new /*~~>*/A1[0];
             }
         """,
         dependsOn = arrayOf(a1)
@@ -97,7 +92,7 @@ interface FindTypesTest : RecipeTest {
         """,
         after = """
             import a.A1;
-            public class B extends ~~>A1 implements ~~>I1 {}
+            public class B extends /*~~>*/A1 implements /*~~>*/I1 {}
         """,
         dependsOn = arrayOf(a1, "public interface I1 {}")
     )
@@ -114,7 +109,7 @@ interface FindTypesTest : RecipeTest {
         after = """
             import a.A1;
             public class B {
-               public ~~>A1 foo() throws ~~>A1 { return null; }
+               public /*~~>*/A1 foo() throws /*~~>*/A1 { return null; }
             }
         """,
         dependsOn = arrayOf(a1)
@@ -138,10 +133,10 @@ interface FindTypesTest : RecipeTest {
             import a.A1;
             import java.util.List;
             public class B {
-               public <T extends ~~>A1> T generic(T n, List<? super ~~>A1> in) { return null; }
+               public <T extends /*~~>*/A1> T generic(T n, List<? super /*~~>*/A1> in) { return null; }
                public void test() {
-                   ~~>A1.stat();
-                   this.<~~>A1>generic(null, null);
+                   /*~~>*/A1.stat();
+                   this.</*~~>*/A1>generic(null, null);
                }
             }
         """,
@@ -165,7 +160,7 @@ interface FindTypesTest : RecipeTest {
             public class B {
                public void test() {
                    try {}
-                   catch(~~>A1 | RuntimeException e) {}
+                   catch(/*~~>*/A1 | RuntimeException e) {}
                }
             }
         """,
@@ -184,7 +179,7 @@ interface FindTypesTest : RecipeTest {
         after = """
             import a.A1;
             public class B {
-               ~~>A1 f1, f2;
+               /*~~>*/A1 f1, f2;
             }
         """,
         dependsOn = arrayOf(a1)
@@ -202,7 +197,7 @@ interface FindTypesTest : RecipeTest {
         after = """
             import a.A1;
             public class B {
-               ~~>A1 a = new ~~>A1();
+               /*~~>*/A1 a = new /*~~>*/A1();
             }
         """,
         dependsOn = arrayOf(a1)
@@ -222,7 +217,7 @@ interface FindTypesTest : RecipeTest {
             import a.A1;
             import java.util.Map;
             public class B {
-               Map<~~>A1, ~~>A1> m;
+               Map</*~~>*/A1, /*~~>*/A1> m;
             }
         """,
         dependsOn = arrayOf(a1)
@@ -240,7 +235,7 @@ interface FindTypesTest : RecipeTest {
         after = """
             import a.A1;
             public class B {
-               ~~>A1 a = (~~>A1) null;
+               /*~~>*/A1 a = (/*~~>*/A1) null;
             }
         """,
         dependsOn = arrayOf(a1)
@@ -258,7 +253,7 @@ interface FindTypesTest : RecipeTest {
             after = """
                 import a.A1;
                 class B {
-                    Class<?> clazz = ~~>A1.class;
+                    Class<?> clazz = /*~~>*/A1.class;
                 }
             """,
             dependsOn = arrayOf(a1)

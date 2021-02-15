@@ -18,12 +18,12 @@ package org.openrewrite.java.format
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
-import org.openrewrite.RecipeTest
 import org.openrewrite.java.JavaIsoVisitor
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.java.tree.J
 
-interface NormalizeFormatTest : RecipeTest {
+interface NormalizeFormatTest : JavaRecipeTest {
     private val removeAnnotation: Recipe
         get() = object : JavaIsoVisitor<ExecutionContext>() {
             override fun visitAnnotation(annotation: J.Annotation, p: ExecutionContext): J.Annotation? = null

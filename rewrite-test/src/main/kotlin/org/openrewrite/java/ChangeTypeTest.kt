@@ -18,9 +18,8 @@ package org.openrewrite.java
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
-import org.openrewrite.RecipeTest
 
-interface ChangeTypeTest : RecipeTest {
+interface ChangeTypeTest : JavaRecipeTest {
     override val recipe: ChangeType
         get() = ChangeType("a.A1","a.A2")
 

@@ -17,16 +17,9 @@ package org.openrewrite.maven
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
-import org.openrewrite.RecipeTest
-import org.openrewrite.maven.cache.InMemoryMavenPomCache
 import org.openrewrite.maven.tree.Maven
 
-class AddDependencyTest : RecipeTest {
-    companion object {
-        private val mavenCache = InMemoryMavenPomCache()
-    }
-
+class AddDependencyTest : MavenRecipeTest {
     override val recipe: AddDependency
         get() = AddDependency(
             "org.springframework.boot",
@@ -35,12 +28,6 @@ class AddDependencyTest : RecipeTest {
         ).apply {
             isSkipIfPresent = false
         }
-
-    override val parser: Parser<*>?
-        get() = MavenParser.builder()
-            .resolveOptional(false)
-            .cache(mavenCache)
-            .build()
 
     @Test
     fun addToExistingDependencies() = assertChanged(

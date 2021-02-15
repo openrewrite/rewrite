@@ -16,86 +16,74 @@
 package org.openrewrite.xml.search
 
 import org.assertj.core.api.Assertions.assertThat
+import org.intellij.lang.annotations.Language
 import org.junit.jupiter.api.Test
-import org.openrewrite.RecipeTest
-import org.openrewrite.TreePrinter
-import org.openrewrite.marker.SearchResult
-import org.openrewrite.xml.XmlParser
+import org.openrewrite.xml.XmlRecipeTest
 
-class FindTagsTest : RecipeTest {
-    override val parser = XmlParser.builder().build()
-
-    override val treePrinter: TreePrinter<*>?
-        get() = SearchResult.PRINTER
+class FindTagsTest : XmlRecipeTest {
 
     @Test
     fun simpleElement() = assertChanged(
-            parser,
-            FindTags("/dependencies/dependency"),
-            before = """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <dependencies>
-                    <dependency>
-                        <artifactId scope="compile">org.openrewrite</artifactId>
-                    </dependency>
+        parser,
+        FindTags("/dependencies/dependency"),
+        before = """
+            <dependencies>
+                <dependency>
+                    <artifactId scope="compile">org.openrewrite</artifactId>
                 </dependency>
-            """,
-            after = """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <dependencies>
-                    ~~><dependency>
-                        <artifactId scope="compile">org.openrewrite</artifactId>
-                    </dependency>
+            </dependencies>
+        """,
+        after = """
+            <dependencies>
+                <!--~~>--><dependency>
+                    <artifactId scope="compile">org.openrewrite</artifactId>
                 </dependency>
-            """
+            </dependencies>
+        """
     )
 
     @Test
     fun wildcard() = assertChanged(
-            parser,
-            FindTags("/dependencies/*"),
-            before = """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <dependencies>
-                    <dependency>
-                        <artifactId scope="compile">org.openrewrite</artifactId>
-                    </dependency>
+        parser,
+        FindTags("/dependencies/*"),
+        before = """
+            <dependencies>
+                <dependency>
+                    <artifactId scope="compile">org.openrewrite</artifactId>
                 </dependency>
-            """,
-            after = """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <dependencies>
-                    ~~><dependency>
-                        <artifactId scope="compile">org.openrewrite</artifactId>
-                    </dependency>
+            </dependencies>
+        """,
+        after = """
+            <dependencies>
+                <!--~~>--><dependency>
+                    <artifactId scope="compile">org.openrewrite</artifactId>
                 </dependency>
-            """
+            </dependencies>
+        """
     )
 
     @Test
     fun noMatch() = assertUnchanged(
-            parser,
-            FindTags("/dependencies/dne"),
-            before = """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <dependencies>
-                    <dependency>
-                        <artifactId scope="compile">org.openrewrite</artifactId>
-                    </dependency>
+        parser,
+        FindTags("/dependencies/dne"),
+        before = """
+            <dependencies>
+                <dependency>
+                    <artifactId scope="compile">org.openrewrite</artifactId>
                 </dependency>
-            """
+            </dependencies>
+        """
     )
 
     @Test
     fun staticFind() {
-        val before = """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <dependencies>
-                    <dependency>
-                        <artifactId scope="compile">org.openrewrite</artifactId>
-                    </dependency>
+        @Language("xml") val before = """
+            <dependencies>
+                <dependency>
+                    <artifactId scope="compile">org.openrewrite</artifactId>
                 </dependency>
-            """
+            </dependencies>
+        """
         val source = parser.parse(*(arrayOf(before.trimIndent()))).iterator().next()
         val matchingTags = FindTags.find(source, "/dependencies/dependency")
         assertThat(matchingTags).isNotNull.isNotEmpty

@@ -17,10 +17,10 @@ package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
-import org.openrewrite.RecipeTest
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaRecipeTest
 
-interface CovariantEqualsTest : RecipeTest {
+interface CovariantEqualsTest : JavaRecipeTest {
     override val recipe: Recipe?
         get() = CovariantEquals()
 

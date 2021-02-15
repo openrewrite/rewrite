@@ -17,18 +17,19 @@ package org.openrewrite.properties
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.RecipeTest
 
-class ChangePropertyValueTest : RecipeTest {
+class ChangePropertyValueTest : PropertiesRecipeTest {
 
-    override val recipe = ChangePropertyValue("management.metrics.binders.files.enabled",
-        "false")
+    override val recipe = ChangePropertyValue(
+        "management.metrics.binders.files.enabled",
+        "false"
+    )
 
     @Test
     fun changeValue() = assertChanged(
-            parser = PropertiesParser.builder().build(),
-            before = "management.metrics.binders.files.enabled=true",
-            after = "management.metrics.binders.files.enabled=false"
+        parser = PropertiesParser.builder().build(),
+        before = "management.metrics.binders.files.enabled=true",
+        after = "management.metrics.binders.files.enabled=false"
     )
 
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")

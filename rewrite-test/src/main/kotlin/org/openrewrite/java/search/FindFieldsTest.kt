@@ -17,14 +17,12 @@ package org.openrewrite.java.search
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.RecipeTest
 import org.openrewrite.TreePrinter
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.marker.SearchResult
 
-interface FindFieldsTest : RecipeTest {
-    override val treePrinter: TreePrinter<*>?
-        get() = SearchResult.PRINTER
+interface FindFieldsTest : JavaRecipeTest {
 
     @Test
     fun findPrivateNonInheritedField(jp: JavaParser) = assertChanged(
@@ -40,7 +38,7 @@ interface FindFieldsTest : RecipeTest {
         after = """
             import java.util.*;
             public class A {
-               ~~>private List list;
+               /*~~>*/private List list;
                private Set set;
             }
         """,
@@ -59,7 +57,7 @@ interface FindFieldsTest : RecipeTest {
         after = """
             import java.util.*;
             public class A {
-               ~~>private String[] s;
+               /*~~>*/private String[] s;
             }
         """,
     )
@@ -81,7 +79,7 @@ interface FindFieldsTest : RecipeTest {
         after = """
             import java.io.*;
             public class A {
-                ~~>File f;
+                /*~~>*/File f;
                 public void test() {
                     try(FileInputStream fis = new FileInputStream(f)) {}
                     catch(FileNotFoundException | RuntimeException e) {}

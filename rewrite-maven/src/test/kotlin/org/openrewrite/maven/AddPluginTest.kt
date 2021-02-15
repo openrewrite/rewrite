@@ -17,17 +17,9 @@ package org.openrewrite.maven
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
 import org.openrewrite.Recipe
-import org.openrewrite.RecipeTest
-import org.openrewrite.maven.tree.Maven
 
-class AddPluginTest : RecipeTest {
-    override val parser: Parser<Maven>
-        get() = MavenParser.builder()
-            .resolveOptional(false)
-            .build()
-
+class AddPluginTest : MavenRecipeTest {
     override val recipe: Recipe
         get() = AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", "100.0")
 
@@ -119,7 +111,7 @@ class AddPluginTest : RecipeTest {
         assertThat(valid.failures()[0].property).isEqualTo("artifactId")
         assertThat(valid.failures()[1].property).isEqualTo("version")
 
-        recipe = AddPlugin("org.openrewrite", "rewrite-maven","1.0.0")
+        recipe = AddPlugin("org.openrewrite", "rewrite-maven", "1.0.0")
         valid = recipe.validate()
         assertThat(valid.isValid).isTrue()
     }

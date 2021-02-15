@@ -16,12 +16,13 @@
 package org.openrewrite.maven.internal
 
 import org.assertj.core.api.Assertions.assertThat
+import org.intellij.lang.annotations.Language
 import org.junit.jupiter.api.Test
 
 class MavenMetadataTest {
     @Test
     fun deserializeMetadata() {
-        val metadata = """
+        @Language("xml") val metadata = """
             <metadata>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot</artifactId>

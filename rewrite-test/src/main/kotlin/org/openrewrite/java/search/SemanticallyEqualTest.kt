@@ -39,25 +39,25 @@ interface SemanticallyEqualTest {
     @Test
     fun tagAnnotationEquality(jp: JavaParser) {
         val cu = jp.parse(
-                """
+            """
                 @Tag(FastTests.class)
                 @Tag(FastTests.class)
                 @Tag(SlowTests.class)
                 class A {}
             """,
-                """
+            """
                 @interface Tags {
                     Tag[] value();
                 }
             """,
-                """
+            """
                 @java.lang.annotation.Repeatable(Tags.class)
                 @interface Tag {
                     Class value();
                 }
             """,
-                "public interface FastTests {}",
-                "public interface SlowTests {}"
+            "public interface FastTests {}",
+            "public interface SlowTests {}"
         )
 
         val fastTest = cu[0].classes[0].annotations[0]
@@ -71,11 +71,11 @@ interface SemanticallyEqualTest {
     @Test
     fun annotationEquality(jp: JavaParser) {
         val cu = jp.parse(
-                """
+            """
                 @MyAnnotation(value = true, srcValue = "true")
                 class A {}
             """,
-                annotInterface
+            annotInterface
         )
 
         val firstAnnot = cu[0].classes[0].annotations[0]
@@ -83,11 +83,11 @@ interface SemanticallyEqualTest {
         jp.reset()
 
         val secondAnnot = jp.parse(
-                """
+            """
                 @MyAnnotation(value = true, srcValue = "true")
                 class B {}
             """,
-                annotInterface
+            annotInterface
         )[0].classes[0].annotations[0]
 
         assertThat(SemanticallyEqual.areEqual(firstAnnot, secondAnnot)).isTrue()
@@ -96,27 +96,27 @@ interface SemanticallyEqualTest {
     @Test
     fun identEquality(jp: JavaParser) {
         val cu = jp.parse(
-                """
+            """
                 @MyAnnotation(value = true)
                 class A {}
             """,
-                "@interface MyAnnotation { boolean value(); }"
+            "@interface MyAnnotation { boolean value(); }"
         )
 
         val firstIdent = cu[0].classes[0].annotations[0].annotationType
         val secondIdent = J.Identifier.build(
-                randomId(),
-                Space.EMPTY,
-                Markers.EMPTY,
-                "MyAnnotation",
-                JavaType.buildType("MyAnnotation")
+            randomId(),
+            Space.EMPTY,
+            Markers.EMPTY,
+            "MyAnnotation",
+            JavaType.buildType("MyAnnotation")
         )
         val thirdIdent = J.Identifier.build(
-                randomId(),
-                Space.EMPTY,
-                Markers.EMPTY,
-                "YourAnnotation",
-                JavaType.buildType("YourAnnotation")
+            randomId(),
+            Space.EMPTY,
+            Markers.EMPTY,
+            "YourAnnotation",
+            JavaType.buildType("YourAnnotation")
         )
 
         assertThat(SemanticallyEqual.areEqual(firstIdent, secondIdent)).isTrue()
@@ -127,143 +127,143 @@ interface SemanticallyEqualTest {
     @Test
     fun fieldAccessEquality(jp: JavaParser) {
         val cu = jp.parse(
-                """
+            """
                 @Category(FastTest.class)
                 @Category(SlowTest.class)
                 class A {
                 }
             """,
-                """
+            """
                 @interface Categories {
                     Category[] value();
                 }
             """,
-                """
+            """
                 @java.lang.annotation.Repeatable(Categories.class)
                 @interface Category {
                     Class value();
                 }
             """,
-                "class FastTest {}",
-                "class SlowTest {}"
+            "class FastTest {}",
+            "class SlowTest {}"
         )
 
         val firstFieldAccess = cu[0].classes[0].annotations[0].arguments!!.first()
         val secondFieldAccess = J.FieldAccess(
+            randomId(),
+            Space.EMPTY,
+            Markers.EMPTY,
+            J.Identifier.build(
                 randomId(),
                 Space.EMPTY,
                 Markers.EMPTY,
+                "FastTest",
+                JavaType.Class.build("FastTest")
+            ),
+            JLeftPadded(
+                Space.EMPTY,
                 J.Identifier.build(
-                        randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY,
-                        "FastTest",
-                        JavaType.Class.build("FastTest")
+                    randomId(),
+                    Space.EMPTY,
+                    Markers.EMPTY,
+                    "class",
+                    null
                 ),
-                JLeftPadded(
-                        Space.EMPTY,
-                        J.Identifier.build(
-                                randomId(),
-                                Space.EMPTY,
-                                Markers.EMPTY,
-                                "class",
-                                null
-                        ),
-                        Markers.EMPTY
-                ),
-                JavaType.Class.build("java.lang.Class")
+                Markers.EMPTY
+            ),
+            JavaType.Class.build("java.lang.Class")
         )
         val thirdFieldAccess = cu[0].classes[0].annotations[1].arguments!!.first()
 
         assertThat(
-                SemanticallyEqual
-                        .areEqual(
-                                firstFieldAccess,
-                                secondFieldAccess
-                        )
+            SemanticallyEqual
+                .areEqual(
+                    firstFieldAccess,
+                    secondFieldAccess
+                )
         ).isTrue()
 
         assertThat(
-                SemanticallyEqual
-                        .areEqual(
-                                firstFieldAccess,
-                                thirdFieldAccess
-                        )
+            SemanticallyEqual
+                .areEqual(
+                    firstFieldAccess,
+                    thirdFieldAccess
+                )
         ).isFalse()
     }
 
     @Test
     fun assignEquality(jp: JavaParser) {
         val cu = jp.parse(
-                """
+            """
                 @MyAnnotation(value = true)
                 class A {}
             """,
-                "@interface MyAnnotation { boolean value(); }"
+            "@interface MyAnnotation { boolean value(); }"
         )
 
         val firstAssign = cu[0].classes[0].annotations[0].arguments!!.first()
         val secondAssign = J.Assignment(
+            randomId(),
+            Space.EMPTY,
+            Markers.EMPTY,
+            J.Identifier.build(
                 randomId(),
                 Space.EMPTY,
                 Markers.EMPTY,
-                J.Identifier.build(
-                        randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY,
-                        "value",
-                        null
+                "value",
+                null
+            ),
+            JLeftPadded(
+                Space.format(" "),
+                J.Literal(
+                    randomId(),
+                    Space.format(" "),
+                    Markers.EMPTY,
+                    true,
+                    "true",
+                    JavaType.Primitive.Boolean
                 ),
-                JLeftPadded(
-                        Space.format(" "),
-                        J.Literal(
-                                randomId(),
-                                Space.format(" "),
-                                Markers.EMPTY,
-                                true,
-                                "true",
-                                JavaType.Primitive.Boolean
-                        ),
-                        Markers.EMPTY
-                ),
-                JavaType.Primitive.Boolean
+                Markers.EMPTY
+            ),
+            JavaType.Primitive.Boolean
         )
         val thirdAssign = secondAssign.withVariable(
-                (secondAssign.variable as J.Identifier).withName("otherValue")
+            (secondAssign.variable as J.Identifier).withName("otherValue")
         )
         val fourthAssign = secondAssign.withAssignment(
-                (secondAssign.assignment as J.Literal).withValue(false)
+            (secondAssign.assignment as J.Literal).withValue(false)
         )
 
         assertThat(
-                SemanticallyEqual
-                        .areEqual(
-                                firstAssign,
-                                secondAssign
-                        )
+            SemanticallyEqual
+                .areEqual(
+                    firstAssign,
+                    secondAssign
+                )
         ).isTrue()
 
         assertThat(
-                SemanticallyEqual
-                        .areEqual(
-                                firstAssign,
-                                thirdAssign
-                        )
+            SemanticallyEqual
+                .areEqual(
+                    firstAssign,
+                    thirdAssign
+                )
         ).isFalse()
 
         assertThat(
-                SemanticallyEqual
-                        .areEqual(
-                                firstAssign,
-                                fourthAssign
-                        )
+            SemanticallyEqual
+                .areEqual(
+                    firstAssign,
+                    fourthAssign
+                )
         ).isFalse()
     }
 
     @Test
     fun literalEquality(jp: JavaParser) {
         val cu = jp.parse(
-                """
+            """
                 class A {
                     int i = 0;
                     String str = "thisString";
@@ -277,88 +277,88 @@ interface SemanticallyEqualTest {
         val nullLiteral = (cu[0].classes[0].body.statements[2] as J.VariableDeclarations).variables[0].initializer
 
         assertThat(
-                SemanticallyEqual
-                        .areEqual(
-                                intLiteral,
-                                J.Literal(
-                                        randomId(),
-                                        Space.EMPTY,
-                                        Markers.EMPTY,
-                                        0,
-                                        "0",
-                                        JavaType.Primitive.Int
-                                )
-                        )
+            SemanticallyEqual
+                .areEqual(
+                    intLiteral,
+                    J.Literal(
+                        randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        0,
+                        "0",
+                        JavaType.Primitive.Int
+                    )
+                )
         ).isTrue()
 
         assertThat(
-                SemanticallyEqual
-                        .areEqual(
-                                strLiteral,
-                                J.Literal(
-                                        randomId(),
-                                        Space.EMPTY,
-                                        Markers.EMPTY,
-                                        "thisString",
-                                        "thisString",
-                                        JavaType.Primitive.String
-                                )
-                        )
+            SemanticallyEqual
+                .areEqual(
+                    strLiteral,
+                    J.Literal(
+                        randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        "thisString",
+                        "thisString",
+                        JavaType.Primitive.String
+                    )
+                )
         ).isTrue()
 
         assertThat(
-                SemanticallyEqual
-                        .areEqual(
-                                nullLiteral,
-                                J.Literal(
-                                        randomId(),
-                                        Space.EMPTY,
-                                        Markers.EMPTY,
-                                        null,
-                                        "null",
-                                        JavaType.Primitive.String
-                                )
-                        )
+            SemanticallyEqual
+                .areEqual(
+                    nullLiteral,
+                    J.Literal(
+                        randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        null,
+                        "null",
+                        JavaType.Primitive.String
+                    )
+                )
         ).isTrue()
 
         assertThat(
-                SemanticallyEqual
-                        .areEqual(
-                                strLiteral,
-                                J.Literal(
-                                        randomId(),
-                                        Space.EMPTY,
-                                        Markers.EMPTY,
-                                        0,
-                                        "0",
-                                        JavaType.Primitive.Int
-                                )
-                        )
+            SemanticallyEqual
+                .areEqual(
+                    strLiteral,
+                    J.Literal(
+                        randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        0,
+                        "0",
+                        JavaType.Primitive.Int
+                    )
+                )
         ).isFalse()
     }
 
     @Test
     fun typeEqualityDependsOnlyOnFqn(jp: JavaParser) {
         val nameA = J.Identifier.build(
-                randomId(),
-                Space.EMPTY,
-                Markers.EMPTY,
-                "name",
-                JavaType.Class.build("org.foo.Bar")
+            randomId(),
+            Space.EMPTY,
+            Markers.EMPTY,
+            "name",
+            JavaType.Class.build("org.foo.Bar")
         )
         val nameB = J.Identifier.build(
-                randomId(),
-                Space.EMPTY,
-                Markers.EMPTY,
-                "name",
-                JavaType.Class.build(
-                        "org.foo.Bar",
-                        listOf(),
-                        listOf(),
-                        listOf(JavaType.Class.build("org.foo.Baz")),
-                        listOf(),
-                        null
-                )
+            randomId(),
+            Space.EMPTY,
+            Markers.EMPTY,
+            "name",
+            JavaType.Class.build(
+                "org.foo.Bar",
+                listOf(),
+                listOf(),
+                listOf(JavaType.Class.build("org.foo.Baz")),
+                listOf(),
+                null
+            )
         )
 
         assertThat(SemanticallyEqual.areEqual(nameA, nameB)).isTrue()

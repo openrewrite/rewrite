@@ -17,12 +17,13 @@ package org.openrewrite.properties
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.RecipeTest
 
-class ChangePropertyKeyTest : RecipeTest {
+class ChangePropertyKeyTest : PropertiesRecipeTest {
 
-    override val recipe = ChangePropertyKey("management.metrics.binders.files.enabled",
-        "management.metrics.enable.process.files")
+    override val recipe = ChangePropertyKey(
+        "management.metrics.binders.files.enabled",
+        "management.metrics.enable.process.files"
+    )
 
     @Test
     fun changeKey() = assertChanged(
@@ -53,7 +54,8 @@ class ChangePropertyKeyTest : RecipeTest {
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("newPropertyKey")
 
-        recipe = ChangePropertyKey("management.metrics.binders.files.enabled", "management.metrics.enable.process.files")
+        recipe =
+            ChangePropertyKey("management.metrics.binders.files.enabled", "management.metrics.enable.process.files")
         valid = recipe.validate()
         assertThat(valid.isValid).isTrue()
     }

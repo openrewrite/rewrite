@@ -18,13 +18,13 @@ package org.openrewrite.java.format
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
-import org.openrewrite.RecipeTest
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.java.style.BlankLinesStyle
 import org.openrewrite.java.style.IntelliJ
 import org.openrewrite.style.NamedStyles
 
-interface BlankLinesTest : RecipeTest {
+interface BlankLinesTest : JavaRecipeTest {
     override val recipe: Recipe?
         get() = BlankLines()
 
