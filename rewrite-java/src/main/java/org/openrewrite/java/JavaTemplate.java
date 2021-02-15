@@ -197,7 +197,7 @@ public class JavaTemplate {
                 } else if (typeName.endsWith(";") || typeName.endsWith("\n")) {
                     throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include a suffixed terminator");
                 }
-                this.imports.add("static import " + typeName + ";\n");
+                this.imports.add("import static " + typeName + ";\n");
             }
             return this;
         }
