@@ -62,12 +62,12 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
             scanYaml(new ClassGraph()
                     .ignoreParentClassLoaders()
-                    .overrideClasspath(classpathLoader)
+                    .overrideClassLoaders(classpathLoader)
                     .acceptPaths("META-INF/rewrite"), properties);
 
             scanClasses(new ClassGraph()
                     .ignoreParentClassLoaders()
-                    .overrideClasspath(classpathLoader), acceptPackages);
+                    .overrideClassLoaders(classpathLoader), acceptPackages);
         }
     }
 
