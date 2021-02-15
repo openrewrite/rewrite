@@ -15,7 +15,8 @@
  */
 package org.openrewrite.maven.cache;
 
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.tree.Pom;
@@ -28,9 +29,17 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.function.Consumer;
 
-@Data
+@EqualsAndHashCode
+@ToString
 public class LocalMavenArtifactCache implements MavenArtifactCache {
     private final Path cache;
+
+    public LocalMavenArtifactCache(Path cache) {
+        if(!cache.toFile().exists() && !cache.toFile().mkdirs()) {
+            throw new IllegalStateException("Unable to find or create maven artifact cache at " + cache);
+        }
+        this.cache = cache;
+    }
 
     @Override
     @Nullable
@@ -69,7 +78,8 @@ public class LocalMavenArtifactCache implements MavenArtifactCache {
         return cache.resolve(Paths.get(dependency.getGroupId().replace('.', '/'),
                 dependency.getArtifactId(),
                 dependency.getVersion(),
-                dependency.getArtifactId() + "-" + dependency.getVersion() +
+                dependency.getArtifactId() + "-" +
+                        (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
                         (dependency.getClassifier() == null ? "" : dependency.getClassifier()) +
                         ".jar"));
     }

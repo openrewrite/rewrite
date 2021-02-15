@@ -29,6 +29,7 @@ import org.openrewrite.yaml.YamlParser;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -61,18 +62,18 @@ public class MavenProjectParser {
                     javaParserBuilder
                             .classpath(downloadArtifacts(maven.getModel().getDependencies(Scope.Compile)))
                             .build()
-                            .parse(maven.getJavaSources(ctx), projectDirectory, ctx)
+                            .parse(maven.getJavaSources(projectDirectory, ctx), projectDirectory, ctx)
             );
 
             sourceFiles.addAll(
                     javaParserBuilder
-                            .classpath(downloadArtifacts(maven.getModel().getDependencies(Scope.Test)))
+                    .classpath(downloadArtifacts(maven.getModel().getDependencies(Scope.Test)))
                             .build()
-                            .parse(maven.getTestJavaSources(ctx), projectDirectory, ctx)
+                            .parse(maven.getTestJavaSources(projectDirectory, ctx), projectDirectory, ctx)
             );
 
-            List<Path> resources = new ArrayList<>(maven.getResources(ctx));
-            resources.addAll(maven.getTestResources(ctx));
+            List<Path> resources = new ArrayList<>(maven.getResources(projectDirectory, ctx));
+            resources.addAll(maven.getTestResources(projectDirectory, ctx));
 
             sourceFiles.addAll(
                     XmlParser.builder().build().parse(
@@ -111,6 +112,7 @@ public class MavenProjectParser {
     private List<Path> downloadArtifacts(Set<Pom.Dependency> dependencies) {
         return dependencies.stream()
                 .map(artifactDownloader::downloadArtifact)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
 }

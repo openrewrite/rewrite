@@ -201,9 +201,8 @@ public class Pom implements Marker {
         return version;
     }
 
-    @Nullable
     public String getPackaging() {
-        return packaging;
+        return packaging == null ? "jar" : packaging;
     }
 
     @Nullable

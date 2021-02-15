@@ -19,6 +19,7 @@ import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Parser
 import org.openrewrite.java.JavaParser
 import org.openrewrite.maven.cache.LocalMavenArtifactCache
+import org.openrewrite.maven.cache.MapdbMavenPomCache
 import org.openrewrite.maven.cache.ReadOnlyLocalMavenArtifactCache
 import org.openrewrite.maven.internal.MavenParsingException
 import org.openrewrite.maven.utilities.MavenArtifactDownloader
@@ -53,14 +54,20 @@ object ParseMavenProjectOnDisk {
 
         val downloader = MavenArtifactDownloader(
             ReadOnlyLocalMavenArtifactCache.MAVEN_LOCAL.orElse(
-                LocalMavenArtifactCache(Paths.get(System.getProperty("user.home"), ".rewrite-cache"))
+                LocalMavenArtifactCache(Paths.get(System.getProperty("user.home"), ".rewrite-cache", "artifacts"))
             ),
             null,
             errorConsumer
         )
 
+        val pomCache = MapdbMavenPomCache(
+            Paths.get(System.getProperty("user.home"), ".rewrite-cache", "poms").toFile(),
+            null
+        )
+
         val mavenParserBuilder = MavenParser.builder()
             .doOnParse(onParse)
+            .cache(pomCache)
             .resolveOptional(false)
             .mavenConfig(projectDir.resolve(".mvn/maven.config"))
 

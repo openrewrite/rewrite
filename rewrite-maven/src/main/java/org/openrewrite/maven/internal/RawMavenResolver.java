@@ -285,7 +285,7 @@ public class RawMavenResolver {
                     versionSelection.get(effectiveScope).put(new GroupArtifact(groupId, artifactId), requestedVersion);
                     version = requestedVersion.resolve(downloader, partialMaven.getRepositories());
 
-                    if (version.contains("${")) {
+                    if (version == null || version.contains("${")) {
                         ctx.getOnError().accept(new MavenParsingException("Unable to download %s:%s:%s. Including POM is at %s",
                                 groupId, artifactId, version, rawMaven));
                         return null;
@@ -444,7 +444,7 @@ public class RawMavenResolver {
                                     optional,
                                     resolved,
                                     depTask.getRequestedVersion(),
-                                    rawMaven.getPom().getSnapshotVersion(),
+                                    depTask.getRawMaven().getPom().getSnapshotVersion(),
                                     depTask.getExclusions()
                             );
                         })
@@ -461,7 +461,8 @@ public class RawMavenResolver {
                         String conflictResolvedVersion = selectVersion(scope, groupId, artifactId, ancestorDep.getVersion())
                                 .resolve(downloader, task.getRepositories());
 
-                        if (!conflictResolvedVersion.equals(ancestorDep.getVersion())) {
+                        if (!ancestorDep.getVersion().equals(conflictResolvedVersion)) {
+                            assert conflictResolvedVersion != null;
                             RawMaven conflictResolvedRaw = downloader.download(groupId, artifactId, conflictResolvedVersion,
                                     null, null, task.getRepositories(), ctx);
 
@@ -480,7 +481,7 @@ public class RawMavenResolver {
                                         ancestorDep.isOptional(),
                                         conflictResolved,
                                         ancestorDep.getRequestedVersion(),
-                                        rawMaven.getPom().getSnapshotVersion(),
+                                        ancestorDep.getDatedSnapshotVersion(),
                                         ancestorDep.getExclusions()
                                 ));
                             }

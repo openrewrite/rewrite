@@ -57,6 +57,14 @@ public class MapdbMavenPomCache implements MavenPomCache {
     public MapdbMavenPomCache(@Nullable File workspace,
                               @Nullable Long maxCacheStoreSize) {
         if (workspace != null) {
+            if(!workspace.exists() && !workspace.mkdirs()) {
+                throw new IllegalStateException("Unable to find or create maven pom cache at " + workspace);
+            }
+
+            if(workspace.isDirectory()) {
+                workspace = new File(workspace, "db");
+            }
+
             DB localRepositoryDiskDb = DBMaker
                     .fileDB(workspace)
                     .fileMmapEnableIfSupported()

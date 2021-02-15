@@ -223,6 +223,7 @@ public class RequestedVersion {
         }
     }
 
+    @Nullable
     public String resolve(MavenPomDownloader downloader, Collection<MavenRepository> repositories) {
         String selectedVersion;
         if (isRange() || isDynamic()) {

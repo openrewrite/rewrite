@@ -65,39 +65,43 @@ public class Maven extends Xml.Document {
                 .collect(Collectors.toList());
     }
 
-    public List<Path> getJavaSources(ExecutionContext ctx) {
+    public List<Path> getJavaSources(Path projectDir, ExecutionContext ctx) {
         if (!"jar".equals(model.getPackaging())) {
             return emptyList();
         }
-        return getSources(getSourcePath().getParent().resolve(Paths.get("src", "main", "java")),
+        return getSources(projectDir.resolve(getSourcePath()).getParent().resolve(Paths.get("src", "main", "java")),
                 ctx, ".java");
     }
 
-    public List<Path> getTestJavaSources(ExecutionContext ctx) {
+    public List<Path> getTestJavaSources(Path projectDir, ExecutionContext ctx) {
         if (!"jar".equals(model.getPackaging())) {
             return emptyList();
         }
-        return getSources(getSourcePath().getParent().resolve(Paths.get("src", "test", "java")),
+        return getSources(projectDir.resolve(getSourcePath()).getParent().resolve(Paths.get("src", "test", "java")),
                 ctx, ".java");
     }
 
-    public List<Path> getResources(ExecutionContext ctx) {
+    public List<Path> getResources(Path projectDir, ExecutionContext ctx) {
         if (!"jar".equals(model.getPackaging())) {
             return emptyList();
         }
-        return getSources(getSourcePath().getParent().resolve(Paths.get("src", "main", "resources")),
+        return getSources(projectDir.resolve(getSourcePath()).getParent().resolve(Paths.get("src", "main", "resources")),
                 ctx, ".properties", ".xml", ".yml", ".yaml");
     }
 
-    public List<Path> getTestResources(ExecutionContext ctx) {
+    public List<Path> getTestResources(Path projectDir, ExecutionContext ctx) {
         if (!"jar".equals(model.getPackaging())) {
             return emptyList();
         }
-        return getSources(getSourcePath().getParent().resolve(Paths.get("src", "test", "resources")),
+        return getSources(projectDir.resolve(getSourcePath()).getParent().resolve(Paths.get("src", "test", "resources")),
                 ctx, ".properties", ".xml", ".yml", ".yaml");
     }
 
     private static List<Path> getSources(Path srcDir, ExecutionContext ctx, String... fileTypes) {
+        if(!srcDir.toFile().exists()) {
+            return emptyList();
+        }
+
         BiPredicate<Path, java.nio.file.attribute.BasicFileAttributes> predicate = (p, bfa) ->
                 bfa.isRegularFile() && Arrays.stream(fileTypes).anyMatch(type -> p.getFileName().toString().endsWith(type));
         try {

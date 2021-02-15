@@ -119,6 +119,6 @@ public class RawMaven {
 
     @Override
     public String toString() {
-        return "RawMaven{from=" + getSourceUri() + ",pom=" + pom + "}";
+        return "RawMaven{from=" + getSourceUri() + " / pom=" + pom + "}";
     }
 }
