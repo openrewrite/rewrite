@@ -38,9 +38,6 @@ public class RemoveUnusedImports extends Recipe {
     }
 
     private static class RemoveUnusedImportsVisitor extends JavaIsoVisitor<ExecutionContext> {
-        RemoveUnusedImportsVisitor() {
-            setCursoringOn();
-        }
 
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
@@ -118,9 +115,6 @@ public class RemoveUnusedImports extends Recipe {
         }
 
         private static class TypesByPackage extends JavaIsoVisitor<Map<String, Set<JavaType.Class>>> {
-            TypesByPackage() {
-                setCursoringOn();
-            }
 
             @Override
             public <N extends NameTree> N visitTypeName(N name, Map<String, Set<JavaType.Class>> ctx) {

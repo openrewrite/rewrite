@@ -29,7 +29,6 @@ public class RemoveContentVisitor<P> extends XmlVisitor<P> {
     public RemoveContentVisitor(Content tag, boolean removeEmptyAncestors) {
         this.scope = tag;
         this.removeEmptyAncestors = removeEmptyAncestors;
-        setCursoringOn();
     }
 
     @Override

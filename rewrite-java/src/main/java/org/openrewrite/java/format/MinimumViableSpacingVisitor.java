@@ -22,9 +22,6 @@ import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.Space;
 
 public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
-    public MinimumViableSpacingVisitor() {
-        setCursoringOn();
-    }
 
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {

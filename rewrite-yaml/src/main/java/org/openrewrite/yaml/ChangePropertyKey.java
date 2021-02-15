@@ -52,10 +52,6 @@ public class ChangePropertyKey extends Recipe {
 
     private class ChangePropertyKeyVisitor<P> extends YamlVisitor<P> {
 
-        public ChangePropertyKeyVisitor() {
-            setCursoringOn();
-        }
-
         @Override
         public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, P p) {
             Yaml.Mapping.Entry e = (Yaml.Mapping.Entry) super.visitMappingEntry(entry, p);
@@ -143,7 +139,6 @@ public class ChangePropertyKey extends Recipe {
 
         private DeletePropertyVisitor(Yaml.Mapping.Entry scope) {
             this.scope = scope;
-            setCursoringOn();
         }
 
         @Override

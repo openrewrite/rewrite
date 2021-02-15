@@ -23,7 +23,6 @@ public class UnwrapParentheses<P> extends JavaVisitor<P> {
 
     public UnwrapParentheses(J.Parentheses<?> scope) {
         this.scope = scope;
-        setCursoringOn();
     }
 
     @Override

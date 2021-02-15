@@ -71,9 +71,6 @@ class XPathMatcherTest {
         val matcher = XPathMatcher(xPath)
 
         return object : XmlVisitor<MutableList<Xml>>() {
-            init {
-                setCursoringOn()
-            }
 
             override fun visitTag(tag: Xml.Tag, p: MutableList<Xml>): Xml {
                 if (matcher.matches(cursor)) {

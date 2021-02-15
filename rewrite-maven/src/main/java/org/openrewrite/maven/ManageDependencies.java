@@ -83,7 +83,6 @@ public class ManageDependencies extends Recipe {
         private ManageDependenciesVisitor(Pattern groupPattern, @Nullable Pattern artifactPattern) {
             this.groupPattern = groupPattern;
             this.artifactPattern = artifactPattern;
-            setCursoringOn();
         }
 
         @Override
@@ -157,7 +156,6 @@ public class ManageDependencies extends Recipe {
                 this.groupId = groupId;
                 this.artifactId = artifactId;
                 this.version = version;
-                setCursoringOn();
             }
 
             @Override

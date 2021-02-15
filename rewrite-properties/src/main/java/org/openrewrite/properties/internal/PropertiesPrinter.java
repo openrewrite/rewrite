@@ -33,7 +33,6 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<P> {
 
     public PropertiesPrinter(TreePrinter<P> treePrinter) {
         this.treePrinter = treePrinter;
-        setCursoringOn();
     }
 
     @NonNull

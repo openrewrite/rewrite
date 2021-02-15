@@ -29,7 +29,6 @@ public class ChangeTagValueVisitor<P> extends XmlVisitor<P> {
     public ChangeTagValueVisitor(Xml.Tag scope, String value) {
         this.scope = scope;
         this.value = value;
-        setCursoringOn();
     }
 
     @Override

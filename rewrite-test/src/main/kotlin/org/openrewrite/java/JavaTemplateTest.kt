@@ -35,9 +35,6 @@ interface JavaTemplateTest : RecipeTest {
     fun addMethodAnnotationTest(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.classpath("junit-jupiter-api").build(),
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            init {
-                setCursoringOn()
-            }
 
             override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
                 val tagComp = Comparator<J.Annotation> { a1, a2 -> a1.simpleName.compareTo(a2.simpleName) }
@@ -90,10 +87,6 @@ interface JavaTemplateTest : RecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            init {
-                setCursoringOn()
-            }
-
             override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
                 val m = super.visitMethodInvocation(method, p)
                 return m.withTemplate(template, m.coordinates.replaceArguments())
@@ -129,10 +122,6 @@ interface JavaTemplateTest : RecipeTest {
                 .doAfterVariableSubstitution(logEvent)
                 .doBeforeParseTemplate(logEvent)
                 .build()
-
-            init {
-                setCursoringOn()
-            }
 
             override fun visitBlock(block: J.Block, p: ExecutionContext): J {
                 var b = super.visitBlock(block, p)
@@ -178,10 +167,6 @@ interface JavaTemplateTest : RecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            init {
-                setCursoringOn()
-            }
-
             override fun visitBlock(block: J.Block, p: ExecutionContext): J {
                 var b = super.visitBlock(block, p)
                 val parent = cursor.dropParentUntil { it is J }.getValue<J>()
@@ -225,10 +210,6 @@ interface JavaTemplateTest : RecipeTest {
             val template = template("others.add(#{});").doAfterVariableSubstitution(logEvent)
                 .doBeforeParseTemplate(logEvent)
                 .build()
-
-            init {
-                setCursoringOn()
-            }
 
             override fun visitBlock(block: J.Block, p: ExecutionContext): J {
                 var b = super.visitBlock(block, p)
@@ -277,10 +258,6 @@ interface JavaTemplateTest : RecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            init {
-                setCursoringOn()
-            }
-
             override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
                 var b = super.visitBlock(block, p)
                 val parent = cursor.dropParentUntil { it is J }.getValue<J>()
@@ -328,9 +305,6 @@ interface JavaTemplateTest : RecipeTest {
                 .doAfterVariableSubstitution(logEvent)
                 .doBeforeParseTemplate(logEvent)
                 .build()
-            init {
-                setCursoringOn()
-            }
             override fun visitClassDeclaration(clazz: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
                 val c = super.visitClassDeclaration(clazz, p)
                 return c.withTemplate(template, c.coordinates.replaceExtendsClause())
@@ -355,9 +329,6 @@ interface JavaTemplateTest : RecipeTest {
                 .doAfterVariableSubstitution(logEvent)
                 .doBeforeParseTemplate(logEvent)
                 .build()
-            init {
-                setCursoringOn()
-            }
             override fun visitClassDeclaration(clazz: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
                 val c = super.visitClassDeclaration(clazz, p)
                 return c.withTemplate(template, c.coordinates.replaceExtendsClause())
@@ -389,10 +360,6 @@ interface JavaTemplateTest : RecipeTest {
                         }
                     """
             ).doAfterVariableSubstitution(logEvent).doBeforeParseTemplate(logEvent).build()
-
-            init {
-                setCursoringOn()
-            }
 
             override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
                 var b = super.visitBlock(block, p)
@@ -440,10 +407,6 @@ interface JavaTemplateTest : RecipeTest {
                 .doAfterVariableSubstitution(logEvent)
                 .doBeforeParseTemplate(logEvent)
                 .build()
-
-            init {
-                setCursoringOn()
-            }
 
             override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J {
                 val m = super.visitMethodInvocation(method, p) as J.MethodInvocation
@@ -564,10 +527,6 @@ interface JavaTemplateTest : RecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            init {
-                setCursoringOn()
-            }
-
             override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
                 val m = super.visitMethodDeclaration(method, p)
                 return m.withTemplate(template, m.coordinates.replaceAnnotations())
@@ -597,10 +556,6 @@ interface JavaTemplateTest : RecipeTest {
                 .doAfterVariableSubstitution(logEvent)
                 .doBeforeParseTemplate(logEvent)
                 .build()
-
-            init {
-                setCursoringOn()
-            }
 
             override fun visitAnnotation(annotation: J.Annotation, p: ExecutionContext): J.Annotation {
                 val a = super.visitAnnotation(annotation, p)
@@ -632,10 +587,6 @@ interface JavaTemplateTest : RecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            init {
-                setCursoringOn()
-            }
-
             override fun visitClassDeclaration(clazz: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
                 val c = super.visitClassDeclaration(clazz, p)
                 return c.withTemplate(template, c.coordinates.replaceAnnotations())
@@ -664,10 +615,6 @@ interface JavaTemplateTest : RecipeTest {
                 .doAfterVariableSubstitution(logEvent)
                 .doBeforeParseTemplate(logEvent)
                 .build()
-
-            init {
-                setCursoringOn()
-            }
 
             override fun visitClassDeclaration(clazz: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
                 val c = super.visitClassDeclaration(clazz, p)
@@ -701,10 +648,6 @@ interface JavaTemplateTest : RecipeTest {
                 .doAfterVariableSubstitution(logEvent)
                 .doBeforeParseTemplate(logEvent)
                 .build()
-
-            init {
-                setCursoringOn()
-            }
 
             override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
                 var b = super.visitBlock(block, p)
@@ -763,10 +706,6 @@ interface JavaTemplateTest : RecipeTest {
                 .doAfterVariableSubstitution(logEvent)
                 .doBeforeParseTemplate(logEvent)
                 .build()
-
-            init {
-                setCursoringOn()
-            }
 
             override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
                 var b = super.visitBlock(block, p)
@@ -854,10 +793,6 @@ interface JavaTemplateTest : RecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            init {
-                setCursoringOn()
-            }
-
             override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
                 var cd = super.visitClassDeclaration(classDecl, p)
                 val helloMethodExists = cd.body.statements.asSequence()
@@ -906,10 +841,6 @@ interface JavaTemplateTest : RecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            init {
-                setCursoringOn()
-            }
-
             override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
                 val c = super.visitClassDeclaration(classDecl, p)
                 return c.withTemplate(template, c.coordinates.replaceTypeParameters())
@@ -937,10 +868,6 @@ interface JavaTemplateTest : RecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            init {
-                setCursoringOn()
-            }
-
             override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
                 val c = super.visitClassDeclaration(classDecl, p)
                 return c.withTemplate(template, c.coordinates.replaceExtendsClause())
@@ -967,10 +894,6 @@ interface JavaTemplateTest : RecipeTest {
             val template = template("implements List<String>").doAfterVariableSubstitution(logEvent)
                 .doBeforeParseTemplate(logEvent)
                 .build()
-
-            init {
-                setCursoringOn()
-            }
 
             override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
                 val c = super.visitClassDeclaration(classDecl, p)
@@ -1004,10 +927,6 @@ interface JavaTemplateTest : RecipeTest {
                     """
             ).doAfterVariableSubstitution(logEvent).doBeforeParseTemplate(logEvent).build()
 
-            init {
-                setCursoringOn()
-            }
-
             override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
                 val c = super.visitClassDeclaration(classDecl, p)
                 return c.withTemplate(template, c.coordinates.replaceBody())
@@ -1035,10 +954,6 @@ interface JavaTemplateTest : RecipeTest {
                 .doAfterVariableSubstitution(logEvent)
                 .doBeforeParseTemplate(logEvent)
                 .build()
-
-            init {
-                setCursoringOn()
-            }
 
             override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
                 val m = super.visitMethodDeclaration(method, p)
@@ -1068,10 +983,6 @@ interface JavaTemplateTest : RecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            init {
-                setCursoringOn()
-            }
-
             override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
                 val m = super.visitMethodDeclaration(method, p)
                 return m.withTemplate(template, m.coordinates.replaceParameters())
@@ -1100,10 +1011,6 @@ interface JavaTemplateTest : RecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            init {
-                setCursoringOn()
-            }
-
             override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
                 val m = super.visitMethodDeclaration(method, p)
                 return m.withTemplate(template, m.coordinates.replaceThrows())
@@ -1131,10 +1038,6 @@ interface JavaTemplateTest : RecipeTest {
                 .doAfterVariableSubstitution(logEvent)
                 .doBeforeParseTemplate(logEvent)
                 .build()
-
-            init {
-                setCursoringOn()
-            }
 
             override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
                 val m = super.visitMethodInvocation(method, p)

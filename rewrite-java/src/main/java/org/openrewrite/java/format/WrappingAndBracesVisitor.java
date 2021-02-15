@@ -32,7 +32,6 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
 
     public WrappingAndBracesVisitor(WrappingAndBracesStyle style) {
         this.style = style;
-        setCursoringOn();
     }
 
     @Override

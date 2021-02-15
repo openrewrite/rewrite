@@ -88,7 +88,6 @@ public class UpgradeDependencyVersion extends Recipe {
         public UpgradeDependencyVersionVisitor() {
             //noinspection ConstantConditions
             versionComparator = Semver.validate(newVersion, versionPattern).getValue();
-            setCursoringOn();
         }
 
         @Override

@@ -37,7 +37,7 @@ interface RenameVariableTest : RecipeTest {
                 }
                 return super.visitVariableDeclarations(multiVariable, p)
             }
-        }.toRecipe(cursored = true),
+        }.toRecipe(),
         before = """
             public class B {
                int n;

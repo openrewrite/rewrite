@@ -53,7 +53,6 @@ public class ChangeMethodName extends Recipe {
 
         private ChangeMethodNameVisitor(MethodMatcher methodMatcher) {
             this.methodMatcher = methodMatcher;
-            setCursoringOn();
         }
 
         @Override

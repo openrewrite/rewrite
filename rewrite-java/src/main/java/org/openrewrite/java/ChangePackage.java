@@ -40,9 +40,6 @@ public class ChangePackage extends Recipe {
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
-            {
-                setCursoringOn();
-            }
 
             final JavaTemplate newPackageExpr = template("package " + newFullyQualifiedPackageName)
                     .build();

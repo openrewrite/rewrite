@@ -32,7 +32,6 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
 
     public UnnecessaryParenthesesVisitor(UnnecessaryParenthesesStyle style) {
         this.style = style;
-        setCursoringOn();
     }
 
     @Override

@@ -49,7 +49,6 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
         this.coordinates = coordinates;
         this.changing = changing;
         this.imports = imports;
-        setCursoringOn();
     }
 
     @Override
@@ -350,7 +349,6 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
 
         private ExtractInsertionCursor(JavaCoordinates coordinates, Cursor parent) {
             insertionId = coordinates.getTree().getId();
-            setCursoringOn();
             setCursor(parent);
         }
 

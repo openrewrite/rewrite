@@ -34,10 +34,6 @@ import java.util.stream.Collectors;
 public class SimplifyBooleanReturnVisitor<P> extends JavaVisitor<P> {
     private final JavaTemplate notIfConditionReturn = template("return !(#{});").build();
 
-    public SimplifyBooleanReturnVisitor() {
-        setCursoringOn();
-    }
-
     @Override
     public J visitIf(J.If iff, P p) {
         J.If i = visitAndCast(iff, p, super::visitIf);

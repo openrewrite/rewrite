@@ -38,9 +38,6 @@ public class FindProperties extends Recipe {
         Pattern propertyMatcher = Pattern.compile(propertyPattern.replace(".", "\\.")
                 .replace("*", ".*"));
         return new MavenVisitor() {
-            {
-                setCursoringOn();
-            }
 
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext context) {

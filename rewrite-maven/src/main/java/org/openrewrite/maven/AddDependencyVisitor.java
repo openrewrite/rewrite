@@ -146,9 +146,6 @@ public class AddDependencyVisitor extends MavenVisitor {
     }
 
     private class InsertDependencyInOrder extends MavenVisitor {
-        public InsertDependencyInOrder() {
-            setCursoringOn();
-        }
 
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {

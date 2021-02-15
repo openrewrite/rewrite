@@ -41,10 +41,6 @@ public class ChangeParentVersion extends Recipe {
 
     private class ChangeParentVersionVisitor extends MavenVisitor {
 
-        private ChangeParentVersionVisitor() {
-            setCursoringOn();
-        }
-
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (PARENT_VERSION_MATCHER.matches(getCursor())) {

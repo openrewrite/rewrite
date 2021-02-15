@@ -25,7 +25,6 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
     public RenameVariable(J.VariableDeclarations.NamedVariable variable, String toName) {
         this.variable = variable;
         this.toName = toName;
-        setCursoringOn();
     }
 
     @Override
@@ -42,7 +41,6 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
 
         public RenameVariableByCursor(Cursor scope) {
             this.scope = scope;
-            setCursoringOn();
         }
 
         @Override

@@ -42,10 +42,6 @@ public class RemoveDependency extends Recipe {
 
     private class RemoveDependencyVisitor extends MavenVisitor {
 
-        public RemoveDependencyVisitor() {
-            setCursoringOn();
-        }
-
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (isDependencyTag(groupId, artifactId)) {

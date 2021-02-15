@@ -33,7 +33,6 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
 
     public XmlPrinter(TreePrinter<P> treePrinter) {
         this.treePrinter = treePrinter;
-        setCursoringOn();
     }
 
     @NonNull

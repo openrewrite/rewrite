@@ -804,9 +804,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public <T> JRightPadded<T> visitRightPadded(JRightPadded<T> right, JRightPadded.Location loc, P p) {
-        if (cursored) {
-            setCursor(new Cursor(getCursor(), right));
-        }
+
+        setCursor(new Cursor(getCursor(), right));
 
         T t = right.getElement();
         if (t instanceof J) {
@@ -816,17 +815,13 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
         Space after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
 
-        if (cursored) {
-            setCursor(getCursor().getParent());
-        }
+        setCursor(getCursor().getParent());
 
         return (after == right.getAfter() && t == right.getElement()) ? right : new JRightPadded<>(t, after, right.getMarkers());
     }
 
     public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, JLeftPadded.Location loc, P p) {
-        if (cursored) {
-            setCursor(new Cursor(getCursor(), left));
-        }
+        setCursor(new Cursor(getCursor(), left));
 
         Space before = visitSpace(left.getBefore(), loc.getBeforeLocation(), p);
         T t = left.getElement();
@@ -836,25 +831,19 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             t = visitAndCast((J) left.getElement(), p);
         }
 
-        if (cursored) {
-            setCursor(getCursor().getParent());
-        }
+        setCursor(getCursor().getParent());
 
         return (before == left.getBefore() && t == left.getElement()) ? left : new JLeftPadded<>(before, t, left.getMarkers());
     }
 
     public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container,
                                                         JContainer.Location loc, P p) {
-        if (cursored) {
-            setCursor(new Cursor(getCursor(), container));
-        }
+        setCursor(new Cursor(getCursor(), container));
 
         Space before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
         List<JRightPadded<J2>> js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
 
-        if (cursored) {
-            setCursor(getCursor().getParent());
-        }
+        setCursor(getCursor().getParent());
 
         return js == container.getPadding().getElements() && before == container.getBefore() ?
                 container :

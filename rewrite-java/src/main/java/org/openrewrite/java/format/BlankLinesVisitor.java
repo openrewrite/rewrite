@@ -31,7 +31,6 @@ class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
 
     public BlankLinesVisitor(BlankLinesStyle style) {
         this.style = style;
-        setCursoringOn();
     }
 
     @Override

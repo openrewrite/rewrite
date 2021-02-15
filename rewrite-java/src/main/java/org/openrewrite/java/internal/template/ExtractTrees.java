@@ -73,9 +73,6 @@ public class ExtractTrees {
     }
 
     private static class ExtractTemplatedCode extends JavaVisitor<ExtractionContext> {
-        public ExtractTemplatedCode() {
-            setCursoringOn();
-        }
 
         @Override
         public Space visitSpace(Space space, Space.Location loc, ExtractionContext context) {

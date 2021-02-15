@@ -37,9 +37,6 @@ public class FindTags extends Recipe {
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         XPathMatcher xPathMatcher = new XPathMatcher(xPath);
         return new XmlVisitor<ExecutionContext>() {
-            {
-                setCursoringOn();
-            }
 
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
@@ -55,9 +52,6 @@ public class FindTags extends Recipe {
     public static Set<Xml.Tag> find(Xml x, String xPath) {
         XPathMatcher xPathMatcher = new XPathMatcher(xPath);
         XmlVisitor<Set<Xml.Tag>> findVisitor = new XmlVisitor<Set<Xml.Tag>>() {
-            {
-                setCursoringOn();
-            }
 
             @Override
             public Xml visitTag(Xml.Tag tag, Set<Xml.Tag> ts) {

@@ -69,7 +69,6 @@ public class UpgradeParentVersion extends Recipe {
         public UpgradeParentVersionVisitor(String toVersion, @Nullable String metadataPattern) {
             //noinspection ConstantConditions
             versionComparator = Semver.validate(toVersion, metadataPattern).getValue();
-            setCursoringOn();
         }
 
         @Override

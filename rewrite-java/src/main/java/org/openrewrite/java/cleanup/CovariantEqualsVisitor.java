@@ -31,10 +31,6 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
 
     private static final MethodMatcher OBJECT_EQUALS_SIGNATURE = new MethodMatcher("* equals(java.lang.Object)");
 
-    public CovariantEqualsVisitor() {
-        setCursoringOn();
-    }
-
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, p);
@@ -58,7 +54,6 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
 
         public ChangeCovariantEqualsMethodVisitor(J.ClassDeclaration enclosingClass) {
             this.enclosingClass = enclosingClass;
-            setCursoringOn();
         }
 
         @Override

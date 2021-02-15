@@ -42,9 +42,6 @@ public final class FindTypes extends Recipe {
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
-            {
-                setCursoringOn();
-            }
 
             @Override
             public <N extends NameTree> N visitTypeName(N name, ExecutionContext ctx) {
@@ -72,9 +69,6 @@ public final class FindTypes extends Recipe {
 
     public static Set<NameTree> find(J j, String fullyQualifiedClassName) {
         JavaIsoVisitor<Set<NameTree>> findVisitor = new JavaIsoVisitor<Set<NameTree>>() {
-            {
-                setCursoringOn();
-            }
 
             @Override
             public <N extends NameTree> N visitTypeName(N name, Set<NameTree> ns) {

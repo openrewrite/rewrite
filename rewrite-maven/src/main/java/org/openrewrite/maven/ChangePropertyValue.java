@@ -46,10 +46,6 @@ public class ChangePropertyValue extends Recipe {
 
     private class ChangePropertyValueVisitor extends MavenVisitor {
 
-        public ChangePropertyValueVisitor() {
-            setCursoringOn();
-        }
-
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (isPropertyTag() && key.equals(tag.getName()) &&

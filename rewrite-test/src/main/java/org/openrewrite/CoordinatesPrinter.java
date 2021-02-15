@@ -69,7 +69,6 @@ public class CoordinatesPrinter {
         public MapSpaces(Class<? extends J> cursorFilter, boolean useColor) {
             this.cursorFilter = cursorFilter;
             this.useColor = useColor;
-            setCursoringOn();
         }
 
         @Override

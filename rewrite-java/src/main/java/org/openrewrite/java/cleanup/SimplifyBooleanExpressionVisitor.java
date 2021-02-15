@@ -29,10 +29,6 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
 
     private static final String MAYBE_AUTO_FORMAT_ME = "MAYBE_AUTO_FORMAT_ME";
 
-    public SimplifyBooleanExpressionVisitor() {
-        setCursoringOn();
-    }
-
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu, P p) {
         J.CompilationUnit c = visitAndCast(cu, p, super::visitCompilationUnit);

@@ -33,7 +33,6 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
         this.classType = classType;
         this.hasName = hasName;
         this.toName = toName;
-        setCursoringOn();
     }
 
     @Override
@@ -104,7 +103,6 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
         public FindVariableDefinition(J.Identifier ident, Cursor referenceScope) {
             this.ident = ident;
             this.referenceScope = referenceScope;
-            setCursoringOn();
         }
 
         @Override

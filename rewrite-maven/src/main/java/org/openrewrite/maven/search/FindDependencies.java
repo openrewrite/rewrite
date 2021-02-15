@@ -60,9 +60,6 @@ public class FindDependencies extends Recipe {
         Scope aScope = Scope.fromName(scope);
 
         return new MavenVisitor() {
-            {
-                setCursoringOn();
-            }
 
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext context) {

@@ -29,7 +29,7 @@ interface ChangeFieldNameTest : RecipeTest {
             }
             return super.visitVariableDeclarations(v, p)
         }
-    }.toRecipe(cursored = true)
+    }.toRecipe()
 
     @Test
     fun changeFieldName(jp: JavaParser) = assertChanged(

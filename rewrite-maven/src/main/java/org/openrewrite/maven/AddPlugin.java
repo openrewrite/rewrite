@@ -45,10 +45,6 @@ public class AddPlugin extends Recipe {
 
     private class AddPluginVisitor extends MavenVisitor {
 
-        public AddPluginVisitor() {
-            setCursoringOn();
-        }
-
         @Override
         public Maven visitMaven(Maven maven, ExecutionContext ctx) {
             Xml.Tag root = maven.getRoot();

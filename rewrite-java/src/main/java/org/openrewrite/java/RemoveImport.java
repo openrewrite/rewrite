@@ -56,7 +56,6 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         this.type = type;
         this.methodMatcher = new MethodMatcher(type + " *(..)");
         this.classType = JavaType.Class.build(type);
-        setCursoringOn();
     }
 
     @Override

@@ -29,7 +29,6 @@ public class AutoFormatVisitor<P> extends XmlVisitor<P> {
 
     public AutoFormatVisitor(Xml.Tag... scope) {
         this.scope = scope;
-        setCursoringOn();
     }
 
     private final FindIndentXmlVisitor<P> findIndent = new FindIndentXmlVisitor<>(0);

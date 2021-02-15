@@ -47,10 +47,6 @@ public class ChangeDependencyScope extends Recipe {
 
     private class ChangeDependencyScopeVisitor extends MavenVisitor {
 
-        private ChangeDependencyScopeVisitor() {
-            setCursoringOn();
-        }
-
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (isDependencyTag()) {

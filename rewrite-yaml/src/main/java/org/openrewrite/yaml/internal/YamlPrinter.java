@@ -33,7 +33,6 @@ public class YamlPrinter<P> extends YamlVisitor<P> {
 
     public YamlPrinter(TreePrinter<P> treePrinter) {
         this.treePrinter = treePrinter;
-        setCursoringOn();
     }
 
     @NonNull

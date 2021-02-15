@@ -29,10 +29,6 @@ public class FormatFirstClassPrefix<P> extends JavaIsoVisitor<P> {
     private static final J.Block EMPTY_BLOCK = new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
             new JRightPadded<>(false, Space.EMPTY, Markers.EMPTY), Collections.emptyList(), Space.EMPTY);
 
-    public FormatFirstClassPrefix() {
-        setCursoringOn();
-    }
-
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);

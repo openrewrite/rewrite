@@ -47,7 +47,6 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
         this.coordinates = coordinates;
         this.insertId = coordinates.getTree().getId();
         this.location = coordinates.getSpaceLocation();
-        setCursoringOn();
     }
 
     @Nullable

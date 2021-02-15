@@ -40,10 +40,6 @@ public class ExcludeDependency extends Recipe {
 
     private class ExcludeDependencyVisitor extends MavenVisitor {
 
-        public ExcludeDependencyVisitor() {
-            setCursoringOn();
-        }
-
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (isDependencyTag()) {

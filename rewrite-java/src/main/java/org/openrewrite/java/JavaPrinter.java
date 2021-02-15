@@ -34,7 +34,6 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
 
     public JavaPrinter(TreePrinter<P> treePrinter) {
         this.treePrinter = treePrinter;
-        setCursoringOn();
     }
 
     @NonNull

@@ -39,7 +39,6 @@ public class AddToTagVisitor<P> extends XmlVisitor<P> {
         this.scope = scope;
         this.tagToAdd = tagToAdd;
         this.tagComparator = tagComparator;
-        setCursoringOn();
     }
 
     @Override

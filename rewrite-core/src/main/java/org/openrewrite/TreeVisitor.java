@@ -17,7 +17,6 @@ package org.openrewrite;
 
 import org.openrewrite.internal.lang.Nullable;
 
-import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
@@ -35,18 +34,12 @@ import java.util.function.BiFunction;
  * @param <P>
  */
 public abstract class TreeVisitor<T extends Tree, P> {
-    private static final boolean IS_DEBUGGING = System.getProperty("org.openrewrite.debug") != null ||
-            ManagementFactory.getRuntimeMXBean().getInputArguments().toString().indexOf("-agentlib:jdwp") > 0;
-
-    protected boolean cursored = IS_DEBUGGING;
 
     private Cursor cursor;
-    private List<TreeVisitor<T, P>> afterVisit;
-
-    protected final void setCursoringOn() {
-        this.cursored = true;
+    {
         setCursor(new Cursor(null, "root"));
     }
+    private List<TreeVisitor<T, P>> afterVisit;
 
     protected void setCursor(@Nullable Cursor cursor) {
         this.cursor = cursor;
@@ -122,9 +115,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
             afterVisit = new ArrayList<>();
         }
 
-        if (cursored) {
-            setCursor(new Cursor(cursor, tree));
-        }
+        setCursor(new Cursor(cursor, tree));
 
         @SuppressWarnings("unchecked") T t = preVisit((T) tree, p);
         if (t != null) {
@@ -134,9 +125,8 @@ public abstract class TreeVisitor<T extends Tree, P> {
             t = postVisit(t, p);
         }
 
-        if (cursored) {
-            setCursor(cursor.getParent());
-        }
+        setCursor(cursor.getParent());
+
 
         if (topLevel) {
             if (t != null) {
@@ -150,6 +140,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
         return t;
     }
 
+    @SuppressWarnings("unused")
     @Nullable
     public T defaultValue(@Nullable Tree tree, P p) {
         //noinspection unchecked

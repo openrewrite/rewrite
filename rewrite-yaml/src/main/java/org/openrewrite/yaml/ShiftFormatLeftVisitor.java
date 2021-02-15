@@ -24,7 +24,6 @@ public class ShiftFormatLeftVisitor<P> extends YamlVisitor<P> {
     public ShiftFormatLeftVisitor(Yaml scope, int shift) {
         this.scope = scope;
         this.shift = shift;
-        setCursoringOn();
     }
 
     @Override

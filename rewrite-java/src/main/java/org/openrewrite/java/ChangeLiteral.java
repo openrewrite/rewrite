@@ -33,7 +33,6 @@ public class ChangeLiteral<P> extends JavaIsoVisitor<P> {
     public ChangeLiteral(Expression scope, Function<Object, Object> transform) {
         this.scope = scope;
         this.transform = transform;
-        setCursoringOn();
     }
 
     @Override

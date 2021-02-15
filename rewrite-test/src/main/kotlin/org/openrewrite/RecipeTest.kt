@@ -201,17 +201,13 @@ interface RecipeTest {
         }
     }
 
-    fun JavaVisitor<ExecutionContext>.toRecipe(cursored: Boolean = false) =
-        AdHocRecipe(cursored, this)
+    fun JavaVisitor<ExecutionContext>.toRecipe() =
+        AdHocRecipe(this)
 
     class AdHocRecipe(
-        private val cursored: Boolean,
         private val visitor: JavaVisitor<ExecutionContext>
     ) : Recipe() {
         override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
-            if (cursored) {
-                visitor.setCursoringOn()
-            }
             return visitor
         }
     }

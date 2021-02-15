@@ -44,10 +44,6 @@ public class GenerateGetter extends Recipe {
                 "}"
         ).build();
 
-        public GenerateGetterVisitor() {
-            setCursoringOn();
-        }
-
         @Override
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
             if (variable.isField(getCursor()) && variable.getSimpleName().equals(fieldName)) {

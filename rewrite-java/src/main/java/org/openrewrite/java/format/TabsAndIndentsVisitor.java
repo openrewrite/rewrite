@@ -31,7 +31,6 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
     public TabsAndIndentsVisitor(TabsAndIndentsStyle style) {
         this.style = style;
-        setCursoringOn();
     }
 
     @Override

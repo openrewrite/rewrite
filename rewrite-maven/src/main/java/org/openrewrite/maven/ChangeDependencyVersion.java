@@ -41,10 +41,6 @@ public class ChangeDependencyVersion extends Recipe {
 
     private class ChangeDependencyVersionVisitor extends MavenVisitor {
 
-        public ChangeDependencyVersionVisitor() {
-            setCursoringOn();
-        }
-
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (isDependencyTag(groupId, artifactId) || isManagedDependencyTag(groupId, artifactId)) {

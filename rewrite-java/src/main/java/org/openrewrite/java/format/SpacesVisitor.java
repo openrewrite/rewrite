@@ -31,7 +31,6 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
 
     public SpacesVisitor(SpacesStyle style) {
         this.style = style;
-        setCursoringOn();
     }
 
     <T extends J> T spaceBefore(T j, boolean spaceBefore) {
