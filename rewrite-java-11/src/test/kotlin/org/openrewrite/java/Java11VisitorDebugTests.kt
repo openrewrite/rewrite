@@ -17,10 +17,7 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
-import org.openrewrite.java.cleanup.CovariantEqualsTest
-import org.openrewrite.java.cleanup.SimplifyBooleanExpressionTest
-import org.openrewrite.java.cleanup.SimplifyBooleanReturnTest
-import org.openrewrite.java.cleanup.UnnecessaryParenthesesTest
+import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.format.*
 import org.openrewrite.java.search.*
 import org.openrewrite.java.tree.TypeTreeTest
@@ -96,6 +93,10 @@ class Java11FindMethodsTest : Java11Test, FindMethodsTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11FindTypesTest : Java11Test, FindTypesTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11HideUtilityClassConstructorTest : Java11Test, HideUtilityClassConstructorTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
