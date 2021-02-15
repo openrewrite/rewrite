@@ -17,11 +17,11 @@ package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
-import org.openrewrite.RecipeTest
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.style.NamedStyles
 
-interface HideUtilityClassConstructorTest : RecipeTest {
+interface HideUtilityClassConstructorTest : JavaRecipeTest {
     override val recipe: Recipe?
         get() = HideUtilityClassConstructor()
 
@@ -209,7 +209,7 @@ interface HideUtilityClassConstructorTest : RecipeTest {
         dependsOn = arrayOf(
             """
             public interface B {
-                public static void utility() {
+                static void utility() {
                 }
             }
         """
@@ -282,7 +282,7 @@ interface HideUtilityClassConstructorTest : RecipeTest {
                 public static void utility() {
                 }
 
-                public static void utility(String args[]) {
+                public static void utility(String[] args) {
                     utility();
                 }
             }
@@ -295,7 +295,7 @@ interface HideUtilityClassConstructorTest : RecipeTest {
                 public static void utility() {
                 }
 
-                public static void utility(String args[]) {
+                public static void utility(String[] args) {
                     utility();
                 }
             }
@@ -482,5 +482,4 @@ interface HideUtilityClassConstructorTest : RecipeTest {
             }
         """
     )
-
 }
