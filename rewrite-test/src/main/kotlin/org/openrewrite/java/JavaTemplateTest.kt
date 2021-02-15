@@ -407,7 +407,7 @@ interface JavaTemplateTest : JavaRecipeTest {
 
             override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J {
                 val m = super.visitMethodInvocation(method, p) as J.MethodInvocation
-                if (m.name.typeInformation.simpleName != "countLetters") {
+                if (m.name.simpleName != "countLetters") {
                     return m
                 }
                 return m.withTemplate(template, m.coordinates.replace(), m.arguments[0])
@@ -649,7 +649,7 @@ interface JavaTemplateTest : JavaRecipeTest {
             override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
                 var b = super.visitBlock(block, p)
                 val parent = cursor.dropParentUntil { it is J }.getValue<J>()
-                if (parent is J.MethodDeclaration && parent.name.typeInformation.simpleName == "foo") {
+                if (parent is J.MethodDeclaration && parent.name.simpleName == "foo") {
                     b = b.withTemplate(
                         template, b.statements[0].coordinates.before(),
                         b.statements[1] as J,

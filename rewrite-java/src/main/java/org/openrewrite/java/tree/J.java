@@ -1861,29 +1861,31 @@ public interface J extends Serializable, Tree {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Getter
     final class Identifier implements J, TypeTree, Expression {
         private static final Map<String, Map<JavaType, IdentifierFlyweight>> flyweights = new WeakHashMap<>();
 
+        @Getter
         @EqualsAndHashCode.Include
         UUID id;
 
+        @Getter
         Space prefix;
 
+        @Getter
         Markers markers;
 
-        IdentifierFlyweight typeInformation;
+        IdentifierFlyweight identifier;
 
-        private Identifier(UUID id, IdentifierFlyweight typeInformation, Space prefix, Markers markers) {
+        private Identifier(UUID id, IdentifierFlyweight identifier, Space prefix, Markers markers) {
             this.id = id;
-            this.typeInformation = typeInformation;
+            this.identifier = identifier;
             this.prefix = prefix;
             this.markers = markers;
         }
 
         @Override
         public JavaType getType() {
-            return typeInformation.getType();
+            return identifier.getType();
         }
 
         @SuppressWarnings("unchecked")
@@ -1896,7 +1898,7 @@ public interface J extends Serializable, Tree {
         }
 
         public String getSimpleName() {
-            return typeInformation.getSimpleName();
+            return identifier.getSimpleName();
         }
 
         @Override
@@ -1910,7 +1912,7 @@ public interface J extends Serializable, Tree {
         }
 
         public Identifier withName(String name) {
-            if (name.equals(typeInformation.getSimpleName())) {
+            if (name.equals(identifier.getSimpleName())) {
                 return this;
             }
             return build(id, prefix, markers, name, getType());
@@ -1921,7 +1923,7 @@ public interface J extends Serializable, Tree {
             if (markers == this.markers) {
                 return this;
             }
-            return build(id, prefix, markers, typeInformation.getSimpleName(), getType());
+            return build(id, prefix, markers, identifier.getSimpleName(), getType());
         }
 
         @SuppressWarnings("unchecked")
@@ -1929,7 +1931,7 @@ public interface J extends Serializable, Tree {
             if (prefix == this.prefix) {
                 return this;
             }
-            return build(id, prefix, markers, typeInformation.getSimpleName(), getType());
+            return build(id, prefix, markers, identifier.getSimpleName(), getType());
         }
 
         @JsonCreator
