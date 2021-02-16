@@ -743,7 +743,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
             visitSpace(multiVariable.getVarargs(), Space.Location.VARARGS, p);
             acc.append("...");
         }
-        visitRightPadded(multiVariable.getPadding().getVars(), JRightPadded.Location.NAMED_VARIABLE, ",", p);
+        visitRightPadded(multiVariable.getPadding().getVariables(), JRightPadded.Location.NAMED_VARIABLE, ",", p);
         return multiVariable;
     }
 
