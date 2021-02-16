@@ -70,9 +70,9 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                         Yaml.Documents yaml = parseFromInput(sourceFile.getRelativePath(relativeTo), is);
                         onParse.onParseSucceeded(sourceFile.getPath());
                         return yaml;
-                    } catch (IOException e) {
+                    } catch (Throwable t) {
                         onParse.onParseFailed(sourceFile.getPath());
-                        ctx.getOnError().accept(e);
+                        ctx.getOnError().accept(t);
                         return null;
                     }
                 })

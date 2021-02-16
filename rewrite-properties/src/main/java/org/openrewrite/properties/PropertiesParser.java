@@ -59,9 +59,9 @@ public class PropertiesParser implements Parser<Properties.File> {
                         Properties.File file = parseFromInput(sourceFile.getRelativePath(relativeTo), is);
                         onParse.onParseSucceeded(sourceFile.getPath());
                         return file;
-                    } catch (IOException e) {
+                    } catch (Throwable t) {
                         onParse.onParseFailed(sourceFile.getPath());
-                        ctx.getOnError().accept(e);
+                        ctx.getOnError().accept(t);
                         return null;
                     }
                 })

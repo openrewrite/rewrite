@@ -45,15 +45,15 @@ public class XmlParser implements Parser<Xml.Document> {
         return new Builder();
     }
 
-    @Override
-    public List<Xml.Document> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
-        return acceptedInputs(sourceFiles).stream()
-                .map(sourceFile -> {
-                    try {
-                        onParse.onParseStart(sourceFile.getPath());
+                        @Override
+                        public List<Xml.Document> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+                            return acceptedInputs(sourceFiles).stream()
+                                    .map(sourceFile -> {
+                                        try {
+                                            onParse.onParseStart(sourceFile.getPath());
 
-                        XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
-                                CharStreams.fromStream(sourceFile.getSource()))));
+                                            XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
+                                                    CharStreams.fromStream(sourceFile.getSource()))));
 
                         parser.removeErrorListeners();
                         parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath()));
@@ -65,9 +65,9 @@ public class XmlParser implements Parser<Xml.Document> {
 
                         onParse.onParseSucceeded(sourceFile.getPath());
                         return document;
-                    } catch (IOException e) {
+                    } catch (Throwable t) {
                         onParse.onParseFailed(sourceFile.getPath());
-                        ctx.getOnError().accept(e);
+                        ctx.getOnError().accept(t);
                         return null;
                     }
                 })
