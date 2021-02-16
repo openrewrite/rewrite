@@ -160,7 +160,7 @@ class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
                 j = keepMaximumLines(j, style.getKeepMaximum().getInDeclarations());
 
                 // don't adjust the first statement in a block
-                if (block.getStatements().iterator().next() != j) {
+                if (!block.getStatements().isEmpty() && block.getStatements().iterator().next() != j) {
                     if (j instanceof J.VariableDeclarations) {
                         if (classDecl.getKind() == J.ClassDeclaration.Kind.Interface) {
                             j = minimumLines(j, style.getMinimum().getAroundFieldInInterface());
