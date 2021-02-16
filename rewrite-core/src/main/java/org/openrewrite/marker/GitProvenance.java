@@ -16,13 +16,68 @@
 package org.openrewrite.marker;
 
 
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.experimental.FieldDefaults;
+import org.eclipse.jgit.lib.*;
 import org.openrewrite.Incubating;
+import org.openrewrite.internal.lang.Nullable;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.URI;
+import java.nio.file.Path;
 
 @Incubating(since = "7.0.0")
+@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Data
 public class GitProvenance implements Marker {
-    private final String origin;
-    private final String branch;
-    private final String change;
+    @Nullable
+    String origin;
+
+    String branch;
+    String change;
+
+    public static GitProvenance fromProjectDirectory(Path projectDir) {
+        try {
+            Repository repository = new RepositoryBuilder().findGitDir(projectDir.toFile()).build();
+            return new GitProvenance(getOrigin(repository), repository.getBranch(), getChangeset(repository));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @Nullable
+    private static String getOrigin(Repository repository) {
+        Config storedConfig = repository.getConfig();
+        String url = storedConfig.getString("remote", "origin", "url");
+        if (url == null) {
+            return null;
+        }
+        if (url.startsWith("https://") || url.startsWith("http://")) {
+            url = hideSensitiveInformation(url);
+        }
+        return url;
+    }
+
+    @Nullable
+    private static String getChangeset(Repository repository) throws IOException {
+        ObjectId head = repository.resolve(Constants.HEAD);
+        if (head == null) {
+            return null;
+        }
+        return head.getName();
+    }
+
+    private static String hideSensitiveInformation(String url) {
+        try {
+            String credentials = URI.create(url).toURL().getUserInfo();
+            if (credentials != null) {
+                return url.replaceFirst(credentials, credentials.replaceFirst(":.*", ""));
+            }
+        } catch (Exception e) {
+            throw new IllegalStateException("Unable to remove credentials from repository URL. {0}", e);
+        }
+        return url;
+    }
 }
