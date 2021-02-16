@@ -38,6 +38,24 @@ public class GitProvenance implements Marker {
     String branch;
     String change;
 
+    @Nullable
+    public String getOrganizationName() {
+        if(origin == null) {
+            return null;
+        }
+        String path = URI.create(origin).getPath();
+        return path.substring(1, path.indexOf('/', 1));
+    }
+
+    @Nullable
+    public String getRepositoryName() {
+        if(origin == null) {
+            return null;
+        }
+        String path = URI.create(origin).getPath();
+        return path.substring(path.lastIndexOf('/') + 1).replaceAll("\\.git$", "");
+    }
+
     public static GitProvenance fromProjectDirectory(Path projectDir) {
         try {
             Repository repository = new RepositoryBuilder().findGitDir(projectDir.toFile()).build();
