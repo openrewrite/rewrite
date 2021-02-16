@@ -33,6 +33,37 @@ interface ChangeMethodNameTest : JavaRecipeTest {
     }
 
     @Test
+    fun changeMethodNameForOverridenMethod(jp: JavaParser) = assertChanged(
+        jp,
+        dependsOn = arrayOf(b, """
+            package com.abc;
+            class C extends B {
+                @Override
+                public void singleArg(String s) {}
+            }
+        """.trimIndent()),
+        recipe = ChangeMethodName("com.abc.B singleArg(String)", "bar"),
+        before = """
+            package com.abc;
+            class A {
+                public void test() {
+                    new C().singleArg("boo");
+                    new java.util.ArrayList<String>().forEach(new C()::singleArg);
+                }
+            }
+        """,
+        after = """
+            package com.abc;
+            class A {
+                public void test() {
+                    new C().bar("boo");
+                    new java.util.ArrayList<String>().forEach(new C()::bar);
+                }
+            }
+        """
+    )
+
+    @Test
     fun changeMethodNameForMethodWithSingleArgDeclarative(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(b),
