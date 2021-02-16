@@ -42,6 +42,21 @@ interface MethodMatcherTest {
     }
 
     @Test
+    fun matchesMethodNameWithDotSeparator(jp: JavaParser) {
+        assertTrue(nameRegex("A.foo()").matches("foo"))
+        assertTrue(nameRegex("A.*()").matches("foo"))
+        assertTrue(nameRegex("A.fo*()").matches("foo"))
+    }
+
+    @Test
+    fun matchesMethodNameWithPoundSeparator(jp: JavaParser) {
+        assertTrue(nameRegex("A#foo()").matches("foo"))
+        assertTrue(nameRegex("A#*()").matches("foo"))
+        assertTrue(nameRegex("A#fo*()").matches("foo"))
+        assertTrue(nameRegex("A#*oo()").matches("foo"))
+    }
+
+    @Test
     fun matchesMethodName(jp: JavaParser) {
         assertTrue(nameRegex("A foo()").matches("foo"))
         assertTrue(nameRegex("A *()").matches("foo"))

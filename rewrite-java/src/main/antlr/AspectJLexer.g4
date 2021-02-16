@@ -43,5 +43,6 @@ lexer grammar AspectJLexer;
 
 import JavaLexer;
 
-DOTDOT								: '..';
+DOTDOT                              : '..';
+POUND                               : '#';
 SPACE                               : ' ';
