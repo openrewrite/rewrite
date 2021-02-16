@@ -133,9 +133,28 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
                     break;
             }
         } else {
-            c = c.withAnnotations(maybeMergeList(c.getAnnotations(), generated));
-            c = c.withTypeParameters(maybeMergeList(c.getTypeParameters(), generated));
-            c = c.withImplements(maybeMergeList(c.getImplements(), generated));
+            J.ClassDeclaration temp = c.withAnnotations(maybeMergeList(c.getAnnotations(), generated));
+            if (temp != c) {
+                //If the list of annotations has changed, apply formatting.
+                temp = (J.ClassDeclaration) new AutoFormatVisitor<>().visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
+                assert temp != null;
+                return temp.withBody(c.getBody());
+            }
+            temp = c.withTypeParameters(maybeMergeList(c.getTypeParameters(), generated));
+            if (temp != c) {
+                //If the type parameters have changed, apply formatting to the container.
+                temp = (J.ClassDeclaration) new AutoFormatVisitor<>().visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
+                assert temp != null;
+                return c.getPadding().withTypeParameters(temp.getPadding().getTypeParameters());
+            }
+
+            temp = c.withImplements(maybeMergeList(c.getImplements(), generated));
+            if (temp != c) {
+                //If the implements clause has changed, apply formatting to the container.
+                temp = (J.ClassDeclaration) new AutoFormatVisitor<>().visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
+                assert temp != null;
+                return c.getPadding().withImplements(temp.getPadding().getImplements());
+            }
         }
         return c;
     }
@@ -186,10 +205,38 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
                     break;
             }
         } else {
-            m = m.withAnnotations(maybeMergeList(m.getAnnotations(), generated));
-            m = m.withTypeParameters(maybeMergeList(m.getTypeParameters(), generated));
-            m = m.withParameters(maybeMergeList(m.getParameters(), generated));
-            m = m.withThrows(maybeMergeList(m.getThrows(), generated));
+            J.MethodDeclaration temp = m.withAnnotations(maybeMergeList(m.getAnnotations(), generated));
+            if (temp != m) {
+                //If the annotations have changed, reformat the method declaration. (no need to format the method body)
+                temp = (J.MethodDeclaration) new AutoFormatVisitor<>().visit(m.withBody(EMPTY_BLOCK), 0, getCursor());
+                assert temp != null;
+                return temp.withBody(m.getBody());
+
+            }
+
+            temp = m.withTypeParameters(maybeMergeList(m.getTypeParameters(), generated));
+            if (temp != m) {
+                //Autoformat the type parameters if they have been changed.
+                temp = (J.MethodDeclaration) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
+                assert temp != null;
+                return m.getPadding().withTypeParameters(temp.getPadding().getTypeParameters());
+            }
+
+            temp = m.withParameters(maybeMergeList(m.getParameters(), generated));
+            if (temp != m) {
+                //Autoformat the parameters if they have been changed.
+                temp = (J.MethodDeclaration) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
+                assert temp != null;
+                return m.getPadding().withParameters(temp.getPadding().getParameters());
+            }
+
+            temp = m.withThrows(maybeMergeList(m.getThrows(), generated));
+            if (temp != m) {
+                //Autoformat the throws clause if a change has been made.
+                temp = (J.MethodDeclaration) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
+                assert temp != null;
+                return m.getPadding().withThrows(temp.getPadding().getThrows());
+            }
         }
         return m;
     }
@@ -208,11 +255,14 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
                     m = m.withAnnotations((List<J.Annotation>) generated);
                 }
                 m = (J.VariableDeclarations) autoFormat.visit(m, 0, getCursor());
-                assert m != null;
             }
         } else {
-            m = m.withAnnotations(maybeMergeList(m.getAnnotations(), generated));
+            J.VariableDeclarations temp = m.withAnnotations(maybeMergeList(m.getAnnotations(), generated));
+            if (temp != m) {
+                m = (J.VariableDeclarations) autoFormat.visit(m, 0, getCursor());
+            }
         }
+        assert m != null;
         return m;
     }
 
@@ -220,13 +270,20 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
     @SuppressWarnings("unchecked")
     public J visitMethodInvocation(J.MethodInvocation method, List<? extends J> generated) {
         J.MethodInvocation m = visitAndCast(method, generated, super::visitMethodInvocation);
+        J.MethodInvocation temp = m;
         if (insertId.equals(m.getId()) && location == Space.Location.METHOD_INVOCATION_ARGUMENTS) {
-            m = m.withArguments((List<Expression>) generated);
+            temp = m.withArguments((List<Expression>) generated);
         } else if (!coordinates.isReplacement()) {
             //noinspection ConstantConditions
-            m = m.withArguments(maybeMergeList(m.getArguments(), generated));
+            temp = m.withArguments(maybeMergeList(m.getArguments(), generated));
         }
 
+        if (temp != m) {
+            //If the arugments have changed, reformat those arguments.
+            temp = (J.MethodInvocation) new AutoFormatVisitor<>().visit(temp, 0, getCursor());
+            assert temp != null;
+            m = m.getPadding().withArguments(temp.getPadding().getArguments());
+        }
         return m;
     }
 
@@ -244,6 +301,8 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
                     } else {
                         newList.addAll(originalList.subList(0, index));
                         newList.addAll((List<T>) generated);
+                        T last = (T) new AutoFormatVisitor<Integer>().visit(originalList.get(index), 0, getCursor());
+
                         newList.addAll(originalList.subList(index, originalList.size()));
                     }
                     return newList;

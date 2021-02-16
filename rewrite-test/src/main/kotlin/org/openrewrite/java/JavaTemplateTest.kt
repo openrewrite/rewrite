@@ -1000,6 +1000,44 @@ interface JavaTemplateTest : JavaRecipeTest {
     )
 
     @Test
+    fun addMethodDeclarationParameters(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val template = template("Date dateOfBirth,String firstName,")
+                .doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .imports("java.util.Date")
+                .build()
+
+            init {
+                setCursoringOn()
+            }
+
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
+                var m = super.visitMethodDeclaration(method, p)
+                if (m.simpleName == "setCustomerInfo") {
+                    m = m.withTemplate(template, m.parameters[0].coordinates.before())
+                    maybeAddImport("java.util.Date")
+                }
+
+                return m
+            }
+        }.toRecipe(),
+        before = """
+            public abstract class Customer {
+                public abstract void setCustomerInfo(String lastName);
+            }
+        """,
+        after = """
+            import java.util.Date;
+
+            public abstract class Customer {
+                public abstract void setCustomerInfo(Date dateOfBirth, String firstName, String lastName);
+            }
+        """
+    )
+
+    @Test
     fun replaceMethodDeclarationThrows(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
