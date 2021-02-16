@@ -4464,7 +4464,7 @@ public interface J extends Serializable, Tree {
         }
 
         public VariableDeclarations withVariables(List<NamedVariable> vars) {
-            return getPadding().withVars(JRightPadded.withElements(this.variables, vars));
+            return getPadding().withVariables(JRightPadded.withElements(this.variables, vars));
         }
 
         @Override
@@ -4611,12 +4611,12 @@ public interface J extends Serializable, Tree {
         public static class Padding {
             private final VariableDeclarations t;
 
-            public List<JRightPadded<NamedVariable>> getVars() {
+            public List<JRightPadded<NamedVariable>> getVariables() {
                 return t.variables;
             }
 
-            public VariableDeclarations withVars(List<JRightPadded<NamedVariable>> vars) {
-                return t.variables == vars ? t : new VariableDeclarations(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.typeExpression, t.varargs, t.dimensionsBeforeName, vars);
+            public VariableDeclarations withVariables(List<JRightPadded<NamedVariable>> variables) {
+                return t.variables == variables ? t : new VariableDeclarations(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.typeExpression, t.varargs, t.dimensionsBeforeName, variables);
             }
         }
     }

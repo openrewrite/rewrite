@@ -19,7 +19,6 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.AddImport;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
@@ -311,7 +310,7 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
             visitSpace(multiVariable.getVarargs(), Space.Location.VARARGS, insertionScope);
             acc.append("...");
         }
-        visitRightPadded(multiVariable.getPadding().getVars(), JRightPadded.Location.NAMED_VARIABLE, ",", insertionScope);
+        visitRightPadded(multiVariable.getPadding().getVariables(), JRightPadded.Location.NAMED_VARIABLE, ",", insertionScope);
         return multiVariable;
     }
 

@@ -580,7 +580,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         m = m.withVarargs(m.getVarargs() == null ?
                 null :
                 visitSpace(m.getVarargs(), Space.Location.VARARGS, p));
-        m = m.getPadding().withVars(ListUtils.map(m.getPadding().getVars(), t -> visitRightPadded(t, JRightPadded.Location.NAMED_VARIABLE, p)));
+        m = m.getPadding().withVariables(ListUtils.map(m.getPadding().getVariables(), t -> visitRightPadded(t, JRightPadded.Location.NAMED_VARIABLE, p)));
         return m;
     }
 
