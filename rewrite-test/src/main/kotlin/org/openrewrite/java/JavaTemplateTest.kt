@@ -1009,10 +1009,6 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .imports("java.util.Date")
                 .build()
 
-            init {
-                setCursoringOn()
-            }
-
             override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
                 var m = super.visitMethodDeclaration(method, p)
                 if (m.simpleName == "setCustomerInfo") {
