@@ -43,8 +43,12 @@ public class GitProvenance implements Marker {
         if(origin == null) {
             return null;
         }
-        String path = URI.create(origin).getPath();
-        return path.substring(1, path.indexOf('/', 1));
+        if (origin.startsWith("git")) {
+            return origin.substring(origin.indexOf(':') + 1, origin.indexOf('/'));
+        } else {
+            String path = URI.create(origin).getPath();
+            return path.substring(1, path.indexOf('/', 1));
+        }
     }
 
     @Nullable
@@ -52,8 +56,12 @@ public class GitProvenance implements Marker {
         if(origin == null) {
             return null;
         }
-        String path = URI.create(origin).getPath();
-        return path.substring(path.lastIndexOf('/') + 1).replaceAll("\\.git$", "");
+        if (origin.startsWith("git")) {
+            return origin.substring(origin.lastIndexOf('/') + 1).replaceAll("\\.git$", "");
+        } else {
+            String path = URI.create(origin).getPath();
+            return path.substring(path.lastIndexOf('/') + 1).replaceAll("\\.git$", "");
+        }
     }
 
     public static GitProvenance fromProjectDirectory(Path projectDir) {

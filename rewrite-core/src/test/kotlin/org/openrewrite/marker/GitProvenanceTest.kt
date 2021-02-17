@@ -20,17 +20,20 @@ import org.junit.jupiter.api.Test
 
 class GitProvenanceTest {
     private val sshRepo = GitProvenance("ssh://git@github.com/openrewrite/rewrite.git", "main", "123")
-    private val httpsRepo = GitProvenance("https://github.com/openrewrite/rewrite.git", "main", "123");
+    private val httpsRepo = GitProvenance("https://github.com/openrewrite/rewrite.git", "main", "123")
+    private val sshAlternateFormRepo = GitProvenance("git@github.com:openrewrite/rewrite.git", "main", "123")
 
     @Test
     fun getOrganizationName() {
         assertThat(sshRepo.organizationName).isEqualTo("openrewrite")
         assertThat(httpsRepo.organizationName).isEqualTo("openrewrite")
+        assertThat(sshAlternateFormRepo.organizationName).isEqualTo("openrewrite")
     }
 
     @Test
     fun getRepositoryName() {
         assertThat(sshRepo.repositoryName).isEqualTo("rewrite")
         assertThat(httpsRepo.repositoryName).isEqualTo("rewrite")
+        assertThat(sshAlternateFormRepo.repositoryName).isEqualTo("rewrite")
     }
 }
