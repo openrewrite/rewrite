@@ -134,9 +134,12 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
         J.VariableDeclarations v = super.visitVariableDeclarations(multiVariable, p);
 
-        if (Space.firstPrefix(v.getVariables()).getWhitespace().isEmpty()) {
-            v = v.withVariables(Space.formatFirstPrefix(v.getVariables(),
-                    v.getVariables().iterator().next().getPrefix().withWhitespace(" ")));
+        J firstEnclosing = getCursor().getParentOrThrow().firstEnclosing(J.class);
+        if (!(firstEnclosing instanceof J.Lambda)) {
+            if (Space.firstPrefix(v.getVariables()).getWhitespace().isEmpty()) {
+                v = v.withVariables(Space.formatFirstPrefix(v.getVariables(),
+                        v.getVariables().iterator().next().getPrefix().withWhitespace(" ")));
+            }
         }
 
         /**

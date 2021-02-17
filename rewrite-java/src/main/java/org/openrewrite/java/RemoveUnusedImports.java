@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
@@ -25,6 +26,7 @@ import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * This recipe will remove any imports for types that are not referenced within the compilation unit. This recipe
@@ -88,10 +90,31 @@ public class RemoveUnusedImports extends Recipe {
                     }
                     if ("*".equals(anImport.getElement().getQualid().getSimpleName())) {
                         if (types.size() < layoutStyle.getClassCountToUseStarImport()) {
-                            types.stream().map(JavaType.FullyQualified::getClassName).sorted().forEach(typeClassName ->
-                                    importsWithUsage.add(anImport.withElement(elem.withQualid(qualid.withName(name
-                                            .withName(typeClassName))).withPrefix(Space.format("\n"))))
-                            );
+                            List<JRightPadded<J.Import>> unfoldedWildcardImports = types.stream().map(JavaType.FullyQualified::getClassName).sorted().map(typeClassName ->
+                                anImport.withElement(
+                                        new J.Import(
+                                                Tree.randomId(),
+                                                elem.getPrefix(),
+                                                elem.getMarkers(),
+                                                elem.getPadding().getStatic(),
+                                                elem.getQualid().withName(
+                                                        name.withName(typeClassName)
+                                                )
+                                        )
+                                )
+                            ).collect(Collectors.toList());
+
+                            importsWithUsage.addAll(ListUtils.map(unfoldedWildcardImports, (index, paddedImport) -> {
+                                if (index != 0) {
+                                    paddedImport = paddedImport.withElement(
+                                            paddedImport.getElement().withPrefix(
+                                                    Space.format("\n")
+                                            )
+                                    );
+                                }
+                                return paddedImport;
+                            }));
+
                             changed = true;
                         } else {
                             importsWithUsage.add(anImport);
@@ -125,6 +148,15 @@ public class RemoveUnusedImports extends Recipe {
                     }
                 }
                 return super.visitTypeName(name, ctx);
+            }
+
+            @Override
+            public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Map<String, Set<JavaType.Class>> ctx) {
+                JavaType.Class targetClass = TypeUtils.asClass(fieldAccess.getTarget().getType());
+                if (targetClass != null && fieldAccess.getName().getSimpleName().equals("class")) {
+                    ctx.computeIfAbsent(targetClass.getPackageName(), t -> new HashSet<>()).add(targetClass);
+                }
+                return super.visitFieldAccess(fieldAccess, ctx);
             }
         }
 

@@ -181,6 +181,31 @@ interface OrderImportsTest : JavaRecipeTest {
     )
 
     @Test
+    fun unfoldStarMultiple(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = recipe.apply { setRemoveUnused(true) },
+        before = """
+            import java.util.*;
+            
+            class A {
+                List list;
+                List list2;
+                Map map;
+            }
+        """,
+            after = """
+            import java.util.List;
+            import java.util.Map;
+            
+            class A {
+                List list;
+                List list2;
+                Map map;
+            }
+        """
+    )
+
+    @Test
     fun removeUnused(jp: JavaParser) = assertChanged(
         jp,
         recipe = recipe.apply { setRemoveUnused(true) },
