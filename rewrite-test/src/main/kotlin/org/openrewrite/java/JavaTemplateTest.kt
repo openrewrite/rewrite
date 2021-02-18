@@ -66,6 +66,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         after = """
             import org.junit.jupiter.api.*;
             class A {
+
                 @Test
                 @Tag("tag1")
                 @Tag("tag2")
@@ -537,6 +538,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         """,
         after = """
             public class A {
+
                 @Deprecated
                 void foo() {
                 }

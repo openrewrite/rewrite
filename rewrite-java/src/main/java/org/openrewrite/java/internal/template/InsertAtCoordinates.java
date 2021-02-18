@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.internal.template;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -102,7 +103,10 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
                     } else {
                         temp = c.withAnnotations((List<J.Annotation>) generated);
                     }
-                    temp = (J.ClassDeclaration) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
+                    //If the annotations have changed, reformat the class declaration (so we can get properly formatted
+                    //annotations). The class declaration is reformatted (minus the body) and we must format
+                    //relative to the first enclosing J.Block or the J.CompilationUnit
+                    temp = (J.ClassDeclaration) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getFormattingParent(getCursor()));
                     assert temp != null;
                     c = temp.withBody(c.getBody());
                     break;
@@ -135,8 +139,10 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
         } else {
             J.ClassDeclaration temp = c.withAnnotations(maybeMergeList(c.getAnnotations(), generated));
             if (temp != c) {
-                //If the list of annotations has changed, apply formatting.
-                temp = (J.ClassDeclaration) new AutoFormatVisitor<>().visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
+                //If the annotations have changed, reformat the class declaration (so we can get properly formatted
+                //annotations). The class declaration is reformatted (minus the body) and we must format
+                //relative to the first enclosing J.Block or the J.CompilationUnit
+                temp = (J.ClassDeclaration) new AutoFormatVisitor<>().visit(temp.withBody(EMPTY_BLOCK), 0, getFormattingParent(getCursor()));
                 assert temp != null;
                 return temp.withBody(c.getBody());
             }
@@ -174,7 +180,11 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
                     } else {
                         temp = m.withAnnotations((List<J.Annotation>) generated);
                     }
-                    temp = (J.MethodDeclaration) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
+                    //If the annotations have changed, reformat the method declaration (so we can get properly formatted
+                    //annotations). The entire method declaration is reformatted (minus the body) and we must format
+                    //relative to the first enclosing J.Block.
+                    temp = (J.MethodDeclaration) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0,
+                            getFormattingParent(getCursor()));
                     assert temp != null;
                     m = temp.withBody(m.getBody());
                     break;
@@ -207,8 +217,11 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
         } else {
             J.MethodDeclaration temp = m.withAnnotations(maybeMergeList(m.getAnnotations(), generated));
             if (temp != m) {
-                //If the annotations have changed, reformat the method declaration. (no need to format the method body)
-                temp = (J.MethodDeclaration) new AutoFormatVisitor<>().visit(m.withBody(EMPTY_BLOCK), 0, getCursor());
+                //If the annotations have changed, reformat the method declaration (so we can get properly formatted
+                //annotations). The entire method declaration is reformatted (minus the body) and we must format
+                //relative to the first enclosing J.Block.
+                temp = (J.MethodDeclaration) new AutoFormatVisitor<>().visit(m.withBody(EMPTY_BLOCK), 0,
+                        getFormattingParent(getCursor()));
                 assert temp != null;
                 return temp.withBody(m.getBody());
 
@@ -216,7 +229,7 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
 
             temp = m.withTypeParameters(maybeMergeList(m.getTypeParameters(), generated));
             if (temp != m) {
-                //Autoformat the type parameters if they have been changed.
+                //Auto-format the type parameters if they have been changed.
                 temp = (J.MethodDeclaration) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
                 assert temp != null;
                 return m.getPadding().withTypeParameters(temp.getPadding().getTypeParameters());
@@ -224,7 +237,7 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
 
             temp = m.withParameters(maybeMergeList(m.getParameters(), generated));
             if (temp != m) {
-                //Autoformat the parameters if they have been changed.
+                //Auto-format the parameters if they have been changed.
                 temp = (J.MethodDeclaration) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
                 assert temp != null;
                 return m.getPadding().withParameters(temp.getPadding().getParameters());
@@ -232,7 +245,7 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
 
             temp = m.withThrows(maybeMergeList(m.getThrows(), generated));
             if (temp != m) {
-                //Autoformat the throws clause if a change has been made.
+                //Auto-format the throws clause if a change has been made.
                 temp = (J.MethodDeclaration) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
                 assert temp != null;
                 return m.getPadding().withThrows(temp.getPadding().getThrows());
@@ -254,12 +267,16 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
                 } else {
                     m = m.withAnnotations((List<J.Annotation>) generated);
                 }
-                m = (J.VariableDeclarations) autoFormat.visit(m, 0, getCursor());
+                //If the annotations have changed, reformat the variable declaration (so we can get properly formatted
+                //annotations). We must format relative to the first enclosing J.Block.
+                m = (J.VariableDeclarations) autoFormat.visit(m, 0, getFormattingParent(getCursor()));
             }
         } else {
             J.VariableDeclarations temp = m.withAnnotations(maybeMergeList(m.getAnnotations(), generated));
             if (temp != m) {
-                m = (J.VariableDeclarations) autoFormat.visit(m, 0, getCursor());
+                //If the annotations have changed, reformat the variable declaration (so we can get properly formatted
+                //annotations). We must format relative to the first enclosing J.Block.
+                m = (J.VariableDeclarations) autoFormat.visit(m, 0, getFormattingParent(getCursor()));
             }
         }
         assert m != null;
@@ -279,12 +296,23 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
         }
 
         if (temp != m) {
-            //If the arugments have changed, reformat those arguments.
+            //If the arguments have changed, reformat those arguments.
             temp = (J.MethodInvocation) new AutoFormatVisitor<>().visit(temp, 0, getCursor());
             assert temp != null;
             m = m.getPadding().withArguments(temp.getPadding().getArguments());
         }
         return m;
+    }
+
+    /**
+     * Annotations typically have a method declaration, class declaration, or variable declaration as their parent, for
+     * the sake of formatting, the template will find the parent cursor for the first enclosing block or, if the
+     * annotation is on the top level class, the Compilation unit.
+     *
+     * @return A parent cursor that can be used for formatting purposes.
+     */
+    private Cursor getFormattingParent(Cursor originalCursor) {
+        return originalCursor.dropParentUntil(v -> v instanceof J.Block || v instanceof J.CompilationUnit);
     }
 
     @SuppressWarnings("unchecked")
@@ -301,8 +329,6 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
                     } else {
                         newList.addAll(originalList.subList(0, index));
                         newList.addAll((List<T>) generated);
-                        T last = (T) new AutoFormatVisitor<Integer>().visit(originalList.get(index), 0, getCursor());
-
                         newList.addAll(originalList.subList(index, originalList.size()));
                     }
                     return newList;
