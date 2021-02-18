@@ -91,6 +91,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class ExplicitInitializationTck : ExplicitInitializationTest
 
     @Nested
+    inner class FallThroughTck : FallThroughTest
+
+    @Nested
     inner class FinalizeLocalVariablesTck : FinalizeLocalVariablesTest
 
     @Nested
