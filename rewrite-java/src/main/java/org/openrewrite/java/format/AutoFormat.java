@@ -18,20 +18,10 @@ package org.openrewrite.java.format;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.J;
 
 public class AutoFormat extends Recipe {
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new AutoFormatFromCompilationUnit();
-    }
-
-    private static class AutoFormatFromCompilationUnit extends JavaIsoVisitor<ExecutionContext> {
-        @Override
-        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext context) {
-            doAfterVisit(new AutoFormatVisitor<>());
-            return cu;
-        }
+        return new AutoFormatVisitor<>();
     }
 }
