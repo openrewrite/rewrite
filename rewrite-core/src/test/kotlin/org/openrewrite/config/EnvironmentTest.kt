@@ -160,4 +160,17 @@ class EnvironmentTest {
         val recipe = env.activateRecipes("test.TextMigration")
         assertThat(recipe.validateAll()).anyMatch { v -> v.isInvalid }
     }
+
+    @Test
+    fun scanClasspath() {
+        val env = Environment.builder().scanClasspath(Collections.emptySet()).build()
+
+        assertThat(env.listRecipes()).hasSize(2)
+                .extracting("name")
+                .contains("org.openrewrite.text.ChangeTextToJon", "org.openrewrite.HelloJon")
+
+        assertThat(env.listStyles()).hasSize(1)
+                .extracting("name")
+                .contains("org.openrewrite.SampleStyle")
+    }
 }

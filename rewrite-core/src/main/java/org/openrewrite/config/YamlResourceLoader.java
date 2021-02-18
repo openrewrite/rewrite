@@ -153,18 +153,38 @@ public class YamlResourceLoader implements ResourceLoader {
                     List<Style> styles = new ArrayList<>();
                     String name = (String) s.get("name");
                     DeclarativeNamedStyles namedStyles = new DeclarativeNamedStyles(name, styles);
-                    List<Map<String, Object>> styleConfigs = (List<Map<String, Object>>) s.get("styleConfigs");
+                    List<Object> styleConfigs = (List<Object>) s.get("styleConfigs");
                     if (styleConfigs != null) {
-                        for (Map<String, Object> styleConfig : styleConfigs) {
-                            Map.Entry<String, Object> nameAndConfig = styleConfig.entrySet().iterator().next();
-                            try {
-                                styles.add((Style) Class.forName(nameAndConfig.getKey()).getDeclaredConstructor().newInstance());
-                            } catch (Exception e) {
-                                namedStyles.addValidation(Validated.invalid(
-                                        name + ".configure (in " + source + ")",
-                                        nameAndConfig.getKey(),
-                                        "is a style that cannot be constructed.",
-                                        e));
+                        for (int i = 0; i < styleConfigs.size(); i++) {
+                            Object next = styleConfigs.get(i);
+                            if (next instanceof String) {
+                                String styleClassName = (String) next;
+                                try {
+                                    styles.add((Style) Class.forName(styleClassName).getDeclaredConstructor().newInstance());
+                                } catch (Exception e) {
+                                    namedStyles.addValidation(invalid(
+                                            name + ".styleConfigs[" + i + "] (in " + source + ")",
+                                            next,
+                                            "is a style that cannot be constructed.",
+                                            e));
+                                }
+                            } else if (next instanceof Map) {
+                                Map.Entry<String, Object> nameAndConfig = ((Map<String, Object>) next).entrySet().iterator().next();
+                                try {
+                                    Map<Object, Object> withJsonType = new HashMap<>((Map<String, Object>) nameAndConfig.getValue());
+                                    withJsonType.put("@c", nameAndConfig.getKey());
+                                    Style e = mapper.convertValue(withJsonType,
+                                            Style.class);
+                                    styles.add(e);
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
+                            } else {
+                                namedStyles.addValidation(invalid(
+                                        name + ".styleConfigs[" + i + "] (in " + source + ")",
+                                        next,
+                                        "is an object type that isn't recognized as a style.",
+                                        null));
                             }
                         }
                     }
