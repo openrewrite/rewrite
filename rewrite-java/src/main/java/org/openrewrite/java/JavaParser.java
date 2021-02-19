@@ -122,6 +122,9 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
         @Nullable
         protected Collection<Path> classpath;
 
+        @Nullable
+        protected Collection<Input> dependsOn;
+
         protected Charset charset = Charset.defaultCharset();
         protected boolean relaxedClassTypeMatching = false;
         protected boolean logCompilationWarningsAndErrors = true;
@@ -140,6 +143,11 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
 
         public B relaxedClassTypeMatching(boolean relaxedClassTypeMatching) {
             this.relaxedClassTypeMatching = relaxedClassTypeMatching;
+            return (B) this;
+        }
+
+        public B dependsOn(Collection<Input> inputs) {
+            this.dependsOn = inputs;
             return (B) this;
         }
 

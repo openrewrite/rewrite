@@ -25,7 +25,7 @@ import com.sun.tools.javac.util.Options;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Parser;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
@@ -54,6 +54,9 @@ public class Java11Parser implements JavaParser {
     @Nullable
     private final Collection<Path> classpath;
 
+    @Nullable
+    private final Collection<Input> dependsOn;
+
     /**
      * When true, enables a parser to use class types from the in-memory type cache rather than performing
      * a deep equality check. Useful when deep class types have already been built from a separate parsing phase
@@ -73,6 +76,7 @@ public class Java11Parser implements JavaParser {
     private final Listener onParse;
 
     private Java11Parser(@Nullable Collection<Path> classpath,
+                         @Nullable Collection<Input> dependsOn,
                          Charset charset,
                          boolean relaxedClassTypeMatching,
                          boolean suppressMappingErrors,
@@ -80,6 +84,7 @@ public class Java11Parser implements JavaParser {
                          Collection<NamedStyles> styles,
                          Listener onParse) {
         this.classpath = classpath;
+        this.dependsOn = dependsOn;
         this.relaxedClassTypeMatching = relaxedClassTypeMatching;
         this.suppressMappingErrors = suppressMappingErrors;
         this.styles = styles;
@@ -137,6 +142,8 @@ public class Java11Parser implements JavaParser {
             public void close() {
             }
         }));
+
+        compileDependencies();
     }
 
     public static Builder builder() {
@@ -245,7 +252,15 @@ public class Java11Parser implements JavaParser {
         Annotate.instance(context).newRound();
         Enter.instance(context).newRound();
         Modules.instance(context).newRound();
+        compileDependencies();
         return this;
+    }
+
+    private void compileDependencies() {
+        if (dependsOn != null) {
+            parseInputs(dependsOn, null, new InMemoryExecutionContext());
+        }
+        Modules.instance(context).newRound();
     }
 
     /**
@@ -316,7 +331,7 @@ public class Java11Parser implements JavaParser {
 
         @Override
         public Java11Parser build() {
-            return new Java11Parser(classpath, charset, relaxedClassTypeMatching,
+            return new Java11Parser(classpath, dependsOn, charset, relaxedClassTypeMatching,
                     suppressMappingErrors, logCompilationWarningsAndErrors, styles, onParse);
         }
     }

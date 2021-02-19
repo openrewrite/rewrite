@@ -101,6 +101,10 @@ class Java11InstanceOfTest: Java11Test, InstanceOfTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11JavaParserTest: Java11Test, JavaParserTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11LabelTest: Java11Test, LabelTest
 
 @DebugOnly

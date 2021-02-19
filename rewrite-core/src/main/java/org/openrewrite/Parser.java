@@ -21,6 +21,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -122,6 +123,15 @@ public interface Parser<S extends SourceFile> {
             this.synthetic = synthetic;
         }
 
+        @Incubating(since = "7.0.0")
+        public static Input fromString(String source) {
+            return new Input(
+                    Paths.get(Long.toString(System.nanoTime())),
+                    () -> new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)),
+                    true
+            );
+        }
+
         public Path getPath() {
             return path;
         }
@@ -154,6 +164,7 @@ public interface Parser<S extends SourceFile> {
 
     interface Builder<S extends SourceFile> {
         Builder<S> doOnParse(Listener listener);
+
         Parser<S> build();
     }
 
@@ -171,12 +182,16 @@ public interface Parser<S extends SourceFile> {
         default void onParseFailed(Path sourcePath) {
         }
 
-        default void onError(String message) {}
+        default void onError(String message) {
+        }
 
-        default void onError(String message, Throwable t) {}
+        default void onError(String message, Throwable t) {
+        }
 
-        default void onWarn(String message) {}
+        default void onWarn(String message) {
+        }
 
-        default void onWarn(String message, Throwable t) {}
+        default void onWarn(String message, Throwable t) {
+        }
     }
 }

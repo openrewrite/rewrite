@@ -24,6 +24,9 @@ abstract class JavaTreeCompatibilityKit {
     abstract fun javaParser(): JavaParser.Builder<*, *>
 
     @Nested
+    inner class JavaParserTck : JavaParserTest
+
+    @Nested
     inner class AnnotationTck : AnnotationTest
 
     @Nested
