@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.openrewrite.Recipe;
+import org.openrewrite.RecipeException;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
@@ -119,6 +120,9 @@ public class YamlResourceLoader implements ResourceLoader {
                     String name = (String) r.get("name");
                     DeclarativeRecipe recipe = new DeclarativeRecipe(name, source);
                     List<Object> recipeList = (List<Object>) r.get("recipeList");
+                    if (recipeList == null) {
+                        throw new RecipeException("Invalid Recipe [" + name + "] recipeList is null");
+                    }
                     for (int i = 0; i < recipeList.size(); i++) {
                         Object next = recipeList.get(i);
                         if (next instanceof String) {
