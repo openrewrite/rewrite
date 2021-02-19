@@ -16,6 +16,7 @@
 package org.openrewrite.config;
 
 import org.openrewrite.Recipe;
+import org.openrewrite.RecipeException;
 import org.openrewrite.style.NamedStyles;
 
 import java.io.File;
@@ -50,12 +51,23 @@ public class Environment {
 
     public Recipe activateRecipes(Iterable<String> activeRecipes) {
         Recipe root = new Recipe();
-        for (Recipe recipe : listRecipes()) {
-            for (String activeRecipe : activeRecipes) {
-                if (activeRecipe.equals(recipe.getName())) {
+        Collection<Recipe> recipes = listRecipes();
+        List<String> recipesNotFound = new ArrayList<>();
+        for (String activeRecipe : activeRecipes) {
+            boolean foundRecipe = false;
+            for (Recipe recipe : recipes) {
+                if (activeRecipe.equals(recipe.getName())){
                     root.doNext(recipe);
+                    foundRecipe = true;
+                    break;
                 }
             }
+            if (!foundRecipe) {
+                recipesNotFound.add(activeRecipe);
+            }
+        }
+        if (!recipesNotFound.isEmpty()) {
+            throw new RecipeException("Recipes not found: " + String.join(", ",recipesNotFound));
         }
         return root;
     }
