@@ -42,6 +42,12 @@ public class Environment {
         return recipes;
     }
 
+    public Collection<RecipeDescriptor> listRecipeDescriptors() {
+        return resourceLoaders.stream()
+                .flatMap(r -> r.listRecipeDescriptors().stream())
+                .collect(toList());
+    }
+
     public Recipe activateRecipes(Iterable<String> activeRecipes) {
         Recipe root = new Recipe();
         for (Recipe recipe : listRecipes()) {
