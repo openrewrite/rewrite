@@ -10,6 +10,8 @@ dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
 
+    implementation("io.github.classgraph:classgraph:latest.release")
+
     testImplementation(project(":rewrite-test"))
 
     integTestImplementation("io.micrometer:micrometer-registry-prometheus:latest.release")

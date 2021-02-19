@@ -144,6 +144,14 @@ public class YamlResourceLoader implements ResourceLoader {
                 .collect(toList());
     }
 
+    @Override
+    public Collection<RecipeDescriptor> listRecipeDescriptors() {
+        return loadResources(ResourceType.Recipe).stream()
+                .filter(r -> r.containsKey("name"))
+                .map(r -> new RecipeDescriptor((String) r.get("name"), Collections.emptyList()))
+                .collect(toList());
+    }
+
     @SuppressWarnings("unchecked")
     @Override
     public Collection<NamedStyles> listStyles() {

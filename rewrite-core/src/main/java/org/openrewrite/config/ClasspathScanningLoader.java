@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Parameter;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -41,6 +42,8 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
     private final List<Recipe> recipes = new ArrayList<>();
     private final List<NamedStyles> styles = new ArrayList<>();
+
+    private final List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();
 
     public ClasspathScanningLoader(Iterable<Path> compileClasspath, Properties properties, String[] acceptPackages) {
         scanYaml(new ClassGraph().acceptPaths("META-INF/rewrite"), properties);
@@ -76,10 +79,12 @@ public class ClasspathScanningLoader implements ResourceLoader {
             scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) -> {
                 YamlResourceLoader resourceLoader = new YamlResourceLoader(input, res.getURI(), properties);
                 recipes.addAll(resourceLoader.listRecipes());
+                recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors());
                 styles.addAll(resourceLoader.listStyles());
             });
         }
     }
+
 
     private void scanClasses(ClassGraph classGraph, String[] acceptPackages) {
         try (ScanResult result = classGraph
@@ -89,13 +94,19 @@ public class ClasspathScanningLoader implements ResourceLoader {
             for (ClassInfo classInfo : result.getSubclasses(Recipe.class.getName())) {
                 Class<?> recipeClass = classInfo.loadClass();
                 try {
+                    List<String> parameters = new ArrayList<>();
                     for (Constructor<?> constructor : recipeClass.getConstructors()) {
+                        for (int i = 0; i < constructor.getParameters().length; i++) {
+                            Parameter param = constructor.getParameters()[i];
+                            parameters.add(param.getName());
+                        }
                         if (constructor.getParameterCount() == 0) {
                             constructor.setAccessible(true);
                             recipes.add((Recipe) constructor.newInstance());
                             break;
                         }
                     }
+                    recipeDescriptors.add(new RecipeDescriptor(classInfo.getName(), parameters));
                 } catch (Exception e) {
                     logger.warn("Unable to configure {}", recipeClass.getName(), e);
                 }
@@ -120,6 +131,11 @@ public class ClasspathScanningLoader implements ResourceLoader {
     @Override
     public Collection<Recipe> listRecipes() {
         return recipes;
+    }
+
+    @Override
+    public Collection<RecipeDescriptor> listRecipeDescriptors() {
+        return recipeDescriptors;
     }
 
     @Override

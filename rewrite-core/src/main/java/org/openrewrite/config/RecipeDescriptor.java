@@ -15,15 +15,24 @@
  */
 package org.openrewrite.config;
 
-import org.openrewrite.Recipe;
-import org.openrewrite.style.NamedStyles;
+import java.util.List;
 
-import java.util.Collection;
+public class RecipeDescriptor {
 
-public interface ResourceLoader {
-    Collection<Recipe> listRecipes();
+    private final String name;
 
-    Collection<RecipeDescriptor> listRecipeDescriptors();
+    private final List<String> parameters;
 
-    Collection<NamedStyles> listStyles();
+    public RecipeDescriptor(String name, List<String> parameters) {
+        this.name = name;
+        this.parameters = parameters;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public List<String> getParameters() {
+        return parameters;
+    }
 }

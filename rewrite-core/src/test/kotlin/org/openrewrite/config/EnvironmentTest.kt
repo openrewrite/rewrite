@@ -173,4 +173,15 @@ class EnvironmentTest {
                 .extracting("name")
                 .contains("org.openrewrite.SampleStyle")
     }
+
+    @Test
+    fun listRecipeDescriptors() {
+        val env = Environment.builder().scanClasspath(Collections.emptySet()).build()
+        val recipeDescriptors = env.listRecipeDescriptors()
+        assertThat(recipeDescriptors).isNotNull.isNotEmpty
+        val changeTextDescriptor = recipeDescriptors.filter { it.name == "org.openrewrite.text.ChangeText" }.firstOrNull()
+        assertThat(changeTextDescriptor).isNotNull
+        assertThat(changeTextDescriptor!!.parameters).hasSize(1)
+        assertThat(changeTextDescriptor.parameters[0]).isEqualTo("toText")
+    }
 }
