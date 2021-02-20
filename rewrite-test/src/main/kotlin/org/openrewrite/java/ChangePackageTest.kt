@@ -42,6 +42,43 @@ interface ChangePackageTest: JavaRecipeTest {
     )
 
     @Test
+    fun changePackageRecursive(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = ChangePackage(
+            "org.openrewrite",
+            "org.openrewrite.test"
+        ),
+        before = """
+            package org.openrewrite.internal;
+            class Test {
+            }
+        """,
+        after = """ 
+            package org.openrewrite.test.internal;
+            class Test {
+            }
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.sourcePath.toString()).contains("org/openrewrite/test/internal")
+        }
+    )
+
+    @Test
+    fun changePackageNonRecursive(jp: JavaParser) = assertUnchanged(
+        jp,
+        recipe = ChangePackage(
+            "org.openrewrite",
+            "org.openrewrite.test",
+            false
+        ),
+        before = """
+            package org.openrewrite.internal;
+            class Test {
+            }
+        """
+    )
+
+    @Test
     fun changePackageReferences(jp: JavaParser) = assertChanged(
         jp,
         cycles = 2,
