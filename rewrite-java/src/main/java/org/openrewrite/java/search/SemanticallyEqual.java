@@ -62,9 +62,7 @@ public class SemanticallyEqual {
             J.Annotation secondAnnotation = (J.Annotation) second;
 
             if (firstAnnotation.getArguments() != null && secondAnnotation.getArguments() != null) {
-                if (firstAnnotation.getArguments() != null &&
-                        secondAnnotation.getArguments() != null &&
-                        firstAnnotation.getArguments().size() == secondAnnotation.getArguments().size()) {
+                if (firstAnnotation.getArguments().size() == secondAnnotation.getArguments().size()) {
 
                     List<Expression> firstArgs = firstAnnotation.getArguments();
                     List<Expression> secondArgs = secondAnnotation.getArguments();
@@ -76,9 +74,8 @@ public class SemanticallyEqual {
                     isEqual = false;
                     return null;
                 }
-
-                this.visitTypeName(firstAnnotation.getAnnotationType(), secondAnnotation.getAnnotationType());
             }
+            this.visitTypeName(firstAnnotation.getAnnotationType(), secondAnnotation.getAnnotationType());
             return null;
         }
 

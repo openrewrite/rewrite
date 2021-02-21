@@ -33,7 +33,45 @@ interface SemanticallyEqualTest {
                 boolean value();
                 String srcValue(); 
             }
+            @interface NoArgAnnotation1{}
+            @interface NoArgAnnotation2{}
         """
+    }
+
+    @Test
+    fun noArgumentsTest(jp: JavaParser) {
+        val cu = jp.parse(
+            """
+                @NoArgAnnotation1
+                class A {}
+            """,
+            annotInterface
+        )
+
+        val firstAnnot = cu[0].classes[0].annotations[0]
+
+        jp.reset()
+
+        val secondAnnot = jp.parse(
+            """
+                @NoArgAnnotation2
+                class B {}
+            """,
+            annotInterface
+        )[0].classes[0].annotations[0]
+
+        jp.reset()
+
+        val thirdAnnot = jp.parse(
+            """
+                @NoArgAnnotation2
+                class B {}
+            """,
+            annotInterface
+        )[0].classes[0].annotations[0]
+
+        assertThat(SemanticallyEqual.areEqual(firstAnnot, secondAnnot)).isFalse()
+        assertThat(SemanticallyEqual.areEqual(secondAnnot,thirdAnnot)).isTrue()
     }
 
     @Test
