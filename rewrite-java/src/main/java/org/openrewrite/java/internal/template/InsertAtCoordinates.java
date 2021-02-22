@@ -98,10 +98,10 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
                 case ANNOTATIONS: {
                     J.ClassDeclaration temp;
                     if (INSERTION.equals(coordinates.getMode())) {
-                        temp = c.withAnnotations(ListUtils.insertInOrder(c.getAnnotations(), (J.Annotation) generated.get(0),
+                        temp = c.withLeadingAnnotations(ListUtils.insertInOrder(c.getLeadingAnnotations(), (J.Annotation) generated.get(0),
                                 coordinates.getComparator()));
                     } else {
-                        temp = c.withAnnotations((List<J.Annotation>) generated);
+                        temp = c.withLeadingAnnotations((List<J.Annotation>) generated);
                     }
                     //If the annotations have changed, reformat the class declaration (so we can get properly formatted
                     //annotations). The class declaration is reformatted (minus the body) and we must format
@@ -137,7 +137,7 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
                     break;
             }
         } else {
-            J.ClassDeclaration temp = c.withAnnotations(maybeMergeList(c.getAnnotations(), generated));
+            J.ClassDeclaration temp = c.withLeadingAnnotations(maybeMergeList(c.getLeadingAnnotations(), generated));
             if (temp != c) {
                 //If the annotations have changed, reformat the class declaration (so we can get properly formatted
                 //annotations). The class declaration is reformatted (minus the body) and we must format
@@ -175,10 +175,10 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
                 case ANNOTATIONS: {
                     J.MethodDeclaration temp;
                     if (INSERTION.equals(coordinates.getMode())) {
-                        temp = m.withAnnotations(ListUtils.insertInOrder(m.getAnnotations(), (J.Annotation) generated.get(0),
+                        temp = m.withLeadingAnnotations(ListUtils.insertInOrder(m.getLeadingAnnotations(), (J.Annotation) generated.get(0),
                                 coordinates.getComparator()));
                     } else {
-                        temp = m.withAnnotations((List<J.Annotation>) generated);
+                        temp = m.withLeadingAnnotations((List<J.Annotation>) generated);
                     }
                     //If the annotations have changed, reformat the method declaration (so we can get properly formatted
                     //annotations). The entire method declaration is reformatted (minus the body) and we must format
@@ -193,7 +193,7 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
                     J.MethodDeclaration temp = m.withTypeParameters((List<J.TypeParameter>) generated);
                     temp = (J.MethodDeclaration) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
                     assert temp != null;
-                    m = m.getPadding().withTypeParameters(temp.getPadding().getTypeParameters());
+                    m = m.withTypeParameters(temp.getTypeParameters());
                     break;
                 }
                 case METHOD_DECLARATION_PARAMETERS: {
@@ -215,7 +215,7 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
                     break;
             }
         } else {
-            J.MethodDeclaration temp = m.withAnnotations(maybeMergeList(m.getAnnotations(), generated));
+            J.MethodDeclaration temp = m.withLeadingAnnotations(maybeMergeList(m.getLeadingAnnotations(), generated));
             if (temp != m) {
                 //If the annotations have changed, reformat the method declaration (so we can get properly formatted
                 //annotations). The entire method declaration is reformatted (minus the body) and we must format
@@ -232,7 +232,7 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
                 //Auto-format the type parameters if they have been changed.
                 temp = (J.MethodDeclaration) autoFormat.visit(temp.withBody(EMPTY_BLOCK), 0, getCursor());
                 assert temp != null;
-                return m.getPadding().withTypeParameters(temp.getPadding().getTypeParameters());
+                return m.getAnnotations().withTypeParameters(temp.getAnnotations().getTypeParameters());
             }
 
             temp = m.withParameters(maybeMergeList(m.getParameters(), generated));
@@ -262,17 +262,17 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
         if (insertId.equals(m.getId())) {
             if (location == Space.Location.ANNOTATIONS) {
                 if (INSERTION.equals(coordinates.getMode())) {
-                    m = m.withAnnotations(ListUtils.insertInOrder(m.getAnnotations(), (J.Annotation) generated.get(0),
+                    m = m.withLeadingAnnotations(ListUtils.insertInOrder(m.getLeadingAnnotations(), (J.Annotation) generated.get(0),
                             coordinates.getComparator()));
                 } else {
-                    m = m.withAnnotations((List<J.Annotation>) generated);
+                    m = m.withLeadingAnnotations((List<J.Annotation>) generated);
                 }
                 //If the annotations have changed, reformat the variable declaration (so we can get properly formatted
                 //annotations). We must format relative to the first enclosing J.Block.
                 m = (J.VariableDeclarations) autoFormat.visit(m, 0, getFormattingParent(getCursor()));
             }
         } else {
-            J.VariableDeclarations temp = m.withAnnotations(maybeMergeList(m.getAnnotations(), generated));
+            J.VariableDeclarations temp = m.withLeadingAnnotations(maybeMergeList(m.getLeadingAnnotations(), generated));
             if (temp != m) {
                 //If the annotations have changed, reformat the variable declaration (so we can get properly formatted
                 //annotations). We must format relative to the first enclosing J.Block.

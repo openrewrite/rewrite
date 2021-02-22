@@ -146,6 +146,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
     protected void visitModifiers(Iterable<Modifier> modifiers, P p) {
         StringBuilder acc = getPrinter();
         for (Modifier mod : modifiers) {
+            visit(mod.getAnnotations(), p);
             String keyword = "";
             switch (mod.getType()) {
                 case Default:
@@ -198,6 +199,14 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
         visit(annotation.getAnnotationType(), p);
         visitContainer("(", annotation.getPadding().getArguments(), JContainer.Location.ANNOTATION_ARGUMENTS, ",", ")", p);
         return annotation;
+    }
+
+    @Override
+    public J visitAnnotatedType(AnnotatedType annotatedType, P p) {
+        visitSpace(annotatedType.getPrefix(), Space.Location.ANNOTATED_TYPE_PREFIX, p);
+        visit(annotatedType.getAnnotations(), p);
+        visit(annotatedType.getTypeExpression(), p);
+        return annotatedType;
     }
 
     @Override
@@ -480,15 +489,16 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
 
         visitSpace(classDecl.getPrefix(), Space.Location.CLASS_DECLARATION_PREFIX, p);
         visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
-        visit(classDecl.getAnnotations(), p);
+        visit(classDecl.getLeadingAnnotations(), p);
         visitModifiers(classDecl.getModifiers(), p);
-        visitSpace(classDecl.getPadding().getKind().getBefore(), Space.Location.CLASS_KIND, p);
+        visit(classDecl.getAnnotations().getKind().getAnnotations(), p);
+        visitSpace(classDecl.getAnnotations().getKind().getPrefix(), Space.Location.CLASS_KIND, p);
         StringBuilder acc = getPrinter();
         acc.append(kind);
         visit(classDecl.getName(), p);
         visitContainer("<", classDecl.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
         visitLeftPadded("extends", classDecl.getPadding().getExtends(), JLeftPadded.Location.EXTENDS, p);
-        visitContainer(classDecl.getKind().equals(ClassDeclaration.Kind.Interface) ? "extends" : "implements",
+        visitContainer(classDecl.getKind().equals(ClassDeclaration.Kind.Type.Interface) ? "extends" : "implements",
                 classDecl.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, ",", null, p);
         visit(classDecl.getBody(), p);
         return classDecl;
@@ -696,10 +706,19 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
     public J visitMethodDeclaration(MethodDeclaration method, P p) {
         visitSpace(method.getPrefix(), Space.Location.METHOD_DECLARATION_PREFIX, p);
         visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
-        visit(method.getAnnotations(), p);
+        visit(method.getLeadingAnnotations(), p);
         visitModifiers(method.getModifiers(), p);
-        visitContainer("<", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
+        TypeParameters typeParameters = method.getAnnotations().getTypeParameters();
+        if (typeParameters != null) {
+            visit(typeParameters.getAnnotations(), p);
+            visitSpace(typeParameters.getPrefix(), Space.Location.TYPE_PARAMETERS, p);
+            StringBuilder acc = getPrinter();
+            acc.append("<");
+            visitRightPadded(typeParameters.getPadding().getTypeParameters(), JRightPadded.Location.TYPE_PARAMETER, ",", p);
+            acc.append(">");
+        }
         visit(method.getReturnTypeExpression(), p);
+        visit(method.getAnnotations().getName().getAnnotations(), p);
         visit(method.getName(), p);
         visitContainer("(", method.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",", ")", p);
         visitContainer("throws", method.getPadding().getThrows(), JContainer.Location.THROWS, ",", null, p);
@@ -730,7 +749,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
         StringBuilder acc = getPrinter();
         visitSpace(multiVariable.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
         visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
-        visit(multiVariable.getAnnotations(), p);
+        visit(multiVariable.getLeadingAnnotations(), p);
         visitModifiers(multiVariable.getModifiers(), p);
         visit(multiVariable.getTypeExpression(), p);
         for (JLeftPadded<Space> dim : multiVariable.getDimensionsBeforeName()) {

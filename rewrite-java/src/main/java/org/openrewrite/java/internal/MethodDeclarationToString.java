@@ -19,6 +19,7 @@ import org.openrewrite.TreePrinter;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
+import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 
 public class MethodDeclarationToString {
@@ -35,7 +36,13 @@ public class MethodDeclarationToString {
             if (!method.getModifiers().isEmpty()) {
                 acc.append(' ');
             }
-            visitContainer("<", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", unused);
+            J.TypeParameters typeParameters = method.getAnnotations().getTypeParameters();
+            if (typeParameters != null) {
+                visitSpace(typeParameters.getPrefix(), Space.Location.TYPE_PARAMETERS, unused);
+                acc.append("<");
+                visitRightPadded(typeParameters.getPadding().getTypeParameters(), JRightPadded.Location.TYPE_PARAMETER, ",", unused);
+                acc.append(">");
+            }
             if (method.getReturnTypeExpression() != null) {
                 acc.append(method.getReturnTypeExpression().printTrimmed()).append(' ');
             }

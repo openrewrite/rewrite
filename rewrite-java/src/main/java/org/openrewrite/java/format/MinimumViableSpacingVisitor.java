@@ -28,7 +28,7 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
 
         boolean first = true;
-        if (!c.getAnnotations().isEmpty()) {
+        if (!c.getLeadingAnnotations().isEmpty()) {
             first = false;
         }
         if (!c.getModifiers().isEmpty()) {
@@ -82,7 +82,7 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
 
         boolean first = true;
-        if (!m.getAnnotations().isEmpty()) {
+        if (!m.getLeadingAnnotations().isEmpty()) {
             first = false;
         }
         if (!m.getModifiers().isEmpty()) {
@@ -92,13 +92,16 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
             }
             first = false;
         }
-        J.MethodDeclaration.Padding padding = m.getPadding();
-        JContainer<J.TypeParameter> typeParameters = padding.getTypeParameters();
-        if (typeParameters != null && !typeParameters.getElements().isEmpty()) {
-            if (!first && typeParameters.getBefore().getWhitespace().isEmpty()) {
-                m = padding.withTypeParameters(typeParameters.withBefore(typeParameters.getBefore().withWhitespace(" ")));
+        J.TypeParameters typeParameters = m.getAnnotations().getTypeParameters();
+        if (typeParameters != null && !typeParameters.getTypeParameters().isEmpty()) {
+            if (!first && typeParameters.getPrefix().getWhitespace().isEmpty()) {
+                m = m.getAnnotations().withTypeParameters(
+                        typeParameters.withPrefix(
+                                typeParameters.getPrefix().withWhitespace(" ")
+                        )
+                );
+                first = false;
             }
-            first = false;
         }
         if (m.getReturnTypeExpression() != null && m.getReturnTypeExpression().getPrefix().getWhitespace().isEmpty()) {
             if (!first) {
@@ -142,7 +145,7 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
             }
         }
 
-        /**
+        /*
          * We need at least one space between multiple modifiers, otherwise we could get a run-on like "publicstaticfinal".
          * Note, this is applicable anywhere that modifiers can exist, such as class declarations, etc.
          */
@@ -150,7 +153,7 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
             v = v.withModifiers(
                     ListUtils.map(v.getModifiers(), (index, modifier) -> {
                         if (index == 0) {
-                            /**
+                            /*
                              * Skip the first modifier in the modifier list (if any). We only
                              * care about ensuring there is at least one space between multiple modifiers.
                              */

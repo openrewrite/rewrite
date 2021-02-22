@@ -283,14 +283,18 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         J.ClassDeclaration c = classDecl;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.CLASS_DECLARATION_PREFIX, p));
         c = visitAndCast(c, p, this::visitStatement);
-        c = c.withAnnotations(ListUtils.map(c.getAnnotations(), a -> visitAndCast(a, p)));
+        c = c.withLeadingAnnotations(ListUtils.map(c.getLeadingAnnotations(), a -> visitAndCast(a, p)));
         c = c.withModifiers(ListUtils.map(c.getModifiers(), m -> visitAndCast(m, p)));
         c = c.withModifiers(ListUtils.map(c.getModifiers(),
                 mod -> mod.withPrefix(visitSpace(mod.getPrefix(), Space.Location.MODIFIER_PREFIX, p))));
         if (c.getPadding().getTypeParameters() != null) {
             c = c.getPadding().withTypeParameters(visitContainer(c.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p));
         }
-        c = c.getPadding().withKind(visitLeftPadded(c.getPadding().getKind(), JLeftPadded.Location.CLASS_KIND, p));
+        c = c.getAnnotations().withKind(
+                c.getAnnotations().getKind().withPrefix(
+                        visitSpace(c.getAnnotations().getKind().getPrefix(), Space.Location.CLASS_KIND, p)
+                )
+        );
         c = c.withName(visitAndCast(c.getName(), p));
         if (c.getPadding().getExtends() != null) {
             c = c.getPadding().withExtends(visitLeftPadded(c.getPadding().getExtends(), JLeftPadded.Location.EXTENDS, p));
@@ -504,12 +508,25 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         J.MethodDeclaration m = method;
         m = m.withPrefix(visitSpace(m.getPrefix(), Space.Location.METHOD_DECLARATION_PREFIX, p));
         m = visitAndCast(m, p, this::visitStatement);
-        m = m.withAnnotations(ListUtils.map(m.getAnnotations(), a -> visitAndCast(a, p)));
+        m = m.withLeadingAnnotations(ListUtils.map(m.getLeadingAnnotations(), a -> visitAndCast(a, p)));
         m = m.withModifiers(ListUtils.map(m.getModifiers(), e -> visitAndCast(e, p)));
         m = m.withModifiers(ListUtils.map(m.getModifiers(),
                 mod -> mod.withPrefix(visitSpace(mod.getPrefix(), Space.Location.MODIFIER_PREFIX, p))));
-        if (m.getPadding().getTypeParameters() != null) {
-            m = m.getPadding().withTypeParameters(visitContainer(m.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p));
+        J.TypeParameters typeParameters = m.getAnnotations().getTypeParameters();
+        if (typeParameters != null) {
+            m = m.getAnnotations().withTypeParameters(typeParameters.withAnnotations(
+                    ListUtils.map(typeParameters.getAnnotations(), a -> visitAndCast(a, p))
+            ));
+        }
+        typeParameters = m.getAnnotations().getTypeParameters();
+        if (typeParameters != null) {
+            m = m.getAnnotations().withTypeParameters(
+                    typeParameters.getPadding().withTypeParameters(
+                            ListUtils.map(typeParameters.getPadding().getTypeParameters(),
+                                    tp -> visitRightPadded(tp, JRightPadded.Location.TYPE_PARAMETER, p)
+                            )
+                    )
+            );
         }
         m = m.withReturnTypeExpression(visitAndCast(m.getReturnTypeExpression(), p));
         m = m.withReturnTypeExpression(
@@ -565,7 +582,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         J.VariableDeclarations m = multiVariable;
         m = m.withPrefix(visitSpace(m.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, p));
         m = visitAndCast(m, p, this::visitStatement);
-        m = m.withAnnotations(ListUtils.map(m.getAnnotations(), a -> visitAndCast(a, p)));
+        m = m.withLeadingAnnotations(ListUtils.map(m.getLeadingAnnotations(), a -> visitAndCast(a, p)));
         m = m.withModifiers(Objects.requireNonNull(ListUtils.map(m.getModifiers(), e -> visitAndCast(e, p))));
         m = m.withModifiers(ListUtils.map(m.getModifiers(),
                 mod -> mod.withPrefix(visitSpace(mod.getPrefix(), Space.Location.MODIFIER_PREFIX, p))));
@@ -883,7 +900,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             Object childScope = it.next();
             if (childScope instanceof J.ClassDeclaration) {
                 J.ClassDeclaration childClass = (J.ClassDeclaration) childScope;
-                if (!(childClass.getKind().equals(J.ClassDeclaration.Kind.Class)) ||
+                if (!(childClass.getKind().equals(J.ClassDeclaration.Kind.Type.Class)) ||
                         childClass.hasModifier(J.Modifier.Type.Static)) {
                     //Short circuit the search if a terminating element is encountered.
                     return false;

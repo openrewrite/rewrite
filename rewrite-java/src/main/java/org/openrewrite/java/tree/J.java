@@ -835,6 +835,10 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @Nullable
+        @NonFinal
+        transient WeakReference<Annotations> annotations;
+
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -849,20 +853,25 @@ public interface J extends Serializable, Tree {
 
         @With
         @Getter
-        List<Annotation> annotations;
+        List<Annotation> leadingAnnotations;
 
         @With
         @Getter
         List<Modifier> modifiers;
 
-        JLeftPadded<Kind> kind;
+        Kind kind;
 
-        public Kind getKind() {
-            return kind.getElement();
+        public Kind.Type getKind() {
+            return kind.getType();
         }
 
-        public ClassDeclaration withKind(Kind kind) {
-            return getPadding().withKind(this.kind.withElement(kind));
+        public ClassDeclaration withKind(Kind.Type type) {
+            Kind k = getAnnotations().getKind();
+            if (k.type == type) {
+                return this;
+            } else {
+                return getAnnotations().withKind(k.withType(type));
+            }
         }
 
         @With
@@ -919,6 +928,16 @@ public interface J extends Serializable, Tree {
             return v.visitClassDeclaration(this, p);
         }
 
+        // gather annotations from everywhere they may occur
+        public List<J.Annotation> getAllAnnotations() {
+            List<Annotation> allAnnotations = new ArrayList<>(leadingAnnotations);
+            for (J.Modifier modifier : modifiers) {
+                allAnnotations.addAll(modifier.getAnnotations());
+            }
+            allAnnotations.addAll(kind.getAnnotations());
+            return allAnnotations;
+        }
+
         @Override
         public Coordinates.ClassDeclaration getCoordinates() {
             return new Coordinates.ClassDeclaration(this);
@@ -928,11 +947,42 @@ public interface J extends Serializable, Tree {
             return name.getSimpleName();
         }
 
-        public enum Kind {
-            Class,
-            Enum,
-            Interface,
-            Annotation
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @Data
+        public static final class Kind implements J {
+
+            @Getter
+            @EqualsAndHashCode.Include
+            UUID id;
+
+            @With
+            @Getter
+            Space prefix;
+
+            @With
+            @Getter
+            Markers markers;
+
+            @With
+            @Getter
+            List<Annotation> annotations;
+
+            @With
+            @Getter
+            Type type;
+
+            @Override
+            public Coordinates getCoordinates() {
+                return new Coordinates.ClassDeclaration.Kind(this);
+            }
+
+            public enum Type {
+                Class,
+                Enum,
+                Interface,
+                Annotation
+            }
         }
 
         public boolean hasModifier(Modifier.Type modifier) {
@@ -963,21 +1013,13 @@ public interface J extends Serializable, Tree {
         public static class Padding {
             private final ClassDeclaration t;
 
-            public JLeftPadded<Kind> getKind() {
-                return t.kind;
-            }
-
-            public ClassDeclaration withKind(JLeftPadded<Kind> kind) {
-                return t.kind == kind ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.annotations, t.modifiers, kind, t.name, t.typeParameters, t.extendings, t.implementings, t.body, t.type);
-            }
-
             @Nullable
             public JLeftPadded<TypeTree> getExtends() {
                 return t.extendings;
             }
 
             public ClassDeclaration withExtends(@Nullable JLeftPadded<TypeTree> extendings) {
-                return t.extendings == extendings ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.kind, t.name, t.typeParameters, extendings, t.implementings, t.body, t.type);
+                return t.extendings == extendings ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, t.typeParameters, extendings, t.implementings, t.body, t.type);
             }
 
             @Nullable
@@ -986,7 +1028,7 @@ public interface J extends Serializable, Tree {
             }
 
             public ClassDeclaration withImplements(@Nullable JContainer<TypeTree> implementings) {
-                return t.implementings == implementings ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.kind, t.name, t.typeParameters, t.extendings, implementings, t.body, t.type);
+                return t.implementings == implementings ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, t.typeParameters, t.extendings, implementings, t.body, t.type);
             }
 
             @Nullable
@@ -995,7 +1037,35 @@ public interface J extends Serializable, Tree {
             }
 
             public ClassDeclaration withTypeParameters(@Nullable JContainer<TypeParameter> typeParameters) {
-                return t.typeParameters == typeParameters ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.kind, t.name, typeParameters, t.extendings, t.implementings, t.body, t.type);
+                return t.typeParameters == typeParameters ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, typeParameters, t.extendings, t.implementings, t.body, t.type);
+            }
+        }
+
+        public Annotations getAnnotations() {
+            Annotations a;
+            if (this.annotations == null) {
+                a = new Annotations(this);
+                this.annotations = new WeakReference<>(a);
+            } else {
+                a = this.annotations.get();
+                if (a == null || a.t != this) {
+                    a = new Annotations(this);
+                    this.annotations = new WeakReference<>(a);
+                }
+            }
+            return a;
+        }
+
+        @RequiredArgsConstructor
+        public static class Annotations {
+            private final ClassDeclaration t;
+
+            public Kind getKind() {
+                return t.kind;
+            }
+
+            public ClassDeclaration withKind(Kind kind) {
+                return t.kind == kind ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, kind, t.name, t.typeParameters, t.extendings, t.implementings, t.body, t.type);
             }
         }
     }
@@ -2715,6 +2785,10 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @Nullable
+        @NonFinal
+        transient WeakReference<Annotations> annotations;
+
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -2729,22 +2803,36 @@ public interface J extends Serializable, Tree {
 
         @With
         @Getter
-        List<Annotation> annotations;
+        List<Annotation> leadingAnnotations;
 
         @With
         @Getter
         List<Modifier> modifiers;
 
         @Nullable
-        JContainer<TypeParameter> typeParameters;
+        TypeParameters typeParameters;
 
         @Nullable
         public List<TypeParameter> getTypeParameters() {
-            return typeParameters == null ? null : typeParameters.getElements();
+            return typeParameters == null ? null : typeParameters.getTypeParameters();
         }
 
         public MethodDeclaration withTypeParameters(@Nullable List<TypeParameter> typeParameters) {
-            return getPadding().withTypeParameters(JContainer.withElementsNullable(this.typeParameters, typeParameters));
+            if (typeParameters == null) {
+                if (this.getAnnotations().getTypeParameters() == null) {
+                    return this;
+                } else {
+                    return this.getAnnotations().withTypeParameters(null);
+                }
+            } else {
+                TypeParameters currentTypeParameters = this.getAnnotations().getTypeParameters();
+                if (currentTypeParameters == null) {
+                    return getAnnotations().withTypeParameters(new TypeParameters(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                            null, typeParameters.stream().map(JRightPadded::build).collect(toList())));
+                } else {
+                    return getAnnotations().withTypeParameters(currentTypeParameters.withTypeParameters(typeParameters));
+                }
+            }
         }
 
         /**
@@ -2755,9 +2843,15 @@ public interface J extends Serializable, Tree {
         @Nullable
         TypeTree returnTypeExpression;
 
-        @With
-        @Getter
-        Identifier name;
+        IdentifierWithAnnotations name;
+
+        public Identifier getName() {
+            return name.getIdentifier();
+        }
+
+        public MethodDeclaration withName(Identifier name) {
+            return getAnnotations().withName(this.name.withIdentifier(name));
+        }
 
         JContainer<Statement> parameters;
 
@@ -2823,7 +2917,7 @@ public interface J extends Serializable, Tree {
         }
 
         public String getSimpleName() {
-            return name.getSimpleName();
+            return name.getIdentifier().getSimpleName();
         }
 
         public boolean hasModifier(Modifier.Type modifier) {
@@ -2838,6 +2932,34 @@ public interface J extends Serializable, Tree {
         @Override
         public Coordinates.MethodDeclaration getCoordinates() {
             return new Coordinates.MethodDeclaration(this);
+        }
+
+        // gather annotations from everywhere they may occur
+        public List<J.Annotation> getAllAnnotations() {
+            List<Annotation> allAnnotations = new ArrayList<>(leadingAnnotations);
+            for (J.Modifier modifier : modifiers) {
+                allAnnotations.addAll(modifier.getAnnotations());
+            }
+            if (typeParameters != null) {
+                allAnnotations.addAll(typeParameters.getAnnotations());
+            }
+            if (returnTypeExpression instanceof AnnotatedType) {
+                allAnnotations.addAll(((AnnotatedType) returnTypeExpression).getAnnotations());
+            }
+            return allAnnotations;
+        }
+
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @Data
+        public static final class IdentifierWithAnnotations {
+
+            @Getter
+            @With
+            Identifier identifier;
+
+            @Getter
+            List<Annotation> annotations;
         }
 
         public Padding getPadding() {
@@ -2859,21 +2981,12 @@ public interface J extends Serializable, Tree {
         public static class Padding {
             private final MethodDeclaration t;
 
-            @Nullable
-            public JContainer<TypeParameter> getTypeParameters() {
-                return t.typeParameters;
-            }
-
-            public MethodDeclaration withTypeParameters(@Nullable JContainer<TypeParameter> typeParameters) {
-                return t.typeParameters == typeParameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.annotations, t.modifiers, typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, t.defaultValue, t.type);
-            }
-
             public JContainer<Statement> getParameters() {
                 return t.parameters;
             }
 
             public MethodDeclaration withParameters(JContainer<Statement> parameters) {
-                return t.parameters == parameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, parameters, t.throwz, t.body, t.defaultValue, t.type);
+                return t.parameters == parameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, parameters, t.throwz, t.body, t.defaultValue, t.type);
             }
 
             @Nullable
@@ -2882,7 +2995,7 @@ public interface J extends Serializable, Tree {
             }
 
             public MethodDeclaration withThrows(@Nullable JContainer<NameTree> throwz) {
-                return t.throwz == throwz ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, throwz, t.body, t.defaultValue, t.type);
+                return t.throwz == throwz ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, throwz, t.body, t.defaultValue, t.type);
             }
 
             @Nullable
@@ -2891,7 +3004,44 @@ public interface J extends Serializable, Tree {
             }
 
             public MethodDeclaration withDefaultValue(@Nullable JLeftPadded<Expression> defaultValue) {
-                return t.defaultValue == defaultValue ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, defaultValue, t.type);
+                return t.defaultValue == defaultValue ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, defaultValue, t.type);
+            }
+        }
+
+        public Annotations getAnnotations() {
+            Annotations a;
+            if (this.annotations == null) {
+                a = new Annotations(this);
+                this.annotations = new WeakReference<>(a);
+            } else {
+                a = this.annotations.get();
+                if (a == null || a.t != this) {
+                    a = new Annotations(this);
+                    this.annotations = new WeakReference<>(a);
+                }
+            }
+            return a;
+        }
+
+        @RequiredArgsConstructor
+        public static class Annotations {
+            private final MethodDeclaration t;
+
+            @Nullable
+            public TypeParameters getTypeParameters() {
+                return t.typeParameters;
+            }
+
+            public MethodDeclaration withTypeParameters(@Nullable TypeParameters typeParameters) {
+                return t.typeParameters == typeParameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, t.defaultValue, t.type);
+            }
+
+            public IdentifierWithAnnotations getName() {
+                return t.name;
+            }
+
+            public MethodDeclaration withName(IdentifierWithAnnotations name) {
+                return t.name == name ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, name, t.parameters, t.throwz, t.body, t.defaultValue, t.type);
             }
         }
     }
@@ -3074,6 +3224,10 @@ public interface J extends Serializable, Tree {
 
         @With
         Type type;
+
+        @With
+        @Getter
+        List<Annotation> annotations;
 
         public enum Type {
             Default,
@@ -4323,6 +4477,77 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class TypeParameters implements J {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<TypeParameters.Padding> padding;
+
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        List<Annotation> annotations;
+
+        List<JRightPadded<TypeParameter>> typeParameters;
+
+        public List<TypeParameter> getTypeParameters() {
+            return JRightPadded.getElements(typeParameters);
+        }
+
+        public TypeParameters withTypeParameters(List<TypeParameter> typeParameters) {
+            return getPadding().withTypeParameters(JRightPadded.withElements(this.typeParameters, typeParameters));
+        }
+
+        @Override
+        public Coordinates.TypeParameters getCoordinates() {
+            return new Coordinates.TypeParameters(this);
+        }
+
+        public TypeParameters.Padding getPadding() {
+            TypeParameters.Padding p;
+            if (this.padding == null) {
+                p = new TypeParameters.Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new TypeParameters.Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final TypeParameters t;
+
+            public List<JRightPadded<TypeParameter>> getTypeParameters() {
+                return t.typeParameters;
+            }
+
+            public TypeParameters withTypeParameters(List<JRightPadded<TypeParameter>> typeParameters) {
+                return t.typeParameters == typeParameters ? t : new TypeParameters(t.id, t.prefix, t.markers, t.annotations, typeParameters);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class Unary implements J, Statement, Expression {
         @Nullable
         @NonFinal
@@ -4437,7 +4662,7 @@ public interface J extends Serializable, Tree {
 
         @With
         @Getter
-        List<Annotation> annotations;
+        List<Annotation> leadingAnnotations;
 
         @With
         @Getter
@@ -4475,6 +4700,18 @@ public interface J extends Serializable, Tree {
         @Override
         public Coordinates.VariableDeclarations getCoordinates() {
             return new Coordinates.VariableDeclarations(this);
+        }
+
+        // gather annotations from everywhere they may occur
+        public List<J.Annotation> getAllAnnotations() {
+            List<Annotation> allAnnotations = new ArrayList<>(leadingAnnotations);
+            for (J.Modifier modifier : modifiers) {
+                allAnnotations.addAll(modifier.getAnnotations());
+            }
+            if (typeExpression != null && typeExpression instanceof J.AnnotatedType) {
+                allAnnotations.addAll(((J.AnnotatedType) typeExpression).getAnnotations());
+            }
+            return allAnnotations;
         }
 
         @Nullable
@@ -4616,7 +4853,7 @@ public interface J extends Serializable, Tree {
             }
 
             public VariableDeclarations withVariables(List<JRightPadded<NamedVariable>> variables) {
-                return t.variables == variables ? t : new VariableDeclarations(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.typeExpression, t.varargs, t.dimensionsBeforeName, variables);
+                return t.variables == variables ? t : new VariableDeclarations(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeExpression, t.varargs, t.dimensionsBeforeName, variables);
             }
         }
     }

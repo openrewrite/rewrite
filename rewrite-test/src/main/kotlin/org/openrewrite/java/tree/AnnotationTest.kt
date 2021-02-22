@@ -60,23 +60,28 @@ interface AnnotationTest : JavaTreeTest {
     )
 
     @Test
-    @Issue("#254")
-    @Disabled
-    fun annotationAfterTypeParameters(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, CompilationUnit, """
-           import java.util.List;
-           import java.lang.annotation.*;
-
-            @Target({ElementType.TYPE_USE})
-            @Retention(RetentionPolicy.RUNTIME)
-            public @interface Yo {}
-
-            public class A {
-                <T> @Yo T method(List<T> list, int element) {
-                    return list.get(element);
+    fun annotationsInManyLocations(jp: JavaParser) = assertParsePrintAndProcess(
+            jp, CompilationUnit, """
+                import java.lang.annotation.*;
+                @Ho
+                public @Ho final @Ho class Test {
+                    @Ho private @Ho transient @Ho String s;
+                    @Ho
+                    public @Ho final @Ho <T> @Ho T merryChristmas() {
+                        return null;
+                    }
+                    @Ho
+                    public @Ho Test() {
+                    }
                 }
-            }
-        """
+                @Target({ElementType.TYPE_USE, ElementType.TYPE, ElementType.FIELD})
+                @interface Hos {
+                    Ho[] value();
+                }
+                @Target({ElementType.TYPE_USE, ElementType.TYPE, ElementType.FIELD})
+                @Repeatable(Hos.class)
+                @interface Ho {
+                }
+            """
     )
-
 }

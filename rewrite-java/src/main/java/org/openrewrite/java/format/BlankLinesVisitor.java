@@ -162,13 +162,13 @@ class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
                 // don't adjust the first statement in a block
                 if (!block.getStatements().isEmpty() && block.getStatements().iterator().next() != j) {
                     if (j instanceof J.VariableDeclarations) {
-                        if (classDecl.getKind() == J.ClassDeclaration.Kind.Interface) {
+                        if (classDecl.getKind() == J.ClassDeclaration.Kind.Type.Interface) {
                             j = minimumLines(j, style.getMinimum().getAroundFieldInInterface());
                         } else {
                             j = minimumLines(j, style.getMinimum().getAroundField());
                         }
                     } else if (j instanceof J.MethodDeclaration) {
-                        if (classDecl.getKind() == J.ClassDeclaration.Kind.Interface) {
+                        if (classDecl.getKind() == J.ClassDeclaration.Kind.Type.Interface) {
                             j = minimumLines(j, style.getMinimum().getAroundMethodInInterface());
                         } else {
                             j = minimumLines(j, style.getMinimum().getAroundMethod());
