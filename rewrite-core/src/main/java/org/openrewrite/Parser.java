@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.io.ByteArrayInputStream;
@@ -130,6 +131,26 @@ public interface Parser<S extends SourceFile> {
                     () -> new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)),
                     true
             );
+        }
+
+        @Incubating(since = "7.0.0")
+        public static Input fromResource(String resource) {
+            return new Input(
+                    Paths.get(Long.toString(System.nanoTime())),
+                    () -> Input.class.getResourceAsStream(resource),
+                    true
+            );
+        }
+
+        @Incubating(since = "7.0.0")
+        public static List<Input> fromResource(String resource, String delimiter) {
+            return Arrays.stream(StringUtils.readFully(Input.class.getResourceAsStream(resource)).split(delimiter))
+                    .map(source -> new Parser.Input(
+                            Paths.get(Long.toString(System.nanoTime())),
+                            () -> new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)),
+                            true
+                    ))
+                    .collect(toList());
         }
 
         public Path getPath() {
