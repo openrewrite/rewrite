@@ -31,24 +31,24 @@ public class FindInheritedFields {
     private FindInheritedFields() {
     }
 
-    public static Set<JavaType.Var> find(J j, String clazz) {
-        Set<JavaType.Var> fields = new HashSet<>();
+    public static Set<JavaType.Variable> find(J j, String clazz) {
+        Set<JavaType.Variable> fields = new HashSet<>();
         new FindInheritedFieldsVisitor(clazz).visit(j, fields);
         return fields;
     }
 
-    private static class FindInheritedFieldsVisitor extends JavaIsoVisitor<Set<JavaType.Var>> {
+    private static class FindInheritedFieldsVisitor extends JavaIsoVisitor<Set<JavaType.Variable>> {
         private final String fullyQualifiedName;
 
         public FindInheritedFieldsVisitor(String fullyQualifiedName) {
             this.fullyQualifiedName = fullyQualifiedName;
         }
 
-        private Set<JavaType.Var> superFields(@Nullable JavaType.Class type) {
+        private Set<JavaType.Variable> superFields(@Nullable JavaType.Class type) {
             if (type == null || type.getSupertype() == null) {
                 return emptySet();
             }
-            Set<JavaType.Var> types = new HashSet<>();
+            Set<JavaType.Variable> types = new HashSet<>();
             type.getMembers().stream()
                     .filter(m -> !m.hasFlags(Flag.Private) && TypeUtils.hasElementType(m.getType(), fullyQualifiedName))
                     .forEach(types::add);
@@ -57,7 +57,7 @@ public class FindInheritedFields {
         }
 
         @Override
-        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Set<JavaType.Var> ctx) {
+        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Set<JavaType.Variable> ctx) {
             JavaType.Class asClass = TypeUtils.asClass(classDecl.getType());
             ctx.addAll(superFields(asClass == null ? null : asClass.getSupertype()));
             return super.visitClassDeclaration(classDecl, ctx);

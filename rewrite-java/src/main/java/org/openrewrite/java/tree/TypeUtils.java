@@ -26,7 +26,7 @@ public class TypeUtils {
     private TypeUtils() {
     }
 
-    public static List<JavaType.Var> getVisibleSupertypeMembers(@Nullable JavaType type) {
+    public static List<JavaType.Variable> getVisibleSupertypeMembers(@Nullable JavaType type) {
         JavaType.Class classType = TypeUtils.asClass(type);
         return classType == null ? emptyList() : classType.getVisibleSupertypeMembers();
     }

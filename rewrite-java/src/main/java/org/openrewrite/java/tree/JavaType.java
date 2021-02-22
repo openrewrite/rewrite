@@ -137,7 +137,7 @@ public interface JavaType extends Serializable {
         public static final Class OBJECT = build("java.lang.Object");
 
         private final String fullyQualifiedName;
-        private final List<Var> members;
+        private final List<Variable> members;
         private final List<JavaType> typeParameters;
         private final List<JavaType> interfaces;
 
@@ -150,7 +150,7 @@ public interface JavaType extends Serializable {
         private final String flyweightId;
 
         private Class(String fullyQualifiedName,
-                      List<Var> members,
+                      List<Variable> members,
                       List<JavaType> typeParameters,
                       List<JavaType> interfaces,
                       @Nullable List<Method> constructors,
@@ -188,7 +188,7 @@ public interface JavaType extends Serializable {
 
         @JsonCreator
         public static Class build(String fullyQualifiedName,
-                                  List<Var> members,
+                                  List<Variable> members,
                                   List<JavaType> typeParameters,
                                   List<JavaType> interfaces,
                                   List<Method> constructors,
@@ -197,14 +197,14 @@ public interface JavaType extends Serializable {
         }
 
         public static Class build(String fullyQualifiedName,
-                                  List<Var> members,
+                                  List<Variable> members,
                                   List<JavaType> typeParameters,
                                   List<JavaType> interfaces,
                                   @Nullable List<Method> constructors,
                                   @Nullable Class supertype,
                                   boolean relaxedClassTypeMatching) {
 
-            List<Var> sortedMembers;
+            List<Variable> sortedMembers;
             if (fullyQualifiedName.equals("java.lang.String")) {
                 //There is a "serialPersistentFields" member within the String class which is used in normal Java
                 //serialization to customize how the String field is serialized. This field is tripping up Jackson
@@ -213,7 +213,7 @@ public interface JavaType extends Serializable {
             } else {
                 sortedMembers = new ArrayList<>(members);
             }
-            sortedMembers.sort(comparing(Var::getName));
+            sortedMembers.sort(comparing(Variable::getName));
 
             JavaType.Class candidate = new Class(fullyQualifiedName, sortedMembers, typeParameters, interfaces, constructors, supertype);
 
@@ -329,10 +329,10 @@ public interface JavaType extends Serializable {
             }
         }
 
-        public List<JavaType.Var> getVisibleSupertypeMembers() {
-            List<JavaType.Var> members = new ArrayList<>();
+        public List<Variable> getVisibleSupertypeMembers() {
+            List<Variable> members = new ArrayList<>();
             if (supertype != null) {
-                for (Var member : supertype.getMembers()) {
+                for (Variable member : supertype.getMembers()) {
                     if (!member.hasFlags(Flag.Private)) {
                         members.add(member);
                     }
@@ -384,7 +384,7 @@ public interface JavaType extends Serializable {
     }
 
     @Data
-    class Var implements JavaType {
+    class Variable implements JavaType {
         private final String name;
 
         @Nullable
@@ -403,11 +403,11 @@ public interface JavaType extends Serializable {
 
         @Override
         public boolean deepEquals(@Nullable JavaType type) {
-            if (!(type instanceof Var)) {
+            if (!(type instanceof Variable)) {
                 return false;
             }
 
-            Var v = (Var) type;
+            Variable v = (Variable) type;
             return this == v || (name.equals(v.name) && TypeUtils.deepEquals(this.type, v.type) &&
                     flags.equals(v.flags));
         }

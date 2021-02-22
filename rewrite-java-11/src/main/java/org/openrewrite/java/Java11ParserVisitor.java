@@ -1571,14 +1571,14 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                     List<Symbol> stackWithSym = new ArrayList<>(stack);
                     stackWithSym.add(sym);
 
-                    List<JavaType.Var> fields;
+                    List<JavaType.Variable> fields;
                     if (sym.members_field == null) {
                         fields = emptyList();
                     } else {
                         fields = new ArrayList<>();
                         for (Symbol elem : sym.members_field.getSymbols()) {
                             if (elem instanceof Symbol.VarSymbol) {
-                                fields.add(new JavaType.Var(
+                                fields.add(new JavaType.Variable(
                                         elem.name.toString(),
                                         type(elem.type, stackWithSym),
                                         filteredFlags(elem)
