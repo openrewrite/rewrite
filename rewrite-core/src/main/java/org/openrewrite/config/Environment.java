@@ -15,6 +15,7 @@
  */
 package org.openrewrite.config;
 
+import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
 import org.openrewrite.style.NamedStyles;
@@ -74,6 +75,13 @@ public class Environment {
 
     public Recipe activateRecipes(String... activeRecipes) {
         return activateRecipes(Arrays.asList(activeRecipes));
+    }
+
+    @Incubating(since = "7.0.0")
+    public Recipe activateAll() {
+        Recipe root = new Recipe();
+        listRecipes().forEach(root::doNext);
+        return root;
     }
 
     /**
