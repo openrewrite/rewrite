@@ -2946,6 +2946,7 @@ public interface J extends Serializable, Tree {
             if (returnTypeExpression instanceof AnnotatedType) {
                 allAnnotations.addAll(((AnnotatedType) returnTypeExpression).getAnnotations());
             }
+            allAnnotations.addAll(name.getAnnotations());
             return allAnnotations;
         }
 
