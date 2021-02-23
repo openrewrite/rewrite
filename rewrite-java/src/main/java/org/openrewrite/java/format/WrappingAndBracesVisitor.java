@@ -19,7 +19,6 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 
@@ -50,15 +49,15 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     @Override public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
         // TODO make annotation wrapping configurable
-        m = m.withAnnotations(withNewlines(m.getAnnotations()));
-        if (!m.getAnnotations().isEmpty()) {
+        m = m.withLeadingAnnotations(withNewlines(m.getLeadingAnnotations()));
+        if (!m.getLeadingAnnotations().isEmpty()) {
             if (!m.getModifiers().isEmpty()) {
                 m = m.withModifiers(withNewline(m.getModifiers()));
-            } else if (m.getPadding().getTypeParameters() != null) {
-                if (!m.getPadding().getTypeParameters().getBefore().getWhitespace().contains("\n")) {
-                    m = m.getPadding().withTypeParameters(
-                            m.getPadding().getTypeParameters().withBefore(
-                                    withNewline(m.getPadding().getTypeParameters().getBefore())
+            } else if (m.getAnnotations().getTypeParameters() != null) {
+                if (!m.getAnnotations().getTypeParameters().getPrefix().getWhitespace().contains("\n")) {
+                    m = m.getAnnotations().withTypeParameters(
+                            m.getAnnotations().getTypeParameters().withPrefix(
+                                    withNewline(m.getAnnotations().getTypeParameters().getPrefix())
                             )
                     );
                 }
@@ -86,21 +85,16 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     @Override public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration j = super.visitClassDeclaration(classDecl, p);
         // TODO make annotation wrapping configurable
-        j = j.withAnnotations(withNewlines(j.getAnnotations()));
-        if (!j.getAnnotations().isEmpty()) {
+        j = j.withLeadingAnnotations(withNewlines(j.getLeadingAnnotations()));
+        if (!j.getLeadingAnnotations().isEmpty()) {
             if (!j.getModifiers().isEmpty()) {
                 j = j.withModifiers(withNewline(j.getModifiers()));
             } else {
-                J.ClassDeclaration.Padding padding = j.getPadding();
-                JLeftPadded<J.ClassDeclaration.Kind> kind = padding.getKind();
-                if (!kind.getBefore().getWhitespace().contains("\n")) {
-                    j = padding.withKind(
-                            kind.withBefore(
-                                    kind.getBefore().withWhitespace(
-                                            "\n" + kind.getBefore().getWhitespace()
-                                    )
-                            )
-                    );
+                J.ClassDeclaration.Kind kind = j.getAnnotations().getKind();
+                if (!kind.getPrefix().getWhitespace().contains("\n")) {
+                    j = j.getAnnotations().withKind(kind.withPrefix(
+                            kind.getPrefix().withWhitespace("\n" + kind.getPrefix().getWhitespace())
+                    ));
                 }
             }
 

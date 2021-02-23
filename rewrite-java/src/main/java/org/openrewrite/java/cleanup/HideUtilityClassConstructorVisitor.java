@@ -33,6 +33,7 @@ import org.openrewrite.marker.Markers;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -72,7 +73,7 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
         if (UtilityClassUtilities.isRefactorableUtilityClass(c, style)) {
-            /**
+            /*
              * Note, it's a deliberate choice to have these be their own respective visitors rather than putting
              * all the logic in one visitor. It's conceptually easier to distinguish what each are doing.
              * And some linters which deal with "utility classes", such as IntelliJ, Checkstyle, etc., treat
@@ -128,7 +129,7 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
                 );
                 // If visibility is Package-Private (no access modifier keyword), replace it with Private
                 if (!md.hasModifier(J.Modifier.Type.Private)) {
-                    J.Modifier mod = new J.Modifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, J.Modifier.Type.Private);
+                    J.Modifier mod = new J.Modifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, J.Modifier.Type.Private, Collections.emptyList());
                     md = md.withModifiers(
                             ListUtils.concat(md.getModifiers(), mod)
                     );
@@ -166,7 +167,7 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
          * @return true if the Class Declaration is annotated with at least one matching ignorableAnnotation
          */
         static boolean hasIgnorableAnnotation(J.ClassDeclaration c, Collection<String> ignorableAnnotations) {
-            return c.getAnnotations().stream().anyMatch(
+            return c.getAllAnnotations().stream().anyMatch(
                     classAnn -> ignorableAnnotations.stream().anyMatch(
                             ignorableAnn -> new AnnotationMatcher(ignorableAnn).matches(classAnn)
                     )

@@ -28,9 +28,9 @@ public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
 
-        if (!c.getAnnotations().isEmpty()) {
-            c = concatenatePrefix(c, Space.firstPrefix(c.getAnnotations()));
-            c = c.withAnnotations(Space.formatFirstPrefix(c.getAnnotations(), Space.EMPTY));
+        if (!c.getLeadingAnnotations().isEmpty()) {
+            c = concatenatePrefix(c, Space.firstPrefix(c.getLeadingAnnotations()));
+            c = c.withLeadingAnnotations(Space.formatFirstPrefix(c.getLeadingAnnotations(), Space.EMPTY));
             return c;
         }
 
@@ -40,9 +40,9 @@ public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
             return c;
         }
 
-        if(!c.getPadding().getKind().getBefore().isEmpty()) {
-            c = concatenatePrefix(c, c.getPadding().getKind().getBefore());
-            c = c.getPadding().withKind(c.getPadding().getKind().withBefore(Space.EMPTY));
+        if(!c.getAnnotations().getKind().getPrefix().isEmpty()) {
+            c = concatenatePrefix(c, c.getAnnotations().getKind().getPrefix());
+            c = c.getAnnotations().withKind(c.getAnnotations().getKind().withPrefix(Space.EMPTY));
             return c;
         }
 
@@ -61,9 +61,9 @@ public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
 
-        if (!m.getAnnotations().isEmpty()) {
-            m = concatenatePrefix(m, Space.firstPrefix(m.getAnnotations()));
-            m = m.withAnnotations(Space.formatFirstPrefix(m.getAnnotations(), Space.EMPTY));
+        if (!m.getLeadingAnnotations().isEmpty()) {
+            m = concatenatePrefix(m, Space.firstPrefix(m.getLeadingAnnotations()));
+            m = m.withLeadingAnnotations(Space.formatFirstPrefix(m.getLeadingAnnotations(), Space.EMPTY));
             return m;
         }
 
@@ -73,9 +73,9 @@ public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
             return m;
         }
 
-        if (m.getPadding().getTypeParameters() != null && !m.getPadding().getTypeParameters().getElements().isEmpty()) {
-            m = concatenatePrefix(m, m.getPadding().getTypeParameters().getBefore());
-            m = m.getPadding().withTypeParameters(m.getPadding().getTypeParameters().withBefore(Space.EMPTY));
+        if (m.getAnnotations().getTypeParameters() != null && !m.getAnnotations().getTypeParameters().getTypeParameters().isEmpty()) {
+            m = concatenatePrefix(m, m.getAnnotations().getTypeParameters().getPrefix());
+            m = m.getAnnotations().withTypeParameters(m.getAnnotations().getTypeParameters().withPrefix(Space.EMPTY));
             return m;
         }
 
@@ -95,9 +95,9 @@ public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
     public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
         J.VariableDeclarations v = super.visitVariableDeclarations(multiVariable, p);
 
-        if (!v.getAnnotations().isEmpty()) {
-            v = concatenatePrefix(v, Space.firstPrefix(v.getAnnotations()));
-            v = v.withAnnotations(Space.formatFirstPrefix(v.getAnnotations(), Space.EMPTY));
+        if (!v.getLeadingAnnotations().isEmpty()) {
+            v = concatenatePrefix(v, Space.firstPrefix(v.getLeadingAnnotations()));
+            v = v.withLeadingAnnotations(Space.formatFirstPrefix(v.getLeadingAnnotations(), Space.EMPTY));
             return v;
         }
 

@@ -57,7 +57,7 @@ public class ClassDeclarationToString {
             }
             visitLeftPadded("extends", classDecl.getPadding().getExtends(), JLeftPadded.Location.EXTENDS, unused);
             if (classDecl.getImplements() != null) {
-                if (J.ClassDeclaration.Kind.Interface.equals(classDecl.getKind())) {
+                if (J.ClassDeclaration.Kind.Type.Interface.equals(classDecl.getKind())) {
                     acc.append("extends");
                 } else {
                     acc.append("implements");

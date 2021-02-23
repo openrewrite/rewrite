@@ -130,7 +130,7 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
     @Override
     public J visitClassDeclaration(J.ClassDeclaration classDecl, Cursor insertionScope) {
         if (!insertionScope.isScopeInPath(classDecl) || !classDecl.getId().equals(coordinates.getTree().getId())) {
-            return super.visitClassDeclaration(classDecl.withAnnotations(emptyList()), insertionScope);
+            return super.visitClassDeclaration(classDecl.withLeadingAnnotations(emptyList()), insertionScope);
         }
 
         String kind = "";
@@ -157,14 +157,14 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
             }
             else {
                 printTemplate();
-                visit(classDecl.getAnnotations(), insertionScope);
+                visit(classDecl.getLeadingAnnotations(), insertionScope);
             }
         } else {
-            visit(classDecl.getAnnotations(), insertionScope);
+            visit(classDecl.getLeadingAnnotations(), insertionScope);
         }
 
         visitModifiers(classDecl.getModifiers(), insertionScope);
-        visitSpace(classDecl.getPadding().getKind().getBefore(), Space.Location.CLASS_KIND, insertionScope);
+        visitSpace(classDecl.getAnnotations().getKind().getPrefix(), Space.Location.CLASS_KIND, insertionScope);
         StringBuilder acc = getPrinter();
         acc.append(kind);
         visit(classDecl.getName(), insertionScope);
@@ -184,7 +184,7 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
         if (coordinates.isReplacement() && Space.Location.IMPLEMENTS.equals(coordinates.getSpaceLocation())) {
             printTemplate();
         } else {
-            visitContainer(classDecl.getKind().equals(J.ClassDeclaration.Kind.Interface) ? "extends" : "implements",
+            visitContainer(classDecl.getKind().equals(J.ClassDeclaration.Kind.Type.Interface) ? "extends" : "implements",
                     classDecl.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, ",", null, insertionScope);
         }
 
@@ -200,7 +200,7 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
     @Override
     public J visitMethodDeclaration(J.MethodDeclaration method, Cursor insertionScope) {
         if (!insertionScope.isScopeInPath(method)) {
-            return super.visitMethodDeclaration(method.withAnnotations(emptyList()).withBody(EMPTY_BLOCK), insertionScope);
+            return super.visitMethodDeclaration(method.withLeadingAnnotations(emptyList()).withBody(EMPTY_BLOCK), insertionScope);
         }
 
         visitSpace(method.getPrefix(), Space.Location.METHOD_DECLARATION_PREFIX, insertionScope);
@@ -211,10 +211,10 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
             }
             else {
                 printTemplate();
-                visit(method.getAnnotations(), insertionScope);
+                visit(method.getLeadingAnnotations(), insertionScope);
             }
         } else {
-            visit(method.getAnnotations(), insertionScope);
+            visit(method.getLeadingAnnotations(), insertionScope);
         }
 
         visitModifiers(method.getModifiers(), insertionScope);
@@ -222,7 +222,15 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
         if (coordinates.isReplacement() && Space.Location.TYPE_PARAMETERS.equals(coordinates.getSpaceLocation())) {
             printTemplate();
         } else {
-            visitContainer("<", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", insertionScope);
+            J.TypeParameters typeParameters = method.getAnnotations().getTypeParameters();
+            if (typeParameters != null) {
+                visit(typeParameters.getAnnotations(), insertionScope);
+                visitSpace(typeParameters.getPrefix(), Space.Location.TYPE_PARAMETERS, insertionScope);
+                StringBuilder acc = getPrinter();
+                acc.append("<");
+                visitRightPadded(typeParameters.getPadding().getTypeParameters(), JRightPadded.Location.TYPE_PARAMETER, ",", insertionScope);
+                acc.append(">");
+            }
         }
 
         visit(method.getReturnTypeExpression(), insertionScope);
@@ -278,9 +286,9 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
     @Override
     public J visitVariableDeclarations(J.VariableDeclarations multiVariable, Cursor insertionScope) {
         if (!insertionScope.isScopeInPath(multiVariable)) {
-            return super.visitVariableDeclarations(multiVariable.withAnnotations(emptyList()), insertionScope);
+            return super.visitVariableDeclarations(multiVariable.withLeadingAnnotations(emptyList()), insertionScope);
         } else if (!multiVariable.getId().equals(coordinates.getTree().getId())) {
-            return super.visitVariableDeclarations(multiVariable.withAnnotations(emptyList()), insertionScope);
+            return super.visitVariableDeclarations(multiVariable.withLeadingAnnotations(emptyList()), insertionScope);
         }
 
         StringBuilder acc = getPrinter();
@@ -292,10 +300,10 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
             }
             else {
                 printTemplate();
-                visit(multiVariable.getAnnotations(), insertionScope);
+                visit(multiVariable.getLeadingAnnotations(), insertionScope);
             }
         } else {
-            visit(multiVariable.getAnnotations(), insertionScope);
+            visit(multiVariable.getLeadingAnnotations(), insertionScope);
         }
 
         visitModifiers(multiVariable.getModifiers(), insertionScope);

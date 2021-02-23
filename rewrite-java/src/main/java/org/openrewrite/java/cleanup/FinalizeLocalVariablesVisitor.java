@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -86,7 +87,7 @@ public class FinalizeLocalVariablesVisitor<P> extends JavaIsoVisitor<P> {
         if (mv.getVariables().stream().noneMatch(hasReassignment)) {
             mv = maybeAutoFormat(mv,
                     mv.withModifiers(
-                            ListUtils.concat(mv.getModifiers(), new J.Modifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, J.Modifier.Type.Final))
+                            ListUtils.concat(mv.getModifiers(), new J.Modifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, J.Modifier.Type.Final, Collections.emptyList()))
                     ), p, getCursor().dropParentUntil(J.class::isInstance));
         }
 

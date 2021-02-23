@@ -215,6 +215,17 @@ public abstract class Coordinates {
         public JavaCoordinates replaceBody() {
             return replace(Space.Location.BLOCK_PREFIX);
         }
+
+        public static class Kind extends Coordinates {
+            Kind(J.ClassDeclaration.Kind tree) {
+                super(tree);
+            }
+
+            @Override
+            public JavaCoordinates before() {
+                return insert(Space.Location.CLASS_KIND);
+            }
+        }
     }
 
     public static class CompilationUnit extends Coordinates {
@@ -719,6 +730,17 @@ public abstract class Coordinates {
 
         public JavaCoordinates bounds() {
             return insert(Space.Location.TYPE_BOUNDS);
+        }
+    }
+
+    public static class TypeParameters extends Coordinates {
+        TypeParameters(J.TypeParameters tree) {
+            super(tree);
+        }
+
+        @Override
+        public JavaCoordinates before() {
+            return insert(Space.Location.TYPE_PARAMETERS_PREFIX);
         }
     }
 

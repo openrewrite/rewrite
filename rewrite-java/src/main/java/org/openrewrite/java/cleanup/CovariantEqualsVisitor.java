@@ -75,7 +75,7 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
                     m.getReturnTypeExpression() != null &&
                     JavaType.Primitive.Boolean.equals(m.getReturnTypeExpression().getType())) {
 
-                if (m.getAnnotations().stream().noneMatch(OVERRIDE_ANNOTATION_SIGNATURE::matches)) {
+                if (m.getAllAnnotations().stream().noneMatch(OVERRIDE_ANNOTATION_SIGNATURE::matches)) {
                     m = maybeAutoFormat(m,
                             m.withTemplate(
                                     template("@Override").build(),

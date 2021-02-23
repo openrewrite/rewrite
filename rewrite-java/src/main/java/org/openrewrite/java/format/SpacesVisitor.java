@@ -86,7 +86,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
         c = c.withBody(spaceBefore(c.getBody(), style.getBeforeLeftBrace().isClassLeftBrace()));
         if (c.getBody().getStatements().isEmpty()) {
-            if (c.getKind() != J.ClassDeclaration.Kind.Enum) {
+            if (c.getKind() != J.ClassDeclaration.Kind.Type.Enum) {
                 boolean withinCodeBraces = style.getWithin().isCodeBraces();
                 if (withinCodeBraces && StringUtils.isNullOrEmpty(c.getBody().getEnd().getWhitespace())) {
                     c = c.withBody(
@@ -188,12 +188,12 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     )
             );
         }
-        if (m.getPadding().getTypeParameters() != null) {
+        if (m.getAnnotations().getTypeParameters() != null) {
             boolean spaceWithinAngleBrackets = style.getWithin().isAngleBrackets();
-            int typeParametersSize = m.getPadding().getTypeParameters().getElements().size();
-            m = m.getPadding().withTypeParameters(
-                    m.getPadding().getTypeParameters().getPadding().withElements(
-                            ListUtils.map(m.getPadding().getTypeParameters().getPadding().getElements(),
+            int typeParametersSize = m.getAnnotations().getTypeParameters().getTypeParameters().size();
+            m = m.getAnnotations().withTypeParameters(
+                    m.getAnnotations().getTypeParameters().getPadding().withTypeParameters(
+                            ListUtils.map(m.getAnnotations().getTypeParameters().getPadding().getTypeParameters(),
                                     (index, elemContainer) -> {
                                         if (index == 0) {
                                             elemContainer = elemContainer.withElement(
@@ -209,8 +209,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                                             elemContainer = spaceAfter(elemContainer, spaceWithinAngleBrackets);
                                         }
                                         return elemContainer;
-                                    }
-                            )
+                                    })
                     )
             );
         }
