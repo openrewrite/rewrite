@@ -63,10 +63,7 @@ class RemoveDependencyTest : MavenRecipeTest {
                 </dependency>
               </dependencies>
             </project>
-        """,
-        afterConditions = { maven: Maven ->
-            assertThat(maven.model.dependencies).hasSize(1)
-        }
+        """
     )
 
     @Test

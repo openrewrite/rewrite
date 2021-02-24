@@ -99,10 +99,7 @@ class AddDependencyTest : MavenRecipeTest {
                 </dependency>
               </dependencies>
             </project>
-        """,
-        afterConditions = { maven: Maven ->
-            assertThat(maven.model.findDependencies("org.springframework.boot", "spring-boot")).isNotEmpty()
-        }
+        """
     )
 
     @Test
@@ -136,10 +133,7 @@ class AddDependencyTest : MavenRecipeTest {
                 </dependency>
               </dependencies>
             </project>
-        """,
-        afterConditions = { maven: Maven ->
-            assertThat(maven.model.findDependencies("org.springframework.boot", "spring-boot")).isNotEmpty()
-        }
+        """
     )
 
     @Test
@@ -187,10 +181,7 @@ class AddDependencyTest : MavenRecipeTest {
                 </dependency>
               </dependencies>
             </project>
-        """,
-        afterConditions = { maven: Maven ->
-            assertThat(maven.model.findDependencies("org.junit.jupiter", "junit-jupiter-api")).isNotEmpty()
-        }
+        """
     )
 
     @Test
@@ -279,10 +270,7 @@ class AddDependencyTest : MavenRecipeTest {
                 </dependency>
               </dependencies>
             </project>
-        """,
-        afterConditions = { maven: Maven ->
-            assertThat(maven.model.findDependencies("com.fasterxml.jackson.core", "jackson-databind")).isNotEmpty()
-        }
+        """
     )
 
     @Test
