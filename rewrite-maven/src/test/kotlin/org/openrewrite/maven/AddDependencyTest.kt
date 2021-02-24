@@ -197,26 +197,6 @@ class AddDependencyTest : MavenRecipeTest {
     )
 
     @Test
-    fun maybeAddDependencyDoesntAddWhenExistingAsTransitiveDependency() = assertUnchanged(
-        recipe = recipe,
-        before = """
-            <project>
-              <modelVersion>4.0.0</modelVersion>
-              <groupId>com.mycompany.app</groupId>
-              <artifactId>my-app</artifactId>
-              <version>1</version>
-              <dependencies>
-                <dependency>
-                  <groupId>org.springframework.boot</groupId>
-                  <artifactId>spring-boot-starter-actuator</artifactId>
-                  <version>1.5.22.RELEASE</version>
-                </dependency>
-              </dependencies>
-            </project>
-        """
-    )
-
-    @Test
     fun useManagedDependency() = assertChanged(
         recipe = AddDependency(
             "com.fasterxml.jackson.core",

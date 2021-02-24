@@ -89,9 +89,17 @@ public class AddDependencyVisitor extends MavenVisitor {
             versionComparator = versionValidation.getValue();
         }
 
-        if(!FindDependency.find(maven, groupId, artifactId).isEmpty() ||
-            !findDependencies(groupId, artifactId).isEmpty()) {
+        if (!FindDependency.find(maven, groupId, artifactId).isEmpty()) {
             return maven;
+        }
+
+        Pom ancestor = model.getParent();
+        while (ancestor != null) {
+            if (ancestor.getDependencies().stream().anyMatch(d -> groupId.equals(d.getGroupId()) &&
+                    artifactId.equals(d.getArtifactId()))) {
+                return maven;
+            }
+            ancestor = ancestor.getParent();
         }
 
         Xml.Tag root = maven.getRoot();
