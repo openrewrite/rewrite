@@ -60,12 +60,12 @@ public class ChangePackage extends Recipe {
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext context) {
                 J.CompilationUnit c = super.visitCompilationUnit(cu, context);
-                Boolean changing = getCursor().<Boolean>getMessage("changing");
-                if (changing != null && changing) {
+                String changingTo = getCursor().getMessage("changingTo");
+                if (changingTo != null) {
                     String path = c.getSourcePath().toString();
                     c = c.withSourcePath(Paths.get(path.replaceFirst(
                             oldFullyQualifiedPackageName.replace('.', '/'),
-                            newFullyQualifiedPackageName.replace('.', '/')
+                            changingTo.replace('.', '/')
                     )));
                 }
                 return c;

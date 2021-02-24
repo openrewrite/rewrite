@@ -83,6 +83,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
 
     @Override
     default List<J.CompilationUnit> parse(@Language("java") String... sources) {
+        Pattern packagePattern = Pattern.compile("^package\\s+([^;]+);");
         Pattern classPattern = Pattern.compile("(class|interface|enum)\\s*(<[^>]*>)?\\s+(\\w+)");
 
         Function<String, String> simpleName = sourceStr -> {
@@ -93,8 +94,13 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
         return parseInputs(
                 Arrays.stream(sources)
                         .map(sourceFile -> {
-                            Path path = Paths.get(Optional.ofNullable(simpleName.apply(sourceFile))
-                                    .orElse(Long.toString(System.nanoTime())) + ".java");
+                            Matcher packageMatcher = packagePattern.matcher(sourceFile);
+                            String pkg = packageMatcher.find() ? packageMatcher.group(1).replace('.', '/') + "/" : "";
+
+                            String className = Optional.ofNullable(simpleName.apply(sourceFile))
+                                    .orElse(Long.toString(System.nanoTime())) + ".java";
+
+                            Path path = Paths.get(pkg + className);
                             return new Input(
                                     path,
                                     () -> new ByteArrayInputStream(sourceFile.getBytes())
