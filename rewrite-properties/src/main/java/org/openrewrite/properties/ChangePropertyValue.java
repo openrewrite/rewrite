@@ -15,18 +15,18 @@
  */
 package org.openrewrite.properties;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.properties.tree.Properties;
 
-@Data
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangePropertyValue extends Recipe {
-    private final String propertyKey;
-    private final String newValue;
+    String propertyKey;
+    String newValue;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {

@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java.example;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
@@ -27,10 +27,11 @@ import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 
-@Data
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class GenerateGetter extends Recipe {
-    private final String fieldName;
+
+    String fieldName;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {

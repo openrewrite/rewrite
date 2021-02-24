@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java.search;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -31,10 +31,11 @@ import java.util.Set;
 /**
  * Finds fields that have a matching type.
  */
-@Data
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class FindFields extends Recipe {
-    private final String fullyQualifiedTypeName;
+
+    String fullyQualifiedTypeName;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {

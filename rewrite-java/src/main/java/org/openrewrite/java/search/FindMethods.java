@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java.search;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -32,13 +32,14 @@ import java.util.Set;
  * Finds matching method invocations.
  */
 @EqualsAndHashCode(callSuper = true)
-@Data
-public final class FindMethods extends Recipe {
+@Value
+public class FindMethods extends Recipe {
+
     /**
      * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
      * See {@link MethodMatcher} for details on the expression's syntax.
      */
-    private final String methodPattern;
+    String methodPattern;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {

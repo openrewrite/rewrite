@@ -15,11 +15,9 @@
  */
 package org.openrewrite.java;
 
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
-import lombok.Builder;
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -37,9 +35,7 @@ import java.util.List;
  * This recipe finds method invocations matching the given method pattern and reorders the arguments based on the ordered
  * array of parameter names.
  */
-@Data
-@JsonDeserialize(builder = ReorderMethodArguments.Builder.class)
-@Builder(builderClassName = "Builder", toBuilder = true)
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class ReorderMethodArguments extends Recipe {
 
@@ -47,19 +43,19 @@ public class ReorderMethodArguments extends Recipe {
      * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
-    private final String methodPattern;
+    String methodPattern;
 
     /**
      * An array of parameter names that indicates the new order in which those arguments should be arranged.
      */
-    private final String[] newParameterNames;
+    String[] newParameterNames;
 
     /**
      * If the original method signature is not type-attributed, this is an optional list that indicates the original order
      * in which the arguments were arranged.
      */
     @Nullable
-    private String[] oldParameterNames;
+    String[] oldParameterNames;
 
     @JsonPOJOBuilder(withPrefix = "")
     public static class Builder {

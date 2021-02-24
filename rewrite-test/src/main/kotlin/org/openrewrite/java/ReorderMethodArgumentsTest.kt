@@ -28,10 +28,7 @@ interface ReorderMethodArgumentsTest : JavaRecipeTest {
     @Test
     fun reorderArguments(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ReorderMethodArguments.builder()
-            .methodPattern("a.A foo(String, Integer, Integer)")
-            .newParameterNames(arrayOf("n", "m", "s"))
-            .build()
+        recipe = ReorderMethodArguments("a.A foo(String, Integer, Integer)", arrayOf("n", "m", "s"), null)
             .doNext(
                 object : Recipe() {
                     override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
@@ -86,11 +83,7 @@ interface ReorderMethodArgumentsTest : JavaRecipeTest {
     @Test
     fun reorderArgumentsWithNoSourceAttachment(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ReorderMethodArguments.builder()
-            .methodPattern("a.A foo(..)")
-            .oldParameterNames(arrayOf("n", "s"))
-            .newParameterNames(arrayOf("s", "n"))
-            .build(),
+        recipe = ReorderMethodArguments("a.A foo(..)", arrayOf("s", "n"), arrayOf("n", "s")),
         dependsOn = arrayOf(
             """
                 package a;
@@ -123,10 +116,7 @@ interface ReorderMethodArgumentsTest : JavaRecipeTest {
     @Test
     fun reorderArgumentsWhereOneOfTheOriginalArgumentsIsVararg(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ReorderMethodArguments.builder()
-            .methodPattern("a.A foo(..)")
-            .newParameterNames(arrayOf("s", "o", "n"))
-            .build(),
+        recipe = ReorderMethodArguments("a.A foo(..)", arrayOf("s", "o", "n"), null),
         dependsOn = arrayOf(
             """
                 package a;
@@ -159,10 +149,7 @@ interface ReorderMethodArgumentsTest : JavaRecipeTest {
     @Test
     fun reorderArgumentsWhereTheLastArgumentIsVarargAndNotPresentInInvocation(jp: JavaParser) = assertUnchanged(
         jp,
-        recipe = ReorderMethodArguments.builder()
-            .methodPattern("a.A foo(..)")
-            .newParameterNames(arrayOf("o", "s"))
-            .build(),
+        recipe = ReorderMethodArguments("a.A foo(..)", arrayOf("o", "s"), null),
         dependsOn = arrayOf(
             """
                 package a;

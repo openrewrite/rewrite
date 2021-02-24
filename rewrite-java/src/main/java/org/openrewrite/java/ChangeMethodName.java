@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -28,7 +28,7 @@ import org.openrewrite.java.tree.TypeTree;
  * A recipe that will look for a specific method target (using a method pattern) and rename the method. This recipe renames
  * both the method declaration and any invocations/references to the method.
  */
-@Data
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeMethodName extends Recipe {
 
@@ -36,12 +36,12 @@ public class ChangeMethodName extends Recipe {
      * A method pattern, expressed as a pointcut expression, that is used to find matching method declarations/invocations.
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
-    private final String methodPattern;
+    String methodPattern;
 
     /**
      * The method name that will replace the existing name.
      */
-    private final String newMethodName;
+    String newMethodName;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {

@@ -15,13 +15,16 @@
  */
 package org.openrewrite.maven;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
-import org.openrewrite.*;
+import lombok.Value;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.cache.MavenPomCache;
-import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.MavenMetadata;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.DependencyManagementDependency;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
@@ -42,19 +45,19 @@ import static java.util.Collections.emptyMap;
  * <a href="https://github.com/npm/node-semver#advanced-range-syntax">advanced range selectors</a>, allowing
  * more precise control over version updates to patch or minor releases.
  */
-@Data
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class UpgradeDependencyVersion extends Recipe {
 
-    private final String groupId;
+    String groupId;
 
     @Nullable
-    private final String artifactId;
+    String artifactId;
 
     /**
      * Node Semver range syntax.
      */
-    private final String newVersion;
+    String newVersion;
 
     /**
      * Allows version selection to be extended beyond the original Node Semver semantics. So for example,
@@ -62,7 +65,7 @@ public class UpgradeDependencyVersion extends Recipe {
      * Guava 29.0-jre
      */
     @Nullable
-    private final String versionPattern;
+    String versionPattern;
 
     @SuppressWarnings("ConstantConditions")
     @Override

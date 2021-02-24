@@ -15,10 +15,7 @@
  */
 package org.openrewrite.java;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
@@ -43,11 +40,13 @@ import java.util.Optional;
  * The @{link {@link OrderImports#removeUnused}} flag (which is defaulted to true) can be used to also remove any
  * imports that are not referenced within the compilation unit.
  */
-@Data
 @EqualsAndHashCode(callSuper = true)
 @AllArgsConstructor
 @NoArgsConstructor
 public class OrderImports extends Recipe {
+
+    @Getter
+    @With
     private boolean removeUnused = true;
 
     @Override

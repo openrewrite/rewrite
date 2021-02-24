@@ -15,8 +15,8 @@
  */
 package org.openrewrite.maven.search;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.marker.RecipeSearchResult;
 import org.openrewrite.maven.MavenVisitor;
@@ -35,11 +35,11 @@ import java.util.regex.Pattern;
  */
 @Incubating(since = "7.0.0")
 @EqualsAndHashCode(callSuper = true)
-@Data
+@Value
 public class DependencyInsight extends Recipe {
-    private final String groupIdPattern;
-    private final String artifactIdPattern;
-    private final String scope;
+    String groupIdPattern;
+    String artifactIdPattern;
+    String scope;
 
     @Override
     public Validated validate() {

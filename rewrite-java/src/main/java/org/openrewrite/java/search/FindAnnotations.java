@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java.search;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -32,13 +32,13 @@ import java.util.Set;
  * Find all annotations matching the annotation pattern.
  */
 @EqualsAndHashCode(callSuper = true)
-@Data
+@Value
 public class FindAnnotations extends Recipe {
     /**
      * An annotation pattern, expressed as a pointcut expression.
      * See {@link AnnotationMatcher} for syntax.
      */
-    private final String annotationPattern;
+    String annotationPattern;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {

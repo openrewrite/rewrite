@@ -15,8 +15,7 @@
  */
 package org.openrewrite.yaml;
 
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.*;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -38,12 +37,12 @@ import static org.openrewrite.Tree.randomId;
  * separated property names, e.g. as Spring Boot
  * interprets application.yml files.
  */
-@Data
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangePropertyKey extends Recipe {
-    private final String oldPropertyKey;
-    private final String newPropertyKey;
-    private final boolean coalesce = true;
+
+    String oldPropertyKey;
+    String newPropertyKey;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -79,9 +78,7 @@ public class ChangePropertyKey extends Recipe {
                                 entry.getValue()
                         ));
                         doAfterVisit(new DeletePropertyVisitor<>(entry));
-                        if (coalesce) {
-                            maybeCoalesceProperties();
-                        }
+                        maybeCoalesceProperties();
                         break;
                     }
 

@@ -15,8 +15,8 @@
  */
 package org.openrewrite.maven;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -32,14 +32,14 @@ import java.util.List;
 
 import static java.util.stream.Collectors.toList;
 
-@Data
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class RemoveDependency extends Recipe {
-    private final String groupId;
-    private final String artifactId;
+    String groupId;
+    String artifactId;
 
     @Nullable
-    private final String scope;
+    String scope;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {

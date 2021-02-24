@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -34,19 +34,19 @@ import static org.openrewrite.Tree.randomId;
  * it were prefixed like `this.a`, or `MyClass.this.a`, or indirectly via a separate method call like `getA()` where `getA()`
  * is defined on the super class.
  */
-@Data
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeType extends Recipe {
 
     /**
      * Fully-qualified class name of the original type.
      */
-    private final String oldFullyQualifiedTypeName;
+    String oldFullyQualifiedTypeName;
 
     /**
      * Fully-qualified class name of the replacement type, the replacement type can also defined as a primitive.
      */
-    private final String newFullyQualifiedTypeName;
+    String newFullyQualifiedTypeName;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {

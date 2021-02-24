@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java.search;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -34,10 +34,11 @@ import java.util.Set;
 /**
  * This recipe finds all explicit references to a type.
  */
-@Data
+@Value
 @EqualsAndHashCode(callSuper = true)
-public final class FindTypes extends Recipe {
-    private final String fullyQualifiedTypeName;
+public class FindTypes extends Recipe {
+
+    String fullyQualifiedTypeName;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {

@@ -17,7 +17,6 @@ package org.openrewrite.maven
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.maven.tree.Maven
 
 class AddDependencyTest : MavenRecipeTest {
     override val recipe: AddDependency
@@ -131,9 +130,8 @@ class AddDependencyTest : MavenRecipeTest {
 
     @Test
     fun addTestDependenciesAfterCompile() = assertChanged(
-        recipe = AddDependency("org.junit.jupiter", "junit-jupiter-api", "5.7.0").apply {
-            scope = "test"
-        },
+        recipe = AddDependency("org.junit.jupiter", "junit-jupiter-api", "5.7.0")
+                .withScope("test"),
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>
@@ -251,9 +249,7 @@ class AddDependencyTest : MavenRecipeTest {
             "com.fasterxml.jackson.core",
             "jackson-databind",
             "2.12.0"
-        ).apply {
-            familyPattern = "com.fasterxml.jackson*"
-        },
+        ).withFamilyPattern("com.fasterxml.jackson*"),
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>

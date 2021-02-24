@@ -15,8 +15,8 @@
  */
 package org.openrewrite.maven;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -28,17 +28,17 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
 
-@Data
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeDependencyScope extends Recipe {
-    private final String groupId;
-    private final String artifactId;
+    String groupId;
+    String artifactId;
 
     /**
      * If null, strips the scope from an existing dependency.
      */
     @Nullable
-    private final String newScope;
+    String newScope;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {

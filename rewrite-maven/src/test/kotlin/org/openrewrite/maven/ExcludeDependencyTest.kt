@@ -113,7 +113,7 @@ class ExcludeDependencyTest : MavenRecipeTest {
                 "org.junit.jupiter",
                 "junit-jupiter-engine",
                 "5.3.0"
-            ).apply { setScope("test") }
+            ).withScope("test")
         ),
         before = """
             <project>

@@ -15,8 +15,8 @@
  */
 package org.openrewrite.maven;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -26,12 +26,12 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
 
-@Data
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeDependencyVersion extends Recipe {
-    private final String groupId;
-    private final String artifactId;
-    private final String newVersion;
+    String groupId;
+    String artifactId;
+    String newVersion;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {

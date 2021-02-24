@@ -15,8 +15,8 @@
  */
 package org.openrewrite.maven;
 
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.*;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.semver.HyphenRange;
@@ -25,11 +25,14 @@ import org.openrewrite.semver.Semver;
 import java.util.regex.Pattern;
 
 @Incubating(since = "7.0.0")
-@Data
+@Getter
+@RequiredArgsConstructor
+@AllArgsConstructor(onConstructor_=@JsonCreator)
 @EqualsAndHashCode(callSuper = true)
 public class AddDependency extends Recipe {
 
     private final String groupId;
+
     private final String artifactId;
 
     /**
@@ -47,55 +50,30 @@ public class AddDependency extends Recipe {
      * Guava 29.0-jre
      */
     @Nullable
+    @With
     private String versionPattern;
 
+    @With
     private boolean releasesOnly = true;
 
     @Nullable
+    @With
     private String classifier;
 
     @Nullable
+    @With
     private String scope;
 
     @Nullable
+    @With
     private String type;
 
     /**
      * A glob expression used to identify other dependencies in the same family as the dependency to be added.
      */
     @Nullable
+    @With
     private String familyPattern;
-
-    /**
-     * Allows the version selection to be extended beyond the original Node Semver semantics. So for example,
-     * a {@link HyphenRange} of "25-29" can be paired with a version pattern of "-jre" to select
-     * Guava 29.0-jre
-     *
-     * @param versionPattern The version pattern extending semver selection.
-     */
-    public void setVersionPattern(@Nullable String versionPattern) {
-        this.versionPattern = versionPattern;
-    }
-
-    public void setClassifier(@Nullable String classifier) {
-        this.classifier = classifier;
-    }
-
-    public void setScope(@Nullable String scope) {
-        this.scope = scope;
-    }
-
-    public void setReleasesOnly(boolean releasesOnly) {
-        this.releasesOnly = releasesOnly;
-    }
-
-    /**
-     * @param familyPattern A glob expression used to identify other dependencies in the same
-     *                      family as the dependency to be added.
-     */
-    public void setFamilyPattern(@Nullable String familyPattern) {
-        this.familyPattern = familyPattern;
-    }
 
     @Override
     public Validated validate() {

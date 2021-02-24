@@ -15,19 +15,19 @@
  */
 package org.openrewrite.maven;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-@Data
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangePropertyValue extends Recipe {
-    private final String key;
-    private final String newValue;
+    String key;
+    String newValue;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {

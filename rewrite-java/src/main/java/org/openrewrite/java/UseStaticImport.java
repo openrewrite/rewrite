@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -27,7 +27,7 @@ import org.openrewrite.java.tree.JavaType;
  * This recipe will find any method invocations that match the method pattern, ensure the method is statically imported
  * and convert's the invocation to use the static import by dropping the invocation's select.
  */
-@Data
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class UseStaticImport extends Recipe {
 
@@ -35,7 +35,7 @@ public class UseStaticImport extends Recipe {
      * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
-    private final String methodPattern;
+    String methodPattern;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {

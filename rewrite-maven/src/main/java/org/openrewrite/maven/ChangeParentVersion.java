@@ -15,8 +15,8 @@
  */
 package org.openrewrite.maven;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -24,15 +24,15 @@ import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
-@Data
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeParentVersion extends Recipe {
 
     private static final XPathMatcher PARENT_VERSION_MATCHER = new XPathMatcher("/project/parent/version");
 
-    private final String groupId;
-    private final String artifactId;
-    private final String newVersion;
+    String groupId;
+    String artifactId;
+    String newVersion;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {

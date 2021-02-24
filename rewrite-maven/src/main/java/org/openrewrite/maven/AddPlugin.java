@@ -15,8 +15,8 @@
  */
 package org.openrewrite.maven;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -28,15 +28,15 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
 
-@Data
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class AddPlugin extends Recipe {
 
     private static final XPathMatcher BUILD_MATCHER = new XPathMatcher("/project/build");
 
-    private final String groupId;
-    private final String artifactId;
-    private final String version;
+    String groupId;
+    String artifactId;
+    String version;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {

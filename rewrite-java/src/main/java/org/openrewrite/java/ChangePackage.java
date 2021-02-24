@@ -16,8 +16,8 @@
 package org.openrewrite.java;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -26,20 +26,20 @@ import org.openrewrite.java.tree.JavaType;
 
 import java.nio.file.Paths;
 
+@Value
 @EqualsAndHashCode(callSuper = true)
-@Data
 public class ChangePackage extends Recipe {
     /**
      * Fully-qualified package name of the old package.
      */
-    private final String oldFullyQualifiedPackageName;
+    String oldFullyQualifiedPackageName;
 
     /**
      * Fully-qualified package name of the replacement package.
      */
-    private final String newFullyQualifiedPackageName;
+    String newFullyQualifiedPackageName;
 
-    private final boolean recursive;
+    boolean recursive;
 
     @JsonCreator
     public ChangePackage(String oldFullyQualifiedPackageName, String newFullyQualifiedPackageName, boolean recursive) {

@@ -15,8 +15,8 @@
  */
 package org.openrewrite.maven.search;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -29,9 +29,9 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 @EqualsAndHashCode(callSuper = true)
-@Data
+@Value
 public class FindProperties extends Recipe {
-    private final String propertyPattern;
+    String propertyPattern;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {

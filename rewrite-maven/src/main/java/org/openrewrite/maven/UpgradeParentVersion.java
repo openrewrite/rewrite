@@ -15,13 +15,16 @@
  */
 package org.openrewrite.maven;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
-import org.openrewrite.*;
+import lombok.Value;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.cache.MavenPomCache;
-import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.MavenMetadata;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
@@ -35,15 +38,15 @@ import java.util.stream.Collectors;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 
-@Data
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class UpgradeParentVersion extends Recipe {
-    private final String groupId;
-    private final String artifactId;
-    private final String newVersion;
+    String groupId;
+    String artifactId;
+    String newVersion;
 
     @Nullable
-    private final String versionPattern;
+    String versionPattern;
 
     @Override
     public Validated validate() {

@@ -15,13 +15,12 @@
  */
 package org.openrewrite.properties.search;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.RecipeSearchResult;
-import org.openrewrite.marker.SearchResult;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 
@@ -31,10 +30,10 @@ import java.util.Set;
 /**
  * Finds occurrences of a property key.
  */
-@Data
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class FindProperties extends Recipe {
-    private final String propertyKey;
+    String propertyKey;
 
     public static Set<Properties.Entry> find(Properties p, String propertyKey) {
         PropertiesVisitor<Set<Properties.Entry>> findVisitor = new PropertiesVisitor<Set<Properties.Entry>>() {

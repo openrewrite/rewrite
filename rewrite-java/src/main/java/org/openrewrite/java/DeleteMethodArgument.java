@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -35,7 +35,7 @@ import static org.openrewrite.Tree.randomId;
  * This recipe finds method invocations matching a method pattern and uses a zero-based argument index to determine
  * which argument is removed.
  */
-@Data
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class DeleteMethodArgument extends Recipe {
 
@@ -43,12 +43,12 @@ public class DeleteMethodArgument extends Recipe {
      * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
-    private final String methodPattern;
+    String methodPattern;
 
     /**
      * A zero-based index that indicates which argument will be removed from the method invocation.
      */
-    private final Integer argumentIndex;
+    Integer argumentIndex;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {

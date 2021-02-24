@@ -15,8 +15,8 @@
  */
 package org.openrewrite.xml.search;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -29,9 +29,9 @@ import java.util.HashSet;
 import java.util.Set;
 
 @EqualsAndHashCode(callSuper = true)
-@Data
+@Value
 public class FindTags extends Recipe {
-    private final String xPath;
+    String xPath;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {

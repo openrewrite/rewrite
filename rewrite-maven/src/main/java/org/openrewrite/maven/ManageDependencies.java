@@ -15,8 +15,8 @@
  */
 package org.openrewrite.maven;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -47,19 +47,19 @@ import static java.util.stream.Collectors.toList;
  * align-able to the same version (either the version provided to this visitor or the maximum matching
  * version if none is provided).
  */
-@Data
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class ManageDependencies extends Recipe {
 
     private static final XPathMatcher MANAGED_DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies");
 
-    private final String groupPattern;
+    String groupPattern;
 
     @Nullable
-    private final String artifactPattern;
+    String artifactPattern;
 
     @Nullable
-    private final String version;
+    String version;
 
     @SuppressWarnings("ConstantConditions")
     @Override
