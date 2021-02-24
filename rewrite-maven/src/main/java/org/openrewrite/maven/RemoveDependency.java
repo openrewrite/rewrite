@@ -20,8 +20,12 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.Validated;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.search.FindDependencies;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -35,16 +39,26 @@ public class RemoveDependency extends Recipe {
     private final String groupId;
     private final String artifactId;
 
+    @Nullable
+    private final String scope;
+
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new RemoveDependencyVisitor();
+    }
+
+    @Override
+    public Validated validate() {
+        return super.validate().and(Validated.test("scope", "Scope must be one of compile, runtime, test, or provided",
+                scope, s -> !Scope.Invalid.equals(Scope.fromName(s))));
     }
 
     private class RemoveDependencyVisitor extends MavenVisitor {
 
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            if (isDependencyTag(groupId, artifactId)) {
+            if (isDependencyTag(groupId, artifactId) && (scope == null ||
+                    tag.getChildValue("scope").orElse("compile").equals(scope))) {
                 doAfterVisit(new RemoveContentVisitor<>(tag, true));
             }
 
@@ -54,9 +68,6 @@ public class RemoveDependency extends Recipe {
         @Override
         public Maven visitMaven(Maven maven, ExecutionContext ctx) {
             model = maven.getModel();
-            if (findDependencies(groupId, artifactId).size() == 0) {
-                return maven;
-            }
             Maven m = super.visitMaven(maven, ctx);
             List<Pom.Dependency> dependencies = model.getDependencies().stream()
                     .filter(dep -> !(dep.getArtifactId().equals(artifactId) && dep.getGroupId().equals(groupId)))
