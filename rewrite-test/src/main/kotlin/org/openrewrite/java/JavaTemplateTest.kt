@@ -114,6 +114,38 @@ interface JavaTemplateTest : JavaRecipeTest {
     )
 
     @Test
+    @Disabled
+    @Issue("#327")
+    fun addStatementBeforeAnotherStatement(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaVisitor<ExecutionContext>() {
+            override fun visitClassDeclaration(
+                classDecl: J.ClassDeclaration,
+                p: ExecutionContext
+            ): J {
+                val classDecl = super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration
+                return classDecl.withTemplate(
+                    template("public String bar = \"hey!\";").build(),
+                    classDecl.body.statements[1].coordinates.before()
+                )
+            }
+        }.toRecipe(),
+        before = """
+            class A {
+                public String foo;
+                public String fuz;
+            }
+        """,
+        after = """
+            class A {
+                public String foo;
+                public String bar = "hey!";
+                public String fuz;
+            }
+        """
+    )
+
+    @Test
     fun beforeStatements(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaVisitor<ExecutionContext>() {
