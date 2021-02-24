@@ -114,7 +114,6 @@ interface JavaTemplateTest : JavaRecipeTest {
     )
 
     @Test
-    @Disabled
     @Issue("#327")
     fun addStatementBeforeAnotherStatement(jp: JavaParser) = assertChanged(
         jp,
@@ -123,8 +122,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                 classDecl: J.ClassDeclaration,
                 p: ExecutionContext
             ): J {
-                val classDecl = super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration
-                return classDecl.withTemplate(
+                val c = super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration
+                return c.withTemplate(
                     template("public String bar = \"hey!\";").build(),
                     classDecl.body.statements[1].coordinates.before()
                 )

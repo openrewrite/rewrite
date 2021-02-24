@@ -82,9 +82,16 @@ public class InsertAtCoordinates extends JavaVisitor<List<? extends J>> {
                     .collect(Collectors.toList());
 
             return b.withStatements(ListUtils.concatAll(b.getStatements(), formatted));
+        } else if (b.getStatements().stream().anyMatch(s -> insertId.equals(s.getId()))) {
+            AutoFormatVisitor<Integer> autoFormat = new AutoFormatVisitor<>();
+            List<Statement> formatted = generated.stream()
+                    .map(it -> autoFormat.visit(it, 0, getCursor()))
+                    .map(Statement.class::cast)
+                    .collect(Collectors.toList());
+
+            //noinspection ConstantConditions
+            b = b.withStatements(maybeMergeList(b.getStatements(), formatted));
         }
-        //noinspection ConstantConditions
-        b = b.withStatements(maybeMergeList(b.getStatements(), generated));
         return b;
     }
 
