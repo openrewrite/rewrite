@@ -344,9 +344,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             JCAnnotation annotation = (JCAnnotation) annotationNode;
             annotationPosTable.put(annotation.pos, annotation);
         }
-        List<J.Annotation> leadingAnnotations = collectAnnotations(annotationPosTable);
 
-        List<J.Modifier> modifiers = sortedFlags(node.getModifiers(), annotationPosTable);
+        ModifierResults modifierResults = sortedModifiersAndAnnotations(node.getModifiers(), annotationPosTable);
 
         List<J.Annotation> kindAnnotations = collectAnnotations(annotationPosTable);
 
@@ -433,7 +432,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         J.Block body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
                 members, sourceBefore("}"));
 
-        return new J.ClassDeclaration(randomId(), fmt, Markers.EMPTY, leadingAnnotations, modifiers, kind, name, typeParams, extendings, implementings, body, (JavaType.Class) type(node));
+        return new J.ClassDeclaration(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), kind, name, typeParams, extendings, implementings, body, (JavaType.Class) type(node));
     }
 
     @Override
@@ -778,8 +777,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             JCAnnotation annotation = (JCAnnotation) annotationNode;
             annotationPosTable.put(annotation.pos, annotation);
         }
-        List<J.Annotation> leadingAnnotations = collectAnnotations(annotationPosTable);
-        List<J.Modifier> modifiers = sortedFlags(node.getModifiers(), annotationPosTable);
+        ModifierResults modifierResults = sortedModifiersAndAnnotations(node.getModifiers(), annotationPosTable);
 
         J.TypeParameters typeParams;
         if (node.getTypeParameters().isEmpty()) {
@@ -842,8 +840,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 padLeft(sourceBefore("default"), convert(node.getDefaultValue()));
 
         return new J.MethodDeclaration(randomId(), fmt, Markers.EMPTY,
-                leadingAnnotations,
-                modifiers, typeParams,
+                modifierResults.getLeadingAnnotations(),
+                modifierResults.getModifiers(), typeParams,
                 returnType, name, params, throwss, body, defaultValue,
                 methodType(jcMethod.type, jcMethod.sym, name.getIdentifier().getSimpleName()));
     }
@@ -1220,13 +1218,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             JCAnnotation annotation = (JCAnnotation) annotationNode;
             annotationPosTable.put(annotation.pos, annotation);
         }
-        List<J.Annotation> leadingAnnotations = collectAnnotations(annotationPosTable);
-        List<J.Modifier> modifiers;
-        if (node.getModifiers().pos >= 0) {
-            modifiers = sortedFlags(node.getModifiers(), annotationPosTable);
-        } else {
-            modifiers = emptyList(); // these are implicit modifiers, like "final" on try-with-resources variable declarations
-        }
+        ModifierResults modifierResults = sortedModifiersAndAnnotations(node.getModifiers(), annotationPosTable);
 
         List<J.Annotation> typeExprAnnotations = collectAnnotations(annotationPosTable);
 
@@ -1295,7 +1287,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             );
         }
 
-        return new J.VariableDeclarations(randomId(), fmt, Markers.EMPTY, leadingAnnotations, modifiers, typeExpr, varargs, beforeDimensions, vars);
+        return new J.VariableDeclarations(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), typeExpr, varargs, beforeDimensions, vars);
     }
 
     @Override
@@ -1848,9 +1840,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         return token;
     }
 
-    // return index of next non-whitespace position, without movign cursor
-    private int peekNextTokenIndex() {
-        int c = cursor;
+    // return index of next non-whitespace position after index
+    private int nextTokenIndexAfter(int index) {
+        int c = index;
         while (Character.isWhitespace(source.charAt(c))) {
             c++;
         }
@@ -1898,25 +1890,29 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     /**
-     * Modifiers in the order they appear in the source, which is not necessarily the same as the order in
+     * Leading Annotations and modifiers in the order they appear in the source, which is not necessarily the same as the order in
      * which they appear in the OpenJDK AST
      */
-    private List<J.Modifier> sortedFlags(ModifiersTree modifiers, Map<Integer, JCAnnotation> annotationPosTable) {
-        if (modifiers.getFlags().isEmpty()) {
-            return emptyList();
-        }
-
+    private ModifierResults sortedModifiersAndAnnotations(ModifiersTree modifiers, Map<Integer, JCAnnotation> annotationPosTable) {
+        List<J.Annotation> leadingAnnotations = new ArrayList<>();
         List<J.Modifier> sortedModifiers = new ArrayList<>();
         List<J.Annotation> currentAnnotations = new ArrayList<>();
+        boolean afterFirstModifier = false;
         boolean inComment = false;
         boolean inMultilineComment = false;
         final AtomicReference<String> word = new AtomicReference<>("");
-        int afterLastModifierCursorPosition = cursor;
+        int afterLastModifierPosition = cursor;
+        int lastAnnotationPosition = cursor;
         for (int i = cursor; i < source.length(); i++) {
-            int nextTokenIndex = peekNextTokenIndex();
-            if (annotationPosTable.containsKey(nextTokenIndex)) {
-                currentAnnotations.add(convert(annotationPosTable.get(nextTokenIndex)));
+            if (annotationPosTable.containsKey(i)) {
+                J.Annotation annotation = convert(annotationPosTable.get(i));
+                if (afterFirstModifier) {
+                    currentAnnotations.add(annotation);
+                } else {
+                    leadingAnnotations.add(annotation);
+                }
                 i = cursor;
+                lastAnnotationPosition = cursor;
                 continue;
             }
             char c = source.charAt(i);
@@ -1945,13 +1941,14 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                         }
 
                         if (matching == null) {
-                            this.cursor = afterLastModifierCursorPosition;
+                            this.cursor = afterLastModifierPosition;
                             break;
                         } else {
                             sortedModifiers.add(mapModifier(matching, currentAnnotations));
+                            afterFirstModifier = true;
                             currentAnnotations = new ArrayList<>();
                             word.set("");
-                            afterLastModifierCursorPosition = cursor;
+                            afterLastModifierPosition = cursor;
                         }
                     }
                 } else {
@@ -1959,7 +1956,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 }
             }
         }
-        return sortedModifiers;
+        if (sortedModifiers.isEmpty()) {
+            cursor = lastAnnotationPosition;
+        }
+        return new ModifierResults(leadingAnnotations, sortedModifiers);
     }
 
     private J.Modifier mapModifier(Modifier mod, List<J.Annotation> annotations) {
@@ -2010,11 +2010,35 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private List<J.Annotation> collectAnnotations(Map<Integer, JCAnnotation> annotationPosTable) {
+        int maxAnnotationPosition = annotationPosTable.keySet().stream().mapToInt(i -> i).max().orElse(0);
         List<J.Annotation> annotations = new ArrayList<>();
-        int nextTokenIndex = peekNextTokenIndex();
-        while (annotationPosTable.containsKey(nextTokenIndex)) {
-            annotations.add(convert(annotationPosTable.get(nextTokenIndex)));
-            nextTokenIndex = peekNextTokenIndex();
+        boolean inComment = false;
+        boolean inMultilineComment = false;
+        for (int i = cursor; i <= maxAnnotationPosition; i++) {
+            if (annotationPosTable.containsKey(i)) {
+                annotations.add(convert(annotationPosTable.get(i)));
+                i = cursor;
+                continue;
+            }
+            char c = source.charAt(i);
+            if (c == '/' && source.length() > i + 1) {
+                char next = source.charAt(i + 1);
+                if (next == '*') {
+                    inMultilineComment = true;
+                } else if (next == '/') {
+                    inComment = true;
+                }
+            }
+
+            if (inMultilineComment && c == '/' && source.charAt(i - 1) == '*') {
+                inMultilineComment = false;
+            } else if (inComment && c == '\n' || c == '\r') {
+                inComment = false;
+            } else if (!inMultilineComment && !inComment) {
+                if (!Character.isWhitespace(c)) {
+                    break;
+                }
+            }
         }
         return annotations;
     }
