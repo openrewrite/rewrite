@@ -41,6 +41,16 @@ public class FindAnnotations extends Recipe {
     String annotationPattern;
 
     @Override
+    public String getDisplayName() {
+        return "Find Annotations";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Find annotations matching an annotation pattern";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         AnnotationMatcher annotationMatcher = new AnnotationMatcher(annotationPattern);
         return new JavaIsoVisitor<ExecutionContext>() {

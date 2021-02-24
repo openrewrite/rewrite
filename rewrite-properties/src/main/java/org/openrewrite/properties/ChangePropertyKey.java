@@ -30,6 +30,16 @@ public class ChangePropertyKey extends Recipe {
     String newPropertyKey;
 
     @Override
+    public String getDisplayName() {
+        return "Change Property Key";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Changes property keys from oldPropertyKey to newPropertyKey";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new ChangePropertyKeyVisitor<>();
     }

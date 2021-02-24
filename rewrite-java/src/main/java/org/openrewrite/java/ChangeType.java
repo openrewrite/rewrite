@@ -49,6 +49,16 @@ public class ChangeType extends Recipe {
     String newFullyQualifiedTypeName;
 
     @Override
+    public String getDisplayName() {
+        return "Change Type";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Changes type oldFullyQualifiedTypeName to newFullyQualifiedTypeName";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new ChangeTypeVisitor(newFullyQualifiedTypeName);
     }

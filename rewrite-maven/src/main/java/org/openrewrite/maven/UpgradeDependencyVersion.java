@@ -78,6 +78,17 @@ public class UpgradeDependencyVersion extends Recipe {
     }
 
     @Override
+    public String getDisplayName() {
+        return "Upgrade Dependency Version";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Upgrade the version a group or group and artifact using Node Semver advanced range selectors, " +
+                "allowing more precise control over version updates to patch or minor releases";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new UpgradeDependencyVersionVisitor();
     }

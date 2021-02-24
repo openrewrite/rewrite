@@ -55,6 +55,16 @@ public class DependencyInsight extends Recipe {
     }
 
     @Override
+    public String getDisplayName() {
+        return "Dependency Insight";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Finds direct and transitive dependencies matching groupIdPattern, artifactIdPattern, and scope. Marks are places on first order dependencies that either directly match or transitively include a matching dependency";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         Pattern groupIdMatcher = Pattern.compile(groupIdPattern.replace(".", "\\.")
                 .replace("*", ".*"));

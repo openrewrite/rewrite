@@ -30,6 +30,16 @@ public class ChangePropertyValue extends Recipe {
     String newValue;
 
     @Override
+    public String getDisplayName() {
+        return "Change Maven Property Value";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Changes maven property matching key to newValue";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new ChangePropertyValueVisitor();
     }

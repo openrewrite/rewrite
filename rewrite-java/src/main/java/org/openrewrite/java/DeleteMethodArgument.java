@@ -51,6 +51,16 @@ public class DeleteMethodArgument extends Recipe {
     Integer argumentIndex;
 
     @Override
+    public String getDisplayName() {
+        return "Delete Method Argument";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Finds method invocations matching methodPattern and deletes the argument at argumentIndex (zero-based index)";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new DeleteMethodArgumentVisitor(new MethodMatcher(methodPattern));
     }

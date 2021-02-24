@@ -53,6 +53,16 @@ public class ChangePackage extends Recipe {
     }
 
     @Override
+    public String getDisplayName() {
+        return "Change Package";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Changes package oldFullyQualifiedPackageName to newFullyQualifiedPackageName";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             final JavaTemplate newPackageExpr = template("package #{}").build();

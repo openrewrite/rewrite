@@ -47,6 +47,16 @@ public class ChangeMethodTargetToStatic extends Recipe {
     String fullyQualifiedTargetTypeName;
 
     @Override
+    public String getDisplayName() {
+        return "Change Method Target To Static";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Finds method invocations matching methodPattern and changes them to be static method calls on fullyQualifiedTargetTypeName";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new ChangeMethodTargetToStaticVisitor(new MethodMatcher(methodPattern));
     }

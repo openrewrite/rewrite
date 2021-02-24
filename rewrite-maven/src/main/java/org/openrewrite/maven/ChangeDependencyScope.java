@@ -41,6 +41,16 @@ public class ChangeDependencyScope extends Recipe {
     String newScope;
 
     @Override
+    public String getDisplayName() {
+        return "Change Dependency Scope";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Changes scope of dependency matching groupId and artifactId to newScope";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new ChangeDependencyScopeVisitor();
     }

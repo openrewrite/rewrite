@@ -34,6 +34,16 @@ public class ChangeDependencyVersion extends Recipe {
     String newVersion;
 
     @Override
+    public String getDisplayName() {
+        return "Change Dependency Version";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Changes version of dependency matching groupId and artifactId to newVersion";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new ChangeDependencyVersionVisitor();
     }

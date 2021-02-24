@@ -204,7 +204,7 @@ interface RecipeTest {
 
     fun TreeVisitor<*, ExecutionContext>.toRecipe() = AdHocRecipe(this)
 
-    class AdHocRecipe(private val visitor: TreeVisitor<*, ExecutionContext>) : Recipe() {
+    class AdHocRecipe(private val visitor: TreeVisitor<*, ExecutionContext>) : HiddenRecipe() {
         override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
             return visitor
         }

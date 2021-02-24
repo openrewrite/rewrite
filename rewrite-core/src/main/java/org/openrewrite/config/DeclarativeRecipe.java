@@ -32,6 +32,16 @@ public class DeclarativeRecipe extends Recipe {
     private final URI source;
     private final List<String> lazyNext = new ArrayList<>();
 
+    @Override
+    public String getDisplayName() {
+        return name;
+    }
+
+    @Override
+    public String getDescription() {
+        return "Declarative Recipe - no description";
+    }
+
     @JsonIgnore
     private Validated validation = Validated.test("initialization",
             "initialize(..) must be called on DeclarativeRecipe prior to use.",

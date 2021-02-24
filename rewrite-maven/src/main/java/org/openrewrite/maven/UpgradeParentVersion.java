@@ -59,6 +59,17 @@ public class UpgradeParentVersion extends Recipe {
     }
 
     @Override
+    public String getDisplayName() {
+        return "Upgrade Parent Version";
+    }
+
+    @Override
+    public String getDescription() {
+        // TODO fill description
+        return "";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new UpgradeParentVersionVisitor(newVersion, versionPattern);
     }

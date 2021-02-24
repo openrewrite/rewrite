@@ -34,6 +34,16 @@ public class FindTags extends Recipe {
     String xPath;
 
     @Override
+    public String getDisplayName() {
+        return "Find XML Tags";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Finds XML Tags using xPath expression";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         XPathMatcher xPathMatcher = new XPathMatcher(xPath);
         return new XmlVisitor<ExecutionContext>() {

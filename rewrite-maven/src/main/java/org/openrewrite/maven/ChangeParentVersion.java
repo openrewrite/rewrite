@@ -35,6 +35,17 @@ public class ChangeParentVersion extends Recipe {
     String newVersion;
 
     @Override
+    public String getDisplayName() {
+        return "Change Parent Version";
+    }
+
+    @Override
+    public String getDescription() {
+        // TODO fill description
+        return "";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new ChangeParentVersionVisitor();
     }

@@ -25,6 +25,16 @@ import org.openrewrite.java.tree.J;
 
 public class WrappingAndBraces extends Recipe {
     @Override
+    public String getDisplayName() {
+        return "Wrapping and Braces";
+    }
+
+    @Override
+    public String getDescription() {
+        return "A formatting recipe that applies wrapping and braces based on WrappingAndBracesStyle settings";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new WrappingAndBracesCompilationUnitStyle();
     }

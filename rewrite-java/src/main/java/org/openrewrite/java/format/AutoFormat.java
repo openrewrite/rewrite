@@ -21,6 +21,16 @@ import org.openrewrite.TreeVisitor;
 
 public class AutoFormat extends Recipe {
     @Override
+    public String getDisplayName() {
+        return "Auto Format Java";
+    }
+
+    @Override
+    public String getDescription() {
+        return "A formatting recipe that aggregates all other java formatting recipes";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new AutoFormatVisitor<>();
     }

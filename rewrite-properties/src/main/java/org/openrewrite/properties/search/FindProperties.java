@@ -52,6 +52,16 @@ public class FindProperties extends Recipe {
     }
 
     @Override
+    public String getDisplayName() {
+        return "Find Properties";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Finds properties by key in properties files";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new PropertiesVisitor<ExecutionContext>() {
             @Override

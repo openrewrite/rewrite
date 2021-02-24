@@ -21,6 +21,16 @@ import org.openrewrite.TreeVisitor;
 
 public class RemoveTrailingWhitespace extends Recipe {
     @Override
+    public String getDisplayName() {
+        return "Remove Trailing Whitespace";
+    }
+
+    @Override
+    public String getDescription() {
+        return "A formatting recipe that removes trailing whitespace";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new RemoveTrailingWhitespaceVisitor<>();
     }

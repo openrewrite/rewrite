@@ -25,6 +25,16 @@ import org.openrewrite.java.tree.J;
 
 public class BlankLines extends Recipe {
     @Override
+    public String getDisplayName() {
+        return "Blank Lines";
+    }
+
+    @Override
+    public String getDescription() {
+        return "A formatting recipe that adds and/or removes blank lines using settings from BlankLinesStyle";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new BlankLinesFromCompilationUnitStyle();
     }

@@ -16,10 +16,7 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.ExecutionContext
-import org.openrewrite.Issue
-import org.openrewrite.Recipe
-import org.openrewrite.TreeVisitor
+import org.openrewrite.*
 import org.openrewrite.java.tree.J
 
 interface AddImportTest : JavaRecipeTest {
@@ -298,7 +295,7 @@ interface AddImportTest : JavaRecipeTest {
     @Test
     fun addNamedStaticImportWhenReferenced(jp: JavaParser) = assertChanged(
         jp,
-        recipe = object : Recipe() {
+        recipe = object : HiddenRecipe() {
             override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
                 return object : JavaIsoVisitor<ExecutionContext>() {
                     override fun visitMethodInvocation(m: J.MethodInvocation, ctx: ExecutionContext) =
@@ -386,7 +383,7 @@ interface AddImportTest : JavaRecipeTest {
      * This visitor removes the "java.util.Collections" receiver from method invocations of "java.util.Collections.emptyList()".
      * This allows us to test that AddImport with setOnlyIfReferenced = true will add a static import when an applicable static method call is present
      */
-    private class FixEmptyListMethodType : Recipe() {
+    private class FixEmptyListMethodType : HiddenRecipe() {
         override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
             return object : JavaIsoVisitor<ExecutionContext>() {
                 override fun visitMethodInvocation(

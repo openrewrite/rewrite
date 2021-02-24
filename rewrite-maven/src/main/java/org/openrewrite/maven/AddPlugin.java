@@ -39,6 +39,16 @@ public class AddPlugin extends Recipe {
     String version;
 
     @Override
+    public String getDisplayName() {
+        return "Add Plugin";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Adds a maven plugin with groupId, artifactId, version";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new AddPluginVisitor();
     }

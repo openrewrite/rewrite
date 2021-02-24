@@ -15,14 +15,11 @@
  */
 package org.openrewrite.text;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 
 import static org.openrewrite.Validated.required;
 
-public class ChangeText extends Recipe {
+public class ChangeText extends HiddenRecipe {
     private final String toText;
 
     public ChangeText(String toText) {

@@ -61,6 +61,16 @@ public class ManageDependencies extends Recipe {
     @Nullable
     String version;
 
+    @Override
+    public String getDisplayName() {
+        return "Manage Dependencies";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Makes existing dependencies identified by groupPattern and optionally artifactPattern and version \"dependency managed\" meaning the version is moved to the dependencyManagement section of the POM";
+    }
+
     @SuppressWarnings("ConstantConditions")
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {

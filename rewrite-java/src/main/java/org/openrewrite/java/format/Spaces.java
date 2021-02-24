@@ -26,6 +26,16 @@ import org.openrewrite.java.tree.J;
 public class Spaces extends Recipe {
 
     @Override
+    public String getDisplayName() {
+        return "Spaces";
+    }
+
+    @Override
+    public String getDescription() {
+        return "A formatting visitor that formats whitespace using settings from SpacesStyle";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new SpacesFromCompilationUnitStyle();
     }

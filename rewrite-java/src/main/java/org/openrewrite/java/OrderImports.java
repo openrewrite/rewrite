@@ -50,6 +50,16 @@ public class OrderImports extends Recipe {
     private boolean removeUnused = true;
 
     @Override
+    public String getDisplayName() {
+        return "Order Imports";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Groups and orders imports using rules from ImportLayoutStyle. Removes unused imports by default.";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new OrderImportsVisitor<>(removeUnused);
     }

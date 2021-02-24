@@ -35,6 +35,16 @@ import java.util.stream.Collectors;
  */
 public class RemoveUnusedImports extends Recipe {
     @Override
+    public String getDisplayName() {
+        return "Remove Unused Imports";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Removes imports for types that are not referenced in that source file";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new RemoveUnusedImportsVisitor();
     }

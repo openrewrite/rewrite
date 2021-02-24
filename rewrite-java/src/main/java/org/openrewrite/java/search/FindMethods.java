@@ -42,6 +42,16 @@ public class FindMethods extends Recipe {
     String methodPattern;
 
     @Override
+    public String getDisplayName() {
+        return "Find Methods";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Finds methods matching methodPattern";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
         return new JavaIsoVisitor<ExecutionContext>() {

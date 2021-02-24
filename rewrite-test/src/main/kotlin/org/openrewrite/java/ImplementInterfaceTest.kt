@@ -17,13 +17,14 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
+import org.openrewrite.HiddenRecipe
 import org.openrewrite.Recipe
 import org.openrewrite.TreeVisitor
 import org.openrewrite.java.tree.J
 
 interface ImplementInterfaceTest : JavaRecipeTest {
     override val recipe: Recipe?
-        get() = object : Recipe() {
+        get() = object : HiddenRecipe() {
             override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
                 return object : JavaVisitor<ExecutionContext>() {
                     override fun visitClassDeclaration(classDecl: J.ClassDeclaration, ctx: ExecutionContext): J {

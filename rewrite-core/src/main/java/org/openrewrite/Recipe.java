@@ -46,7 +46,8 @@ import static java.util.stream.Collectors.*;
  * <p>
  * returns a list of {@link Result results} for each modified {@link SourceFile}
  */
-public class Recipe {
+public abstract class Recipe {
+
     private static final Logger logger = LoggerFactory.getLogger(Recipe.class);
 
     @SuppressWarnings("unused")
@@ -83,6 +84,10 @@ public class Recipe {
             return tree;
         }
     };
+
+    public abstract String getDisplayName();
+
+    public abstract String getDescription();
 
     @Nullable
     private Recipe next;

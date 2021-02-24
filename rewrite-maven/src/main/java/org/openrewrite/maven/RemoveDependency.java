@@ -42,6 +42,16 @@ public class RemoveDependency extends Recipe {
     String scope;
 
     @Override
+    public String getDisplayName() {
+        return "Remove Dependency";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Removes dependency identified by groupId and artifactId and optionally scope";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new RemoveDependencyVisitor();
     }

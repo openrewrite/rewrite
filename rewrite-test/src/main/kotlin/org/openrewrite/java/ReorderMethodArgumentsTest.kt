@@ -18,6 +18,7 @@ package org.openrewrite.java
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
+import org.openrewrite.HiddenRecipe
 import org.openrewrite.Recipe
 import org.openrewrite.TreeVisitor
 import org.openrewrite.java.tree.J
@@ -30,7 +31,7 @@ interface ReorderMethodArgumentsTest : JavaRecipeTest {
         jp,
         recipe = ReorderMethodArguments("a.A foo(String, Integer, Integer)", arrayOf("n", "m", "s"), null)
             .doNext(
-                object : Recipe() {
+                object : HiddenRecipe() {
                     override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
                         return object : JavaVisitor<ExecutionContext>() {
                             override fun visitLiteral(literal: J.Literal, p: ExecutionContext): J {

@@ -34,6 +34,16 @@ public class ExcludeDependency extends Recipe {
     String artifactId;
 
     @Override
+    public String getDisplayName() {
+        return "Exclude Dependency";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Excludes dependency by groupId and artifactId";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new ExcludeDependencyVisitor();
     }

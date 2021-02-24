@@ -29,6 +29,16 @@ public class ChangePropertyValue extends Recipe {
     String newValue;
 
     @Override
+    public String getDisplayName() {
+        return "Change Property Value";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Changes the values of properties identified by propertyKey to newValue";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new ChangePropertyValueVisitor<>();
     }

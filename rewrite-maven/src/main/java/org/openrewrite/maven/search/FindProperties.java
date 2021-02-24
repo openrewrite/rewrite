@@ -34,6 +34,16 @@ public class FindProperties extends Recipe {
     String propertyPattern;
 
     @Override
+    public String getDisplayName() {
+        return "Find Maven Properties";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Finds Maven properties matching propertyPattern";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         Pattern propertyMatcher = Pattern.compile(propertyPattern.replace(".", "\\.")
                 .replace("*", ".*"));

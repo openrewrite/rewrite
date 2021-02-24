@@ -38,6 +38,16 @@ public class FindFields extends Recipe {
     String fullyQualifiedTypeName;
 
     @Override
+    public String getDisplayName() {
+        return "Find Fields";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Finds fields with type matching fullyQualifiedTypeName";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override

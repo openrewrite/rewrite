@@ -44,6 +44,16 @@ public class ChangeMethodTargetToVariable extends Recipe {
     String variableType;
 
     @Override
+    public String getDisplayName() {
+        return "Change Method Target To Variable";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Finds method invocations matching methodPattern and changes them to be method calls on the variable specified by variableName and variableType";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new ChangeMethodTargetToVariableVisitor(new MethodMatcher(methodPattern), JavaType.Class.build(variableType));
     }

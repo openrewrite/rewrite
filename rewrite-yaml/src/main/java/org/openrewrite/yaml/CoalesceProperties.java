@@ -27,6 +27,16 @@ import java.util.List;
 public class CoalesceProperties extends Recipe {
 
     @Override
+    public String getDisplayName() {
+        return "Coalesce YAML Properties";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Simplifies nested map hierarchies into their simplest form";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new CoalescePropertiesVisitor<>();
     }

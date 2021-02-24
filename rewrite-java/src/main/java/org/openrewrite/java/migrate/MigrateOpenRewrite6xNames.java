@@ -112,4 +112,14 @@ public class MigrateOpenRewrite6xNames extends Recipe {
         //NEW_CLASS_ENCL_SUFFIX         > NEW_CLASS_ENCLOSING_SUFFIX
 
     }
+
+    @Override
+    public String getDisplayName() {
+        return "Migrate OpenRewrite 6.x Names";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Changes types and method names that were changed as part of the OpenRewrite 7 changes";
+    }
 }

@@ -45,6 +45,16 @@ public class ChangePropertyKey extends Recipe {
     String newPropertyKey;
 
     @Override
+    public String getDisplayName() {
+        return "Change YAML Property Key";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Changes all oldPropertyKey yaml keys to newPropertyKey";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new ChangePropertyKeyVisitor<>();
     }

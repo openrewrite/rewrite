@@ -24,6 +24,16 @@ import org.openrewrite.TreeVisitor;
  */
 public class NormalizeFormat extends Recipe {
     @Override
+    public String getDisplayName() {
+        return "Normalize Format";
+    }
+
+    @Override
+    public String getDescription() {
+        return "A formatting recipe that moves whitespace to the outermost AST element possible";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new NormalizeFormatVisitor<>();
     }

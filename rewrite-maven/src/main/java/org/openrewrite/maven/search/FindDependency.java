@@ -50,6 +50,16 @@ public class FindDependency extends Recipe {
     }
 
     @Override
+    public String getDisplayName() {
+        return "Find Dependency";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Finds dependencies matching groupId and artifactId";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenVisitor() {
             @Override

@@ -24,7 +24,7 @@ import org.openrewrite.text.PlainText
 class RecipeLifecycleTest {
     @Test
     fun generateFile() {
-        val results = object : Recipe() {
+        val results = object : HiddenRecipe() {
             override fun getName() = "test.GeneratingRecipe"
 
             override fun visit(before: List<SourceFile>, ctx: ExecutionContext) =
@@ -36,7 +36,7 @@ class RecipeLifecycleTest {
 
     @Test
     fun deleteFile() {
-        val results = object : Recipe() {
+        val results = object : HiddenRecipe() {
             override fun getName() = "test.DeletingRecipe"
 
             override fun visit(before: List<SourceFile>, ctx: ExecutionContext) =
@@ -48,7 +48,7 @@ class RecipeLifecycleTest {
 
     @Test
     fun deleteFileByReturningNullFromVisit() {
-        val results = object : Recipe() {
+        val results = object : HiddenRecipe() {
             override fun getName() = "test.DeletingRecipe"
 
             override fun getVisitor(): TreeVisitor<*, ExecutionContext> {

@@ -34,6 +34,16 @@ public class GenerateGetter extends Recipe {
     String fieldName;
 
     @Override
+    public String getDisplayName() {
+        return "Generate Getter";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Generates a 'get' accessor method for fieldName";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new GenerateGetterVisitor<>();
     }

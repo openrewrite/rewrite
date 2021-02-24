@@ -41,6 +41,16 @@ public class FindTypes extends Recipe {
     String fullyQualifiedTypeName;
 
     @Override
+    public String getDisplayName() {
+        return "Find Types";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Find type references by fully qualified type name";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
 

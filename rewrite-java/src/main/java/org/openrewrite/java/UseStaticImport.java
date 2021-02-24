@@ -38,6 +38,16 @@ public class UseStaticImport extends Recipe {
     String methodPattern;
 
     @Override
+    public String getDisplayName() {
+        return "Use Static Import";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Find and converts method invocations matching methodPattern to use a static import";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new UseStaticImportVisitor(new MethodMatcher(methodPattern));
     }

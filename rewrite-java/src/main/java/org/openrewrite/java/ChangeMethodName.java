@@ -44,6 +44,16 @@ public class ChangeMethodName extends Recipe {
     String newMethodName;
 
     @Override
+    public String getDisplayName() {
+        return "Change Method Name";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Changes the name of methods identified by methodPattern to newMethodName";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new ChangeMethodNameVisitor(new MethodMatcher(methodPattern));
     }

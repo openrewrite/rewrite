@@ -86,6 +86,16 @@ public class AddDependency extends Recipe {
     }
 
     @Override
+    public String getDisplayName() {
+        return "Add Dependency";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Adds a Maven dependency";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new AddDependencyVisitor(
                 groupId,

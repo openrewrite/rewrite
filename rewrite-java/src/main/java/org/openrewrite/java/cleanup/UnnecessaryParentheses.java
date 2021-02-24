@@ -27,6 +27,16 @@ import org.openrewrite.java.tree.J;
 @Incubating(since = "7.0.0")
 public class UnnecessaryParentheses extends Recipe {
     @Override
+    public String getDisplayName() {
+        return "Unnecessary Parentheses";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Removes parentheses that are syntactically unnecessary";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new UnnecessaryParenthesesFromCompilationUnitStyle();
     }

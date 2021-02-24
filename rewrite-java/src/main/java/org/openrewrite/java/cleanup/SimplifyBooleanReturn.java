@@ -23,6 +23,17 @@ import org.openrewrite.TreeVisitor;
 @Incubating(since = "7.0.0")
 public class SimplifyBooleanReturn extends Recipe {
     @Override
+    public String getDisplayName() {
+        return "Simplify Boolean Return";
+    }
+
+    @Override
+    public String getDescription() {
+        // TODO description
+        return "";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new SimplifyBooleanReturnVisitor();
     }

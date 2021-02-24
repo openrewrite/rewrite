@@ -62,6 +62,16 @@ public class ReorderMethodArguments extends Recipe {
     }
 
     @Override
+    public String getDisplayName() {
+        return "Reorder Method Arguments";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Finds method invocations matching methodPattern and reorders arguments using the order of names in newParameterNames";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new ReorderMethodArgumentsVisitor(new MethodMatcher(methodPattern));
     }
