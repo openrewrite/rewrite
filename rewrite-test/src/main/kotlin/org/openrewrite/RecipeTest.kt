@@ -99,6 +99,7 @@ interface RecipeTest {
         assertThat(result!!.after).isNotNull
         assertThat(result.after!!.print(treePrinter ?: TreePrinter.identity<Any>(), null))
             .isEqualTo(after.trimIndent())
+        afterConditions(result.after as T)
     }
 
     fun assertChanged(
@@ -146,6 +147,7 @@ interface RecipeTest {
         assertThat(result!!.after).isNotNull
         assertThat(result.after!!.printTrimmed(treePrinter ?: TreePrinter.identity<Any>()))
             .isEqualTo(after.trimIndent())
+        afterConditions(result.after as T)
     }
 
     fun assertUnchanged(

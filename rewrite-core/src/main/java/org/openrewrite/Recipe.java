@@ -200,7 +200,7 @@ public class Recipe {
 
         WatchForNewMessageExecutionContext ctxWithWatch = new WatchForNewMessageExecutionContext(ctx);
         for (int i = 0; i < maxCycles; i++) {
-            after = visitInternal(before, ctxWithWatch, forkJoinPool, recipeThatDeletedSourceFile);
+            after = visitInternal(acc, ctxWithWatch, forkJoinPool, recipeThatDeletedSourceFile);
             if (after == acc && !ctxWithWatch.needAnotherCycle) {
                 break;
             }

@@ -31,7 +31,7 @@ class RecipeLifecycleTest {
                 before + PlainText(randomId(), Markers.EMPTY, "test")
         }.run(emptyList())
 
-        assertThat(results.map { it.recipesThatMadeChanges.map { r -> r.name }.first() }).containsExactly("test.GeneratingRecipe")
+        assertThat(results.map { it.recipesThatMadeChanges.map { r -> r.name }.first() }.distinct()).containsExactly("test.GeneratingRecipe")
     }
 
     @Test
