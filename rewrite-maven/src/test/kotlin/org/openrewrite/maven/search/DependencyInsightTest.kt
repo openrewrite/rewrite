@@ -18,11 +18,11 @@ package org.openrewrite.maven.search
 import org.junit.jupiter.api.Test
 import org.openrewrite.maven.MavenRecipeTest
 
-class FindDependenciesTest : MavenRecipeTest {
+class DependencyInsightTest : MavenRecipeTest {
 
     @Test
     fun findDependency() = assertChanged(
-        recipe = FindDependencies("*guava*", "*", "compile"),
+        recipe = DependencyInsight("*guava*", "*", "compile"),
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>
@@ -61,7 +61,7 @@ class FindDependenciesTest : MavenRecipeTest {
 
     @Test
     fun findDependencyTransitively() = assertChanged(
-        recipe = FindDependencies("*", "*simpleclient*", "compile"),
+        recipe = DependencyInsight("*", "*simpleclient*", "compile"),
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>

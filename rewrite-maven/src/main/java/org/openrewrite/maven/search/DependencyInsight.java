@@ -17,10 +17,7 @@ package org.openrewrite.maven.search;
 
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 import org.openrewrite.marker.RecipeSearchResult;
 import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.maven.tree.Pom;
@@ -31,9 +28,15 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+/**
+ * Find direct and transitive dependencies, marking first order dependencies that
+ * either match or transitively include a dependency matching {@link #groupIdPattern} and
+ * {@link #artifactIdPattern}.
+ */
+@Incubating(since = "7.0.0")
 @EqualsAndHashCode(callSuper = true)
 @Data
-public class FindDependencies extends Recipe {
+public class DependencyInsight extends Recipe {
     private final String groupIdPattern;
     private final String artifactIdPattern;
     private final String scope;
@@ -72,9 +75,9 @@ public class FindDependencies extends Recipe {
                         Optional<Pom.Dependency> match = dependencies.stream().filter(this::dependencyMatches).findFirst();
                         if(match.isPresent()) {
                             if(dependencyMatches(dependency)) {
-                                t = t.withMarker(new RecipeSearchResult(FindDependencies.this));
+                                t = t.withMarker(new RecipeSearchResult(DependencyInsight.this));
                             } else {
-                                t = t.withMarker(new RecipeSearchResult(FindDependencies.this,
+                                t = t.withMarker(new RecipeSearchResult(DependencyInsight.this,
                                         match.get().getCoordinates()));
                             }
                         }

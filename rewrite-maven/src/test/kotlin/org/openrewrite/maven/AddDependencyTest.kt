@@ -25,9 +25,7 @@ class AddDependencyTest : MavenRecipeTest {
             "org.springframework.boot",
             "spring-boot",
             "1.5.22.RELEASE"
-        ).apply {
-            isSkipIfPresent = false
-        }
+        )
 
     @Test
     fun addToExistingDependencies() = assertChanged(
@@ -69,10 +67,7 @@ class AddDependencyTest : MavenRecipeTest {
                 </dependency>
               </dependencies>
             </project>
-        """,
-        afterConditions = { maven: Maven ->
-            assertThat(maven.model.findDependencies("org.springframework.boot", "spring-boot")).isNotEmpty()
-        }
+        """
     )
 
     @Test
@@ -108,9 +103,7 @@ class AddDependencyTest : MavenRecipeTest {
             "org.springframework.boot",
             "spring-boot",
             "1.4.X"
-        ).apply {
-            isSkipIfPresent = false
-        },
+        ),
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>
@@ -140,7 +133,6 @@ class AddDependencyTest : MavenRecipeTest {
     fun addTestDependenciesAfterCompile() = assertChanged(
         recipe = AddDependency("org.junit.jupiter", "junit-jupiter-api", "5.7.0").apply {
             scope = "test"
-            isSkipIfPresent = false
         },
         before = """
             <project>
@@ -186,7 +178,7 @@ class AddDependencyTest : MavenRecipeTest {
 
     @Test
     fun maybeAddDependencyDoesntAddWhenExistingDependency() = assertUnchanged(
-        recipe = recipe.apply { isSkipIfPresent = true },
+        recipe = recipe,
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>
@@ -206,7 +198,7 @@ class AddDependencyTest : MavenRecipeTest {
 
     @Test
     fun maybeAddDependencyDoesntAddWhenExistingAsTransitiveDependency() = assertUnchanged(
-        recipe = recipe.apply { isSkipIfPresent = true },
+        recipe = recipe,
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>
@@ -281,7 +273,6 @@ class AddDependencyTest : MavenRecipeTest {
             "2.12.0"
         ).apply {
             familyPattern = "com.fasterxml.jackson*"
-            isSkipIfPresent = false
         },
         before = """
             <project>
@@ -329,10 +320,7 @@ class AddDependencyTest : MavenRecipeTest {
                 </dependency>
               </dependencies>
             </project>
-        """,
-        afterConditions = { maven: Maven ->
-            assertThat(maven.model.findDependencies("com.fasterxml.jackson.core", "jackson-databind")).isNotEmpty()
-        }
+        """
     )
 
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")

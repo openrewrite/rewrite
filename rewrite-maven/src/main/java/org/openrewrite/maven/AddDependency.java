@@ -60,8 +60,6 @@ public class AddDependency extends Recipe {
     @Nullable
     private String type;
 
-    private boolean skipIfPresent = true;
-
     /**
      * A glob expression used to identify other dependencies in the same family as the dependency to be added.
      */
@@ -85,10 +83,6 @@ public class AddDependency extends Recipe {
 
     public void setScope(@Nullable String scope) {
         this.scope = scope;
-    }
-
-    public void setSkipIfPresent(boolean skipIfPresent) {
-        this.skipIfPresent = skipIfPresent;
     }
 
     public void setReleasesOnly(boolean releasesOnly) {
@@ -124,7 +118,6 @@ public class AddDependency extends Recipe {
                 classifier,
                 scope,
                 type,
-                skipIfPresent,
                 familyPattern == null ? null : Pattern.compile(familyPattern.replace("*", ".*"))
         );
     }

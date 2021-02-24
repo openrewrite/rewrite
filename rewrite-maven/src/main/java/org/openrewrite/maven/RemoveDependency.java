@@ -22,7 +22,6 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.search.FindDependencies;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.Scope;

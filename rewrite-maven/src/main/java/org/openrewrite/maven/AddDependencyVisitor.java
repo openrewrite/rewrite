@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
+import lombok.RequiredArgsConstructor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
@@ -24,6 +25,7 @@ import org.openrewrite.maven.internal.InsertDependencyComparator;
 import org.openrewrite.maven.internal.MavenMetadata;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.Version;
+import org.openrewrite.maven.search.FindDependency;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.Scope;
@@ -49,6 +51,7 @@ import static java.util.Collections.*;
  * <p>
  * Places a new dependency as physically "near" to a group of similar dependencies as possible.
  */
+@RequiredArgsConstructor
 @EqualsAndHashCode(callSuper = false)
 public class AddDependencyVisitor extends MavenVisitor {
     private static final XPathMatcher DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencies");
@@ -71,35 +74,11 @@ public class AddDependencyVisitor extends MavenVisitor {
     @Nullable
     private final String type;
 
-    private final boolean skipIfPresent;
-
     @Nullable
     private final Pattern familyPattern;
 
     @Nullable
     private VersionComparator versionComparator;
-
-    public AddDependencyVisitor(String groupId,
-                                String artifactId,
-                                String version,
-                                @Nullable String metadataPattern,
-                                boolean releasesOnly,
-                                @Nullable String classifier,
-                                @Nullable String scope,
-                                @Nullable String type,
-                                boolean skipIfPresent,
-                                @Nullable Pattern familyPattern) {
-        this.groupId = groupId;
-        this.artifactId = artifactId;
-        this.version = version;
-        this.metadataPattern = metadataPattern;
-        this.releasesOnly = releasesOnly;
-        this.classifier = classifier;
-        this.scope = scope;
-        this.type = type;
-        this.skipIfPresent = skipIfPresent;
-        this.familyPattern = familyPattern;
-    }
 
     @Override
     public Maven visitMaven(Maven maven, ExecutionContext ctx) {
@@ -110,10 +89,8 @@ public class AddDependencyVisitor extends MavenVisitor {
             versionComparator = versionValidation.getValue();
         }
 
-        if (skipIfPresent && findDependencies(groupId, artifactId).stream().anyMatch(d ->
-                version.equals(d.getVersion()) &&
-                        (classifier == null || classifier.equals(d.getClassifier())) &&
-                        d.getScope().isInClasspathOf(Scope.fromName(scope)))) {
+        if(!FindDependency.find(maven, groupId, artifactId).isEmpty() ||
+            !findDependencies(groupId, artifactId).isEmpty()) {
             return maven;
         }
 

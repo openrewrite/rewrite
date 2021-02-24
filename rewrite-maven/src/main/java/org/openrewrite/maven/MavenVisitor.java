@@ -98,6 +98,7 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
     /**
      * Finds dependencies in the model that match the provided group and artifact ids.
      *
+     *
      * @param groupId    The groupId to match
      * @param artifactId The artifactId to match.
      * @return dependencies (including transitive dependencies) with any version matching the provided group and artifact id, if any.
@@ -131,7 +132,6 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
                 classifier,
                 scope,
                 type,
-                true,
                 null);
 
         if (!getAfterVisit().contains(op)) {
