@@ -77,7 +77,8 @@ interface ChangeMethodTargetToStaticTest : JavaRecipeTest {
         ),
         recipe = ChangeMethodTargetToStatic("a.A foo()","b.B"),
         before = """
-            import static a.A.*;
+            import static a.A.foo;
+            
             class C {
                public void test() {
                    foo();

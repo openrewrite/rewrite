@@ -117,7 +117,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.Identifier visitIdentifier(J.Identifier ident, P p) {
-        if (getCursor().getPathAsStream().noneMatch(J.Import.class::isInstance)) {
+        if (getCursor().getPathAsStream().noneMatch(J.Import.class::isInstance) &&
+                !(getCursor().getParentOrThrow().getValue() instanceof J.MethodInvocation)) {
             referencedFields.add(ident.getSimpleName());
         }
         return super.visitIdentifier(ident, p);
