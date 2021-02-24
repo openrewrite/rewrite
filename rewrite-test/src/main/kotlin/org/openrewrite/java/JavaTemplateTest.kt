@@ -29,42 +29,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         private val logEvent = Consumer<String> { s -> logger.info(s) }
     }
 
-    @Issue("#325")
-    @Disabled
-    @Test
-    fun replaceSecondAnnotationOnClassDeclaration(jp: JavaParser.Builder<*, *>) = assertChanged(
-        parser = jp.build(),
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            var t = template("@SuppressWarnings(\"bla-bla-bla\")").build()
-            override fun visitAnnotation(annotation: J.Annotation, p: ExecutionContext): J.Annotation {
-                var a = super.visitAnnotation(annotation, p)
-                if (a.simpleName.equals("SuppressWarnings")) {
-                    a = a.withTemplate(t, a.coordinates.replace())
-                }
-                return a;
-            }
-        }.toRecipe(),
-        before = """
-            class ThingOneTwo {}
-            class ConfigClass {
-                @Override
-                @SuppressWarnings("bla")
-                public ThingOneTwo thingOneTwo() {
-                    return new ThingOneTwo();
-                }
-            }
-        """,
-        after = """
-            class ThingOneTwo {}
-            class ConfigClass {
-                @Override
-                @SuppressWarnings("bla-bla-bla")
-                public ThingOneTwo thingOneTwo() {
-                    return new ThingOneTwo();
-                }
-            }
-        """
-    )
     @Test
     fun addMethodAnnotationTest(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.classpath("junit-jupiter-api").build(),
