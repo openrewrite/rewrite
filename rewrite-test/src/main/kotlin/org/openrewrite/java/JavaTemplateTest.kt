@@ -609,7 +609,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         """
     )
 
-    @Disabled
     @Issue("#331")
     @Test
     fun replaceAnnotationOnClass(jp: JavaParser) = assertChanged(
