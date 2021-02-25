@@ -129,8 +129,10 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
 
     @Override
     public J visitClassDeclaration(J.ClassDeclaration classDecl, Cursor insertionScope) {
-        if (!insertionScope.isScopeInPath(classDecl) || !classDecl.getId().equals(coordinates.getTree().getId())) {
+        if (!insertionScope.isScopeInPath(classDecl)) {
             return super.visitClassDeclaration(classDecl.withLeadingAnnotations(emptyList()), insertionScope);
+        } else if  (!classDecl.getId().equals(coordinates.getTree().getId())) {
+            return super.visitClassDeclaration(classDecl, insertionScope);
         }
 
         String kind = "";
