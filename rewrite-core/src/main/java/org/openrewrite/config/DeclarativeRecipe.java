@@ -20,10 +20,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
 
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 import static org.openrewrite.Validated.invalid;
 
@@ -31,6 +28,7 @@ public class DeclarativeRecipe extends Recipe {
     private final String name;
     private final String displayName;
     private final String description;
+    private final Set<String> tags;
     private final URI source;
     private final List<String> lazyNext = new ArrayList<>();
 
@@ -49,11 +47,17 @@ public class DeclarativeRecipe extends Recipe {
             "initialize(..) must be called on DeclarativeRecipe prior to use.",
             this, r -> lazyNext.isEmpty());
 
-    public DeclarativeRecipe(String name, String displayName, String description, URI source) {
+    public DeclarativeRecipe(String name, String displayName, String description, Set<String> tags, URI source) {
         this.name = name;
         this.displayName = displayName;
         this.description = description;
+        this.tags = tags;
         this.source = source;
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return tags;
     }
 
     void initialize(Collection<Recipe> availableRecipes) {

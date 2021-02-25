@@ -94,6 +94,10 @@ public abstract class Recipe {
         return "";
     }
 
+    public Set<String> getTags() {
+        return Collections.emptySet();
+    }
+
     @JsonIgnore
     @Nullable
     private Recipe next;

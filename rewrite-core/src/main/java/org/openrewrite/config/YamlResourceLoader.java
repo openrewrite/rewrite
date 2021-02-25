@@ -119,7 +119,12 @@ public class YamlResourceLoader implements ResourceLoader {
                     String name = (String) r.get("name");
                     String displayName = (String) r.get("displayName");
                     String description = (String) r.get("description");
-                    DeclarativeRecipe recipe = new DeclarativeRecipe(name, displayName, description, source);
+                    Set<String> tags = Collections.emptySet();
+                    List<String> rawTags = (List<String>) r.get("tags");
+                    if (rawTags != null) {
+                        tags = new HashSet<>(rawTags);
+                    }
+                    DeclarativeRecipe recipe = new DeclarativeRecipe(name, displayName, description, tags, source);
                     List<Object> recipeList = (List<Object>) r.get("recipeList");
                     if (recipeList == null) {
                         throw new RecipeException("Invalid Recipe [" + name + "] recipeList is null");
@@ -151,11 +156,19 @@ public class YamlResourceLoader implements ResourceLoader {
                 .collect(toList());
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
         return loadResources(ResourceType.Recipe).stream()
                 .filter(r -> r.containsKey("name"))
-                .map(r -> new RecipeDescriptor((String) r.get("name"), (String) r.get("displayName"), (String) r.get("description"), Collections.emptyList()))
+                .map(r -> {
+                    Set<String> tags = Collections.emptySet();
+                    List<String> rawTags = (List<String>) r.get("tags");
+                    if (rawTags != null) {
+                        tags = new HashSet<>(rawTags);
+                    }
+                    return new RecipeDescriptor((String) r.get("name"), (String) r.get("displayName"), (String) r.get("description"), tags, Collections.emptyList());
+                })
                 .collect(toList());
     }
 

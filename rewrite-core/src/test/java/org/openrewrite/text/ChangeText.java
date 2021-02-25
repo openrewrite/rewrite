@@ -17,6 +17,8 @@ package org.openrewrite.text;
 
 import org.openrewrite.*;
 
+import java.util.Set;
+
 import static org.openrewrite.Validated.required;
 
 public class ChangeText extends Recipe {
@@ -26,6 +28,11 @@ public class ChangeText extends Recipe {
 
     public ChangeText(String toText) {
         this.toText = toText;
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Set.of("plain text");
     }
 
     @Override

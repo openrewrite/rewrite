@@ -143,7 +143,8 @@ public class ClasspathScanningLoader implements ResourceLoader {
                         primaryConstructor.setAccessible(true);
                         recipes.add((Recipe) primaryConstructor.newInstance());
                     }
-                    recipeDescriptors.add(new RecipeDescriptor(classInfo.getName(), recipe.getDisplayName(), recipe.getDescription(), options));
+                    recipeDescriptors.add(new RecipeDescriptor(classInfo.getName(), recipe.getDisplayName(),
+                            recipe.getDescription(), recipe.getTags(), options));
                 } catch (Exception e) {
                     logger.warn("Unable to configure {}", recipeClass.getName(), e);
                 }

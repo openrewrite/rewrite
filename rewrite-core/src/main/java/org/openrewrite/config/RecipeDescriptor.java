@@ -18,6 +18,7 @@ package org.openrewrite.config;
 import lombok.Value;
 
 import java.util.List;
+import java.util.Set;
 
 @Value
 public class RecipeDescriptor {
@@ -27,6 +28,8 @@ public class RecipeDescriptor {
     String displayName;
 
     String description;
+
+    Set<String> tags;
 
     List<OptionDescriptor> options;
 }
