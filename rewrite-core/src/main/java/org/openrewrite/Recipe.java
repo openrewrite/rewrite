@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import lombok.EqualsAndHashCode;
@@ -93,6 +94,7 @@ public abstract class Recipe {
         return "";
     }
 
+    @JsonIgnore
     @Nullable
     private Recipe next;
 
@@ -107,6 +109,7 @@ public abstract class Recipe {
         return this;
     }
 
+    @JsonIgnore
     public List<Recipe> getRecipeList() {
         Recipe r = next;
         List<Recipe> list = new ArrayList<>();

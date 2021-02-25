@@ -205,6 +205,7 @@ interface RecipeTest {
     fun TreeVisitor<*, ExecutionContext>.toRecipe() = AdHocRecipe(this)
 
     class AdHocRecipe(private val visitor: TreeVisitor<*, ExecutionContext>) : Recipe() {
+
         override fun getDisplayName(): String {
             return "Ad hoc recipe"
         }

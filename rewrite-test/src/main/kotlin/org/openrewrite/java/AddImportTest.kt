@@ -387,7 +387,11 @@ interface AddImportTest : JavaRecipeTest {
      * This visitor removes the "java.util.Collections" receiver from method invocations of "java.util.Collections.emptyList()".
      * This allows us to test that AddImport with setOnlyIfReferenced = true will add a static import when an applicable static method call is present
      */
-    private class FixEmptyListMethodType : HiddenRecipe() {
+    private class FixEmptyListMethodType : Recipe() {
+        override fun getDisplayName(): String {
+            return "Fix Empty List"
+        }
+
         override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
             return object : JavaIsoVisitor<ExecutionContext>() {
                 override fun visitMethodInvocation(
