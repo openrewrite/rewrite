@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -64,6 +65,11 @@ public class ChangeDependencyVersion extends Recipe {
                             doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), newVersion));
                         }
                     }
+                }
+                // In this case a transitive dependency has been removed and the dependency now requires a version
+                else if (!versionTag.isPresent() && !isManagedDependencyTag(groupId, artifactId)) {
+                    Xml.Tag newVersionTag = Xml.Tag.build("<version>"+newVersion+"</version>");
+                    doAfterVisit(new AddToTagVisitor<>(getCursor().getValue(), newVersionTag));
                 }
             } else if (!modules.isEmpty() && isPropertyTag()) {
                 String propertyKeyRef = "${" + tag.getName() + "}";
