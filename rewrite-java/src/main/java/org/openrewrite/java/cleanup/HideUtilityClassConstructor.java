@@ -27,7 +27,7 @@ public class HideUtilityClassConstructor extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Hide Utility Class Constructor";
+        return "Hide utility class constructor";
     }
 
     @Override

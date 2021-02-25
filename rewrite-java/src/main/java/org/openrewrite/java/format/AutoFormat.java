@@ -22,7 +22,7 @@ import org.openrewrite.TreeVisitor;
 public class AutoFormat extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Auto Format Java";
+        return "Auto format Java";
     }
 
     @Override

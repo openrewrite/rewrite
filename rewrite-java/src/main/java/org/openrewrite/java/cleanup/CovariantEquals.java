@@ -22,9 +22,10 @@ import org.openrewrite.TreeVisitor;
 
 @Incubating(since = "7.0.0")
 public class CovariantEquals extends Recipe {
+
     @Override
     public String getDisplayName() {
-        return "Covariant Equals";
+        return "Covariant equals";
     }
 
     @Override

@@ -26,7 +26,10 @@ class ExecutionContextTest {
     fun anotherCycleIfNewMessagesInExecutionContext() {
         var cycles = 0
 
-        object: HiddenRecipe() {
+        object: Recipe() {
+            override fun getDisplayName(): String {
+                return name
+            }
 
             override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
                 return object : TreeVisitor<PlainText, ExecutionContext>() {

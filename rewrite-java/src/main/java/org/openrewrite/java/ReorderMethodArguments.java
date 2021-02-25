@@ -20,6 +20,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.Option;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.Expression;
@@ -43,17 +44,20 @@ public class ReorderMethodArguments extends Recipe {
      * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
+    @Option(displayName = "Method pattern", description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations")
     String methodPattern;
 
     /**
      * An array of parameter names that indicates the new order in which those arguments should be arranged.
      */
+    @Option(displayName = "New parameter names", description = "An array of parameter names that indicates the new order in which those arguments should be arranged")
     String[] newParameterNames;
 
     /**
      * If the original method signature is not type-attributed, this is an optional list that indicates the original order
      * in which the arguments were arranged.
      */
+    @Option(displayName = "Old parameter names", description = "If the original method signature is not type-attributed, this is an optional list that indicates the original order in which the arguments were arranged")
     @Nullable
     String[] oldParameterNames;
 
@@ -63,12 +67,12 @@ public class ReorderMethodArguments extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Reorder Method Arguments";
+        return "Reorder method arguments";
     }
 
     @Override
     public String getDescription() {
-        return "Finds method invocations matching methodPattern and reorders arguments using the order of names in newParameterNames";
+        return "Reorder method arguments into the specified order";
     }
 
     @Override

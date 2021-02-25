@@ -15,7 +15,6 @@
  */
 package org.openrewrite.config;
 
-import org.openrewrite.HiddenRecipe;
 import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
@@ -52,7 +51,13 @@ public class Environment {
     }
 
     public Recipe activateRecipes(Iterable<String> activeRecipes) {
-        Recipe root = new HiddenRecipe();
+        Recipe root = new Recipe() {
+
+            @Override
+            public String getDisplayName() {
+                return getName();
+            }
+        };
         Collection<Recipe> recipes = listRecipes();
         List<String> recipesNotFound = new ArrayList<>();
         for (String activeRecipe : activeRecipes) {
@@ -80,7 +85,13 @@ public class Environment {
 
     @Incubating(since = "7.0.0")
     public Recipe activateAll() {
-        Recipe root = new HiddenRecipe();
+        Recipe root = new Recipe() {
+
+            @Override
+            public String getDisplayName() {
+                return getName();
+            }
+        };
         listRecipes().forEach(root::doNext);
         return root;
     }

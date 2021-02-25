@@ -54,8 +54,11 @@ class ResultTest {
                 |}
                 |
             """.trimMargin(),
-            setOf(object : HiddenRecipe() {
+            setOf(object : Recipe() {
                 override fun getName(): String = "logger.Fix"
+                override fun getDisplayName(): String {
+                    return name
+                }
             })
         ).diff
 
@@ -111,11 +114,17 @@ class ResultTest {
             """.trimMargin(),
 
             setOf(
-                object : HiddenRecipe() {
+                object : Recipe() {
                     override fun getName(): String = "logger.Fix1"
+                    override fun getDisplayName(): String {
+                        return name
+                    }
                 },
-                object : HiddenRecipe() {
+                object : Recipe() {
                     override fun getName(): String = "logger.Fix2"
+                    override fun getDisplayName(): String {
+                        return name
+                    }
                 }
             )
         ).diff

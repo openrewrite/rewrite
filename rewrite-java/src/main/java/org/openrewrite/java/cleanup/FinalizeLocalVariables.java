@@ -22,9 +22,10 @@ import org.openrewrite.TreeVisitor;
 
 @Incubating(since = "7.0.0")
 public class FinalizeLocalVariables extends Recipe {
+
     @Override
     public String getDisplayName() {
-        return "Finalize Local Variables";
+        return "Finalize local variables";
     }
 
     @Override

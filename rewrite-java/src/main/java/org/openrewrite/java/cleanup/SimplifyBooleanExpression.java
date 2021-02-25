@@ -22,9 +22,10 @@ import org.openrewrite.TreeVisitor;
 
 @Incubating(since = "7.0.0")
 public class SimplifyBooleanExpression extends Recipe {
+
     @Override
     public String getDisplayName() {
-        return "Simplify Boolean Expression";
+        return "Simplify boolean expression";
     }
 
     @Override

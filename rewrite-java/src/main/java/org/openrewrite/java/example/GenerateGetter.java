@@ -17,10 +17,7 @@ package org.openrewrite.java.example;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
@@ -31,16 +28,17 @@ import org.openrewrite.java.tree.TypeUtils;
 @EqualsAndHashCode(callSuper = true)
 public class GenerateGetter extends Recipe {
 
+    @Option(displayName = "Field name", description = "Name of field to generate getter for")
     String fieldName;
 
     @Override
     public String getDisplayName() {
-        return "Generate Getter";
+        return "Generate getter";
     }
 
     @Override
     public String getDescription() {
-        return "Generates a 'get' accessor method for fieldName";
+        return "Generate a \"get\" accessor method";
     }
 
     @Override

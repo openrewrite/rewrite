@@ -19,7 +19,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ScanResult;
-import org.openrewrite.HiddenRecipe;
 import org.openrewrite.Recipe;
 import org.openrewrite.Option;
 import org.openrewrite.style.NamedStyles;
@@ -96,7 +95,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 .scan()) {
             for (ClassInfo classInfo : result.getSubclasses(Recipe.class.getName())) {
                 Class<?> recipeClass = classInfo.loadClass();
-                if (HiddenRecipe.class.isAssignableFrom(recipeClass) || recipeClass.equals(DeclarativeRecipe.class)) {
+                if (recipeClass.equals(DeclarativeRecipe.class)) {
                     continue;
                 }
                 try {

@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.Option;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -35,16 +36,17 @@ public class UseStaticImport extends Recipe {
      * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
+    @Option(displayName = "Method pattern", description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.")
     String methodPattern;
 
     @Override
     public String getDisplayName() {
-        return "Use Static Import";
+        return "Use static import";
     }
 
     @Override
     public String getDescription() {
-        return "Find and converts method invocations matching methodPattern to use a static import";
+        return "Replace non-static method calls with static ones";
     }
 
     @Override
