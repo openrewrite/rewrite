@@ -15,16 +15,20 @@
  */
 package org.openrewrite.config;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ScanResult;
+import org.openrewrite.HiddenRecipe;
 import org.openrewrite.Recipe;
+import org.openrewrite.RecipeParam;
 import org.openrewrite.style.NamedStyles;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.Parameter;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -93,20 +97,55 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 .scan()) {
             for (ClassInfo classInfo : result.getSubclasses(Recipe.class.getName())) {
                 Class<?> recipeClass = classInfo.loadClass();
+                if (HiddenRecipe.class.isAssignableFrom(recipeClass) || recipeClass.equals(DeclarativeRecipe.class)) {
+                    continue;
+                }
                 try {
-                    List<String> parameters = new ArrayList<>();
-                    for (Constructor<?> constructor : recipeClass.getConstructors()) {
-                        for (int i = 0; i < constructor.getParameters().length; i++) {
-                            Parameter param = constructor.getParameters()[i];
-                            parameters.add(param.getName());
-                        }
-                        if (constructor.getParameterCount() == 0) {
-                            constructor.setAccessible(true);
-                            recipes.add((Recipe) constructor.newInstance());
-                            break;
+                    List<ParameterDescriptor> parameters = new ArrayList<>();
+
+                    for (Field field : recipeClass.getDeclaredFields()) {
+                        RecipeParam recipeParam = field.getAnnotation(RecipeParam.class);
+                        if (recipeParam != null) {
+                            parameters.add(new ParameterDescriptor(field.getName(), field.getType().getSimpleName(),
+                                    recipeParam.displayName(), recipeParam.description()));
                         }
                     }
-                    recipeDescriptors.add(new RecipeDescriptor(classInfo.getName(), parameters));
+
+                    Constructor<?> primaryConstructor = null;
+                    Constructor<?>[] constructors = recipeClass.getConstructors();
+                    if (constructors.length == 0) {
+                        // kotlin object declarations have no constructors at all
+                        continue;
+                    } else if (recipeClass.getConstructors().length == 1) {
+                        primaryConstructor = recipeClass.getConstructors()[0];
+                    } else {
+                        for (Constructor<?> constructor : constructors) {
+                            if (constructor.isAnnotationPresent(JsonCreator.class)) {
+                                primaryConstructor = constructor;
+                                break;
+                            }
+                        }
+                    }
+                    if (primaryConstructor == null) {
+                        throw new IllegalStateException("Unable to locate primary constructor for Recipe " + recipeClass);
+                    }
+                    Object[] constructorArgs = new Object[primaryConstructor.getParameterCount()];
+                    for (int i = 0; i < primaryConstructor.getParameters().length; i++) {
+                        Parameter param = primaryConstructor.getParameters()[i];
+                        if (param.getType().isPrimitive()) {
+                            constructorArgs[i] = getPrimitiveDefault(param.getType());
+                        } else {
+                            constructorArgs[i] = null;
+                        }
+                    }
+                    primaryConstructor.setAccessible(true);
+                    Recipe recipe = (Recipe) primaryConstructor.newInstance(constructorArgs);
+
+                    if (primaryConstructor.getParameterCount() == 0) {
+                        primaryConstructor.setAccessible(true);
+                        recipes.add((Recipe) primaryConstructor.newInstance());
+                    }
+                    recipeDescriptors.add(new RecipeDescriptor(classInfo.getName(), recipe.getDisplayName(), recipe.getDescription(), parameters));
                 } catch (Exception e) {
                     logger.warn("Unable to configure {}", recipeClass.getName(), e);
                 }
@@ -125,6 +164,28 @@ public class ClasspathScanningLoader implements ResourceLoader {
                     logger.warn("Unable to configure {}", styleClass.getName(), e);
                 }
             }
+        }
+    }
+
+    private Object getPrimitiveDefault(Class<?> t) {
+        if (t.equals(byte.class)) {
+            return (byte) 0;
+        } else if (t.equals(short.class)) {
+            return (short) 0;
+        } else if (t.equals(int.class)) {
+            return 0;
+        } else if (t.equals(long.class)) {
+            return 0L;
+        } else if (t.equals(float.class)) {
+            return 0.0f;
+        } else if (t.equals(double.class)) {
+            return 0.0d;
+        } else if (t.equals(char.class)) {
+            return '\u0000';
+        } else if (t.equals(boolean.class)) {
+            return false;
+        } else {
+            throw new IllegalArgumentException(t.getCanonicalName() + " is not a supported primitive type");
         }
     }
 

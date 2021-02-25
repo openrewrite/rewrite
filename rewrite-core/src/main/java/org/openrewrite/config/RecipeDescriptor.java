@@ -15,24 +15,18 @@
  */
 package org.openrewrite.config;
 
+import lombok.Value;
+
 import java.util.List;
 
+@Value
 public class RecipeDescriptor {
 
-    private final String name;
+    String name;
 
-    private final List<String> parameters;
+    String displayName;
 
-    public RecipeDescriptor(String name, List<String> parameters) {
-        this.name = name;
-        this.parameters = parameters;
-    }
+    String description;
 
-    public String getName() {
-        return name;
-    }
-
-    public List<String> getParameters() {
-        return parameters;
-    }
+    List<ParameterDescriptor> parameters;
 }

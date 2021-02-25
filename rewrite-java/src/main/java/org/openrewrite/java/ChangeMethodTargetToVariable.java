@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.RecipeParam;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
@@ -39,18 +40,23 @@ public class ChangeMethodTargetToVariable extends Recipe {
      * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
+    @RecipeParam(displayName = "Method pattern", description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations")
     String methodPattern;
+
+    @RecipeParam(displayName = "Variable name", description = "Name of variable to use as target for the modified method invocation")
     String variableName;
+
+    @RecipeParam(displayName = "Variable type", description = "Type attribution to use for the return type of the modified method invocation")
     String variableType;
 
     @Override
     public String getDisplayName() {
-        return "Change Method Target To Variable";
+        return "Change method target to variable";
     }
 
     @Override
     public String getDescription() {
-        return "Finds method invocations matching methodPattern and changes them to be method calls on the variable specified by variableName and variableType";
+        return "Change method invocations to method calls on a variable";
     }
 
     @Override

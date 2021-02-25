@@ -16,50 +16,45 @@
 package org.openrewrite.java;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.EqualsAndHashCode;
-import lombok.Value;
+import lombok.*;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.RecipeParam;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
 import java.nio.file.Paths;
 
-@Value
+@Getter
+@RequiredArgsConstructor
+@AllArgsConstructor(onConstructor_ = @JsonCreator)
 @EqualsAndHashCode(callSuper = true)
 public class ChangePackage extends Recipe {
     /**
      * Fully-qualified package name of the old package.
      */
-    String oldFullyQualifiedPackageName;
+    @RecipeParam(displayName = "Old fully-qualified package name", description = "Fully-qualified package name of the old package")
+    private final String oldFullyQualifiedPackageName;
 
     /**
      * Fully-qualified package name of the replacement package.
      */
-    String newFullyQualifiedPackageName;
+    @RecipeParam(displayName = "New fully-qualified package name", description = "Fully-qualified package name of the replacement package")
+    private final String newFullyQualifiedPackageName;
 
-    boolean recursive;
-
-    @JsonCreator
-    public ChangePackage(String oldFullyQualifiedPackageName, String newFullyQualifiedPackageName, boolean recursive) {
-        this.oldFullyQualifiedPackageName = oldFullyQualifiedPackageName;
-        this.newFullyQualifiedPackageName = newFullyQualifiedPackageName;
-        this.recursive = recursive;
-    }
-
-    public ChangePackage(String oldFullyQualifiedPackageName, String newFullyQualifiedPackageName) {
-        this(oldFullyQualifiedPackageName, newFullyQualifiedPackageName, true);
-    }
+    @With
+    @RecipeParam(displayName = "Recursive", description = "If true, recursively change subpackage names")
+    private boolean recursive = true;
 
     @Override
     public String getDisplayName() {
-        return "Change Package";
+        return "Change package";
     }
 
     @Override
     public String getDescription() {
-        return "Changes package oldFullyQualifiedPackageName to newFullyQualifiedPackageName";
+        return "Change package names";
     }
 
     @Override

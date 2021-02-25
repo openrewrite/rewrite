@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.RecipeParam;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
@@ -39,21 +40,23 @@ public class ChangeMethodTargetToStatic extends Recipe {
      * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
+    @RecipeParam(displayName = "Method pattern", description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations")
     String methodPattern;
 
     /**
      * A fully-qualified class name of the type upon which the static method is defined.
      */
+    @RecipeParam(displayName = "Fully-qualified target type name", description = "A fully-qualified class name of the type upon which the static method is defined")
     String fullyQualifiedTargetTypeName;
 
     @Override
     public String getDisplayName() {
-        return "Change Method Target To Static";
+        return "Change method target to static";
     }
 
     @Override
     public String getDescription() {
-        return "Finds method invocations matching methodPattern and changes them to be static method calls on fullyQualifiedTargetTypeName";
+        return "Change method invocations to static method calls";
     }
 
     @Override

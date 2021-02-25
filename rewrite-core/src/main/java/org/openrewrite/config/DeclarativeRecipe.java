@@ -29,17 +29,19 @@ import static org.openrewrite.Validated.invalid;
 
 public class DeclarativeRecipe extends Recipe {
     private final String name;
+    private final String displayName;
+    private final String description;
     private final URI source;
     private final List<String> lazyNext = new ArrayList<>();
 
     @Override
     public String getDisplayName() {
-        return name;
+        return displayName;
     }
 
     @Override
     public String getDescription() {
-        return "Declarative Recipe - no description";
+        return description;
     }
 
     @JsonIgnore
@@ -47,8 +49,10 @@ public class DeclarativeRecipe extends Recipe {
             "initialize(..) must be called on DeclarativeRecipe prior to use.",
             this, r -> lazyNext.isEmpty());
 
-    public DeclarativeRecipe(String name, URI source) {
+    public DeclarativeRecipe(String name, String displayName, String description, URI source) {
         this.name = name;
+        this.displayName = displayName;
+        this.description = description;
         this.source = source;
     }
 

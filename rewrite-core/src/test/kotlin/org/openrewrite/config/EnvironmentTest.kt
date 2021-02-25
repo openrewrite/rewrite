@@ -182,6 +182,7 @@ class EnvironmentTest {
         val changeTextDescriptor = recipeDescriptors.filter { it.name == "org.openrewrite.text.ChangeText" }.firstOrNull()
         assertThat(changeTextDescriptor).isNotNull
         assertThat(changeTextDescriptor!!.parameters).hasSize(1)
-        assertThat(changeTextDescriptor.parameters[0]).isEqualTo("toText")
+        assertThat(changeTextDescriptor.parameters[0].name).isEqualTo("toText")
+        assertThat(changeTextDescriptor.parameters[0].type).isEqualTo("String")
     }
 }

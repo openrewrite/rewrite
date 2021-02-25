@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.RecipeParam;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -43,21 +44,23 @@ public class DeleteMethodArgument extends Recipe {
      * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
+    @RecipeParam(displayName = "Method pattern", description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations")
     String methodPattern;
 
     /**
      * A zero-based index that indicates which argument will be removed from the method invocation.
      */
-    Integer argumentIndex;
+    @RecipeParam(displayName = "Argument index", description = "A zero-based index that indicates which argument will be removed from the method invocation")
+    int argumentIndex;
 
     @Override
     public String getDisplayName() {
-        return "Delete Method Argument";
+        return "Delete method argument";
     }
 
     @Override
     public String getDescription() {
-        return "Finds method invocations matching methodPattern and deletes the argument at argumentIndex (zero-based index)";
+        return "Delete an argument from method invocations";
     }
 
     @Override
@@ -81,7 +84,7 @@ public class DeleteMethodArgument extends Recipe {
                     .count() >= argumentIndex + 1) {
                 List<Expression> args = new ArrayList<>(m.getArguments());
 
-                args.remove((int) argumentIndex);
+                args.remove(argumentIndex);
                 if (args.isEmpty()) {
                     args = singletonList(new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY));
                 }

@@ -87,7 +87,9 @@ public abstract class Recipe {
 
     public abstract String getDisplayName();
 
-    public abstract String getDescription();
+    public String getDescription() {
+        return "";
+    }
 
     @Nullable
     private Recipe next;

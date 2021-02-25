@@ -19,11 +19,23 @@ import org.openrewrite.*;
 
 import static org.openrewrite.Validated.required;
 
-public class ChangeText extends HiddenRecipe {
+public class ChangeText extends Recipe {
+
+    @RecipeParam(displayName = "To Text", description = "Text to change tree value to")
     private final String toText;
 
     public ChangeText(String toText) {
         this.toText = toText;
+    }
+
+    @Override
+    public String getDisplayName() {
+        return "Change Text";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Changes Text, test recipe";
     }
 
     @Override

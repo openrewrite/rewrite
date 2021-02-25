@@ -15,20 +15,18 @@
  */
 package org.openrewrite.java;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
+import org.openrewrite.RecipeParam;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.marker.Markers;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -41,22 +39,23 @@ import java.util.Optional;
  * imports that are not referenced within the compilation unit.
  */
 @EqualsAndHashCode(callSuper = true)
-@AllArgsConstructor
+@AllArgsConstructor(onConstructor_=@JsonCreator)
 @NoArgsConstructor
 public class OrderImports extends Recipe {
 
     @Getter
     @With
+    @RecipeParam(displayName = "Remove unused", description = "Remove unnecessary imports")
     private boolean removeUnused = true;
 
     @Override
     public String getDisplayName() {
-        return "Order Imports";
+        return "Order imports";
     }
 
     @Override
     public String getDescription() {
-        return "Groups and orders imports using rules from ImportLayoutStyle. Removes unused imports by default.";
+        return "Group and order imports";
     }
 
     @Override

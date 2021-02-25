@@ -78,24 +78,11 @@ interface DeleteMethodArgumentTest : JavaRecipeTest {
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = DeleteMethodArgument(null, null)
-        var valid = recipe.validate()
-        assertThat(valid.isValid).isFalse()
-        assertThat(valid.failures()).hasSize(2)
-        assertThat(valid.failures()[0].property).isEqualTo("argumentIndex")
-        assertThat(valid.failures()[1].property).isEqualTo("methodPattern")
-
-        recipe = DeleteMethodArgument(null, 0)
-        valid = recipe.validate()
+        val recipe = DeleteMethodArgument(null, 0)
+        val valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
-
-        recipe = DeleteMethodArgument("b.B foo()", null)
-        valid = recipe.validate()
-        assertThat(valid.isValid).isFalse()
-        assertThat(valid.failures()).hasSize(1)
-        assertThat(valid.failures()[0].property).isEqualTo("argumentIndex")
     }
 
 }

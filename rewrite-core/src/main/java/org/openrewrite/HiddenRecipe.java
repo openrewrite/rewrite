@@ -16,7 +16,7 @@
 package org.openrewrite;
 
 /**
- * Non-discoverable Recipe, where you don't care about displayName and description
+ * Non-discoverable Recipe, where you don't need to care about displayName and description
  */
 public class HiddenRecipe extends Recipe {
 
