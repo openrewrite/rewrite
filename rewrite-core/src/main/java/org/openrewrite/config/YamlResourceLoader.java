@@ -131,8 +131,10 @@ public class YamlResourceLoader implements ResourceLoader {
                         } else if (next instanceof Map) {
                             Map.Entry<String, Object> nameAndConfig = ((Map<String, Object>) next).entrySet().iterator().next();
                             try {
-                                recipe.doNext((Recipe) mapper.convertValue(nameAndConfig.getValue(),
-                                        Class.forName(nameAndConfig.getKey())));
+                                Map<Object, Object> withJsonType = new HashMap<>((Map<String, Object>) nameAndConfig.getValue());
+                                withJsonType.put("@c", nameAndConfig.getKey());
+                                recipe.doNext(mapper.convertValue(withJsonType,
+                                        Recipe.class));
                             } catch (Exception e) {
                                 e.printStackTrace();
                             }

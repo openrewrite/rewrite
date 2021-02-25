@@ -109,7 +109,6 @@ public abstract class Recipe {
         return this;
     }
 
-    @JsonIgnore
     public List<Recipe> getRecipeList() {
         Recipe r = next;
         List<Recipe> list = new ArrayList<>();
