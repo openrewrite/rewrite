@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.NullUtils;
@@ -46,6 +47,7 @@ import static java.util.stream.Collectors.*;
  * <p>
  * returns a list of {@link Result results} for each modified {@link SourceFile}
  */
+@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
 public abstract class Recipe {
 
     private static final Logger logger = LoggerFactory.getLogger(Recipe.class);
