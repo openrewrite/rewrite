@@ -21,7 +21,7 @@ import static org.openrewrite.Validated.required;
 
 public class ChangeText extends Recipe {
 
-    @RecipeParam(displayName = "To Text", description = "Text to change tree value to")
+    @Option(displayName = "To Text", description = "Text to change tree value to")
     private final String toText;
 
     public ChangeText(String toText) {

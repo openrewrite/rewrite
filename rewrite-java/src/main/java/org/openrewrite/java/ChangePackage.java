@@ -19,7 +19,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.RecipeParam;
+import org.openrewrite.Option;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -34,17 +34,17 @@ public class ChangePackage extends Recipe {
     /**
      * Fully-qualified package name of the old package.
      */
-    @RecipeParam(displayName = "Old fully-qualified package name", description = "Fully-qualified package name of the old package")
+    @Option(displayName = "Old fully-qualified package name", description = "Fully-qualified package name of the old package")
     private final String oldFullyQualifiedPackageName;
 
     /**
      * Fully-qualified package name of the replacement package.
      */
-    @RecipeParam(displayName = "New fully-qualified package name", description = "Fully-qualified package name of the replacement package")
+    @Option(displayName = "New fully-qualified package name", description = "Fully-qualified package name of the replacement package")
     private final String newFullyQualifiedPackageName;
 
     @With
-    @RecipeParam(displayName = "Recursive", description = "If true, recursively change subpackage names")
+    @Option(displayName = "Recursive", description = "If true, recursively change subpackage names")
     private boolean recursive = true;
 
     @Override

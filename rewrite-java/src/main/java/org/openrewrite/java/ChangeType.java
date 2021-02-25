@@ -19,7 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.RecipeParam;
+import org.openrewrite.Option;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -42,13 +42,13 @@ public class ChangeType extends Recipe {
     /**
      * Fully-qualified class name of the original type.
      */
-    @RecipeParam(displayName = "Old fully-qualified type name", description = "Fully-qualified class name of the original type")
+    @Option(displayName = "Old fully-qualified type name", description = "Fully-qualified class name of the original type")
     String oldFullyQualifiedTypeName;
 
     /**
      * Fully-qualified class name of the replacement type, the replacement type can also defined as a primitive.
      */
-    @RecipeParam(displayName = "New fully-qualified type name", description = "Fully-qualified class name of the replacement type, the replacement type can also defined as a primitive")
+    @Option(displayName = "New fully-qualified type name", description = "Fully-qualified class name of the replacement type, the replacement type can also defined as a primitive")
     String newFullyQualifiedTypeName;
 
     @Override

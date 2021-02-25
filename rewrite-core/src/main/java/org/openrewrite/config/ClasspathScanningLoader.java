@@ -21,7 +21,7 @@ import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ScanResult;
 import org.openrewrite.HiddenRecipe;
 import org.openrewrite.Recipe;
-import org.openrewrite.RecipeParam;
+import org.openrewrite.Option;
 import org.openrewrite.style.NamedStyles;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +29,6 @@ import org.slf4j.LoggerFactory;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
-import java.lang.reflect.Parameter;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -101,13 +100,13 @@ public class ClasspathScanningLoader implements ResourceLoader {
                     continue;
                 }
                 try {
-                    List<ParameterDescriptor> parameters = new ArrayList<>();
+                    List<OptionDescriptor> options = new ArrayList<>();
 
                     for (Field field : recipeClass.getDeclaredFields()) {
-                        RecipeParam recipeParam = field.getAnnotation(RecipeParam.class);
-                        if (recipeParam != null) {
-                            parameters.add(new ParameterDescriptor(field.getName(), field.getType().getSimpleName(),
-                                    recipeParam.displayName(), recipeParam.description()));
+                        Option option = field.getAnnotation(Option.class);
+                        if (option != null) {
+                            options.add(new OptionDescriptor(field.getName(), field.getType().getSimpleName(),
+                                    option.displayName(), option.description()));
                         }
                     }
 
@@ -131,7 +130,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
                     }
                     Object[] constructorArgs = new Object[primaryConstructor.getParameterCount()];
                     for (int i = 0; i < primaryConstructor.getParameters().length; i++) {
-                        Parameter param = primaryConstructor.getParameters()[i];
+                        java.lang.reflect.Parameter param = primaryConstructor.getParameters()[i];
                         if (param.getType().isPrimitive()) {
                             constructorArgs[i] = getPrimitiveDefault(param.getType());
                         } else {
@@ -145,7 +144,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
                         primaryConstructor.setAccessible(true);
                         recipes.add((Recipe) primaryConstructor.newInstance());
                     }
-                    recipeDescriptors.add(new RecipeDescriptor(classInfo.getName(), recipe.getDisplayName(), recipe.getDescription(), parameters));
+                    recipeDescriptors.add(new RecipeDescriptor(classInfo.getName(), recipe.getDisplayName(), recipe.getDescription(), options));
                 } catch (Exception e) {
                     logger.warn("Unable to configure {}", recipeClass.getName(), e);
                 }

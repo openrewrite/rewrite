@@ -19,7 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.RecipeParam;
+import org.openrewrite.Option;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -37,13 +37,13 @@ public class ChangeMethodName extends Recipe {
      * A method pattern, expressed as a pointcut expression, that is used to find matching method declarations/invocations.
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
-    @RecipeParam(displayName = "Method pattern", description = "A method pattern, expressed as a pointcut expression, that is used to find matching method declarations/invocations.")
+    @Option(displayName = "Method pattern", description = "A method pattern, expressed as a pointcut expression, that is used to find matching method declarations/invocations.")
     String methodPattern;
 
     /**
      * The method name that will replace the existing name.
      */
-    @RecipeParam(displayName = "New method name", description = "The method name that will replace the existing name.")
+    @Option(displayName = "New method name", description = "The method name that will replace the existing name.")
     String newMethodName;
 
     @Override

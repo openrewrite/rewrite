@@ -13,16 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite;
+package org.openrewrite.config;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import lombok.Value;
+import org.openrewrite.internal.lang.Nullable;
 
-@Target({ElementType.FIELD})
-@Retention(RetentionPolicy.RUNTIME)
-public @interface RecipeParam {
-    String displayName() default "";
-    String description() default "";
+@Value
+public class OptionDescriptor {
+
+    String name;
+
+    String type;
+
+    @Nullable
+    String displayName;
+
+    @Nullable
+    String description;
+
 }

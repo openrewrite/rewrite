@@ -19,7 +19,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.RecipeParam;
+import org.openrewrite.Option;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.style.ImportLayoutStyle;
@@ -45,7 +45,7 @@ public class OrderImports extends Recipe {
 
     @Getter
     @With
-    @RecipeParam(displayName = "Remove unused", description = "Remove unnecessary imports")
+    @Option(displayName = "Remove unused", description = "Remove unnecessary imports")
     private boolean removeUnused = true;
 
     @Override

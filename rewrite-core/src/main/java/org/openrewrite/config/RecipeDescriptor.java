@@ -28,5 +28,5 @@ public class RecipeDescriptor {
 
     String description;
 
-    List<ParameterDescriptor> parameters;
+    List<OptionDescriptor> options;
 }
