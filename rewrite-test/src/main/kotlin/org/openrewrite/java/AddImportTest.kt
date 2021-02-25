@@ -295,7 +295,11 @@ interface AddImportTest : JavaRecipeTest {
     @Test
     fun addNamedStaticImportWhenReferenced(jp: JavaParser) = assertChanged(
         jp,
-        recipe = object : HiddenRecipe() {
+        recipe = object : Recipe() {
+            override fun getDisplayName(): String {
+                return "Test"
+            }
+
             override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
                 return object : JavaIsoVisitor<ExecutionContext>() {
                     override fun visitMethodInvocation(m: J.MethodInvocation, ctx: ExecutionContext) =
