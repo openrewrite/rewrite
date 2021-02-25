@@ -1,0 +1,51 @@
+---
+name: ci
+
+on:
+  push:
+    branches:
+      - master
+    tags-ignore:
+      - "*"
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch: {}
+
+env:
+  GRADLE_OPTS: '-Dorg.gradle.jvmargs="-Xmx2048m -XX:+HeapDumpOnOutOfMemoryError"'
+  GRADLE_SWITCHES: "-s --console=plain --info --stacktrace"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: set-up-jdk
+        uses: actions/setup-java@v1
+        with:
+          java-version: "11"
+      - name: setup-cache
+        uses: actions/cache@v2.1.4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: build
+        run: ./gradlew ${GRADLE_SWITCHES} build test
+
+      # - name: publish-snapshots
+      #   if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+      #   timeout-minutes: 30
+      #   run: ./gradlew ${GRADLE_SWITCHES} snapshot publish
+      #   env:
+      #     OSSRH_TOKEN: ${{ secrets.OSSRH_TOKEN }}
+      #     OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+      #     SIGNING_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+      #     SIGNING_GPG_PRIVATE_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
