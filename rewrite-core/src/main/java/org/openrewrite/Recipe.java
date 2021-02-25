@@ -103,6 +103,16 @@ public abstract class Recipe {
         return this;
     }
 
+    public List<Recipe> getRecipeList() {
+        Recipe r = next;
+        List<Recipe> list = new ArrayList<>();
+        while (r != null) {
+            list.add(r);
+            r = r.next;
+        }
+        return list;
+    }
+
     /**
      * A recipe can optionally encasulate a visitor that performs operations on a set of source files. Subclasses
      * of the recipe may override this method to provide an instance of a visitor that will be used when the recipe
