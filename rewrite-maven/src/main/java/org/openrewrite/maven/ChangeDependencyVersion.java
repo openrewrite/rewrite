@@ -18,6 +18,7 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.tree.Pom;
@@ -30,18 +31,19 @@ import java.util.Optional;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeDependencyVersion extends Recipe {
+
+    @Option(displayName = "Group ID", description = "Group ID of dependency to modify.")
     String groupId;
+
+    @Option(displayName = "Artifact ID", description = "Artifacty ID of dependency to modify.")
     String artifactId;
+
+    @Option(displayName = "New version", description = "New version to apply to the matching dependency.")
     String newVersion;
 
     @Override
     public String getDisplayName() {
-        return "Change Dependency Version";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Changes version of dependency matching groupId and artifactId to newVersion";
+        return "Change Maven dependency version";
     }
 
     @Override

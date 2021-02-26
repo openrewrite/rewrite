@@ -18,6 +18,7 @@ package org.openrewrite.maven.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
@@ -31,16 +32,13 @@ import java.util.regex.Pattern;
 @EqualsAndHashCode(callSuper = true)
 @Value
 public class FindProperties extends Recipe {
+
+    @Option(displayName = "Property pattern", description = "Regular expression pattern used to match property tag names.")
     String propertyPattern;
 
     @Override
     public String getDisplayName() {
-        return "Find Maven Properties";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Finds Maven properties matching propertyPattern";
+        return "Find Maven project properties";
     }
 
     @Override

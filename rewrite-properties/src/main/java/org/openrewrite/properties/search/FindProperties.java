@@ -18,6 +18,7 @@ package org.openrewrite.properties.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.RecipeSearchResult;
@@ -33,6 +34,8 @@ import java.util.Set;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindProperties extends Recipe {
+
+    @Option(displayName = "Property key")
     String propertyKey;
 
     public static Set<Properties.Entry> find(Properties p, String propertyKey) {
@@ -53,12 +56,7 @@ public class FindProperties extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Find Properties";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Finds properties by key in properties files";
+        return "Find properties file property";
     }
 
     @Override

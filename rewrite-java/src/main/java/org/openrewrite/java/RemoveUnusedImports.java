@@ -41,7 +41,7 @@ public class RemoveUnusedImports extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Remove imports for types that are not referenced";
+        return "Remove imports for types that are not referenced.";
     }
 
     @Override

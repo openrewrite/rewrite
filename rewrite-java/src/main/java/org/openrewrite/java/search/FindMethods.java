@@ -18,6 +18,7 @@ package org.openrewrite.java.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -39,16 +40,17 @@ public class FindMethods extends Recipe {
      * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
      * See {@link MethodMatcher} for details on the expression's syntax.
      */
+    @Option(displayName = "Method pattern", description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.")
     String methodPattern;
 
     @Override
     public String getDisplayName() {
-        return "Find Methods";
+        return "Find methods";
     }
 
     @Override
     public String getDescription() {
-        return "Finds methods matching methodPattern";
+        return "Find methods by pattern.";
     }
 
     @Override

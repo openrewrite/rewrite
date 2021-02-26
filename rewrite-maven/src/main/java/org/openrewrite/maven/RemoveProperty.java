@@ -18,6 +18,7 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.tree.Xml;
@@ -25,16 +26,13 @@ import org.openrewrite.xml.tree.Xml;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class RemoveProperty extends Recipe {
+
+    @Option(displayName = "Property name", description = "Name of property to remove.")
     String propertyName;
 
     @Override
     public String getDisplayName() {
-        return "Remove Property Tag";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Removes property from maven properties";
+        return "Remove Maven project property";
     }
 
     @Override

@@ -27,6 +27,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -40,13 +41,13 @@ public class ChangeMethodTargetToStatic extends Recipe {
      * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
-    @Option(displayName = "Method pattern", description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations")
+    @Option(displayName = "Method pattern", description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.")
     String methodPattern;
 
     /**
      * A fully-qualified class name of the type upon which the static method is defined.
      */
-    @Option(displayName = "Fully-qualified target type name", description = "A fully-qualified class name of the type upon which the static method is defined")
+    @Option(displayName = "Fully-qualified target type name", description = "A fully-qualified class name of the type upon which the static method is defined.")
     String fullyQualifiedTargetTypeName;
 
     @Override
@@ -56,7 +57,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Change method invocations to static method calls";
+        return "Change method invocations to static method calls.";
     }
 
     @Override

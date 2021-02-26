@@ -46,7 +46,7 @@ public class UseStaticImport extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Replace non-static method calls with static ones";
+        return "Replace method calls with calls to the same method via static import.";
     }
 
     @Override

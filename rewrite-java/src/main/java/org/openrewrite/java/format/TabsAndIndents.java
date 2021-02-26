@@ -26,12 +26,12 @@ import org.openrewrite.java.tree.J;
 public class TabsAndIndents extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Tabs and Indents";
+        return "Tabs and indents";
     }
 
     @Override
     public String getDescription() {
-        return "A formatting recipe that applies tabs and indents using settings from TabsAndIndentsStyle";
+        return "Format tabs and indents in Java code.";
     }
 
     @Override

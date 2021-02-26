@@ -18,6 +18,7 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.tree.Pom;
@@ -30,17 +31,21 @@ import java.util.Optional;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ExcludeDependency extends Recipe {
+
+    @Option(displayName = "Group ID", description = "Group ID of dependency to exclude.")
     String groupId;
+
+    @Option(displayName = "ArtifactID", description = "Artifact ID of dependency to exclude.")
     String artifactId;
 
     @Override
     public String getDisplayName() {
-        return "Exclude Dependency";
+        return "Exclude Maven dependency";
     }
 
     @Override
     public String getDescription() {
-        return "Excludes dependency by groupId and artifactId";
+        return "Exclude specified maven dependency from any dependency that transitively include it.";
     }
 
     @Override

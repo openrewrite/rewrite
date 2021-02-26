@@ -17,10 +17,7 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenMetadata;
@@ -41,10 +38,18 @@ import static java.util.Collections.emptyMap;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class UpgradeParentVersion extends Recipe {
+
+    @Option(displayName = "Group ID", description = "Group ID of parent to upgrade.")
     String groupId;
+
+    @Option(displayName = "Artifact ID", description = "Artifact ID of parent to upgrade.")
     String artifactId;
+
+    @Option(displayName = "New version", description = "Version to upgrade matching parent to.")
     String newVersion;
 
+    // TODO fill description
+    @Option(displayName = "Version pattern", required = false)
     @Nullable
     String versionPattern;
 
@@ -60,7 +65,7 @@ public class UpgradeParentVersion extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Upgrade Parent Version";
+        return "Upgrade Maven parent project version";
     }
 
     @Override

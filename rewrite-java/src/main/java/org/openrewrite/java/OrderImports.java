@@ -45,7 +45,7 @@ public class OrderImports extends Recipe {
 
     @Getter
     @With
-    @Option(displayName = "Remove unused", description = "Remove unnecessary imports")
+    @Option(displayName = "Remove unused", description = "Remove unnecessary imports.", required = false)
     private boolean removeUnused = true;
 
     @Override
@@ -55,7 +55,7 @@ public class OrderImports extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Group and order imports";
+        return "Group and order imports.";
     }
 
     @Override

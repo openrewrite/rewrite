@@ -44,20 +44,20 @@ public class ReorderMethodArguments extends Recipe {
      * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
-    @Option(displayName = "Method pattern", description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations")
+    @Option(displayName = "Method pattern", description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.")
     String methodPattern;
 
     /**
      * An array of parameter names that indicates the new order in which those arguments should be arranged.
      */
-    @Option(displayName = "New parameter names", description = "An array of parameter names that indicates the new order in which those arguments should be arranged")
+    @Option(displayName = "New parameter names", description = "An array of parameter names that indicates the new order in which those arguments should be arranged.")
     String[] newParameterNames;
 
     /**
      * If the original method signature is not type-attributed, this is an optional list that indicates the original order
      * in which the arguments were arranged.
      */
-    @Option(displayName = "Old parameter names", description = "If the original method signature is not type-attributed, this is an optional list that indicates the original order in which the arguments were arranged")
+    @Option(displayName = "Old parameter names", description = "If the original method signature is not type-attributed, this is an optional list that indicates the original order in which the arguments were arranged.", required = false)
     @Nullable
     String[] oldParameterNames;
 
@@ -72,7 +72,7 @@ public class ReorderMethodArguments extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Reorder method arguments into the specified order";
+        return "Reorder method arguments into the specified order.";
     }
 
     @Override

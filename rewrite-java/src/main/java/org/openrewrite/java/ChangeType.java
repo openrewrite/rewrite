@@ -42,13 +42,13 @@ public class ChangeType extends Recipe {
     /**
      * Fully-qualified class name of the original type.
      */
-    @Option(displayName = "Old fully-qualified type name", description = "Fully-qualified class name of the original type")
+    @Option(displayName = "Old fully-qualified type name", description = "Fully-qualified class name of the original type.")
     String oldFullyQualifiedTypeName;
 
     /**
      * Fully-qualified class name of the replacement type, the replacement type can also defined as a primitive.
      */
-    @Option(displayName = "New fully-qualified type name", description = "Fully-qualified class name of the replacement type, the replacement type can also defined as a primitive")
+    @Option(displayName = "New fully-qualified type name", description = "Fully-qualified class name of the replacement type, the replacement type can also defined as a primitive.")
     String newFullyQualifiedTypeName;
 
     @Override
@@ -58,7 +58,7 @@ public class ChangeType extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Change a given type to another";
+        return "Change a given type to another.";
     }
 
     @Override

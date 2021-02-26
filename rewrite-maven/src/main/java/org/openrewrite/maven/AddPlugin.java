@@ -18,6 +18,7 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.tree.Maven;
@@ -34,18 +35,18 @@ public class AddPlugin extends Recipe {
 
     private static final XPathMatcher BUILD_MATCHER = new XPathMatcher("/project/build");
 
+    @Option(displayName = "Group ID")
     String groupId;
+
+    @Option(displayName = "Artifact ID")
     String artifactId;
+
+    @Option(displayName = "Version")
     String version;
 
     @Override
     public String getDisplayName() {
-        return "Add Plugin";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Adds a maven plugin with groupId, artifactId, version";
+        return "Add Maven plugin";
     }
 
     @Override

@@ -18,6 +18,7 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
@@ -53,22 +54,25 @@ public class ManageDependencies extends Recipe {
 
     private static final XPathMatcher MANAGED_DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies");
 
+    @Option(displayName = "Group pattern", description = "Group regular expression pattern used to match dependencies.")
     String groupPattern;
 
+    @Option(displayName = "Artifact pattern", required = false, description = "Artifact regular expression pattern used to match dependencies.")
     @Nullable
     String artifactPattern;
 
+    @Option(displayName = "Version", required = false, description = "Version to use on the added dependency in dependency management. Defaults to the existing version found on the matching dependency.")
     @Nullable
     String version;
 
     @Override
     public String getDisplayName() {
-        return "Manage Dependencies";
+        return "Manage dependencies";
     }
 
     @Override
     public String getDescription() {
-        return "Makes existing dependencies identified by groupPattern and optionally artifactPattern and version \"dependency managed\" meaning the version is moved to the dependencyManagement section of the POM";
+        return "Make existing dependencies `dependency managed` meaning the version is moved to the dependencyManagement section of the POM.";
     }
 
     @SuppressWarnings("ConstantConditions")

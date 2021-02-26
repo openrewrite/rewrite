@@ -17,10 +17,7 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
@@ -35,20 +32,20 @@ import static java.util.stream.Collectors.toList;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class RemoveDependency extends Recipe {
+
+    @Option(displayName = "Group ID", description = "Group ID of dependency to remove.")
     String groupId;
+
+    @Option(displayName = "Artifact ID", description = "Artifact ID of dependency to remove.")
     String artifactId;
 
+    @Option(displayName = "Scope", required = false, description = "Scope of dependency to remove.")
     @Nullable
     String scope;
 
     @Override
     public String getDisplayName() {
-        return "Remove Dependency";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Removes dependency identified by groupId and artifactId and optionally scope";
+        return "Remove Maven dependency";
     }
 
     @Override

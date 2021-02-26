@@ -18,6 +18,7 @@ package org.openrewrite.properties;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.properties.tree.Properties;
@@ -25,17 +26,16 @@ import org.openrewrite.properties.tree.Properties;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangePropertyValue extends Recipe {
+
+    @Option(displayName = "Property key")
     String propertyKey;
+
+    @Option(displayName = "New value")
     String newValue;
 
     @Override
     public String getDisplayName() {
-        return "Change Property Value";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Changes the values of properties identified by propertyKey to newValue";
+        return "Change properties file property value";
     }
 
     @Override

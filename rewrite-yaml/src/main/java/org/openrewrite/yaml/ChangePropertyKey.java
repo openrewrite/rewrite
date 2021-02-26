@@ -17,6 +17,7 @@ package org.openrewrite.yaml;
 
 import lombok.*;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
@@ -41,17 +42,15 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(callSuper = true)
 public class ChangePropertyKey extends Recipe {
 
+    @Option(displayName = "Old property key")
     String oldPropertyKey;
+
+    @Option(displayName = "New property key")
     String newPropertyKey;
 
     @Override
     public String getDisplayName() {
-        return "Change YAML Property Key";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Changes all oldPropertyKey yaml keys to newPropertyKey";
+        return "Change YAML property key";
     }
 
     @Override

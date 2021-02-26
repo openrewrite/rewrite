@@ -28,7 +28,7 @@ import org.openrewrite.java.tree.TypeUtils;
 @EqualsAndHashCode(callSuper = true)
 public class GenerateGetter extends Recipe {
 
-    @Option(displayName = "Field name", description = "Name of field to generate getter for")
+    @Option(displayName = "Field name", description = "Name of field to generate getter for.")
     String fieldName;
 
     @Override
@@ -38,7 +38,7 @@ public class GenerateGetter extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Generate a \"get\" accessor method";
+        return "Generate a `get` accessor method.";
     }
 
     @Override

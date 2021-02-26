@@ -37,8 +37,14 @@ import java.util.regex.Pattern;
 @EqualsAndHashCode(callSuper = true)
 @Value
 public class DependencyInsight extends Recipe {
+
+    @Option(displayName = "Group ID pattern", description = "Group ID Regular expression pattern used to match dependencies.")
     String groupIdPattern;
+
+    @Option(displayName = "Artifact ID pattern", description = "Artifact ID Regular expression pattern used to match dependencies.")
     String artifactIdPattern;
+
+    @Option(displayName = "Scope", description = "Match dependencies with the specified scope")
     String scope;
 
     @Override
@@ -56,12 +62,12 @@ public class DependencyInsight extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Dependency Insight";
+        return "Maven dependency insight";
     }
 
     @Override
     public String getDescription() {
-        return "Finds direct and transitive dependencies matching groupIdPattern, artifactIdPattern, and scope. Marks are places on first order dependencies that either directly match or transitively include a matching dependency";
+        return "Find direct and transitive dependencies matching groupIdPattern, artifactIdPattern, and scope. Marks are places on first order dependencies that either directly match or transitively include a matching dependency.";
     }
 
     @Override

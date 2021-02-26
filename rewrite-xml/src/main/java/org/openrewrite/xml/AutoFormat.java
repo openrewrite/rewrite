@@ -23,12 +23,12 @@ public class AutoFormat extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Auto Format XML";
+        return "Format XML";
     }
 
     @Override
     public String getDescription() {
-        return "Indents XML using the most common indentation size and tabs or space choice in use in the file";
+        return "Indents XML using the most common indentation size and tabs or space choice in use in the file.";
     }
 
     @Override

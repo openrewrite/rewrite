@@ -18,6 +18,7 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
@@ -30,19 +31,18 @@ public class ChangeParentVersion extends Recipe {
 
     private static final XPathMatcher PARENT_VERSION_MATCHER = new XPathMatcher("/project/parent/version");
 
+    @Option(displayName = "Group ID", description = "Group ID of project parent to change.")
     String groupId;
+
+    @Option(displayName = "Artifact ID", description = "Artifact ID of project parent to change.")
     String artifactId;
+
+    @Option(displayName = "New version", description = "New version to apply to the matching project parent element.")
     String newVersion;
 
     @Override
     public String getDisplayName() {
-        return "Change Parent Version";
-    }
-
-    @Override
-    public String getDescription() {
-        // TODO fill description
-        return "";
+        return "Change Maven project parent version";
     }
 
     @Override

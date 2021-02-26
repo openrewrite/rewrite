@@ -32,7 +32,7 @@ public class Spaces extends Recipe {
 
     @Override
     public String getDescription() {
-        return "A formatting visitor that formats whitespace using settings from SpacesStyle";
+        return "Format whitespace in Java code.";
     }
 
     @Override

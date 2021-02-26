@@ -33,7 +33,7 @@ public class UnnecessaryParentheses extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Remove unnecessary parentheses";
+        return "Remove unnecessary parentheses.";
     }
 
     @Override

@@ -44,13 +44,13 @@ public class DeleteMethodArgument extends Recipe {
      * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
-    @Option(displayName = "Method pattern", description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations")
+    @Option(displayName = "Method pattern", description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.")
     String methodPattern;
 
     /**
      * A zero-based index that indicates which argument will be removed from the method invocation.
      */
-    @Option(displayName = "Argument index", description = "A zero-based index that indicates which argument will be removed from the method invocation")
+    @Option(displayName = "Argument index", description = "A zero-based index that indicates which argument will be removed from the method invocation.")
     int argumentIndex;
 
     @Override
@@ -60,7 +60,7 @@ public class DeleteMethodArgument extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Delete an argument from method invocations";
+        return "Delete an argument from method invocations.";
     }
 
     @Override

@@ -31,8 +31,10 @@ import java.util.regex.Pattern;
 @EqualsAndHashCode(callSuper = true)
 public class AddDependency extends Recipe {
 
+    @Option(displayName = "Group ID")
     private final String groupId;
 
+    @Option(displayName = "Artifact ID")
     private final String artifactId;
 
     /**
@@ -42,6 +44,7 @@ public class AddDependency extends Recipe {
      * <p>
      * To pull the whole family up to a later version, use {@link UpgradeDependencyVersion}.
      */
+    @Option(displayName = "Version", description = "Maven dependency version.")
     private final String version;
 
     /**
@@ -49,21 +52,28 @@ public class AddDependency extends Recipe {
      * A {@link HyphenRange} of "25-29" can be paired with a metadata pattern of "-jre" to select
      * Guava 29.0-jre
      */
+    // TODO fill description
+    @Option(displayName = "Version pattern", required = false)
     @Nullable
     @With
     private String versionPattern;
 
+    // TODO fill description
+    @Option(displayName = "Releases only", required = false)
     @With
     private boolean releasesOnly = true;
 
+    @Option(displayName = "Classifier", required = false)
     @Nullable
     @With
     private String classifier;
 
+    @Option(displayName = "Scope", required = false)
     @Nullable
     @With
     private String scope;
 
+    @Option(displayName = "Type", required = false)
     @Nullable
     @With
     private String type;
@@ -71,6 +81,8 @@ public class AddDependency extends Recipe {
     /**
      * A glob expression used to identify other dependencies in the same family as the dependency to be added.
      */
+    // TODO fill description
+    @Option(displayName = "Family pattern", required = false)
     @Nullable
     @With
     private String familyPattern;
@@ -78,7 +90,6 @@ public class AddDependency extends Recipe {
     @Override
     public Validated validate() {
         Validated validated = super.validate();
-        //noinspection ConstantConditions
         if (version != null) {
             validated = validated.or(Semver.validate(version, versionPattern));
         }
@@ -87,12 +98,7 @@ public class AddDependency extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Add Dependency";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Adds a Maven dependency";
+        return "Add Maven dependency";
     }
 
     @Override

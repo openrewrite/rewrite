@@ -17,10 +17,7 @@ package org.openrewrite.maven.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.marker.RecipeSearchResult;
 import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.maven.tree.Maven;
@@ -32,7 +29,11 @@ import java.util.Set;
 @EqualsAndHashCode(callSuper = true)
 @Value
 public class FindDependency extends Recipe {
+
+    @Option(displayName = "Group ID")
     String groupId;
+
+    @Option(displayName = "Artifact ID")
     String artifactId;
 
     public static Set<Xml.Tag> find(Maven maven, String groupId, String artifactId) {
@@ -51,12 +52,7 @@ public class FindDependency extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Find Dependency";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Finds dependencies matching groupId and artifactId";
+        return "Find Maven dependency";
     }
 
     @Override

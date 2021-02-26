@@ -17,10 +17,7 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenMetadata;
@@ -49,14 +46,17 @@ import static java.util.Collections.emptyMap;
 @EqualsAndHashCode(callSuper = true)
 public class UpgradeDependencyVersion extends Recipe {
 
+    @Option(displayName = "Group ID", description = "Group ID of dependency to upgrade.")
     String groupId;
 
+    @Option(displayName = "Artifact ID", required = false, description = "Artifact ID of dependency to upgrade.")
     @Nullable
     String artifactId;
 
     /**
      * Node Semver range syntax.
      */
+    @Option(displayName = "New version", description = "Version to upgrade dependency to. Supports Node Semver range syntax.")
     String newVersion;
 
     /**
@@ -64,6 +64,8 @@ public class UpgradeDependencyVersion extends Recipe {
      * The {@link HyphenRange} of "25-29" can be paired with a version pattern of "-jre" to select
      * Guava 29.0-jre
      */
+    // TODO fill description
+    @Option(displayName = "versionPattern", required = false)
     @Nullable
     String versionPattern;
 
@@ -79,13 +81,13 @@ public class UpgradeDependencyVersion extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Upgrade Dependency Version";
+        return "Upgrade Maven dependency version";
     }
 
     @Override
     public String getDescription() {
         return "Upgrade the version a group or group and artifact using Node Semver advanced range selectors, " +
-                "allowing more precise control over version updates to patch or minor releases";
+                "allowing more precise control over version updates to patch or minor releases.";
     }
 
     @Override

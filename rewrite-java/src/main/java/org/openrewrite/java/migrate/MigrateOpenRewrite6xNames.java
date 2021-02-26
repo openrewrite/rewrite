@@ -115,11 +115,11 @@ public class MigrateOpenRewrite6xNames extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Migrate OpenRewrite 6.x Names";
+        return "Migrate OpenRewrite 6.x names";
     }
 
     @Override
     public String getDescription() {
-        return "Changes types and method names that were changed as part of the OpenRewrite 7 changes";
+        return "Change types and method names from OpenRewrite 6.x to 7.";
     }
 }

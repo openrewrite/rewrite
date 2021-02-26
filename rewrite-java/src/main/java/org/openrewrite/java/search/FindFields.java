@@ -18,6 +18,7 @@ package org.openrewrite.java.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -35,16 +36,12 @@ import java.util.Set;
 @EqualsAndHashCode(callSuper = true)
 public class FindFields extends Recipe {
 
+    @Option(displayName = "Fully-qualified type name", description = "A fully-qualified Java type name, that is used to find matching fields.")
     String fullyQualifiedTypeName;
 
     @Override
     public String getDisplayName() {
-        return "Find Fields";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Finds fields with type matching fullyQualifiedTypeName";
+        return "Find fields";
     }
 
     @Override

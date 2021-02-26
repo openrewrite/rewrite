@@ -42,7 +42,7 @@ public class ChangeText extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Changes Text, test recipe";
+        return "Changes Text, test recipe.";
     }
 
     @Override

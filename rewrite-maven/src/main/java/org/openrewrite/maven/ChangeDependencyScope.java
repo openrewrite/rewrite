@@ -18,6 +18,7 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
@@ -31,23 +32,23 @@ import java.util.Optional;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeDependencyScope extends Recipe {
+
+    @Option(displayName = "Group ID")
     String groupId;
+
+    @Option(displayName = "Artifact ID")
     String artifactId;
 
     /**
      * If null, strips the scope from an existing dependency.
      */
+    @Option(displayName = "New scope", description = "Scope to apply to specified Maven dependency. May be null, which indicates that scope should be removed from the dependency.")
     @Nullable
     String newScope;
 
     @Override
     public String getDisplayName() {
-        return "Change Dependency Scope";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Changes scope of dependency matching groupId and artifactId to newScope";
+        return "Change Maven dependency scope";
     }
 
     @Override

@@ -34,17 +34,17 @@ public class ChangePackage extends Recipe {
     /**
      * Fully-qualified package name of the old package.
      */
-    @Option(displayName = "Old fully-qualified package name", description = "Fully-qualified package name of the old package")
+    @Option(displayName = "Old fully-qualified package name", description = "Fully-qualified package name of the old package.")
     private final String oldFullyQualifiedPackageName;
 
     /**
      * Fully-qualified package name of the replacement package.
      */
-    @Option(displayName = "New fully-qualified package name", description = "Fully-qualified package name of the replacement package")
+    @Option(displayName = "New fully-qualified package name", description = "Fully-qualified package name of the replacement package.")
     private final String newFullyQualifiedPackageName;
 
     @With
-    @Option(displayName = "Recursive", description = "If true, recursively change subpackage names")
+    @Option(displayName = "Recursive", description = "Recursively change subpackage names", required = false)
     private boolean recursive = true;
 
     @Override
@@ -54,7 +54,7 @@ public class ChangePackage extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Change package names";
+        return "Change package names.";
     }
 
     @Override

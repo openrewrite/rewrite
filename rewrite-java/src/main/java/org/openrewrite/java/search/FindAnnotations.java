@@ -18,6 +18,7 @@ package org.openrewrite.java.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.AnnotationMatcher;
@@ -38,16 +39,17 @@ public class FindAnnotations extends Recipe {
      * An annotation pattern, expressed as a pointcut expression.
      * See {@link AnnotationMatcher} for syntax.
      */
+    @Option(displayName = "Annotation pattern", description = "An annotation pattern, expressed as a pointcut expression.")
     String annotationPattern;
 
     @Override
     public String getDisplayName() {
-        return "Find Annotations";
+        return "Find annotations";
     }
 
     @Override
     public String getDescription() {
-        return "Find annotations matching an annotation pattern";
+        return "Find annotations by pattern.";
     }
 
     @Override

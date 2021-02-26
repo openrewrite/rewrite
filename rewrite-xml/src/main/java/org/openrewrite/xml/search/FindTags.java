@@ -18,6 +18,7 @@ package org.openrewrite.xml.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.RecipeSearchResult;
@@ -31,16 +32,18 @@ import java.util.Set;
 @EqualsAndHashCode(callSuper = true)
 @Value
 public class FindTags extends Recipe {
+
+    @Option(displayName = "XPath", description = "XPath expression used to find matching tags.")
     String xPath;
 
     @Override
     public String getDisplayName() {
-        return "Find XML Tags";
+        return "Find XML tags";
     }
 
     @Override
     public String getDescription() {
-        return "Finds XML Tags using xPath expression";
+        return "Find tags by XPath expression.";
     }
 
     @Override

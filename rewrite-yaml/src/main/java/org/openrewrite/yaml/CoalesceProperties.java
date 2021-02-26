@@ -28,12 +28,12 @@ public class CoalesceProperties extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Coalesce YAML Properties";
+        return "Coalesce YAML properties";
     }
 
     @Override
     public String getDescription() {
-        return "Simplifies nested map hierarchies into their simplest form";
+        return "Simplify nested map hierarchies into their simplest form.";
     }
 
     @Override

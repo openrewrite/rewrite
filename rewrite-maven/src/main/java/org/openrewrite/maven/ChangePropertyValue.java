@@ -18,6 +18,7 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
@@ -26,17 +27,16 @@ import org.openrewrite.xml.tree.Xml;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangePropertyValue extends Recipe {
+
+    @Option(displayName = "Key", description = "Property key to change.")
     String key;
+
+    @Option(displayName = "Value", description = "Value to apply to the matching property.")
     String newValue;
 
     @Override
     public String getDisplayName() {
-        return "Change Maven Property Value";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Changes maven property matching key to newValue";
+        return "Change a Maven project property value";
     }
 
     @Override

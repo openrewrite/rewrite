@@ -25,6 +25,9 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeTree;
 
+import java.util.HashSet;
+import java.util.Set;
+
 /**
  * A recipe that will look for a specific method target (using a method pattern) and rename the method. This recipe renames
  * both the method declaration and any invocations/references to the method.
@@ -48,12 +51,12 @@ public class ChangeMethodName extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Change method names";
+        return "Change method name";
     }
 
     @Override
     public String getDescription() {
-        return "Rename a method";
+        return "Rename a method.";
     }
 
     @Override
