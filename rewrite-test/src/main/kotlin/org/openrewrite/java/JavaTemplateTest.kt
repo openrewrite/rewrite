@@ -634,6 +634,36 @@ interface JavaTemplateTest : JavaRecipeTest {
         """
     )
 
+    @Issue("#333")
+    @Test
+    fun replaceAnnotationOnClassWithCommentsAndAnnotations(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val template = template("@Issue")
+                .doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
+
+            override fun visitAnnotation(annotation: J.Annotation, p: ExecutionContext): J.Annotation {
+                val a = super.visitAnnotation(annotation, p)
+                if (a.simpleName.equals("Deprecated")) {
+                    return a.withTemplate(template, a.coordinates.replace())
+                }
+                return a;
+            }
+        }.toRecipe(),
+        before = """
+                @Deprecated
+                @SuppressWarnings("yo")
+                public class A {}
+            """,
+        after = """
+                @Issue
+                @SuppressWarnings("yo")
+                public class A {}
+        """
+    )
+
     @Test
     fun addAnnotationToClass(jp: JavaParser) = assertChanged(
         jp,
