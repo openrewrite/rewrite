@@ -284,18 +284,24 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.CLASS_DECLARATION_PREFIX, p));
         c = visitAndCast(c, p, this::visitStatement);
         c = c.withLeadingAnnotations(ListUtils.map(c.getLeadingAnnotations(), a -> visitAndCast(a, p)));
-        c = c.withModifiers(ListUtils.map(c.getModifiers(), m -> visitAndCast(m, p)));
         c = c.withModifiers(ListUtils.map(c.getModifiers(),
                 mod -> mod.withPrefix(visitSpace(mod.getPrefix(), Space.Location.MODIFIER_PREFIX, p))));
-        if (c.getPadding().getTypeParameters() != null) {
-            c = c.getPadding().withTypeParameters(visitContainer(c.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p));
-        }
+        c = c.withModifiers(ListUtils.map(c.getModifiers(), m -> visitAndCast(m, p)));
+        //Kind can have annotations associated with it, need to visit those.
+        c = c.getAnnotations().withKind(
+                classDecl.getAnnotations().getKind().withAnnotations(
+                        ListUtils.map(classDecl.getAnnotations().getKind().getAnnotations(), a -> visitAndCast(a, p))
+                )
+        );
         c = c.getAnnotations().withKind(
                 c.getAnnotations().getKind().withPrefix(
                         visitSpace(c.getAnnotations().getKind().getPrefix(), Space.Location.CLASS_KIND, p)
                 )
         );
         c = c.withName(visitAndCast(c.getName(), p));
+        if (c.getPadding().getTypeParameters() != null) {
+            c = c.getPadding().withTypeParameters(visitContainer(c.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p));
+        }
         if (c.getPadding().getExtends() != null) {
             c = c.getPadding().withExtends(visitLeftPadded(c.getPadding().getExtends(), JLeftPadded.Location.EXTENDS, p));
         }
