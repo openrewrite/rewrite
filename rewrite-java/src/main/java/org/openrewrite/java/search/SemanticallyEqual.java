@@ -16,6 +16,7 @@
 package org.openrewrite.java.search;
 
 import org.openrewrite.Incubating;
+import org.openrewrite.RecipeException;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -153,9 +154,15 @@ public class SemanticallyEqual {
                 return null;
             }
             NameTree secondTypeName = (NameTree) second;
-
-            isEqual = isEqual && identEquals((J.Identifier) firstTypeName, (J.Identifier) secondTypeName);
-
+            if (!firstTypeName.getType().equals(secondTypeName.getType())) {
+                isEqual = false;
+                return null;
+            }
+            if (firstTypeName instanceof J.Identifier && secondTypeName instanceof J.Identifier) {
+                isEqual = isEqual && identEquals((J.Identifier) firstTypeName, (J.Identifier) secondTypeName);
+            } else {
+                throw new RecipeException("SemanticallyEqual [" + firstTypeName.getType() + " : " + secondTypeName.getType() + "] not supported");
+            }
             return null;
         }
 
