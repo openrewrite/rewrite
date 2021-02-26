@@ -27,6 +27,7 @@ public interface DependencyDescriptor {
     @Nullable
     String getClassifier();
 
+    @Nullable
     Scope getScope();
 
     Set<GroupArtifact> getExclusions();

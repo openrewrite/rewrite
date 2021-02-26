@@ -178,6 +178,20 @@ public class Pom implements Marker {
         return null;
     }
 
+    @Nullable
+    public String getManagedScope(String groupId, String artifactId) {
+        DependencyManagement effectiveDependencyManagement = getEffectiveDependencyManagement();
+        for (DependencyManagementDependency dep : effectiveDependencyManagement.getDependencies()) {
+            for (DependencyDescriptor dependencyDescriptor : dep.getDependencies()) {
+                if (groupId.equals(dependencyDescriptor.getGroupId()) && artifactId.equals(dependencyDescriptor.getArtifactId()) &&
+                        dependencyDescriptor.getScope() != null) {
+                    return dependencyDescriptor.getScope().name().toLowerCase();
+                }
+            }
+        }
+        return null;
+    }
+
     public Collection<Pom.Dependency> findDependencies(String groupId, String artifactId) {
         return dependencies.stream()
                 .flatMap(d -> d.findDependencies(groupId, artifactId).stream())
