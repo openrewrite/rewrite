@@ -82,7 +82,8 @@ public class ChangePackage extends Recipe {
                 if (original.equals(oldFullyQualifiedPackageName)) {
                     getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "changingTo", newFullyQualifiedPackageName);
                     return pkg.withTemplate(newPackageExpr, pkg.getCoordinates().replace(), newFullyQualifiedPackageName);
-                } else if (recursive && original.startsWith(oldFullyQualifiedPackageName)) {
+                } else if (recursive && original.startsWith(oldFullyQualifiedPackageName) &&
+                        !original.startsWith(newFullyQualifiedPackageName)) {
                     String changingTo = newFullyQualifiedPackageName +
                             original.substring(oldFullyQualifiedPackageName.length());
                     getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "changingTo",
