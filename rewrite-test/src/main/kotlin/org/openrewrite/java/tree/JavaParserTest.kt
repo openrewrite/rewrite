@@ -17,11 +17,27 @@ package org.openrewrite.java.tree
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Parser
+import org.openrewrite.TreeSerializer
 import org.openrewrite.java.JavaParser
+import java.nio.file.Paths
 import java.util.Collections.singletonList
 
 interface JavaParserTest {
+    @Test
+    fun relativeSourcePath(jp: JavaParser) {
+        val projectDir = Paths.get("/Users/jon/Projects/github/Netflix/eureka")
+        val sourcePath = Paths.get("/Users/jon/Projects/github/Netflix/eureka/eureka-client-archaius2/src/main/java/com/netflix/discovery/EurekaArchaius2ClientConfig.java")
+        val cu = jp.parseInputs(listOf(Parser.Input(sourcePath) { "class Test {}".byteInputStream() }), projectDir, InMemoryExecutionContext())[0]
+
+        assertThat(cu.sourcePath.toString()).isEqualTo("eureka-client-archaius2/src/main/java/com/netflix/discovery/EurekaArchaius2ClientConfig.java")
+        val serializer = TreeSerializer<J.CompilationUnit>()
+
+        val cu2 = serializer.read(serializer.write(cu))
+        assertThat(cu2.sourcePath.toString()).isEqualTo("eureka-client-archaius2/src/main/java/com/netflix/discovery/EurekaArchaius2ClientConfig.java")
+    }
+
     @Test
     fun dependsOn(jp: JavaParser.Builder<*, *>) {
         val cu = jp
