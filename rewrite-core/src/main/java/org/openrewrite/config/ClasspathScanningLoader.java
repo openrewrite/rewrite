@@ -15,19 +15,17 @@
  */
 package org.openrewrite.config;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ScanResult;
 import org.openrewrite.Recipe;
-import org.openrewrite.Option;
+import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.style.NamedStyles;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -99,52 +97,13 @@ public class ClasspathScanningLoader implements ResourceLoader {
                     continue;
                 }
                 try {
-                    List<OptionDescriptor> options = new ArrayList<>();
-
-                    for (Field field : recipeClass.getDeclaredFields()) {
-                        Option option = field.getAnnotation(Option.class);
-                        if (option != null) {
-                            options.add(new OptionDescriptor(field.getName(), field.getType().getSimpleName(),
-                                    option.displayName(), option.description()));
-                        }
-                    }
-
-                    Constructor<?> primaryConstructor = null;
-                    Constructor<?>[] constructors = recipeClass.getConstructors();
-                    if (constructors.length == 0) {
-                        // kotlin object declarations have no constructors at all
-                        continue;
-                    } else if (recipeClass.getConstructors().length == 1) {
-                        primaryConstructor = recipeClass.getConstructors()[0];
-                    } else {
-                        for (Constructor<?> constructor : constructors) {
-                            if (constructor.isAnnotationPresent(JsonCreator.class)) {
-                                primaryConstructor = constructor;
-                                break;
-                            }
-                        }
-                    }
-                    if (primaryConstructor == null) {
-                        throw new IllegalStateException("Unable to locate primary constructor for Recipe " + recipeClass);
-                    }
-                    Object[] constructorArgs = new Object[primaryConstructor.getParameterCount()];
-                    for (int i = 0; i < primaryConstructor.getParameters().length; i++) {
-                        java.lang.reflect.Parameter param = primaryConstructor.getParameters()[i];
-                        if (param.getType().isPrimitive()) {
-                            constructorArgs[i] = getPrimitiveDefault(param.getType());
-                        } else {
-                            constructorArgs[i] = null;
-                        }
-                    }
-                    primaryConstructor.setAccessible(true);
-                    Recipe recipe = (Recipe) primaryConstructor.newInstance(constructorArgs);
+                    recipeDescriptors.add(RecipeIntrospectionUtils.recipeDescriptorFromRecipeClass(recipeClass));
+                    Constructor<?> primaryConstructor = RecipeIntrospectionUtils.getPrimaryConstructor(recipeClass);
 
                     if (primaryConstructor.getParameterCount() == 0) {
                         primaryConstructor.setAccessible(true);
                         recipes.add((Recipe) primaryConstructor.newInstance());
                     }
-                    recipeDescriptors.add(new RecipeDescriptor(classInfo.getName(), recipe.getDisplayName(),
-                            recipe.getDescription(), recipe.getTags(), options));
                 } catch (Exception e) {
                     logger.warn("Unable to configure {}", recipeClass.getName(), e);
                 }
@@ -163,28 +122,6 @@ public class ClasspathScanningLoader implements ResourceLoader {
                     logger.warn("Unable to configure {}", styleClass.getName(), e);
                 }
             }
-        }
-    }
-
-    private Object getPrimitiveDefault(Class<?> t) {
-        if (t.equals(byte.class)) {
-            return (byte) 0;
-        } else if (t.equals(short.class)) {
-            return (short) 0;
-        } else if (t.equals(int.class)) {
-            return 0;
-        } else if (t.equals(long.class)) {
-            return 0L;
-        } else if (t.equals(float.class)) {
-            return 0.0f;
-        } else if (t.equals(double.class)) {
-            return 0.0d;
-        } else if (t.equals(char.class)) {
-            return '\u0000';
-        } else if (t.equals(boolean.class)) {
-            return false;
-        } else {
-            throw new IllegalArgumentException(t.getCanonicalName() + " is not a supported primitive type");
         }
     }
 

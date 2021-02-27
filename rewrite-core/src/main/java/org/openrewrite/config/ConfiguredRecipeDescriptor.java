@@ -16,24 +16,15 @@
 package org.openrewrite.config;
 
 import lombok.Value;
-import lombok.With;
 
 import java.util.List;
-import java.util.Set;
 
 @Value
-public class RecipeDescriptor {
+public class ConfiguredRecipeDescriptor {
 
     String name;
 
     String displayName;
 
-    String description;
-
-    Set<String> tags;
-
-    List<OptionDescriptor> options;
-
-    @With
-    List<ConfiguredRecipeDescriptor> recipeList;
+    List<ConfiguredOptionDescriptor> options;
 }

@@ -113,6 +113,11 @@ public abstract class Recipe {
         return this;
     }
 
+    @Nullable
+    public Recipe getNext() {
+        return next;
+    }
+
     public List<Recipe> getRecipeList() {
         Recipe r = next;
         List<Recipe> list = new ArrayList<>();

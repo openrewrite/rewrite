@@ -24,6 +24,7 @@ import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
+import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
@@ -141,6 +142,7 @@ public class YamlResourceLoader implements ResourceLoader {
                                 recipe.doNext(mapper.convertValue(withJsonType,
                                         Recipe.class));
                             } catch (Exception e) {
+                                // TODO error handling?
                                 e.printStackTrace();
                             }
                         } else {
@@ -156,20 +158,16 @@ public class YamlResourceLoader implements ResourceLoader {
                 .collect(toList());
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
-        return loadResources(ResourceType.Recipe).stream()
-                .filter(r -> r.containsKey("name"))
-                .map(r -> {
-                    Set<String> tags = Collections.emptySet();
-                    List<String> rawTags = (List<String>) r.get("tags");
-                    if (rawTags != null) {
-                        tags = new HashSet<>(rawTags);
-                    }
-                    return new RecipeDescriptor((String) r.get("name"), (String) r.get("displayName"), (String) r.get("description"), tags, Collections.emptyList());
-                })
-                .collect(toList());
+        Collection<Recipe> recipes = listRecipes();
+        List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();
+        for (Recipe recipe : recipes) {
+            DeclarativeRecipe declarativeRecipe = (DeclarativeRecipe) recipe;
+            declarativeRecipe.initialize(recipes);
+            recipeDescriptors.add(RecipeIntrospectionUtils.recipeDescriptorFromDeclarativeRecipe(declarativeRecipe));
+        }
+        return recipeDescriptors;
     }
 
     @SuppressWarnings("unchecked")

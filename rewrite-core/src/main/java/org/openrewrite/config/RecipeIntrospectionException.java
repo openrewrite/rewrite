@@ -15,25 +15,13 @@
  */
 package org.openrewrite.config;
 
-import lombok.Value;
-import lombok.With;
+public class RecipeIntrospectionException extends RuntimeException {
 
-import java.util.List;
-import java.util.Set;
+    public RecipeIntrospectionException(String message) {
+        super(message);
+    }
 
-@Value
-public class RecipeDescriptor {
-
-    String name;
-
-    String displayName;
-
-    String description;
-
-    Set<String> tags;
-
-    List<OptionDescriptor> options;
-
-    @With
-    List<ConfiguredRecipeDescriptor> recipeList;
+    public RecipeIntrospectionException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }
