@@ -49,6 +49,11 @@ public class RemoveDependency extends Recipe {
     }
 
     @Override
+    public String getDescription() {
+        return "Removes a single dependency from the <dependencies> section of the pom.xml";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new RemoveDependencyVisitor();
     }

@@ -54,14 +54,18 @@ public class ManageDependencies extends Recipe {
 
     private static final XPathMatcher MANAGED_DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies");
 
-    @Option(displayName = "Group pattern", description = "Group regular expression pattern used to match dependencies.")
+    @Option(displayName = "Group pattern",
+            description = "GroupId regular expression pattern used to match dependencies that should be managed.")
     String groupPattern;
 
-    @Option(displayName = "Artifact pattern", required = false, description = "Artifact regular expression pattern used to match dependencies.")
+    @Option(displayName = "Artifact pattern", required = false,
+            description = "ArtifactId regular expression pattern used to match dependencies that should be managed.")
     @Nullable
     String artifactPattern;
 
-    @Option(displayName = "Version", required = false, description = "Version to use on the added dependency in dependency management. Defaults to the existing version found on the matching dependency.")
+    @Option(displayName = "Version", required = false,
+            description = "Version to use for the dependency in dependency management. " +
+                    "Defaults to the existing version found on the matching dependency.")
     @Nullable
     String version;
 
@@ -72,7 +76,7 @@ public class ManageDependencies extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Make existing dependencies `dependency managed` meaning the version is moved to the dependencyManagement section of the POM.";
+        return "Make existing dependencies managed by moving their version to be specified in the dependencyManagement section of the POM.";
     }
 
     @SuppressWarnings("ConstantConditions")

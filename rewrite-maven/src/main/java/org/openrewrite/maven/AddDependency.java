@@ -44,22 +44,20 @@ public class AddDependency extends Recipe {
      * <p>
      * To pull the whole family up to a later version, use {@link UpgradeDependencyVersion}.
      */
-    @Option(displayName = "Version", description = "Maven dependency version.")
+    @Option(displayName = "Version", description = "An exact version number, or node-style semver selector used to select the version number.")
     private final String version;
 
-    /**
-     * Allows version selection to be extended beyond the original Node Semver semantics. So for example,
-     * A {@link HyphenRange} of "25-29" can be paired with a metadata pattern of "-jre" to select
-     * Guava 29.0-jre
-     */
-    // TODO fill description
-    @Option(displayName = "Version pattern", required = false)
+    @Option(displayName = "Version pattern",
+            description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
+                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+            required = false)
     @Nullable
     @With
     private String versionPattern;
 
-    // TODO fill description
-    @Option(displayName = "Releases only", required = false)
+    @Option(displayName = "Releases only",
+            description = "When set to 'true' snapshots are excluded from consideration. Defaults to 'true'",
+            required = false)
     @With
     private boolean releasesOnly = true;
 
@@ -81,8 +79,9 @@ public class AddDependency extends Recipe {
     /**
      * A glob expression used to identify other dependencies in the same family as the dependency to be added.
      */
-    // TODO fill description
-    @Option(displayName = "Family pattern", required = false)
+    @Option(displayName = "Family pattern", required = false,
+            description = "A pattern, applied to groupIds, used to determine which other dependencies should have aligned version numbers. " +
+                    "Accepts '*' as a wildcard character.")
     @Nullable
     @With
     private String familyPattern;
@@ -90,6 +89,7 @@ public class AddDependency extends Recipe {
     @Override
     public Validated validate() {
         Validated validated = super.validate();
+        //noinspection ConstantConditions
         if (version != null) {
             validated = validated.or(Semver.validate(version, versionPattern));
         }

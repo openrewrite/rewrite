@@ -48,12 +48,12 @@ public class UpgradeParentVersion extends Recipe {
     @Option(displayName = "Artifact ID", description = "Artifact ID of parent to upgrade.")
     String artifactId;
 
-    @Option(displayName = "New Version", description = "An exact version number, or node-style semver selector to upgrade the parent pom version to.")
+    @Option(displayName = "New Version", description = "An exact version number, or node-style semver selector used to select the version number")
     String newVersion;
 
     @Option(displayName = "Version Metadata Pattern", description =
             "A regular expression used to validate the metadata of a version number. " +
-                    "e.g.: \"jre\" ensures that version \"1.0.0-jre\" would be selected instead of \"1.0.0-android\" ",
+                    "e.g.: \"-jre\" ensures that version \"1.0.0-jre\" would be selected instead of \"1.0.0-android\" ",
             required = false)
     @Nullable
     String versionPattern;

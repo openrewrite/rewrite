@@ -64,8 +64,10 @@ public class UpgradeDependencyVersion extends Recipe {
      * The {@link HyphenRange} of "25-29" can be paired with a version pattern of "-jre" to select
      * Guava 29.0-jre
      */
-    // TODO fill description
-    @Option(displayName = "versionPattern", required = false)
+    @Option(displayName = "versionPattern",
+            description = "A regular expression used to validate the metadata of a version number. " +
+                    "e.g.: \"-jre\" ensures that version \"1.0.0-jre\" would be selected instead of \"1.0.0-android\" ",
+            required = false)
     @Nullable
     String versionPattern;
 

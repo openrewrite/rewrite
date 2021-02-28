@@ -45,7 +45,7 @@ public class ExcludeDependency extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Exclude specified maven dependency from any dependency that transitively include it.";
+        return "Exclude specified dependency from any dependency that transitively includes it.";
     }
 
     @Override

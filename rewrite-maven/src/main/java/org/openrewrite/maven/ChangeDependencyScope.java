@@ -42,13 +42,19 @@ public class ChangeDependencyScope extends Recipe {
     /**
      * If null, strips the scope from an existing dependency.
      */
-    @Option(displayName = "New scope", description = "Scope to apply to specified Maven dependency. May be null, which indicates that scope should be removed from the dependency.")
+    @Option(displayName = "New scope", description = "Scope to apply to specified Maven dependency. " +
+            "May be null, which indicates that no scope should be added and any existing scope be removed from the dependency.")
     @Nullable
     String newScope;
 
     @Override
     public String getDisplayName() {
         return "Change Maven dependency scope";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Add or alter the scope of the specified dependency";
     }
 
     @Override
