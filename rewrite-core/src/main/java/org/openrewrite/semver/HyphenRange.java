@@ -16,6 +16,7 @@
 package org.openrewrite.semver;
 
 import org.openrewrite.Validated;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -29,7 +30,7 @@ public class HyphenRange extends LatestRelease {
     private final String upper;
     private final String lower;
 
-    private HyphenRange(String lower, String upper, String metadataPattern) {
+    private HyphenRange(String lower, String upper, @Nullable String metadataPattern) {
         super(metadataPattern);
         this.lower = fillPartialVersionWithZeroes(lower);
         this.upper = fillPartialVersionWithZeroes(upper);
@@ -49,7 +50,7 @@ public class HyphenRange extends LatestRelease {
                 super.compare(version, lower) >= 0;
     }
 
-    public static Validated build(String pattern, String metadataPattern) {
+    public static Validated build(String pattern, @Nullable String metadataPattern) {
         Matcher matcher = HYPHEN_RANGE_PATTERN.matcher(pattern);
         if (!matcher.matches()) {
             return Validated.invalid("hyphenRange", pattern, "not a hyphen range");

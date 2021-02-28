@@ -26,6 +26,8 @@ import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
+import org.openrewrite.xml.ChangeTagValueVisitor;
+import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Collection;
@@ -38,6 +40,7 @@ import static java.util.Collections.emptyMap;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class UpgradeParentVersion extends Recipe {
+    private static final XPathMatcher PARENT_VERSION_MATCHER = new XPathMatcher("/project/parent/version");
 
     @Option(displayName = "Group ID", description = "Group ID of parent to upgrade.")
     String groupId;
@@ -45,11 +48,13 @@ public class UpgradeParentVersion extends Recipe {
     @Option(displayName = "Artifact ID", description = "Artifact ID of parent to upgrade.")
     String artifactId;
 
-    @Option(displayName = "New version", description = "Version to upgrade matching parent to.")
+    @Option(displayName = "New Version", description = "An exact version number, or node-style semver selector to upgrade the parent pom version to.")
     String newVersion;
 
-    // TODO fill description
-    @Option(displayName = "Version pattern", required = false)
+    @Option(displayName = "Version Metadata Pattern", description =
+            "A regular expression used to validate the metadata of a version number. " +
+                    "e.g.: \"jre\" ensures that version \"1.0.0-jre\" would be selected instead of \"1.0.0-android\" ",
+            required = false)
     @Nullable
     String versionPattern;
 
@@ -70,8 +75,7 @@ public class UpgradeParentVersion extends Recipe {
 
     @Override
     public String getDescription() {
-        // TODO fill description
-        return "";
+        return "Set the parent pom version number according to a node-style semver selector or to a specific version number";
     }
 
     @Override
@@ -103,7 +107,7 @@ public class UpgradeParentVersion extends Recipe {
                     tag.getChildValue("version")
                             .flatMap(parentVersion -> findNewerDependencyVersion(groupId, artifactId, parentVersion, ctx))
                             .ifPresent(newer -> {
-                                ChangeParentVersion changeParentVersion = new ChangeParentVersion(groupId, artifactId, newer);
+                                ChangeParentVersion changeParentVersion = new ChangeParentVersion(newer);
                                 doAfterVisit(changeParentVersion);
                             });
                 }
@@ -126,6 +130,28 @@ public class UpgradeParentVersion extends Recipe {
             return availableVersions.stream()
                     .filter(v -> latestRelease.compare(currentVersion, v) < 0)
                     .max(versionComparator);
+        }
+    }
+
+    private class ChangeParentVersion extends MavenVisitor {
+
+        private final String toVersion;
+
+        private ChangeParentVersion(String toVersion) {
+            this.toVersion = toVersion;
+        }
+
+        @Override
+        public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            if (PARENT_VERSION_MATCHER.matches(getCursor())) {
+                Xml.Tag parent = getCursor().getParentOrThrow().getValue();
+                if (groupId.equals(parent.getChildValue("groupId").orElse(null)) &&
+                        artifactId.equals(parent.getChildValue("artifactId").orElse(null)) &&
+                        !toVersion.equals(tag.getValue().orElse(null))) {
+                    doAfterVisit(new ChangeTagValueVisitor<>(tag, toVersion));
+                }
+            }
+            return super.visitTag(tag, ctx);
         }
     }
 }

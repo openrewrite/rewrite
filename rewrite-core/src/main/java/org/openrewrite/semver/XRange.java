@@ -16,6 +16,7 @@
 package org.openrewrite.semver;
 
 import org.openrewrite.Validated;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -31,7 +32,7 @@ public class XRange extends LatestRelease {
     private final String minor;
     private final String patch;
 
-    XRange(String major, String minor, String patch, String metadataPattern) {
+    XRange(String major, String minor, String patch, @Nullable String metadataPattern) {
         super(metadataPattern);
         this.major = major;
         this.minor = minor;
@@ -69,7 +70,7 @@ public class XRange extends LatestRelease {
         return gav.group(3) == null || !gav.group(3).equals(patch);
     }
 
-    public static Validated build(String pattern, String metadataPattern) {
+    public static Validated build(String pattern, @Nullable String metadataPattern) {
         Matcher matcher = X_RANGE_PATTERN.matcher(pattern);
         if (!matcher.matches() || !(pattern.contains("x") || pattern.contains("X") || pattern.contains("*"))) {
             return Validated.invalid("xRange", pattern, "not an x-range");

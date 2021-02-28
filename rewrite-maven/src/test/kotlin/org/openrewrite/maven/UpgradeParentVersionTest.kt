@@ -25,7 +25,49 @@ class UpgradeParentVersionTest : MavenRecipeTest {
             "org.springframework.boot",
             "spring-boot-starter-parent",
             "~1.5",
-            null as String?
+            null
+        ),
+        before = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <parent>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-parent</artifactId>
+                <version>1.5.12.RELEASE</version>
+                <relativePath/> <!-- lookup parent from repository -->
+              </parent>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+            </project>
+        """,
+        after = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <parent>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-parent</artifactId>
+                <version>1.5.22.RELEASE</version>
+                <relativePath/> <!-- lookup parent from repository -->
+              </parent>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+            </project>
+        """
+    )
+
+    @Test
+    fun upgradeToExactVersion() = assertChanged(
+        recipe = UpgradeParentVersion(
+            "org.springframework.boot",
+            "spring-boot-starter-parent",
+            "1.5.22.RELEASE",
+            null
         ),
         before = """
             <project>
@@ -90,6 +132,10 @@ class UpgradeParentVersionTest : MavenRecipeTest {
         assertThat(valid.isValid).isTrue()
 
         recipe = UpgradeParentVersion("org.openrewrite", "rewrite-maven", "latest.release", "123")
+        valid = recipe.validate()
+        assertThat(valid.isValid).isTrue()
+
+        recipe = UpgradeParentVersion("org.springframework.boot", "spring-boot-starter-parent", "1.5.22.RELEASE", null)
         valid = recipe.validate()
         assertThat(valid.isValid).isTrue()
     }

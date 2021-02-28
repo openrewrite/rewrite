@@ -16,6 +16,7 @@
 package org.openrewrite.semver;
 
 import org.openrewrite.Validated;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -32,7 +33,7 @@ public class TildeRange extends LatestRelease {
     private final String upperExclusive;
     private final String lower;
 
-    private TildeRange(String lower, String upperExclusive, String metadataPattern) {
+    private TildeRange(String lower, String upperExclusive, @Nullable String metadataPattern) {
         super(metadataPattern);
         this.lower = lower;
         this.upperExclusive = upperExclusive;
@@ -45,7 +46,7 @@ public class TildeRange extends LatestRelease {
                 super.compare(version, lower) >= 0;
     }
 
-    public static Validated build(String pattern, String metadataPattern) {
+    public static Validated build(String pattern, @Nullable String metadataPattern) {
         Matcher matcher = TILDE_RANGE_PATTERN.matcher(pattern);
         if (!matcher.matches()) {
             return Validated.invalid("tildeRange", pattern, "not a tilde range");

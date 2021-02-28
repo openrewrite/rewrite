@@ -96,7 +96,7 @@ public class LatestRelease implements VersionComparator {
         return v1.compareTo(v2);
     }
 
-    public static Validated build(@Nullable String toVersion, @Nullable String metadataPattern) {
+    public static Validated build(String toVersion, @Nullable String metadataPattern) {
         return toVersion.equals("latest.release") ?
                 Validated.valid("latestRelease", new LatestRelease(metadataPattern)) :
                 Validated.invalid("latestRelease", toVersion, "not a hyphen range");
