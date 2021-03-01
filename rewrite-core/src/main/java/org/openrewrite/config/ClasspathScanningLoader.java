@@ -93,7 +93,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 .scan()) {
             for (ClassInfo classInfo : result.getSubclasses(Recipe.class.getName())) {
                 Class<?> recipeClass = classInfo.loadClass();
-                if (recipeClass.equals(DeclarativeRecipe.class)) {
+                if (recipeClass.equals(DeclarativeRecipe.class) || recipeClass.getEnclosingClass() != null) {
                     continue;
                 }
                 try {
