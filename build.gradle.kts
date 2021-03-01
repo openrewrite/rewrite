@@ -86,11 +86,12 @@ subprojects {
         destinationDir.mkdirs()
     }
 
-    // We use kotlin exclusively for tests
+    // We use kotlin exclusively for tests and rewrite-maven's dependency on okhttp
     // The kotlin plugin adds kotlin-stdlib dependencies to the main sourceSet, even if it doesn't use any kotlin
     // To avoid shipping dependencies we don't actually need, exclude them from the main sourceSet classpath but add them _back_ in for the test source sets
+    // Doing this is a bit hacky. Instead we should be setting kotlin.stdlib.default.dependency=false in the gradle.properties and manually adding the dependency where needed
     configurations.all {
-        if (project.name != "rewrite-test" && (name == "compileClasspath" || name == "runtimeClasspath")) {
+        if (!(project.name == "rewrite-test" || project.name == "rewrite-maven") && (name == "compileClasspath" || name == "runtimeClasspath")) {
             exclude(group = "org.jetbrains.kotlin")
         }
     }
@@ -159,7 +160,7 @@ subprojects {
                                 (dependencyList.item(i) as org.w3c.dom.Element).let { dependency ->
                                     if ((dependency.getElementsByTagName("scope")
                                                     .item(0) as org.w3c.dom.Element).textContent == "provided"
-                                        || (project.name != "rewrite-test"
+                                        || (project.name != "rewrite-test" && project.name != "rewrite-maven"
                                                 && (dependency.getElementsByTagName("groupId")
                                             .item(0) as org.w3c.dom.Element).textContent == "org.jetbrains.kotlin")) {
                                         dependencies.removeChild(dependency)
@@ -194,7 +195,7 @@ subprojects {
             repository.setPassword(project.findProperty("bintrayKey"))
         }
     }
-    
+
     val sourcesJarTask = tasks.register("sourcesJar", Jar::class.java) {
         archiveClassifier.set("sources")
     }
