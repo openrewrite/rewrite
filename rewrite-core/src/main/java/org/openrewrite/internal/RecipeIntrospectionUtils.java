@@ -36,10 +36,8 @@ public class RecipeIntrospectionUtils {
         RecipeDescriptor recipeDescriptor = new RecipeDescriptor(recipeClass.getName(), recipe.getDisplayName(),
                 recipe.getDescription(), recipe.getTags(), options, emptyList());
         List<ConfiguredRecipeDescriptor> recipeList = new ArrayList<>();
-        Recipe next = recipe.getNext();
-        while (next != null) {
+        for (Recipe next : recipe.getRecipeList()) {
             recipeList.add(configuredRecipeDescriptorFromRecipe(next));
-            next = next.getNext();
         }
         return recipeDescriptor.withRecipeList(recipeList);
     }
@@ -70,23 +68,27 @@ public class RecipeIntrospectionUtils {
         }
     }
 
-    private static ConfiguredRecipeDescriptor configuredRecipeDescriptorFromRecipe(Recipe childRecipe) {
+    private static ConfiguredRecipeDescriptor configuredRecipeDescriptorFromRecipe(Recipe recipe) {
         List<ConfiguredOptionDescriptor> configuredOptions = new ArrayList<>();
-        for (Field field : childRecipe.getClass().getDeclaredFields()) {
+        for (Field field : recipe.getClass().getDeclaredFields()) {
             Option option = field.getAnnotation(Option.class);
             if (option != null) {
                 try {
                     field.setAccessible(true);
-                    Object fieldValue = field.get(childRecipe);
+                    Object fieldValue = field.get(recipe);
                     configuredOptions.add(new ConfiguredOptionDescriptor(field.getName(),
                             field.getType().getSimpleName(), fieldValue == null ? "" : fieldValue.toString()));
                 } catch (IllegalAccessException e) {
                     throw new RecipeIntrospectionException("Error getting configured recipe option value, recipe: " +
-                            childRecipe.getClass().getName() + ", option: " + field.getName(), e);
+                            recipe.getClass().getName() + ", option: " + field.getName(), e);
                 }
             }
         }
-        return new ConfiguredRecipeDescriptor(childRecipe.getName(), childRecipe.getDisplayName(), configuredOptions);
+        List<ConfiguredRecipeDescriptor> recipeList = new ArrayList<>();
+        for (Recipe next : recipe.getRecipeList()) {
+            recipeList.add(configuredRecipeDescriptorFromRecipe(next));
+        }
+        return new ConfiguredRecipeDescriptor(recipe.getName(), recipe.getDisplayName(), configuredOptions, recipeList);
     }
 
     private static Recipe constructRecipe(Class<?> recipeClass) {

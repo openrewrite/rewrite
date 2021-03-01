@@ -27,4 +27,6 @@ public class ConfiguredRecipeDescriptor {
     String displayName;
 
     List<ConfiguredOptionDescriptor> options;
+
+    List<ConfiguredRecipeDescriptor> recipeList;
 }

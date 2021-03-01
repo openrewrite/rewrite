@@ -99,33 +99,18 @@ public abstract class Recipe {
     }
 
     @JsonIgnore
-    @Nullable
-    private Recipe next;
+    private final List<Recipe> recipeList = new ArrayList<>();
 
     /**
      * @param recipe {@link Recipe} to append to the doNext chain
      */
     public Recipe doNext(Recipe recipe) {
-        Recipe tail = this;
-        //noinspection StatementWithEmptyBody
-        for (; tail.next != null; tail = tail.next) ;
-        tail.next = recipe;
+        recipeList.add(recipe);
         return this;
     }
 
-    @Nullable
-    public Recipe getNext() {
-        return next;
-    }
-
     public List<Recipe> getRecipeList() {
-        Recipe r = next;
-        List<Recipe> list = new ArrayList<>();
-        while (r != null) {
-            list.add(r);
-            r = r.next;
-        }
-        return list;
+        return recipeList;
     }
 
     /**
@@ -190,8 +175,8 @@ public abstract class Recipe {
             }
         }
 
-        if (next != null) {
-            afterWidened = next.visitInternal(afterWidened, ctx, forkJoinPool, recipeThatDeletedSourceFile);
+        for (Recipe recipe : recipeList) {
+            afterWidened = recipe.visitInternal(afterWidened, ctx, forkJoinPool, recipeThatDeletedSourceFile);
         }
         return afterWidened;
     }
@@ -317,8 +302,8 @@ public abstract class Recipe {
 
     private Collection<Validated> validateAll(ExecutionContext ctx, Collection<Validated> acc) {
         acc.add(validate(ctx));
-        if (next != null) {
-            next.validateAll(ctx, acc);
+        for (Recipe recipe : recipeList) {
+            recipe.validateAll(ctx, acc);
         }
         return acc;
     }
