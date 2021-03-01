@@ -28,11 +28,7 @@ interface SpacesTest : JavaRecipeTest {
         get() = Spaces()
 
     fun namedStyles(styles: Collection<Style>) : Iterable<NamedStyles> {
-        return listOf(NamedStyles("Test", "test", "test", emptySet(), listOf(IntelliJ.spaces().run {
-            withBeforeParentheses(beforeParentheses.run {
-                withMethodDeclaration(true)
-            })
-        })))
+        return listOf(NamedStyles("Test", "test", "test", emptySet(), styles))
     }
 
     @Test
