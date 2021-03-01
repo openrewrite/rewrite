@@ -31,11 +31,11 @@ interface JavaParserTest {
         val sourcePath = Paths.get("/Users/jon/Projects/github/Netflix/eureka/eureka-client-archaius2/src/main/java/com/netflix/discovery/EurekaArchaius2ClientConfig.java")
         val cu = jp.parseInputs(listOf(Parser.Input(sourcePath) { "class Test {}".byteInputStream() }), projectDir, InMemoryExecutionContext())[0]
 
-        assertThat(cu.sourcePath.toString()).isEqualTo("eureka-client-archaius2/src/main/java/com/netflix/discovery/EurekaArchaius2ClientConfig.java")
+        assertThat(cu.sourcePath).isEqualTo(Paths.get("eureka-client-archaius2/src/main/java/com/netflix/discovery/EurekaArchaius2ClientConfig.java"))
         val serializer = TreeSerializer<J.CompilationUnit>()
 
         val cu2 = serializer.read(serializer.write(cu))
-        assertThat(cu2.sourcePath.toString()).isEqualTo("eureka-client-archaius2/src/main/java/com/netflix/discovery/EurekaArchaius2ClientConfig.java")
+        assertThat(cu2.sourcePath).isEqualTo(Paths.get("eureka-client-archaius2/src/main/java/com/netflix/discovery/EurekaArchaius2ClientConfig.java"))
     }
 
     @Test

@@ -24,7 +24,9 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
+import java.io.File;
 import java.nio.file.Paths;
+import java.util.regex.Matcher;
 
 @Getter
 @RequiredArgsConstructor
@@ -67,9 +69,11 @@ public class ChangePackage extends Recipe {
                 J.CompilationUnit c = super.visitCompilationUnit(cu, context);
                 String changingTo = getCursor().getMessage("changingTo");
                 if (changingTo != null) {
-                    String path = c.getSourcePath().toString();
+                    String path = c.getSourcePath().toString().replace('\\', '/');
+                    String changingFrom = getCursor().getMessage("changingFrom");
+                    assert changingFrom != null;
                     c = c.withSourcePath(Paths.get(path.replaceFirst(
-                            oldFullyQualifiedPackageName.replace('.', '/'),
+                            changingFrom.replace('.', '/'),
                             changingTo.replace('.', '/')
                     )));
                 }
@@ -79,6 +83,7 @@ public class ChangePackage extends Recipe {
             @Override
             public J.Package visitPackage(J.Package pkg, ExecutionContext context) {
                 String original = pkg.getExpression().printTrimmed().replaceAll("\\s", "");
+                getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "changingFrom", original);
                 if (original.equals(oldFullyQualifiedPackageName)) {
                     getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "changingTo", newFullyQualifiedPackageName);
                     return pkg.withTemplate(newPackageExpr, pkg.getCoordinates().replace(), newFullyQualifiedPackageName);

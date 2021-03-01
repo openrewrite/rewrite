@@ -17,6 +17,7 @@ package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import java.nio.file.Paths
 
 interface ChangePackageTest: JavaRecipeTest {
     @Test
@@ -38,7 +39,7 @@ interface ChangePackageTest: JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.sourcePath.toString()).contains("org/openrewrite/test")
+            assertThat(cu.sourcePath).isEqualTo(Paths.get("org", "openrewrite", "test", "Test.java"))
         }
     )
 
@@ -61,7 +62,7 @@ interface ChangePackageTest: JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.sourcePath.toString()).contains("org/openrewrite/test/internal")
+            assertThat(cu.sourcePath).isEqualTo(Paths.get("org/openrewrite/test/internal/Test.java"))
         }
     )
 
