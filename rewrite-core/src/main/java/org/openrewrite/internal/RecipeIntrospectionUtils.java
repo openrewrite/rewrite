@@ -76,8 +76,10 @@ public class RecipeIntrospectionUtils {
                 try {
                     field.setAccessible(true);
                     Object fieldValue = field.get(recipe);
-                    configuredOptions.add(new ConfiguredOptionDescriptor(field.getName(),
-                            field.getType().getSimpleName(), fieldValue == null ? "" : fieldValue.toString()));
+                    if (fieldValue != null) {
+                        configuredOptions.add(new ConfiguredOptionDescriptor(field.getName(),
+                                field.getType().getSimpleName(), fieldValue.toString()));
+                    }
                 } catch (IllegalAccessException e) {
                     throw new RecipeIntrospectionException("Error getting configured recipe option value, recipe: " +
                             recipe.getClass().getName() + ", option: " + field.getName(), e);
