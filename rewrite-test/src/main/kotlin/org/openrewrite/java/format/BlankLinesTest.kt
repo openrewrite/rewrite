@@ -30,7 +30,7 @@ interface BlankLinesTest : JavaRecipeTest {
 
     fun blankLines(with: BlankLinesStyle.() -> BlankLinesStyle = { this }) = listOf(
         NamedStyles(
-            "test", listOf(
+            "test", "test", "test", emptySet(), listOf(
                 IntelliJ.blankLines().run { with(this) })
         )
     )

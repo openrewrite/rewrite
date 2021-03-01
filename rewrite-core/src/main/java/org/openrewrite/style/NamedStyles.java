@@ -22,6 +22,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 
 import java.util.Collection;
+import java.util.Set;
 
 /**
  * A collection of styles by name, e.g. IntelliJ or Google Java Format.
@@ -30,6 +31,10 @@ import java.util.Collection;
 @EqualsAndHashCode
 public class NamedStyles implements Marker {
     private final String name;
+    private final String displayName;
+    @Nullable
+    private final String description;
+    private final Set<String> tags;
     private final Collection<Style> styles;
 
     @SuppressWarnings("unchecked")

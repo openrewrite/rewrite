@@ -21,19 +21,28 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.java.style.IntelliJ
 import org.openrewrite.style.NamedStyles
+import org.openrewrite.style.Style
 
 interface SpacesTest : JavaRecipeTest {
     override val recipe: Recipe?
         get() = Spaces()
 
+    fun namedStyles(styles: Collection<Style>) : Iterable<NamedStyles> {
+        return listOf(NamedStyles("Test", "test", "test", emptySet(), listOf(IntelliJ.spaces().run {
+            withBeforeParentheses(beforeParentheses.run {
+                withMethodDeclaration(true)
+            })
+        })))
+    }
+
     @Test
     fun beforeParensMethodDeclarationTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             jp.styles(
-                    listOf(NamedStyles("Test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeParentheses(beforeParentheses.run {
                             withMethodDeclaration(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -65,11 +74,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeParensMethodDeclarationFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             jp.styles(
-                    listOf(NamedStyles("Test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeParentheses(beforeParentheses.run {
                             withMethodDeclaration(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -88,11 +97,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeParensMethodCallTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeParentheses(beforeParentheses.run {
                             withMethodCall(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -113,11 +122,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeParensMethodCallFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeParentheses(beforeParentheses.run {
                             withMethodCall(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -138,11 +147,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeParensIfParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeParentheses(beforeParentheses.run {
                             withIfParentheses(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -165,11 +174,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeParensIfParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeParentheses(beforeParentheses.run {
                             withIfParentheses(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -192,11 +201,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeParensForParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeParentheses(beforeParentheses.run {
                             withForParentheses(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -219,11 +228,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeParensForParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeParentheses(beforeParentheses.run {
                             withForParentheses(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -246,11 +255,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeParensWhileParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeParentheses(beforeParentheses.run {
                             withWhileParentheses(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -273,11 +282,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeParensWhileParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeParentheses(beforeParentheses.run {
                             withWhileParentheses(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -300,11 +309,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeParensSwitchParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeParentheses(beforeParentheses.run {
                             withSwitchParentheses(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -327,11 +336,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeParensSwitchParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeParentheses(beforeParentheses.run {
                             withSwitchParentheses(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -362,11 +371,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeParensTryParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeParentheses(beforeParentheses.run {
                             withTryParentheses(false)
                         })
-                    })))
+                    }))
             ).build(),
             dependsOn = tryResource,
             before = """
@@ -390,11 +399,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeParensTryParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeParentheses(beforeParentheses.run {
                             withTryParentheses(true)
                         })
-                    })))
+                    }))
             ).build(),
             dependsOn = tryResource,
             before = """
@@ -418,11 +427,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeParensCatchParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeParentheses(beforeParentheses.run {
                             withCatchParentheses(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -447,11 +456,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeParensCatchParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeParentheses(beforeParentheses.run {
                             withCatchParentheses(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -476,11 +485,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeParensSynchronizedParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeParentheses(beforeParentheses.run {
                             withSynchronizedParentheses(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -503,11 +512,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeParensSynchronizedParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeParentheses(beforeParentheses.run {
                             withSynchronizedParentheses(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -530,11 +539,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeParensAnnotationParametersTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeParentheses(beforeParentheses.run {
                             withAnnotationParameters(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 @SuppressWarnings({"ALL"})
@@ -551,11 +560,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeParensAnnotationParametersFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeParentheses(beforeParentheses.run {
                             withAnnotationParameters(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 @SuppressWarnings ({"ALL"})
@@ -572,11 +581,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun aroundOperatorsAssignmentFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withAroundOperators(aroundOperators.run {
                             withAssignment(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -599,11 +608,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun aroundOperatorsAssignmentTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withAroundOperators(aroundOperators.run {
                             withAssignment(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -626,11 +635,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun aroundOperatorsLogicalFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withAroundOperators(aroundOperators.run {
                             withLogical(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -653,11 +662,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun aroundOperatorsLogicalTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withAroundOperators(aroundOperators.run {
                             withLogical(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -680,11 +689,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun aroundOperatorsEqualityFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withAroundOperators(aroundOperators.run {
                             withEquality(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -707,11 +716,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun aroundOperatorsEqualityTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withAroundOperators(aroundOperators.run {
                             withEquality(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -734,11 +743,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun aroundOperatorsRelationalFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withAroundOperators(aroundOperators.run {
                             withRelational(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -765,11 +774,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun aroundOperatorsRelationalTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withAroundOperators(aroundOperators.run {
                             withRelational(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -796,11 +805,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun aroundOperatorsBitwiseFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withAroundOperators(aroundOperators.run {
                             withBitwise(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -825,11 +834,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun aroundOperatorsBitwiseTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withAroundOperators(aroundOperators.run {
                             withBitwise(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -854,11 +863,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun aroundOperatorsAdditiveFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withAroundOperators(aroundOperators.run {
                             withAdditive(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -881,11 +890,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun aroundOperatorsAdditiveTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withAroundOperators(aroundOperators.run {
                             withAdditive(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -908,11 +917,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun aroundOperatorsMultiplicativeFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withAroundOperators(aroundOperators.run {
                             withMultiplicative(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -937,11 +946,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun aroundOperatorsMultiplicativeTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withAroundOperators(aroundOperators.run {
                             withMultiplicative(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -966,11 +975,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun aroundOperatorsShiftFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withAroundOperators(aroundOperators.run {
                             withShift(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -995,11 +1004,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun aroundOperatorsShiftTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withAroundOperators(aroundOperators.run {
                             withShift(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1024,11 +1033,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun aroundOperatorsUnaryTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withAroundOperators(aroundOperators.run {
                             withUnary(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1067,11 +1076,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun aroundOperatorsUnaryFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withAroundOperators(aroundOperators.run {
                             withUnary(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1110,11 +1119,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun aroundOperatorsLambdaArrowFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withAroundOperators(aroundOperators.run {
                             withLambdaArrow(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1135,11 +1144,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun aroundOperatorsLambdaArrowTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withAroundOperators(aroundOperators.run {
                             withLambdaArrow(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1160,11 +1169,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun aroundOperatorsMethodReferenceDoubleColonTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withAroundOperators(aroundOperators.run {
                             withMethodReferenceDoubleColon(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1185,11 +1194,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun aroundOperatorsMethodReferenceDoubleColonFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withAroundOperators(aroundOperators.run {
                             withMethodReferenceDoubleColon(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1210,11 +1219,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceClassLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withClassLeftBrace(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1229,11 +1238,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceClassLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withClassLeftBrace(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test{
@@ -1248,11 +1257,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceMethodLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withMethodLeftBrace(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test{
@@ -1271,11 +1280,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceMethodLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withMethodLeftBrace(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test{
@@ -1294,11 +1303,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceIfLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withIfLeftBrace(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test{
@@ -1321,11 +1330,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceIfLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withIfLeftBrace(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test{
@@ -1348,11 +1357,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceElseLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withElseLeftBrace(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test{
@@ -1377,11 +1386,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceElseLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withElseLeftBrace(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1406,11 +1415,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceForLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withForLeftBrace(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1437,11 +1446,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceForLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withForLeftBrace(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1468,11 +1477,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceWhileLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withWhileLeftBrace(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1495,11 +1504,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceWhileLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withWhileLeftBrace(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1522,11 +1531,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceDoLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withDoLeftBrace(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1549,11 +1558,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceDoLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withDoLeftBrace(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1576,11 +1585,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceSwitchLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withSwitchLeftBrace(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1603,11 +1612,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceSwitchLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withSwitchLeftBrace(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1630,11 +1639,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceTryLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withTryLeftBrace(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1659,11 +1668,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceTryLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withTryLeftBrace(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1688,11 +1697,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceCatchLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withCatchLeftBrace(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1717,11 +1726,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceCatchLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withCatchLeftBrace(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1746,11 +1755,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceFinallyLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withFinallyLeftBrace(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1777,11 +1786,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceFinallyLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withFinallyLeftBrace(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1808,11 +1817,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceSynchronizedLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withSynchronizedLeftBrace(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1835,11 +1844,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceSynchronizedLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withSynchronizedLeftBrace(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1862,11 +1871,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceArrayInitializerLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withArrayInitializerLeftBrace(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1887,11 +1896,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceArrayInitializerLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withArrayInitializerLeftBrace(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1912,11 +1921,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceAnnotationArrayInitializerLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withAnnotationArrayInitializerLeftBrace(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 @SuppressWarnings({"ALL"})
@@ -1933,11 +1942,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeLeftBraceAnnotationArrayInitializerLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeLeftBrace(beforeLeftBrace.run {
                             withAnnotationArrayInitializerLeftBrace(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 @SuppressWarnings( {"ALL"})
@@ -1954,11 +1963,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeKeywordsElseKeywordFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeKeywords(beforeKeywords.run {
                             withElseKeyword(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -1983,11 +1992,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeKeywordsElseKeywordTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeKeywords(beforeKeywords.run {
                             withElseKeyword(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2012,11 +2021,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeKeywordsWhileKeywordFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeKeywords(beforeKeywords.run {
                             withWhileKeyword(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2039,11 +2048,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeKeywordsWhileKeywordTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeKeywords(beforeKeywords.run {
                             withWhileKeyword(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2066,11 +2075,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeKeywordsCatchKeywordFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeKeywords(beforeKeywords.run {
                             withCatchKeyword(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2095,11 +2104,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeKeywordsCatchKeywordTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeKeywords(beforeKeywords.run {
                             withCatchKeyword(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2124,11 +2133,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeKeywordsFinallyKeywordFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeKeywords(beforeKeywords.run {
                             withFinallyKeyword(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2155,11 +2164,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun beforeKeywordsFinallyKeywordTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withBeforeKeywords(beforeKeywords.run {
                             withFinallyKeyword(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2186,11 +2195,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinCodeBracesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withCodeBraces(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {}
@@ -2207,11 +2216,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinCodeBracesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withCodeBraces(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test { }
@@ -2228,11 +2237,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinBracketsTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withBrackets(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2253,11 +2262,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinBracketsFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withBrackets(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2278,11 +2287,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinArrayInitializerBracesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withArrayInitializerBraces(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2303,11 +2312,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinArrayInitializerBracesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withArrayInitializerBraces(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2328,11 +2337,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinEmptyArrayInitializerBracesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withEmptyArrayInitializerBraces(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2353,11 +2362,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinEmptyArrayInitializerBracesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withEmptyArrayInitializerBraces(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2378,11 +2387,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinGroupingParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withGroupingParentheses(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2403,11 +2412,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinGroupingParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withGroupingParentheses(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2428,11 +2437,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinMethodDeclarationParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withMethodDeclarationParentheses(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2451,11 +2460,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinMethodDeclarationParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withMethodDeclarationParentheses(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2474,11 +2483,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinEmptyMethodDeclarationParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withEmptyMethodDeclarationParentheses(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2497,11 +2506,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinEmptyMethodDeclarationParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withEmptyMethodDeclarationParentheses(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2520,11 +2529,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinMethodCallParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withMethodCallParentheses(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2549,11 +2558,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinMethodCallParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withMethodCallParentheses(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2578,11 +2587,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinEmptyMethodCallParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withEmptyMethodCallParentheses(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2607,11 +2616,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinEmptyMethodCallParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withEmptyMethodCallParentheses(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2636,11 +2645,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinIfParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withIfParentheses(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2663,11 +2672,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinIfParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withIfParentheses(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2690,11 +2699,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinForParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withForParentheses(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2721,11 +2730,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinForParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withForParentheses(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2752,11 +2761,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinWhileParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withWhileParentheses(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2783,11 +2792,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinWhileParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withWhileParentheses(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2814,11 +2823,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinSwitchParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withSwitchParentheses(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2841,11 +2850,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinSwitchParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withSwitchParentheses(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2868,11 +2877,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinTryParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withTryParentheses(true)
                         })
-                    })))
+                    }))
             ).build(),
             dependsOn = tryResource,
             before = """
@@ -2896,11 +2905,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinTryParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withTryParentheses(false)
                         })
-                    })))
+                    }))
             ).build(),
             dependsOn = tryResource,
             before = """
@@ -2924,11 +2933,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinCatchParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withCatchParentheses(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2953,11 +2962,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinCatchParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withCatchParentheses(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -2982,11 +2991,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinSynchronizedParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withSynchronizedParentheses(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -3009,11 +3018,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinSynchronizedParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withSynchronizedParentheses(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -3036,11 +3045,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinTypeCastParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withTypeCastParentheses(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -3061,11 +3070,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinTypeCastParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withTypeCastParentheses(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -3086,11 +3095,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinAnnotationParenthesesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withAnnotationParentheses(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 @SuppressWarnings({"ALL"})
@@ -3107,11 +3116,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinAnnotationParenthesesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withAnnotationParentheses(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 @SuppressWarnings( {"ALL"} )
@@ -3128,11 +3137,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinAngleBracketsTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withAngleBrackets(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 import java.util.ArrayList;
@@ -3163,11 +3172,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun withinAngleBracketsFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withWithin(within.run {
                             withAngleBrackets(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 import java.util.ArrayList;
@@ -3198,11 +3207,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun ternaryOperatorBeforeQuestionMarkFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withTernaryOperator(ternaryOperator.run {
                             withBeforeQuestionMark(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -3225,11 +3234,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun ternaryOperatorBeforeQuestionMarkTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withTernaryOperator(ternaryOperator.run {
                             withBeforeQuestionMark(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -3252,11 +3261,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun ternaryOperatorAfterQuestionMarkFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withTernaryOperator(ternaryOperator.run {
                             withAfterQuestionMark(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -3279,11 +3288,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun ternaryOperatorAfterQuestionMarkTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withTernaryOperator(ternaryOperator.run {
                             withAfterQuestionMark(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -3306,11 +3315,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun ternaryOperatorBeforeColonFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withTernaryOperator(ternaryOperator.run {
                             withBeforeColon(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -3333,11 +3342,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun ternaryOperatorBeforeColonTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withTernaryOperator(ternaryOperator.run {
                             withBeforeColon(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -3360,11 +3369,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun ternaryOperatorAfterColonFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withTernaryOperator(ternaryOperator.run {
                             withAfterColon(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -3387,11 +3396,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun ternaryOperatorAfterColonTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withTernaryOperator(ternaryOperator.run {
                             withAfterColon(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -3414,11 +3423,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun typeArgumentsAfterCommaFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withTypeArguments(typeArguments.run {
                             withAfterComma(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 import java.util.Map;
@@ -3451,11 +3460,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun typeArgumentsAfterCommaTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withTypeArguments(typeArguments.run {
                             withAfterComma(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 import java.util.Map;
@@ -3488,11 +3497,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun typeArgumentsBeforeOpeningAngleBracketTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withTypeArguments(typeArguments.run {
                             withBeforeOpeningAngleBracket(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 import java.util.Map;
@@ -3525,11 +3534,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun typeArgumentsBeforeOpeningAngleBracketFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withTypeArguments(typeArguments.run {
                             withBeforeOpeningAngleBracket(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 import java.util.Map;
@@ -3562,11 +3571,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun typeArgumentsAfterClosingAngleBracketTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withTypeArguments(typeArguments.run {
                             withAfterClosingAngleBracket(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 import java.util.Map;
@@ -3599,11 +3608,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun typeArgumentsAfterClosingAngleBracketFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withTypeArguments(typeArguments.run {
                             withAfterClosingAngleBracket(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 import java.util.Map;
@@ -3636,11 +3645,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherBeforeCommaTrueNewArrayInitializer(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withBeforeComma(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -3661,11 +3670,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherBeforeCommaFalseNewArrayInitializer(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withBeforeComma(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -3686,11 +3695,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherAfterCommaFalseNewArrayInitializer(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withAfterComma(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -3711,11 +3720,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherAfterCommaTrueNewArrayInitializer(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withAfterComma(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -3736,11 +3745,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherBeforeCommaTrueMethodDeclArgs(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withBeforeComma(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -3759,11 +3768,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherBeforeCommaFalseMethodDeclArgs(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withBeforeComma(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -3782,11 +3791,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherAfterCommaFalseMethodDeclArgs(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withAfterComma(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -3805,11 +3814,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherAfterCommaTrueMethodDeclArgs(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withAfterComma(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -3836,11 +3845,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherBeforeCommaTrueMethodInvocationParams(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withBeforeComma(true)
                         })
-                    })))
+                    }))
             ).build(),
             dependsOn = methodInvocationDependsOn,
             before = """
@@ -3862,11 +3871,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherBeforeCommaFalseMethodInvocationParams(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withBeforeComma(false)
                         })
-                    })))
+                    }))
             ).build(),
             dependsOn = methodInvocationDependsOn,
             before = """
@@ -3888,11 +3897,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherAfterCommaFalseMethodInvocationParams(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withAfterComma(false)
                         })
-                    })))
+                    }))
             ).build(),
             dependsOn = methodInvocationDependsOn,
             before = """
@@ -3914,11 +3923,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherAfterCommaTrueMethodInvocationParams(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withAfterComma(true)
                         })
-                    })))
+                    }))
             ).build(),
             dependsOn = methodInvocationDependsOn,
             before = """
@@ -3948,11 +3957,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherBeforeCommaTrueNewClassArgs(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withBeforeComma(true)
                         })
-                    })))
+                    }))
             ).build(),
             dependsOn = newClassArgsDependsOn,
             before = """
@@ -3974,11 +3983,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherBeforeCommaFalseNewClassArgs(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withBeforeComma(false)
                         })
-                    })))
+                    }))
             ).build(),
             dependsOn = newClassArgsDependsOn,
             before = """
@@ -4000,11 +4009,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherAfterCommaFalseNewClassArgs(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withAfterComma(false)
                         })
-                    })))
+                    }))
             ).build(),
             dependsOn = newClassArgsDependsOn,
             before = """
@@ -4026,11 +4035,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherAfterCommaTrueNewClassArgs(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withAfterComma(true)
                         })
-                    })))
+                    }))
             ).build(),
             dependsOn = newClassArgsDependsOn,
             before = """
@@ -4052,11 +4061,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherBeforeCommaTrueLambdaParameters(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withBeforeComma(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 import java.util.function.BiFunction;
@@ -4081,11 +4090,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherBeforeCommaFalseLambdaParameters(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withBeforeComma(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 import java.util.function.BiFunction;
@@ -4110,11 +4119,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherAfterCommaFalseLambdaParameters(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withAfterComma(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 import java.util.function.BiFunction;
@@ -4139,11 +4148,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherAfterCommaTrueLambdaParameters(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withAfterComma(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 import java.util.function.BiFunction;
@@ -4168,11 +4177,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherBeforeCommaTrueForLoopUpdate(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withBeforeComma(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -4195,11 +4204,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherBeforeCommaFalseForLoopUpdate(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withBeforeComma(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -4222,11 +4231,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherAfterCommaFalseForLoopUpdate(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withAfterComma(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -4249,11 +4258,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherAfterCommaTrueForLoopUpdate(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withAfterComma(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -4276,11 +4285,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherBeforeCommaTrueEnumValueInitArgs(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withBeforeComma(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 enum Test {
@@ -4305,11 +4314,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherBeforeCommaFalseEnumValueInitArgs(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withBeforeComma(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 enum Test {
@@ -4334,11 +4343,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherAfterCommaFalseEnumValueInitArgs(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withAfterComma(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 enum Test {
@@ -4363,11 +4372,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherAfterCommaTrueEnumValueInitArgs(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withAfterComma(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 enum Test {
@@ -4392,11 +4401,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherBeforeForSemicolonTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withBeforeForSemicolon(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -4419,11 +4428,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherBeforeForSemicolonFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withBeforeForSemicolon(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -4446,11 +4455,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherAfterForSemicolonFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withAfterForSemicolon(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -4473,11 +4482,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherAfterForSemicolonTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withAfterForSemicolon(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -4500,11 +4509,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherAfterTypeCastFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withAfterTypeCast(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -4525,11 +4534,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherAfterTypeCastTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withAfterTypeCast(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -4550,11 +4559,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherBeforeColonInForEachFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withBeforeColonInForEach(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -4577,11 +4586,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherBeforeColonInForEachTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withBeforeColonInForEach(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test {
@@ -4604,11 +4613,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherInsideOneLineEnumBracesTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withInsideOneLineEnumBraces(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 enum Test {}
@@ -4621,11 +4630,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun otherInsideOneLineEnumBracesFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withOther(other.run {
                             withInsideOneLineEnumBraces(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 enum Test { }
@@ -4638,11 +4647,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun typeParametersBeforeOpeningAngleBracketTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withTypeParameters(typeParameters.run {
                             withBeforeOpeningAngleBracket(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test<T> {
@@ -4657,11 +4666,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun typeParametersBeforeOpeningAngleBracketFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withTypeParameters(typeParameters.run {
                             withBeforeOpeningAngleBracket(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test <T> {
@@ -4676,11 +4685,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun typeParametersAroundTypeBoundsFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withTypeParameters(typeParameters.run {
                             withAroundTypeBounds(false)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test<T extends Integer & Appendable> {
@@ -4695,11 +4704,11 @@ interface SpacesTest : JavaRecipeTest {
     @Test
     fun typeParametersAroundTypeBoundsTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
-                    listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                    namedStyles(listOf(IntelliJ.spaces().run {
                         withTypeParameters(typeParameters.run {
                             withAroundTypeBounds(true)
                         })
-                    })))
+                    }))
             ).build(),
             before = """
                 class Test<T extends Integer&Appendable> {

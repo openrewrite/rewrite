@@ -21,18 +21,22 @@ import org.openrewrite.style.Style;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 
 public class IntelliJ extends NamedStyles {
     private static final IntelliJ INSTANCE = new IntelliJ();
 
     private IntelliJ() {
-        super("intellij-idea", Arrays.asList(
-                importLayout(),
-                blankLines(),
-                tabsAndIndents(),
-                spaces(),
-                wrappingAndBraces(),
-                unnecessaryParentheses())
+        super("intellij-idea", "IntelliJ IDEA", "IntelliJ IDEA defaults for all ",
+                Collections.emptySet(),
+                Arrays.asList(
+                        importLayout(),
+                        blankLines(),
+                        tabsAndIndents(),
+                        spaces(),
+                        wrappingAndBraces(),
+                        unnecessaryParentheses()
+                )
         );
     }
 

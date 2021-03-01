@@ -16,6 +16,7 @@
 ---
 type: specs.openrewrite.org/v1beta/style
 name: org.openrewrite.java.GoogleJavaFormat
+displayName: Google Java format
 configure:
   org.openrewrite.java.style.ImportLayoutStyle:
       classCountToUseStarImport: 999

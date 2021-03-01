@@ -272,7 +272,7 @@ interface OrderImportsTest : JavaRecipeTest {
             JavaParser.fromJavaVersion().styles(
                     listOf(
                             NamedStyles(
-                                    "spring", listOf(
+                                    "spring", "spring", "spring", emptySet(), listOf(
                                     ImportLayoutStyle.builder()
                                             .classCountToUseStarImport(999)
                                             .nameCountToUseStarImport(999)

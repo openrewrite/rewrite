@@ -41,7 +41,7 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
     fun unnecessaryParentheses(with: UnnecessaryParenthesesStyle.() -> UnnecessaryParenthesesStyle = { this }) =
         listOf(
             NamedStyles(
-                "test", listOf(
+                "test", "test", "test", emptySet(), listOf(
                     UnnecessaryParenthesesStyle(
                         false,
                         false,
@@ -76,7 +76,7 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
         jp.styles(
             listOf(
                 NamedStyles(
-                    "test", listOf(
+                    "test", "test", "test", emptySet(), listOf(
                         IntelliJ.unnecessaryParentheses()
                     )
                 )

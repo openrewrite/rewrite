@@ -178,7 +178,14 @@ public class YamlResourceLoader implements ResourceLoader {
                 .map(s -> {
                     List<Style> styles = new ArrayList<>();
                     String name = (String) s.get("name");
-                    DeclarativeNamedStyles namedStyles = new DeclarativeNamedStyles(name, styles);
+                    String displayName = (String) s.get("displayName");
+                    String description = (String) s.get("description");
+                    Set<String> tags = Collections.emptySet();
+                    List<String> rawTags = (List<String>) s.get("tags");
+                    if (rawTags != null) {
+                        tags = new HashSet<>(rawTags);
+                    }
+                    DeclarativeNamedStyles namedStyles = new DeclarativeNamedStyles(name, displayName, description, tags, styles);
                     List<Object> styleConfigs = (List<Object>) s.get("styleConfigs");
                     if (styleConfigs != null) {
                         for (int i = 0; i < styleConfigs.size(); i++) {

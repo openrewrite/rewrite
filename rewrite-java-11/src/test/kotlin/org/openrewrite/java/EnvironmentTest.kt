@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.config.ConfiguredRecipeDescriptor
 import org.openrewrite.config.Environment
 import org.openrewrite.config.RecipeDescriptor
+import org.openrewrite.style.NamedStyles
 import java.util.*
 
 class EnvironmentTest {
@@ -28,23 +29,25 @@ class EnvironmentTest {
         val env = Environment.builder().scanClasspath(Collections.emptySet()).build()
         val recipeDescriptors = env.listRecipeDescriptors()
         recipeDescriptors.forEach {
-            println("--------------------------------------------------------------------------------")
+            println()
             printRecipeDescriptor(it)
         }
     }
 
     private fun printRecipeDescriptor(recipe: RecipeDescriptor, indent: String = "") {
-        println("name: " + recipe.name)
-        println("displayName: " + recipe.displayName)
-        println("description: " + recipe.description)
-        println("tags: " + recipe.tags)
-        println("parameters: ")
-        recipe.options.forEach {
-            println("\t---")
-            println("\tname: " + it.name)
-            println("\tdisplayName: " + it.displayName)
-            println("\ttype: " + it.type)
-            println("\tdescription: " + it.description)
+        println("name: ${recipe.name}")
+        println("displayName: ${recipe.displayName}")
+        println("description: ${recipe.description}")
+        println("tags: ${recipe.tags}")
+        if (recipe.options.isNotEmpty()) {
+            println("options: ")
+            recipe.options.forEach {
+                println()
+                println("\tname: ${it.name}")
+                println("\tdisplayName: ${it.displayName}")
+                println("\ttype: ${it.type}")
+                println("\tdescription: ${it.description}")
+            }
         }
         if (recipe.recipeList.isNotEmpty()) {
             println("recipeList:")
@@ -53,15 +56,33 @@ class EnvironmentTest {
     }
 
     private fun printConfiguredRecipeDescriptor(recipe: ConfiguredRecipeDescriptor, indent: String = "") {
-        println("${indent}--------------------------------------------------------------------------------")
-        println("${indent}name: " + recipe.name)
-        println("${indent}displayName: " + recipe.displayName)
+        println()
+        println("${indent}name: ${recipe.name}")
+        println("${indent}displayName: ${recipe.displayName}")
         println("${indent}parameters: ")
         recipe.options.forEach {
-            println("${indent}\t---")
-            println("${indent}\tname: " + it.name)
-            println("${indent}\ttype: " + it.type)
-            println("${indent}\tvalue: " + it.value)
+            println()
+            println("${indent}\tname: ${it.name}")
+            println("${indent}\ttype: ${it.type}")
+            println("${indent}\tvalue: ${it.value}")
         }
+    }
+
+    @Test
+    fun listStyles() {
+        val env = Environment.builder().scanClasspath(Collections.emptySet()).build()
+        val styles = env.listStyles()
+        styles.forEach {
+            println()
+            printStyle(it)
+        }
+    }
+
+    private fun printStyle(style: NamedStyles) {
+        println()
+        println("name: ${style.name}")
+        println("displayName: ${style.displayName}")
+        println("description: ${style.description}")
+        println("tags: ${style.tags}")
     }
 }

@@ -27,7 +27,7 @@ class TreeSerializerTest {
     fun serializeStyle() {
         val serializer = TreeSerializer<PlainText>()
 
-        val styles = NamedStyles("utf8", listOf(TextStyle().apply {
+        val styles = NamedStyles("utf8", "test", "test", emptySet(), listOf(TextStyle().apply {
             charset = "UTF-8"
         }))
 

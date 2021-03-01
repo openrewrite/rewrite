@@ -418,7 +418,7 @@ interface HideUtilityClassConstructorTest : JavaRecipeTest {
         jp.styles(
             listOf(
                 NamedStyles(
-                    "test", listOf(
+                    "test", "test", "test", emptySet(), listOf(
                         HideUtilityClassConstructorStyle(
                             listOf(
                                 "@lombok.experimental.UtilityClass",

@@ -30,7 +30,7 @@ interface TabsAndIndentsTest : JavaRecipeTest {
 
     fun tabsAndIndents(with: TabsAndIndentsStyle.() -> TabsAndIndentsStyle = { this }) = listOf(
         NamedStyles(
-            "test", listOf(
+            "test", "test", "test", emptySet(), listOf(
                 IntelliJ.tabsAndIndents().run { with(this) })
         )
     )

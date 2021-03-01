@@ -34,6 +34,10 @@ recipeList:
 ---
 type: specs.openrewrite.org/v1beta/style
 name: org.openrewrite.SampleStyle
+displayName: Sample style
+description: Sample test style
+tags:
+  - testing
 styleConfigs:
   - org.openrewrite.text.TextStyle:
       charset: 'UTF-8'

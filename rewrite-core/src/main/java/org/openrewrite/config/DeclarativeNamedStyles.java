@@ -20,12 +20,13 @@ import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
 import java.util.Collection;
+import java.util.Set;
 
 public class DeclarativeNamedStyles extends NamedStyles {
     private Validated validation = Validated.none();
 
-    public DeclarativeNamedStyles(String name, Collection<Style> styles) {
-        super(name, styles);
+    public DeclarativeNamedStyles(String name, String displayName, String description, Set<String> tags, Collection<Style> styles) {
+        super(name, displayName, description, tags, styles);
     }
 
     void addValidation(Validated validated) {

@@ -185,4 +185,16 @@ class EnvironmentTest {
         assertThat(changeTextDescriptor.options[0].name).isEqualTo("toText")
         assertThat(changeTextDescriptor.options[0].type).isEqualTo("String")
     }
+
+    @Test
+    fun listStyles() {
+        val env = Environment.builder().scanClasspath(Collections.emptySet()).build()
+        val styles = env.listStyles();
+        assertThat(styles).isNotNull.isNotEmpty;
+        val sampleStyle = styles.filter { it.name == "org.openrewrite.SampleStyle" }.firstOrNull()
+        assertThat(sampleStyle).isNotNull
+        assertThat(sampleStyle!!.displayName).isEqualTo("Sample style")
+        assertThat(sampleStyle.description).isEqualTo("Sample test style")
+        assertThat(sampleStyle.tags).containsExactly("testing")
+    }
 }
