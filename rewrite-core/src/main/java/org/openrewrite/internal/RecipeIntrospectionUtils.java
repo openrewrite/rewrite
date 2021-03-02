@@ -68,7 +68,7 @@ public class RecipeIntrospectionUtils {
         }
     }
 
-    private static ConfiguredRecipeDescriptor configuredRecipeDescriptorFromRecipe(Recipe recipe) {
+    public static ConfiguredRecipeDescriptor configuredRecipeDescriptorFromRecipe(Recipe recipe) {
         List<ConfiguredOptionDescriptor> configuredOptions = new ArrayList<>();
         for (Field field : recipe.getClass().getDeclaredFields()) {
             Option option = field.getAnnotation(Option.class);
