@@ -120,7 +120,7 @@ public class RecipeIntrospectionUtils {
             Option option = field.getAnnotation(Option.class);
             if (option != null) {
                 options.add(new OptionDescriptor(field.getName(), field.getType().getSimpleName(),
-                        option.displayName(), option.description()));
+                        option.displayName(), option.description(), option.required()));
             }
         }
         return options;

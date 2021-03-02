@@ -47,6 +47,7 @@ class EnvironmentTest {
                 println("\tdisplayName: ${it.displayName}")
                 println("\ttype: ${it.type}")
                 println("\tdescription: ${it.description}")
+                println("\trequired: ${it.isRequired}")
             }
         }
         if (recipe.recipeList.isNotEmpty()) {

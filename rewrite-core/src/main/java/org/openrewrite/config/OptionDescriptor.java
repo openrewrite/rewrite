@@ -31,4 +31,6 @@ public class OptionDescriptor {
     @Nullable
     String description;
 
+    boolean required;
+
 }
