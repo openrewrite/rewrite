@@ -25,9 +25,9 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     fun upgradeVersion() = assertChanged(
         recipe = UpgradeDependencyVersion(
             "org.springframework.boot",
-            null as String?,
+            null,
             "~1.5",
-            null as String?),
+            null),
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>
@@ -159,7 +159,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         assertChanged(
             recipe = UpgradeDependencyVersion(
                 "com.google.guava",
-                null as String?,
+                null,
                 "25-28",
                 "-jre"),
             dependsOn = arrayOf(server.toFile()),
@@ -180,6 +180,51 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
             """
         )
     }
+
+    @Test
+    fun upgradeToExactVersion() = assertChanged(
+        recipe = UpgradeDependencyVersion(
+            "org.thymeleaf",
+            "thymeleaf-spring5",
+            "3.0.12.RELEASE",
+            null),
+        before = """
+            <project>
+            <modelVersion>4.0.0</modelVersion>
+            
+                <packaging>pom</packaging>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+    
+                <dependencies>
+                    <dependency>
+                        <groupId>org.thymeleaf</groupId>
+                        <artifactId>thymeleaf-spring5</artifactId>
+                        <version>3.0.8.RELEASE</version>
+                    </dependency>
+                </dependencies>
+            </project>
+        """,
+        after = """
+            <project>
+            <modelVersion>4.0.0</modelVersion>
+            
+                <packaging>pom</packaging>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+            
+                <dependencies>
+                    <dependency>
+                        <groupId>org.thymeleaf</groupId>
+                        <artifactId>thymeleaf-spring5</artifactId>
+                        <version>3.0.12.RELEASE</version>
+                    </dependency>
+                </dependencies>
+            </project>
+        """
+    )
 
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
@@ -210,5 +255,10 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         recipe = UpgradeDependencyVersion("org.openrewrite", "rewrite-maven", "latest.release", "123")
         valid = recipe.validate()
         Assertions.assertThat(valid.isValid).isTrue()
+
+        recipe = UpgradeDependencyVersion("org.openrewrite", "rewrite-maven", "1.0.0", null)
+        valid = recipe.validate()
+        Assertions.assertThat(valid.isValid).isTrue()
+
     }
 }

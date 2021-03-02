@@ -30,12 +30,11 @@ public class SimplifyBooleanReturn extends Recipe {
 
     @Override
     public String getDescription() {
-        // TODO description
-        return "";
+        return "Simplifies Boolean expressions by removing redundancies. e.g.: `a && true` simplifies to `a`";
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new SimplifyBooleanReturnVisitor();
+    protected SimplifyBooleanReturnVisitor<ExecutionContext> getVisitor() {
+        return new SimplifyBooleanReturnVisitor<>();
     }
 }

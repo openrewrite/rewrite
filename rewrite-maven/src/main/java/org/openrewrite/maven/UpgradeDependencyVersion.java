@@ -29,6 +29,9 @@ import org.openrewrite.semver.HyphenRange;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
+import org.openrewrite.xml.AddToTagVisitor;
+import org.openrewrite.xml.ChangeTagValueVisitor;
+import org.openrewrite.xml.tree.Xml;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -123,7 +126,7 @@ public class UpgradeDependencyVersion extends Recipe {
             for (Pom.Dependency dependency : model.getDependencies()) {
                 if (dependency.getGroupId().equals(groupId) && (artifactId == null || dependency.getArtifactId().equals(artifactId))) {
                     findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion(), ctx).ifPresent(newer -> {
-                        ChangeDependencyVersion changeDependencyVersion = new ChangeDependencyVersion(groupId, dependency.getArtifactId(), newer);
+                        ChangeDependencyVersionVisitor changeDependencyVersion = new ChangeDependencyVersionVisitor(newer, dependency.getArtifactId());
                         doAfterVisit(changeDependencyVersion);
                     });
                 }
@@ -132,7 +135,7 @@ public class UpgradeDependencyVersion extends Recipe {
             for (DependencyManagementDependency dependency : model.getDependencyManagement().getDependencies()) {
                 if (dependency.getGroupId().equals(groupId) && (artifactId == null || dependency.getArtifactId().equals(artifactId))) {
                     findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion(), ctx).ifPresent(newer -> {
-                        ChangeDependencyVersion changeDependencyVersion = new ChangeDependencyVersion(groupId, dependency.getArtifactId(), newer);
+                        ChangeDependencyVersionVisitor changeDependencyVersion = new ChangeDependencyVersionVisitor(newer, dependency.getArtifactId());
                         doAfterVisit(changeDependencyVersion);
                     });
                 }
@@ -153,6 +156,54 @@ public class UpgradeDependencyVersion extends Recipe {
             return availableVersions.stream()
                     .filter(v -> latestRelease.compare(currentVersion, v) < 0)
                     .max(versionComparator);
+        }
+    }
+
+
+    private class ChangeDependencyVersionVisitor extends MavenVisitor {
+        private final String newVersion;
+        private final String artifactId;
+
+        private ChangeDependencyVersionVisitor(String newVersion, String artifactId) {
+            this.newVersion = newVersion;
+            this.artifactId = artifactId;
+        }
+
+        @Override
+        public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            if (isDependencyTag(groupId, artifactId) || isManagedDependencyTag(groupId, artifactId)) {
+                Optional<Xml.Tag> versionTag = tag.getChild("version");
+                if (versionTag.isPresent()) {
+                    String version = versionTag.get().getValue().orElse(null);
+                    if (version != null) {
+                        if (version.trim().startsWith("${") && !newVersion.equals(model.getValue(version.trim()))) {
+                            doAfterVisit(new ChangePropertyValue(version, newVersion));
+                        } else if (!newVersion.equals(version)) {
+                            doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), newVersion));
+                        }
+                    }
+                }
+                // In this case a transitive dependency has been removed and the dependency now requires a version
+                else if (!versionTag.isPresent() && !isManagedDependencyTag(groupId, artifactId)) {
+                    Xml.Tag newVersionTag = Xml.Tag.build("<version>" + newVersion + "</version>");
+                    doAfterVisit(new AddToTagVisitor<>(getCursor().getValue(), newVersionTag));
+                }
+            } else if (!modules.isEmpty() && isPropertyTag()) {
+                String propertyKeyRef = "${" + tag.getName() + "}";
+
+                OUTER:
+                for (Pom module : modules) {
+                    for (Pom.Dependency dependency : module.getDependencies()) {
+                        if (propertyKeyRef.equals(dependency.getRequestedVersion())) {
+                            doAfterVisit(new ChangeTagValueVisitor<>(tag, newVersion));
+                            break OUTER;
+                        }
+                    }
+
+                }
+            }
+
+            return super.visitTag(tag, ctx);
         }
     }
 }
