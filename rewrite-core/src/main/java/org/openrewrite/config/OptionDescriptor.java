@@ -33,4 +33,7 @@ public class OptionDescriptor {
 
     boolean required;
 
+    @Nullable
+    Object value;
+
 }

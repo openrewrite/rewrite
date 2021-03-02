@@ -19,7 +19,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import lombok.EqualsAndHashCode;
-import org.openrewrite.config.ConfiguredRecipeDescriptor;
+import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.NullUtils;
@@ -100,8 +100,8 @@ public abstract class Recipe {
         return Collections.emptySet();
     }
 
-    public ConfiguredRecipeDescriptor getDescriptor() {
-        return RecipeIntrospectionUtils.configuredRecipeDescriptorFromRecipe(this);
+    public RecipeDescriptor getDescriptor() {
+        return RecipeIntrospectionUtils.recipeDescriptorFromRecipe(this);
     }
 
     @JsonIgnore

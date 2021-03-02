@@ -16,7 +16,6 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.config.ConfiguredRecipeDescriptor
 import org.openrewrite.config.Environment
 import org.openrewrite.config.RecipeDescriptor
 import org.openrewrite.style.NamedStyles
@@ -48,24 +47,12 @@ class EnvironmentTest {
                 println("\ttype: ${it.type}")
                 println("\tdescription: ${it.description}")
                 println("\trequired: ${it.isRequired}")
+                println("\tvalue: ${it.value}")
             }
         }
         if (recipe.recipeList.isNotEmpty()) {
             println("recipeList:")
-            recipe.recipeList.forEach { printConfiguredRecipeDescriptor(it, "$indent    ") }
-        }
-    }
-
-    private fun printConfiguredRecipeDescriptor(recipe: ConfiguredRecipeDescriptor, indent: String = "") {
-        println()
-        println("${indent}name: ${recipe.name}")
-        println("${indent}displayName: ${recipe.displayName}")
-        println("${indent}parameters: ")
-        recipe.options.forEach {
-            println()
-            println("${indent}\tname: ${it.name}")
-            println("${indent}\ttype: ${it.type}")
-            println("${indent}\tvalue: ${it.value}")
+            recipe.recipeList.forEach { printRecipeDescriptor(it, "$indent    ") }
         }
     }
 

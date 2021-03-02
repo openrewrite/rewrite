@@ -35,5 +35,5 @@ public class RecipeDescriptor {
     List<OptionDescriptor> options;
 
     @With
-    List<ConfiguredRecipeDescriptor> recipeList;
+    List<RecipeDescriptor> recipeList;
 }

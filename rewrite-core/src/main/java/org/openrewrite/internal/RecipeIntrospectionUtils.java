@@ -35,17 +35,17 @@ public class RecipeIntrospectionUtils {
         Recipe recipe = constructRecipe(recipeClass);
         RecipeDescriptor recipeDescriptor = new RecipeDescriptor(recipeClass.getName(), recipe.getDisplayName(),
                 recipe.getDescription(), recipe.getTags(), options, emptyList());
-        List<ConfiguredRecipeDescriptor> recipeList = new ArrayList<>();
+        List<RecipeDescriptor> recipeList = new ArrayList<>();
         for (Recipe next : recipe.getRecipeList()) {
-            recipeList.add(configuredRecipeDescriptorFromRecipe(next));
+            recipeList.add(recipeDescriptorFromRecipe(next));
         }
         return recipeDescriptor.withRecipeList(recipeList);
     }
 
     public static RecipeDescriptor recipeDescriptorFromDeclarativeRecipe(DeclarativeRecipe recipe) {
-        List<ConfiguredRecipeDescriptor> recipeList = new ArrayList<>();
+        List<RecipeDescriptor> recipeList = new ArrayList<>();
         for (Recipe childRecipe : recipe.getRecipeList()) {
-            recipeList.add(configuredRecipeDescriptorFromRecipe(childRecipe));
+            recipeList.add(recipeDescriptorFromRecipe(childRecipe));
         }
         return new RecipeDescriptor(recipe.getName(), recipe.getDisplayName(), recipe.getDescription(),
                 recipe.getTags(), emptyList(), recipeList);
@@ -68,29 +68,13 @@ public class RecipeIntrospectionUtils {
         }
     }
 
-    public static ConfiguredRecipeDescriptor configuredRecipeDescriptorFromRecipe(Recipe recipe) {
-        List<ConfiguredOptionDescriptor> configuredOptions = new ArrayList<>();
-        for (Field field : recipe.getClass().getDeclaredFields()) {
-            Option option = field.getAnnotation(Option.class);
-            if (option != null) {
-                try {
-                    field.setAccessible(true);
-                    Object fieldValue = field.get(recipe);
-                    if (fieldValue != null) {
-                        configuredOptions.add(new ConfiguredOptionDescriptor(field.getName(),
-                                field.getType().getSimpleName(), fieldValue.toString()));
-                    }
-                } catch (IllegalAccessException e) {
-                    throw new RecipeIntrospectionException("Error getting configured recipe option value, recipe: " +
-                            recipe.getClass().getName() + ", option: " + field.getName(), e);
-                }
-            }
-        }
-        List<ConfiguredRecipeDescriptor> recipeList = new ArrayList<>();
+    public static RecipeDescriptor recipeDescriptorFromRecipe(Recipe recipe) {
+        List<OptionDescriptor> options = getOptionsDescriptors(recipe);
+        List<RecipeDescriptor> recipeList = new ArrayList<>();
         for (Recipe next : recipe.getRecipeList()) {
-            recipeList.add(configuredRecipeDescriptorFromRecipe(next));
+            recipeList.add(recipeDescriptorFromRecipe(next));
         }
-        return new ConfiguredRecipeDescriptor(recipe.getName(), recipe.getDisplayName(), configuredOptions, recipeList);
+        return new RecipeDescriptor(recipe.getName(), recipe.getDisplayName(), recipe.getDescription(), recipe.getTags(), options, recipeList);
     }
 
     private static Recipe constructRecipe(Class<?> recipeClass) {
@@ -120,7 +104,28 @@ public class RecipeIntrospectionUtils {
             Option option = field.getAnnotation(Option.class);
             if (option != null) {
                 options.add(new OptionDescriptor(field.getName(), field.getType().getSimpleName(),
-                        option.displayName(), option.description(), option.required()));
+                        option.displayName(), option.description(), option.required(), null));
+            }
+        }
+        return options;
+    }
+
+    private static List<OptionDescriptor> getOptionsDescriptors(Recipe recipe) {
+        List<OptionDescriptor> options = new ArrayList<>();
+
+        for (Field field : recipe.getClass().getDeclaredFields()) {
+            field.setAccessible(true);
+            Option option = field.getAnnotation(Option.class);
+            if (option != null) {
+                Object fieldValue;
+                try {
+                    fieldValue = field.get(recipe);
+                } catch (IllegalAccessException e) {
+                    throw new RecipeIntrospectionException("Error getting recipe option value, recipe: " +
+                            recipe.getClass().getName() + ", option: " + field.getName(), e);
+                }
+                options.add(new OptionDescriptor(field.getName(), field.getType().getSimpleName(),
+                        option.displayName(), option.description(), option.required(), fieldValue));
             }
         }
         return options;
