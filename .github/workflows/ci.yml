@@ -47,5 +47,5 @@ jobs:
       #   env:
       #     OSSRH_TOKEN: ${{ secrets.OSSRH_TOKEN }}
       #     OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
-      #     SIGNING_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
-      #     SIGNING_GPG_PRIVATE_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+      #     SIGNING_KEY: ${{ secrets.OSSRH_SIGNING_KEY }}
+      #     SIGNING_PASSWORD: ${{ secrets.OSSRH_SIGNING_PASSWORD }}

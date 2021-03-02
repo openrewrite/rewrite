@@ -38,19 +38,19 @@ jobs:
       - name: publish-candidate
         if: contains(github.ref, '-rc.')
         timeout-minutes: 30
-        run: ./gradlew ${GRADLE_SWITCHES} -Prelease.disableGitChecks=true -Prelease.useLastTag=true candidate publishToSonatype closeSonatypeStagingRepository # closeAndReleaseSonatypeStagingRepository
+        run: ./gradlew ${GRADLE_SWITCHES} -Prelease.disableGitChecks=true -Prelease.useLastTag=true candidate publish closeSonatypeStagingRepository # closeAndReleaseSonatypeStagingRepository
         env:
           OSSRH_TOKEN: ${{ secrets.OSSRH_TOKEN }}
           OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
-          SIGNING_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
-          SIGNING_GPG_PRIVATE_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          SIGNING_KEY: ${{ secrets.OSSRH_SIGNING_KEY }}
+          SIGNING_PASSWORD: ${{ secrets.OSSRH_SIGNING_PASSWORD }}
 
       - name: publish-release
         if: (!contains(github.ref, '-rc.'))
         timeout-minutes: 30
-        run: ./gradlew ${GRADLE_SWITCHES} -Prelease.disableGitChecks=true -Prelease.useLastTag=true final publishToSonatype closeSonatypeStagingRepository # closeAndReleaseSonatypeStagingRepository
+        run: ./gradlew ${GRADLE_SWITCHES} -Prelease.disableGitChecks=true -Prelease.useLastTag=true final publish closeSonatypeStagingRepository # closeAndReleaseSonatypeStagingRepository
         env:
           OSSRH_TOKEN: ${{ secrets.OSSRH_TOKEN }}
           OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
-          SIGNING_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
-          SIGNING_GPG_PRIVATE_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          SIGNING_KEY: ${{ secrets.OSSRH_SIGNING_KEY }}
+          SIGNING_PASSWORD: ${{ secrets.OSSRH_SIGNING_PASSWORD }}
