@@ -93,6 +93,38 @@ class MavenDependencyResolutionIntegTest {
         )
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/346")
+    @Test
+    @Disabled
+    fun overrideParentVersion(@TempDir tempDir: Path) {
+        assertDependencyResolutionEqualsAether(
+            tempDir,
+            pom = """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-parent</artifactId>
+                        <version>2.2.11.RELEASE</version>
+                        <relativePath/> <!-- lookup parent from repository -->
+                    </parent>
+                    <groupId>com.example</groupId>
+                    <artifactId>my-example</artifactId>
+                    <version>1.0.0</version>
+
+                    <dependencies>
+                        <!-- Fix CVE-2017-18640-->
+                        <dependency>
+                            <groupId>org.yaml</groupId>
+                            <artifactId>snakeyaml</artifactId>
+                            <version>1.27</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """.trimIndent()
+        )
+    }
+
     @Issue("#93")
     @Test
     fun snapshotVersion() {
