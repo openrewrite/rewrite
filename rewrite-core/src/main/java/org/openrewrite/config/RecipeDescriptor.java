@@ -34,6 +34,8 @@ public class RecipeDescriptor {
 
     List<OptionDescriptor> options;
 
+    List<String> languages;
+
     @With
     List<RecipeDescriptor> recipeList;
 }

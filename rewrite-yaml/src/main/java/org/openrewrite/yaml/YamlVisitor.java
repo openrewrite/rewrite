@@ -17,9 +17,15 @@ package org.openrewrite.yaml;
 
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.tree.Yaml;
 
 public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
+
+    @Override
+    public String getLanguage() {
+        return "yaml";
+    }
 
     public Yaml visitDocuments(Yaml.Documents documents, P p) {
         return documents.withDocuments(ListUtils.map(documents.getDocuments(), d -> visitAndCast(d, p)));

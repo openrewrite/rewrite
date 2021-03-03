@@ -32,7 +32,7 @@ public class RemoveProperty extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Remove Maven project property";
+        return "Remove a Maven project property";
     }
 
     @Override

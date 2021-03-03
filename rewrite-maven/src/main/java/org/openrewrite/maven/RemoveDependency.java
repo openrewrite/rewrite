@@ -33,13 +33,21 @@ import static java.util.stream.Collectors.toList;
 @EqualsAndHashCode(callSuper = true)
 public class RemoveDependency extends Recipe {
 
-    @Option(displayName = "Group ID", description = "Group ID of dependency to remove.")
+    @Option(displayName = "Group",
+            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            example = "com.google.guava")
     String groupId;
 
-    @Option(displayName = "Artifact ID", description = "Artifact ID of dependency to remove.")
+    @Option(displayName = "Artifact",
+            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            example = "guava")
     String artifactId;
 
-    @Option(displayName = "Scope", required = false, description = "Scope of dependency to remove.")
+    @Option(displayName = "Scope",
+            description = "Only remove dependencies if they are in this scope. If 'runtime', this will" +
+                    "also remove dependencies in the 'compile' scope because 'compile' dependencies are part of the runtime dependency set",
+            valid = {"compile", "test", "runtime", "provided"},
+            required = false)
     @Nullable
     String scope;
 
@@ -50,7 +58,7 @@ public class RemoveDependency extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Removes a single dependency from the <dependencies> section of the pom.xml";
+        return "Removes a single dependency from the <dependencies> section of the pom.xml.";
     }
 
     @Override

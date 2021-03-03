@@ -46,6 +46,14 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     /**
+     * @return Describes the language type that this visitor applies to, e.g. java, xml, properties.
+     */
+    @Nullable
+    public String getLanguage() {
+        return null;
+    }
+
+    /**
      * Execute the visitor once after the whole source file has been visited.
      * The visitor is executed against the whole source file. This operation only happens once
      * immediately after the containing visitor visits the whole source file. A subsequent {@link Recipe}

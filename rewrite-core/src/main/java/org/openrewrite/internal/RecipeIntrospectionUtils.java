@@ -35,7 +35,11 @@ public class RecipeIntrospectionUtils {
         List<OptionDescriptor> options = getOptionDescriptors(recipeClass);
         Recipe recipe = constructRecipe(recipeClass);
         RecipeDescriptor recipeDescriptor = new RecipeDescriptor(recipeClass.getName(), recipe.getDisplayName(),
-                recipe.getDescription(), recipe.getTags(), options, emptyList());
+                recipe.getDescription(),
+                recipe.getTags(),
+                options,
+                recipe.getLanguages(),
+                emptyList());
         List<RecipeDescriptor> recipeList = new ArrayList<>();
         for (Recipe next : recipe.getRecipeList()) {
             recipeList.add(recipeDescriptorFromRecipe(next));
@@ -49,7 +53,7 @@ public class RecipeIntrospectionUtils {
             recipeList.add(recipeDescriptorFromRecipe(childRecipe));
         }
         return new RecipeDescriptor(recipe.getName(), recipe.getDisplayName(), recipe.getDescription(),
-                recipe.getTags(), emptyList(), recipeList);
+                recipe.getTags(), emptyList(), recipe.getLanguages(), recipeList);
     }
 
     public static Constructor<?> getPrimaryConstructor(Class<?> recipeClass) {
@@ -75,7 +79,8 @@ public class RecipeIntrospectionUtils {
         for (Recipe next : recipe.getRecipeList()) {
             recipeList.add(recipeDescriptorFromRecipe(next));
         }
-        return new RecipeDescriptor(recipe.getName(), recipe.getDisplayName(), recipe.getDescription(), recipe.getTags(), options, recipeList);
+        return new RecipeDescriptor(recipe.getName(), recipe.getDisplayName(), recipe.getDescription(),
+                recipe.getTags(), options, recipe.getLanguages(), recipeList);
     }
 
     private static Recipe constructRecipe(Class<?> recipeClass) {

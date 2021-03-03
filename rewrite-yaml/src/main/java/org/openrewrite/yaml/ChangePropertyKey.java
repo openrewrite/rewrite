@@ -20,6 +20,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
@@ -34,7 +35,7 @@ import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;
 
 /**
- * When nested YAML mappings are interpreted as dot
+ * Nested YAML mappings are interpreted as dot
  * separated property names, e.g. as Spring Boot
  * interprets application.yml files.
  */
@@ -42,15 +43,24 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(callSuper = true)
 public class ChangePropertyKey extends Recipe {
 
-    @Option(displayName = "Old property key")
+    @Option(displayName = "Old property key",
+            example = "management.metrics.binders.files.enabled")
     String oldPropertyKey;
 
-    @Option(displayName = "New property key")
+    @Option(displayName = "New property key",
+            example = "management.metrics.enable.process.files")
     String newPropertyKey;
 
     @Override
     public String getDisplayName() {
-        return "Change YAML property key";
+        return "Change property key";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Change a YAML property key leaving the value intact. Nested YAML mappings are " +
+                "interpreted as dot separated property names, i.e. as Spring Boot interprets " +
+                "application.yml files.";
     }
 
     @Override

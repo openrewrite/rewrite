@@ -33,6 +33,7 @@ import java.util.*;
 import java.util.concurrent.ForkJoinPool;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singleton;
@@ -100,8 +101,17 @@ public abstract class Recipe {
         return Collections.emptySet();
     }
 
-    public RecipeDescriptor getDescriptor() {
+    public final RecipeDescriptor getDescriptor() {
         return RecipeIntrospectionUtils.recipeDescriptorFromRecipe(this);
+    }
+
+    /**
+     * @return Describes the language type(s) that this recipe applies to, e.g. java, xml, properties.
+     */
+    public List<String> getLanguages() {
+        return Stream.concat(Stream.of(getVisitor().getLanguage()), getRecipeList().stream().flatMap(r -> r.getLanguages().stream()))
+                .filter(Objects::nonNull)
+                .collect(toList());
     }
 
     @JsonIgnore

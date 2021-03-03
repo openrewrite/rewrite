@@ -31,6 +31,11 @@ import java.util.Objects;
 
 public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
+    @Override
+    public String getLanguage() {
+        return "java";
+    }
+
     @Incubating(since = "7.0.0")
     public JavaTemplate.Builder template(String code) {
         return JavaTemplate.builder(this::getCursor, code);

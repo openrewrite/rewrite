@@ -54,18 +54,24 @@ public class ManageDependencies extends Recipe {
 
     private static final XPathMatcher MANAGED_DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies");
 
-    @Option(displayName = "Group pattern",
-            description = "GroupId regular expression pattern used to match dependencies that should be managed.")
+    @Option(displayName = "Group",
+            description = "Group glob expression pattern used to match dependencies that should be managed." +
+                    "Group is the the first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            example = "com.google.*")
     String groupPattern;
 
-    @Option(displayName = "Artifact pattern", required = false,
-            description = "ArtifactId regular expression pattern used to match dependencies that should be managed.")
+    @Option(displayName = "Artifact",
+            description = "Artifact glob expression pattern used to match dependencies that should be managed." +
+                    "Artifact is the second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            example = "guava*",
+            required = false)
     @Nullable
     String artifactPattern;
 
-    @Option(displayName = "Version", required = false,
+    @Option(displayName = "Version",
             description = "Version to use for the dependency in dependency management. " +
-                    "Defaults to the existing version found on the matching dependency.")
+                    "Defaults to the existing version found on the matching dependency.",
+            required = false)
     @Nullable
     String version;
 

@@ -35,13 +35,19 @@ public class AddPlugin extends Recipe {
 
     private static final XPathMatcher BUILD_MATCHER = new XPathMatcher("/project/build");
 
-    @Option(displayName = "Group ID")
+    @Option(displayName = "Group",
+            description = "The first part of a dependency coordinate 'org.openrewrite.maven:rewrite-maven-plugin:VERSION'.",
+            example = "org.openrewrite.maven")
     String groupId;
 
-    @Option(displayName = "Artifact ID")
+    @Option(displayName = "Artifact",
+            description = "The second part of a dependency coordinate 'org.openrewrite.maven:rewrite-maven-plugin:VERSION'.",
+            example = "rewrite-maven-plugin")
     String artifactId;
 
-    @Option(displayName = "Version")
+    @Option(displayName = "Version",
+            description = "A fixed version of the plugin to add.",
+            example = "1.0.0")
     String version;
 
     @Override

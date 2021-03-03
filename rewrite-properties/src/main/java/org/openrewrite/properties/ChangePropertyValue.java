@@ -27,15 +27,22 @@ import org.openrewrite.properties.tree.Properties;
 @EqualsAndHashCode(callSuper = true)
 public class ChangePropertyValue extends Recipe {
 
-    @Option(displayName = "Property key")
+    @Option(displayName = "Property key",
+            example = "management.metrics.binders.files.enabled")
     String propertyKey;
 
-    @Option(displayName = "New value")
+    @Option(displayName = "New value",
+            example = "false")
     String newValue;
 
     @Override
     public String getDisplayName() {
         return "Change properties file property value";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Change a property value leaving the key intact.";
     }
 
     @Override

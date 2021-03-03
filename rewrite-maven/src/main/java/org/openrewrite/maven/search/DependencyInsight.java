@@ -86,7 +86,6 @@ public class DependencyInsight extends Recipe {
         Scope aScope = Scope.fromName(scope);
 
         return new MavenVisitor() {
-
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, context);

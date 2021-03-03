@@ -28,15 +28,17 @@ import org.openrewrite.xml.tree.Xml;
 @EqualsAndHashCode(callSuper = true)
 public class ChangePropertyValue extends Recipe {
 
-    @Option(displayName = "Key", description = "Property key to change.")
+    @Option(displayName = "Key",
+            description = "Property key to change.")
     String key;
 
-    @Option(displayName = "Value", description = "Value to apply to the matching property.")
+    @Option(displayName = "Value",
+            description = "Value to apply to the matching property.")
     String newValue;
 
     @Override
     public String getDisplayName() {
-        return "Change a Maven project property value";
+        return "Change a Maven project property value.";
     }
 
     @Override

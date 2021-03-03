@@ -35,7 +35,9 @@ import java.util.Set;
 @EqualsAndHashCode(callSuper = true)
 public class FindProperties extends Recipe {
 
-    @Option(displayName = "Property key")
+    @Option(displayName = "Property key",
+            description = "A property glob expression that properties are matched against.",
+            example = "guava*")
     String propertyKey;
 
     public static Set<Properties.Entry> find(Properties p, String propertyKey) {
@@ -56,7 +58,12 @@ public class FindProperties extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Find properties file property";
+        return "Find property";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Find uses of a property by key or keys by pattern.";
     }
 
     @Override

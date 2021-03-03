@@ -19,7 +19,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.semver.HyphenRange;
 import org.openrewrite.semver.Semver;
 
 import java.util.regex.Pattern;
@@ -31,10 +30,14 @@ import java.util.regex.Pattern;
 @EqualsAndHashCode(callSuper = true)
 public class AddDependency extends Recipe {
 
-    @Option(displayName = "Group ID")
+    @Option(displayName = "Group",
+            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            example = "com.google.guava")
     private final String groupId;
 
-    @Option(displayName = "Artifact ID")
+    @Option(displayName = "Artifact",
+            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            example = "guava")
     private final String artifactId;
 
     /**
@@ -44,34 +47,44 @@ public class AddDependency extends Recipe {
      * <p>
      * To pull the whole family up to a later version, use {@link UpgradeDependencyVersion}.
      */
-    @Option(displayName = "Version", description = "An exact version number, or node-style semver selector used to select the version number.")
+    @Option(displayName = "Version",
+            description = "An exact version number, or node-style semver selector used to select the version number.",
+            example = "29.X")
     private final String version;
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
                     "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+            example = "-jre",
             required = false)
     @Nullable
     @With
     private String versionPattern;
 
     @Option(displayName = "Releases only",
-            description = "When set to 'true' snapshots are excluded from consideration. Defaults to 'true'",
+            description = "Whether to exclude snapshots from consideration.",
             required = false)
     @With
     private boolean releasesOnly = true;
 
-    @Option(displayName = "Classifier", required = false)
+    @Option(displayName = "Classifier",
+            description = "A Maven classifier to add. Most commonly used to select shaded or test variants of a library",
+            example = "test",
+            required = false)
     @Nullable
     @With
     private String classifier;
 
-    @Option(displayName = "Scope", required = false)
+    @Option(displayName = "Scope",
+            valid = { "compile", "test", "runtime", "provided" },
+            required = false)
     @Nullable
     @With
     private String scope;
 
-    @Option(displayName = "Type", required = false)
+    @Option(displayName = "Type",
+            valid = { "jar", "pom" },
+            required = false)
     @Nullable
     @With
     private String type;
@@ -81,7 +94,8 @@ public class AddDependency extends Recipe {
      */
     @Option(displayName = "Family pattern", required = false,
             description = "A pattern, applied to groupIds, used to determine which other dependencies should have aligned version numbers. " +
-                    "Accepts '*' as a wildcard character.")
+                    "Accepts '*' as a wildcard character.",
+            example = "com.fasterxml.jackson*")
     @Nullable
     @With
     private String familyPattern;

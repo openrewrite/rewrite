@@ -32,10 +32,14 @@ import java.util.Optional;
 @EqualsAndHashCode(callSuper = true)
 public class ExcludeDependency extends Recipe {
 
-    @Option(displayName = "Group ID", description = "Group ID of dependency to exclude.")
+    @Option(displayName = "Group",
+            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            example = "com.google.guava")
     String groupId;
 
-    @Option(displayName = "ArtifactID", description = "Artifact ID of dependency to exclude.")
+    @Option(displayName = "Artifact",
+            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            example = "guava")
     String artifactId;
 
     @Override

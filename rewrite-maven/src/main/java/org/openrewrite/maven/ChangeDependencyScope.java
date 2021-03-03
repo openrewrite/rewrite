@@ -33,17 +33,24 @@ import java.util.Optional;
 @EqualsAndHashCode(callSuper = true)
 public class ChangeDependencyScope extends Recipe {
 
-    @Option(displayName = "Group ID")
+    @Option(displayName = "Group",
+            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            example = "com.google.guava")
     String groupId;
 
-    @Option(displayName = "Artifact ID")
+    @Option(displayName = "Artifact",
+            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            example = "guava")
     String artifactId;
 
     /**
      * If null, strips the scope from an existing dependency.
      */
-    @Option(displayName = "New scope", description = "Scope to apply to specified Maven dependency. " +
-            "May be null, which indicates that no scope should be added and any existing scope be removed from the dependency.")
+    @Option(displayName = "New scope",
+            description = "Scope to apply to specified Maven dependency. " +
+                    "May be omitted, which indicates that no scope should be added and any existing scope be removed from the dependency.",
+            valid = { "compile", "test", "runtime", "provided" },
+            required = false)
     @Nullable
     String newScope;
 

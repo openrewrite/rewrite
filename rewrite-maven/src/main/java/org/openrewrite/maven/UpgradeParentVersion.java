@@ -42,18 +42,25 @@ import static java.util.Collections.emptyMap;
 public class UpgradeParentVersion extends Recipe {
     private static final XPathMatcher PARENT_VERSION_MATCHER = new XPathMatcher("/project/parent/version");
 
-    @Option(displayName = "Group ID", description = "Group ID of parent to upgrade.")
+    @Option(displayName = "Group",
+            description = "The first part of a dependency coordinate 'org.springframework.boot:spring-boot-parent:VERSION'.",
+            example = "org.springframework.boot")
     String groupId;
 
-    @Option(displayName = "Artifact ID", description = "Artifact ID of parent to upgrade.")
+    @Option(displayName = "Artifact",
+            description = "The second part of a dependency coordinate 'org.springframework.boot:spring-boot-parent:VERSION'.",
+            example = "spring-boot-parent")
     String artifactId;
 
-    @Option(displayName = "New Version", description = "An exact version number, or node-style semver selector used to select the version number")
+    @Option(displayName = "New version",
+            description = "An exact version number, or node-style semver selector used to select the version number.",
+            example = "29.X")
     String newVersion;
 
-    @Option(displayName = "Version Metadata Pattern", description =
-            "A regular expression used to validate the metadata of a version number. " +
-                    "e.g.: \"-jre\" ensures that version \"1.0.0-jre\" would be selected instead of \"1.0.0-android\" ",
+    @Option(displayName = "Version pattern",
+            description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
+                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+            example = "-jre",
             required = false)
     @Nullable
     String versionPattern;
@@ -75,7 +82,7 @@ public class UpgradeParentVersion extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Set the parent pom version number according to a node-style semver selector or to a specific version number";
+        return "Set the parent pom version number according to a node-style semver selector or to a specific version number.";
     }
 
     @Override

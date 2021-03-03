@@ -33,7 +33,8 @@ public class CoalesceProperties extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Simplify nested map hierarchies into their simplest form.";
+        return "Simplify nested map hierarchies into their simplest dot separated property form, i.e. as Spring Boot interprets " +
+                "application.yml files.";
     }
 
     @Override

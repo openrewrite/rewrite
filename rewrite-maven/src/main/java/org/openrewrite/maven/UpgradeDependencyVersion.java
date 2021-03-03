@@ -49,27 +49,26 @@ import static java.util.Collections.emptyMap;
 @EqualsAndHashCode(callSuper = true)
 public class UpgradeDependencyVersion extends Recipe {
 
-    @Option(displayName = "Group ID", description = "Group ID of dependency to upgrade.")
+    @Option(displayName = "Group",
+            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            example = "com.google.guava")
     String groupId;
 
-    @Option(displayName = "Artifact ID", required = false, description = "Artifact ID of dependency to upgrade.")
+    @Option(displayName = "Artifact",
+            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            example = "guava")
     @Nullable
     String artifactId;
 
-    /**
-     * Node Semver range syntax.
-     */
-    @Option(displayName = "New version", description = "Version to upgrade dependency to. Supports Node Semver range syntax.")
+    @Option(displayName = "New version",
+            description = "An exact version number, or node-style semver selector used to select the version number.",
+            example = "29.X")
     String newVersion;
 
-    /**
-     * Allows version selection to be extended beyond the original Node Semver semantics. So for example,
-     * The {@link HyphenRange} of "25-29" can be paired with a version pattern of "-jre" to select
-     * Guava 29.0-jre
-     */
-    @Option(displayName = "versionPattern",
-            description = "A regular expression used to validate the metadata of a version number. " +
-                    "e.g.: \"-jre\" ensures that version \"1.0.0-jre\" would be selected instead of \"1.0.0-android\" ",
+    @Option(displayName = "Version pattern",
+            description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
+                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+            example = "-jre",
             required = false)
     @Nullable
     String versionPattern;

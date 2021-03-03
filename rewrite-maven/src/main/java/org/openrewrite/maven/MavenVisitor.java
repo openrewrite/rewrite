@@ -39,6 +39,11 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
     protected Pom model;
     protected Collection<Pom> modules;
 
+    @Override
+    public String getLanguage() {
+        return "maven";
+    }
+
     public Maven visitMaven(Maven maven, ExecutionContext ctx) {
         this.model = maven.getModel();
         this.modules = maven.getModules();

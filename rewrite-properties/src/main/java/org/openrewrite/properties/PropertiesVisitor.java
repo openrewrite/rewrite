@@ -21,6 +21,11 @@ import org.openrewrite.properties.tree.Properties;
 
 public class PropertiesVisitor<P> extends TreeVisitor<Properties, P> {
 
+    @Override
+    public String getLanguage() {
+        return "properties";
+    }
+
     public Properties visitFile(Properties.File file, P p) {
         return file.withContent(ListUtils.map(file.getContent(), c -> visitAndCast(c, p)));
     }
