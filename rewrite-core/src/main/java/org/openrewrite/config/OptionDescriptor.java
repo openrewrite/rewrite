@@ -18,6 +18,8 @@ package org.openrewrite.config;
 import lombok.Value;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.util.List;
+
 @Value
 public class OptionDescriptor {
 
@@ -31,9 +33,14 @@ public class OptionDescriptor {
     @Nullable
     String description;
 
+    @Nullable
+    String example;
+
+    @Nullable
+    List<String> valid;
+
     boolean required;
 
     @Nullable
     Object value;
-
 }

@@ -24,6 +24,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static java.util.Collections.emptyList;
@@ -103,8 +104,14 @@ public class RecipeIntrospectionUtils {
         for (Field field : recipeClass.getDeclaredFields()) {
             Option option = field.getAnnotation(Option.class);
             if (option != null) {
-                options.add(new OptionDescriptor(field.getName(), field.getType().getSimpleName(),
-                        option.displayName(), option.description(), option.required(), null));
+                options.add(new OptionDescriptor(field.getName(),
+                        field.getType().getSimpleName(),
+                        option.displayName(),
+                        option.description(),
+                        option.example().isEmpty() ? null : option.example(),
+                        option.valid().length == 1 && option.valid()[0].isEmpty() ? null : Arrays.asList(option.valid()),
+                        option.required(),
+                        null));
             }
         }
         return options;
@@ -124,8 +131,14 @@ public class RecipeIntrospectionUtils {
                     throw new RecipeIntrospectionException("Error getting recipe option value, recipe: " +
                             recipe.getClass().getName() + ", option: " + field.getName(), e);
                 }
-                options.add(new OptionDescriptor(field.getName(), field.getType().getSimpleName(),
-                        option.displayName(), option.description(), option.required(), fieldValue));
+                options.add(new OptionDescriptor(field.getName(),
+                        field.getType().getSimpleName(),
+                        option.displayName(),
+                        option.description(),
+                        option.example().isEmpty() ? null : option.example(),
+                        option.valid().length == 1 && option.valid()[0].isEmpty() ? null : Arrays.asList(option.valid()),
+                        option.required(),
+                        fieldValue));
             }
         }
         return options;

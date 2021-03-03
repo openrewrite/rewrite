@@ -25,5 +25,7 @@ import java.lang.annotation.Target;
 public @interface Option {
     String displayName() default "";
     String description() default "";
+    String example() default "";
+    String[] valid() default "";
     boolean required() default true;
 }

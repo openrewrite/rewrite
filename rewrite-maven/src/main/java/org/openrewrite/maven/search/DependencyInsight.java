@@ -38,13 +38,19 @@ import java.util.regex.Pattern;
 @Value
 public class DependencyInsight extends Recipe {
 
-    @Option(displayName = "Group ID pattern", description = "Group ID Regular expression pattern used to match dependencies.")
+    @Option(displayName = "Group pattern",
+            description = "Group glob pattern used to match dependencies.",
+            example = "com.fasterxml.jackson.module")
     String groupIdPattern;
 
-    @Option(displayName = "Artifact ID pattern", description = "Artifact ID Regular expression pattern used to match dependencies.")
+    @Option(displayName = "Artifact pattern",
+            description = "Artifact glob pattern used to match dependencies.",
+            example = "jackson-module-*")
     String artifactIdPattern;
 
-    @Option(displayName = "Scope", description = "Match dependencies with the specified scope")
+    @Option(displayName = "Scope",
+            description = "Match dependencies with the specified scope",
+            valid = {"compile", "test", "runtime", "provided"})
     String scope;
 
     @Override
