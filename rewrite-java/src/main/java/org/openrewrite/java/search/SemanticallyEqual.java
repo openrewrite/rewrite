@@ -88,7 +88,7 @@ public class SemanticallyEqual {
             }
             J.Identifier secondIdent = (J.Identifier) second;
 
-            isEqual = isEqual && Objects.equals(firstIdent.getType(), secondIdent.getType()) &&
+            isEqual = isEqual && typeEquals(firstIdent.getType(), secondIdent.getType()) &&
                     firstIdent.getSimpleName().equals(secondIdent.getSimpleName());
 
             return null;
@@ -154,10 +154,6 @@ public class SemanticallyEqual {
                 return null;
             }
             NameTree secondTypeName = (NameTree) second;
-            if (!firstTypeName.getType().equals(secondTypeName.getType())) {
-                isEqual = false;
-                return null;
-            }
             if (firstTypeName instanceof J.Identifier && secondTypeName instanceof J.Identifier) {
                 isEqual = isEqual && identEquals((J.Identifier) firstTypeName, (J.Identifier) secondTypeName);
             } else {

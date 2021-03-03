@@ -382,7 +382,15 @@ interface SemanticallyEqualTest {
             Space.EMPTY,
             Markers.EMPTY,
             "name",
-            JavaType.Class.build("org.foo.Bar")
+            object : JavaType.FullyQualified() {
+                override fun deepEquals(type: JavaType?): Boolean {
+                    return false
+                }
+
+                override fun getFullyQualifiedName(): String {
+                    return "org.foo.Bar"
+                }
+            }
         )
         val nameB = J.Identifier.build(
             randomId(),
