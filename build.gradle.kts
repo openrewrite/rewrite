@@ -1,37 +1,57 @@
 import com.github.jk1.license.LicenseReportExtension
-import io.spring.gradle.bintray.SpringBintrayExtension
 import nebula.plugin.contacts.Contact
 import nebula.plugin.contacts.ContactsExtension
 import nebula.plugin.info.InfoBrokerPlugin
 import nl.javadude.gradle.plugins.license.LicenseExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import org.jfrog.gradle.plugin.artifactory.dsl.ArtifactoryPluginConvention
-import org.jfrog.gradle.plugin.artifactory.dsl.PublisherConfig
 import java.util.*
 
 buildscript {
     repositories {
-        jcenter()
         gradlePluginPortal()
-    }
-
-    dependencies {
-        classpath("io.spring.gradle:spring-release-plugin:0.20.1")
-
-        constraints {
-            classpath("org.jfrog.buildinfo:build-info-extractor-gradle:4.13.0") {
-                because("Need recent version for Gradle 6+ compatibility")
-            }
-        }
     }
 }
 
 plugins {
-    id("io.spring.release") version "0.20.1"
+    `java-library`
+    `maven-publish`
+    signing
+
+    id("nebula.release") version "15.3.1"
+    id("io.github.gradle-nexus.publish-plugin") version "1.0.0"
+
+    id("com.github.hierynomus.license") version "0.15.0" apply false
     id("org.jetbrains.kotlin.jvm") version "1.4.21" apply false
     id("org.gradle.test-retry") version "1.1.6" apply false
     id("com.github.jk1.dependency-license-report") version "1.16" apply false
+
+    id("nebula.maven-publish") version "17.3.2" apply false
+    id("nebula.contacts") version "5.1.0" apply false
+    id("nebula.info") version "9.3.0" apply false
+
+    id("nebula.javadoc-jar") version "17.3.2" apply false
+    id("nebula.source-jar") version "17.3.2" apply false
+    id("nebula.maven-apache-license") version "17.3.2" apply false
 }
+
+configure<nebula.plugin.release.git.base.ReleasePluginExtension> {
+    defaultVersionStrategy = nebula.plugin.release.NetflixOssStrategies.SNAPSHOT(project)
+}
+
+nexusPublishing {
+    repositories {
+        sonatype {
+            username.set(project.findProperty("ossrhUsername") as String? ?: System.getenv("OSSRH_USERNAME"))
+            password.set(project.findProperty("ossrhToken") as String? ?: System.getenv("OSSRH_TOKEN"))
+        }
+    }
+}
+
+// project.gradle.taskGraph.whenReady { TaskExecutionGraph graph ->
+//   if (graph.hasTask(":devSnapshot")) {
+//       throw new GradleException("You cannot use the devSnapshot task from the release plugin. Please use the snapshot task.")
+//   }
+// }
 
 allprojects {
     apply(plugin = "license")
@@ -40,12 +60,37 @@ allprojects {
 }
 
 subprojects {
+    apply(plugin = "signing")
+//    apply(plugin = "maven-publish") // todo
+    apply(plugin = "nebula.maven-publish")
+    apply(plugin = "nebula.contacts")
+    apply(plugin = "nebula.info")
+    // apply(plugin = "nebula.javadoc-jar") // todo, hacking
+    apply(plugin = "nebula.source-jar")
+    apply(plugin = "nebula.maven-apache-license")
     apply(plugin = "java-library")
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "nebula.maven-resolved-dependencies")
-    apply(plugin = "io.spring.publishing")
     apply(plugin = "org.gradle.test-retry")
     apply(plugin = "com.github.jk1.dependency-license-report")
+
+    signing {
+        setRequired({
+            !project.version.toString().endsWith("SNAPSHOT") && !project.hasProperty("skipSigning")
+        })
+
+        val signingKey = project.findProperty("signingKey") as String? ?: System.getenv("SIGNING_KEY")
+        val signingPassword = project.findProperty("signingPassword") as String? ?: System.getenv("SIGNING_PASSWORD")
+
+        if (project.hasProperty("useGpgCmd")) {
+            // "./gradlew ... -DuseGpgCmd" enables local gpgCmd for signing in case a human wants to do this locally
+            useGpgCmd()
+        } else {
+            useInMemoryPgpKeys(signingKey, signingPassword)
+        }
+
+        sign(publishing.publications["nebula"])
+    }
 
     repositories {
         mavenCentral()
@@ -177,25 +222,7 @@ subprojects {
         }
     }
 
-    configure<SpringBintrayExtension> {
-        org = "openrewrite"
-        repo = "maven"
-    }
-
-    project.withConvention(ArtifactoryPluginConvention::class) {
-        setContextUrl("https://oss.jfrog.org/artifactory")
-        publisherConfig.let {
-            val repository: PublisherConfig.Repository = it.javaClass
-                    .getDeclaredField("repository")
-                    .apply { isAccessible = true }
-                    .get(it) as PublisherConfig.Repository
-
-            repository.setRepoKey("oss-snapshot-local")
-            repository.setUsername(project.findProperty("bintrayUser"))
-            repository.setPassword(project.findProperty("bintrayKey"))
-        }
-    }
-
+    // todo, hacking
     val sourcesJarTask = tasks.register("sourcesJar", Jar::class.java) {
         archiveClassifier.set("sources")
     }
@@ -205,6 +232,7 @@ subprojects {
     tasks.named("assemble").configure {
         dependsOn(sourcesJarTask)
     }
+    // todo until here
 
     tasks.withType<GenerateMavenPom> {
         doLast {
