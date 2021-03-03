@@ -16,7 +16,10 @@
 package org.openrewrite.java.search
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
+import org.openrewrite.Parser
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.tree.J
@@ -24,6 +27,7 @@ import org.openrewrite.java.tree.JLeftPadded
 import org.openrewrite.java.tree.JavaType
 import org.openrewrite.java.tree.Space
 import org.openrewrite.marker.Markers
+import java.util.*
 
 interface SemanticallyEqualTest {
 
@@ -36,6 +40,30 @@ interface SemanticallyEqualTest {
             @interface NoArgAnnotation1{}
             @interface NoArgAnnotation2{}
         """
+    }
+
+    @Disabled
+    @Issue("#345")
+    @Test
+    fun fullyQualifiedReference(jp: JavaParser) {
+        val mcAnnoClass =
+            """
+                package org.mco.anno;
+                public @interface McAnno {}
+            """
+        val j = JavaParser.fromJavaVersion().dependsOn(Collections.singletonList(Parser.Input.fromString(mcAnnoClass))).build();
+        val cu1 = j.parse(
+            """
+                import org.mco.anno.McAnno;
+                @McAnno
+                class M {}
+                @org.mco.anno.McAnno
+                class N {}
+            """)
+        val c1Anno = cu1[0].classes[0].leadingAnnotations[0]
+        val c2Anno = cu1[0].classes[1].leadingAnnotations[0]
+        assertThat(SemanticallyEqual.areEqual(c2Anno, c2Anno)).isTrue()
+        assertThat(SemanticallyEqual.areEqual(c1Anno, c2Anno)).isTrue()
     }
 
     @Test
