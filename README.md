@@ -1,7 +1,7 @@
 ![Logo](https://github.com/openrewrite/rewrite/raw/master/doc/logo-oss.png)
 # Semantic code search and transformation
 
-[![Build Status](https://circleci.com/gh/openrewrite/rewrite.svg?style=shield)](https://circleci.com/gh/openrewrite/rewrite)
+![ci](https://github.com/openrewrite/rewrite/actions/workflows/ci.yml/badge.svg)
 [![Apache 2.0](https://img.shields.io/github/license/openrewrite/rewrite.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Maven Central](https://img.shields.io/maven-central/v/org.openrewrite/rewrite-java.svg)](https://mvnrepository.com/artifact/org.openrewrite/rewrite-java)
 
