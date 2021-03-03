@@ -56,7 +56,11 @@ public class MavenRepositoryMirror {
 
     public MavenRepository apply(MavenRepository repo) {
         URI uri = URI.create(url);
-        return matches(repo) && !repo.getUri().equals(uri) ? repo.withUri(uri) : repo;
+        if (matches(repo) && !(repo.getUri().equals(uri) && repo.getId().equals(id))) {
+            return repo.withUri(uri).withId(id);
+        } else {
+            return repo;
+        }
     }
 
     public boolean matches(MavenRepository repository) {

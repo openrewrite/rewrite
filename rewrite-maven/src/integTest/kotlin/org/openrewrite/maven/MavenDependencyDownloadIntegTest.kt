@@ -15,6 +15,11 @@
  */
 package org.openrewrite.maven
 
+import mockwebserver3.Dispatcher
+import mockwebserver3.MockResponse
+import mockwebserver3.MockWebServer
+import mockwebserver3.RecordedRequest
+import okhttp3.Credentials
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
@@ -76,36 +81,65 @@ class MavenDependencyDownloadIntegTest {
         }
     }
 
-    @Disabled("This requires a full instance of artifactory with particular configuration to be running locally")
     @Test
-    fun withAuth() {
-        val ctx = InMemoryExecutionContext()
-        MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
-            """
+    fun mirrorsAndAuth() {
+        // Set up a web server that returns 401 to any request without an Authorization header corresponding to specific credentials
+        // Exceptions in the console output are due to MavenPomDownloader attempting to access via https first before falling back to http
+        val username = "admin"
+        val password = "password"
+        MockWebServer().apply {
+            dispatcher = object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    if(request.headers.find { it.first == "Authorization" && it.second == Credentials.basic(username, password) } == null) {
+                        return MockResponse().apply {
+                            setResponseCode(401)
+                        }
+                    }
+                    else {
+                        return MockResponse().apply {
+                            setResponseCode(200)
+                            setBody("""
+                                <project>
+                                  <modelVersion>4.0.0</modelVersion>
+
+                                  <groupId>com.foo</groupId>
+                                  <artifactId>bar</artifactId>
+                                  <version>1.0.0</version>
+                                  
+                                </project>
+                            """.trimIndent())
+                        }
+                    }
+                }
+            }
+        }.use { mockRepo ->
+            val ctx = InMemoryExecutionContext { err -> throw err }
+            MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
+                """
                 <settings>
                     <mirrors>
                         <mirror>
                             <mirrorOf>*</mirrorOf>
                             <name>repo</name>
-                            <url>http://localhost:8081/artifactory/jcenter-authenticated/</url>
+                            <url>http://${mockRepo.hostName}:${mockRepo.port}</url>
                             <id>repo</id>
                         </mirror>
                     </mirrors>
                     <servers>
                         <server>
                             <id>repo</id>
-                            <username>admin</username>
-                            <password>E0Sl0n85N0DK</password>
+                            <username>${username}</username>
+                            <password>${password}</password>
                         </server>
                     </servers>
                 </settings>
                 """.trimIndent().byteInputStream()
-        }, ctx)
+            }, ctx)
 
-        // Don't worry about the credentials stored in here being useful for any other purpose or worth protecting
-        val maven: Maven = MavenParser.builder().build().parse(
-            ctx,
-            """
+            // Don't worry about the credentials stored in here being useful for any other purpose or worth protecting
+            val maven: Maven = MavenParser.builder().build().parse(
+                ctx,
+                """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
                 
@@ -115,17 +149,23 @@ class MavenDependencyDownloadIntegTest {
                 
                     <dependencies>
                         <dependency>
-                            <groupId>com.google.guava</groupId>
-                            <artifactId>guava</artifactId>
-                            <version>29.0-jre</version>
+                            <groupId>com.foo</groupId>
+                            <artifactId>bar</artifactId>
+                            <version>1.0.0</version>
                         </dependency>
                     </dependencies>
                 </project>
                 """
-        ).first()
+            ).first()
 
-        assertThat(maven.model.dependencies)
-            .hasSize(1)
-            .matches { it.first().artifactId == "guava" }
+            assertThat(mockRepo.requestCount)
+                .isGreaterThan(0)
+                .`as`("The mock repository received no requests. Applying mirrors is probably broken")
+
+            assertThat(maven.model.dependencies)
+                .hasSize(1)
+                .matches { it.first().groupId == "com.foo" && it.first().artifactId == "bar" }
+
+        }
     }
 }

@@ -30,6 +30,7 @@ import java.net.URI;
 @Data
 public class MavenRepository {
     @EqualsAndHashCode.Include
+    @With
     String id;
 
     @With

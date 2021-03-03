@@ -27,4 +27,8 @@ public class MavenDownloadingException extends RuntimeException {
     public MavenDownloadingException(String message, Object... args) {
         super(String.format(message, args));
     }
+
+    public MavenDownloadingException(Throwable throwable) {
+        super(throwable);
+    }
 }

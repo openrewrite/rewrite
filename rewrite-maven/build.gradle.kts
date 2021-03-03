@@ -38,7 +38,7 @@ dependencies {
     integTestImplementation("org.eclipse.aether:aether-transport-http:latest.release")
     integTestImplementation("org.apache.maven:maven-aether-provider:latest.release")
     integTestImplementation("org.apache.maven:maven-core:latest.release")
-
+    integTestImplementation("com.squareup.okhttp3:mockwebserver:latest.release")
     integTestImplementation("io.micrometer:micrometer-registry-prometheus:latest.release")
 
     integTestImplementation(project(":rewrite-java-11"))
