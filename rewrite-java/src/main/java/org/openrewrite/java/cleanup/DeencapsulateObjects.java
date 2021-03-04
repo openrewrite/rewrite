@@ -1,26 +1,50 @@
+/*
+ * Copyright 2020 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.openrewrite.java.cleanup;
 
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import lombok.val;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+
+import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.J.Identifier;
 import org.openrewrite.java.tree.JavaType;
 
+@Incubating(since = "7.0.0")
 public class DeencapsulateObjects extends Recipe {
+
+  @Override
+  public String getDisplayName() {
+    return "De-encapsulate DTO parameters";
+  }
+
+  @Override
+  public String getDescription() {
+    return "Find DTO method parameters and replace with their underlying ID equivalent when method only uses ID.";
+  }
+
   @Override protected TreeVisitor<?, ExecutionContext> getVisitor() {
     return new Visitor();
   }
 
-  public static class Visitor extends JavaIsoVisitor<ExecutionContext> {
+  private static class Visitor extends JavaIsoVisitor<ExecutionContext> {
 
     static String degetterify(String input) {
       String getterRemoved = input.replaceAll("^get([A-Z])", "$1");
@@ -31,9 +55,9 @@ public class DeencapsulateObjects extends Recipe {
       return new String(c);
     }
 
-    @Override public J.MethodDeclaration visitMethodDeclaration(        J.MethodDeclaration method,        ExecutionContext notused    ) {
+    @Override public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext context) {
       AtomicReference<J.MethodDeclaration> modifiedMethod =
-          new AtomicReference<>(super.visitMethodDeclaration(method, notused));
+          new AtomicReference<>(super.visitMethodDeclaration(method, context));
       AtomicBoolean wasModified = new AtomicBoolean(false);
 
       modifiedMethod.get().getParameters()
@@ -44,7 +68,7 @@ public class DeencapsulateObjects extends Recipe {
 
             Identifier parameter = it.getVariables().get(0).getName();
             FindParameterUsages usagesFinder = new FindParameterUsages(parameter);
-            usagesFinder.visit(modifiedMethod.get(), modifiedMethod.get());
+            usagesFinder.visit(modifiedMethod.get(), context);
             Set<Identifier> uniqueUsages = usagesFinder.uniqueUsages;
             if (uniqueUsages.size() == 1) {
               wasModified.set(true);
@@ -56,13 +80,13 @@ public class DeencapsulateObjects extends Recipe {
                   parameter,
                   replacedParameterName,
                   usagesFinder.returnType
-              ).visitMethodDeclaration(modifiedMethod.get(), null));
+              ).visitMethodDeclaration(modifiedMethod.get(), context));
 
               // find and replace usages
               modifiedMethod.set((J.MethodDeclaration) new ReplaceInvocationsWithParameter(
                   replacedParameterName,
                   usage
-              ).visitMethodDeclaration(modifiedMethod.get(), null));
+              ).visitMethodDeclaration(modifiedMethod.get(), context));
             }
           });
       if (wasModified.get()) {
@@ -77,7 +101,7 @@ public class DeencapsulateObjects extends Recipe {
     }
   }
 
-  public static class ReplaceInvocationsWithParameter extends JavaVisitor<Void> {
+  private static class ReplaceInvocationsWithParameter extends JavaVisitor<ExecutionContext> {
     private final String newParameterName;
     private final Identifier methodIdentifier;
 
@@ -86,39 +110,39 @@ public class DeencapsulateObjects extends Recipe {
       this.methodIdentifier = methodIdentifier;
     }
 
-    @Override public J visitMethodInvocation(J.MethodInvocation method, Void notused) {
+    @Override public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
       if (method.getName() == methodIdentifier) {
         return method.withTemplate(template("${}").build(), method.getCoordinates().replace(),
             newParameterName);
       }
-      return super.visitMethodInvocation(method, notused);
+      return super.visitMethodInvocation(method, context);
     }
   }
 
-  public static class ReplaceParameterWithCaller extends JavaIsoVisitor<Void> {
+  private static class ReplaceParameterWithCaller extends JavaIsoVisitor<ExecutionContext> {
     private final Identifier parameter;
     private final String newParameterName;
     private final JavaType newType;
 
-    ReplaceParameterWithCaller(Identifier parameter, String newParameterName, JavaType newtyppe) {
+    ReplaceParameterWithCaller(Identifier parameter, String newParameterName, JavaType newtype) {
       this.parameter = parameter;
       this.newParameterName = newParameterName;
-      this.newType = newtyppe;
+      this.newType = newtype;
     }
 
     @Override public J.VariableDeclarations visitVariableDeclarations(
-        J.VariableDeclarations multiVariable, Void notused) {
+        J.VariableDeclarations multiVariable, ExecutionContext context) {
       if (multiVariable.getVariables().get(0).getName() == parameter) {
 
-        return super.visitVariableDeclarations(multiVariable, notused)
+        return super.visitVariableDeclarations(multiVariable, context)
             .withTemplate(template("${} ${}").build(), multiVariable.getCoordinates().replace(),
                 newType, newParameterName);
       }
-      return super.visitVariableDeclarations(multiVariable, notused);
+      return super.visitVariableDeclarations(multiVariable, context);
     }
   }
 
-  public static class FindParameterUsages extends JavaVisitor<J> {
+  private static class FindParameterUsages extends JavaVisitor<ExecutionContext> {
     private final Identifier parameter;
 
     FindParameterUsages(Identifier parameter) {
@@ -129,8 +153,8 @@ public class DeencapsulateObjects extends Recipe {
     HashSet<Identifier> uniqueUsages = new HashSet<>();
     JavaType returnType = null;
 
-    @Override public J visitIdentifier(Identifier ident, J notUsed) {
-      if (ident == parameter) {
+    @Override public J visitIdentifier(Identifier identifer, ExecutionContext context) {
+      if (identifer == parameter) {
         J enclosingStatement = getCursor().getParentOrThrow().getValue();
         if (enclosingStatement instanceof J.MethodInvocation) {
           J.MethodInvocation methodInvocation = (J.MethodInvocation) enclosingStatement;
@@ -143,7 +167,7 @@ public class DeencapsulateObjects extends Recipe {
               "enclosingStatement was ${enclosingStatement.javaClass.kotlin.qualifiedName}");
         }
       }
-      return super.visitIdentifier(ident, notUsed);
+      return super.visitIdentifier(identifer, context);
     }
   }
 }
