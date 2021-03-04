@@ -176,9 +176,11 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         break;
                     }
                     case METHOD_DECLARATION_PARAMETER: {
-                        JContainer<Expression> container = getCursor().getParentOrThrow().getValue();
-                        Expression firstArg = container.getElements().iterator().next();
-                        if (firstArg.getPrefix().getLastWhitespace().contains("\n")) {
+                        JContainer<J> container = getCursor().getParentOrThrow().getValue();
+                        J firstArg = container.getElements().iterator().next();
+                        if (firstArg.getPrefix().getWhitespace().isEmpty()) {
+                            after = right.getAfter();
+                        } else if (firstArg.getPrefix().getLastWhitespace().contains("\n")) {
                             // if the first argument is on its own line, align all arguments to be continuation indented
                             elem = visitAndCast(elem, p);
                             after = indentTo(right.getAfter(), indent);

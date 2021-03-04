@@ -998,14 +998,15 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         jp,
         before = """
                 public class Test {
-                    public static DefaultRepositorySystemSession getRepositorySystemSession(RepositorySystem system,
+                    public static DefaultRepositorySystemSession getRepositorySystemSession(RepositorySystem system, // comments here
                                                                                             @Nullable File localRepositoryDir) {
                         DefaultRepositorySystemSession repositorySystemSession = org.apache.maven.repository.internal.MavenRepositorySystemUtils
                                 .newSession();
                         repositorySystemSession.setDependencySelector(
                                 new AndDependencySelector(
-                                        new ExclusionDependencySelector(),
+                                        new ExclusionDependencySelector(), // some comments
                                         new ScopeDependencySelector(emptyList(), Arrays.asList("provided", "test")),
+                                        // more comments
                                         new OptionalDependencySelector()
                                 )
                         );
