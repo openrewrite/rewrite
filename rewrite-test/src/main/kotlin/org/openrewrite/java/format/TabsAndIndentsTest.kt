@@ -1139,4 +1139,41 @@ interface TabsAndIndentsTest : JavaRecipeTest {
             }
         """
     )
+    @Test
+    fun tabsFileWithSpacesFormat(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+		public class ZuulRouteApplicationContextInitializer {
+				public ZuulRouteApplicationContextInitializer() {
+						return null;
+				}
+			}
+        """,
+        after = """
+        public class ZuulRouteApplicationContextInitializer {
+            public ZuulRouteApplicationContextInitializer() {
+                return null;
+            }
+        }
+        """
+    )
+
+    @Test
+    fun mixedTabsSpacesFileWithSpacesFormat(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+		public class ZuulRouteApplicationContextInitializer {
+				public ZuulRouteApplicationContextInitializer() {
+	    				  return null;
+				    }
+			}
+        """,
+        after = """
+        public class ZuulRouteApplicationContextInitializer {
+            public ZuulRouteApplicationContextInitializer() {
+                return null;
+            }
+        }
+        """
+    )
 }

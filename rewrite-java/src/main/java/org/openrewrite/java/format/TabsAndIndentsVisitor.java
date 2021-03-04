@@ -28,9 +28,15 @@ import java.util.Optional;
 
 class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     private final TabsAndIndentsStyle style;
+    private final String spacesForTab;
 
     public TabsAndIndentsVisitor(TabsAndIndentsStyle style) {
         this.style = style;
+        String s = new String();
+        for (int i = 0; i < style.getTabSize(); i++) {
+            s = s + " ";
+        }
+        spacesForTab = s;
     }
 
     @Override
@@ -385,6 +391,9 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private String indent(String whitespace, int shift) {
+        if (!style.isUseTabCharacter() && whitespace.contains("\t")) {
+            whitespace = whitespace.replaceAll("\t", spacesForTab);
+        }
         StringBuilder newWhitespace = new StringBuilder(whitespace);
         shift(newWhitespace, shift);
         return newWhitespace.toString();
