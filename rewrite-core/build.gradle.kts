@@ -10,10 +10,12 @@ dependencies {
     api("com.fasterxml.jackson.core:jackson-databind:latest.release")
     api("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")
     api("com.fasterxml.jackson.module:jackson-module-parameter-names:latest.release")
+    api("com.fasterxml.jackson.module:jackson-module-kotlin:latest.release")
 
     implementation("io.github.classgraph:classgraph:latest.release")
-
     implementation("org.yaml:snakeyaml:latest.release")
+
+    testImplementation(project(":rewrite-test"))
 }
 
 tasks.withType<ShadowJar> {

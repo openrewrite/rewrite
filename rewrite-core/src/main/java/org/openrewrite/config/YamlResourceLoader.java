@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.module.kotlin.KotlinModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
@@ -46,6 +47,7 @@ public class YamlResourceLoader implements ResourceLoader {
             .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
             .build()
             .registerModule(new ParameterNamesModule())
+            .registerModule(new KotlinModule())
             .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 

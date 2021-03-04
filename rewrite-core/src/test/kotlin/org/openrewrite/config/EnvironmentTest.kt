@@ -17,13 +17,15 @@ package org.openrewrite.config
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.*
 import org.openrewrite.Tree.randomId
 import org.openrewrite.marker.Markers
 import org.openrewrite.text.PlainText
 import java.net.URI
+import java.nio.file.Path
 import java.util.*
 
-class EnvironmentTest {
+class EnvironmentTest : RecipeTest {
     @Test
     fun listRecipes() {
         val env = Environment.builder()
@@ -165,11 +167,11 @@ class EnvironmentTest {
     fun scanClasspath() {
         val env = Environment.builder().scanClasspath(Collections.emptySet()).build()
 
-        assertThat(env.listRecipes()).hasSize(2)
+        assertThat(env.listRecipes()).hasSizeGreaterThanOrEqualTo(2)
                 .extracting("name")
                 .contains("org.openrewrite.text.ChangeTextToJon", "org.openrewrite.HelloJon")
 
-        assertThat(env.listStyles()).hasSize(1)
+        assertThat(env.listStyles()).hasSizeGreaterThanOrEqualTo(1)
                 .extracting("name")
                 .contains("org.openrewrite.SampleStyle")
     }
@@ -197,4 +199,44 @@ class EnvironmentTest {
         assertThat(sampleStyle.description).isEqualTo("Sample test style")
         assertThat(sampleStyle.tags).containsExactly("testing")
     }
+
+    val plainTextParser = object : Parser<PlainText> {
+        override fun parse(vararg sources: String?): MutableList<PlainText> {
+            return sources.asSequence()
+                    .filterNotNull()
+                    .map { PlainText(randomId(), Markers.EMPTY, it)}
+                    .toMutableList()
+        }
+
+        override fun parseInputs(sources: MutableIterable<Parser.Input>, relativeTo: Path?, ctx: ExecutionContext): MutableList<PlainText> {
+            throw NotImplementedError("Not needed for test")
+        }
+
+        override fun accept(path: Path): Boolean {
+            throw NotImplementedError("Not needed for test")
+        }
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/343")
+    @Test
+    fun environmentActivatedRecipeUsableInTests() = assertChanged(
+            parser = plainTextParser,
+            recipe = Environment.builder()
+                    .scanClasspath(Collections.emptySet())
+                    .build()
+                    .activateRecipes("org.openrewrite.text.ChangeTextToJon"),
+            before = "some text that isn't jon",
+            after = "Hello Jon!"
+    )
+
+    @Test
+    fun deserializesKotlinRecipe() = assertChanged(
+        parser = plainTextParser,
+        recipe = Environment.builder()
+                .scanClasspath(Collections.emptySet())
+                .build()
+                .activateRecipes("org.openrewrite.text.HelloKotlin"),
+        before = "some text",
+        after = "Hello Kotlin"
+    )
 }

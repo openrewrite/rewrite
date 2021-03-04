@@ -30,6 +30,7 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import com.fasterxml.jackson.dataformat.smile.SmileFactory;
 import com.fasterxml.jackson.dataformat.smile.SmileGenerator;
+import com.fasterxml.jackson.module.kotlin.KotlinModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import lombok.SneakyThrows;
 
@@ -60,6 +61,7 @@ public class TreeSerializer<S extends SourceFile> {
                 .build()
                 .registerModule(new RelativePathModule())
                 .registerModule(new ParameterNamesModule())
+                .registerModule(new KotlinModule())
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .setSerializationInclusion(JsonInclude.Include.NON_NULL);
 

@@ -51,13 +51,7 @@ public class Environment {
     }
 
     public Recipe activateRecipes(Iterable<String> activeRecipes) {
-        Recipe root = new Recipe() {
-
-            @Override
-            public String getDisplayName() {
-                return getName();
-            }
-        };
+        Recipe root = new CompositeRecipe();
         Collection<Recipe> recipes = listRecipes();
         List<String> recipesNotFound = new ArrayList<>();
         for (String activeRecipe : activeRecipes) {
@@ -85,13 +79,7 @@ public class Environment {
 
     @Incubating(since = "7.0.0")
     public Recipe activateAll() {
-        Recipe root = new Recipe() {
-
-            @Override
-            public String getDisplayName() {
-                return getName();
-            }
-        };
+        Recipe root = new CompositeRecipe();
         listRecipes().forEach(root::doNext);
         return root;
     }
@@ -165,6 +153,18 @@ public class Environment {
 
         public Environment build() {
             return new Environment(resourceLoaders);
+        }
+    }
+
+    /**
+     * A recipe that exists only to wrap other recipes.
+     * Anonymous recipe classes aren't serializable/deserializable so use this, or another named type, instead
+     */
+    private static class CompositeRecipe extends Recipe {
+
+        @Override
+        public String getDisplayName() {
+            return getName();
         }
     }
 }
