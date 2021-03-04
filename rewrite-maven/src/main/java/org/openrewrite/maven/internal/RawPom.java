@@ -63,6 +63,12 @@ public class RawPom {
     String snapshotVersion;
 
     @Nullable
+    String name;
+
+    @Nullable
+    String description;
+
+    @Nullable
     String packaging;
 
     @Nullable
