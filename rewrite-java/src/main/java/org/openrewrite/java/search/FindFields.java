@@ -36,12 +36,19 @@ import java.util.Set;
 @EqualsAndHashCode(callSuper = true)
 public class FindFields extends Recipe {
 
-    @Option(displayName = "Fully-qualified type name", description = "A fully-qualified Java type name, that is used to find matching fields.")
+    @Option(displayName = "Fully-qualified type name",
+            description = "A fully-qualified Java type name, that is used to find matching fields.",
+            example = "org.slf4j.api.Logger")
     String fullyQualifiedTypeName;
 
     @Override
     public String getDisplayName() {
         return "Find fields";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Finds declared fields matching a particular class name.";
     }
 
     @Override

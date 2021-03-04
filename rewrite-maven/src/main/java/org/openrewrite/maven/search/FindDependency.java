@@ -30,10 +30,14 @@ import java.util.Set;
 @Value
 public class FindDependency extends Recipe {
 
-    @Option(displayName = "Group ID")
+    @Option(displayName = "Group",
+            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            example = "com.google.guava")
     String groupId;
 
-    @Option(displayName = "Artifact ID")
+    @Option(displayName = "Artifact",
+            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            example = "guava")
     String artifactId;
 
     public static Set<Xml.Tag> find(Maven maven, String groupId, String artifactId) {
@@ -53,6 +57,11 @@ public class FindDependency extends Recipe {
     @Override
     public String getDisplayName() {
         return "Find Maven dependency";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Finds first-order dependency uses, i.e. dependencies that are defined directly in a project.";
     }
 
     @Override

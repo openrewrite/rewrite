@@ -73,8 +73,8 @@ public class DependencyInsight extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Find direct and transitive dependencies matching groupIdPattern, artifactIdPattern, and scope. " +
-                "Marks are places on first order dependencies that either directly match or transitively include a matching dependency.";
+        return "Find direct and transitive dependencies matching a group, artifact, and scope. " +
+                "Results include dependencies that either directly match or transitively include a matching dependency.";
     }
 
     @Override

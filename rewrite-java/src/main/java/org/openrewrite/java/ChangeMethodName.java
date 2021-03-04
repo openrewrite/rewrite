@@ -40,13 +40,17 @@ public class ChangeMethodName extends Recipe {
      * A method pattern, expressed as a pointcut expression, that is used to find matching method declarations/invocations.
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
-    @Option(displayName = "Method pattern", description = "A method pattern, expressed as a pointcut expression, that is used to find matching method declarations/invocations.")
+    @Option(displayName = "Method pattern",
+            description = "A method pattern, expressed as a pointcut expression, that is used to find matching method declarations/invocations.",
+            example = "org.mockito.Matchers anyVararg()")
     String methodPattern;
 
     /**
      * The method name that will replace the existing name.
      */
-    @Option(displayName = "New method name", description = "The method name that will replace the existing name.")
+    @Option(displayName = "New method name",
+            description = "The method name that will replace the existing name.",
+            example = "any")
     String newMethodName;
 
     @Override

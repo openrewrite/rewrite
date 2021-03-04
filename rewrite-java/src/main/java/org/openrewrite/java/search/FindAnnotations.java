@@ -29,9 +29,6 @@ import org.openrewrite.marker.RecipeSearchResult;
 import java.util.HashSet;
 import java.util.Set;
 
-/**
- * Find all annotations matching the annotation pattern.
- */
 @EqualsAndHashCode(callSuper = true)
 @Value
 public class FindAnnotations extends Recipe {
@@ -39,7 +36,9 @@ public class FindAnnotations extends Recipe {
      * An annotation pattern, expressed as a pointcut expression.
      * See {@link AnnotationMatcher} for syntax.
      */
-    @Option(displayName = "Annotation pattern", description = "An annotation pattern, expressed as a pointcut expression.")
+    @Option(displayName = "Annotation pattern",
+            description = "An annotation pattern, expressed as a pointcut expression.",
+            example = "@java.lang.SuppressWarnings(\"deprecation\")")
     String annotationPattern;
 
     @Override
@@ -49,7 +48,7 @@ public class FindAnnotations extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Find annotations by pattern.";
+        return "Find all annotations matching the annotation pattern.";
     }
 
     @Override

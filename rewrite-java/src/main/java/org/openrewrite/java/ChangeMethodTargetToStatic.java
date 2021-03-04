@@ -38,16 +38,17 @@ import static org.openrewrite.Tree.randomId;
 public class ChangeMethodTargetToStatic extends Recipe {
 
     /**
-     * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
-    @Option(displayName = "Method pattern", description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.")
+    @Option(displayName = "Method pattern",
+            description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations. " +
+                    "The original method call may or may not be a static method invocation.",
+            example = "org.assertj.core.api.AssertionsForClassTypes assertThat(..)")
     String methodPattern;
 
-    /**
-     * A fully-qualified class name of the type upon which the static method is defined.
-     */
-    @Option(displayName = "Fully-qualified target type name", description = "A fully-qualified class name of the type upon which the static method is defined.")
+    @Option(displayName = "Fully-qualified target type name",
+            description = "A fully-qualified class name of the type upon which the static method is defined.",
+            example = "org.assertj.core.api.Assertions")
     String fullyQualifiedTargetTypeName;
 
     @Override

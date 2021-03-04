@@ -40,7 +40,9 @@ public class FindMethods extends Recipe {
      * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
      * See {@link MethodMatcher} for details on the expression's syntax.
      */
-    @Option(displayName = "Method pattern", description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.")
+    @Option(displayName = "Method pattern",
+            description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.",
+            example = "java.util.List add(..)")
     String methodPattern;
 
     @Override

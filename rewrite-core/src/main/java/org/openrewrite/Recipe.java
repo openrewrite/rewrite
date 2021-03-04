@@ -109,9 +109,10 @@ public abstract class Recipe {
      * @return Describes the language type(s) that this recipe applies to, e.g. java, xml, properties.
      */
     public List<String> getLanguages() {
-        return Stream.concat(Stream.of(getVisitor().getLanguage()), getRecipeList().stream().flatMap(r -> r.getLanguages().stream()))
-                .filter(Objects::nonNull)
-                .collect(toList());
+        return emptyList();
+//        return Stream.concat(Stream.of(getVisitor().getLanguage()), getRecipeList().stream().flatMap(r -> r.getLanguages().stream()))
+//                .filter(Objects::nonNull)
+//                .collect(toList());
     }
 
     @JsonIgnore
