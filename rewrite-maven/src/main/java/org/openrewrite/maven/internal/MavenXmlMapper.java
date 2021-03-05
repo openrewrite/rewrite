@@ -18,9 +18,15 @@ package org.openrewrite.maven.internal;
 import com.ctc.wstx.stax.WstxInputFactory;
 import com.ctc.wstx.stax.WstxOutputFactory;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
+import com.fasterxml.jackson.databind.deser.std.StdScalarDeserializer;
+import com.fasterxml.jackson.databind.deser.std.StringDeserializer;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.dataformat.xml.XmlFactory;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.fasterxml.jackson.module.jaxb.JaxbAnnotationModule;
@@ -28,6 +34,7 @@ import com.fasterxml.jackson.module.kotlin.KotlinModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 
 import javax.xml.stream.XMLInputFactory;
+import java.io.IOException;
 
 public class MavenXmlMapper {
     private static final ObjectMapper readMapper;
@@ -54,7 +61,8 @@ public class MavenXmlMapper {
                     .withFieldVisibility(JsonAutoDetect.Visibility.NONE)
                     .withGetterVisibility(JsonAutoDetect.Visibility.NONE)
                     .withSetterVisibility(JsonAutoDetect.Visibility.NONE)
-                    .withCreatorVisibility(JsonAutoDetect.Visibility.PUBLIC_ONLY));
+                    .withCreatorVisibility(JsonAutoDetect.Visibility.PUBLIC_ONLY)).
+                    registerModule(new StringTrimModule());
         }
         {
             writeMapper = XmlMapper.builder(xmlFactory)
@@ -73,5 +81,19 @@ public class MavenXmlMapper {
 
     public static ObjectMapper writeMapper() {
         return writeMapper;
+    }
+
+
+    public static class StringTrimModule extends SimpleModule {
+
+        public StringTrimModule() {
+            addDeserializer(String.class, new StringDeserializer() {
+                @Override
+                public String deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+                    String value = super.deserialize(p, ctxt);
+                    return value != null ? value.trim() : null;
+                }
+            });
+        }
     }
 }
