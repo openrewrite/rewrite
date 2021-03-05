@@ -83,11 +83,8 @@ public class ExtractTrees {
                 //that element will not be collected.
                 context.collectElements = false;
 
-                while (context.collectedElements.size() > 1 && getCursor().isScopeInPath(context.collectedElements.get(0).element)) {
-                    //If we have collected more than one element and the ending element is on the path of the first element, then
-                    //the first element does not belong to the template, exclude it and move the start depth up.
-                    context.collectedElements.remove(0);
-                }
+                // Remove any elements in the same scope as the one having the End Token.
+                context.collectedElements.removeIf(ce -> getCursor().isScopeInPath(ce.element));
             }
 
             Comment startToken = findComment(space, JavaTemplatePrinter.SNIPPET_MARKER_START);

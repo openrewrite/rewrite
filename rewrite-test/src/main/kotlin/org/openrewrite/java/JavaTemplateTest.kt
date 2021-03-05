@@ -15,13 +15,15 @@
  */
 package org.openrewrite.java
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
+import org.openrewrite.Parser
 import org.openrewrite.java.tree.J
 import org.slf4j.LoggerFactory
+import java.util.*
 import java.util.function.Consumer
+import kotlin.Comparator
 
 interface JavaTemplateTest : JavaRecipeTest {
     companion object {
@@ -606,6 +608,46 @@ interface JavaTemplateTest : JavaRecipeTest {
                     void foo() {
                     }
                 }
+        """
+    )
+
+    @Test
+    fun replaceOneOfThreeMethodAnnotation() = assertChanged(
+        JavaParser.fromJavaVersion().dependsOn(
+            Collections.singletonList(
+                Parser.Input.fromString(
+            """
+                public @interface Anno1{}
+                public @interface Anno2{}
+                public @interface Anno3{}
+            """))).build(),
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val template = template("@Anno3")
+                .doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
+
+            override fun visitAnnotation(annotation: J.Annotation, p: ExecutionContext): J.Annotation {
+                val a = super.visitAnnotation(annotation, p)
+                if (a.simpleName.equals("Anno1")) {
+                    return a.withTemplate(template, a.coordinates.replace())
+                }
+                return a;
+            }
+        }.toRecipe(),
+        before = """
+            public class Cd {
+                @Anno1
+                @Anno2
+                void md() {}
+            }
+        """,
+        after = """
+            public class Cd {
+                @Anno3
+                @Anno2
+                void md() {}
+            }
         """
     )
 
