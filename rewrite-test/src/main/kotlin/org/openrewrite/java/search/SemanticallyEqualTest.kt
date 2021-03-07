@@ -16,7 +16,6 @@
 package org.openrewrite.java.search
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Parser
@@ -42,7 +41,6 @@ interface SemanticallyEqualTest {
         """
     }
 
-    @Disabled
     @Issue("#345")
     @Test
     fun fullyQualifiedReference(jp: JavaParser) {
