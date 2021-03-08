@@ -15,7 +15,9 @@
  */
 package org.openrewrite.java
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.java.style.ImportLayoutStyle
 import org.openrewrite.style.NamedStyles
 
@@ -560,6 +562,63 @@ interface OrderImportsTest : JavaRecipeTest {
                 void c() {
                     one();
                     B.two();
+                }
+            }
+        """
+    )
+
+    @Disabled
+    @Issue("#352")
+    @Test
+    fun groupImportsIsAwareOfNestedClasses(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = recipe.withRemoveUnused(false),
+        dependsOn = arrayOf("""
+            package org.abc;
+            public class A {}
+            public class B {}
+            public class C {}
+            public class D {}
+            public class E {}
+            public class F {}
+            public class G {}
+            public class H {
+                public class H1 {}
+            }
+        """),
+        before = """
+            package org.bar;
+    
+            import org.abc.A;
+            import org.abc.B;
+            import org.abc.C;
+            import org.abc.D;
+            import org.abc.E;
+            import org.abc.F;
+            import org.abc.G;
+            import org.abc.H;
+            import org.abc.H.H1;
+            import java.util.Arrays;
+            import java.util.List;
+    
+            public class C {
+                void c() {
+                    List l = Arrays.asList(new A(), new B(), new C(), new D(), new E(), new F(), new G(), new H(), new H1());
+                }
+            }
+        """,
+        after = """
+            package org.bar;
+    
+            import org.abc.*;
+            import org.abc.H.H1;
+            import java.util.Arrays;
+            import java.util.List;
+    
+    
+            public class C {
+                void c() {
+                    List l = Arrays.asList(new A(), new B(), new C(), new D(), new E(), new F(), new G(), new H(), new H1());
                 }
             }
         """
