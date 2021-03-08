@@ -19,7 +19,7 @@ dependencies {
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:latest.release")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")
 
-    compileOnly("org.mapdb:mapdb:latest.release")
+    implementation("org.mapdb:mapdb:latest.release")
     compileOnly(project(":rewrite-java"))
     compileOnly(project(":rewrite-yaml"))
     compileOnly(project(":rewrite-properties"))

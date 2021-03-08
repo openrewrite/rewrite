@@ -18,6 +18,8 @@ package org.openrewrite.maven.utilities;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.maven.MavenParser;
+import org.openrewrite.maven.cache.MapdbMavenPomCache;
+import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.Scope;
@@ -36,16 +38,16 @@ public final class PrintMavenAsCycloneDxBom {
         Path projectDir = Paths.get("/Users/tyler.vangorder/work/cyclonedx");
         Path pomFile = Paths.get("/Users/tyler.vangorder/work/cyclonedx/pom.xml");
 
-        //ExecutionContext context = new InMemoryExecutionContext(e -> System.out.println(e.getMessage()));
+//        ExecutionContext context = new InMemoryExecutionContext(e -> System.out.println(e.getMessage()));
         ExecutionContext context = new InMemoryExecutionContext();
 
-//        MavenPomCache pomCache =  new MapdbMavenPomCache(
-//                Paths.get(System.getProperty("user.home"), ".rewrite-cache", "poms").toFile(),
-//                null
-//        );
+        MavenPomCache pomCache =  new MapdbMavenPomCache(
+                Paths.get(System.getProperty("user.home"), ".rewrite-cache", "poms").toFile(),
+                null
+        );
 
         List<Maven> maven = MavenParser.builder()
-//                .cache(pomCache)
+                .cache(pomCache)
                 .build().parse(Collections.singletonList(pomFile), projectDir, context);
 
 
@@ -219,7 +221,7 @@ public final class PrintMavenAsCycloneDxBom {
     }
 
     private static boolean isDependencyInScope(Pom.Dependency dependency) {
-        boolean check = (!dependency.isOptional() || dependency.getScope() == Scope.Compile) && dependency.getScope() != Scope.Test;
+        boolean check = !dependency.isOptional() && dependency.getScope() != Scope.Test;
         if (check) {
             System.out.println(dependency.getScope() + " - " + dependency.getGroupId() + "/" + dependency.getArtifactId());
         }
