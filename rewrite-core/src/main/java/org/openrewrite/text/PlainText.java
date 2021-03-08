@@ -15,7 +15,6 @@
  */
 package org.openrewrite.text;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
@@ -25,6 +24,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
 
+/**
+ * The simplest of all ASTs representing nothing more than just unstructured text.
+ */
 public class PlainText implements SourceFile, Tree {
     private final UUID id;
     private Markers markers;

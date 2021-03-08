@@ -17,6 +17,7 @@ package org.openrewrite.text;
 
 import org.openrewrite.*;
 
+import java.util.Collections;
 import java.util.Set;
 
 import static org.openrewrite.Validated.required;
@@ -32,7 +33,7 @@ public class ChangeText extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Set.of("plain text");
+        return Collections.singleton("plain text");
     }
 
     @Override

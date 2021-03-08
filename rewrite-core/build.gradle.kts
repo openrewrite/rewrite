@@ -14,8 +14,6 @@ dependencies {
 
     implementation("io.github.classgraph:classgraph:latest.release")
     implementation("org.yaml:snakeyaml:latest.release")
-
-    testImplementation(project(":rewrite-test"))
 }
 
 tasks.withType<ShadowJar> {

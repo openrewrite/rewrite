@@ -17,40 +17,26 @@ package org.openrewrite;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.databind.json.JsonMapper;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import com.fasterxml.jackson.dataformat.smile.SmileFactory;
 import com.fasterxml.jackson.dataformat.smile.SmileGenerator;
 import com.fasterxml.jackson.module.kotlin.KotlinModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
-import lombok.SneakyThrows;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
-import java.nio.file.Path;
-import java.util.List;
 
-public class TreeSerializer<S extends SourceFile> {
-    private final TypeReference<S> sourceType = new TypeReference<S>() {
-    };
-
-    private final TypeReference<List<S>> sourceListType = new TypeReference<List<S>>() {
-    };
-
+public class RecipeSerializer {
     private final ObjectMapper mapper;
 
-    public TreeSerializer() {
+    public RecipeSerializer() {
         SmileFactory f = new SmileFactory();
         f.configure(SmileGenerator.Feature.CHECK_SHARED_STRING_VALUES, true);
 
@@ -59,8 +45,8 @@ public class TreeSerializer<S extends SourceFile> {
                 // see https://cowtowncoder.medium.com/jackson-2-12-most-wanted-3-5-246624e2d3d0
                 .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
                 .build()
-                .registerModule(new RelativePathModule())
                 .registerModule(new ParameterNamesModule())
+                .registerModule(new KotlinModule())
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .setSerializationInclusion(JsonInclude.Include.NON_NULL);
 
@@ -71,85 +57,35 @@ public class TreeSerializer<S extends SourceFile> {
                 .withFieldVisibility(JsonAutoDetect.Visibility.ANY));
     }
 
-    public void write(Iterable<S> sources, OutputStream out) {
+    public void write(Recipe recipe, OutputStream out) {
         try {
-            mapper.writeValue(out, sources);
+            mapper.writeValue(out, recipe);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    public byte[] write(Iterable<S> sources) {
+    public byte[] write(Recipe recipe) {
         try {
-            return mapper.writeValueAsBytes(sources);
+            return mapper.writeValueAsBytes(recipe);
         } catch (JsonProcessingException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    public void write(S source, OutputStream out) {
+    public Recipe read(InputStream input) {
         try {
-            mapper.writeValue(out, source);
+            return mapper.readValue(input, Recipe.class);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    public byte[] write(S source) {
+    public Recipe read(byte[] bytes) {
         try {
-            return mapper.writeValueAsBytes(source);
-        } catch (JsonProcessingException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    public List<S> readList(InputStream input) {
-        try {
-            return mapper.readValue(input, sourceListType);
+            return mapper.readValue(bytes, Recipe.class);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
-
-    public List<S> readList(byte[] bytes) {
-        try {
-            return mapper.readValue(bytes, sourceListType);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    public S read(InputStream input) {
-        try {
-            return mapper.readValue(input, sourceType);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    public S read(byte[] bytes) {
-        try {
-            return mapper.readValue(bytes, sourceType);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    private static class RelativePathModule extends SimpleModule {
-        public RelativePathModule() {
-            addSerializer(new RelativePathSerializer());
-        }
-
-        private static class RelativePathSerializer extends StdSerializer<Path> {
-            protected RelativePathSerializer() {
-                super(Path.class);
-            }
-
-            @Override
-            public void serialize(Path value, JsonGenerator gen, SerializerProvider provider) throws IOException {
-                gen.writeString(value.toString());
-            }
-        }
-    }
-
 }

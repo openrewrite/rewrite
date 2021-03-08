@@ -15,13 +15,6 @@
  */
 package org.openrewrite
 
-import com.fasterxml.jackson.annotation.JsonAutoDetect
-import com.fasterxml.jackson.annotation.JsonInclude
-import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.databind.cfg.ConstructorDetector
-import com.fasterxml.jackson.databind.json.JsonMapper
-import com.fasterxml.jackson.module.kotlin.KotlinModule
-import com.fasterxml.jackson.module.paramnames.ParameterNamesModule
 import org.assertj.core.api.Assertions.*
 import org.junit.jupiter.api.fail
 import java.io.File
@@ -60,23 +53,8 @@ interface RecipeTest {
         assertThat(recipe).`as`("A recipe must be specified").isNotNull
 
         if (recipe !is AdHocRecipe) {
-            val m = JsonMapper.builder()
-                .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
-                .build()
-                .registerModule(ParameterNamesModule())
-                .registerModule(KotlinModule())
-                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-                .setSerializationInclusion(JsonInclude.Include.NON_NULL)
-
-            val recipeMapper = m.setVisibility(
-                m.serializationConfig.defaultVisibilityChecker
-                    .withCreatorVisibility(JsonAutoDetect.Visibility.PUBLIC_ONLY)
-                    .withGetterVisibility(JsonAutoDetect.Visibility.NONE)
-                    .withIsGetterVisibility(JsonAutoDetect.Visibility.NONE)
-                    .withFieldVisibility(JsonAutoDetect.Visibility.ANY)
-            )
-
-            assertThat(recipeMapper.readValue(recipeMapper.writeValueAsString(recipe), recipe!!.javaClass))
+            val recipeSerializer = RecipeSerializer()
+            assertThat(recipeSerializer.read(recipeSerializer.write(recipe!!)))
                 .`as`("Recipe must be serializable/deserializable")
                 .isEqualTo(recipe)
         }

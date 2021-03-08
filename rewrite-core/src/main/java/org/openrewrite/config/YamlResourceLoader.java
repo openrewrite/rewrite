@@ -141,8 +141,7 @@ public class YamlResourceLoader implements ResourceLoader {
                             try {
                                 Map<Object, Object> withJsonType = new HashMap<>((Map<String, Object>) nameAndConfig.getValue());
                                 withJsonType.put("@c", nameAndConfig.getKey());
-                                recipe.doNext(mapper.convertValue(withJsonType,
-                                        Recipe.class));
+                                recipe.doNext(mapper.convertValue(withJsonType, Recipe.class));
                             } catch (Exception e) {
                                 // TODO error handling?
                                 e.printStackTrace();
@@ -208,8 +207,7 @@ public class YamlResourceLoader implements ResourceLoader {
                                 try {
                                     Map<Object, Object> withJsonType = new HashMap<>((Map<String, Object>) nameAndConfig.getValue());
                                     withJsonType.put("@c", nameAndConfig.getKey());
-                                    Style e = mapper.convertValue(withJsonType,
-                                            Style.class);
+                                    Style e = mapper.convertValue(withJsonType, Style.class);
                                     styles.add(e);
                                 } catch (Exception e) {
                                     e.printStackTrace();
