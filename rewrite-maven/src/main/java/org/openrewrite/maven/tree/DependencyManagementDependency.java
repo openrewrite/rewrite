@@ -24,6 +24,7 @@ import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,11 +38,10 @@ import static java.util.Collections.emptyMap;
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-public interface DependencyManagementDependency {
+public interface DependencyManagementDependency extends DependencyDescriptor {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
-    class Defined implements DependencyManagementDependency,
-            DependencyDescriptor {
+    class Defined implements DependencyManagementDependency {
         String groupId;
         String artifactId;
         String version;
@@ -86,6 +86,24 @@ public interface DependencyManagementDependency {
         public Map<String, String> getProperties() {
             // FIXME should be active properties by profile as well? also parent properties?
             return maven.getProperties();
+        }
+
+        @Override
+        public @Nullable String getClassifier() {
+            // classifier isn't possible on Imported
+            return null;
+        }
+
+        @Override
+        public @Nullable Scope getScope() {
+            // scope isn't possible on Imported
+            return null;
+        }
+
+        @Override
+        public Set<GroupArtifact> getExclusions() {
+            // exclusions aren't possible on Imported
+            return new HashSet<>();
         }
     }
 

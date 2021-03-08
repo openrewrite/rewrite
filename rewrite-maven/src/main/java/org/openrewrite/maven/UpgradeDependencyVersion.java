@@ -17,15 +17,18 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenMetadata;
 import org.openrewrite.maven.internal.MavenPomDownloader;
-import org.openrewrite.maven.tree.DependencyManagementDependency;
+import org.openrewrite.maven.tree.DependencyDescriptor;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
-import org.openrewrite.semver.HyphenRange;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -122,22 +125,21 @@ public class UpgradeDependencyVersion extends Recipe {
         }
 
         private void maybeChangeDependencyVersion(Pom model, ExecutionContext ctx) {
-            for (Pom.Dependency dependency : model.getDependencies()) {
-                if (dependency.getGroupId().equals(groupId) && (artifactId == null || dependency.getArtifactId().equals(artifactId))) {
-                    findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion(), ctx).ifPresent(newer -> {
-                        ChangeDependencyVersionVisitor changeDependencyVersion = new ChangeDependencyVersionVisitor(newer, dependency.getArtifactId());
-                        doAfterVisit(changeDependencyVersion);
-                    });
-                }
+            for (DependencyDescriptor dependency : model.getDependencies()) {
+                maybeChangeDependencyVersionForDescriptor(ctx, dependency);
             }
 
-            for (DependencyManagementDependency dependency : model.getDependencyManagement().getDependencies()) {
-                if (dependency.getGroupId().equals(groupId) && (artifactId == null || dependency.getArtifactId().equals(artifactId))) {
-                    findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion(), ctx).ifPresent(newer -> {
-                        ChangeDependencyVersionVisitor changeDependencyVersion = new ChangeDependencyVersionVisitor(newer, dependency.getArtifactId());
-                        doAfterVisit(changeDependencyVersion);
-                    });
-                }
+            for (DependencyDescriptor dependency : model.getDependencyManagement().getDependencies()) {
+                maybeChangeDependencyVersionForDescriptor(ctx, dependency);
+            }
+        }
+
+        private void maybeChangeDependencyVersionForDescriptor(ExecutionContext ctx, DependencyDescriptor dependency) {
+            if (dependency.getGroupId().equals(groupId) && (artifactId == null || dependency.getArtifactId().equals(artifactId))) {
+                findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion(), ctx).ifPresent(newer -> {
+                    ChangeDependencyVersionVisitor changeDependencyVersion = new ChangeDependencyVersionVisitor(newer, dependency.getArtifactId());
+                    doAfterVisit(changeDependencyVersion);
+                });
             }
         }
 
