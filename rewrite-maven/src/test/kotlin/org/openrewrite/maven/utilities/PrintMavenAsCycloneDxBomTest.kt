@@ -18,11 +18,11 @@ package org.openrewrite.maven.utilities
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.internal.StringUtils
 import org.openrewrite.maven.MavenParser
 
 class PrintMavenAsCycloneDxBomTest {
     @Test
-    @Disabled("Disabled until we fix dependency resolution")
     fun cycloneDxBom() {
         val pom = MavenParser.builder()
                 .build()
@@ -36,9 +36,9 @@ class PrintMavenAsCycloneDxBomTest {
                       
                       <dependencies>
                         <dependency>
-                            <group>org.yaml</group>
-                            <name>snakeyaml</name>
-                            <version>1.25</version>
+                            <groupId>org.yaml</groupId>
+                            <artifactId>snakeyaml</artifactId>
+                            <version>1.27</version>
                         </dependency>
                         <dependency>
                           <groupId>org.junit.jupiter</groupId>
@@ -49,37 +49,52 @@ class PrintMavenAsCycloneDxBomTest {
                       </dependencies>
                     </project>
                 """)
+        var bom = PrintMavenAsCycloneDxBom.print(pom[0]).replace(Regex("<timestamp>.*</timestamp>"), "<timestamp>TODAY</timestamp>");
 
-        assertThat(PrintMavenAsCycloneDxBom.print(pom[0])).isEqualTo("""
+        assertThat(bom).isEqualTo("""
             <?xml version="1.0" encoding="UTF-8"?>
             <bom xmlns="http://cyclonedx.org/schema/bom/1.2" serialNumber="urn:uuid:${pom[0].id}" version="1">
-              <components>
-                <component type="library" bom-ref="my-app">
-                  <group>com.mycompany.app</group>
-                  <name>my-app</name>
-                  <version>1</version>
-                  <purl>pkg:maven/com.mycompany.app/my-app@1</purl>
-                  <dependencies>
-                    <dependency ref="my-app">
-                      <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.11.2"/>
-                      <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-core@2.11.2"/>
-                      <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.11.2"/>
-                      <dependency ref="pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.11.2"/>
-                      <dependency ref="pkg:maven/org.springframework/spring-aop@5.2.9.RELEASE"/>
-                      <dependency ref="pkg:maven/org.springframework/spring-beans@5.2.9.RELEASE"/>
-                      <dependency ref="pkg:maven/org.springframework/spring-context@5.2.9.RELEASE"/>
-                      <dependency ref="pkg:maven/org.springframework/spring-core@5.2.9.RELEASE"/>
-                      <dependency ref="pkg:maven/org.springframework/spring-expression@5.2.9.RELEASE"/>
-                      <dependency ref="pkg:maven/org.springframework/spring-jcl@5.2.9.RELEASE"/>
-                      <dependency ref="pkg:maven/org.springframework.boot/spring-boot@2.3.4.RELEASE"/>
-                      <dependency ref="pkg:maven/org.springframework.boot/spring-boot-actuator@2.3.4.RELEASE"/>
-                      <dependency ref="pkg:maven/org.springframework.boot/spring-boot-actuator-autoconfigure@2.3.4.RELEASE"/>
-                      <dependency ref="pkg:maven/org.springframework.boot/spring-boot-autoconfigure@2.3.4.RELEASE"/>
+                <metadata>
+                    <timestamp>TODAY</timestamp>
+                    <tools>
+                        <tool>
+                            <vendor>OpenRewrite</vendor>
+                            <name>OpenRewrite CycloneDX</name>
+                            <version>7.0.0</version>
+                        </tool>
+                    </tools>
+                    <component bom-ref="pkg:maven/com.mycompany.app/my-app@1?type=jar" type="library">
+                        <group>com.mycompany.app</group>
+                        <name>my-app</name>
+                        <version>1</version>
+                        <scope>required</scope>
+                        <purl>pkg:maven/com.mycompany.app/my-app@1?type=jar</purl>
+                    </component>
+                </metadata>
+                <components>
+                    <component bom-ref="pkg:maven/org.yaml/snakeyaml@1.27?type=jar" type="library">
+                        <group>org.yaml</group>
+                        <name>snakeyaml</name>
+                        <version>1.27</version>
+                        <description>
+                            <![CDATA[YAML 1.1 parser and emitter for Java]]>
+                        </description>
+                        <scope>required</scope>
+                        <licenses>
+                            <license>
+                                <id>Apache-2.0</id>
+                                <name>Apache License, Version 2.0</name>
+                            </license>
+                          </licenses>
+                        <purl>pkg:maven/org.yaml/snakeyaml@1.27?type=jar</purl>
+                    </component>
+                </components>
+                <dependencies>
+                    <dependency ref="pkg:maven/org.yaml/snakeyaml@1.27?type=jar">
                     </dependency>
-                  </dependencies>
-                </component>
-              </components>
+                </dependencies>
             </bom>
+
         """.trimIndent())
     }
 }
