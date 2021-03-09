@@ -213,7 +213,7 @@ public class TreeBuilder {
 
         //Need to collect any types within the insert scope. FullyQualified types will be added as an import
         //and Method types will either need to be stubbed out or statically imported into the synthetic class.
-        List<JavaType> typesInScope = new GetTypesInScope(insertionScope).visit(cu);
+        List<JavaType> typesInScope = new GetTypesInScope(insertionScope).visit(compilationUnit);
 
         List<JavaType.Method> localMethods = new ArrayList<>();
         for (JavaType type: typesInScope) {
