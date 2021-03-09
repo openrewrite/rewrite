@@ -123,6 +123,13 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
      */
     JavaParser reset();
 
+    /**
+     * Changes the classpath on the parser. Intended for use in multiple pass parsing, where we want to keep the
+     * compiler symbol table intact for type attribution on later parses, i.e. for maven multi-module projects.
+     * @param classpath new classpath to use
+     */
+    void setClasspath(Collection<Path> classpath);
+
     @SuppressWarnings("unchecked")
     abstract class Builder<P extends JavaParser, B extends Builder<P, B>> implements Parser.Builder<J.CompilationUnit> {
         @Nullable
