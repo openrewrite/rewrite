@@ -20,6 +20,7 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureParser;
 import org.openrewrite.java.internal.grammar.AspectJLexer;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -30,7 +31,7 @@ import static java.util.stream.Collectors.toList;
 
 /**
  * This matcher will find all annotations matching the annotation pattern
- *
+ * <p>
  * The annotation pattern, expressed as a pointcut expression, is used to find matching annotations. The format of the
  * expression is as follows:
  * <P><P><B>
@@ -41,7 +42,7 @@ import static java.util.stream.Collectors.toList;
  *
  * <P><PRE>
  * EXAMPLES:
- *
+ * <p>
  * {@literal @}java.lang.SuppressWarnings                                 - Matches java.lang.SuppressWarnings with no parameters.
  * {@literal @}myhttp.Get(serviceName="payments", path="recentPayments")  - Matches references to myhttp.Get where the parameters are also matched.
  * {@literal @}myhttp.Get(path="recentPayments", serviceName="payments")  - Exaclty the same results from the previous example, order of parameters does not matter.
@@ -93,16 +94,40 @@ public class AnnotationMatcher {
 
         return annotation.getArguments() == null || annotation.getArguments().stream()
                 .findAny()
-                .map(arg -> {
-                    if (arg instanceof J.Assignment) {
-                        return ((J.Assignment) arg).getAssignment().printTrimmed().equals(match.elementValue().getText());
-                    }
-                    if (arg instanceof J.Literal) {
-                        return ((J.Literal) arg).getValueSource().equals(match.elementValue().getText());
-                    }
-                    return false;
-                })
+                .map(arg -> argumentValueMatches("value", arg, match.elementValue().getText()))
                 .orElse(true);
+    }
+
+    private boolean argumentValueMatches(String matchOnArgumentName, Expression arg, String matchText) {
+        if(matchOnArgumentName.equals("value")) {
+            if (arg instanceof J.Literal) {
+                return ((J.Literal) arg).getValueSource().equals(matchText);
+            }
+            if (arg instanceof J.FieldAccess && ((J.FieldAccess) arg).getSimpleName().equals("class") &&
+                    matchText.endsWith(".class")) {
+                return JavaType.Class.build(matchText.replaceAll("\\.class$", ""))
+                        .equals(((J.FieldAccess) arg).getTarget().getType());
+            }
+            if (arg instanceof J.NewArray) {
+                J.NewArray na = (J.NewArray) arg;
+                if(na.getInitializer() == null || na.getInitializer().size() != 1) {
+                    return false;
+                }
+                return argumentValueMatches("value", na.getInitializer().get(0), matchText);
+            }
+        }
+
+        if(!(arg instanceof J.Assignment)) {
+            return false;
+        }
+
+        J.Assignment assignment = (J.Assignment) arg;
+        if(!assignment.getVariable().printTrimmed().equals(matchOnArgumentName)) {
+            return false;
+        }
+
+        // we've already matched the argument name, so recursively we just check the value matches match text.
+        return argumentValueMatches("value", assignment.getAssignment(), matchText);
     }
 
     @Data

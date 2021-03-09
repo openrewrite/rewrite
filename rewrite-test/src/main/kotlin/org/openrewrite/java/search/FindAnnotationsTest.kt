@@ -17,10 +17,11 @@ package org.openrewrite.java.search
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 
-interface FindAnnotationsTest: JavaRecipeTest {
+interface FindAnnotationsTest : JavaRecipeTest {
     companion object {
         const val foo = """
             package com.netflix.foo;
@@ -30,6 +31,36 @@ interface FindAnnotationsTest: JavaRecipeTest {
             }
         """
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/357")
+    @Test
+    fun matchesClassArgument(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.classpath("junit-jupiter-api").build(),
+        recipe = FindAnnotations("@org.junit.jupiter.api.extension.ExtendWith(org.openrewrite.MyExtension.class)"),
+        before = """
+            import org.junit.jupiter.api.extension.ExtendWith;
+            import org.openrewrite.MyExtension;
+            @ExtendWith(MyExtension.class) public class A {}
+            @ExtendWith({MyExtension.class}) class B {}
+            @ExtendWith(value = MyExtension.class) class C {}
+            @ExtendWith(value = {MyExtension.class}) class D {}
+        """,
+        after = """
+            import org.junit.jupiter.api.extension.ExtendWith;
+            import org.openrewrite.MyExtension;
+            /*~~>*/@ExtendWith(MyExtension.class) public class A {}
+            /*~~>*/@ExtendWith({MyExtension.class}) class B {}
+            /*~~>*/@ExtendWith(value = MyExtension.class) class C {}
+            /*~~>*/@ExtendWith(value = {MyExtension.class}) class D {}
+        """,
+        dependsOn = arrayOf(
+            """
+                package org.openrewrite;
+                import org.junit.jupiter.api.extension.Extension;
+                public class MyExtension implements Extension {}
+            """
+        )
+    )
 
     @Test
     fun matchesSimpleFullyQualifiedAnnotation(jp: JavaParser) = assertChanged(

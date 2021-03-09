@@ -18,15 +18,12 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
 import org.openrewrite.Option;
+import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeTree;
-
-import java.util.HashSet;
-import java.util.Set;
 
 /**
  * A recipe that will look for a specific method target (using a method pattern) and rename the method. This recipe renames
