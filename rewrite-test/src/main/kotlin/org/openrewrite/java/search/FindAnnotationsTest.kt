@@ -156,6 +156,24 @@ interface FindAnnotationsTest : JavaRecipeTest {
     )
 
     @Test
+    fun matchesPartialNamedParameters(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = FindAnnotations("""@com.netflix.foo.Foo(baz="bar")"""),
+        before = """
+            import com.netflix.foo.Foo;
+            @Foo(bar="quux", baz="bar")
+            public class A {}
+        """,
+        after = """
+            import com.netflix.foo.Foo;
+            /*~~>*/@Foo(bar="quux", baz="bar")
+            public class A {}
+        """,
+        dependsOn = arrayOf(foo)
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/358")
+    @Test
     fun matchesNamedParametersRegardlessOfOrder(jp: JavaParser) = assertChanged(
         jp,
         recipe = FindAnnotations("""@com.netflix.foo.Foo(baz="bar",bar="quux")"""),

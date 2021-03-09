@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java;
 
-import lombok.Data;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureParser;
@@ -24,10 +23,6 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
-
-import java.util.List;
-
-import static java.util.stream.Collectors.toList;
 
 /**
  * This matcher will find all annotations matching the annotation pattern
@@ -74,17 +69,19 @@ public class AnnotationMatcher {
             return true;
         }
 
-        List<AnnotationParameter> matchArgs = pairs.elementValuePair().stream()
-                .map(pair -> new AnnotationParameter(pair.Identifier().getText(), pair.elementValue().getText()))
-                .collect(toList());
+        if (annotation.getArguments() == null) {
+            return false;
+        }
 
-        return annotation.getArguments() != null && annotation.getArguments().stream()
-                .map(arg -> {
-                    J.Assignment assignment = (J.Assignment) arg;
-                    return new AnnotationParameter(assignment.getVariable().printTrimmed(),
-                            assignment.getAssignment().printTrimmed());
-                })
-                .allMatch(param -> matchArgs.stream().anyMatch(param::equals));
+        for (AnnotationSignatureParser.ElementValuePairContext elementValuePair : pairs.elementValuePair()) {
+            String argumentName = elementValuePair.Identifier().getText();
+            String matchText = elementValuePair.elementValue().getText();
+            if (annotation.getArguments().stream().noneMatch(arg -> argumentValueMatches(argumentName, arg, matchText))) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private boolean matchesSingleParameter(J.Annotation annotation) {
@@ -99,7 +96,7 @@ public class AnnotationMatcher {
     }
 
     private boolean argumentValueMatches(String matchOnArgumentName, Expression arg, String matchText) {
-        if(matchOnArgumentName.equals("value")) {
+        if (matchOnArgumentName.equals("value")) {
             if (arg instanceof J.Literal) {
                 return ((J.Literal) arg).getValueSource().equals(matchText);
             }
@@ -110,30 +107,23 @@ public class AnnotationMatcher {
             }
             if (arg instanceof J.NewArray) {
                 J.NewArray na = (J.NewArray) arg;
-                if(na.getInitializer() == null || na.getInitializer().size() != 1) {
+                if (na.getInitializer() == null || na.getInitializer().size() != 1) {
                     return false;
                 }
                 return argumentValueMatches("value", na.getInitializer().get(0), matchText);
             }
         }
 
-        if(!(arg instanceof J.Assignment)) {
+        if (!(arg instanceof J.Assignment)) {
             return false;
         }
 
         J.Assignment assignment = (J.Assignment) arg;
-        if(!assignment.getVariable().printTrimmed().equals(matchOnArgumentName)) {
+        if (!assignment.getVariable().printTrimmed().equals(matchOnArgumentName)) {
             return false;
         }
 
         // we've already matched the argument name, so recursively we just check the value matches match text.
         return argumentValueMatches("value", assignment.getAssignment(), matchText);
     }
-
-    @Data
-    private static class AnnotationParameter {
-        private final String id;
-        private final String value;
-    }
-
 }
