@@ -84,8 +84,13 @@ public class MavenParser implements Parser<Maven> {
                 projectPoms.stream().collect(toMap(RawMaven::getSourcePath, Function.identity())), ctx);
 
         List<Maven> parsed = new ArrayList<>();
+        Map<String, String> effectiveProperties = new HashMap<>();
+        if (relativeTo != null) {
+            effectiveProperties.put("project.basedir", relativeTo.toString());
+            effectiveProperties.put("basedir", relativeTo.toString());
+        }
         for (RawMaven raw : projectPoms) {
-            Xml.Document resolve = new RawMavenResolver(downloader, activeProfiles, resolveOptional, null, ctx, relativeTo).resolve(raw);
+            Xml.Document resolve = new RawMavenResolver(downloader, activeProfiles, resolveOptional, effectiveProperties, ctx, relativeTo).resolve(raw);
             if (resolve != null) {
                 Maven maven1 = new Maven(resolve);
                 parsed.add(maven1);

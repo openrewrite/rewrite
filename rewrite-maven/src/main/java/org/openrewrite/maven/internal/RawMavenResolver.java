@@ -77,15 +77,7 @@ public class RawMavenResolver {
         this.downloader = downloader;
         this.activeProfiles = activeProfiles;
         this.resolveOptional = resolveOptional;
-        if (effectiveProperties == null) {
-            this.effectiveProperties = new HashMap<>();
-            if (projectDir != null) {
-                this.effectiveProperties.put("project.basedir", projectDir.toString());
-                this.effectiveProperties.put("basedir", projectDir.toString());
-            }
-        } else {
-            this.effectiveProperties = effectiveProperties;
-        }
+        this.effectiveProperties = effectiveProperties;
 
         this.ctx = new MavenExecutionContextView(ctx);
         this.projectDir = projectDir;
@@ -148,8 +140,9 @@ public class RawMavenResolver {
 
     private void processProperties(ResolutionTask task, PartialMaven partialMaven) {
 
-        task.getRawMaven().getActiveProperties(activeProfiles).entrySet().stream()
-            .forEach(e -> effectiveProperties.putIfAbsent(e.getKey(), e.getValue()));
+        task.getRawMaven().getActiveProperties(activeProfiles).forEach(
+                (k, v) -> effectiveProperties.putIfAbsent(k, v)
+        );
 
         partialMaven.setProperties(task.getRawMaven().getPom().getProperties());
         partialMaven.setEffectiveProperties(effectiveProperties);
@@ -383,7 +376,7 @@ public class RawMavenResolver {
                             dep.getOptional() != null && dep.getOptional(),
                             dep.getClassifier(),
                             dep.getType(),
-                            version,
+                            dep.getVersion(),
                             partialMaven.getRepositories(),
                             null
                     );
@@ -433,7 +426,7 @@ public class RawMavenResolver {
 
                 //noinspection OptionalAssignedToNull
                 if (maybeParent == null) {
-                    parent = new RawMavenResolver(downloader, activeProfiles, resolveOptional, partialMaven.getProperties(), ctx, projectDir)
+                    parent = new RawMavenResolver(downloader, activeProfiles, resolveOptional, effectiveProperties, ctx, projectDir)
                             .resolve(rawParentModel, Scope.Compile, rawParent.getVersion(), partialMaven.getRepositories(), parentPomSightings);
                     resolved.put(parentKey, Optional.ofNullable(parent));
                 } else {
@@ -722,6 +715,9 @@ public class RawMavenResolver {
 
             try {
                 return placeholderHelper.replacePlaceholders(v, key -> {
+                    if (key == null) {
+                        return null;
+                    }
                     switch (key) {
                         case "groupId":
                         case "project.groupId":
@@ -756,7 +752,7 @@ public class RawMavenResolver {
                         return value;
                     }
 
-                    value = properties.get(key);
+                    value = effectiveProperties.get(key);
                     if (value != null) {
                         return value;
                     }
