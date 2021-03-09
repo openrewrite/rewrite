@@ -16,13 +16,12 @@
 ---
 type: specs.openrewrite.org/v1beta/style
 name: org.openrewrite.java.GoogleJavaFormat
-displayName: Google Java format
-configure:
-  org.openrewrite.java.style.ImportLayoutStyle:
+displayName: Google java format
+styleConfigs:
+  - org.openrewrite.java.style.ImportLayoutStyle:
       classCountToUseStarImport: 999
       nameCountToUseStarImport: 999
       layout:
-        blocks:
-          - import static all other imports
-          - <blank line>
-          - import all other imports
+        - import static all other imports
+        - <blank line>
+        - import all other imports

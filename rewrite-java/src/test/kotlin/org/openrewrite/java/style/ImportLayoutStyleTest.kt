@@ -15,13 +15,16 @@
  */
 package org.openrewrite.java.style
 
+import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.style.Style
 
 class ImportLayoutStyleTest {
     companion object {
         private val mapper = ObjectMapper()
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
     }
 
     @Test
@@ -47,5 +50,8 @@ class ImportLayoutStyleTest {
         val style = mapper.convertValue(styleConfig, ImportLayoutStyle::class.java)
         assertThat(style.classCountToUseStarImport).isEqualTo(999)
         assertThat(style.nameCountToUseStarImport).isEqualTo(998)
+
+        // round trip
+        mapper.readValue(mapper.writeValueAsBytes(style), Style::class.java)
     }
 }

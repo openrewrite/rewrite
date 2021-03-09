@@ -17,7 +17,10 @@ package org.openrewrite.config
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.*
+import org.openrewrite.ExecutionContext
+import org.openrewrite.Issue
+import org.openrewrite.Parser
+import org.openrewrite.RecipeTest
 import org.openrewrite.Tree.randomId
 import org.openrewrite.marker.Markers
 import org.openrewrite.text.PlainText
@@ -200,7 +203,7 @@ class EnvironmentTest : RecipeTest {
         assertThat(sampleStyle.tags).containsExactly("testing")
     }
 
-    val plainTextParser = object : Parser<PlainText> {
+    private val plainTextParser = object : Parser<PlainText> {
         override fun parse(vararg sources: String?): MutableList<PlainText> {
             return sources.asSequence()
                     .filterNotNull()

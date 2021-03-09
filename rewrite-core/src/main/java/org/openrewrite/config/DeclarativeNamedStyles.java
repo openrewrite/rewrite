@@ -15,6 +15,7 @@
  */
 package org.openrewrite.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.openrewrite.Validated;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
@@ -23,6 +24,7 @@ import java.util.Collection;
 import java.util.Set;
 
 public class DeclarativeNamedStyles extends NamedStyles {
+    @JsonIgnore
     private Validated validation = Validated.none();
 
     public DeclarativeNamedStyles(String name, String displayName, String description, Set<String> tags, Collection<Style> styles) {

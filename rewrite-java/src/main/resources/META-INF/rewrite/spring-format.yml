@@ -17,12 +17,11 @@
 type: specs.openrewrite.org/v1beta/style
 name: org.openrewrite.java.SpringFormat
 displayName: Spring format
-configure:
-  org.openrewrite.java.style.ImportLayoutStyle:
-    layout:
+styleConfigs:
+  - org.openrewrite.java.style.ImportLayoutStyle:
       classCountToUseStarImport: 999
       nameCountToUseStarImport: 999
-      blocks:
+      layout:
         - import java.*
         - <blank line>
         - import javax.*
@@ -32,25 +31,24 @@ configure:
         - import org.springframework.*
         - <blank line>
         - import static all other imports
-  org.openrewrite.java.style.DeclarationOrderStyle:
-    layout:
-      blocks:
-        - public static fields
-        - <blank line>
-        - private static fields
-        - <blank line>
-        - final fields
-        - <blank line>
-        - all other fields
-        - <blank line>
-        - all other constructors
-        - <blank line>
-        - all other methods
-        - all accessors
-#        - all getters
-#        - all setters
-#        - all with
-        - equals
-        - hashCode
-        - toString
-        - all other classes
+#  - org.openrewrite.java.style.DeclarationOrderStyle:
+#      layout:
+#        - public static fields
+#        - <blank line>
+#        - private static fields
+#        - <blank line>
+#        - final fields
+#        - <blank line>
+#        - all other fields
+#        - <blank line>
+#        - all other constructors
+#        - <blank line>
+#        - all other methods
+#        - all accessors
+#  #        - all getters
+#  #        - all setters
+#  #        - all with
+#        - equals
+#        - hashCode
+#        - toString
+#        - all other classes

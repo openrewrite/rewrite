@@ -15,6 +15,8 @@
  */
 package org.openrewrite.style;
 
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.Validated;
@@ -28,9 +30,11 @@ import java.util.Set;
  * A collection of styles by name, e.g. IntelliJ or Google Java Format.
  */
 @Data
-@EqualsAndHashCode
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class NamedStyles implements Marker {
+    @EqualsAndHashCode.Include
     private final String name;
+
     private final String displayName;
     @Nullable
     private final String description;

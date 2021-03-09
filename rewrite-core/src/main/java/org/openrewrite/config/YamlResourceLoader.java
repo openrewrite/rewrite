@@ -43,6 +43,8 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Validated.invalid;
 
 public class YamlResourceLoader implements ResourceLoader {
+    int refCount = 0;
+
     private static final ObjectMapper mapper = JsonMapper.builder()
             .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
             .build()
@@ -207,6 +209,7 @@ public class YamlResourceLoader implements ResourceLoader {
                                 try {
                                     Map<Object, Object> withJsonType = new HashMap<>((Map<String, Object>) nameAndConfig.getValue());
                                     withJsonType.put("@c", nameAndConfig.getKey());
+                                    withJsonType.put("@ref", refCount++);
                                     Style e = mapper.convertValue(withJsonType, Style.class);
                                     styles.add(e);
                                 } catch (Exception e) {

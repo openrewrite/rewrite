@@ -51,30 +51,7 @@ import static org.openrewrite.internal.StreamUtils.distinctBy;
  * <P><P>
  * <li>classCountToUseStarImport  - How many imports from the same package must be present before they should be collapsed into a star import. The default is 5.</li>
  * <li>nameCountToUseStarImport - How many static imports from the same type must be present before they should be collapsed into a static star import. The default is 3.</li>
- * <li>blocks - An ordered list of import groupings which define exactly how imports should be organized within a compilation unit</li>
- * <P><P>
- * Example:
- * <P><PRE>
- * ---
- * type: specs.openrewrite.org/v1beta/style
- * name: io.moderne.spring.style
- * <p>
- * configure:
- * org.openrewrite.java.style.ImportLayoutStyle:
- * layout:
- * classCountToUseStarImport: 999
- * nameCountToUseStarImport: 999
- * blocks:
- * - import java.*
- * - &lt;blank line&gt;
- * - import javax.*
- * - &lt;blank line&gt;
- * - import all other imports
- * - &lt;blank line&gt;
- * - import org.springframework.*
- * - &lt;blank line&gt;
- * - import static all other imports
- * </PRE>
+ * <li>layout - An ordered list of import groupings which define exactly how imports should be organized within a compilation unit</li>
  */
 @Getter
 public class ImportLayoutStyle implements JavaStyle {
@@ -437,12 +414,12 @@ public class ImportLayoutStyle implements JavaStyle {
                         if (block instanceof Block.BlankLines) {
                             return "<blank line>";
                         } else if (block instanceof Block.AllOthers) {
-                            return (((Block.AllOthers) block).isStatic() ? "static " : "") +
+                            return "import " + (((Block.AllOthers) block).isStatic() ? "static " : "") +
                                     "all other imports";
                         } else if (block instanceof Block.ImportPackage) {
                             Block.ImportPackage importPackage = (Block.ImportPackage) block;
                             return (importPackage.isStatic() ? "static " : "") +
-                                    "import" + importPackage.getPackageWildcard();
+                                    "import " + importPackage.getPackageWildcard();
                         }
                         return new UnsupportedOperationException("Unknown block type " + block.getClass().getName());
                     })
