@@ -1,6 +1,5 @@
 build/
 .gradle/
-.java-version
 out/
 */src/main/gen/
 */src/main/antlr/
