@@ -45,7 +45,7 @@ import static java.util.Collections.*;
 /**
  * Adds a dependency if there is no dependency matching <code>groupId</code> and <code>artifactId</code>.
  * A matching dependency with a different version or scope does NOT have its version or scope updated.
- * Use {@link UpgradeDependencyVersion} in the case of a different version.
+ * Use {@link ChangeDependencyVersion} or {@link UpgradeDependencyVersion} in the case of a different version.
  * Use {@link ChangeDependencyScope} in the case of a different scope.
  * <p>
  * Places a new dependency as physically "near" to a group of similar dependencies as possible.
@@ -129,7 +129,7 @@ public class AddDependencyVisitor extends MavenVisitor {
                         type,
                         false,
                         new Pom(groupId, artifactId, version, null, null, null, packaging, classifier, null,
-                                emptyList(), new Pom.DependencyManagement(emptyList()), emptyList(), emptyList(), emptyMap()),
+                                emptyList(), new Pom.DependencyManagement(emptyList()), emptyList(), emptyList(), emptyMap(), emptyMap()),
                         version,
                         null,
                         emptySet()
