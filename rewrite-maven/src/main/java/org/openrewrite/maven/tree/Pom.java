@@ -73,7 +73,15 @@ public class Pom implements Marker {
     Collection<License> licenses;
 
     Collection<MavenRepository> repositories;
+
+    //The properties parsed direction from this pom's XML file. The values may be different than the effective property
+    //values.
     Map<String, String> properties;
+
+    //Effective properties are collected across all pom.xml files that were resolved during a parse. These properties
+    //reflect the what the value should be in the context of the entire maven tree and account for property precedence
+    //when the same property key is encountered multiple times.
+    Map<String, String> effectiveProperties;
 
     public Pom(@Nullable String groupId,
                String artifactId,
@@ -88,7 +96,8 @@ public class Pom implements Marker {
                DependencyManagement dependencyManagement,
                Collection<License> licenses,
                Collection<MavenRepository> repositories,
-               Map<String, String> properties) {
+               Map<String, String> properties,
+               Map<String, String> effectiveProperties) {
         this.groupId = groupId;
         this.artifactId = artifactId;
         this.version = version;
@@ -103,6 +112,7 @@ public class Pom implements Marker {
         this.licenses = licenses;
         this.repositories = repositories;
         this.properties = properties;
+        this.effectiveProperties = effectiveProperties;
     }
 
     public Set<Dependency> getDependencies(Scope scope) {
@@ -148,12 +158,34 @@ public class Pom implements Marker {
         if (property == null) {
             return null;
         }
-        String key = property.replace("${", "").replace("}", "");
-        String value = properties.get(key);
-        if (value == null) {
-            return parent == null ? null : parent.getProperty(key);
+        switch (property) {
+            case "groupId":
+            case "project.groupId":
+            case "pom.groupId":
+                return getGroupId();
+            case "project.parent.groupId":
+                return parent != null ? parent.getGroupId() : null;
+            case "artifactId":
+            case "project.artifactId":
+            case "pom.artifactId":
+                return getArtifactId(); // cannot be inherited from parent
+            case "project.parent.artifactId":
+                return parent == null ? null : parent.getArtifactId();
+            case "version":
+            case "project.version":
+            case "pom.version":
+                return getVersion();
+            case "project.parent.version":
+                return parent != null ? parent.getVersion() : null;
         }
-        return value;
+
+        String value = System.getProperty(property);
+        if (value != null) {
+            return value;
+        }
+
+        String key = property.replace("${", "").replace("}", "");
+        return effectiveProperties.get(key);
     }
 
     public String getGroupId() {
