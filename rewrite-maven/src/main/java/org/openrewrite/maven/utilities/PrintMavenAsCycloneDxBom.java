@@ -34,25 +34,6 @@ import java.util.*;
  */
 public final class PrintMavenAsCycloneDxBom {
 
-    public static void main(String[] arguments) {
-        Path projectDir = Paths.get("/Users/tyler.vangorder/work/cyclonedx");
-        Path pomFile = Paths.get("/Users/tyler.vangorder/work/cyclonedx/pom.xml");
-
-//        ExecutionContext context = new InMemoryExecutionContext(e -> System.out.println(e.getMessage()));
-        ExecutionContext context = new InMemoryExecutionContext();
-
-        MavenPomCache pomCache =  new MapdbMavenPomCache(
-                Paths.get(System.getProperty("user.home"), ".rewrite-cache", "poms").toFile(),
-                null
-        );
-
-        List<Maven> maven = MavenParser.builder()
-                .cache(pomCache)
-                .build().parse(Collections.singletonList(pomFile), projectDir, context);
-
-
-        System.out.println(print(maven.get(0)));
-    }
     private PrintMavenAsCycloneDxBom() {
     }
 
@@ -81,7 +62,7 @@ public final class PrintMavenAsCycloneDxBom {
         bom.append("        <tools>\n");
         bom.append("            <tool>\n");
         bom.append("                <vendor>OpenRewrite</vendor>\n");
-        bom.append("                <name>OpenRewrite CycloneDX\n");
+        bom.append("                <name>OpenRewrite CycloneDX</name>\n");
         //Probably should pull the version from build properties.
         bom.append("                <version>7.0.0</version>\n");
         bom.append("            </tool>\n");
@@ -99,7 +80,7 @@ public final class PrintMavenAsCycloneDxBom {
         for (Map.Entry<String, Pom.Dependency> entry : dependencyMap.entrySet()) {
             writeComponent(entry.getValue().getModel(), entry.getKey(), entry.getValue().getVersion(), entry.getValue().getScope(), "        ", bom);
         }
-        bom.append("    <components>\n");
+        bom.append("    </components>\n");
     }
 
     private static void writeDependencies(Map <String, Pom.Dependency> dependencyMap, StringBuilder bom) {
