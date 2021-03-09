@@ -43,6 +43,12 @@ public class Pom implements Marker {
     @Nullable
     String version;
 
+    @Nullable
+    String name;
+
+    @Nullable
+    String description;
+
     /**
      * The timestamp and build numbered version number (the latest snapshot at time dependencies were resolved).
      */
@@ -72,6 +78,8 @@ public class Pom implements Marker {
     public Pom(@Nullable String groupId,
                String artifactId,
                @Nullable String version,
+               @Nullable String name,
+               @Nullable String description,
                @Nullable String snapshotVersion,
                @Nullable String packaging,
                @Nullable String classifier,
@@ -84,6 +92,8 @@ public class Pom implements Marker {
         this.groupId = groupId;
         this.artifactId = artifactId;
         this.version = version;
+        this.name = name;
+        this.description = description;
         this.snapshotVersion = snapshotVersion;
         this.packaging = packaging;
         this.classifier = classifier;
