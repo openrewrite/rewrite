@@ -1,6 +1,5 @@
 build/
 .gradle/
-gradle.properties
 .java-version
 out/
 */src/main/gen/

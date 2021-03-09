@@ -1,36 +1,50 @@
 import com.github.jk1.license.LicenseReportExtension
-import io.spring.gradle.bintray.SpringBintrayExtension
 import nebula.plugin.contacts.Contact
 import nebula.plugin.contacts.ContactsExtension
-import nebula.plugin.info.InfoBrokerPlugin
 import nl.javadude.gradle.plugins.license.LicenseExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import org.jfrog.gradle.plugin.artifactory.dsl.ArtifactoryPluginConvention
-import org.jfrog.gradle.plugin.artifactory.dsl.PublisherConfig
 import java.util.*
 
 buildscript {
     repositories {
-        jcenter()
         gradlePluginPortal()
-    }
-
-    dependencies {
-        classpath("io.spring.gradle:spring-release-plugin:0.20.1")
-
-        constraints {
-            classpath("org.jfrog.buildinfo:build-info-extractor-gradle:4.13.0") {
-                because("Need recent version for Gradle 6+ compatibility")
-            }
-        }
     }
 }
 
 plugins {
-    id("io.spring.release") version "0.20.1"
+    `java-library`
+    `maven-publish`
+    signing
+
+    id("nebula.release") version "15.3.1"
+    id("io.github.gradle-nexus.publish-plugin") version "1.0.0"
+
+    id("com.github.johnrengelman.shadow") version "6.1.0" apply false
+    id("com.github.hierynomus.license") version "0.15.0" apply false
     id("org.jetbrains.kotlin.jvm") version "1.4.21" apply false
     id("org.gradle.test-retry") version "1.1.6" apply false
     id("com.github.jk1.dependency-license-report") version "1.16" apply false
+
+    id("nebula.maven-publish") version "17.3.2" apply false
+    id("nebula.contacts") version "5.1.0" apply false
+    id("nebula.info") version "9.3.0" apply false
+
+    id("nebula.javadoc-jar") version "17.3.2" apply false
+    id("nebula.source-jar") version "17.3.2" apply false
+    id("nebula.maven-apache-license") version "17.3.2" apply false
+}
+
+configure<nebula.plugin.release.git.base.ReleasePluginExtension> {
+    defaultVersionStrategy = nebula.plugin.release.NetflixOssStrategies.SNAPSHOT(project)
+}
+
+nexusPublishing {
+    repositories {
+        sonatype {
+            username.set(project.findProperty("ossrhUsername") as String? ?: System.getenv("OSSRH_USERNAME"))
+            password.set(project.findProperty("ossrhToken") as String? ?: System.getenv("OSSRH_TOKEN"))
+        }
+    }
 }
 
 allprojects {
@@ -41,11 +55,31 @@ allprojects {
 
 subprojects {
     apply(plugin = "java-library")
-    apply(plugin = "org.jetbrains.kotlin.jvm")
+    apply(plugin = "maven-publish")
+    apply(plugin = "signing")
+
     apply(plugin = "nebula.maven-resolved-dependencies")
-    apply(plugin = "io.spring.publishing")
+    apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "org.gradle.test-retry")
     apply(plugin = "com.github.jk1.dependency-license-report")
+
+    apply(plugin = "nebula.maven-publish")
+    apply(plugin = "nebula.contacts")
+    apply(plugin = "nebula.info")
+
+    apply(plugin = "nebula.javadoc-jar")
+    apply(plugin = "nebula.source-jar")
+    apply(plugin = "nebula.maven-apache-license")
+
+    signing {
+        setRequired({
+            !project.version.toString().endsWith("SNAPSHOT") || project.hasProperty("forceSigning")
+        })
+        val signingKey = project.findProperty("signingKey") as String? ?: System.getenv("SIGNING_KEY")
+        val signingPassword = project.findProperty("signingPassword") as String? ?: System.getenv("SIGNING_PASSWORD")
+        useInMemoryPgpKeys(signingKey, signingPassword)
+        sign(publishing.publications["nebula"])
+    }
 
     repositories {
         mavenCentral()
@@ -142,14 +176,16 @@ subprojects {
                 suppressPomMetadataWarningsFor("runtimeElements")
 
                 pom.withXml {
-                    (asElement().getElementsByTagName("dependencies").item(0) as org.w3c.dom.Element).let { dependencies ->
+                    (asElement().getElementsByTagName("dependencies")
+                        .item(0) as org.w3c.dom.Element).let { dependencies ->
                         dependencies.getElementsByTagName("dependency").let { dependencyList ->
                             var i = 0
                             var length = dependencyList.length
                             while (i < length) {
                                 (dependencyList.item(i) as org.w3c.dom.Element).let { dependency ->
                                     if ((dependency.getElementsByTagName("scope")
-                                                    .item(0) as org.w3c.dom.Element).textContent == "provided") {
+                                            .item(0) as org.w3c.dom.Element).textContent == "provided"
+                                    ) {
                                         dependencies.removeChild(dependency)
                                         i--
                                         length--
@@ -164,80 +200,6 @@ subprojects {
         }
     }
 
-    configure<SpringBintrayExtension> {
-        org = "openrewrite"
-        repo = "maven"
-    }
-
-    project.withConvention(ArtifactoryPluginConvention::class) {
-        setContextUrl("https://oss.jfrog.org/artifactory")
-        publisherConfig.let {
-            val repository: PublisherConfig.Repository = it.javaClass
-                    .getDeclaredField("repository")
-                    .apply { isAccessible = true }
-                    .get(it) as PublisherConfig.Repository
-
-            repository.setRepoKey("oss-snapshot-local")
-            repository.setUsername(project.findProperty("bintrayUser"))
-            repository.setPassword(project.findProperty("bintrayKey"))
-        }
-    }
-
-    val sourcesJarTask = tasks.register("sourcesJar", Jar::class.java) {
-        archiveClassifier.set("sources")
-    }
-    artifacts {
-        add("archives", sourcesJarTask)
-    }
-    tasks.named("assemble").configure {
-        dependsOn(sourcesJarTask)
-    }
-
-    tasks.withType<GenerateMavenPom> {
-        doLast {
-            // because pom.withXml adds blank lines
-            destination.writeText(
-                destination.readLines().filter { it.isNotBlank() }.joinToString("\n")
-            )
-        }
-
-        doFirst {
-            val runtimeClasspath = configurations.getByName("runtimeClasspath")
-
-            val gav = { dep: ResolvedDependency ->
-                "${dep.moduleGroup}:${dep.moduleName}:${dep.moduleVersion}"
-            }
-
-            val observedDependencies = TreeSet<ResolvedDependency> { d1, d2 ->
-                gav(d1).compareTo(gav(d2))
-            }
-
-            fun reduceDependenciesAtIndent(indent: Int):
-                    (List<String>, ResolvedDependency) -> List<String> =
-                    { dependenciesAsList: List<String>, dep: ResolvedDependency ->
-                        dependenciesAsList + listOf(" ".repeat(indent) + dep.module.id.toString()) + (
-                                if (observedDependencies.add(dep)) {
-                                    dep.children
-                                            .sortedBy(gav)
-                                            .fold(emptyList(), reduceDependenciesAtIndent(indent + 2))
-                                } else {
-                                    // this dependency subtree has already been printed, so skip it
-                                    emptyList()
-                                }
-                            )
-                    }
-
-            project.plugins.withType<InfoBrokerPlugin> {
-                add("Resolved-Dependencies", runtimeClasspath
-                        .resolvedConfiguration
-                        .lenientConfiguration
-                        .firstLevelModuleDependencies
-                        .sortedBy(gav)
-                        .fold(emptyList(), reduceDependenciesAtIndent(6))
-                        .joinToString("\n", "\n", "\n" + " ".repeat(4)))
-            }
-        }
-    }
 }
 
 defaultTasks("build")

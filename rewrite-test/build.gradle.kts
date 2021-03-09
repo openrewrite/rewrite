@@ -24,3 +24,8 @@ tasks.named<JavaCompile>("compileJava") {
     options.forkOptions.executable = "javac"
     options.compilerArgs.addAll(listOf("--release", "8"))
 }
+
+tasks.withType<Javadoc> {
+    // todo
+    isFailOnError = false
+}

@@ -1,3 +1,4 @@
+# minified version of circleci; should be removed once fully switched over
 version: 2.1
 
 executors:
@@ -21,28 +22,9 @@ commands:
         default: 'check test'
     steps:
       - checkout
-      - restore_cache:
-          key: gradle-dependencies-{{ checksum "build.gradle.kts" }}
-      - run:
-          name: downloadDependencies
-          command: ./gradlew downloadDependencies
-      - save_cache:
-          key: gradle-dependencies-{{ checksum "build.gradle.kts" }}
-          paths:
-            - ~/.gradle
       - run:
           name: run gradle command
           command: ./gradlew << parameters.command >>
-      - run:
-          name: collect test reports
-          when: always
-          command: |
-            mkdir -p ~/rewrite/test-results/junit/
-            find . -type f -regex ".*/build/test-results/.*xml" -exec cp {} ~/rewrite/test-results/junit/ \;
-      - store_test_results:
-          path: ~/rewrite/test-results/
-      - store_artifacts:
-          path: ~/rewrite/test-results/
 
 jobs:
   build:
@@ -50,59 +32,8 @@ jobs:
     steps:
       - gradlew-build
 
-  deploy:
-    executor: circle-jdk-executor
-    steps:
-      - checkout
-      - restore_cache:
-          key: gradle-dependencies-{{ checksum "build.gradle.kts" }}
-      - deploy:
-          name: Deployment
-          command: sh ./gradle/deploy.sh
-
-  maven-central-sync:
-    executor: circle-jdk-executor
-    steps:
-      - checkout
-      - run:
-          name: Decrypt properties
-          command: openssl aes-256-cbc -d -in gradle.properties.enc -out gradle.properties -k "$KEY" -md sha256
-      - deploy:
-          name: Maven Central sync
-          command: ./gradlew mavenCentralSync -Prelease.useLastTag=true -x bintrayPublish -x bintrayUpload -x bintrayCreateVersion -x bintrayCreatePackage
-          # Maven Central Sync might take more than 10 minutes
-          no_output_timeout: 30m
-
 workflows:
   version: 2
   build_prs_deploy_snapshots:
     jobs:
       - build
-      - deploy:
-          requires:
-            - build
-          filters:
-            branches:
-              only:
-                - master
-                - /\d+\.\d+\.x/
-  build_deploy_releases:
-    jobs:
-      - build:
-          filters:
-            branches:
-              ignore: /.*/
-            tags:
-              only: /^v\d+\.\d+\.\d+(-rc\.\d+)?$/
-      - deploy:
-          requires:
-            - build
-          filters:
-            tags:
-              only: /^v\d+\.\d+\.\d+(-rc\.\d+)?$/
-      - maven-central-sync:
-          requires:
-            - deploy
-          filters:
-            tags:
-              only: /^v\d+\.\d+\.\d+(-rc\.\d+)?$/

@@ -70,7 +70,14 @@ tasks.withType<Javadoc> {
     // generated ANTLR sources violate doclint
     (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:none", "-quiet")
 
-    exclude("**/VersionRangeParser**")
+    // TODO
+    // openrewrite/rewrite/rewrite-maven/src/main/java/org/openrewrite/maven/AddDependency.java:29: error: cannot find symbol
+    // @AllArgsConstructor(onConstructor_=@JsonCreator)
+    //                     ^
+    //   symbol:   method onConstructor_()
+    //   location: @interface AllArgsConstructor
+    // 1 error
+    exclude("**/VersionRangeParser**", "**/AddDependency**")
 }
 
 configure<LicenseExtension> {

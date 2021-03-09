@@ -40,12 +40,12 @@ jobs:
       - name: build
         run: ./gradlew ${GRADLE_SWITCHES} build test
 
-      # - name: publish-snapshots
-      #   if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-      #   timeout-minutes: 30
-      #   run: ./gradlew ${GRADLE_SWITCHES} snapshot publish
-      #   env:
-      #     OSSRH_TOKEN: ${{ secrets.OSSRH_TOKEN }}
-      #     OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
-      #     SIGNING_KEY: ${{ secrets.OSSRH_SIGNING_KEY }}
-      #     SIGNING_PASSWORD: ${{ secrets.OSSRH_SIGNING_PASSWORD }}
+      - name: publish-snapshots
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        timeout-minutes: 30
+        run: ./gradlew ${GRADLE_SWITCHES} snapshot publish -PforceSigning
+        env:
+          OSSRH_TOKEN: ${{ secrets.OSSRH_TOKEN }}
+          OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          SIGNING_KEY: ${{ secrets.OSSRH_SIGNING_KEY }}
+          SIGNING_PASSWORD: ${{ secrets.OSSRH_SIGNING_PASSWORD }}
