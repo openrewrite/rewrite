@@ -259,7 +259,9 @@ public class RawMavenResolver {
                         version = result;
                     } while (i++ < 2 || !Objects.equals(version, last));
 
-                    // dependencyManagement takes precedence over the version specified on the dependency
+                    // This gives dependencyManagement precedence over what's listed in the actual dependency
+                    // We've learned these are not actually the correct semantics. See:
+                    // https://github.com/openrewrite/rewrite/issues/346
                     if (version == null) {
                         String depVersion = dep.getVersion();
                         if (depVersion != null) {
@@ -273,44 +275,40 @@ public class RawMavenResolver {
                         return null;
                     }
 
-                    String scope = null;
-                    // loop so that when dependencyManagement refers to a property that we take another pass to resolve the property.
-                    i = 0;
-                    do {
-                        last = scope;
-                        String result = null;
-                        if (last != null) {
-                            String partialMavenScope = partialMaven.getValue(last);
-                            if (partialMavenScope != null) {
-                                result = partialMavenScope;
-                            }
-                        }
-                        if (result == null) {
-                            OUTER:
-                            for (DependencyManagementDependency managed : partialMaven.getDependencyManagement().getDependencies()) {
-                                for (DependencyDescriptor dependencyDescriptor : managed.getDependencies()) {
-                                    if (groupId.equals(partialMaven.getValue(dependencyDescriptor.getGroupId())) &&
-                                            artifactId.equals(partialMaven.getValue(dependencyDescriptor.getArtifactId())) &&
-                                            dependencyDescriptor.getScope() != null) {
-                                        result = dependencyDescriptor.getScope().name().toLowerCase();
-                                        break OUTER;
-                                    }
+
+                    String scope = partialMaven.getValue(dep.getScope());
+                    // dependencyManagement scope only relevant if no scope is specified on the dependency
+                    if (scope == null) {
+                        // loop so that when dependencyManagement refers to a property that we take another pass to resolve the property.
+                        i = 0;
+                        do {
+                            last = scope;
+                            String result = null;
+                            if (last != null) {
+                                String partialMavenScope = partialMaven.getValue(last);
+                                if (partialMavenScope != null) {
+                                    result = partialMavenScope;
                                 }
                             }
+                            if (result == null) {
+                                OUTER:
+                                for (DependencyManagementDependency managed : partialMaven.getDependencyManagement().getDependencies()) {
+                                    for (DependencyDescriptor dependencyDescriptor : managed.getDependencies()) {
+                                        if (groupId.equals(partialMaven.getValue(dependencyDescriptor.getGroupId())) &&
+                                                artifactId.equals(partialMaven.getValue(dependencyDescriptor.getArtifactId())) &&
+                                                dependencyDescriptor.getScope() != null) {
+                                            result = dependencyDescriptor.getScope().name().toLowerCase();
+                                            break OUTER;
+                                        }
+                                    }
+                                }
 
-                            if (result == null && partialMaven.getParent() != null) {
-                                result = partialMaven.getParent().getManagedScope(groupId, artifactId);
+                                if (result == null && partialMaven.getParent() != null) {
+                                    result = partialMaven.getParent().getManagedScope(groupId, artifactId);
+                                }
                             }
-                        }
-                        scope = result;
-                    } while (i++ < 2 || !Objects.equals(scope, last));
-
-                    // dependencyManagement takes precedence over the scope specified on the dependency
-                    if (scope == null) {
-                        String depScope = dep.getScope();
-                        if (depScope != null) {
-                            scope = partialMaven.getValue(depScope);
-                        }
+                            scope = result;
+                        } while (i++ < 2 || !Objects.equals(scope, last));
                     }
 
                     Scope requestedScope = Scope.fromName(scope);

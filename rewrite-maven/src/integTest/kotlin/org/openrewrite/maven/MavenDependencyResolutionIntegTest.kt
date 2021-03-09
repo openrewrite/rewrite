@@ -788,4 +788,64 @@ class MavenDependencyResolutionIntegTest {
 
         assertThat(maven.model.dependencies.first().version).isNotBlank
     }
+
+    @Test
+    fun parentPomProfileProperty() {
+        val maven = MavenParser.builder()
+            .resolveOptional(false)
+            .build()
+            .parse("""
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+
+                    <groupId>org.openrewrite.maven</groupId>
+                    <artifactId>multi-module-project-parent</artifactId>
+                    <version>0.1.0-SNAPSHOT</version>
+                    <packaging>pom</packaging>
+
+                    <modules>
+                        <module>a</module>
+                    </modules>
+
+                    <profiles>
+                        <profile>
+                          <id>appserverConfig-dev-2</id>
+                          <activation>
+                            <activeByDefault>true</activeByDefault>
+                          </activation>
+                          <properties>
+                            <guava.version>29.0-jre</guava.version>
+                          </properties>
+                        </profile>
+                    </profiles>
+                </project>
+            """,
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                
+                    <parent>
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>multi-module-project-parent</artifactId>
+                        <version>0.1.0-SNAPSHOT</version>
+                    </parent>
+                
+                    <artifactId>a</artifactId>
+                
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>${"$"}{guava.version}</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """)
+            .find { it.model.artifactId == "a" }
+
+        assertThat(maven!!.model.dependencies)
+            .hasSize(1)
+            .matches { it.first().artifactId == "guava" && it.first().version == "29.0-jre" }
+
+    }
 }
