@@ -57,19 +57,33 @@ public class MavenProjectParser {
         List<Maven> mavens = mavenParser.parse(Maven.getMavenPoms(projectDirectory, ctx), projectDirectory, ctx);
         List<SourceFile> sourceFiles = new ArrayList<>(mavens);
 
+        // sort maven projects so that multi-module build dependencies parse before the dependent projects
+        mavens.sort((m1, m2) -> {
+            Pom m1Model = m1.getModel();
+            List<Pom.Dependency> m1Dependencies = m1Model.getDependencies().stream().filter(d -> d.getRepository() == null).collect(Collectors.toList());
+            Pom m2Model = m2.getModel();
+            List<Pom.Dependency> m2Dependencies = m2Model.getDependencies().stream().filter(d -> d.getRepository() == null).collect(Collectors.toList());
+            if (m1Dependencies.stream().anyMatch(m1Dependency -> m1Dependency.getGroupId().equals(m2Model.getGroupId()) && m1Dependency.getArtifactId().equals(m2Model.getArtifactId()))) {
+                return 1;
+            } else if (m2Dependencies.stream().anyMatch(m2Dependency -> m2Dependency.getGroupId().equals(m1Model.getGroupId()) && m2Dependency.getArtifactId().equals(m1Model.getArtifactId()))) {
+                return -1;
+            } else {
+                return 0;
+            }
+        });
+
+        JavaParser javaParser = javaParserBuilder
+                .build();
+
         for (Maven maven : mavens) {
+            javaParser.setClasspath(downloadArtifacts(maven.getModel().getDependencies(Scope.Compile)));
             sourceFiles.addAll(
-                    javaParserBuilder
-                            .classpath(downloadArtifacts(maven.getModel().getDependencies(Scope.Compile)))
-                            .build()
-                            .parse(maven.getJavaSources(projectDirectory, ctx), projectDirectory, ctx)
+                    javaParser.parse(maven.getJavaSources(projectDirectory, ctx), projectDirectory, ctx)
             );
 
+            javaParser.setClasspath(downloadArtifacts(maven.getModel().getDependencies(Scope.Test)));
             sourceFiles.addAll(
-                    javaParserBuilder
-                    .classpath(downloadArtifacts(maven.getModel().getDependencies(Scope.Test)))
-                            .build()
-                            .parse(maven.getTestJavaSources(projectDirectory, ctx), projectDirectory, ctx)
+                    javaParser.parse(maven.getTestJavaSources(projectDirectory, ctx), projectDirectory, ctx)
             );
 
             List<Path> resources = new ArrayList<>(maven.getResources(projectDirectory, ctx));
@@ -111,6 +125,7 @@ public class MavenProjectParser {
 
     private List<Path> downloadArtifacts(Set<Pom.Dependency> dependencies) {
         return dependencies.stream()
+                .filter(d -> d.getRepository() != null)
                 .map(artifactDownloader::downloadArtifact)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());

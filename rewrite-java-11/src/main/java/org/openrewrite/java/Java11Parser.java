@@ -36,7 +36,10 @@ import org.openrewrite.style.NamedStyles;
 
 import javax.tools.JavaFileManager;
 import javax.tools.StandardLocation;
-import java.io.*;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.UncheckedIOException;
+import java.io.Writer;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
@@ -52,7 +55,7 @@ import static java.util.stream.Collectors.toList;
 public class Java11Parser implements JavaParser {
 
     @Nullable
-    private final Collection<Path> classpath;
+    private Collection<Path> classpath;
 
     @Nullable
     private final Collection<Input> dependsOn;
@@ -256,6 +259,10 @@ public class Java11Parser implements JavaParser {
         return this;
     }
 
+    public void setClasspath(Collection<Path> classpath) {
+        this.classpath = classpath;
+    }
+
     private void compileDependencies() {
         if (dependsOn != null) {
             parseInputs(dependsOn, null, new InMemoryExecutionContext());
@@ -263,11 +270,15 @@ public class Java11Parser implements JavaParser {
         Modules.instance(context).newRound();
     }
 
+
     /**
      * Initialize modules
      */
     private void initModules(Collection<JCTree.JCCompilationUnit> cus) {
         Modules modules = Modules.instance(context);
+        // Creating a new round is necessary for multiple pass parsing, where we want to keep the symbol table from a
+        // previous parse intact
+        modules.newRound();
         modules.initModules(com.sun.tools.javac.util.List.from(cus));
     }
 
