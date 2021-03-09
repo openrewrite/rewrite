@@ -49,7 +49,7 @@ class PrintMavenAsCycloneDxBomTest {
                       </dependencies>
                     </project>
                 """)
-        var bom = PrintMavenAsCycloneDxBom.print(pom[0]).replace(Regex("<timestamp>.*</timestamp>"), "<timestamp>TODAY</timestamp>");
+        val bom = PrintMavenAsCycloneDxBom.print(pom[0]).replace(Regex("<timestamp>.*</timestamp>"), "<timestamp>TODAY</timestamp>")
 
         assertThat(bom).isEqualTo("""
             <?xml version="1.0" encoding="UTF-8"?>
