@@ -51,13 +51,25 @@ public class RawMavenResolver {
     private final Collection<String> activeProfiles;
     private final boolean resolveOptional;
 
+    /**
+     * This is used to keep track of all properties encountered as raw maven poms are resolved into their partial forms.
+     * A property key may exist in multiple places as the resolver walks the dependencies and the value of the property
+     * is set the first time the property is encountered.
+     *
+     * A property in the root (the first pom to be resolved) will take precedence over a property defined in the parent.
+     * A property in a parent will take precedence over the same property defined in a transitive pom file.
+     * An effective property may have a value that, itself contains a property place holder to a second property and
+     * resolution of placeholders is done on-demand when a value is requested from the pom.
+     */
+    private final Map<String, String> effectiveProperties;
+
     private final MavenExecutionContextView ctx;
 
     @Nullable
     private final Path projectDir;
 
     public RawMavenResolver(MavenPomDownloader downloader, Collection<String> activeProfiles,
-                            boolean resolveOptional, ExecutionContext ctx, @Nullable Path projectDir) {
+                            boolean resolveOptional, Map<String, String> effectiveProperties, ExecutionContext ctx, @Nullable Path projectDir) {
         this.versionSelection = new TreeMap<>();
         for (Scope scope : Scope.values()) {
             versionSelection.putIfAbsent(scope, new HashMap<>());
@@ -65,6 +77,16 @@ public class RawMavenResolver {
         this.downloader = downloader;
         this.activeProfiles = activeProfiles;
         this.resolveOptional = resolveOptional;
+        if (effectiveProperties == null) {
+            this.effectiveProperties = new HashMap<>();
+            if (projectDir != null) {
+                this.effectiveProperties.put("project.basedir", projectDir.toString());
+                this.effectiveProperties.put("basedir", projectDir.toString());
+            }
+        } else {
+            this.effectiveProperties = effectiveProperties;
+        }
+
         this.ctx = new MavenExecutionContextView(ctx);
         this.projectDir = projectDir;
     }
@@ -125,7 +147,12 @@ public class RawMavenResolver {
     }
 
     private void processProperties(ResolutionTask task, PartialMaven partialMaven) {
-        partialMaven.setProperties(task.getRawMaven().getActiveProperties(activeProfiles));
+
+        task.getRawMaven().getActiveProperties(activeProfiles).entrySet().stream()
+            .forEach(e -> effectiveProperties.putIfAbsent(e.getKey(), e.getValue()));
+
+        partialMaven.setProperties(task.getRawMaven().getPom().getProperties());
+        partialMaven.setEffectiveProperties(effectiveProperties);
     }
 
     private void processDependencyManagement(ResolutionTask task, PartialMaven partialMaven) {
@@ -159,7 +186,7 @@ public class RawMavenResolver {
                 RawMaven rawMaven = downloader.download(groupId, artifactId, version, null, null,
                         partialMaven.getRepositories(), ctx);
                 if (rawMaven != null) {
-                    Pom maven = new RawMavenResolver(downloader, activeProfiles, resolveOptional, ctx, projectDir)
+                    Pom maven = new RawMavenResolver(downloader, activeProfiles, resolveOptional, partialMaven.getProperties(), ctx, projectDir)
                             .resolve(rawMaven, Scope.Compile, d.getVersion(), partialMaven.getRepositories());
 
                     if (maven != null) {
@@ -184,7 +211,7 @@ public class RawMavenResolver {
     private void processDependencies(ResolutionTask task, PartialMaven partialMaven) {
         RawMaven rawMaven = task.getRawMaven();
 
-        // Parent dependencies wind up being part of the subtree rooted at "task", so affect conflict resolution further down tree.
+        // Parent dependencies wind up being part of the subtree rooted at "task", so affect conflict resolution further down tree.ls
         if (partialMaven.getParent() != null) {
             for (Pom.Dependency dependency : partialMaven.getParent().getDependencies()) {
                 RequestedVersion requestedVersion = selectVersion(dependency.getScope(), dependency.getGroupId(),
@@ -356,7 +383,7 @@ public class RawMavenResolver {
                             dep.getOptional() != null && dep.getOptional(),
                             dep.getClassifier(),
                             dep.getType(),
-                            dep.getVersion(),
+                            version,
                             partialMaven.getRepositories(),
                             null
                     );
@@ -406,7 +433,7 @@ public class RawMavenResolver {
 
                 //noinspection OptionalAssignedToNull
                 if (maybeParent == null) {
-                    parent = new RawMavenResolver(downloader, activeProfiles, resolveOptional, ctx, projectDir)
+                    parent = new RawMavenResolver(downloader, activeProfiles, resolveOptional, partialMaven.getProperties(), ctx, projectDir)
                             .resolve(rawParentModel, Scope.Compile, rawParent.getVersion(), partialMaven.getRepositories(), parentPomSightings);
                     resolved.put(parentKey, Optional.ofNullable(parent));
                 } else {
@@ -553,7 +580,8 @@ public class RawMavenResolver {
                                 partial.getDependencyManagement(),
                                 partial.getLicenses(),
                                 partial.getRepositories(),
-                                partial.getProperties()
+                                partial.getProperties(),
+                                effectiveProperties
                         )
                 );
             } else {
@@ -653,7 +681,15 @@ public class RawMavenResolver {
         Collection<ResolutionTask> dependencyTasks = emptyList();
         Collection<Pom.License> licenses = emptyList();
         Collection<MavenRepository> repositories = emptyList();
+
+        //The properties parsed direction from this pom's XML file. The values may be different than the effective property
+        //values.
         Map<String, String> properties = emptyMap();
+
+        //Effective properties are collected across all pom.xml files that were resolved during a parse. These properties
+        //reflect what the value should be in the context of the entire maven tree and account for property precedence
+        //when the same property key is encountered multiple times.
+        Map<String, String> effectiveProperties = emptyMap();
 
         /**
          * The order of repositories should be:
@@ -713,34 +749,14 @@ public class RawMavenResolver {
                             return parent == null ? null : parent.getVersion();
                         case "project.parent.version":
                             return parent != null ? parent.getVersion() : null;
-                        case "project.basedir":
-                        case "basedir":
-                            return projectDir == null ? null : projectDir.toString();
                     }
 
-                    String value = rawPom.getActiveProperties(activeProfiles).get(key);
+                    String value = System.getProperty(key);
                     if (value != null) {
                         return value;
                     }
 
-                    // will be null when processing dependencyManagement itself...
-                    if (dependencyManagement != null) {
-                        for (DependencyManagementDependency managedDependency : dependencyManagement.getDependencies()) {
-                            value = managedDependency.getProperties().get(key);
-                            if (value != null) {
-                                return value;
-                            }
-                        }
-                    }
-
-                    for (Pom ancestor = parent; ancestor != null; ancestor = ancestor.getParent()) {
-                        value = ancestor.getValue("${" + key + "}");
-                        if (value != null) {
-                            return value;
-                        }
-                    }
-
-                    value = System.getProperty(key);
+                    value = properties.get(key);
                     if (value != null) {
                         return value;
                     }

@@ -85,7 +85,7 @@ public class MavenParser implements Parser<Maven> {
 
         List<Maven> parsed = new ArrayList<>();
         for (RawMaven raw : projectPoms) {
-            Xml.Document resolve = new RawMavenResolver(downloader, activeProfiles, resolveOptional, ctx, relativeTo).resolve(raw);
+            Xml.Document resolve = new RawMavenResolver(downloader, activeProfiles, resolveOptional, null, ctx, relativeTo).resolve(raw);
             if (resolve != null) {
                 Maven maven1 = new Maven(resolve);
                 parsed.add(maven1);
