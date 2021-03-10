@@ -21,12 +21,13 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.semver.Semver;
 
+import java.util.List;
 import java.util.regex.Pattern;
 
 @Incubating(since = "7.0.0")
 @Getter
 @RequiredArgsConstructor
-@AllArgsConstructor(onConstructor_=@JsonCreator)
+@AllArgsConstructor(onConstructor_ = @JsonCreator)
 @EqualsAndHashCode(callSuper = true)
 public class AddDependency extends Recipe {
 
@@ -76,14 +77,14 @@ public class AddDependency extends Recipe {
     private String classifier;
 
     @Option(displayName = "Scope",
-            valid = { "compile", "test", "runtime", "provided" },
+            valid = {"compile", "test", "runtime", "provided"},
             required = false)
     @Nullable
     @With
     private String scope;
 
     @Option(displayName = "Type",
-            valid = { "jar", "pom" },
+            valid = {"jar", "pom"},
             required = false)
     @Nullable
     @With
@@ -92,13 +93,21 @@ public class AddDependency extends Recipe {
     /**
      * A glob expression used to identify other dependencies in the same family as the dependency to be added.
      */
-    @Option(displayName = "Family pattern", required = false,
+    @Option(displayName = "Family pattern",
             description = "A pattern, applied to groupIds, used to determine which other dependencies should have aligned version numbers. " +
                     "Accepts '*' as a wildcard character.",
-            example = "com.fasterxml.jackson*")
+            example = "com.fasterxml.jackson*",
+            required = false)
     @Nullable
     @With
     private String familyPattern;
+
+    @Option(displayName = "Only if using",
+            description = "Add the dependency only if using one of the supplied types. Types should be identified by fully qualified class name or a glob expression",
+            example = "org.junit.jupiter.api.*",
+            required = false)
+    @Nullable
+    private List<String> onlyIfUsing;
 
     @Override
     public Validated validate() {
@@ -126,7 +135,8 @@ public class AddDependency extends Recipe {
                 classifier,
                 scope,
                 type,
-                familyPattern == null ? null : Pattern.compile(familyPattern.replace("*", ".*"))
+                familyPattern == null ? null : Pattern.compile(familyPattern.replace("*", ".*")),
+                onlyIfUsing
         );
     }
 }

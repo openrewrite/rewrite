@@ -41,6 +41,7 @@ import static java.util.stream.Collectors.toList;
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @JsonTypeInfo(use = JsonTypeInfo.Id.MINIMAL_CLASS, property = "@c")
 public interface JavaType extends Serializable {
+    String FOUND_TYPE_CONTEXT_KEY = "org.openrewrite.java.FoundType";
 
     boolean deepEquals(@Nullable JavaType type);
 

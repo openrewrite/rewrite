@@ -64,17 +64,19 @@ public class FindTypes extends Recipe {
                 JavaType.Class asClass = TypeUtils.asClass(n.getType());
                 if (asClass != null && asClass.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         getCursor().firstEnclosing(J.Import.class) == null) {
+                    ctx.putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY, asClass);
                     return n.withMarker(new RecipeSearchResult(FindTypes.this));
                 }
                 return n;
             }
 
             @Override
-            public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext executionContext) {
-                J.FieldAccess fa = (J.FieldAccess) super.visitFieldAccess(fieldAccess, executionContext);
-                JavaType.Class targetClass = TypeUtils.asClass(fa.getTarget().getType());
-                if (targetClass != null && targetClass.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
+            public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+                J.FieldAccess fa = (J.FieldAccess) super.visitFieldAccess(fieldAccess, ctx);
+                JavaType.Class asClass = TypeUtils.asClass(fa.getTarget().getType());
+                if (asClass != null && asClass.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                     fa.getName().getSimpleName().equals("class")) {
+                    ctx.putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY, asClass);
                     return fa.withMarker(new RecipeSearchResult(FindTypes.this));
                 }
                 return fa;

@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
 import org.openrewrite.maven.internal.MavenMetadata;
@@ -36,9 +37,7 @@ import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
+import java.util.*;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.*;
@@ -78,10 +77,20 @@ public class AddDependencyVisitor extends MavenVisitor {
     private final Pattern familyPattern;
 
     @Nullable
+    private final List<String> onlyIfUsing;
+
+    @Nullable
     private VersionComparator versionComparator;
 
     @Override
     public Maven visitMaven(Maven maven, ExecutionContext ctx) {
+        if (onlyIfUsing != null) {
+            Set<JavaType> found = ctx.getMessage(JavaType.FOUND_TYPE_CONTEXT_KEY, emptySet());
+            if (onlyIfUsing.stream().noneMatch(t -> found.contains(JavaType.Class.build(t)))) {
+                return maven;
+            }
+        }
+
         model = maven.getModel();
 
         Validated versionValidation = Semver.validate(version, metadataPattern);
