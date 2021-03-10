@@ -115,4 +115,21 @@ public enum Scope {
                 return Invalid;
         }
     }
+
+    /**
+     * Give two scopes, returns the scope with the highest precedence.
+     *
+     * @return Scope with the higher precedence.
+     */
+    @Nullable public static Scope maxPrecedence(@Nullable Scope scope1, @Nullable Scope scope2) {
+        if (scope1 == null) {
+            return scope2;
+        } else if (scope2 == null) {
+            return scope1;
+        } else if (scope1.ordinal() <= scope2.ordinal()) {
+            return scope1;
+        } else {
+            return scope2;
+        }
+    }
 }

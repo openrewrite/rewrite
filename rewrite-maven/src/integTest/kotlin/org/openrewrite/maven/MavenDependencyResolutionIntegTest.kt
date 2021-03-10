@@ -181,7 +181,7 @@ class MavenDependencyResolutionIntegTest {
                 <dependency>
                     <groupId>org.openrewrite</groupId>
                     <artifactId>rewrite-core</artifactId>
-                    <version>6.2.0-SNAPSHOT</version>
+                    <version>6.1.0-SNAPSHOT</version>
                 </dependency>
               </dependencies>
             </project>
@@ -194,8 +194,8 @@ class MavenDependencyResolutionIntegTest {
             .parse(pom)
             .first()
 
-        assertThat(maven.model.dependencies.first().version).isEqualTo("6.2.0-SNAPSHOT")
-        assertThat(maven.model.dependencies.first().model.snapshotVersion).startsWith("6.2.0")
+        assertThat(maven.model.dependencies.first().version).isEqualTo("6.1.0-SNAPSHOT")
+        assertThat(maven.model.dependencies.first().model.snapshotVersion).startsWith("6.1.0")
     }
 
     @Issue("#166")

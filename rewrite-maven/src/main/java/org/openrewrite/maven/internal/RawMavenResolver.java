@@ -308,18 +308,7 @@ public class RawMavenResolver {
                                 }
                             }
                             if (result == null) {
-                                OUTER:
-                                for (DependencyManagementDependency managed : partialMaven.getDependencyManagement().getDependencies()) {
-                                    for (DependencyDescriptor dependencyDescriptor : managed.getDependencies()) {
-                                        if (groupId.equals(partialMaven.getValue(dependencyDescriptor.getGroupId())) &&
-                                                artifactId.equals(partialMaven.getValue(dependencyDescriptor.getArtifactId())) &&
-                                                dependencyDescriptor.getScope() != null) {
-                                            result = dependencyDescriptor.getScope().name().toLowerCase();
-                                            break OUTER;
-                                        }
-                                    }
-                                }
-
+                                result = partialMaven.getDependencyManagement().getManagedScope(groupId, artifactId);
                                 if (result == null && partialMaven.getParent() != null) {
                                     result = partialMaven.getParent().getManagedScope(groupId, artifactId);
                                 }

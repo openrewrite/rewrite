@@ -209,29 +209,12 @@ public class Pom implements Marker {
 
     @Nullable
     public String getManagedVersion(String groupId, String artifactId) {
-        DependencyManagement effectiveDependencyManagement = getEffectiveDependencyManagement();
-        for (DependencyManagementDependency dep : effectiveDependencyManagement.getDependencies()) {
-            for (DependencyDescriptor dependencyDescriptor : dep.getDependencies()) {
-                if (groupId.equals(dependencyDescriptor.getGroupId()) && artifactId.equals(dependencyDescriptor.getArtifactId())) {
-                    return dependencyDescriptor.getVersion();
-                }
-            }
-        }
-        return null;
+        return getEffectiveDependencyManagement().getManagedVersion(groupId, artifactId);
     }
 
     @Nullable
     public String getManagedScope(String groupId, String artifactId) {
-        DependencyManagement effectiveDependencyManagement = getEffectiveDependencyManagement();
-        for (DependencyManagementDependency dep : effectiveDependencyManagement.getDependencies()) {
-            for (DependencyDescriptor dependencyDescriptor : dep.getDependencies()) {
-                if (groupId.equals(dependencyDescriptor.getGroupId()) && artifactId.equals(dependencyDescriptor.getArtifactId()) &&
-                        dependencyDescriptor.getScope() != null) {
-                    return dependencyDescriptor.getScope().name().toLowerCase();
-                }
-            }
-        }
-        return null;
+        return getEffectiveDependencyManagement().getManagedScope(groupId, artifactId);
     }
 
     public Collection<Pom.Dependency> findDependencies(String groupId, String artifactId) {
@@ -414,6 +397,31 @@ public class Pom implements Marker {
     @Data
     public static class DependencyManagement {
         Collection<DependencyManagementDependency> dependencies;
+
+        @Nullable
+        public String getManagedVersion(String groupId, String artifactId) {
+            for (DependencyManagementDependency dep : dependencies) {
+                for (DependencyDescriptor dependencyDescriptor : dep.getDependencies()) {
+                    if (groupId.equals(dependencyDescriptor.getGroupId()) && artifactId.equals(dependencyDescriptor.getArtifactId())) {
+                        return dependencyDescriptor.getVersion();
+                    }
+                }
+            }
+            return null;
+        }
+
+        @Nullable
+        public String getManagedScope(String groupId, String artifactId) {
+            Scope scope = null;
+            for (DependencyManagementDependency dep : dependencies) {
+                for (DependencyDescriptor dependencyDescriptor : dep.getDependencies()) {
+                    if (groupId.equals(dependencyDescriptor.getGroupId()) && artifactId.equals(dependencyDescriptor.getArtifactId())) {
+                        scope = Scope.maxPrecedence(scope, dependencyDescriptor.getScope() == null ? Scope.Compile : dependencyDescriptor.getScope());
+                    }
+                }
+            }
+            return scope == null ? null : scope.name().toLowerCase();
+        }
     }
 
     @Override
