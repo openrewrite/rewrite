@@ -4,8 +4,8 @@ name: publish
 on:
   push:
     tags:
-      - v*.*.*
-      - v*.*.*-rc.*
+      - v[0-9]+.[0-9]+.[0-9]+
+      - v[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+
 
 env:
   GRADLE_OPTS: '-Dorg.gradle.jvmargs="-Xmx2048m -XX:+HeapDumpOnOutOfMemoryError"'
@@ -14,6 +14,7 @@ env:
 jobs:
   release:
     runs-on: ubuntu-latest
+    if: github.repository_owner == 'openrewrite'
     steps:
       - uses: actions/checkout@v2
         with:
@@ -35,7 +36,7 @@ jobs:
       - name: publish-candidate
         if: contains(github.ref, '-rc.')
         timeout-minutes: 30
-        run: ./gradlew ${GRADLE_SWITCHES} -Prelease.disableGitChecks=true -Prelease.useLastTag=true candidate publish closeSonatypeStagingRepository # todo closeAndReleaseSonatypeStagingRepository
+        run: ./gradlew ${GRADLE_SWITCHES} -Prelease.disableGitChecks=true -Prelease.useLastTag=true candidate publish closeAndReleaseSonatypeStagingRepository
         env:
           OSSRH_TOKEN: ${{ secrets.OSSRH_TOKEN }}
           OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
@@ -45,7 +46,7 @@ jobs:
       - name: publish-release
         if: (!contains(github.ref, '-rc.'))
         timeout-minutes: 30
-        run: ./gradlew ${GRADLE_SWITCHES} -Prelease.disableGitChecks=true -Prelease.useLastTag=true final publish closeSonatypeStagingRepository # todo closeAndReleaseSonatypeStagingRepository
+        run: ./gradlew ${GRADLE_SWITCHES} -Prelease.disableGitChecks=true -Prelease.useLastTag=true final publish closeAndReleaseSonatypeStagingRepository
         env:
           OSSRH_TOKEN: ${{ secrets.OSSRH_TOKEN }}
           OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}

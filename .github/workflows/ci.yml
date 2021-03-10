@@ -10,7 +10,6 @@ on:
   pull_request:
     branches:
       - master
-  workflow_dispatch: {}
 
 env:
   GRADLE_OPTS: '-Dorg.gradle.jvmargs="-Xmx2048m -XX:+HeapDumpOnOutOfMemoryError"'
@@ -18,7 +17,37 @@ env:
 
 jobs:
   build:
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ["11"]
+        os: ["ubuntu-latest"]
+    runs-on: ${{ matrix.os }}
+    if: github.repository_owner == 'openrewrite'
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: set-up-jdk
+        uses: actions/setup-java@v1
+        with:
+          java-version: ${{ matrix.java }}
+      - name: setup-cache
+        uses: actions/cache@v2.1.4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+      - name: build
+        run: ./gradlew ${GRADLE_SWITCHES} build test
+
+  publish-snapshots:
+    needs: [build]
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.repository_owner == 'openrewrite'
     steps:
       - uses: actions/checkout@v2
         with:
@@ -36,12 +65,8 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
-
-      - name: build
-        run: ./gradlew ${GRADLE_SWITCHES} build test
-
       - name: publish-snapshots
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'push'
         timeout-minutes: 30
         run: ./gradlew ${GRADLE_SWITCHES} snapshot publish -PforceSigning
         env:
