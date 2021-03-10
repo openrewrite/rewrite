@@ -311,9 +311,14 @@ public class ImportLayoutStyle implements JavaStyle {
                         .sorted(IMPORT_SORTING)
                         .collect(groupingBy(
                                 anImport -> {
+                                    String typeName = anImport.getElement().getTypeName();
                                     if (anImport.getElement().isStatic()) {
-                                        return anImport.getElement().getTypeName();
+                                        return typeName;
                                     } else {
+                                        if(typeName.contains(".")) {
+                                            return anImport.getElement().getPackageName() +
+                                                    typeName.substring(0, typeName.lastIndexOf('.'));
+                                        }
                                         return anImport.getElement().getPackageName();
                                     }
                                 },

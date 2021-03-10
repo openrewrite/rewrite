@@ -76,6 +76,32 @@ interface OrderImportsTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/352")
+    @Test
+    fun innerClasses(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import org.openrewrite.java.tree.Comment;
+            import org.openrewrite.java.tree.Coordinates;
+            import org.openrewrite.java.tree.Expression;
+            import org.openrewrite.java.tree.Flag;
+            import org.openrewrite.java.tree.J.Assert;
+            import org.openrewrite.java.tree.J.ClassDeclaration;
+            import org.openrewrite.java.tree.J.MethodDeclaration;
+            import org.openrewrite.java.tree.J.NewArray;
+            import org.openrewrite.java.tree.J.NewClass;
+            import org.openrewrite.java.tree.JavaType;
+            
+            class Test {}
+        """,
+        after = """
+            import org.openrewrite.java.tree.*;
+            import org.openrewrite.java.tree.J.*;
+            
+            class Test {}
+        """
+    )
+
     @Test
     fun blankLineThenEmptyBlockThenNonEmptyBlock(jp: JavaParser) = assertChanged(
             jp,
@@ -624,3 +650,4 @@ interface OrderImportsTest : JavaRecipeTest {
         """
     )
 }
+
