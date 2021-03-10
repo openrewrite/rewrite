@@ -145,6 +145,13 @@ class MavenDependencyResolutionIntegTest {
                     <properties>
                         <jackson.version>2.12.1</jackson.version>
                     </properties>
+                    
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.fasterxml.jackson.core</groupId>
+                            <artifactId>jackson-core</artifactId>
+                        </dependency>
+                    </dependencies>
                 </project>
             """.trimIndent()
         )
