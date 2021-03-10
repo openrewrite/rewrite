@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
@@ -31,6 +32,7 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
 
@@ -55,6 +57,17 @@ public class Maven extends Xml.Document {
         assert model != null;
 
         modules = document.getMarkers().findFirst(Modules.class)
+                .map(Modules::getModules)
+                .orElse(emptyList());
+    }
+
+    @JsonCreator
+    public Maven(UUID id, Path sourcePath, String prefix, Markers markers, Prolog prolog, Tag root, String eof) {
+        super(id, sourcePath, prefix, markers, prolog, root, eof);
+        model = markers.findFirst(Pom.class).orElse(null);
+        assert model != null;
+
+        modules = markers.findFirst(Modules.class)
                 .map(Modules::getModules)
                 .orElse(emptyList());
     }
