@@ -76,6 +76,26 @@ interface OrderImportsTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/259")
+    @Test
+    fun multipleClassesWithTheSameNameButDifferentPackages(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            import org.another.Comment;
+            import org.openrewrite.java.tree.Comment;
+            import org.openrewrite.java.tree.Coordinates;
+            import org.openrewrite.java.tree.Expression;
+            import org.openrewrite.java.tree.Flag;
+            import org.openrewrite.java.tree.JavaType;
+            
+            class Test {}
+        """,
+        dependsOn = arrayOf("""
+            package org.another;
+            public class Comment {}
+        """)
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/352")
     @Test
     fun innerClasses(jp: JavaParser) = assertChanged(

@@ -315,9 +315,10 @@ public class ImportLayoutStyle implements JavaStyle {
                                     if (anImport.getElement().isStatic()) {
                                         return typeName;
                                     } else {
-                                        if(typeName.contains(".")) {
+                                        String className = anImport.getElement().getClassName();
+                                        if (className.contains(".")) {
                                             return anImport.getElement().getPackageName() +
-                                                    typeName.substring(0, typeName.lastIndexOf('.'));
+                                                    className.substring(0, className.lastIndexOf('.'));
                                         }
                                         return anImport.getElement().getPackageName();
                                     }
@@ -336,12 +337,26 @@ public class ImportLayoutStyle implements JavaStyle {
                             if (importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1)) {
                                 J.FieldAccess qualid = toStar.getElement().getQualid();
                                 J.Identifier name = qualid.getName();
-                                return Stream.of(toStar.withElement(toStar.getElement().withQualid(qualid.withName(
-                                        name.withName("*")))));
-                            } else {
-                                return importGroup.stream()
-                                        .filter(distinctBy(t -> t.getElement().printTrimmed()));
+
+                                Set<String> typeNamesInThisGroup = importGroup.stream()
+                                        .map(im -> im.getElement().getClassName())
+                                        .collect(Collectors.toSet());
+
+                                Optional<String> oneOfTheTypesIsInAnotherGroupToo = groupedImports.values().stream()
+                                        .filter(group -> group != importGroup)
+                                        .flatMap(group -> group.stream()
+                                                .filter(im -> typeNamesInThisGroup.contains(im.getElement().getClassName())))
+                                        .map(im -> im.getElement().getTypeName())
+                                        .findAny();
+
+                                if (starImportExists || !oneOfTheTypesIsInAnotherGroupToo.isPresent()) {
+                                    return Stream.of(toStar.withElement(toStar.getElement().withQualid(qualid.withName(
+                                            name.withName("*")))));
+                                }
                             }
+
+                            return importGroup.stream()
+                                    .filter(distinctBy(t -> t.getElement().printTrimmed()));
                         }).collect(toList());
             }
         }
