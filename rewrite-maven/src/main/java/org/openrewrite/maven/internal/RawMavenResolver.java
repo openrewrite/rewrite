@@ -78,7 +78,6 @@ public class RawMavenResolver {
         this.activeProfiles = activeProfiles;
         this.resolveOptional = resolveOptional;
         this.effectiveProperties = effectiveProperties;
-
         this.ctx = new MavenExecutionContextView(ctx);
         this.projectDir = projectDir;
     }
@@ -140,9 +139,7 @@ public class RawMavenResolver {
 
     private void processProperties(ResolutionTask task, PartialMaven partialMaven) {
 
-        task.getRawMaven().getActiveProperties(activeProfiles).forEach(
-                (k, v) -> effectiveProperties.putIfAbsent(k, v)
-        );
+        task.getRawMaven().getActiveProperties(activeProfiles).forEach(effectiveProperties::putIfAbsent);
 
         partialMaven.setProperties(task.getRawMaven().getPom().getProperties());
         partialMaven.setEffectiveProperties(effectiveProperties);
@@ -179,7 +176,7 @@ public class RawMavenResolver {
                 RawMaven rawMaven = downloader.download(groupId, artifactId, version, null, null,
                         partialMaven.getRepositories(), ctx);
                 if (rawMaven != null) {
-                    Pom maven = new RawMavenResolver(downloader, activeProfiles, resolveOptional, partialMaven.getProperties(), ctx, projectDir)
+                    Pom maven = new RawMavenResolver(downloader, activeProfiles, resolveOptional, effectiveProperties, ctx, projectDir)
                             .resolve(rawMaven, Scope.Compile, d.getVersion(), partialMaven.getRepositories());
 
                     if (maven != null) {
@@ -247,46 +244,43 @@ public class RawMavenResolver {
                         }
                     }
 
-                    String version = null;
-                    String last;
-                    // loop so that when dependencyManagement refers to a property that we take another pass to resolve the property.
-                    int i = 0;
-                    do {
-                        last = version;
-                        String result = null;
-                        if (last != null) {
-                            String partialMavenVersion = partialMaven.getValue(last);
-                            if (partialMavenVersion != null) {
-                                result = partialMavenVersion;
-                            }
-                        }
-                        if (result == null) {
-                            OUTER:
-                            for (DependencyManagementDependency managed : partialMaven.getDependencyManagement().getDependencies()) {
-                                for (DependencyDescriptor dependencyDescriptor : managed.getDependencies()) {
-                                    if (groupId.equals(partialMaven.getValue(dependencyDescriptor.getGroupId())) &&
-                                            artifactId.equals(partialMaven.getValue(dependencyDescriptor.getArtifactId()))) {
-                                        result = dependencyDescriptor.getVersion();
-                                        break OUTER;
-                                    }
+                    //Resolve the dependency version. if the version is set in the pom, it take precedence over the
+                    //managed version. This allows a downstream pom to override the managed version.
+                    String version = dep.getVersion() !=null ? partialMaven.getValue(dep.getVersion()) : null;
+
+                    if (version == null) {
+                        //If the version is not yet defined, look for it in the managed dependencies.
+
+                        String last;
+                        // loop so that when dependencyManagement refers to a property that we take another pass to resolve the property.
+                        int i = 0;
+                        do {
+                            last = version;
+                            String result = null;
+                            if (last != null) {
+                                String partialMavenVersion = partialMaven.getValue(last);
+                                if (partialMavenVersion != null) {
+                                    result = partialMavenVersion;
                                 }
                             }
+                            if (result == null) {
+                                OUTER:
+                                for (DependencyManagementDependency managed : partialMaven.getDependencyManagement().getDependencies()) {
+                                    for (DependencyDescriptor dependencyDescriptor : managed.getDependencies()) {
+                                        if (groupId.equals(partialMaven.getValue(dependencyDescriptor.getGroupId())) &&
+                                                artifactId.equals(partialMaven.getValue(dependencyDescriptor.getArtifactId()))) {
+                                            result = dependencyDescriptor.getVersion();
+                                            break OUTER;
+                                        }
+                                    }
+                                }
 
-                            if (result == null && partialMaven.getParent() != null) {
-                                result = partialMaven.getParent().getManagedVersion(groupId, artifactId);
+                                if (result == null && partialMaven.getParent() != null) {
+                                    result = partialMaven.getParent().getManagedVersion(groupId, artifactId);
+                                }
                             }
-                        }
-                        version = result;
-                    } while (i++ < 2 || !Objects.equals(version, last));
-
-                    // This gives dependencyManagement precedence over what's listed in the actual dependency
-                    // We've learned these are not actually the correct semantics. See:
-                    // https://github.com/openrewrite/rewrite/issues/346
-                    if (version == null) {
-                        String depVersion = dep.getVersion();
-                        if (depVersion != null) {
-                            version = partialMaven.getValue(depVersion);
-                        }
+                            version = result;
+                        } while (i++ < 2 || !Objects.equals(version, last));
                     }
 
                     if (version == null) {
@@ -295,12 +289,15 @@ public class RawMavenResolver {
                         return null;
                     }
 
+                    //Resolve the dependency scope. if the scope is set in the pom, it take precedence over the
+                    //managed scope. This allows a downstream pom to override the managed scope.
+                    String scope = dep.getScope() != null ? partialMaven.getValue(dep.getScope()) : null;
 
-                    String scope = partialMaven.getValue(dep.getScope());
-                    // dependencyManagement scope only relevant if no scope is specified on the dependency
                     if (scope == null) {
+
                         // loop so that when dependencyManagement refers to a property that we take another pass to resolve the property.
-                        i = 0;
+                        int i = 0;
+                        String last;
                         do {
                             last = scope;
                             String result = null;
@@ -330,7 +327,6 @@ public class RawMavenResolver {
                             scope = result;
                         } while (i++ < 2 || !Objects.equals(scope, last));
                     }
-
                     Scope requestedScope = Scope.fromName(scope);
                     Scope effectiveScope = requestedScope.transitiveOf(task.getScope());
 
