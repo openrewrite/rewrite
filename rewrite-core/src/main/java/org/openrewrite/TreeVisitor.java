@@ -15,6 +15,8 @@
  */
 package org.openrewrite;
 
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Timer;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.ArrayList;
@@ -36,9 +38,11 @@ import java.util.function.BiFunction;
 public abstract class TreeVisitor<T extends Tree, P> {
 
     private Cursor cursor;
+
     {
         setCursor(new Cursor(null, "root"));
     }
+
     private List<TreeVisitor<T, P>> afterVisit;
 
     protected void setCursor(@Nullable Cursor cursor) {
@@ -117,9 +121,11 @@ public abstract class TreeVisitor<T extends Tree, P> {
             return defaultValue(null, p);
         }
 
+        Timer.Sample sample = null;
         boolean topLevel = false;
         if (afterVisit == null) {
             topLevel = true;
+            sample = Timer.start();
             afterVisit = new ArrayList<>();
         }
 
@@ -135,13 +141,18 @@ public abstract class TreeVisitor<T extends Tree, P> {
 
         setCursor(cursor.getParent());
 
-
         if (topLevel) {
+            sample.stop(Timer.builder("rewrite.visitor.visit")
+                    .tag("visitor.class", getClass().getName())
+                    .register(Metrics.globalRegistry));
             if (t != null) {
                 for (TreeVisitor<T, P> v : afterVisit) {
                     t = v.visit(t, p);
                 }
             }
+            sample.stop(Timer.builder("rewrite.visitor.visit.cumulative")
+                    .tag("visitor.class", getClass().getName())
+                    .register(Metrics.globalRegistry));
             afterVisit = null;
         }
 

@@ -14,6 +14,7 @@ dependencies {
     api("com.fasterxml.jackson.module:jackson-module-parameter-names:latest.release")
     api("com.fasterxml.jackson.module:jackson-module-kotlin:latest.release")
 
+    implementation("io.micrometer:micrometer-core:latest.release")
     implementation("io.github.classgraph:classgraph:latest.release")
     implementation("org.yaml:snakeyaml:latest.release")
 }

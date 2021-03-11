@@ -18,6 +18,10 @@ package org.openrewrite;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Timer;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.ListUtils;
@@ -33,7 +37,6 @@ import java.util.*;
 import java.util.concurrent.ForkJoinPool;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singleton;
@@ -150,6 +153,8 @@ public abstract class Recipe {
         // if this recipe isn't valid we just skip it and proceed to next
         if (validate(ctx).isValid()) {
             after = ListUtils.map(after, forkJoinPool, s -> {
+                Timer.Builder timer = Timer.builder("rewrite.recipe.visit").tag("recipe", getDisplayName());
+                Timer.Sample sample = Timer.start();
                 try {
                     @SuppressWarnings("unchecked") S afterFile = (S) getVisitor().visit(s, ctx);
                     if (afterFile != null && afterFile != s) {
@@ -159,12 +164,16 @@ public abstract class Recipe {
                                     r1.recipes.addAll(r2.recipes);
                                     return r1;
                                 }));
-                    }
-                    if (afterFile == null) {
+                        sample.stop(timer.tags("outcome", "changed", "exception", "none").register(Metrics.globalRegistry));
+                    } else if (afterFile == null) {
                         recipeThatDeletedSourceFile.put(s.getId(), this);
+                        sample.stop(timer.tags("outcome", "deleted", "exception", "none").register(Metrics.globalRegistry));
+                    } else {
+                        sample.stop(timer.tags("outcome", "unchanged", "exception", "none").register(Metrics.globalRegistry));
                     }
                     return afterFile;
                 } catch (Throwable t) {
+                    sample.stop(timer.tags("outcome", "error", "exception", t.getClass().getSimpleName()).register(Metrics.globalRegistry));
                     ctx.getOnError().accept(t);
                     return s;
                 }
@@ -195,6 +204,7 @@ public abstract class Recipe {
         for (Recipe recipe : recipeList) {
             afterWidened = recipe.visitInternal(afterWidened, ctx, forkJoinPool, recipeThatDeletedSourceFile);
         }
+
         return afterWidened;
     }
 
@@ -226,6 +236,13 @@ public abstract class Recipe {
                                   ExecutionContext ctx,
                                   ForkJoinPool forkJoinPool,
                                   int maxCycles) {
+        DistributionSummary.builder("rewrite.recipe.run")
+                .tag("recipe", getDisplayName())
+                .description("The distribution of recipe runs and the size of source file batches given to them to process.")
+                .baseUnit("source files")
+                .register(Metrics.globalRegistry)
+                .record(before.size());
+
         Map<UUID, Recipe> recipeThatDeletedSourceFile = new HashMap<>();
         List<? extends SourceFile> acc = before;
         List<? extends SourceFile> after = acc;
