@@ -346,6 +346,48 @@ class MavenParserTest {
                 .containsExactly("junit-jupiter" to Scope.Test, "guava" to Scope.Compile)
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/323")
+    @Test
+    fun dependencyScopeTakesPrecedenceOverDependencyManagementScope() {
+        val pomSource = """<?xml version="1.0" encoding="UTF-8"?>
+            <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                    <dependencies>
+                       <dependency>
+                            <groupId>org.junit.jupiter</groupId>
+                            <artifactId>junit-jupiter</artifactId>
+                            <version>5.7.1</version>
+                            <scope>test</scope>
+                        </dependency>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.junit.jupiter</groupId>
+                        <artifactId>junit-jupiter</artifactId>
+                        <scope>compile</scope>
+                    </dependency>
+                    <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                    </dependency>
+                </dependencies>
+            </project>
+        """
+
+        val maven = MavenParser.builder().build().parse(pomSource)[0]
+        assertThat(maven.model.dependencies.map { it.artifactId to it.scope })
+                .containsExactly("junit-jupiter" to Scope.Compile, "guava" to Scope.Compile)
+    }
+
     @Test
     fun mirrorsAndAuth() {
         // Set up a web server that returns 401 to any request without an Authorization header corresponding to specific credentials
@@ -677,6 +719,5 @@ class MavenParserTest {
         assertThat(maven!!.model.dependencies)
                 .hasSize(1)
                 .matches { it.first().artifactId == "guava" && it.first().version == "29.0-jre" }
-
     }
 }
