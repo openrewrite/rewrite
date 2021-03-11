@@ -160,7 +160,7 @@ public class Space implements Markable {
                     if (last == '/' && !inSingleLineComment && !inMultiLineComment && !inJavadoc) {
                         inSingleLineComment = true;
                         comment = new StringBuilder();
-                    } else if (last == '*' && inMultiLineComment) {
+                    } else if (last == '*' && inMultiLineComment && comment.length() > 0) {
                         inMultiLineComment = false;
                         comment.setLength(comment.length() - 1); // trim the last '*'
                         comments.add(new Comment(Comment.Style.BLOCK, comment.toString(), prefix.toString()));

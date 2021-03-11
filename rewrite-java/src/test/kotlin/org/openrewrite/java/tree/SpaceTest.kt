@@ -91,6 +91,17 @@ class SpaceTest {
     }
 
     @Test
+    fun multilineCommentWithDoubleSlashCommentOnFirstLine() {
+        val cf = Space.format("""
+        /*// debugging
+        * bla
+        */
+        """.trimIndent())
+        assertThat(cf.comments).hasSize(1)
+        assertThat(cf.comments.first().text).isEqualTo("// debugging\n* bla\n")
+    }
+
+    @Test
     fun stringify() {
         assertThat(Space.format("\n  \n\t \t").toString())
             .isEqualTo("Space(comments=<0 comments>, whitespace='\\n·₁·₂\\n-₁·₂-₃')")
