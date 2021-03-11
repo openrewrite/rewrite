@@ -17,7 +17,10 @@ package org.openrewrite.maven.utilities;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.marker.JavaProvenance;
+import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
@@ -26,11 +29,14 @@ import org.openrewrite.properties.PropertiesParser;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.yaml.YamlParser;
 
+import java.io.FileReader;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -38,6 +44,9 @@ import java.util.stream.Collectors;
  * Maven, Java, YAML, properties, and XML AST representations of sources and resources found.
  */
 public class MavenProjectParser {
+
+    private static final Pattern mavenWrapperVersionPattern = Pattern.compile(".*apache-maven/(.*?)/.*");
+
     private final MavenParser mavenParser;
     private final MavenArtifactDownloader artifactDownloader;
     private final JavaParser.Builder<?, ?> javaParserBuilder;
@@ -54,8 +63,14 @@ public class MavenProjectParser {
     }
 
     public List<SourceFile> parse(Path projectDirectory) {
+        GitProvenance gitProvenance = GitProvenance.fromProjectDirectory(projectDirectory);
         List<Maven> mavens = mavenParser.parse(Maven.getMavenPoms(projectDirectory, ctx), projectDirectory, ctx);
         List<SourceFile> sourceFiles = new ArrayList<>(mavens);
+        Path rootPomPath = Paths.get("pom.xml");
+        Maven rootMaven = sourceFiles.stream().filter(f -> f.getSourcePath().equals(rootPomPath))
+                    .map(Maven.class::cast).findAny()
+                    .orElseThrow(() -> new RuntimeException("Unable to locate root pom source file"));
+        Pom rootMavenModel = rootMaven.getModel();
 
         // sort maven projects so that multi-module build dependencies parse before the dependent projects
         mavens.sort((m1, m2) -> {
@@ -75,53 +90,122 @@ public class MavenProjectParser {
         JavaParser javaParser = javaParserBuilder
                 .build();
 
+        String javaRuntimeVersion = System.getProperty("java.runtime.version");
+        String javaVendor = System.getProperty("java.vm.vendor");
+        String sourceCompatibility = javaRuntimeVersion;
+        String targetCompatibility = javaRuntimeVersion;
+        String propertiesSourceCompatibility = rootMavenModel.getValue(rootMavenModel.getEffectiveProperties().get("maven.compiler.source"));
+        if (propertiesSourceCompatibility != null) {
+            sourceCompatibility = propertiesSourceCompatibility;
+        }
+        String propertiesTargetCompatibility = rootMavenModel.getValue(rootMavenModel.getEffectiveProperties().get("maven.compiler.target"));
+        if (propertiesTargetCompatibility != null) {
+            targetCompatibility = propertiesTargetCompatibility;
+        }
+
+        Path wrapperPropertiesPath = projectDirectory.resolve(".mvn/wrapper/maven-wrapper.properties");
+        String mavenVersion = "3.6";
+        if (Files.exists(wrapperPropertiesPath)) {
+            try {
+                Properties wrapperProperties = new Properties();
+                wrapperProperties.load(new FileReader(wrapperPropertiesPath.toFile()));
+                String distributionUrl = (String) wrapperProperties.get("distributionUrl");
+                if (distributionUrl != null) {
+                    Matcher wrapperVersionMatcher = mavenWrapperVersionPattern.matcher(distributionUrl);
+                    if (wrapperVersionMatcher.matches()) {
+                        mavenVersion = wrapperVersionMatcher.group(1);
+                    }
+                }
+            } catch (IOException e) {
+                ctx.getOnError().accept(e);
+            }
+        }
+
+        JavaProvenance.BuildTool buildTool = new JavaProvenance.BuildTool(JavaProvenance.BuildTool.Type.Maven,
+                mavenVersion);
+
+        JavaProvenance.JavaVersion javaVersion = new JavaProvenance.JavaVersion(
+                javaRuntimeVersion,
+                javaVendor,
+                sourceCompatibility,
+                targetCompatibility
+        );
+
+        JavaProvenance.Publication publication = new JavaProvenance.Publication(
+                rootMavenModel.getGroupId(),
+                rootMavenModel.getArtifactId(),
+                rootMavenModel.getVersion()
+        );
+
+        JavaProvenance mainProvenance = new JavaProvenance(
+                rootMavenModel.getName(),
+                "main",
+                buildTool,
+                javaVersion,
+                publication
+        );
+
+        JavaProvenance testProvenance = new JavaProvenance(
+                rootMavenModel.getName(),
+                "test",
+                buildTool,
+                javaVersion,
+                publication
+        );
+
         for (Maven maven : mavens) {
             javaParser.setClasspath(downloadArtifacts(maven.getModel().getDependencies(Scope.Compile)));
             sourceFiles.addAll(
-                    javaParser.parse(maven.getJavaSources(projectDirectory, ctx), projectDirectory, ctx)
-            );
+                    ListUtils.map(javaParser.parse(maven.getJavaSources(projectDirectory, ctx), projectDirectory, ctx),
+                            s -> s.withMarker(mainProvenance)
+                    ));
 
             javaParser.setClasspath(downloadArtifacts(maven.getModel().getDependencies(Scope.Test)));
             sourceFiles.addAll(
-                    javaParser.parse(maven.getTestJavaSources(projectDirectory, ctx), projectDirectory, ctx)
-            );
+                    ListUtils.map(javaParser.parse(maven.getTestJavaSources(projectDirectory, ctx), projectDirectory, ctx),
+                            s -> s.withMarker(testProvenance)
+                    ));
 
-            List<Path> resources = new ArrayList<>(maven.getResources(projectDirectory, ctx));
-            resources.addAll(maven.getTestResources(projectDirectory, ctx));
-
-            sourceFiles.addAll(
-                    XmlParser.builder().build().parse(
-                            resources.stream()
-                                    .filter(p -> p.getFileName().toString().endsWith(".xml"))
-                                    .collect(Collectors.toList()),
-                            projectDirectory,
-                            ctx
-                    )
-            );
-
-            sourceFiles.addAll(
-                    YamlParser.builder().build().parse(
-                            resources.stream()
-                                    .filter(p -> p.getFileName().toString().endsWith(".yml") || p.getFileName().toString().endsWith(".yaml"))
-                                    .collect(Collectors.toList()),
-                            projectDirectory,
-                            ctx
-                    )
-            );
-
-            sourceFiles.addAll(
-                    PropertiesParser.builder().build().parse(
-                            resources.stream()
-                                    .filter(p -> p.getFileName().toString().endsWith(".properties"))
-                                    .collect(Collectors.toList()),
-                            projectDirectory,
-                            ctx
-                    )
-            );
+            parseResources(maven.getResources(projectDirectory, ctx), projectDirectory, sourceFiles, mainProvenance);
+            parseResources(maven.getTestResources(projectDirectory, ctx), projectDirectory, sourceFiles, testProvenance);
         }
 
-        return sourceFiles;
+        return ListUtils.map(sourceFiles, s -> s.withMarker(gitProvenance));
     }
+
+    private void parseResources(List<Path> resources, Path projectDirectory, List<SourceFile> sourceFiles, JavaProvenance javaProvenance) {
+        sourceFiles.addAll(
+                ListUtils.map(
+                        XmlParser.builder().build().parse(
+                                resources.stream()
+                                        .filter(p -> p.getFileName().toString().endsWith(".xml"))
+                                        .collect(Collectors.toList()),
+                                projectDirectory,
+                                ctx
+                        ), s -> s.withMarker(javaProvenance)
+                ));
+
+        sourceFiles.addAll(
+                ListUtils.map(YamlParser.builder().build().parse(
+                        resources.stream()
+                                .filter(p -> p.getFileName().toString().endsWith(".yml") || p.getFileName().toString().endsWith(".yaml"))
+                                .collect(Collectors.toList()),
+                        projectDirectory,
+                        ctx
+                        ), s -> s.withMarker(javaProvenance)
+                ));
+
+        sourceFiles.addAll(
+                ListUtils.map(PropertiesParser.builder().build().parse(
+                        resources.stream()
+                                .filter(p -> p.getFileName().toString().endsWith(".properties"))
+                                .collect(Collectors.toList()),
+                        projectDirectory,
+                        ctx
+                        ), s -> s.withMarker(javaProvenance)
+                ));
+    }
+
 
     private List<Path> downloadArtifacts(Set<Pom.Dependency> dependencies) {
         return dependencies.stream()
