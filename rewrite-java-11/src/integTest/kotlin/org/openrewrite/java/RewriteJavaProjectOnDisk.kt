@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java
 
-import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.SourceFile

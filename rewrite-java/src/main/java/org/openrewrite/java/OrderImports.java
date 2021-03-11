@@ -43,6 +43,7 @@ import java.util.Optional;
 @NoArgsConstructor
 public class OrderImports extends Recipe {
 
+    @SuppressWarnings("FieldMayBeFinal")
     @Getter
     @With
     @Option(displayName = "Remove unused", description = "Remove unnecessary imports.", required = false)

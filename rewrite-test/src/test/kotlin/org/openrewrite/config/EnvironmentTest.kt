@@ -37,6 +37,7 @@ class EnvironmentTest : RecipeTest {
                     """
                         type: specs.openrewrite.org/v1beta/recipe
                         name: test.ChangeTextToHello
+                        displayName: Change text to hello
                         recipeList:
                             - org.openrewrite.text.ChangeText:
                                 toText: Hello
@@ -86,11 +87,13 @@ class EnvironmentTest : RecipeTest {
                     """
                         type: specs.openrewrite.org/v1beta/recipe
                         name: test.TextMigration
+                        displayName: Text migration
                         recipeList:
                             - test.ChangeTextToHello
                         ---
                         type: specs.openrewrite.org/v1beta/recipe
                         name: test.ChangeTextToHello
+                        displayName: Change text to hello
                         recipeList:
                             - org.openrewrite.text.ChangeText:
                                 toText: Hello
@@ -116,6 +119,7 @@ class EnvironmentTest : RecipeTest {
                     """
                         type: specs.openrewrite.org/v1beta/recipe
                         name: test.TextMigration
+                        displayName: Text migration
                         recipeList:
                             - test.ChangeTextToHello
                     """.trimIndent().byteInputStream(),
@@ -128,6 +132,7 @@ class EnvironmentTest : RecipeTest {
                     """
                         type: specs.openrewrite.org/v1beta/recipe
                         name: test.ChangeTextToHello
+                        displayName: Change text to hello
                         recipeList:
                             - org.openrewrite.text.ChangeText:
                                 toText: Hello
@@ -153,6 +158,7 @@ class EnvironmentTest : RecipeTest {
                     """
                         type: specs.openrewrite.org/v1beta/recipe
                         name: test.TextMigration
+                        displayName: Text migration
                         recipeList:
                             - test.DoesNotExist
                     """.trimIndent().byteInputStream(),

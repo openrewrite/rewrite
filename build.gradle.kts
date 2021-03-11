@@ -21,7 +21,7 @@ plugins {
 
     id("com.github.johnrengelman.shadow") version "6.1.0" apply false
     id("com.github.hierynomus.license") version "0.15.0" apply false
-    id("org.jetbrains.kotlin.jvm") version "1.4.21" apply false
+    id("org.jetbrains.kotlin.jvm") version "1.4.31" apply false
     id("org.gradle.test-retry") version "1.1.6" apply false
     id("com.github.jk1.dependency-license-report") version "1.16" apply false
 
@@ -115,8 +115,8 @@ subprojects {
     tasks.withType(KotlinCompile::class.java) {
         kotlinOptions {
             jvmTarget = "1.8"
+            useIR = true
         }
-
         destinationDir.mkdirs()
     }
 
