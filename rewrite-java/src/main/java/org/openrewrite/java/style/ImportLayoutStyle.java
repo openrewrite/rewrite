@@ -55,16 +55,16 @@ import static org.openrewrite.internal.StreamUtils.distinctBy;
  */
 @Getter
 public class ImportLayoutStyle implements JavaStyle {
-    private final int classCountToUseStarImport;
-    private final int nameCountToUseStarImport;
+    private final Integer classCountToUseStarImport;
+    private final Integer nameCountToUseStarImport;
 
     @JsonTypeInfo(use = JsonTypeInfo.Id.NONE)
     @JsonDeserialize(using = BlockDeserializer.class)
     @JsonSerialize(using = BlockSerializer.class)
     private final List<Block> layout;
 
-    public ImportLayoutStyle(@JsonProperty("classCountToUseStarImport") int classCountToUseStarImport,
-                             @JsonProperty("nameCountToUseStarImport") int nameCountToUseStarImport,
+    public ImportLayoutStyle(@JsonProperty("classCountToUseStarImport") Integer classCountToUseStarImport,
+                             @JsonProperty("nameCountToUseStarImport") Integer nameCountToUseStarImport,
                              @JsonProperty("layout") List<Block> layout) {
         this.classCountToUseStarImport = classCountToUseStarImport;
         this.nameCountToUseStarImport = nameCountToUseStarImport;
@@ -93,7 +93,7 @@ public class ImportLayoutStyle implements JavaStyle {
 
         // Allocate imports to blocks, preferring to put imports into non-catchall blocks
         for (JRightPadded<J.Import> anImport : originalImports) {
-            boolean accepted = false;
+            Boolean accepted = false;
             for (Block block : blocksNoCatchalls) {
                 if (block.accept(anImport)) {
                     accepted = true;
@@ -143,8 +143,8 @@ public class ImportLayoutStyle implements JavaStyle {
 
     public static class Builder {
         private final List<Block> blocks = new ArrayList<>();
-        private int classCountToUseStarImport = 5;
-        private int nameCountToUseStarImport = 3;
+        private Integer classCountToUseStarImport = 5;
+        private Integer nameCountToUseStarImport = 3;
 
         public Builder importAllOthers() {
             blocks.add(new Block.AllOthers(false, classCountToUseStarImport, nameCountToUseStarImport));
@@ -166,7 +166,7 @@ public class ImportLayoutStyle implements JavaStyle {
             return this;
         }
 
-        public Builder importPackage(String packageWildcard, boolean withSubpackages) {
+        public Builder importPackage(String packageWildcard, Boolean withSubpackages) {
             blocks.add(new Block.ImportPackage(false, packageWildcard, withSubpackages, classCountToUseStarImport, nameCountToUseStarImport));
             return this;
         }
@@ -175,7 +175,7 @@ public class ImportLayoutStyle implements JavaStyle {
             return importPackage(packageWildcard, true);
         }
 
-        public Builder staticImportPackage(String packageWildcard, boolean withSubpackages) {
+        public Builder staticImportPackage(String packageWildcard, Boolean withSubpackages) {
             blocks.add(new Block.ImportPackage(true, packageWildcard, withSubpackages, classCountToUseStarImport, nameCountToUseStarImport));
             return this;
         }
@@ -184,12 +184,12 @@ public class ImportLayoutStyle implements JavaStyle {
             return staticImportPackage(packageWildcard, true);
         }
 
-        public Builder classCountToUseStarImport(int classCountToUseStarImport) {
+        public Builder classCountToUseStarImport(Integer classCountToUseStarImport) {
             this.classCountToUseStarImport = classCountToUseStarImport;
             return this;
         }
 
-        public Builder nameCountToUseStarImport(int nameCountToUseStarImport) {
+        public Builder nameCountToUseStarImport(Integer nameCountToUseStarImport) {
             this.nameCountToUseStarImport = nameCountToUseStarImport;
             return this;
         }
@@ -220,7 +220,7 @@ public class ImportLayoutStyle implements JavaStyle {
          * @param anImport The import to be compared against the block's matching rules.
          * @return true if the import was a match (and was stored within the block)
          */
-        boolean accept(JRightPadded<J.Import> anImport);
+        Boolean accept(JRightPadded<J.Import> anImport);
 
         /**
          * @return Imports belonging to this block, folded appropriately.
@@ -238,7 +238,7 @@ public class ImportLayoutStyle implements JavaStyle {
             }
 
             @Override
-            public boolean accept(JRightPadded<J.Import> anImport) {
+            public Boolean accept(JRightPadded<J.Import> anImport) {
                 return false;
             }
 
@@ -271,13 +271,13 @@ public class ImportLayoutStyle implements JavaStyle {
 
             private final List<JRightPadded<J.Import>> imports = new ArrayList<>();
 
-            private final boolean statik;
+            private final Boolean statik;
             private final Pattern packageWildcard;
-            private final int classCountToUseStarImport;
-            private final int nameCountToUseStarImport;
+            private final Integer classCountToUseStarImport;
+            private final Integer nameCountToUseStarImport;
 
-            public ImportPackage(boolean statik, String packageWildcard, boolean withSubpackages,
-                                 int classCountToUseStarImport, int nameCountToUseStarImport) {
+            public ImportPackage(Boolean statik, String packageWildcard, Boolean withSubpackages,
+                                 Integer classCountToUseStarImport, Integer nameCountToUseStarImport) {
                 this.statik = statik;
                 this.classCountToUseStarImport = classCountToUseStarImport;
                 this.nameCountToUseStarImport = nameCountToUseStarImport;
@@ -286,7 +286,7 @@ public class ImportLayoutStyle implements JavaStyle {
                         .replace("*", withSubpackages ? ".+" : "[^.]+"));
             }
 
-            public boolean isStatic() {
+            public Boolean isStatic() {
                 return statik;
             }
 
@@ -295,7 +295,7 @@ public class ImportLayoutStyle implements JavaStyle {
             }
 
             @Override
-            public boolean accept(JRightPadded<J.Import> anImport) {
+            public Boolean accept(JRightPadded<J.Import> anImport) {
                 if (anImport.getElement().isStatic() == statik &&
                         packageWildcard.matcher(anImport.getElement().getQualid().printTrimmed()).matches()) {
                     imports.add(anImport);
@@ -330,9 +330,9 @@ public class ImportLayoutStyle implements JavaStyle {
                 return groupedImports.values().stream()
                         .flatMap(importGroup -> {
                             JRightPadded<J.Import> toStar = importGroup.get(0);
-                            boolean statik1 = toStar.getElement().isStatic();
-                            int threshold = statik1 ? nameCountToUseStarImport : classCountToUseStarImport;
-                            boolean starImportExists = importGroup.stream()
+                            Boolean statik1 = toStar.getElement().isStatic();
+                            Integer threshold = statik1 ? nameCountToUseStarImport : classCountToUseStarImport;
+                            Boolean starImportExists = importGroup.stream()
                                     .anyMatch(it -> it.getElement().getQualid().getSimpleName().equals("*"));
                             if (importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1)) {
                                 J.FieldAccess qualid = toStar.getElement().getQualid();
@@ -362,10 +362,10 @@ public class ImportLayoutStyle implements JavaStyle {
         }
 
         class AllOthers extends Block.ImportPackage {
-            private final boolean statik;
+            private final Boolean statik;
             private Collection<ImportPackage> packageImports = emptyList();
 
-            public AllOthers(boolean statik, int classCountToUseStarImport, int nameCountToUseStarImport) {
+            public AllOthers(Boolean statik, Integer classCountToUseStarImport, Integer nameCountToUseStarImport) {
                 super(statik, "*", true,
                         classCountToUseStarImport, nameCountToUseStarImport);
                 this.statik = statik;
@@ -375,12 +375,12 @@ public class ImportLayoutStyle implements JavaStyle {
                 this.packageImports = packageImports;
             }
 
-            public boolean isStatic() {
+            public Boolean isStatic() {
                 return statik;
             }
 
             @Override
-            public boolean accept(JRightPadded<J.Import> anImport) {
+            public Boolean accept(JRightPadded<J.Import> anImport) {
                 if (packageImports.stream().noneMatch(pi -> pi.accept(anImport))) {
                     super.accept(anImport);
                 }
@@ -400,7 +400,7 @@ public class ImportLayoutStyle implements JavaStyle {
                     builder.blankLine();
                 } else if (block.startsWith("import ")) {
                     block = block.substring("import ".length());
-                    boolean statik = false;
+                    Boolean statik = false;
                     if (block.startsWith("static")) {
                         statik = true;
                         block = block.substring("static ".length());

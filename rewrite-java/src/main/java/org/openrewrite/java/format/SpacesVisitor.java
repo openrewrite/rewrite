@@ -84,10 +84,10 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
-        c = c.withBody(spaceBefore(c.getBody(), style.getBeforeLeftBrace().isClassLeftBrace()));
+        c = c.withBody(spaceBefore(c.getBody(), style.getBeforeLeftBrace().getClassLeftBrace()));
         if (c.getBody().getStatements().isEmpty()) {
             if (c.getKind() != J.ClassDeclaration.Kind.Type.Enum) {
-                boolean withinCodeBraces = style.getWithin().isCodeBraces();
+                boolean withinCodeBraces = style.getWithin().getCodeBraces();
                 if (withinCodeBraces && StringUtils.isNullOrEmpty(c.getBody().getEnd().getWhitespace())) {
                     c = c.withBody(
                             c.getBody().withEnd(
@@ -102,7 +102,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     );
                 }
             } else {
-                boolean spaceInsideOneLineEnumBraces = style.getOther().isInsideOneLineEnumBraces();
+                boolean spaceInsideOneLineEnumBraces = style.getOther().getInsideOneLineEnumBraces();
                 if (spaceInsideOneLineEnumBraces && StringUtils.isNullOrEmpty(c.getBody().getEnd().getWhitespace())) {
                     c = c.withBody(c.getBody().withEnd(c.getBody().getEnd().withWhitespace(" ")));
                 } else if (!spaceInsideOneLineEnumBraces && c.getBody().getEnd().getWhitespace().equals(" ")) {
@@ -113,11 +113,11 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         if (c.getPadding().getTypeParameters() != null) {
             c = c.getPadding().withTypeParameters(
                     spaceBefore(c.getPadding().getTypeParameters(),
-                            style.getTypeParameters().isBeforeOpeningAngleBracket())
+                            style.getTypeParameters().getBeforeOpeningAngleBracket())
             );
         }
         if (c.getPadding().getTypeParameters() != null) {
-            boolean spaceWithinAngleBrackets = style.getWithin().isAngleBrackets();
+            boolean spaceWithinAngleBrackets = style.getWithin().getAngleBrackets();
             int typeParametersSize = c.getPadding().getTypeParameters().getElements().size();
             c = c.getPadding().withTypeParameters(
                     c.getPadding().getTypeParameters().getPadding().withElements(
@@ -130,7 +130,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                                         } else {
                                             elemContainer = elemContainer.withElement(
                                                     spaceBefore(elemContainer.getElement(),
-                                                            style.getOther().isAfterComma())
+                                                            style.getOther().getAfterComma())
                                             );
                                         }
                                         if (index == typeParametersSize - 1) {
@@ -149,13 +149,13 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
         m = m.getPadding().withParameters(
-                spaceBefore(m.getPadding().getParameters(), style.getBeforeParentheses().isMethodDeclaration()));
+                spaceBefore(m.getPadding().getParameters(), style.getBeforeParentheses().getMethodDeclaration()));
         if (m.getBody() != null) {
-            m = m.withBody(spaceBefore(m.getBody(), style.getBeforeLeftBrace().isMethodLeftBrace()));
+            m = m.withBody(spaceBefore(m.getBody(), style.getBeforeLeftBrace().getMethodLeftBrace()));
         }
         Statement firstParam = m.getParameters().iterator().next();
         if (firstParam instanceof J.Empty) {
-            boolean useSpace = style.getWithin().isEmptyMethodDeclarationParentheses();
+            boolean useSpace = style.getWithin().getEmptyMethodDeclarationParentheses();
             m = m.getPadding().withParameters(
                     m.getPadding().getParameters().getPadding().withElements(
                             ListUtils.map(m.getPadding().getParameters().getPadding().getElements(),
@@ -165,7 +165,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             );
         } else {
             final int paramsSize = m.getParameters().size();
-            boolean useSpace = style.getWithin().isMethodDeclarationParentheses();
+            boolean useSpace = style.getWithin().getMethodDeclarationParentheses();
             m = m.getPadding().withParameters(
                     m.getPadding().getParameters().getPadding().withElements(
                             ListUtils.map(m.getPadding().getParameters().getPadding().getElements(),
@@ -174,13 +174,13 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                                             param = param.withElement(spaceBefore(param.getElement(), useSpace));
                                         } else {
                                             param = param.withElement(
-                                                    spaceBefore(param.getElement(), style.getOther().isAfterComma())
+                                                    spaceBefore(param.getElement(), style.getOther().getAfterComma())
                                             );
                                         }
                                         if (index == paramsSize - 1) {
                                             param = spaceAfter(param, useSpace);
                                         } else {
-                                            param = spaceAfter(param, style.getOther().isBeforeComma());
+                                            param = spaceAfter(param, style.getOther().getBeforeComma());
                                         }
                                         return param;
                                     }
@@ -189,7 +189,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             );
         }
         if (m.getAnnotations().getTypeParameters() != null) {
-            boolean spaceWithinAngleBrackets = style.getWithin().isAngleBrackets();
+            boolean spaceWithinAngleBrackets = style.getWithin().getAngleBrackets();
             int typeParametersSize = m.getAnnotations().getTypeParameters().getTypeParameters().size();
             m = m.getAnnotations().withTypeParameters(
                     m.getAnnotations().getTypeParameters().getPadding().withTypeParameters(
@@ -202,7 +202,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                                         } else {
                                             elemContainer = elemContainer.withElement(
                                                     spaceBefore(elemContainer.getElement(),
-                                                            style.getOther().isAfterComma())
+                                                            style.getOther().getAfterComma())
                                             );
                                         }
                                         if (index == typeParametersSize - 1) {
@@ -219,10 +219,10 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
         J.MethodInvocation m = super.visitMethodInvocation(method, p);
-        m = m.getPadding().withArguments(spaceBefore(m.getPadding().getArguments(), style.getBeforeParentheses().isMethodCall()));
+        m = m.getPadding().withArguments(spaceBefore(m.getPadding().getArguments(), style.getBeforeParentheses().getMethodCall()));
         Expression firstArg = m.getArguments().iterator().next();
         if (firstArg instanceof J.Empty) {
-            boolean useSpace = style.getWithin().isEmptyMethodCallParentheses();
+            boolean useSpace = style.getWithin().getEmptyMethodCallParentheses();
             m = m.getPadding().withArguments(
                     m.getPadding().getArguments().getPadding().withElements(
                             ListUtils.map(m.getPadding().getArguments().getPadding().getElements(),
@@ -232,7 +232,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             );
         } else {
             final int argsSize = m.getArguments().size();
-            boolean useSpace = style.getWithin().isMethodCallParentheses();
+            boolean useSpace = style.getWithin().getMethodCallParentheses();
             m = m.getPadding().withArguments(
                     m.getPadding().getArguments().getPadding().withElements(
                             ListUtils.map(m.getPadding().getArguments().getPadding().getElements(),
@@ -241,13 +241,13 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                                             arg = arg.withElement(spaceBefore(arg.getElement(), useSpace));
                                         } else {
                                             arg = arg.withElement(
-                                                    spaceBefore(arg.getElement(), style.getOther().isAfterComma())
+                                                    spaceBefore(arg.getElement(), style.getOther().getAfterComma())
                                             );
                                         }
                                         if (index == argsSize - 1) {
                                             arg = spaceAfter(arg, useSpace);
                                         } else {
-                                            arg = spaceAfter(arg, style.getOther().isBeforeComma());
+                                            arg = spaceAfter(arg, style.getOther().getBeforeComma());
                                         }
                                         return arg;
                                     }
@@ -258,9 +258,9 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         if (m.getPadding().getTypeParameters() != null) {
             m = m.getPadding().withTypeParameters(
                     spaceBefore(m.getPadding().getTypeParameters(),
-                            style.getTypeArguments().isBeforeOpeningAngleBracket())
+                            style.getTypeArguments().getBeforeOpeningAngleBracket())
             );
-            m = m.withName(spaceBefore(m.getName(), style.getTypeArguments().isAfterClosingAngleBracket()));
+            m = m.withName(spaceBefore(m.getName(), style.getTypeArguments().getAfterClosingAngleBracket()));
         }
         if (m.getPadding().getTypeParameters() != null) {
             m = m.getPadding().withTypeParameters(
@@ -270,7 +270,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                                         if (index != 0) {
                                             elemContainer = elemContainer.withElement(
                                                     spaceBefore(elemContainer.getElement(),
-                                                            style.getTypeArguments().isAfterComma())
+                                                            style.getTypeArguments().getAfterComma())
                                             );
                                         }
                                         return elemContainer;
@@ -285,9 +285,9 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.If visitIf(J.If iff, P p) {
         J.If i = super.visitIf(iff, p);
-        i = i.withIfCondition(spaceBefore(i.getIfCondition(), style.getBeforeParentheses().isIfParentheses()));
-        i = i.getPadding().withThenPart(spaceBeforeRightPaddedElement(i.getPadding().getThenPart(), style.getBeforeLeftBrace().isIfLeftBrace()));
-        boolean useSpaceWithinIfParentheses = style.getWithin().isIfParentheses();
+        i = i.withIfCondition(spaceBefore(i.getIfCondition(), style.getBeforeParentheses().getIfParentheses()));
+        i = i.getPadding().withThenPart(spaceBeforeRightPaddedElement(i.getPadding().getThenPart(), style.getBeforeLeftBrace().getIfLeftBrace()));
+        boolean useSpaceWithinIfParentheses = style.getWithin().getIfParentheses();
         i = i.withIfCondition(
                 i.getIfCondition().getPadding().withTree(
                         spaceAfter(
@@ -305,8 +305,8 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.If.Else visitElse(J.If.Else elze, P p) {
         J.If.Else e = super.visitElse(elze, p);
-        e = e.getPadding().withBody(spaceBeforeRightPaddedElement(e.getPadding().getBody(), style.getBeforeLeftBrace().isElseLeftBrace()));
-        e = spaceBefore(e, style.getBeforeKeywords().isElseKeyword());
+        e = e.getPadding().withBody(spaceBeforeRightPaddedElement(e.getPadding().getBody(), style.getBeforeLeftBrace().getElseLeftBrace()));
+        e = spaceBefore(e, style.getBeforeKeywords().getElseKeyword());
         return e;
     }
 
@@ -314,13 +314,13 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     public J.ForLoop visitForLoop(J.ForLoop forLoop, P p) {
         J.ForLoop f = super.visitForLoop(forLoop, p);
         J.ForLoop.Control control = f.getControl();
-        control = spaceBefore(control, style.getBeforeParentheses().isForParentheses());
-        boolean spaceWithinForParens = style.getWithin().isForParentheses();
+        control = spaceBefore(control, style.getBeforeParentheses().getForParentheses());
+        boolean spaceWithinForParens = style.getWithin().getForParentheses();
         control = control.withInit(
                 spaceBefore(f.getControl().getInit(), spaceWithinForParens)
         );
-        boolean spaceBeforeSemicolon = style.getOther().isBeforeForSemicolon();
-        boolean spaceAfterSemicolon = style.getOther().isAfterForSemicolon();
+        boolean spaceBeforeSemicolon = style.getOther().getBeforeForSemicolon();
+        boolean spaceAfterSemicolon = style.getOther().getAfterForSemicolon();
         control = control.getPadding().withInit(
                 spaceAfter(control.getPadding().getInit(), spaceBeforeSemicolon)
         );
@@ -342,29 +342,29 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                                 );
                             } else {
                                 elemContainer = elemContainer.withElement(
-                                        spaceBefore(elemContainer.getElement(), style.getOther().isAfterComma())
+                                        spaceBefore(elemContainer.getElement(), style.getOther().getAfterComma())
                                 );
                             }
                             if (index == updateStatementsSize - 1) {
                                 elemContainer = spaceAfter(elemContainer, spaceWithinForParens);
                             } else {
-                                elemContainer = spaceAfter(elemContainer, style.getOther().isBeforeComma());
+                                elemContainer = spaceAfter(elemContainer, style.getOther().getBeforeComma());
                             }
                             return elemContainer;
                         }
                 )
         );
         f = f.withControl(control);
-        f = f.getPadding().withBody(spaceBeforeRightPaddedElement(f.getPadding().getBody(), style.getBeforeLeftBrace().isForLeftBrace()));
+        f = f.getPadding().withBody(spaceBeforeRightPaddedElement(f.getPadding().getBody(), style.getBeforeLeftBrace().getForLeftBrace()));
         return f;
     }
 
     @Override
     public J.ForEachLoop visitForEachLoop(J.ForEachLoop forLoop, P p) {
         J.ForEachLoop f = super.visitForEachLoop(forLoop, p);
-        f = f.withControl(spaceBefore(f.getControl(), style.getBeforeParentheses().isForParentheses()));
-        f = f.getPadding().withBody(spaceBeforeRightPaddedElement(f.getPadding().getBody(), style.getBeforeLeftBrace().isForLeftBrace()));
-        boolean spaceWithinForParens = style.getWithin().isForParentheses();
+        f = f.withControl(spaceBefore(f.getControl(), style.getBeforeParentheses().getForParentheses()));
+        f = f.getPadding().withBody(spaceBeforeRightPaddedElement(f.getPadding().getBody(), style.getBeforeLeftBrace().getForLeftBrace()));
+        boolean spaceWithinForParens = style.getWithin().getForParentheses();
         f = f.withControl(
                 f.getControl().withVariable(
                         spaceBefore(f.getControl().getVariable(), spaceWithinForParens)
@@ -377,7 +377,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         );
         f = f.withControl(
                 f.getControl().getPadding().withVariable(
-                        spaceAfter(f.getControl().getPadding().getVariable(), style.getOther().isBeforeColonInForEach())
+                        spaceAfter(f.getControl().getPadding().getVariable(), style.getOther().getBeforeColonInForEach())
                 )
         );
         return f;
@@ -386,9 +386,9 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.WhileLoop visitWhileLoop(J.WhileLoop whileLoop, P p) {
         J.WhileLoop w = super.visitWhileLoop(whileLoop, p);
-        w = w.withCondition(spaceBefore(w.getCondition(), style.getBeforeParentheses().isWhileParentheses()));
-        w = w.getPadding().withBody(spaceBeforeRightPaddedElement(w.getPadding().getBody(), style.getBeforeLeftBrace().isWhileLeftBrace()));
-        boolean spaceWithinWhileParens = style.getWithin().isWhileParentheses();
+        w = w.withCondition(spaceBefore(w.getCondition(), style.getBeforeParentheses().getWhileParentheses()));
+        w = w.getPadding().withBody(spaceBeforeRightPaddedElement(w.getPadding().getBody(), style.getBeforeLeftBrace().getWhileLeftBrace()));
+        boolean spaceWithinWhileParens = style.getWithin().getWhileParentheses();
         w = w.withCondition(
                 w.getCondition().withTree(
                         spaceBefore(w.getCondition().getTree(), spaceWithinWhileParens)
@@ -405,10 +405,10 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.DoWhileLoop visitDoWhileLoop(J.DoWhileLoop doWhileLoop, P p) {
         J.DoWhileLoop d = super.visitDoWhileLoop(doWhileLoop, p);
-        d = d.getPadding().withWhileCondition(spaceBefore(d.getPadding().getWhileCondition(), style.getBeforeKeywords().isWhileKeyword()));
-        d = d.getPadding().withWhileCondition(spaceBeforeLeftPaddedElement(d.getPadding().getWhileCondition(), style.getBeforeParentheses().isWhileParentheses()));
-        d = d.getPadding().withBody(spaceBeforeRightPaddedElement(d.getPadding().getBody(), style.getBeforeLeftBrace().isDoLeftBrace()));
-        boolean spaceWithinWhileParens = style.getWithin().isWhileParentheses();
+        d = d.getPadding().withWhileCondition(spaceBefore(d.getPadding().getWhileCondition(), style.getBeforeKeywords().getWhileKeyword()));
+        d = d.getPadding().withWhileCondition(spaceBeforeLeftPaddedElement(d.getPadding().getWhileCondition(), style.getBeforeParentheses().getWhileParentheses()));
+        d = d.getPadding().withBody(spaceBeforeRightPaddedElement(d.getPadding().getBody(), style.getBeforeLeftBrace().getDoLeftBrace()));
+        boolean spaceWithinWhileParens = style.getWithin().getWhileParentheses();
         d = d.withWhileCondition(
                 d.getWhileCondition().withTree(
                         spaceBefore(d.getWhileCondition().getTree(), spaceWithinWhileParens)
@@ -425,9 +425,9 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.Switch visitSwitch(J.Switch _switch, P p) {
         J.Switch s = super.visitSwitch(_switch, p);
-        s = s.withSelector(spaceBefore(s.getSelector(), style.getBeforeParentheses().isSwitchParentheses()));
-        s = s.withCases(spaceBefore(s.getCases(), style.getBeforeLeftBrace().isSwitchLeftBrace()));
-        boolean spaceWithinSwitchParens = style.getWithin().isSwitchParentheses();
+        s = s.withSelector(spaceBefore(s.getSelector(), style.getBeforeParentheses().getSwitchParentheses()));
+        s = s.withCases(spaceBefore(s.getCases(), style.getBeforeLeftBrace().getSwitchLeftBrace()));
+        boolean spaceWithinSwitchParens = style.getWithin().getSwitchParentheses();
         s = s.withSelector(
                 s.getSelector().withTree(
                         spaceBefore(s.getSelector().getTree(), spaceWithinSwitchParens)
@@ -445,15 +445,15 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     public J.Try visitTry(J.Try _try, P p) {
         J.Try t = super.visitTry(_try, p);
         if (t.getPadding().getResources() != null) {
-            t = t.getPadding().withResources(spaceBefore(t.getPadding().getResources(), style.getBeforeParentheses().isTryParentheses()));
+            t = t.getPadding().withResources(spaceBefore(t.getPadding().getResources(), style.getBeforeParentheses().getTryParentheses()));
         }
-        t = t.withBody(spaceBefore(t.getBody(), style.getBeforeLeftBrace().isTryLeftBrace()));
+        t = t.withBody(spaceBefore(t.getBody(), style.getBeforeLeftBrace().getTryLeftBrace()));
         if (t.getPadding().getFinally() != null) {
-            JLeftPadded<J.Block> f = spaceBefore(t.getPadding().getFinally(), style.getBeforeKeywords().isFinallyKeyword());
-            f = spaceBeforeLeftPaddedElement(f, style.getBeforeLeftBrace().isFinallyLeftBrace());
+            JLeftPadded<J.Block> f = spaceBefore(t.getPadding().getFinally(), style.getBeforeKeywords().getFinallyKeyword());
+            f = spaceBeforeLeftPaddedElement(f, style.getBeforeLeftBrace().getFinallyLeftBrace());
             t = t.getPadding().withFinally(f);
         }
-        boolean spaceWithinTryParentheses = style.getWithin().isTryParentheses();
+        boolean spaceWithinTryParentheses = style.getWithin().getTryParentheses();
         if (t.getResources() != null) {
             t = t.withResources(ListUtils.mapFirst(t.getResources(), res -> spaceBefore(res, spaceWithinTryParentheses)));
         }
@@ -472,10 +472,10 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.Try.Catch visitCatch(J.Try.Catch _catch, P p) {
         J.Try.Catch c = super.visitCatch(_catch, p);
-        c = spaceBefore(c, style.getBeforeKeywords().isCatchKeyword());
-        c = c.withParameter(spaceBefore(c.getParameter(), style.getBeforeParentheses().isCatchParentheses()));
-        c = c.withBody(spaceBefore(c.getBody(), style.getBeforeLeftBrace().isCatchLeftBrace()));
-        boolean spaceWithinCatchParens = style.getWithin().isCatchParentheses();
+        c = spaceBefore(c, style.getBeforeKeywords().getCatchKeyword());
+        c = c.withParameter(spaceBefore(c.getParameter(), style.getBeforeParentheses().getCatchParentheses()));
+        c = c.withBody(spaceBefore(c.getBody(), style.getBeforeLeftBrace().getCatchLeftBrace()));
+        boolean spaceWithinCatchParens = style.getWithin().getCatchParentheses();
         c = c.withParameter(
                 c.getParameter().withTree(
                         spaceBefore(c.getParameter().getTree(), spaceWithinCatchParens)
@@ -492,9 +492,9 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.Synchronized visitSynchronized(J.Synchronized sync, P p) {
         J.Synchronized s = super.visitSynchronized(sync, p);
-        s = s.withLock(spaceBefore(s.getLock(), style.getBeforeParentheses().isSynchronizedParentheses()));
-        s = s.withBody(spaceBefore(s.getBody(), style.getBeforeLeftBrace().isSynchronizedLeftBrace()));
-        boolean spaceWithinSynchronizedParens = style.getWithin().isSynchronizedParentheses();
+        s = s.withLock(spaceBefore(s.getLock(), style.getBeforeParentheses().getSynchronizedParentheses()));
+        s = s.withBody(spaceBefore(s.getBody(), style.getBeforeLeftBrace().getSynchronizedLeftBrace()));
+        boolean spaceWithinSynchronizedParens = style.getWithin().getSynchronizedParentheses();
         s = s.withLock(
                 s.getLock().withTree(
                         spaceBefore(s.getLock().getTree(), spaceWithinSynchronizedParens)
@@ -513,9 +513,9 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         J.Annotation a = super.visitAnnotation(annotation, p);
         if (a.getPadding().getArguments() != null) {
             a = a.getPadding().withArguments(spaceBefore(a.getPadding().getArguments(),
-                    style.getBeforeParentheses().isAnnotationParameters()));
+                    style.getBeforeParentheses().getAnnotationParameters()));
         }
-        boolean spaceWithinAnnotationParentheses = style.getWithin().isAnnotationParentheses();
+        boolean spaceWithinAnnotationParentheses = style.getWithin().getAnnotationParentheses();
         if (a.getPadding().getArguments() != null) {
             int argsSize = a.getPadding().getArguments().getElements().size();
             a = a.getPadding().withArguments(
@@ -526,7 +526,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                                             // don't overwrite changes made by before left brace annotation array
                                             // initializer setting when space within annotation parens is false
                                             if (spaceWithinAnnotationParentheses ||
-                                                    !style.getBeforeLeftBrace().isAnnotationArrayInitializerLeftBrace()) {
+                                                    !style.getBeforeLeftBrace().getAnnotationArrayInitializerLeftBrace()) {
                                                 arg = arg.withElement(
                                                         spaceBefore(arg.getElement(), spaceWithinAnnotationParentheses)
                                                 );
@@ -547,10 +547,10 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.Assignment visitAssignment(J.Assignment assignment, P p) {
         J.Assignment a = super.visitAssignment(assignment, p);
-        a = a.getPadding().withAssignment(spaceBefore(a.getPadding().getAssignment(), style.getAroundOperators().isAssignment()));
+        a = a.getPadding().withAssignment(spaceBefore(a.getPadding().getAssignment(), style.getAroundOperators().getAssignment()));
         a = a.getPadding().withAssignment(
                 a.getPadding().getAssignment().withElement(
-                        spaceBefore(a.getPadding().getAssignment().getElement(), style.getAroundOperators().isAssignment())
+                        spaceBefore(a.getPadding().getAssignment().getElement(), style.getAroundOperators().getAssignment())
                 )
         );
         return a;
@@ -562,20 +562,20 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         J.AssignmentOperation.Padding padding = a.getPadding();
         JLeftPadded<J.AssignmentOperation.Type> operator = padding.getOperator();
         String operatorBeforeWhitespace = operator.getBefore().getWhitespace();
-        if (style.getAroundOperators().isAssignment() && StringUtils.isNullOrEmpty(operatorBeforeWhitespace)) {
+        if (style.getAroundOperators().getAssignment() && StringUtils.isNullOrEmpty(operatorBeforeWhitespace)) {
             a = padding.withOperator(
                     operator.withBefore(
                             operator.getBefore().withWhitespace(" ")
                     )
             );
-        } else if (!style.getAroundOperators().isAssignment() && operatorBeforeWhitespace.equals(" ")) {
+        } else if (!style.getAroundOperators().getAssignment() && operatorBeforeWhitespace.equals(" ")) {
             a = padding.withOperator(
                     operator.withBefore(
                             operator.getBefore().withWhitespace("")
                     )
             );
         }
-        a = a.withAssignment(spaceBefore(a.getAssignment(), style.getAroundOperators().isAssignment()));
+        a = a.withAssignment(spaceBefore(a.getAssignment(), style.getAroundOperators().getAssignment()));
         return a;
     }
 
@@ -583,13 +583,13 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
         J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, p);
         if (v.getPadding().getInitializer() != null) {
-            v = v.getPadding().withInitializer(spaceBefore(v.getPadding().getInitializer(), style.getAroundOperators().isAssignment()));
+            v = v.getPadding().withInitializer(spaceBefore(v.getPadding().getInitializer(), style.getAroundOperators().getAssignment()));
         }
         if (v.getPadding().getInitializer() != null) {
             if (v.getPadding().getInitializer().getElement() != null) {
                 v = v.getPadding().withInitializer(
                         v.getPadding().getInitializer().withElement(
-                                spaceBefore(v.getPadding().getInitializer().getElement(), style.getAroundOperators().isAssignment())
+                                spaceBefore(v.getPadding().getInitializer().getElement(), style.getAroundOperators().getAssignment())
                         )
                 );
             }
@@ -604,36 +604,36 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         switch (operator) {
             case And:
             case Or:
-                b = applyBinarySpaceAround(b, style.getAroundOperators().isLogical());
+                b = applyBinarySpaceAround(b, style.getAroundOperators().getLogical());
                 break;
             case Equal:
             case NotEqual:
-                b = applyBinarySpaceAround(b, style.getAroundOperators().isEquality());
+                b = applyBinarySpaceAround(b, style.getAroundOperators().getEquality());
                 break;
             case LessThan:
             case LessThanOrEqual:
             case GreaterThan:
             case GreaterThanOrEqual:
-                b = applyBinarySpaceAround(b, style.getAroundOperators().isRelational());
+                b = applyBinarySpaceAround(b, style.getAroundOperators().getRelational());
                 break;
             case BitAnd:
             case BitOr:
             case BitXor:
-                b = applyBinarySpaceAround(b, style.getAroundOperators().isBitwise());
+                b = applyBinarySpaceAround(b, style.getAroundOperators().getBitwise());
                 break;
             case Addition:
             case Subtraction:
-                b = applyBinarySpaceAround(b, style.getAroundOperators().isAdditive());
+                b = applyBinarySpaceAround(b, style.getAroundOperators().getAdditive());
                 break;
             case Multiplication:
             case Division:
             case Modulo:
-                b = applyBinarySpaceAround(b, style.getAroundOperators().isMultiplicative());
+                b = applyBinarySpaceAround(b, style.getAroundOperators().getMultiplicative());
                 break;
             case LeftShift:
             case RightShift:
             case UnsignedRightShift:
-                b = applyBinarySpaceAround(b, style.getAroundOperators().isShift());
+                b = applyBinarySpaceAround(b, style.getAroundOperators().getShift());
                 break;
         }
         return b;
@@ -682,7 +682,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         switch (u.getOperator()) {
             case PostIncrement:
             case PostDecrement:
-                u = applyUnaryOperatorBeforeSpace(u, style.getAroundOperators().isUnary());
+                u = applyUnaryOperatorBeforeSpace(u, style.getAroundOperators().getUnary());
                 break;
             case PreIncrement:
             case PreDecrement:
@@ -690,8 +690,8 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             case Positive:
             case Not:
             case Complement:
-                u = applyUnaryOperatorBeforeSpace(u, style.getAroundOperators().isUnary());
-                u = applyUnaryOperatorExprSpace(u, style.getAroundOperators().isUnary());
+                u = applyUnaryOperatorBeforeSpace(u, style.getAroundOperators().getUnary());
+                u = applyUnaryOperatorExprSpace(u, style.getAroundOperators().getUnary());
                 break;
         }
         return u;
@@ -736,7 +736,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.Lambda visitLambda(J.Lambda lambda, P p) {
         J.Lambda l = super.visitLambda(lambda, p);
-        boolean useSpaceAroundLambdaArrow = style.getAroundOperators().isLambdaArrow();
+        boolean useSpaceAroundLambdaArrow = style.getAroundOperators().getLambdaArrow();
         if (useSpaceAroundLambdaArrow && StringUtils.isNullOrEmpty(l.getArrow().getWhitespace())) {
             l = l.withArrow(
                     l.getArrow().withWhitespace(" ")
@@ -746,7 +746,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     l.getArrow().withWhitespace("")
             );
         }
-        l = l.withBody(spaceBefore(l.getBody(), style.getAroundOperators().isLambdaArrow()));
+        l = l.withBody(spaceBefore(l.getBody(), style.getAroundOperators().getLambdaArrow()));
         if (!(l.getParameters().getParameters().iterator().next() instanceof J.Empty)) {
             int parametersSize = l.getParameters().getParameters().size();
             l = l.withParameters(
@@ -755,11 +755,11 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                                     (index, elemContainer) -> {
                                         if (index != 0) {
                                             elemContainer = elemContainer.withElement(
-                                                    spaceBefore(elemContainer.getElement(), style.getOther().isAfterComma())
+                                                    spaceBefore(elemContainer.getElement(), style.getOther().getAfterComma())
                                             );
                                         }
                                         if (index != parametersSize - 1) {
-                                            elemContainer = spaceAfter(elemContainer, style.getOther().isBeforeComma());
+                                            elemContainer = spaceAfter(elemContainer, style.getOther().getBeforeComma());
                                         }
                                         return elemContainer;
                                     }
@@ -774,11 +774,11 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     public J.MemberReference visitMemberReference(J.MemberReference memberRef, P p) {
         J.MemberReference m = super.visitMemberReference(memberRef, p);
         m = m.getPadding().withReference(
-                spaceBefore(m.getPadding().getReference(), style.getAroundOperators().isMethodReferenceDoubleColon())
+                spaceBefore(m.getPadding().getReference(), style.getAroundOperators().getMethodReferenceDoubleColon())
         );
         m = m.getPadding().withReference(
                 m.getPadding().getReference().withElement(
-                        spaceBefore(m.getPadding().getReference().getElement(), style.getAroundOperators().isMethodReferenceDoubleColon())
+                        spaceBefore(m.getPadding().getReference().getElement(), style.getAroundOperators().getMethodReferenceDoubleColon())
                 )
         );
         return m;
@@ -794,37 +794,37 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
              * when enabled supercedes
              * Spaces -> Before left brace -> Annotation array initializer left brace
              */
-            if (!style.getWithin().isAnnotationParentheses()) {
-                n = spaceBefore(n, style.getBeforeLeftBrace().isAnnotationArrayInitializerLeftBrace());
+            if (!style.getWithin().getAnnotationParentheses()) {
+                n = spaceBefore(n, style.getBeforeLeftBrace().getAnnotationArrayInitializerLeftBrace());
             }
         } else {
             if (n.getPadding().getInitializer() != null) {
-                JContainer<Expression> initializer = spaceBefore(n.getPadding().getInitializer(), style.getBeforeLeftBrace().isArrayInitializerLeftBrace());
+                JContainer<Expression> initializer = spaceBefore(n.getPadding().getInitializer(), style.getBeforeLeftBrace().getArrayInitializerLeftBrace());
                 n = n.getPadding().withInitializer(initializer);
             }
         }
         if (n.getPadding().getInitializer() != null) {
             JContainer<Expression> i = n.getPadding().getInitializer();
-            if (style.getOther().isAfterComma()) {
+            if (style.getOther().getAfterComma()) {
                 i = JContainer.withElements(i, ListUtils.map(i.getElements(), (idx, elem) -> idx == 0 ? elem : spaceBefore(elem, true)));
             }
 
             if (i.getElements().iterator().next() instanceof J.Empty) {
-                boolean useSpaceWithinEmptyArrayInitializerBraces = style.getWithin().isEmptyArrayInitializerBraces();
+                boolean useSpaceWithinEmptyArrayInitializerBraces = style.getWithin().getEmptyArrayInitializerBraces();
                 i = i.map(expr -> spaceBefore(expr, useSpaceWithinEmptyArrayInitializerBraces));
             } else {
-                boolean useSpaceWithinArrayInitializerBraces = style.getWithin().isArrayInitializerBraces();
+                boolean useSpaceWithinArrayInitializerBraces = style.getWithin().getArrayInitializerBraces();
                 int initializerElementsSize = i.getElements().size();
                 i = i.getPadding().withElements(ListUtils.map(i.getPadding().getElements(), (index, elemContainer) -> {
                     if (index == 0) {
                         elemContainer = elemContainer.withElement(spaceBefore(elemContainer.getElement(), useSpaceWithinArrayInitializerBraces));
                     } else {
-                        elemContainer = elemContainer.withElement(spaceBefore(elemContainer.getElement(), style.getOther().isAfterComma()));
+                        elemContainer = elemContainer.withElement(spaceBefore(elemContainer.getElement(), style.getOther().getAfterComma()));
                     }
                     if (index == initializerElementsSize - 1) {
                         elemContainer = spaceAfter(elemContainer, useSpaceWithinArrayInitializerBraces);
                     } else {
-                        elemContainer = spaceAfter(elemContainer, style.getOther().isBeforeComma());
+                        elemContainer = spaceAfter(elemContainer, style.getOther().getBeforeComma());
                     }
                     return elemContainer;
                 }));
@@ -837,7 +837,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.ArrayAccess visitArrayAccess(J.ArrayAccess arrayAccess, P p) {
         J.ArrayAccess a = super.visitArrayAccess(arrayAccess, p);
-        boolean useSpaceWithinBrackets = style.getWithin().isBrackets();
+        boolean useSpaceWithinBrackets = style.getWithin().getBrackets();
         if (useSpaceWithinBrackets) {
             if (StringUtils.isNullOrEmpty(a.getDimension().getPadding().getIndex().getElement().getPrefix().getWhitespace())) {
                 a = a.withDimension(
@@ -887,7 +887,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public <T extends J> J.Parentheses<T> visitParentheses(J.Parentheses<T> parens, P p) {
         J.Parentheses<T> p2 = super.visitParentheses(parens, p);
-        if (style.getWithin().isGroupingParentheses()) {
+        if (style.getWithin().getGroupingParentheses()) {
             if (StringUtils.isNullOrEmpty(p2.getPadding().getTree().getElement().getPrefix().getWhitespace())) {
                 p2 = p2.getPadding().withTree(
                         p2.getPadding().getTree().withElement(
@@ -928,7 +928,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.TypeCast visitTypeCast(J.TypeCast typeCast, P p) {
         J.TypeCast tc = super.visitTypeCast(typeCast, p);
-        boolean spaceWithinTypeCastParens = style.getWithin().isTypeCastParentheses();
+        boolean spaceWithinTypeCastParens = style.getWithin().getTypeCastParentheses();
         tc = tc.withClazz(
                 tc.getClazz().withTree(
                         spaceBefore(tc.getClazz().getTree(), spaceWithinTypeCastParens)
@@ -939,18 +939,18 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                         spaceAfter(tc.getClazz().getPadding().getTree(), spaceWithinTypeCastParens)
                 )
         );
-        tc = tc.withExpression(spaceBefore(tc.getExpression(), style.getOther().isAfterTypeCast()));
+        tc = tc.withExpression(spaceBefore(tc.getExpression(), style.getOther().getAfterTypeCast()));
         return tc;
     }
 
     @Override
     public J.ParameterizedType visitParameterizedType(J.ParameterizedType type, P p) {
         J.ParameterizedType pt = super.visitParameterizedType(type, p);
-        boolean spaceWithinAngleBrackets = style.getWithin().isAngleBrackets();
+        boolean spaceWithinAngleBrackets = style.getWithin().getAngleBrackets();
         if (pt.getPadding().getTypeParameters() != null) {
             pt = pt.getPadding().withTypeParameters(
                     spaceBefore(pt.getPadding().getTypeParameters(),
-                            style.getTypeArguments().isBeforeOpeningAngleBracket())
+                            style.getTypeArguments().getBeforeOpeningAngleBracket())
             );
         }
         if (pt.getPadding().getTypeParameters() != null &&
@@ -967,7 +967,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                                         } else {
                                             elemContainer = elemContainer.withElement(
                                                     spaceBefore(elemContainer.getElement(),
-                                                            style.getTypeArguments().isAfterComma())
+                                                            style.getTypeArguments().getAfterComma())
                                             );
                                         }
                                         if (index == typeParametersSize - 1) {
@@ -986,10 +986,10 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     public J.Ternary visitTernary(J.Ternary ternary, P p) {
         J.Ternary t = super.visitTernary(ternary, p);
         SpacesStyle.TernaryOperator ternaryOperatorSettings = style.getTernaryOperator();
-        t = t.getPadding().withTruePart(spaceBefore(t.getPadding().getTruePart(), ternaryOperatorSettings.isBeforeQuestionMark()));
-        t = t.withTruePart(spaceBefore(t.getTruePart(), ternaryOperatorSettings.isAfterQuestionMark()));
-        t = t.getPadding().withFalsePart(spaceBefore(t.getPadding().getFalsePart(), ternaryOperatorSettings.isBeforeColon()));
-        t = t.withFalsePart(spaceBefore(t.getFalsePart(), ternaryOperatorSettings.isAfterColon()));
+        t = t.getPadding().withTruePart(spaceBefore(t.getPadding().getTruePart(), ternaryOperatorSettings.getBeforeQuestionMark()));
+        t = t.withTruePart(spaceBefore(t.getTruePart(), ternaryOperatorSettings.getAfterQuestionMark()));
+        t = t.getPadding().withFalsePart(spaceBefore(t.getPadding().getFalsePart(), ternaryOperatorSettings.getBeforeColon()));
+        t = t.withFalsePart(spaceBefore(t.getFalsePart(), ternaryOperatorSettings.getAfterColon()));
         return t;
     }
 
@@ -1004,11 +1004,11 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                                     (index, elemContainer) -> {
                                         if (index != 0) {
                                             elemContainer = elemContainer.withElement(
-                                                    spaceBefore(elemContainer.getElement(), style.getOther().isAfterComma())
+                                                    spaceBefore(elemContainer.getElement(), style.getOther().getAfterComma())
                                             );
                                         }
                                         if (index != argsSize - 1) {
-                                            elemContainer = spaceAfter(elemContainer, style.getOther().isBeforeComma());
+                                            elemContainer = spaceAfter(elemContainer, style.getOther().getBeforeComma());
                                         }
                                         return elemContainer;
                                     }
@@ -1032,12 +1032,12 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                                                 if (index != 0) {
                                                     elemContainer = elemContainer.withElement(
                                                             spaceBefore(elemContainer.getElement(),
-                                                                    style.getOther().isAfterComma())
+                                                                    style.getOther().getAfterComma())
                                                     );
                                                 }
                                                 if (index != initializerArgumentsSize - 1) {
                                                     elemContainer = spaceAfter(elemContainer,
-                                                            style.getOther().isBeforeComma());
+                                                            style.getOther().getBeforeComma());
                                                 }
                                                 return elemContainer;
                                             }
@@ -1053,7 +1053,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     public J.TypeParameter visitTypeParameter(J.TypeParameter typeParam, P p) {
         J.TypeParameter tp = super.visitTypeParameter(typeParam, p);
         if (tp.getPadding().getBounds() != null) {
-            boolean spaceAroundTypeBounds = style.getTypeParameters().isAroundTypeBounds();
+            boolean spaceAroundTypeBounds = style.getTypeParameters().getAroundTypeBounds();
             int typeBoundsSize = tp.getPadding().getBounds().getPadding().getElements().size();
             tp = tp.getPadding().withBounds(
                     tp.getPadding().getBounds().getPadding().withElements(

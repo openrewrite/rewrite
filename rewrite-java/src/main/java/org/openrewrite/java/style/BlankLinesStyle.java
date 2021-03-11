@@ -16,45 +16,45 @@
 package org.openrewrite.java.style;
 
 import lombok.AccessLevel;
-import lombok.Data;
+import lombok.Value;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.java.JavaStyle;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@Data
+@Value
 @With
 public class BlankLinesStyle implements JavaStyle {
     KeepMaximum keepMaximum;
     Minimum minimum;
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
+    @Value
     @With
     public static class KeepMaximum {
-        int inDeclarations;
-        int inCode;
-        int beforeEndOfBlock;
-        int betweenHeaderAndPackage;
+        Integer inDeclarations;
+        Integer inCode;
+        Integer beforeEndOfBlock;
+        Integer betweenHeaderAndPackage;
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
+    @Value
     @With
     public static class Minimum {
-        int beforePackage;
-        int afterPackage;
-        int beforeImports;
-        int afterImports;
-        int aroundClass;
-        int afterClassHeader;
-        int beforeClassEnd;
-        int afterAnonymousClassHeader;
-        int aroundFieldInInterface;
-        int aroundField;
-        int aroundMethodInInterface;
-        int aroundMethod;
-        int beforeMethodBody;
-        int aroundInitializer;
+        Integer beforePackage;
+        Integer afterPackage;
+        Integer beforeImports;
+        Integer afterImports;
+        Integer aroundClass;
+        Integer afterClassHeader;
+        Integer beforeClassEnd;
+        Integer afterAnonymousClassHeader;
+        Integer aroundFieldInInterface;
+        Integer aroundField;
+        Integer aroundMethodInInterface;
+        Integer aroundMethod;
+        Integer beforeMethodBody;
+        Integer aroundInitializer;
     }
 }

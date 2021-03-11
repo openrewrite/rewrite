@@ -16,7 +16,7 @@
 package org.openrewrite.java.style;
 
 import lombok.AccessLevel;
-import lombok.Data;
+import lombok.Value;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.Incubating;
@@ -24,30 +24,30 @@ import org.openrewrite.java.JavaStyle;
 
 @Incubating(since = "7.0.0")
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@Data
+@Value
 @With
 public class UnnecessaryParenthesesStyle implements JavaStyle {
-    boolean expr;
-    boolean ident;
-    boolean numDouble;
-    boolean numFloat;
-    boolean numInt;
-    boolean numLong;
-    boolean stringLiteral;
-    boolean literalNull;
-    boolean literalFalse;
-    boolean literalTrue;
-    boolean assign;
-    boolean bandAssign;
-    boolean borAssign;
-    boolean bsrAssign;
-    boolean bxorAssign;
-    boolean divAssign;
-    boolean minusAssign;
-    boolean modAssign;
-    boolean plusAssign;
-    boolean slAssign;
-    boolean srAssign;
-    boolean starAssign;
-    boolean lambda;
+    Boolean expr;
+    Boolean ident;
+    Boolean numDouble;
+    Boolean numFloat;
+    Boolean numInt;
+    Boolean numLong;
+    Boolean stringLiteral;
+    Boolean literalNull;
+    Boolean literalFalse;
+    Boolean literalTrue;
+    Boolean assign;
+    Boolean bandAssign;
+    Boolean borAssign;
+    Boolean bsrAssign;
+    Boolean bxorAssign;
+    Boolean divAssign;
+    Boolean minusAssign;
+    Boolean modAssign;
+    Boolean plusAssign;
+    Boolean slAssign;
+    Boolean srAssign;
+    Boolean starAssign;
+    Boolean lambda;
 }

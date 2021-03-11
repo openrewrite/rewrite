@@ -47,7 +47,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     @Override
     public J visitIdentifier(J.Identifier ident, P p) {
         J.Identifier i = visitAndCast(ident, p, super::visitIdentifier);
-        if (style.isIdent() && getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.Parentheses) {
+        if (style.getIdent() && getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.Parentheses) {
             getCursor().putMessageOnFirstEnclosing(J.Parentheses.class, UNNECESSARY_PARENTHESES_MARKER, getCursor());
         }
         return i;
@@ -57,14 +57,14 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     public J visitLiteral(J.Literal literal, P p) {
         J.Literal l = visitAndCast(literal, p, super::visitLiteral);
         JavaType.Primitive type = l.getType();
-        if ((style.isNumInt() && type == JavaType.Primitive.Int) ||
-                (style.isNumDouble() && type == JavaType.Primitive.Double) ||
-                (style.isNumLong() && type == JavaType.Primitive.Long) ||
-                (style.isNumFloat() && type == JavaType.Primitive.Float) ||
-                (style.isStringLiteral() && type == JavaType.Primitive.String) ||
-                (style.isLiteralNull() && type == JavaType.Primitive.Null) ||
-                (style.isLiteralFalse() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(false)) ||
-                (style.isLiteralTrue() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(true))) {
+        if ((style.getNumInt() && type == JavaType.Primitive.Int) ||
+                (style.getNumDouble() && type == JavaType.Primitive.Double) ||
+                (style.getNumLong() && type == JavaType.Primitive.Long) ||
+                (style.getNumFloat() && type == JavaType.Primitive.Float) ||
+                (style.getStringLiteral() && type == JavaType.Primitive.String) ||
+                (style.getLiteralNull() && type == JavaType.Primitive.Null) ||
+                (style.getLiteralFalse() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(false)) ||
+                (style.getLiteralTrue() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(true))) {
             if (getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.Parentheses) {
                 getCursor().putMessageOnFirstEnclosing(J.Parentheses.class, UNNECESSARY_PARENTHESES_MARKER, getCursor());
             }
@@ -76,17 +76,17 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     public J visitAssignmentOperation(J.AssignmentOperation assignOp, P p) {
         J.AssignmentOperation a = visitAndCast(assignOp, p, super::visitAssignmentOperation);
         J.AssignmentOperation.Type op = a.getOperator();
-        if (a.getAssignment() instanceof J.Parentheses && ((style.isBandAssign() && op == J.AssignmentOperation.Type.BitAnd) ||
-                (style.isBorAssign() && op == J.AssignmentOperation.Type.BitOr) ||
-                (style.isBsrAssign() && op == J.AssignmentOperation.Type.UnsignedRightShift) ||
-                (style.isBxorAssign() && op == J.AssignmentOperation.Type.BitXor) ||
-                (style.isSrAssign() && op == J.AssignmentOperation.Type.RightShift) ||
-                (style.isSlAssign() && op == J.AssignmentOperation.Type.LeftShift) ||
-                (style.isMinusAssign() && op == J.AssignmentOperation.Type.Subtraction) ||
-                (style.isDivAssign() && op == J.AssignmentOperation.Type.Division) ||
-                (style.isPlusAssign() && op == J.AssignmentOperation.Type.Addition) ||
-                (style.isStarAssign() && op == J.AssignmentOperation.Type.Multiplication) ||
-                (style.isModAssign() && op == J.AssignmentOperation.Type.Modulo))) {
+        if (a.getAssignment() instanceof J.Parentheses && ((style.getBandAssign() && op == J.AssignmentOperation.Type.BitAnd) ||
+                (style.getBorAssign() && op == J.AssignmentOperation.Type.BitOr) ||
+                (style.getBsrAssign() && op == J.AssignmentOperation.Type.UnsignedRightShift) ||
+                (style.getBxorAssign() && op == J.AssignmentOperation.Type.BitXor) ||
+                (style.getSrAssign() && op == J.AssignmentOperation.Type.RightShift) ||
+                (style.getSlAssign() && op == J.AssignmentOperation.Type.LeftShift) ||
+                (style.getMinusAssign() && op == J.AssignmentOperation.Type.Subtraction) ||
+                (style.getDivAssign() && op == J.AssignmentOperation.Type.Division) ||
+                (style.getPlusAssign() && op == J.AssignmentOperation.Type.Addition) ||
+                (style.getStarAssign() && op == J.AssignmentOperation.Type.Multiplication) ||
+                (style.getModAssign() && op == J.AssignmentOperation.Type.Modulo))) {
             a = (J.AssignmentOperation) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment()).visit(a, p, getCursor());
         }
         return a;
@@ -95,7 +95,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     @Override
     public J visitAssignment(J.Assignment assignment, P p) {
         J.Assignment a = visitAndCast(assignment, p, super::visitAssignment);
-        if (style.isAssign() && a.getAssignment() instanceof J.Parentheses) {
+        if (style.getAssign() && a.getAssignment() instanceof J.Parentheses) {
             a = (J.Assignment) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment()).visit(a, p, getCursor());
         }
         return a;
@@ -104,7 +104,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     @Override
     public J visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
         J.VariableDeclarations.NamedVariable v = visitAndCast(variable, p, super::visitVariable);
-        if (style.isAssign() && v.getInitializer() != null && v.getInitializer() instanceof J.Parentheses) {
+        if (style.getAssign() && v.getInitializer() != null && v.getInitializer() instanceof J.Parentheses) {
             v = (J.VariableDeclarations.NamedVariable) new UnwrapParentheses<>((J.Parentheses<?>) v.getInitializer()).visit(v, p, getCursor());
         }
         return v;

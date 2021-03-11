@@ -16,13 +16,13 @@
 package org.openrewrite.java.style;
 
 import lombok.AccessLevel;
-import lombok.Data;
+import lombok.Value;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.java.JavaStyle;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@Data
+@Value
 @With
 public class SpacesStyle implements JavaStyle {
     BeforeParentheses beforeParentheses;
@@ -36,139 +36,139 @@ public class SpacesStyle implements JavaStyle {
     TypeParameters typeParameters;
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
+    @Value
     @With
     public static class BeforeParentheses {
-        boolean methodDeclaration;
-        boolean methodCall;
-        boolean ifParentheses;
-        boolean forParentheses;
-        boolean whileParentheses;
-        boolean switchParentheses;
-        boolean tryParentheses;
-        boolean catchParentheses;
-        boolean synchronizedParentheses;
-        boolean annotationParameters;
+        Boolean methodDeclaration;
+        Boolean methodCall;
+        Boolean ifParentheses;
+        Boolean forParentheses;
+        Boolean whileParentheses;
+        Boolean switchParentheses;
+        Boolean tryParentheses;
+        Boolean catchParentheses;
+        Boolean synchronizedParentheses;
+        Boolean annotationParameters;
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
+    @Value
     @With
     public static class AroundOperators {
-        boolean assignment;
-        boolean logical;
-        boolean equality;
-        boolean relational;
-        boolean bitwise;
-        boolean additive;
-        boolean multiplicative;
-        boolean shift;
-        boolean unary;
-        boolean lambdaArrow;
-        boolean methodReferenceDoubleColon;
+        Boolean assignment;
+        Boolean logical;
+        Boolean equality;
+        Boolean relational;
+        Boolean bitwise;
+        Boolean additive;
+        Boolean multiplicative;
+        Boolean shift;
+        Boolean unary;
+        Boolean lambdaArrow;
+        Boolean methodReferenceDoubleColon;
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
+    @Value
     @With
     public static class BeforeLeftBrace {
-        boolean classLeftBrace;
-        boolean methodLeftBrace;
-        boolean ifLeftBrace;
-        boolean elseLeftBrace;
-        boolean forLeftBrace;
-        boolean whileLeftBrace;
-        boolean doLeftBrace;
-        boolean switchLeftBrace;
-        boolean tryLeftBrace;
-        boolean catchLeftBrace;
-        boolean finallyLeftBrace;
-        boolean synchronizedLeftBrace;
-        boolean arrayInitializerLeftBrace;
-        boolean annotationArrayInitializerLeftBrace;
+        Boolean classLeftBrace;
+        Boolean methodLeftBrace;
+        Boolean ifLeftBrace;
+        Boolean elseLeftBrace;
+        Boolean forLeftBrace;
+        Boolean whileLeftBrace;
+        Boolean doLeftBrace;
+        Boolean switchLeftBrace;
+        Boolean tryLeftBrace;
+        Boolean catchLeftBrace;
+        Boolean finallyLeftBrace;
+        Boolean synchronizedLeftBrace;
+        Boolean arrayInitializerLeftBrace;
+        Boolean annotationArrayInitializerLeftBrace;
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
+    @Value
     @With
     public static class BeforeKeywords {
-        boolean elseKeyword;
-        boolean whileKeyword;
-        boolean catchKeyword;
-        boolean finallyKeyword;
+        Boolean elseKeyword;
+        Boolean whileKeyword;
+        Boolean catchKeyword;
+        Boolean finallyKeyword;
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
+    @Value
     @With
     public static class Within {
         /**
          * Based on testing in IntelliJ, within codeBraces only affects whether or not a space is inserted
          * into empty interface and class braces, not functions, logical blocks, or lambda braces.
          */
-        boolean codeBraces;
+        Boolean codeBraces;
 
-        boolean brackets;
-        boolean arrayInitializerBraces;
-        boolean emptyArrayInitializerBraces;
-        boolean groupingParentheses;
-        boolean methodDeclarationParentheses;
-        boolean emptyMethodDeclarationParentheses;
-        boolean methodCallParentheses;
-        boolean emptyMethodCallParentheses;
-        boolean ifParentheses;
-        boolean forParentheses;
-        boolean whileParentheses;
-        boolean switchParentheses;
-        boolean tryParentheses;
-        boolean catchParentheses;
-        boolean synchronizedParentheses;
-        boolean typeCastParentheses;
-        boolean annotationParentheses;
-        boolean angleBrackets;
+        Boolean brackets;
+        Boolean arrayInitializerBraces;
+        Boolean emptyArrayInitializerBraces;
+        Boolean groupingParentheses;
+        Boolean methodDeclarationParentheses;
+        Boolean emptyMethodDeclarationParentheses;
+        Boolean methodCallParentheses;
+        Boolean emptyMethodCallParentheses;
+        Boolean ifParentheses;
+        Boolean forParentheses;
+        Boolean whileParentheses;
+        Boolean switchParentheses;
+        Boolean tryParentheses;
+        Boolean catchParentheses;
+        Boolean synchronizedParentheses;
+        Boolean typeCastParentheses;
+        Boolean annotationParentheses;
+        Boolean angleBrackets;
 
         // Records are a java 14 preview feature (and still a preview language feature in java 15)
         // rewrite does not consult this style setting for now
-        boolean recordHeader;
+        Boolean recordHeader;
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
+    @Value
     @With
     public static class TernaryOperator {
-        boolean beforeQuestionMark;
-        boolean afterQuestionMark;
-        boolean beforeColon;
-        boolean afterColon;
+        Boolean beforeQuestionMark;
+        Boolean afterQuestionMark;
+        Boolean beforeColon;
+        Boolean afterColon;
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
+    @Value
     @With
     public static class TypeArguments {
-        boolean afterComma;
-        boolean beforeOpeningAngleBracket;
-        boolean afterClosingAngleBracket;
+        Boolean afterComma;
+        Boolean beforeOpeningAngleBracket;
+        Boolean afterClosingAngleBracket;
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
+    @Value
     @With
     public static class Other {
-        boolean beforeComma;
-        boolean afterComma;
-        boolean beforeForSemicolon;
-        boolean afterForSemicolon;
-        boolean afterTypeCast;
-        boolean beforeColonInForEach;
-        boolean insideOneLineEnumBraces;
+        Boolean beforeComma;
+        Boolean afterComma;
+        Boolean beforeForSemicolon;
+        Boolean afterForSemicolon;
+        Boolean afterTypeCast;
+        Boolean beforeColonInForEach;
+        Boolean insideOneLineEnumBraces;
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
+    @Value
     @With
     public static class TypeParameters {
-        boolean beforeOpeningAngleBracket;
-        boolean aroundTypeBounds;
+        Boolean beforeOpeningAngleBracket;
+        Boolean aroundTypeBounds;
     }
 }

@@ -16,18 +16,18 @@
 package org.openrewrite.java.style;
 
 import lombok.AccessLevel;
-import lombok.Data;
+import lombok.Value;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.java.JavaStyle;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@Data
+@Value
 @With
 public class TabsAndIndentsStyle implements JavaStyle {
-    private boolean useTabCharacter;
-    private int tabSize;
-    private int indentSize;
-    private int continuationIndent;
-    private boolean indentsRelativeToExpressionStart;
+    Boolean useTabCharacter;
+    Integer tabSize;
+    Integer indentSize;
+    Integer continuationIndent;
+    Boolean indentsRelativeToExpressionStart;
 }
