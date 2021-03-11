@@ -24,25 +24,28 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.DependencyManagementDependency;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
-public class RemoveUnneededDependencyOverrides extends Recipe {
+public class RemoveRedundantDependencyVersions extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Remove dependency overrides in descendant poms";
+        return "Remove redundant explicit dependency versions";
     }
 
     @Override
     public String getDescription() {
-        return "For child poms that contain the same dependency version as an ancestor," +
-                " remove the explicit version in the child.";
+        return "Remove explicitly-specified dependency versions when a parent pom's dependencyManagement " +
+                "specifies the same explicit version.";
     }
 
     @Override
@@ -53,18 +56,39 @@ public class RemoveUnneededDependencyOverrides extends Recipe {
     private static class FindManagedDependencyVersionVisitor extends MavenVisitor {
         @Override
         public Maven visitMaven(Maven maven, ExecutionContext ctx) {
-            Collection<Pom.Dependency> dependencies = maven.getModel().getDependencies();
+            Maven newMaven = super.visitMaven(maven, ctx);
+            List<Pom.Dependency> dependencies = new ArrayList<>(maven.getModel().getDependencies());
             for (Pom.Dependency dependency : dependencies) {
-                String managedVersion = findManagedVersion(maven.getModel(), dependency);
+                DependencyManagementDependency.Defined managedVersion = findManagedVersion(maven.getModel(), dependency);
+                Scope scope = managedVersion != null ? managedVersion.getScope() : null;
+
                 if (managedVersion != null
                         && dependency.getRequestedVersion() != null
                         && dependency.getVersion().equals(dependency.getRequestedVersion())
-                        && managedVersion.equals(dependency.getRequestedVersion())) {
+                        && managedVersion.getVersion().equals(dependency.getRequestedVersion())
+                        && scopeMatches(scope, dependency.getScope())) {
                     doAfterVisit(new RemoveVersionVisitor(maven.getModel().getArtifactId(), dependency.getGroupId(), dependency.getArtifactId(), managedVersion));
                 }
             }
 
-            return super.visitMaven(maven, ctx);
+            return newMaven;
+        }
+
+        /**
+         * Because no defined scope defaults to "compile", this utility will coalesce null scopes to compile.
+         */
+        private static Scope scopeOrDefault(@Nullable Scope scope) {
+            if (scope == null) {
+                return Scope.Compile;
+            }
+            return scope;
+        }
+
+        /**
+         * Check whether two scopes match. A null scope counts as whatever the default scope is (Compile)
+         */
+        private static boolean scopeMatches(@Nullable Scope firstScope, @Nullable Scope secondScope) {
+            return Objects.equals(scopeOrDefault(firstScope), scopeOrDefault(secondScope));
         }
 
         /**
@@ -79,14 +103,18 @@ public class RemoveUnneededDependencyOverrides extends Recipe {
          * @return Returns the managed dependency version. Returns null if it is never found in any dependencyManagement block.
          */
         @Nullable
-        private String findManagedVersion(Pom pom, Pom.Dependency dependency) {
+        private DependencyManagementDependency.Defined findManagedVersion(Pom pom, Pom.Dependency dependency) {
             if (pom.getDependencyManagement() != null) {
                 Collection<DependencyManagementDependency> managedDependencies = pom.getDependencyManagement().getDependencies();
                 for (DependencyManagementDependency managedDependency : managedDependencies) {
-                    if (dependency.getGroupId().equals(managedDependency.getGroupId())
-                            && dependency.getArtifactId().equals(managedDependency.getArtifactId())) {
-                        if (managedDependency.getVersion() != null) {
-                            return managedDependency.getVersion();
+                    if (!(managedDependency instanceof DependencyManagementDependency.Defined)) {
+                        continue;
+                    }
+                    DependencyManagementDependency.Defined definedDependency = (DependencyManagementDependency.Defined) managedDependency;
+                    if (dependency.getGroupId().equals(definedDependency.getGroupId())
+                            && dependency.getArtifactId().equals(definedDependency.getArtifactId())) {
+                        if (definedDependency.getVersion() != null) {
+                            return definedDependency;
                         }
                     }
                 }
@@ -110,9 +138,9 @@ public class RemoveUnneededDependencyOverrides extends Recipe {
         final private String moduleArtifactId;
         final private String groupId;
         final private String artifactId;
-        final private String managedVersion;
+        final private DependencyManagementDependency.Defined managedVersion;
 
-        public RemoveVersionVisitor(String moduleArtifactId, String groupId, String artifactId, String managedVersion) {
+        public RemoveVersionVisitor(String moduleArtifactId, String groupId, String artifactId, DependencyManagementDependency.Defined managedVersion) {
             this.moduleArtifactId = moduleArtifactId;
             this.groupId = groupId;
             this.artifactId = artifactId;
@@ -125,13 +153,21 @@ public class RemoveUnneededDependencyOverrides extends Recipe {
                     && isDependencyTag(groupId, artifactId)
                     && tag.getContent() != null) {
                 List<? extends Content> contents = tag.getContent();
+                Xml.Tag versionTag = null;
+                Scope scope = null;
                 for (Content content : contents) {
                     Xml.Tag contentTag = (Xml.Tag) content;
                     if (contentTag.getName().equals("version")
                             && contentTag.getValue().isPresent()
-                            && managedVersion.equals(contentTag.getValue().get())) {
-                        doAfterVisit(new RemoveContentVisitor<>(content, false));
+                            && managedVersion.getVersion().equals(contentTag.getValue().get())) {
+                        versionTag = contentTag;
+                    } else if (contentTag.getName().equals("scope") && contentTag.getValue().isPresent()) {
+                        scope = Scope.fromName(contentTag.getValue().get());
                     }
+                }
+                if (versionTag != null
+                        && FindManagedDependencyVersionVisitor.scopeMatches(scope, managedVersion.getScope())) {
+                    doAfterVisit(new RemoveContentVisitor<>(versionTag, false));
                 }
             }
 
