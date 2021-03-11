@@ -38,7 +38,6 @@ dependencies {
     integTestImplementation("org.eclipse.aether:aether-transport-http:latest.release")
     integTestImplementation("org.apache.maven:maven-aether-provider:latest.release")
     integTestImplementation("org.apache.maven:maven-core:latest.release")
-    integTestImplementation("com.squareup.okhttp3:mockwebserver:latest.release")
     integTestImplementation("io.micrometer:micrometer-registry-prometheus:latest.release")
 
     integTestImplementation(project(":rewrite-java-11"))
@@ -46,10 +45,10 @@ dependencies {
     integTestImplementation(project(":rewrite-xml"))
     integTestImplementation(project(":rewrite-yaml"))
 
-    testImplementation("ch.qos.logback:logback-classic:1.0.13")
-    testImplementation("org.mapdb:mapdb:latest.release")
-
     testImplementation(project(":rewrite-test"))
+    testImplementation("ch.qos.logback:logback-classic:1.0.13")
+    testImplementation("com.squareup.okhttp3:mockwebserver:latest.release")
+    testImplementation("org.mapdb:mapdb:latest.release")
 
     testRuntimeOnly("org.mapdb:mapdb:latest.release")
 }

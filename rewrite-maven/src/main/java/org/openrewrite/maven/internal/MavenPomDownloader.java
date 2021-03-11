@@ -49,7 +49,8 @@ import static java.util.stream.Collectors.toList;
 
 public class MavenPomDownloader {
     private static final RetryConfig retryConfig = RetryConfig.custom()
-            .retryExceptions(SocketTimeoutException.class, TimeoutException.class)
+            .retryOnException(throwable -> throwable instanceof SocketTimeoutException ||
+                    throwable instanceof TimeoutException)
             .build();
 
     private static final RetryRegistry retryRegistry = RetryRegistry.of(retryConfig);
@@ -317,7 +318,7 @@ public class MavenPomDownloader {
                     return response.isSuccessful() ?
                             repository.withUri(URI.create(httpsUri)) :
                             null;
-                } catch (SSLException e) {
+                } catch (Throwable t) {
                     // Fallback to http if https is unavailable and the original URL was an http URL
                     if (httpsUri.equals(originalUrl)) {
                         return null;
@@ -332,13 +333,11 @@ public class MavenPomDownloader {
                                     repository.getUsername(),
                                     repository.getPassword());
                         }
-                    } catch (Throwable t) {
+                    } catch (Throwable t2) {
                         return null;
                     }
-                } catch (Throwable t) {
                     return null;
                 }
-                return null;
             });
         } catch (Exception e) {
             return null;

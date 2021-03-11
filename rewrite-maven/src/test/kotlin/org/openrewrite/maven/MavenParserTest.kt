@@ -15,13 +15,21 @@
  */
 package org.openrewrite.maven
 
+import mockwebserver3.Dispatcher
+import mockwebserver3.MockResponse
+import mockwebserver3.MockWebServer
+import mockwebserver3.RecordedRequest
+import okhttp3.Credentials
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
+import org.openrewrite.Parser
+import org.openrewrite.maven.tree.Maven
 import org.openrewrite.maven.tree.Pom
 import org.openrewrite.maven.tree.Scope
+import java.nio.file.Paths
 
 class MavenParserTest {
     private val parser = MavenParser.builder().resolveOptional(false).build()
@@ -336,5 +344,92 @@ class MavenParserTest {
         val maven = MavenParser.builder().build().parse(pomSource)[0]
         assertThat(maven.model.dependencies.map { it.artifactId to it.scope })
             .containsExactly("junit-jupiter" to Scope.Test, "guava" to Scope.Compile)
+    }
+
+    @Test
+    fun mirrorsAndAuth() {
+        // Set up a web server that returns 401 to any request without an Authorization header corresponding to specific credentials
+        // Exceptions in the console output are due to MavenPomDownloader attempting to access via https first before falling back to http
+        val username = "admin"
+        val password = "password"
+        MockWebServer().apply {
+            dispatcher = object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    if(request.headers.find { it.first == "Authorization" && it.second == Credentials.basic(username, password) } == null) {
+                        return MockResponse().apply {
+                            setResponseCode(401)
+                        }
+                    }
+                    else {
+                        return MockResponse().apply {
+                            setResponseCode(200)
+                            setBody("""
+                                <project>
+                                  <modelVersion>4.0.0</modelVersion>
+
+                                  <groupId>com.foo</groupId>
+                                  <artifactId>bar</artifactId>
+                                  <version>1.0.0</version>
+                                  
+                                </project>
+                            """.trimIndent())
+                        }
+                    }
+                }
+            }
+        }.use { mockRepo ->
+            val ctx = InMemoryExecutionContext { err -> throw err }
+            MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
+                """
+                <settings>
+                    <mirrors>
+                        <mirror>
+                            <mirrorOf>*</mirrorOf>
+                            <name>repo</name>
+                            <url>http://${mockRepo.hostName}:${mockRepo.port}</url>
+                            <id>repo</id>
+                        </mirror>
+                    </mirrors>
+                    <servers>
+                        <server>
+                            <id>repo</id>
+                            <username>${username}</username>
+                            <password>${password}</password>
+                        </server>
+                    </servers>
+                </settings>
+                """.trimIndent().byteInputStream()
+            }, ctx)
+
+            // Don't worry about the credentials stored in here being useful for any other purpose or worth protecting
+            val maven: Maven = MavenParser.builder().build().parse(
+                    ctx,
+                    """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                    
+                        <groupId>org.openrewrite.test</groupId>
+                        <artifactId>foo</artifactId>
+                        <version>0.1.0-SNAPSHOT</version>
+                    
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.foo</groupId>
+                                <artifactId>bar</artifactId>
+                                <version>1.0.0</version>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                """
+            ).first()
+
+            assertThat(mockRepo.requestCount)
+                    .isGreaterThan(0)
+                    .`as`("The mock repository received no requests. Applying mirrors is probably broken")
+
+            assertThat(maven.model.dependencies)
+                    .hasSize(1)
+                    .matches { it.first().groupId == "com.foo" && it.first().artifactId == "bar" }
+        }
     }
 }
