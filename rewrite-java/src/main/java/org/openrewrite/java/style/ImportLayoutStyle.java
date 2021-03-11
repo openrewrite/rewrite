@@ -15,10 +15,10 @@
  */
 package org.openrewrite.java.style;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonSerializer;
@@ -26,6 +26,7 @@ import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import lombok.Getter;
+import lombok.Value;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
@@ -53,23 +54,16 @@ import static org.openrewrite.internal.StreamUtils.distinctBy;
  * <li>nameCountToUseStarImport - How many static imports from the same type must be present before they should be collapsed into a static star import. The default is 3.</li>
  * <li>layout - An ordered list of import groupings which define exactly how imports should be organized within a compilation unit</li>
  */
+@Value
 @Getter
+@JsonDeserialize(using = Deserializer.class)
+@JsonSerialize(using = Serializer.class)
 public class ImportLayoutStyle implements JavaStyle {
-    private final Integer classCountToUseStarImport;
-    private final Integer nameCountToUseStarImport;
+    Integer classCountToUseStarImport;
+    Integer nameCountToUseStarImport;
 
     @JsonTypeInfo(use = JsonTypeInfo.Id.NONE)
-    @JsonDeserialize(using = BlockDeserializer.class)
-    @JsonSerialize(using = BlockSerializer.class)
-    private final List<Block> layout;
-
-    public ImportLayoutStyle(@JsonProperty("classCountToUseStarImport") Integer classCountToUseStarImport,
-                             @JsonProperty("nameCountToUseStarImport") Integer nameCountToUseStarImport,
-                             @JsonProperty("layout") List<Block> layout) {
-        this.classCountToUseStarImport = classCountToUseStarImport;
-        this.nameCountToUseStarImport = nameCountToUseStarImport;
-        this.layout = layout;
-    }
+    List<Block> layout;
 
     /**
      * This method will order and group a list of imports producing a new list that conforms to the rules defined
@@ -93,7 +87,7 @@ public class ImportLayoutStyle implements JavaStyle {
 
         // Allocate imports to blocks, preferring to put imports into non-catchall blocks
         for (JRightPadded<J.Import> anImport : originalImports) {
-            Boolean accepted = false;
+            boolean accepted = false;
             for (Block block : blocksNoCatchalls) {
                 if (block.accept(anImport)) {
                     accepted = true;
@@ -119,7 +113,7 @@ public class ImportLayoutStyle implements JavaStyle {
                     extraLineSpace += "\n";
                 }
             } else {
-                for (JRightPadded<J.Import> orderedImport : block.orderedImports()) {
+                for (JRightPadded<J.Import> orderedImport : block.orderedImports(classCountToUseStarImport, nameCountToUseStarImport)) {
                     Space prefix = importIndex == 0 ? originalImports.get(0).getElement().getPrefix() :
                             orderedImport.getElement().getPrefix().withWhitespace(extraLineSpace + "\n");
 
@@ -225,7 +219,7 @@ public class ImportLayoutStyle implements JavaStyle {
         /**
          * @return Imports belonging to this block, folded appropriately.
          */
-        List<JRightPadded<J.Import>> orderedImports();
+        List<JRightPadded<J.Import>> orderedImports(int classCountToUseStarImport, int nameCountToUseStarImport);
 
         /**
          * A specialized block implementation to act as a blank line separator between import groupings.
@@ -243,7 +237,7 @@ public class ImportLayoutStyle implements JavaStyle {
             }
 
             @Override
-            public List<JRightPadded<J.Import>> orderedImports() {
+            public List<JRightPadded<J.Import>> orderedImports(int classCountToUseStarImport, int nameCountToUseStartImport) {
                 return emptyList();
             }
         }
@@ -273,14 +267,10 @@ public class ImportLayoutStyle implements JavaStyle {
 
             private final Boolean statik;
             private final Pattern packageWildcard;
-            private final Integer classCountToUseStarImport;
-            private final Integer nameCountToUseStarImport;
 
             public ImportPackage(Boolean statik, String packageWildcard, Boolean withSubpackages,
                                  Integer classCountToUseStarImport, Integer nameCountToUseStarImport) {
                 this.statik = statik;
-                this.classCountToUseStarImport = classCountToUseStarImport;
-                this.nameCountToUseStarImport = nameCountToUseStarImport;
                 this.packageWildcard = Pattern.compile(packageWildcard
                         .replace(".", "\\.")
                         .replace("*", withSubpackages ? ".+" : "[^.]+"));
@@ -305,7 +295,7 @@ public class ImportLayoutStyle implements JavaStyle {
             }
 
             @Override
-            public List<JRightPadded<J.Import>> orderedImports() {
+            public List<JRightPadded<J.Import>> orderedImports(int classCountToUseStarImport, int nameCountToUseStarImport) {
                 Map<String, List<JRightPadded<J.Import>>> groupedImports = imports
                         .stream()
                         .sorted(IMPORT_SORTING)
@@ -330,9 +320,9 @@ public class ImportLayoutStyle implements JavaStyle {
                 return groupedImports.values().stream()
                         .flatMap(importGroup -> {
                             JRightPadded<J.Import> toStar = importGroup.get(0);
-                            Boolean statik1 = toStar.getElement().isStatic();
+                            boolean statik1 = toStar.getElement().isStatic();
                             Integer threshold = statik1 ? nameCountToUseStarImport : classCountToUseStarImport;
-                            Boolean starImportExists = importGroup.stream()
+                            boolean starImportExists = importGroup.stream()
                                     .anyMatch(it -> it.getElement().getQualid().getSimpleName().equals("*"));
                             if (importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1)) {
                                 J.FieldAccess qualid = toStar.getElement().getQualid();
@@ -388,64 +378,83 @@ public class ImportLayoutStyle implements JavaStyle {
             }
         }
     }
+}
 
-    private static class BlockDeserializer extends JsonDeserializer<List<Block>> {
-        @Override
-        public List<Block> deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
-            String[] blockIter = p.readValueAs(String[].class);
-            Builder builder = builder();
-            for (String block : blockIter) {
-                block = block.trim();
-                if (block.equals("<blank line>")) {
-                    builder.blankLine();
-                } else if (block.startsWith("import ")) {
-                    block = block.substring("import ".length());
-                    Boolean statik = false;
-                    if (block.startsWith("static")) {
-                        statik = true;
-                        block = block.substring("static ".length());
-                    }
-                    if (block.equals("all other imports")) {
-                        if (statik) {
-                            builder.importStaticAllOthers();
+class Deserializer extends JsonDeserializer<ImportLayoutStyle> {
+    @Override
+    public ImportLayoutStyle deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+        ImportLayoutStyle.Builder builder = ImportLayoutStyle.builder();
+        for (String currentField = null; p.hasCurrentToken(); p.nextToken()) {
+            switch (p.currentToken()) {
+                case FIELD_NAME:
+                    currentField = p.getCurrentName();
+                    break;
+                case VALUE_STRING:
+                    String block = p.getText().trim();
+                    if (block.equals("<blank line>")) {
+                        builder.blankLine();
+                    } else if (block.startsWith("import ")) {
+                        block = block.substring("import ".length());
+                        boolean statik = false;
+                        if (block.startsWith("static")) {
+                            statik = true;
+                            block = block.substring("static ".length());
+                        }
+                        if (block.equals("all other imports")) {
+                            if (statik) {
+                                builder.importStaticAllOthers();
+                            } else {
+                                builder.importAllOthers();
+                            }
                         } else {
-                            builder.importAllOthers();
+                            if (statik) {
+                                builder.staticImportPackage(block);
+                            } else {
+                                builder.importPackage(block);
+                            }
                         }
                     } else {
-                        if (statik) {
-                            builder.staticImportPackage(block);
-                        } else {
-                            builder.importPackage(block);
-                        }
+                        throw new IllegalArgumentException("Syntax error in layout block [" + block + "]");
                     }
-                } else {
-                    throw new IllegalArgumentException("Syntax error in layout block [" + block + "]");
-                }
+                    break;
+                case VALUE_NUMBER_INT:
+                    if ("classCountToUseStarImport".equals(currentField)) {
+                        builder.classCountToUseStarImport(p.getValueAsInt());
+                    } else if ("nameCountToUseStarImport".equals(currentField)) {
+                        builder.nameCountToUseStarImport(p.getValueAsInt());
+                    }
+                    break;
             }
-            return builder.build().layout;
         }
+
+        return builder.build();
     }
+}
 
-    private static class BlockSerializer extends JsonSerializer<List<Block>> {
-        @Override
-        public void serialize(List<Block> value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            String[] blocks = value.stream()
-                    .map(block -> {
-                        if (block instanceof Block.BlankLines) {
-                            return "<blank line>";
-                        } else if (block instanceof Block.AllOthers) {
-                            return "import " + (((Block.AllOthers) block).isStatic() ? "static " : "") +
-                                    "all other imports";
-                        } else if (block instanceof Block.ImportPackage) {
-                            Block.ImportPackage importPackage = (Block.ImportPackage) block;
-                            return (importPackage.isStatic() ? "static " : "") +
-                                    "import " + importPackage.getPackageWildcard();
-                        }
-                        return new UnsupportedOperationException("Unknown block type " + block.getClass().getName());
-                    })
-                    .toArray(String[]::new);
+class Serializer extends JsonSerializer<ImportLayoutStyle> {
+    @Override
+    public void serialize(ImportLayoutStyle value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+        gen.writeNumberField("classCountToUseStarImport", value.getClassCountToUseStarImport());
+        gen.writeNumberField("nameCountToUseStarImport", value.getNameCountToUseStarImport());
 
-            gen.writeArray(blocks, 0, value.size());
-        }
+        String[] blocks = value.getLayout().stream()
+                .map(block -> {
+                    if (block instanceof ImportLayoutStyle.Block.BlankLines) {
+                        return "<blank line>";
+                    } else if (block instanceof ImportLayoutStyle.Block.AllOthers) {
+                        return "import " + (((ImportLayoutStyle.Block.AllOthers) block).isStatic() ? "static " : "") +
+                                "all other imports";
+                    } else if (block instanceof ImportLayoutStyle.Block.ImportPackage) {
+                        ImportLayoutStyle.Block.ImportPackage importPackage = (ImportLayoutStyle.Block.ImportPackage) block;
+                        return (importPackage.isStatic() ? "static " : "") +
+                                "import " + importPackage.getPackageWildcard();
+                    }
+                    return new UnsupportedOperationException("Unknown block type " + block.getClass().getName());
+                })
+                .toArray(String[]::new);
+
+        gen.writeArrayFieldStart("layout");
+        gen.writeArray(blocks, 0, blocks.length);
+        gen.writeEndArray();
     }
 }

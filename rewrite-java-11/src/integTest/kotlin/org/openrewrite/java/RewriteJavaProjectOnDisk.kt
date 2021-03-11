@@ -16,12 +16,16 @@
 package org.openrewrite.java
 
 import org.openrewrite.InMemoryExecutionContext
+import org.openrewrite.Parser
 import org.openrewrite.Recipe
 import org.openrewrite.SourceFile
+import org.openrewrite.config.YamlResourceLoader
+import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.attribute.BasicFileAttributes
+import java.util.*
 import java.util.function.BiPredicate
 import kotlin.io.path.ExperimentalPathApi
 import kotlin.streams.toList
@@ -31,7 +35,8 @@ object RewriteJavaProjectOnDisk {
     @JvmStatic
     fun main(args: Array<String>) {
         val srcDir = Paths.get(args[0])
-        val recipe: Recipe = Class.forName(args[1]).getDeclaredConstructor().newInstance() as Recipe
+//        val recipe: Recipe = Class.forName(args[1]).getDeclaredConstructor().newInstance() as Recipe
+        val recipe = OrderImports(false)
 
         val predicate = BiPredicate<Path, BasicFileAttributes> { p, bfa ->
             bfa.isRegularFile && p.fileName.toString().endsWith(".java") &&
@@ -43,15 +48,48 @@ object RewriteJavaProjectOnDisk {
             .limit(if (args.size > 2) args[2].toLong() else Long.MAX_VALUE)
             .toList()
 
-        val parser: JavaParser = JavaParser.fromJavaVersion()
+        val listener = object : Parser.Listener {
+            override fun onWarn(message: String, t: Throwable) {
+                t.printStackTrace()
+            }
+
+            override fun onError(message: String, t: Throwable) {
+                t.printStackTrace()
+            }
+        }
+
+        val parser = JavaParser.fromJavaVersion()
             .logCompilationWarningsAndErrors(false) // optional, for quiet parsing
+            .doOnParse(listener)
             .build()
 
+        val style = YamlResourceLoader("""
+            type: specs.openrewrite.org/v1beta/style
+            name: com.netflix.eureka.Style
+            displayName: Eureka style
+            styleConfigs:
+              - org.openrewrite.java.style.ImportLayoutStyle:
+                  classCountToUseStarImport: 999
+                  nameCountToUseStarImport: 999
+                  layout:
+                    - import all other imports
+                    - <blank line>
+                    - import javax.*
+                    - import java.*
+                    - <blank line>
+                    - import static all other imports
+        """.trimIndent().byteInputStream(), URI.create("eureka.yml"), Properties()).listStyles().first()
+
         val sourceFiles: List<SourceFile> = parser.parse(paths, srcDir, InMemoryExecutionContext())
-        recipe.run(sourceFiles).map {
-            println(it.diff())
-            if(System.getenv("rewrite.autofix")?.equals("true") == true) {
-                it.after!!.sourcePath.toFile().writeText(it.after!!.print(), Charsets.UTF_8)
+            .map { it.withMarker(style) }
+
+        for (sourceFile in sourceFiles) {
+            println(sourceFile.sourcePath)
+            recipe.run(listOf(sourceFile)).map {
+                println(it.diff())
+                if(System.getenv("rewrite.autofix")?.equals("true") == true) {
+                    it.after!!.sourcePath.toFile().writeText(it.after!!.print(), Charsets.UTF_8)
+                }
             }
         }
     }
