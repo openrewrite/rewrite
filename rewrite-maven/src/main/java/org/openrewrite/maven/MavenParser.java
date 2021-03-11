@@ -90,7 +90,7 @@ public class MavenParser implements Parser<Maven> {
             effectiveProperties.put("basedir", relativeTo.toString());
         }
         for (RawMaven raw : projectPoms) {
-            Xml.Document resolve = new RawMavenResolver(downloader, activeProfiles, resolveOptional, effectiveProperties, ctx, relativeTo).resolve(raw);
+            Xml.Document resolve = new RawMavenResolver(downloader, activeProfiles, resolveOptional, ctx, relativeTo).resolve(raw, effectiveProperties);
             if (resolve != null) {
                 Maven maven1 = new Maven(resolve);
                 parsed.add(maven1);

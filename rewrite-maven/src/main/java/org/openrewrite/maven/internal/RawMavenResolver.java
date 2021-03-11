@@ -51,25 +51,13 @@ public class RawMavenResolver {
     private final Collection<String> activeProfiles;
     private final boolean resolveOptional;
 
-    /**
-     * This is used to keep track of all properties encountered as raw maven poms are resolved into their partial forms.
-     * A property key may exist in multiple places as the resolver walks the dependencies and the value of the property
-     * is set the first time the property is encountered.
-     *
-     * A property in the root (the first pom to be resolved) will take precedence over a property defined in the parent.
-     * A property in a parent will take precedence over the same property defined in a transitive pom file.
-     * An effective property may have a value that, itself contains a property place holder to a second property and
-     * resolution of placeholders is done on-demand when a value is requested from the pom.
-     */
-    private final Map<String, String> effectiveProperties;
-
     private final MavenExecutionContextView ctx;
 
     @Nullable
     private final Path projectDir;
 
     public RawMavenResolver(MavenPomDownloader downloader, Collection<String> activeProfiles,
-                            boolean resolveOptional, Map<String, String> effectiveProperties, ExecutionContext ctx, @Nullable Path projectDir) {
+                            boolean resolveOptional, ExecutionContext ctx, @Nullable Path projectDir) {
         this.versionSelection = new TreeMap<>();
         for (Scope scope : Scope.values()) {
             versionSelection.putIfAbsent(scope, new HashMap<>());
@@ -77,14 +65,14 @@ public class RawMavenResolver {
         this.downloader = downloader;
         this.activeProfiles = activeProfiles;
         this.resolveOptional = resolveOptional;
-        this.effectiveProperties = effectiveProperties;
         this.ctx = new MavenExecutionContextView(ctx);
         this.projectDir = projectDir;
     }
 
     @Nullable
-    public Xml.Document resolve(RawMaven rawMaven) {
-        Pom pom = resolve(rawMaven, Scope.None, rawMaven.getPom().getVersion(), ctx.getRepositories());
+    public Xml.Document resolve(RawMaven rawMaven, Map<String, String> effectiveProperties) {
+
+        Pom pom = resolve(rawMaven, Scope.None, rawMaven.getPom().getVersion(), effectiveProperties, ctx.getRepositories());
         assert pom != null;
         return rawMaven.getDocument().withMarkers(rawMaven.getDocument().getMarkers()
                 .compute(pom, (old, n) -> n));
@@ -100,15 +88,16 @@ public class RawMavenResolver {
      * @return A transitively resolved POM model.
      */
     @Nullable
-    public Pom resolve(RawMaven rawMaven, Scope scope, @Nullable String requestedVersion, Collection<MavenRepository> repositories) {
-        return resolve(rawMaven, scope, requestedVersion, repositories, null);
+    public Pom resolve(RawMaven rawMaven, Scope scope, @Nullable String requestedVersion, Map<String, String> effectiveProperties, Collection<MavenRepository> repositories) {
+        return resolve(rawMaven, scope, requestedVersion, effectiveProperties, repositories, null);
     }
 
     @Nullable
-    private Pom resolve(RawMaven rawMaven, Scope scope, @Nullable String requestedVersion, Collection<MavenRepository> repositories,
+    private Pom resolve(RawMaven rawMaven, Scope scope, @Nullable String requestedVersion, Map<String, String> effectiveProperties, Collection<MavenRepository> repositories,
                         @Nullable LinkedHashSet<PartialTreeKey> seenParentPoms) {
+
         ResolutionTask rootTask = new ResolutionTask(scope, rawMaven, emptySet(),
-                false, null, null, requestedVersion, repositories, seenParentPoms);
+                false, null, null, requestedVersion, effectiveProperties, repositories, seenParentPoms);
 
         workQueue.add(rootTask);
 
@@ -139,10 +128,10 @@ public class RawMavenResolver {
 
     private void processProperties(ResolutionTask task, PartialMaven partialMaven) {
 
-        task.getRawMaven().getActiveProperties(activeProfiles).forEach(effectiveProperties::putIfAbsent);
+        task.getRawMaven().getActiveProperties(activeProfiles).forEach(task.getEffectiveProperties()::putIfAbsent);
 
         partialMaven.setProperties(task.getRawMaven().getPom().getProperties());
-        partialMaven.setEffectiveProperties(effectiveProperties);
+        partialMaven.setEffectiveProperties(task.getEffectiveProperties());
     }
 
     private void processDependencyManagement(ResolutionTask task, PartialMaven partialMaven) {
@@ -176,8 +165,8 @@ public class RawMavenResolver {
                 RawMaven rawMaven = downloader.download(groupId, artifactId, version, null, null,
                         partialMaven.getRepositories(), ctx);
                 if (rawMaven != null) {
-                    Pom maven = new RawMavenResolver(downloader, activeProfiles, resolveOptional, effectiveProperties, ctx, projectDir)
-                            .resolve(rawMaven, Scope.Compile, d.getVersion(), partialMaven.getRepositories());
+                    Pom maven = new RawMavenResolver(downloader, activeProfiles, resolveOptional, ctx, projectDir)
+                            .resolve(rawMaven, Scope.Compile, d.getVersion(), new HashMap<>(partialMaven.getEffectiveProperties()), partialMaven.getRepositories());
 
                     if (maven != null) {
                         managedDependencies.add(new DependencyManagementDependency.Imported(groupId, artifactId,
@@ -362,6 +351,7 @@ public class RawMavenResolver {
                             dep.getClassifier(),
                             dep.getType(),
                             dep.getVersion(),
+                            new HashMap<>(partialMaven.getEffectiveProperties()),
                             partialMaven.getRepositories(),
                             null
                     );
@@ -411,8 +401,8 @@ public class RawMavenResolver {
 
                 //noinspection OptionalAssignedToNull
                 if (maybeParent == null) {
-                    parent = new RawMavenResolver(downloader, activeProfiles, resolveOptional, effectiveProperties, ctx, projectDir)
-                            .resolve(rawParentModel, Scope.Compile, rawParent.getVersion(), partialMaven.getRepositories(), parentPomSightings);
+                    parent = new RawMavenResolver(downloader, activeProfiles, resolveOptional, ctx, projectDir)
+                            .resolve(rawParentModel, Scope.Compile, rawParent.getVersion(), partialMaven.getEffectiveProperties(), partialMaven.getRepositories(), parentPomSightings);
                     resolved.put(parentKey, Optional.ofNullable(parent));
                 } else {
                     parent = maybeParent.orElse(null);
@@ -508,9 +498,19 @@ public class RawMavenResolver {
                             RawMaven conflictResolvedRaw = downloader.download(groupId, artifactId, conflictResolvedVersion,
                                     null, null, task.getRepositories(), ctx);
 
-                            Pom conflictResolved = conflictResolvedRaw == null ? null : assembleResults(new ResolutionTask(scope, conflictResolvedRaw,
-                                    ancestorDep.getExclusions(), ancestorDep.isOptional(), ancestorDep.getRequestedVersion(),
-                                    ancestorDep.getClassifier(), ancestorDep.getType(), task.getRepositories(), null), nextAssemblyStack);
+                            Pom conflictResolved = conflictResolvedRaw == null ? null :
+                                    assembleResults(
+                                            new ResolutionTask(
+                                                    scope,
+                                                    conflictResolvedRaw,
+                                                    ancestorDep.getExclusions(),
+                                                    ancestorDep.isOptional(),
+                                                    ancestorDep.getClassifier(),
+                                                    ancestorDep.getType(),
+                                                    ancestorDep.getRequestedVersion(),
+                                                    partial.effectiveProperties,
+                                                    task.getRepositories(),
+                                                    null), nextAssemblyStack);
 
                             if (conflictResolved == null) {
                                 dependencies.add(ancestorDep);
@@ -559,7 +559,7 @@ public class RawMavenResolver {
                                 partial.getLicenses(),
                                 partial.getRepositories(),
                                 partial.getProperties(),
-                                effectiveProperties
+                                partial.getEffectiveProperties()
                         )
                 );
             } else {
@@ -625,6 +625,18 @@ public class RawMavenResolver {
         @EqualsAndHashCode.Include
         @Nullable
         String requestedVersion;
+
+        /**
+         * This is used to keep track of all properties encountered as raw maven poms are resolved into their partial forms.
+         * A property key may exist in multiple places as the resolver walks the dependencies and the value of the property
+         * is set the first time the property is encountered.
+         *
+         * A property in the root (the first pom to be resolved) will take precedence over a property defined in the parent.
+         * A property in a parent will take precedence over the same property defined in a transitive pom file.
+         * An effective property may have a value that, itself contains a property place holder to a second property and
+         * resolution of placeholders is done on-demand when a value is requested from the pom.
+         */
+        private Map<String, String> effectiveProperties;
 
         Collection<MavenRepository> repositories;
 

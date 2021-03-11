@@ -336,7 +336,7 @@ class MavenDependencyResolutionIntegTest {
                 <repository>
                     <id>spring-milestones</id>
                     <name>Spring Milestones</name>
-                    <url>http://repo.spring.io/milestone</url>
+                    <url>https://repo.spring.io/milestone</url>
                 </repository>
               </repositories>
               
