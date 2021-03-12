@@ -37,11 +37,11 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.maven.cache.InMemoryMavenPomCache
 import org.openrewrite.maven.internal.MavenParsingException
-import org.openrewrite.maven.tree.Maven
 import org.openrewrite.maven.tree.Pom
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -57,6 +57,14 @@ class MavenDependencyResolutionIntegTest {
     companion object {
         private val meterRegistry = Metrics.globalRegistry
         private val mavenCache = InMemoryMavenPomCache()
+        private val executionContext: ExecutionContext
+            get() = InMemoryExecutionContext { t ->
+                if (t is MavenParsingException) {
+                    println(t.message)
+                } else {
+                    t.printStackTrace()
+                }
+            }
 
         @JvmStatic
         @BeforeAll
@@ -349,7 +357,11 @@ class MavenDependencyResolutionIntegTest {
             </project>
         """.trimIndent()
 
-        assertDependencyResolutionEqualsAether(tempDir, pom)
+        // Maven says that the correct version is org.slf4j:slf4j-api:1.7.30, but aether says org.slf4j:slf4j-api:1.7.25
+        // This asserts that the versions match Maven's expectation
+        val expected = javaClass.getResource("/springBootParentExpected.txt").readText()
+        assertThat(printTreeRecursive(parse(pom).model, false))
+                .isEqualTo(expected)
     }
 
     @Test
@@ -441,7 +453,11 @@ class MavenDependencyResolutionIntegTest {
             </project>
         """.trimIndent()
 
-        assertDependencyResolutionEqualsAether(tempDir, pom)
+        // Maven says that the correct version is org.slf4j:slf4j-api:1.7.30, but aether says org.slf4j:slf4j-api:1.7.25
+        // This asserts that the versions match Maven's expectation
+        val importDependenciesExpected = javaClass.getResource("/importDependenciesExpected.txt").readText()
+        assertThat(printTreeRecursive(parse(pom).model, false))
+                .isEqualTo(importDependenciesExpected)
     }
 
     @Test
@@ -586,25 +602,19 @@ class MavenDependencyResolutionIntegTest {
         assertDependencyResolutionEqualsAether(tempDir, singleDependencyPom("net.openhft:lang:6.6.2"))
     }
 
-    private fun assertDependencyResolutionEqualsAether(tempDir: Path, pom: String, ignoreScopes: Boolean = false) {
-        val pomFile = tempDir.resolve("pom.xml").toFile().apply { writeText(pom) }
-
-        val pomAst: Maven = MavenParser.builder()
+    fun parse(pom: String) = MavenParser.builder()
             .cache(mavenCache)
             .resolveOptional(false)
             .build()
-            .parse(listOf(pomFile.toPath()), null, InMemoryExecutionContext { t ->
-                if (t is MavenParsingException) {
-                    println(t.message)
-                } else {
-                    t.printStackTrace()
-                }
-            })
+            .parse(executionContext, pom)
             .first()
 
-        val rewrite = printTreeRecursive(pomAst.model, ignoreScopes)
-        val aether = MavenAetherParser().dependencyTree(pomFile, ignoreScopes)
-        assertThat(rewrite).isEqualTo(aether)
+    private fun assertDependencyResolutionEqualsAether(tempDir: Path, pom: String, ignoreScopes: Boolean = false) {
+        val pomFile = tempDir.resolve("pom.xml").toFile().apply { writeText(pom) }
+        val pomAst = parse(pom)
+        val rewriteResult = printTreeRecursive(pomAst.model, ignoreScopes)
+        val aetherResult = MavenAetherParser().dependencyTree(pomFile, ignoreScopes)
+        assertThat(rewriteResult).isEqualTo(aetherResult)
     }
 
     private fun printTreeRecursive(maven: Pom, ignoreScopes: Boolean): String {
