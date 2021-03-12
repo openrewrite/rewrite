@@ -76,6 +76,20 @@ interface OrderImportsTest : JavaRecipeTest {
         """
     )
 
+    @Test
+    fun sortInnerAndOuterClassesInTheSamePackage(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            import com.netflix.appinfo.AmazonInfo;
+            import com.netflix.appinfo.AmazonInfo.MetaDataKey;
+            import com.netflix.appinfo.ApplicationInfoManager;
+            import com.netflix.appinfo.DataCenterInfo.Name;
+            import com.netflix.appinfo.InstanceInfo;
+            
+            class Test {}
+        """
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/259")
     @Test
     fun multipleClassesWithTheSameNameButDifferentPackages(jp: JavaParser) = assertUnchanged(

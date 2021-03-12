@@ -383,6 +383,11 @@ public class ImportLayoutStyle implements JavaStyle {
                             .forEach(ordered::add);
                 }
 
+                // interleaves inner classes and outer classes back together which are separated into different groups
+                // above for the sake of determining whether groups of outer class or inner class imports need to be star
+                // folded/unfolded
+                ordered.sort(IMPORT_SORTING);
+
                 return ordered;
             }
         }
