@@ -17,6 +17,7 @@ package org.openrewrite.java.style;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonSerializer;
@@ -425,7 +426,7 @@ class Deserializer extends JsonDeserializer<ImportLayoutStyle> {
     @Override
     public ImportLayoutStyle deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
         ImportLayoutStyle.Builder builder = ImportLayoutStyle.builder();
-        for (String currentField = null; p.hasCurrentToken(); p.nextToken()) {
+        for (String currentField = null; p.hasCurrentToken() && p.getCurrentToken() != JsonToken.END_OBJECT; p.nextToken()) {
             switch (p.currentToken()) {
                 case FIELD_NAME:
                     currentField = p.getCurrentName();
