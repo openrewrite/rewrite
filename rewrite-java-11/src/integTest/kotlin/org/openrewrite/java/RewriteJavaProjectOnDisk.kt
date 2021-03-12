@@ -72,10 +72,11 @@ object RewriteJavaProjectOnDisk {
                   classCountToUseStarImport: 999
                   nameCountToUseStarImport: 999
                   layout:
+                    - import java.*
+                    - <blank line>
                     - import all other imports
                     - <blank line>
                     - import javax.*
-                    - import java.*
                     - <blank line>
                     - import static all other imports
         """.trimIndent().byteInputStream(), URI.create("eureka.yml"), Properties()).listStyles().first()
