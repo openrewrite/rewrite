@@ -70,7 +70,7 @@ jobs:
         timeout-minutes: 30
         run: ./gradlew ${GRADLE_SWITCHES} snapshot publish -PforceSigning
         env:
-          OSSRH_TOKEN: ${{ secrets.OSSRH_TOKEN }}
-          OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
-          SIGNING_KEY: ${{ secrets.OSSRH_SIGNING_KEY }}
-          SIGNING_PASSWORD: ${{ secrets.OSSRH_SIGNING_PASSWORD }}
+          ORG_GRADLE_PROJECT_sonatypeUsername: ${{ secrets.OSSRH_USERNAME }}
+          ORG_GRADLE_PROJECT_sonatypePassword: ${{ secrets.OSSRH_TOKEN }}
+          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.OSSRH_SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.OSSRH_SIGNING_PASSWORD }}
