@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.style;
 
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
@@ -54,6 +55,7 @@ import static org.openrewrite.internal.StreamUtils.distinctBy;
  */
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Getter
+@JsonTypeInfo(use = JsonTypeInfo.Id.NONE)
 @JsonDeserialize(using = Deserializer.class)
 @JsonSerialize(using = Serializer.class)
 public class ImportLayoutStyle implements JavaStyle {
@@ -432,6 +434,9 @@ class Deserializer extends JsonDeserializer<ImportLayoutStyle> {
                     currentField = p.getCurrentName();
                     break;
                 case VALUE_STRING:
+                    if(!currentField.equals("layout")) {
+                        break;
+                    }
                     String block = p.getText().trim();
                     if (block.equals("<blank line>")) {
                         builder.blankLine();
@@ -476,6 +481,8 @@ class Deserializer extends JsonDeserializer<ImportLayoutStyle> {
 class Serializer extends JsonSerializer<ImportLayoutStyle> {
     @Override
     public void serialize(ImportLayoutStyle value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+        gen.writeStartObject();
+        gen.writeStringField("@c", ImportLayoutStyle.class.getName());
         gen.writeNumberField("classCountToUseStarImport", value.getClassCountToUseStarImport());
         gen.writeNumberField("nameCountToUseStarImport", value.getNameCountToUseStarImport());
 
@@ -498,5 +505,6 @@ class Serializer extends JsonSerializer<ImportLayoutStyle> {
         gen.writeArrayFieldStart("layout");
         gen.writeArray(blocks, 0, blocks.length);
         gen.writeEndArray();
+        gen.writeEndObject();
     }
 }
