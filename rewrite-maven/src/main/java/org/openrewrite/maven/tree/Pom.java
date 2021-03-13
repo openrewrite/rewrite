@@ -137,7 +137,7 @@ public class Pom implements Marker {
     }
 
     private void addDependenciesFromScope(Scope scope, Dependency dep, Set<Dependency> found) {
-        if (dep.getScope().isInClasspathOf(scope)) {
+        if (dep.getScope().isInClasspathOf(scope) || dep.getScope().equals(scope)) {
             found.add(dep);
             for (Dependency child : dep.getModel().getDependencies()) {
                 addDependenciesFromScope(scope, child, found);
