@@ -22,6 +22,7 @@ import mockwebserver3.RecordedRequest
 import okhttp3.Credentials
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
@@ -719,5 +720,140 @@ class MavenParserTest {
         assertThat(maven!!.model.dependencies)
                 .hasSize(1)
                 .matches { it.first().artifactId == "guava" && it.first().version == "29.0-jre" }
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/376")
+    @Disabled
+    @Test
+    fun dependencyManagementPropagatesToDependencies() {
+        // a depends on b
+        // a-parent manages version of d to 0.1
+        // b depends on d without specifying version
+        // b-parent manages version of d to 0.2
+        // Therefore the version of b that wins is 0.1
+        val a = MavenParser.builder()
+                .resolveOptional(false)
+                .build()
+                .parse("""
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                
+                    <parent>
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>a-parent</artifactId>
+                        <version>0.1.0-SNAPSHOT</version>
+                        <relativePath />
+                    </parent>
+                
+                    <artifactId>a</artifactId>
+                
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.openrewrite.maven</groupId>
+                            <artifactId>b</artifactId>
+                            <version>0.1.0-SNAPSHOT</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """,
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                
+                    <groupId>org.openrewrite.maven</groupId>
+                    <artifactId>a-parent</artifactId>
+                    <version>0.1.0-SNAPSHOT</version>
+                    <packaging>pom</packaging>
+                
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.openrewrite.maven</groupId>
+                                <artifactId>d</artifactId>
+                                <version>0.1.0-SNAPSHOT</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+            """,
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                
+                    <parent>
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>b-parent</artifactId>
+                        <version>0.1.0-SNAPSHOT</version>
+                        <relativePath />
+                    </parent>
+                
+                    <artifactId>b</artifactId>
+                
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.openrewrite.maven</groupId>
+                            <artifactId>d</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """,
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                
+                    <groupId>org.openrewrite.maven</groupId>
+                    <artifactId>b-parent</artifactId>
+                    <version>0.1.0-SNAPSHOT</version>
+                    <packaging>pom</packaging>
+                
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.openrewrite.maven</groupId>
+                                <artifactId>d</artifactId>
+                                <version>0.2.0-SNAPSHOT</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+            """,
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                
+                    <groupId>org.openrewrite.maven</groupId>
+                    <artifactId>d</artifactId>
+                    <version>0.1.0-SNAPSHOT</version>
+                
+                    <properties>
+                        <maven.compiler.source>1.8</maven.compiler.source>
+                        <maven.compiler.target>1.8</maven.compiler.target>
+                    </properties>
+                </project>
+            """,
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                
+                    <groupId>org.openrewrite.maven</groupId>
+                    <artifactId>d</artifactId>
+                    <version>0.2.0-SNAPSHOT</version>
+                
+                    <properties>
+                        <maven.compiler.source>1.8</maven.compiler.source>
+                        <maven.compiler.target>1.8</maven.compiler.target>
+                    </properties>
+                </project>
+            """)
+                .find { it.model.artifactId == "a" }
+
+        assertThat(a!!.model.dependencies)
+                .hasSize(1)
+        val b = a.model.dependencies.first()
+        assertThat(b)
+                .matches { it.artifactId == "b" }
+                .matches { it.model.dependencies.size == 1}
+                .matches({ it.model.dependencies.first().artifactId == "d" && it.model.dependencies.first().version == "0.1.0-SNAPSHOT" },
+                        "Because of a-parent's dependencyManagement, b should depend on d 0.1.0-SNAPSHOT")
     }
 }
