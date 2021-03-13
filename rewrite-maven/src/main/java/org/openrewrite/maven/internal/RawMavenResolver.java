@@ -71,7 +71,6 @@ public class RawMavenResolver {
 
     @Nullable
     public Xml.Document resolve(RawMaven rawMaven, Map<String, String> effectiveProperties) {
-
         Pom pom = resolve(rawMaven, Scope.None, rawMaven.getPom().getVersion(), effectiveProperties, ctx.getRepositories());
         assert pom != null;
         return rawMaven.getDocument().withMarkers(rawMaven.getDocument().getMarkers()
@@ -200,7 +199,7 @@ public class RawMavenResolver {
         }
 
         partialMaven.setDependencyTasks(rawMaven.getActiveDependencies(activeProfiles).stream()
-                .filter(dep -> resolveOptional || dep.getOptional() == null || !dep.getOptional())
+                .filter(dep -> rawMaven.isProjectPom() || (resolveOptional || dep.getOptional() == null || !dep.getOptional()))
                 .map(dep -> {
                     // replace property references, source versions from dependency management sections, etc.
                     String groupId = partialMaven.getValue(dep.getGroupId());

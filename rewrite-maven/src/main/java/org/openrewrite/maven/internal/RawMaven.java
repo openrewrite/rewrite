@@ -42,6 +42,9 @@ public class RawMaven {
     final Xml.Document document;
     final RawPom pom;
 
+    @With
+    final boolean projectPom;
+
     /**
      * Provided when this pom was downloaded from a remote repository.
      */
@@ -77,7 +80,7 @@ public class RawMaven {
             if (snapshotVersion != null) {
                 pom.setSnapshotVersion(snapshotVersion);
             }
-            return new RawMaven(document, pom);
+            return new RawMaven(document, pom, false);
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to parse " + source.getPath(), e);
         }
