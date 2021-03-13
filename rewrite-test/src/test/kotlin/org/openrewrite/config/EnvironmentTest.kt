@@ -66,6 +66,7 @@ class EnvironmentTest : RecipeTest {
                     """
                         type: specs.openrewrite.org/v1beta/recipe
                         name: test.ChangeTextToHello
+                        displayName: Change text to hello
                         recipeList:
                             - org.openrewrite.text.ChangeText
                     """.trimIndent().byteInputStream(),
@@ -200,8 +201,8 @@ class EnvironmentTest : RecipeTest {
     @Test
     fun listStyles() {
         val env = Environment.builder().scanClasspath(Collections.emptySet()).build()
-        val styles = env.listStyles();
-        assertThat(styles).isNotNull.isNotEmpty;
+        val styles = env.listStyles()
+        assertThat(styles).isNotNull.isNotEmpty
         val sampleStyle = styles.filter { it.name == "org.openrewrite.SampleStyle" }.firstOrNull()
         assertThat(sampleStyle).isNotNull
         assertThat(sampleStyle!!.displayName).isEqualTo("Sample style")

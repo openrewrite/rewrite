@@ -123,6 +123,9 @@ public class YamlResourceLoader implements ResourceLoader {
                 .map(r -> {
                     String name = (String) r.get("name");
                     String displayName = (String) r.get("displayName");
+                    if (displayName == null) {
+                        throw new RecipeException("Invalid Recipe [" + name + "] displayName is null");
+                    }
                     String description = (String) r.get("description");
                     Set<String> tags = Collections.emptySet();
                     List<String> rawTags = (List<String>) r.get("tags");
