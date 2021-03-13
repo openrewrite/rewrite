@@ -187,6 +187,7 @@ public class MavenPomDownloader {
                 return projectPom;
             }
         }
+
         if (containingPom != null && !StringUtils.isBlank(relativePath)) {
             Path folderContainingPom = containingPom.getSourcePath()
                     .getParent();
@@ -204,6 +205,7 @@ public class MavenPomDownloader {
                 }
             }
         }
+
         List<MavenRepository> repos =  Stream.concat(repositories.stream(), Stream.of(SUPER_POM_REPOSITORY))
                 .map(this::normalizeRepository)
                 .filter(Objects::nonNull)
@@ -250,19 +252,24 @@ public class MavenPomDownloader {
                         });
 
                 sample.stop(addTagsByResult(timer, result).register(Metrics.globalRegistry));
-                return result.getData();
+                if(result.getState() != CacheResult.State.Unavailable) {
+                    return result.getData();
+                }
             } catch (Exception e) {
                 sample.stop(timer.tags("outcome", "error", "exception", e.getClass().getName())
                         .register(Metrics.globalRegistry));
                 errors.put(repo, e);
-                continue;
             }
         }
-        String errorText = "Unable to download dependency " + groupId + ":" + artifactId + ":" + version + " from any of these repositories: \n" +
-                errors.entrySet().stream()
-                .map(entry -> "    Id: " + entry.getKey().getId() + ", URL: " + entry.getKey().getUri().toString() + ", cause: " + entry.getValue())
-                .collect(Collectors.joining("\n"));
-        ctx.getOnError().accept(new MavenDownloadingException(errorText));
+
+        if(!errors.isEmpty()) {
+            String errorText = "Unable to download dependency " + groupId + ":" + artifactId + ":" + version + " from any of these repositories: \n" +
+                    errors.entrySet().stream()
+                            .map(entry -> "    Id: " + entry.getKey().getId() + ", URL: " + entry.getKey().getUri().toString() + ", cause: " + entry.getValue())
+                            .collect(Collectors.joining("\n"));
+            ctx.getOnError().accept(new MavenDownloadingException(errorText));
+        }
+
         return null;
     }
 
