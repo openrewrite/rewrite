@@ -122,6 +122,10 @@ subprojects {
         options.compilerArgs.add("-parameters")
     }
 
+    tasks.withType(Javadoc::class.java) {
+        options.encoding = "UTF-8"
+    }
+
     tasks.named<JavaCompile>("compileJava") {
         sourceCompatibility = JavaVersion.VERSION_1_8.toString()
         targetCompatibility = JavaVersion.VERSION_1_8.toString()
