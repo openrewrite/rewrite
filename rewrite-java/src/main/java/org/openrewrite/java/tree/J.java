@@ -4944,7 +4944,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class Wildcard implements J, Expression {
+    final class Wildcard implements J, Expression, TypeTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;

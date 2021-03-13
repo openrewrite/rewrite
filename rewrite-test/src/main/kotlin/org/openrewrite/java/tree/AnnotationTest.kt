@@ -16,6 +16,7 @@
 package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTreeTest
 import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
@@ -98,6 +99,22 @@ interface AnnotationTest : JavaTreeTest {
                 @interface C {
                 }
             """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/377")
+    @Test
+    fun typeParameterAnnotations(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, CompilationUnit, """
+            import java.util.List;
+            import java.lang.annotation.*;
+            class TypeAnnotationTest {
+                List<@A ? extends @A String> list;
+           
+                @Target({ ElementType.FIELD, ElementType.TYPE_USE, ElementType.TYPE_PARAMETER })
+                private static @interface A {
+                }
+            }
+        """
     )
 
     @Test
