@@ -124,7 +124,7 @@ public class YamlResourceLoader implements ResourceLoader {
                     String name = (String) r.get("name");
                     String displayName = (String) r.get("displayName");
                     if (displayName == null) {
-                        throw new RecipeException("Invalid Recipe [" + name + "] displayName is null");
+                        displayName = name;
                     }
                     String description = (String) r.get("description");
                     Set<String> tags = Collections.emptySet();
@@ -185,6 +185,9 @@ public class YamlResourceLoader implements ResourceLoader {
                     List<Style> styles = new ArrayList<>();
                     String name = (String) s.get("name");
                     String displayName = (String) s.get("displayName");
+                    if (displayName == null) {
+                        displayName = name;
+                    }
                     String description = (String) s.get("description");
                     Set<String> tags = Collections.emptySet();
                     List<String> rawTags = (List<String>) s.get("tags");
