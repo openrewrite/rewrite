@@ -564,15 +564,24 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private J visitEnumVariable(VariableTree node, Space fmt) {
-        skip(node.getName().toString());
-        J.Identifier name = J.Identifier.build(randomId(), EMPTY, Markers.EMPTY, node.getName().toString(), type(node));
+        List<J.Annotation> annotations = emptyList();
+        Space nameSpace = EMPTY;
+
+        if(!node.getModifiers().getAnnotations().isEmpty()) {
+            annotations = convertAll(node.getModifiers().getAnnotations());
+            nameSpace = sourceBefore(node.getName().toString());
+        } else {
+            skip(node.getName().toString());
+        }
+
+        J.Identifier name = J.Identifier.build(randomId(), nameSpace, Markers.EMPTY, node.getName().toString(), type(node));
 
         J.NewClass initializer = null;
         if (source.charAt(endPos(node) - 1) == ')' || source.charAt(endPos(node) - 1) == '}') {
             initializer = convert(node.getInitializer());
         }
 
-        return new J.EnumValue(randomId(), fmt, Markers.EMPTY, name, initializer);
+        return new J.EnumValue(randomId(), fmt, Markers.EMPTY, annotations, name, initializer);
     }
 
     @Override

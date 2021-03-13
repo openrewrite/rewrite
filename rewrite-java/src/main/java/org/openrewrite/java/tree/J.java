@@ -1344,6 +1344,9 @@ public interface J extends Serializable, Tree {
         Markers markers;
 
         @With
+        List<J.Annotation> annotations;
+
+        @With
         Identifier name;
 
         @With

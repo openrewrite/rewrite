@@ -558,6 +558,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
     @Override
     public J visitEnumValue(EnumValue enoom, P p) {
         visitSpace(enoom.getPrefix(), Space.Location.ENUM_VALUE_PREFIX, p);
+        visit(enoom.getAnnotations(), p);
         visit(enoom.getName(), p);
         NewClass initializer = enoom.getInitializer();
         if (enoom.getInitializer() != null) {

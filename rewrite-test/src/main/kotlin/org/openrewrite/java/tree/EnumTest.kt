@@ -16,11 +16,26 @@
 package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTreeTest
 import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
 
 interface EnumTest : JavaTreeTest {
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/379")
+    @Test
+    fun enumWithAnnotations(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, CompilationUnit, """
+            public enum Test {
+                @Deprecated(since = "now")
+                One,
+                
+                @Deprecated(since = "now")
+                Two;
+            }
+        """
+    )
 
     @Test
     fun anonymousClassInitializer(jp: JavaParser) = assertParsePrintAndProcess(
