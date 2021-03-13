@@ -681,6 +681,31 @@ class MavenParserTest {
         assertThat(maven.model.dependencies.first().version).isEqualTo("0.1.0-SNAPSHOT")
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/378")
+    @Test
+    fun parseNotInProfileActivation() {
+        MavenParser.builder()
+            .resolveOptional(false)
+            .build()
+            .parse(
+                """
+                    <project>
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>test</artifactId>
+                        <version>0.1.0-SNAPSHOT</version>
+                        <profiles>
+                            <profile>
+                              <id>repo-incode-work</id>
+                              <properties>
+                                <name>!skip.repo-incode-work</name>
+                              </properties>
+                            </profile>
+                        </profiles>
+                    </project>
+                """
+            )
+    }
+
     @Test
     fun parentPomProfileProperty() {
         val maven = MavenParser.builder()
