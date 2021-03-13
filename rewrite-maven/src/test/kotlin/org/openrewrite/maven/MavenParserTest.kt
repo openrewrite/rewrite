@@ -40,115 +40,122 @@ class MavenParserTest {
     fun parse() {
         val parser = MavenParser.builder().build()
 
-        val maven = parser.parse("""
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-            
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <packaging>pom</packaging>
-                <developers>
-                    <developer>
-                        <name>Trygve Laugst&oslash;l</name>
-                    </developer>
-                </developers>
-
-                <dependencies>
-                  <dependency>
-                    <groupId>org.junit.jupiter</groupId>
-                    <artifactId>junit-jupiter-api</artifactId>
-                    <version>5.7.0</version>
-                    <type>pom</type>
-                    <scope>test</scope>
-                  </dependency>
-                </dependencies>
-            </project>
-        """)[0]
+        val maven = parser.parse(
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <developers>
+                        <developer>
+                            <name>Trygve Laugst&oslash;l</name>
+                        </developer>
+                    </developers>
+    
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.junit.jupiter</groupId>
+                        <artifactId>junit-jupiter-api</artifactId>
+                        <version>5.7.0</version>
+                        <type>pom</type>
+                        <scope>test</scope>
+                      </dependency>
+                    </dependencies>
+                </project>
+            """
+        )[0]
 
         assertThat(maven.model.dependencies.first().model.licenses.first()?.type)
-                .isEqualTo(Pom.LicenseType.Eclipse)
+            .isEqualTo(Pom.LicenseType.Eclipse)
         assertThat(maven.model.dependencies.first().type)
-                .isEqualTo("pom")
+            .isEqualTo("pom")
         assertThat(maven.model.packaging)
-                .isEqualTo("pom")
+            .isEqualTo("pom")
     }
 
     @Test
     fun emptyArtifactPolicy() {
         // example from https://repo1.maven.org/maven2/org/openid4java/openid4java-parent/0.9.6/openid4java-parent-0.9.6.pom
-        MavenParser.builder().build().parse("""
-            <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <repositories>
-                    <repository>
-                        <id>alchim.snapshots</id>
-                        <name>Achim Repository Snapshots</name>
-                        <url>http://alchim.sf.net/download/snapshots</url>
-                        <snapshots/>
-                    </repository>
-                </repositories>
-            </project>
-        """.trimIndent())
+        MavenParser.builder().build().parse(
+            """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <repositories>
+                        <repository>
+                            <id>alchim.snapshots</id>
+                            <name>Achim Repository Snapshots</name>
+                            <url>http://alchim.sf.net/download/snapshots</url>
+                            <snapshots/>
+                        </repository>
+                    </repositories>
+                </project>
+            """.trimIndent()
+        )
     }
 
     @Test
     fun handlesRepositories() {
-        MavenParser.builder().build().parse("""
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-
-                <groupId>org.openrewrite.maven</groupId>
-                <artifactId>single-project</artifactId>
-                <version>0.1.0-SNAPSHOT</version>
-
-                <dependencies>
-                    <dependency>
-                        <groupId>com.google.guava</groupId>
-                        <artifactId>guava</artifactId>
-                        <version>29.0-jre</version>
-                    </dependency>
-                </dependencies>
-
-                <repositories>
-                    <repository>
-                        <id>jcenter</id>
-                        <name>JCenter</name>
-                        <url>https://jcenter.bintray.com/</url>
-                    </repository>
-                </repositories>
-            </project>
-        """)
+        MavenParser.builder().build().parse(
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+    
+                    <groupId>org.openrewrite.maven</groupId>
+                    <artifactId>single-project</artifactId>
+                    <version>0.1.0-SNAPSHOT</version>
+    
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                        </dependency>
+                    </dependencies>
+    
+                    <repositories>
+                        <repository>
+                            <id>jcenter</id>
+                            <name>JCenter</name>
+                            <url>https://jcenter.bintray.com/</url>
+                        </repository>
+                    </repositories>
+                </project>
+            """.trimIndent()
+        )
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/198")
     @Test
     fun handlesPropertiesInDependencyScope() {
-        val maven = MavenParser.builder().build().parse("""
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-
-                <groupId>org.openrewrite.maven</groupId>
-                <artifactId>single-project</artifactId>
-                <version>0.1.0-SNAPSHOT</version>
-
-                <properties>
-                    <dependency.scope>compile</dependency.scope>
-                </properties>
-
-                <dependencies>
-                    <dependency>
-                        <groupId>com.google.guava</groupId>
-                        <artifactId>guava</artifactId>
-                        <version>29.0-jre</version>
-                        <scope>${"$"}{dependency.scope}</scope>
-                    </dependency>
-                </dependencies>
-            </project>
-
-        """).first()
+        val maven = MavenParser.builder().build().parse(
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+    
+                    <groupId>org.openrewrite.maven</groupId>
+                    <artifactId>single-project</artifactId>
+                    <version>0.1.0-SNAPSHOT</version>
+    
+                    <properties>
+                        <dependency.scope>compile</dependency.scope>
+                    </properties>
+    
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                            <scope>${"$"}{dependency.scope}</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """
+        ).first()
         assertThat(maven.model.dependencies).hasSize(1)
         assertThat(maven.model.dependencies.first()).matches { it.scope == Scope.Compile }
     }
@@ -256,49 +263,53 @@ class MavenParserTest {
     @Test
     fun selfRecursiveParent() {
         MavenParser.builder()
-                .resolveOptional(false)
-                .build()
-                .parse("""
-                <project>
-                    <modelVersion>4.0.0</modelVersion>
-                
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
+            .resolveOptional(false)
+            .build()
+            .parse(
+                """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
                     
-                    <parent>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
                         <version>1</version>
-                    </parent>
-                </project>
-            """)
+                        
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>my-app</artifactId>
+                            <version>1</version>
+                        </parent>
+                    </project>
+                """
+            )
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/135")
     @Test
     fun selfRecursiveDependency() {
         val maven = MavenParser.builder()
-                .resolveOptional(false)
-                .build()
-                .parse("""
-                <project>
-                    <modelVersion>4.0.0</modelVersion>
-
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    
-                    <dependencies>
-                        <dependency>
-                            <groupId>com.mycompany.app</groupId>
-                            <artifactId>my-app</artifactId>
-                            <version>1</version>
-                        </dependency>
-                    </dependencies>
-                </project>
-            """)
-                .first()
+            .resolveOptional(false)
+            .build()
+            .parse(
+                """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+    
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.mycompany.app</groupId>
+                                <artifactId>my-app</artifactId>
+                                <version>1</version>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                """
+            )
+            .first()
 
         // Maven itself would respond to this pom with a fatal error.
         // So long as we don't produce an AST with cycles it's OK
@@ -309,7 +320,7 @@ class MavenParserTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/323")
     @Test
     fun inheritScopeFromDependencyManagement() {
-        val pomSource = """<?xml version="1.0" encoding="UTF-8"?>
+        val pomSource = """
             <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -344,13 +355,13 @@ class MavenParserTest {
 
         val maven = MavenParser.builder().build().parse(pomSource)[0]
         assertThat(maven.model.dependencies.map { it.artifactId to it.scope })
-                .containsExactly("junit-jupiter" to Scope.Test, "guava" to Scope.Compile)
+            .containsExactly("junit-jupiter" to Scope.Test, "guava" to Scope.Compile)
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/323")
     @Test
     fun dependencyScopeTakesPrecedenceOverDependencyManagementScope() {
-        val pomSource = """<?xml version="1.0" encoding="UTF-8"?>
+        val pomSource = """
             <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -386,7 +397,7 @@ class MavenParserTest {
 
         val maven = MavenParser.builder().build().parse(pomSource)[0]
         assertThat(maven.model.dependencies.map { it.artifactId to it.scope })
-                .containsExactly("junit-jupiter" to Scope.Compile, "guava" to Scope.Compile)
+            .containsExactly("junit-jupiter" to Scope.Compile, "guava" to Scope.Compile)
     }
 
     @Test
@@ -398,14 +409,20 @@ class MavenParserTest {
         MockWebServer().apply {
             dispatcher = object : Dispatcher() {
                 override fun dispatch(request: RecordedRequest): MockResponse {
-                    if (request.headers.find { it.first == "Authorization" && it.second == Credentials.basic(username, password) } == null) {
+                    if (request.headers.find {
+                            it.first == "Authorization" && it.second == Credentials.basic(
+                                username,
+                                password
+                            )
+                        } == null) {
                         return MockResponse().apply {
                             setResponseCode(401)
                         }
                     } else {
                         return MockResponse().apply {
                             setResponseCode(200)
-                            setBody("""
+                            setBody(
+                                """
                                 <project>
                                   <modelVersion>4.0.0</modelVersion>
 
@@ -414,7 +431,8 @@ class MavenParserTest {
                                   <version>1.0.0</version>
                                   
                                 </project>
-                            """.trimIndent())
+                            """.trimIndent()
+                            )
                         }
                     }
                 }
@@ -423,54 +441,54 @@ class MavenParserTest {
             val ctx = InMemoryExecutionContext { err -> throw err }
             MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
                 """
-                <settings>
-                    <mirrors>
-                        <mirror>
-                            <mirrorOf>*</mirrorOf>
-                            <name>repo</name>
-                            <url>http://${mockRepo.hostName}:${mockRepo.port}</url>
-                            <id>repo</id>
-                        </mirror>
-                    </mirrors>
-                    <servers>
-                        <server>
-                            <id>repo</id>
-                            <username>${username}</username>
-                            <password>${password}</password>
-                        </server>
-                    </servers>
-                </settings>
+                    <settings>
+                        <mirrors>
+                            <mirror>
+                                <mirrorOf>*</mirrorOf>
+                                <name>repo</name>
+                                <url>http://${mockRepo.hostName}:${mockRepo.port}</url>
+                                <id>repo</id>
+                            </mirror>
+                        </mirrors>
+                        <servers>
+                            <server>
+                                <id>repo</id>
+                                <username>${username}</username>
+                                <password>${password}</password>
+                            </server>
+                        </servers>
+                    </settings>
                 """.trimIndent().byteInputStream()
             }, ctx)
 
             val maven: Maven = MavenParser.builder().build().parse(
-                    ctx,
-                    """
-                        <project>
-                            <modelVersion>4.0.0</modelVersion>
-                        
-                            <groupId>org.openrewrite.test</groupId>
-                            <artifactId>foo</artifactId>
-                            <version>0.1.0-SNAPSHOT</version>
-                        
-                            <dependencies>
-                                <dependency>
-                                    <groupId>com.foo</groupId>
-                                    <artifactId>bar</artifactId>
-                                    <version>1.0.0</version>
-                                </dependency>
-                            </dependencies>
-                        </project>
-                    """
+                ctx,
+                """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                    
+                        <groupId>org.openrewrite.test</groupId>
+                        <artifactId>foo</artifactId>
+                        <version>0.1.0-SNAPSHOT</version>
+                    
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.foo</groupId>
+                                <artifactId>bar</artifactId>
+                                <version>1.0.0</version>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                """
             ).first()
 
             assertThat(mockRepo.requestCount)
-                    .isGreaterThan(0)
-                    .`as`("The mock repository received no requests. Applying mirrors is probably broken")
+                .isGreaterThan(0)
+                .`as`("The mock repository received no requests. Applying mirrors is probably broken")
 
             assertThat(maven.model.dependencies)
-                    .hasSize(1)
-                    .matches { it.first().groupId == "com.foo" && it.first().artifactId == "bar" }
+                .hasSize(1)
+                .matches { it.first().groupId == "com.foo" && it.first().artifactId == "bar" }
         }
     }
 
@@ -480,8 +498,9 @@ class MavenParserTest {
         // a depends on d. The version number is a property specified in a's parent, b
         // b gets part of the version number for d from a property specified in b's parent, c
         val maven = MavenParser.builder()
-                .build()
-                .parse("""
+            .build()
+            .parse(
+                """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
                     
@@ -554,8 +573,8 @@ class MavenParserTest {
                     
                     </project>
                 """
-                )
-                .find { it.model.artifactId == "a" }!!
+            )
+            .find { it.model.artifactId == "a" }!!
 
         assertThat(maven.model.dependencies.first().version).isEqualTo("0.1.0-SNAPSHOT")
     }
@@ -568,8 +587,9 @@ class MavenParserTest {
         // c's dependencyManagement specifies the version of d to use
         // So if all goes well a will have the version of d from c's dependencyManagement
         val maven = MavenParser.builder()
-                .build()
-                .parse("""
+            .build()
+            .parse(
+                """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
                     
@@ -595,7 +615,7 @@ class MavenParserTest {
                         </dependencies>
                     </project>
                 """,
-                        """
+                """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
                     
@@ -621,9 +641,8 @@ class MavenParserTest {
                             </dependencies>
                         </dependencyManagement>
                     </project>
-                     
                 """,
-                        """
+                """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
                     
@@ -643,7 +662,7 @@ class MavenParserTest {
                         </dependencyManagement>
                     </project>
                 """,
-                        """
+                """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
                     
@@ -657,8 +676,7 @@ class MavenParserTest {
                         </properties>
                     </project>
                 """
-                )
-                .find { it.model.artifactId == "a" }!!
+            ).find { it.model.artifactId == "a" }!!
 
         assertThat(maven.model.dependencies.first().version).isEqualTo("0.1.0-SNAPSHOT")
     }
@@ -666,60 +684,61 @@ class MavenParserTest {
     @Test
     fun parentPomProfileProperty() {
         val maven = MavenParser.builder()
-                .resolveOptional(false)
-                .build()
-                .parse("""
-                <project>
-                    <modelVersion>4.0.0</modelVersion>
-
-                    <groupId>org.openrewrite.maven</groupId>
-                    <artifactId>multi-module-project-parent</artifactId>
-                    <version>0.1.0-SNAPSHOT</version>
-                    <packaging>pom</packaging>
-
-                    <modules>
-                        <module>a</module>
-                    </modules>
-
-                    <profiles>
-                        <profile>
-                          <id>appserverConfig-dev-2</id>
-                          <activation>
-                            <activeByDefault>true</activeByDefault>
-                          </activation>
-                          <properties>
-                            <guava.version>29.0-jre</guava.version>
-                          </properties>
-                        </profile>
-                    </profiles>
-                </project>
-            """,
-                        """
-                <project>
-                    <modelVersion>4.0.0</modelVersion>
-                
-                    <parent>
+            .resolveOptional(false)
+            .build()
+            .parse(
+                """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+    
                         <groupId>org.openrewrite.maven</groupId>
                         <artifactId>multi-module-project-parent</artifactId>
                         <version>0.1.0-SNAPSHOT</version>
-                    </parent>
-                
-                    <artifactId>a</artifactId>
-                
-                    <dependencies>
-                        <dependency>
-                            <groupId>com.google.guava</groupId>
-                            <artifactId>guava</artifactId>
-                            <version>${"$"}{guava.version}</version>
-                        </dependency>
-                    </dependencies>
-                </project>
-            """)
-                .find { it.model.artifactId == "a" }
+                        <packaging>pom</packaging>
+    
+                        <modules>
+                            <module>a</module>
+                        </modules>
+    
+                        <profiles>
+                            <profile>
+                              <id>appserverConfig-dev-2</id>
+                              <activation>
+                                <activeByDefault>true</activeByDefault>
+                              </activation>
+                              <properties>
+                                <guava.version>29.0-jre</guava.version>
+                              </properties>
+                            </profile>
+                        </profiles>
+                    </project>
+                """,
+                """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                    
+                        <parent>
+                            <groupId>org.openrewrite.maven</groupId>
+                            <artifactId>multi-module-project-parent</artifactId>
+                            <version>0.1.0-SNAPSHOT</version>
+                        </parent>
+                    
+                        <artifactId>a</artifactId>
+                    
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.google.guava</groupId>
+                                <artifactId>guava</artifactId>
+                                <version>${"$"}{guava.version}</version>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                """
+            ).find { it.model.artifactId == "a" }
 
         assertThat(maven!!.model.dependencies)
-                .hasSize(1)
-                .matches { it.first().artifactId == "guava" && it.first().version == "29.0-jre" }
+            .hasSize(1)
+            .matches { it.first().artifactId == "guava" && it.first().version == "29.0-jre" }
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/376")
@@ -732,128 +751,132 @@ class MavenParserTest {
         // b-parent manages version of d to 0.2
         // Therefore the version of b that wins is 0.1
         val a = MavenParser.builder()
-                .resolveOptional(false)
-                .build()
-                .parse("""
-                <project>
-                    <modelVersion>4.0.0</modelVersion>
-                
-                    <parent>
-                        <groupId>org.openrewrite.maven</groupId>
-                        <artifactId>a-parent</artifactId>
-                        <version>0.1.0-SNAPSHOT</version>
-                        <relativePath />
-                    </parent>
-                
-                    <artifactId>a</artifactId>
-                
-                    <dependencies>
-                        <dependency>
+            .resolveOptional(false)
+            .build()
+            .parse(
+                """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                    
+                        <parent>
                             <groupId>org.openrewrite.maven</groupId>
-                            <artifactId>b</artifactId>
+                            <artifactId>a-parent</artifactId>
                             <version>0.1.0-SNAPSHOT</version>
-                        </dependency>
-                    </dependencies>
-                </project>
-            """,
-            """
-                <project>
-                    <modelVersion>4.0.0</modelVersion>
-                
-                    <groupId>org.openrewrite.maven</groupId>
-                    <artifactId>a-parent</artifactId>
-                    <version>0.1.0-SNAPSHOT</version>
-                    <packaging>pom</packaging>
-                
-                    <dependencyManagement>
+                            <relativePath />
+                        </parent>
+                    
+                        <artifactId>a</artifactId>
+                    
                         <dependencies>
                             <dependency>
                                 <groupId>org.openrewrite.maven</groupId>
-                                <artifactId>d</artifactId>
+                                <artifactId>b</artifactId>
                                 <version>0.1.0-SNAPSHOT</version>
                             </dependency>
                         </dependencies>
-                    </dependencyManagement>
-                </project>
-            """,
-            """
-                <project>
-                    <modelVersion>4.0.0</modelVersion>
-                
-                    <parent>
+                    </project>
+                """,
+                """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                    
                         <groupId>org.openrewrite.maven</groupId>
-                        <artifactId>b-parent</artifactId>
+                        <artifactId>a-parent</artifactId>
                         <version>0.1.0-SNAPSHOT</version>
-                        <relativePath />
-                    </parent>
-                
-                    <artifactId>b</artifactId>
-                
-                    <dependencies>
-                        <dependency>
+                        <packaging>pom</packaging>
+                    
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>org.openrewrite.maven</groupId>
+                                    <artifactId>d</artifactId>
+                                    <version>0.1.0-SNAPSHOT</version>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                    </project>
+                """,
+                """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                    
+                        <parent>
                             <groupId>org.openrewrite.maven</groupId>
-                            <artifactId>d</artifactId>
-                        </dependency>
-                    </dependencies>
-                </project>
-            """,
-            """
-                <project>
-                    <modelVersion>4.0.0</modelVersion>
-                
-                    <groupId>org.openrewrite.maven</groupId>
-                    <artifactId>b-parent</artifactId>
-                    <version>0.1.0-SNAPSHOT</version>
-                    <packaging>pom</packaging>
-                
-                    <dependencyManagement>
+                            <artifactId>b-parent</artifactId>
+                            <version>0.1.0-SNAPSHOT</version>
+                            <relativePath />
+                        </parent>
+                    
+                        <artifactId>b</artifactId>
+                    
                         <dependencies>
                             <dependency>
                                 <groupId>org.openrewrite.maven</groupId>
                                 <artifactId>d</artifactId>
-                                <version>0.2.0-SNAPSHOT</version>
                             </dependency>
                         </dependencies>
-                    </dependencyManagement>
-                </project>
-            """,
-            """
-                <project>
-                    <modelVersion>4.0.0</modelVersion>
-                
-                    <groupId>org.openrewrite.maven</groupId>
-                    <artifactId>d</artifactId>
-                    <version>0.1.0-SNAPSHOT</version>
-                
-                    <properties>
-                        <maven.compiler.source>1.8</maven.compiler.source>
-                        <maven.compiler.target>1.8</maven.compiler.target>
-                    </properties>
-                </project>
-            """,
-            """
-                <project>
-                    <modelVersion>4.0.0</modelVersion>
-                
-                    <groupId>org.openrewrite.maven</groupId>
-                    <artifactId>d</artifactId>
-                    <version>0.2.0-SNAPSHOT</version>
-                
-                    <properties>
-                        <maven.compiler.source>1.8</maven.compiler.source>
-                        <maven.compiler.target>1.8</maven.compiler.target>
-                    </properties>
-                </project>
-            """)
-                .find { it.model.artifactId == "a" }
+                    </project>
+                """,
+                """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                    
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>b-parent</artifactId>
+                        <version>0.1.0-SNAPSHOT</version>
+                        <packaging>pom</packaging>
+                    
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>org.openrewrite.maven</groupId>
+                                    <artifactId>d</artifactId>
+                                    <version>0.2.0-SNAPSHOT</version>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                    </project>
+                """,
+                """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                    
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>d</artifactId>
+                        <version>0.1.0-SNAPSHOT</version>
+                    
+                        <properties>
+                            <maven.compiler.source>1.8</maven.compiler.source>
+                            <maven.compiler.target>1.8</maven.compiler.target>
+                        </properties>
+                    </project>
+                """,
+                """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                    
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>d</artifactId>
+                        <version>0.2.0-SNAPSHOT</version>
+                    
+                        <properties>
+                            <maven.compiler.source>1.8</maven.compiler.source>
+                            <maven.compiler.target>1.8</maven.compiler.target>
+                        </properties>
+                    </project>
+                """
+            )
+            .find { it.model.artifactId == "a" }
 
         assertThat(a!!.model.dependencies)
-                .hasSize(1)
+            .hasSize(1)
         val b = a.model.dependencies.first()
         assertThat(b)
-                .matches { it.artifactId == "b" }
-                .matches { it.model.dependencies.size == 1}
-                .matches({ it.model.dependencies.first().artifactId == "d" && it.model.dependencies.first().version == "0.1.0-SNAPSHOT" },
-                        "Because of a-parent's dependencyManagement, b should depend on d 0.1.0-SNAPSHOT")
+            .matches { it.artifactId == "b" }
+            .matches { it.model.dependencies.size == 1 }
+            .matches(
+                { it.model.dependencies.first().artifactId == "d" && it.model.dependencies.first().version == "0.1.0-SNAPSHOT" },
+                "Because of a-parent's dependencyManagement, b should depend on d 0.1.0-SNAPSHOT"
+            )
     }
 }
