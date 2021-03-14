@@ -128,15 +128,20 @@ class Java11OrderImportsTest : Java11Test, OrderImportsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11RemoveAnnotation: Java11Test, RemoveAnnotationTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11RemoveTrailingWhitespaceTest : Java11Test, RemoveTrailingWhitespaceTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11RemoveUnusedImportsTest : Java11Test, RemoveUnusedImportsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11RenameVariableTest : Java11Test, RenameVariableTest
 
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
-class Java11RemoveTrailingWhitespaceTest : Java11Test, RemoveTrailingWhitespaceTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

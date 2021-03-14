@@ -79,7 +79,7 @@ public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
             return m;
         }
 
-        if (m.getReturnTypeExpression() != null && m.getReturnTypeExpression().getPrefix().getWhitespace().isEmpty()) {
+        if (m.getReturnTypeExpression() != null && !m.getReturnTypeExpression().getPrefix().getWhitespace().isEmpty()) {
             m = concatenatePrefix(m, m.getReturnTypeExpression().getPrefix());
             m = m.withReturnTypeExpression(m.getReturnTypeExpression().withPrefix(Space.EMPTY));
             return m;

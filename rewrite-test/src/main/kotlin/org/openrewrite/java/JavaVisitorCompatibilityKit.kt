@@ -102,6 +102,12 @@ abstract class JavaVisitorCompatibilityKit {
     inner class OrderImportsTck : OrderImportsTest
 
     @Nested
+    inner class RemoveAnnotationTck : RemoveAnnotationTest
+
+    @Nested
+    inner class RemoveTrailingWhitespaceTck : RemoveTrailingWhitespaceTest
+
+    @Nested
     inner class RemoveUnusedImportsTck : RemoveUnusedImportsTest
 
     @Nested
@@ -110,8 +116,6 @@ abstract class JavaVisitorCompatibilityKit {
     @Nested
     inner class ReorderMethodArgumentsTck : ReorderMethodArgumentsTest
 
-    @Nested
-    inner class RemoveTrailingWhitespaceTck : RemoveTrailingWhitespaceTest
 
     @Nested
     inner class SemanticallyEqualTck : SemanticallyEqualTest
