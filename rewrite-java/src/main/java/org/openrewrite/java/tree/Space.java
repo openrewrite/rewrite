@@ -166,12 +166,14 @@ public class Space implements Markable {
                         comments.add(new Comment(Comment.Style.BLOCK, comment.toString(), prefix.toString()));
                         prefix = new StringBuilder();
                         comment = new StringBuilder();
+                        continue;
                     } else if (last == '*' && inJavadoc) {
                         inJavadoc = false;
                         comment.setLength(comment.length() - 1); // trim the last '*'
                         comments.add(new Comment(Comment.Style.JAVADOC, comment.toString(), prefix.toString()));
                         prefix = new StringBuilder();
                         comment = new StringBuilder();
+                        continue;
                     } else {
                         comment.append(c);
                     }

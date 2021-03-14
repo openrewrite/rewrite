@@ -57,6 +57,10 @@ class Java11ClassDeclarationTest: Java11Test, ClassDeclarationTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11CommentTest: Java11Test, CommentTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11CompilationUnitTest: Java11Test, CompilationUnitTest
 
 @DebugOnly

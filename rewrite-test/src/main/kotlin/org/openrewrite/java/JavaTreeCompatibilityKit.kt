@@ -54,6 +54,9 @@ abstract class JavaTreeCompatibilityKit {
     inner class ClassDeclarationTck : ClassDeclarationTest
 
     @Nested
+    inner class CommentTck : CommentTest
+
+    @Nested
     inner class CompilationUnitTck : CompilationUnitTest
 
     @Nested
