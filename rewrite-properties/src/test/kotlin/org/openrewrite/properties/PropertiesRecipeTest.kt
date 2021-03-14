@@ -26,15 +26,78 @@ interface PropertiesRecipeTest : RecipeTest {
     override val treePrinter: TreePrinter<*>?
         get() = SearchResult.printer("<!--~~>-->/", "<!--~~(%s)~~>-->")
 
+    fun assertChanged(
+        @Language("properties") before: String,
+        @Language("properties") dependsOn: Array<String>,
+        @Language("properties") after: String,
+    ) {
+        super.assertChanged(parser, recipe, before, dependsOn, after, 1) {}
+    }
+
+    fun assertChanged(
+        @Language("properties") before: String,
+        @Language("properties") after: String,
+    ) {
+        super.assertChanged(parser, recipe, before, emptyArray(), after, 1) {}
+    }
+
+    fun assertChanged(
+        parser: Parser<*>?,
+        @Language("properties") before: String,
+        @Language("properties") dependsOn: Array<String>,
+        @Language("properties") after: String,
+        cycles: Int
+    ) {
+        super.assertChanged(parser, recipe, before, dependsOn, after, cycles) {}
+    }
+
+    fun assertChanged(
+        recipe: Recipe?,
+        @Language("properties") before: String,
+        @Language("properties") dependsOn: Array<String>,
+        @Language("properties") after: String,
+        cycles: Int
+    ) {
+        super.assertChanged(parser, recipe, before, dependsOn, after, cycles) {}
+    }
+
+    fun assertChanged(
+        @Language("properties") before: String,
+        @Language("properties") dependsOn: Array<String>,
+        @Language("properties") after: String,
+        cycles: Int
+    ) {
+        super.assertChanged(parser, recipe, before, dependsOn, after, cycles) {}
+    }
+
+    fun assertChanged(
+        recipe: Recipe?,
+        @Language("properties") before: String,
+        @Language("properties") after: String,
+        cycles: Int,
+    ) {
+        super.assertChanged(parser, recipe, before, emptyArray(), after, cycles) {}
+    }
+
+    fun <T : SourceFile> assertChanged(
+        parser: Parser<T>?,
+        recipe: Recipe?,
+        @Language("properties") before: String,
+        @Language("properties") after: String,
+        cycles: Int,
+    ) {
+        super.assertChanged(parser, recipe, before, emptyArray(), after, cycles) {}
+    }
+    
     override fun assertChanged(
         parser: Parser<*>?,
         recipe: Recipe?,
         @Language("properties") before: String,
         @Language("properties") dependsOn: Array<String>,
-        cycles: Int,
-        @Language("properties") after: String
+        @Language("properties") after: String,
+        cycles: Int
     ) {
-        super.assertChanged(parser, recipe, before, dependsOn, cycles, after)
+        super.assertChanged(parser, recipe, before, dependsOn, after, cycles) {}
     }
 
     override fun <T : SourceFile> assertChanged(

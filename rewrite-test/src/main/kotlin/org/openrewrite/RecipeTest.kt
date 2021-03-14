@@ -34,8 +34,8 @@ interface RecipeTest {
         recipe: Recipe? = this.recipe,
         before: String,
         dependsOn: Array<String> = emptyArray(),
-        cycles: Int = 1,
-        after: String
+        after: String,
+        cycles: Int = 1
     ) {
         assertChanged(parser, recipe, before, dependsOn, after, cycles) {}
     }
