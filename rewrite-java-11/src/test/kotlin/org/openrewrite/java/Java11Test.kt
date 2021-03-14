@@ -16,7 +16,5 @@
 package org.openrewrite.java
 
 interface Java11Test {
-
     fun javaParser(): Java11Parser.Builder = Java11Parser.builder()
-        .doOnParse(TestParserListener())
 }

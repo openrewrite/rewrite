@@ -131,7 +131,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     void setClasspath(Collection<Path> classpath);
 
     @SuppressWarnings("unchecked")
-    abstract class Builder<P extends JavaParser, B extends Builder<P, B>> implements Parser.Builder<J.CompilationUnit> {
+    abstract class Builder<P extends JavaParser, B extends Builder<P, B>> {
         @Nullable
         protected Collection<Path> classpath;
 
@@ -140,8 +140,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
 
         protected Charset charset = Charset.defaultCharset();
         protected boolean relaxedClassTypeMatching = false;
-        protected boolean logCompilationWarningsAndErrors = true;
-        protected boolean suppressMappingErrors = false;
+        protected boolean logCompilationWarningsAndErrors = false;
         protected final List<NamedStyles> styles = new ArrayList<>();
 
         public B logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
@@ -171,11 +170,6 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
 
         public B classpath(String... classpath) {
             this.classpath = dependenciesFromClasspath(classpath);
-            return (B) this;
-        }
-
-        public B suppressMappingErrors(boolean suppressMappingErrors) {
-            this.suppressMappingErrors = suppressMappingErrors;
             return (B) this;
         }
 

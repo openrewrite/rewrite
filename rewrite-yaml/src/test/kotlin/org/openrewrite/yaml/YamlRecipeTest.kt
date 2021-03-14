@@ -21,7 +21,7 @@ import org.openrewrite.marker.SearchResult
 
 interface YamlRecipeTest : RecipeTest {
     override val parser: YamlParser
-        get() = YamlParser.builder().build()
+        get() = YamlParser()
 
     override val treePrinter: TreePrinter<*>?
         get() = SearchResult.printer("#~~>\n", "#~~(%s)~~>\n")

@@ -22,7 +22,7 @@ import org.openrewrite.properties.tree.Properties
 class PropertiesParserTest {
     @Test
     fun noEndOfLine() {
-        val props = PropertiesParser.builder().build().parse("""
+        val props = PropertiesParser().parse("""
             key=value
         """.trimIndent())[0]
 
@@ -36,7 +36,7 @@ class PropertiesParserTest {
 
     @Test
     fun endOfLine() {
-        val props = PropertiesParser.builder().build().parse("key=value\n")[0]
+        val props = PropertiesParser().parse("key=value\n")[0]
 
         val entries = props.content.map { it as Properties.Entry }
         assertThat(entries).hasSize(1)
@@ -48,7 +48,7 @@ class PropertiesParserTest {
 
     @Test
     fun endOfFile() {
-        val props = PropertiesParser.builder().build().parse("key=value\n\n")[0]
+        val props = PropertiesParser().parse("key=value\n\n")[0]
         val entries = props.content.map { it as Properties.Entry }
         assertThat(entries).hasSize(1)
         val entry = entries[0]
@@ -59,7 +59,7 @@ class PropertiesParserTest {
 
     @Test
     fun garbageEndOfFile() {
-        val props = PropertiesParser.builder().build().parse("key=value\nasdf\n")[0]
+        val props = PropertiesParser().parse("key=value\nasdf\n")[0]
         val entries = props.content.map { it as Properties.Entry }
         assertThat(entries).hasSize(1)
         val entry = entries[0]
@@ -70,7 +70,7 @@ class PropertiesParserTest {
 
     @Test
     fun commentThenEntry() {
-        val props = PropertiesParser.builder().build().parse("""
+        val props = PropertiesParser().parse("""
             # this is a comment
             key=value
         """.trimIndent())[0]
@@ -85,7 +85,7 @@ class PropertiesParserTest {
 
     @Test
     fun entryCommentEntry() {
-        val props = PropertiesParser.builder().build().parse("""
+        val props = PropertiesParser().parse("""
             key1=value1
             # comment
             key2=value2
@@ -107,7 +107,7 @@ class PropertiesParserTest {
 
     @Test
     fun multipleEntries() {
-        val props = PropertiesParser.builder().build().parse("""
+        val props = PropertiesParser().parse("""
             key=value
             key2 = value2
         """.trimIndent())[0]

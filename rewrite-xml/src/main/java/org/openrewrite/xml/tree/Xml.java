@@ -195,7 +195,7 @@ public interface Xml extends Serializable, Tree {
         String name;
 
         public static Xml.Tag build(@Language("xml") String tagSource) {
-            return XmlParser.builder().build().parse(tagSource).get(0).getRoot();
+            return new XmlParser().parse(tagSource).get(0).getRoot();
         }
 
         public Tag withName(String name) {

@@ -176,7 +176,7 @@ public class MavenProjectParser {
     private void parseResources(List<Path> resources, Path projectDirectory, List<SourceFile> sourceFiles, JavaProvenance javaProvenance) {
         sourceFiles.addAll(
                 ListUtils.map(
-                        XmlParser.builder().build().parse(
+                        new XmlParser().parse(
                                 resources.stream()
                                         .filter(p -> p.getFileName().toString().endsWith(".xml"))
                                         .collect(Collectors.toList()),
@@ -186,7 +186,7 @@ public class MavenProjectParser {
                 ));
 
         sourceFiles.addAll(
-                ListUtils.map(YamlParser.builder().build().parse(
+                ListUtils.map(new YamlParser().parse(
                         resources.stream()
                                 .filter(p -> p.getFileName().toString().endsWith(".yml") || p.getFileName().toString().endsWith(".yaml"))
                                 .collect(Collectors.toList()),
@@ -196,7 +196,7 @@ public class MavenProjectParser {
                 ));
 
         sourceFiles.addAll(
-                ListUtils.map(PropertiesParser.builder().build().parse(
+                ListUtils.map(new PropertiesParser().parse(
                         resources.stream()
                                 .filter(p -> p.getFileName().toString().endsWith(".properties"))
                                 .collect(Collectors.toList()),

@@ -21,7 +21,7 @@ import org.openrewrite.marker.SearchResult
 
 interface PropertiesRecipeTest : RecipeTest {
     override val parser: PropertiesParser
-        get() = PropertiesParser.builder().build()
+        get() = PropertiesParser()
 
     override val treePrinter: TreePrinter<*>?
         get() = SearchResult.printer("<!--~~>-->/", "<!--~~(%s)~~>-->")

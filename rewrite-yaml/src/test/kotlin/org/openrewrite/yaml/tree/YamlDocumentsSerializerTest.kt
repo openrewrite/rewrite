@@ -25,7 +25,7 @@ class YamlDocumentsSerializerTest {
     @Test
     fun roundTripSerialization() {
         val serializer = TreeSerializer<Yaml.Documents>()
-        val a = YamlParser.builder().build().parse("key: value")[0]
+        val a = YamlParser().parse("key: value")[0]
 
         val aBytes = serializer.write(a)
         val aDeser = serializer.read(aBytes)
@@ -36,8 +36,8 @@ class YamlDocumentsSerializerTest {
     @Test
     fun roundTripSerializationList() {
         val serializer = TreeSerializer<Yaml.Documents>()
-        val y1 = YamlParser.builder().build().parse("key: value")[0]
-        val y2 = YamlParser.builder().build().parse("key: value")[0]
+        val y1 = YamlParser().parse("key: value")[0]
+        val y2 = YamlParser().parse("key: value")[0]
 
         val serialized = serializer.write(listOf(y1, y2))
         val deserialized = serializer.readList(serialized)

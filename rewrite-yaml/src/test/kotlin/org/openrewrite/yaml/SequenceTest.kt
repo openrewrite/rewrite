@@ -27,7 +27,7 @@ class SequenceTest {
             - oranges
         """.trimIndent()
 
-        val y = YamlParser.builder().build().parse(yText)[0]
+        val y = YamlParser().parse(yText)[0]
 
         assertThat((y.documents[0].blocks[0] as Yaml.Sequence).entries.map { it.block }.map { it as Yaml.Scalar }.map { it.value })
                 .containsExactly("apples", "oranges")

@@ -15,9 +15,12 @@
  */
 package org.openrewrite.maven.internal;
 
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Timer;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenExecutionContextView;
@@ -73,6 +76,10 @@ public class RawMavenResolver {
     public Xml.Document resolve(RawMaven rawMaven, Map<String, String> effectiveProperties) {
         Pom pom = resolve(rawMaven, Scope.None, rawMaven.getPom().getVersion(), effectiveProperties, ctx.getRepositories());
         assert pom != null;
+        rawMaven.getSample().stop(MetricsHelper.successTags(Timer.builder("rewrite.parse")
+                .description("The time spent parsing a Maven POM file")
+                .tag("file.type", "Maven"))
+                .register(Metrics.globalRegistry));
         return rawMaven.getDocument().withMarkers(rawMaven.getDocument().getMarkers()
                 .compute(pom, (old, n) -> n));
     }

@@ -21,7 +21,7 @@ import org.openrewrite.xml.tree.Xml
 
 class XPathMatcherTest {
 
-    private val x = XmlParser.builder().build().parse(
+    private val x = XmlParser().parse(
         """
             <?xml version="1.0" encoding="UTF-8"?>
             <dependencies>

@@ -13,8 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java
+package org.openrewrite.xml;
 
-class Java11TreeCompatibilityTest: JavaTreeCompatibilityKit() {
-    override fun javaParser(): Java11Parser.Builder = Java11Parser.builder()
+import java.nio.file.Path;
+
+public class XmlParsingException extends Exception {
+    private final Path sourcePath;
+
+    public XmlParsingException(Path sourcePath, String message, Throwable t) {
+        super(message, t);
+        this.sourcePath = sourcePath;
+    }
+
+    public Path getSourcePath() {
+        return sourcePath;
+    }
 }

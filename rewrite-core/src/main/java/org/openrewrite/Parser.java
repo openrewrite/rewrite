@@ -78,7 +78,7 @@ public interface Parser<S extends SourceFile> {
      * @param sources    A collection of inputs. At the conclusion of parsing all sources' {@link Input#source}
      *                   are closed.
      * @param relativeTo A common relative path for all {@link Input#path}.
-     * @param ctx
+     * @param ctx        The execution context
      * @return A list of {@link SourceFile}.
      */
     List<S> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx);
@@ -180,39 +180,6 @@ public interface Parser<S extends SourceFile> {
         @Override
         public int hashCode() {
             return Objects.hash(path);
-        }
-    }
-
-    interface Builder<S extends SourceFile> {
-        Builder<S> doOnParse(Listener listener);
-
-        Parser<S> build();
-    }
-
-    @Incubating(since = "7.0.0")
-    interface Listener {
-        Listener NOOP = new Listener() {
-        };
-
-        default void onParseStart(Path sourcePath) {
-        }
-
-        default void onParseSucceeded(Path sourcePath) {
-        }
-
-        default void onParseFailed(Path sourcePath) {
-        }
-
-        default void onError(String message) {
-        }
-
-        default void onError(String message, Throwable t) {
-        }
-
-        default void onWarn(String message) {
-        }
-
-        default void onWarn(String message, Throwable t) {
         }
     }
 }

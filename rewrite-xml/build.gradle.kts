@@ -14,10 +14,10 @@ tasks.register<JavaExec>("generateAntlrSources") {
 dependencies {
     api(project(":rewrite-core"))
     api("org.jetbrains:annotations:latest.release")
+    api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
 
     implementation("org.antlr:antlr4:4.8-1")
-
-    api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
+    implementation("io.micrometer:micrometer-core:latest.release")
 
     testImplementation(project(":rewrite-test"))
 }

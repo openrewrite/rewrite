@@ -26,7 +26,7 @@ import org.openrewrite.internal.StringUtils
 import org.openrewrite.xml.internal.XmlPrinter
 
 class XmlParserTest {
-    private val parser: XmlParser = XmlParser.builder().build()
+    private val parser: XmlParser = XmlParser()
 
     private fun assertUnchanged(before: String) {
         val xmlDocument = parser.parse(StringUtils.trimIndent(before)).iterator().next()

@@ -26,6 +26,7 @@ import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
@@ -43,8 +44,6 @@ import java.io.Writer;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static java.util.stream.Collectors.toList;
 
@@ -68,30 +67,23 @@ public class Java11Parser implements JavaParser {
      */
     private final boolean relaxedClassTypeMatching;
 
-    private final boolean suppressMappingErrors;
-
     private final JavacFileManager pfm;
 
     private final Context context;
     private final JavaCompiler compiler;
     private final ResettableLog compilerLog;
     private final Collection<NamedStyles> styles;
-    private final Listener onParse;
 
     private Java11Parser(@Nullable Collection<Path> classpath,
                          @Nullable Collection<Input> dependsOn,
                          Charset charset,
                          boolean relaxedClassTypeMatching,
-                         boolean suppressMappingErrors,
                          boolean logCompilationWarningsAndErrors,
-                         Collection<NamedStyles> styles,
-                         Listener onParse) {
+                         Collection<NamedStyles> styles) {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
         this.relaxedClassTypeMatching = relaxedClassTypeMatching;
-        this.suppressMappingErrors = suppressMappingErrors;
         this.styles = styles;
-        this.onParse = onParse;
 
         this.context = new Context();
         this.compilerLog = new ResettableLog(context);
@@ -110,9 +102,7 @@ public class Java11Parser implements JavaParser {
         Options.instance(context).put("-g", "-g");
         Options.instance(context).put("-proc", "none");
 
-        //This is a little strange, but by constructing this ahead of the compiler, we are setting the "to do"
-        //instance within the context to a version that is instrumented with micrometer. The compiler will
-        //use this instance by pulling it out of the context.
+        // MUST be created ahead of compiler construction
         new TimedTodo(context);
 
         // MUST be created (registered with the context) after pfm and compilerLog
@@ -132,7 +122,7 @@ public class Java11Parser implements JavaParser {
                 if (logCompilationWarningsAndErrors) {
                     String log = new String(Arrays.copyOfRange(cbuf, off, len));
                     if (!log.isBlank()) {
-                        onParse.onWarn(log);
+                        org.slf4j.LoggerFactory.getLogger(Java11Parser.class).warn(log);
                     }
                 }
             }
@@ -167,28 +157,26 @@ public class Java11Parser implements JavaParser {
             }
         }
 
-        LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = acceptedInputs(sourceFiles).stream()
-                .collect(Collectors.toMap(
-                        Function.identity(),
-                        input -> Timer.builder("rewrite.parse")
-                                .description("The time spent by the JDK in parsing and tokenizing the source file")
-                                .tag("file.type", "Java")
-                                .tag("step", "(1) JDK parsing")
-                                .tag("outcome", "success")
-                                .tag("exception", "none")
-                                .register(Metrics.globalRegistry)
-                                .record(() -> {
-                                    try {
-                                        return compiler.parse(new Java11ParserInputFileObject(input));
-                                    } catch (IllegalStateException e) {
-                                        if (e.getMessage().equals("endPosTable already set")) {
-                                            throw new IllegalStateException("Call reset() on JavaParser before parsing another" +
-                                                    "set of source files that have some of the same fully qualified names", e);
-                                        }
-                                        throw e;
-                                    }
-                                }),
-                        (e2, e1) -> e1, LinkedHashMap::new));
+        LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = new LinkedHashMap<>();
+        for (Input input1 : acceptedInputs(sourceFiles)) {
+            cus.put(input1, MetricsHelper.successTags(
+                    Timer.builder("rewrite.parse")
+                            .description("The time spent by the JDK in parsing and tokenizing the source file")
+                            .tag("file.type", "Java")
+                            .tag("step", "(1) JDK parsing"))
+                    .register(Metrics.globalRegistry)
+                    .record(() -> {
+                        try {
+                            return compiler.parse(new Java11ParserInputFileObject(input1));
+                        } catch (IllegalStateException e) {
+                            if (e.getMessage().equals("endPosTable already set")) {
+                                throw new IllegalStateException("Call reset() on JavaParser before parsing another" +
+                                        "set of source files that have some of the same fully qualified names", e);
+                            }
+                            throw e;
+                        }
+                    }));
+        }
 
         try {
             initModules(cus.values());
@@ -205,7 +193,7 @@ public class Java11Parser implements JavaParser {
         } catch (Throwable t) {
             // when symbol entering fails on problems like missing types, attribution can often times proceed
             // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
-            onParse.onWarn("Failed symbol entering or attribution", t);
+            ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
         }
 
         Map<String, JavaType.Class> sharedClassTypes = new HashMap<>();
@@ -217,29 +205,29 @@ public class Java11Parser implements JavaParser {
                         Java11ParserVisitor parser = new Java11ParserVisitor(
                                 input.getRelativePath(relativeTo),
                                 StringUtils.readFully(input.getSource()),
-                                relaxedClassTypeMatching, styles, sharedClassTypes, onParse);
+                                relaxedClassTypeMatching,
+                                styles,
+                                sharedClassTypes,
+                                ctx
+                        );
+
                         J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
-                        sample.stop(Timer.builder("rewrite.parse")
-                                .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
-                                .tag("file.type", "Java")
-                                .tag("outcome", "success")
-                                .tag("exception", "none")
-                                .tag("step", "(3) Map to Rewrite AST")
+                        sample.stop(MetricsHelper.successTags(
+                                Timer.builder("rewrite.parse")
+                                        .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
+                                        .tag("file.type", "Java")
+                                        .tag("step", "(3) Map to Rewrite AST"))
                                 .register(Metrics.globalRegistry));
                         return cu;
                     } catch (Throwable t) {
-                        sample.stop(Timer.builder("rewrite.parse")
-                                .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
-                                .tag("file.type", "Java")
-                                .tag("outcome", "error")
-                                .tag("exception", t.getClass().getSimpleName())
-                                .tag("step", "(3) Map to Rewrite AST")
+                        sample.stop(MetricsHelper.errorTags(
+                                Timer.builder("rewrite.parse")
+                                        .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
+                                        .tag("file.type", "Java")
+                                        .tag("step", "(3) Map to Rewrite AST"), t)
                                 .register(Metrics.globalRegistry));
 
-                        if (!suppressMappingErrors) {
-                            throw t;
-                        }
-
+                        ctx.getOnError().accept(t);
                         return null;
                     }
                 })
@@ -313,12 +301,11 @@ public class Java11Parser implements JavaParser {
         @Override
         public boolean isEmpty() {
             if (sample != null) {
-                sample.stop(Timer.builder("rewrite.parse")
-                        .description("The time spent by the JDK in type attributing the source file")
-                        .tag("file.type", "Java")
-                        .tag("step", "(2) Type attribution")
-                        .tag("outcome", "success")
-                        .tag("exception", "none")
+                sample.stop(MetricsHelper.successTags(
+                        Timer.builder("rewrite.parse")
+                                .description("The time spent by the JDK in type attributing the source file")
+                                .tag("file.type", "Java")
+                                .tag("step", "(2) Type attribution"))
                         .register(Metrics.globalRegistry));
             }
             return super.isEmpty();
@@ -332,18 +319,10 @@ public class Java11Parser implements JavaParser {
     }
 
     public static class Builder extends JavaParser.Builder<Java11Parser, Builder> {
-        private Listener onParse = Listener.NOOP;
-
-        @Override
-        public Java11Parser.Builder doOnParse(Listener onParse) {
-            this.onParse = onParse;
-            return this;
-        }
-
         @Override
         public Java11Parser build() {
             return new Java11Parser(classpath, dependsOn, charset, relaxedClassTypeMatching,
-                    suppressMappingErrors, logCompilationWarningsAndErrors, styles, onParse);
+                    logCompilationWarningsAndErrors, styles);
         }
     }
 }

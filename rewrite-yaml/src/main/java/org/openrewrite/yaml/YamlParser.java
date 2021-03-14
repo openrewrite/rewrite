@@ -15,9 +15,12 @@
  */
 package org.openrewrite.yaml;
 
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Timer;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
@@ -46,16 +49,6 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
-    private final Listener onParse;
-
-    protected YamlParser(Listener onParse) {
-        this.onParse = onParse;
-    }
-
-    public static Builder builder() {
-        return new Builder();
-    }
-
     @Override
     public List<Yaml.Documents> parse(@Language("yml") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
@@ -65,13 +58,16 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
     public List<Yaml.Documents> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
+                    Timer.Builder timer = Timer.builder("rewrite.parse")
+                            .description("The time spent parsing a YAML file")
+                            .tag("file.type", "YAML");
+                    Timer.Sample sample = Timer.start();
                     try (InputStream is = sourceFile.getSource()) {
-                        onParse.onParseStart(sourceFile.getPath());
                         Yaml.Documents yaml = parseFromInput(sourceFile.getRelativePath(relativeTo), is);
-                        onParse.onParseSucceeded(sourceFile.getPath());
+                        sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         return yaml;
                     } catch (Throwable t) {
-                        onParse.onParseFailed(sourceFile.getPath());
+                        sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
                         ctx.getOnError().accept(t);
                         return null;
                     }
@@ -242,21 +238,6 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
 
         public Yaml.Sequence build() {
             return new Yaml.Sequence(randomId(), prefix, Markers.EMPTY, entries);
-        }
-    }
-
-    public static class Builder implements org.openrewrite.Parser.Builder<Yaml.Documents> {
-        private Listener onParse = Listener.NOOP;
-
-        @Override
-        public Builder doOnParse(Listener onParse) {
-            this.onParse = onParse;
-            return this;
-        }
-
-        @Override
-        public YamlParser build() {
-            return new YamlParser(onParse);
         }
     }
 }

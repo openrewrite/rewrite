@@ -20,6 +20,11 @@ import org.openrewrite.*
 import org.openrewrite.marker.SearchResult
 
 interface JavaRecipeTest : RecipeTest {
+    override val parser: Parser<*>?
+        get() = JavaParser.fromJavaVersion()
+            .logCompilationWarningsAndErrors(true)
+            .build()
+
     override val treePrinter: TreePrinter<*>?
         get() = SearchResult.printer("/*~~>*/", "/*~~(%s)~~>*/")
 

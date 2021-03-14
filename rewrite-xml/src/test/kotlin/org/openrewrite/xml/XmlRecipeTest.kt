@@ -21,7 +21,7 @@ import org.openrewrite.marker.SearchResult
 
 interface XmlRecipeTest : RecipeTest {
     override val parser: XmlParser
-        get() = XmlParser.builder().build()
+        get() = XmlParser()
 
     override val treePrinter: TreePrinter<*>?
         get() = SearchResult.printer("<!--~~>-->", "<!--~~(%s)~~>-->")

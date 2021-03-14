@@ -15,30 +15,8 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.Parser;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-public class TestParserListener implements Parser.Listener {
-    private static final Logger logger = LoggerFactory.getLogger(TestParserListener.class);
-
-    @Override
-    public void onError(String message, Throwable t) {
-        logger.error(message, t);
-    }
-
-    @Override
-    public void onError(String message) {
-        logger.error(message);
-    }
-
-    @Override
-    public void onWarn(String message, Throwable t) {
-        logger.error(message, t);
-    }
-
-    @Override
-    public void onWarn(String message) {
-        logger.error(message);
+public class JavaParsingException extends Exception {
+    public JavaParsingException(String message, Throwable t) {
+        super(message, t);
     }
 }

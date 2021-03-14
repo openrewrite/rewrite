@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.internal;
 
+import io.micrometer.core.instrument.Timer;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.ExecutionContext;
@@ -39,6 +40,7 @@ import static java.util.Collections.singletonList;
 @RequiredArgsConstructor
 @Getter
 public class RawMaven {
+    final Timer.Sample sample = Timer.start();
     final Xml.Document document;
     final RawPom pom;
 
@@ -71,7 +73,7 @@ public class RawMaven {
 
     public static RawMaven parse(Parser.Input source, @Nullable Path relativeTo, @Nullable String snapshotVersion,
                                  ExecutionContext ctx) {
-        Xml.Document document = MavenXmlParser.builder().build()
+        Xml.Document document = new MavenXmlParser()
                 .parseInputs(singletonList(source), relativeTo, ctx)
                 .iterator().next();
 
@@ -95,10 +97,6 @@ public class RawMaven {
     }
 
     private static class MavenXmlParser extends XmlParser {
-        protected MavenXmlParser(Listener onParse) {
-            super(onParse);
-        }
-
         @Override
         public boolean accept(Path path) {
             return super.accept(path) || path.toString().endsWith(".pom");

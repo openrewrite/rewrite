@@ -15,11 +15,14 @@
  */
 package org.openrewrite.xml;
 
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Timer;
 import org.antlr.v4.runtime.*;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.internal.XmlParserVisitor;
@@ -27,7 +30,6 @@ import org.openrewrite.xml.internal.grammar.XMLLexer;
 import org.openrewrite.xml.internal.grammar.XMLParser;
 import org.openrewrite.xml.tree.Xml;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
@@ -35,38 +37,29 @@ import java.util.Objects;
 import static java.util.stream.Collectors.toList;
 
 public class XmlParser implements Parser<Xml.Document> {
-    private final Listener onParse;
-
-    protected XmlParser(Listener onParse) {
-        this.onParse = onParse;
-    }
-
-    public static Builder builder() {
-        return new Builder();
-    }
-
-                        @Override
-                        public List<Xml.Document> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
-                            return acceptedInputs(sourceFiles).stream()
-                                    .map(sourceFile -> {
-                                        try {
-                                            onParse.onParseStart(sourceFile.getPath());
-
-                                            XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
-                                                    CharStreams.fromStream(sourceFile.getSource()))));
+    @Override
+    public List<Xml.Document> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+        return acceptedInputs(sourceFiles).stream()
+                .map(sourceFile -> {
+                    Timer.Builder timer = Timer.builder("rewrite.parse")
+                            .description("The time spent parsing an XML file")
+                            .tag("file.type", "XML");
+                    Timer.Sample sample = Timer.start();
+                    try {
+                        XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
+                                CharStreams.fromStream(sourceFile.getSource()))));
 
                         parser.removeErrorListeners();
-                        parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath()));
+                        parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
 
                         Xml.Document document = new XmlParserVisitor(
                                 sourceFile.getRelativePath(relativeTo),
                                 StringUtils.readFully(sourceFile.getSource())
                         ).visitDocument(parser.document());
-
-                        onParse.onParseSucceeded(sourceFile.getPath());
+                        sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         return document;
                     } catch (Throwable t) {
-                        onParse.onParseFailed(sourceFile.getPath());
+                        sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
                         ctx.getOnError().accept(t);
                         return null;
                     }
@@ -85,33 +78,20 @@ public class XmlParser implements Parser<Xml.Document> {
         return path.toString().endsWith(".xml");
     }
 
-    public static class Builder implements Parser.Builder<Xml.Document> {
-        private Listener onParse = Listener.NOOP;
-
-        @Override
-        public XmlParser.Builder doOnParse(Listener onParse) {
-            this.onParse = onParse;
-            return this;
-        }
-
-        @Override
-        public XmlParser build() {
-            return new XmlParser(onParse);
-        }
-    }
-
-    private class ForwardingErrorListener extends BaseErrorListener {
+    private static class ForwardingErrorListener extends BaseErrorListener {
         private final Path sourcePath;
+        private final ExecutionContext ctx;
 
-        private ForwardingErrorListener(Path sourcePath) {
+        private ForwardingErrorListener(Path sourcePath, ExecutionContext ctx) {
             this.sourcePath = sourcePath;
+            this.ctx = ctx;
         }
 
         @Override
         public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
                                 int line, int charPositionInLine, String msg, RecognitionException e) {
-            onParse.onWarn(String.format("Syntax error at line %d:%d %s. Including file at %s", line,
-                    charPositionInLine, msg, sourcePath), e);
+            ctx.getOnError().accept(new XmlParsingException(sourcePath,
+                    String.format("Syntax error at line %d:%d %s.", line, charPositionInLine, msg), e));
         }
     }
 }

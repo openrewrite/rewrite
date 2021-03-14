@@ -15,10 +15,13 @@
  */
 package org.openrewrite.properties;
 
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Timer;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.tree.Properties;
@@ -35,16 +38,6 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 public class PropertiesParser implements Parser<Properties.File> {
-    private final Listener onParse;
-
-    protected PropertiesParser(Listener onParse) {
-        this.onParse = onParse;
-    }
-
-    public static Builder builder() {
-        return new Builder();
-    }
-
     @Override
     public List<Properties.File> parse(@Language("properties") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
@@ -54,13 +47,16 @@ public class PropertiesParser implements Parser<Properties.File> {
     public List<Properties.File> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
+                    Timer.Builder timer = Timer.builder("rewrite.parse")
+                            .description("The time spent parsing a properties file")
+                            .tag("file.type", "Properties");
+                    Timer.Sample sample = Timer.start();
                     try (InputStream is = sourceFile.getSource()) {
-                        onParse.onParseStart(sourceFile.getPath());
                         Properties.File file = parseFromInput(sourceFile.getRelativePath(relativeTo), is);
-                        onParse.onParseSucceeded(sourceFile.getPath());
+                        sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         return file;
                     } catch (Throwable t) {
-                        onParse.onParseFailed(sourceFile.getPath());
+                        sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
                         ctx.getOnError().accept(t);
                         return null;
                     }
@@ -237,20 +233,5 @@ public class PropertiesParser implements Parser<Properties.File> {
     @Override
     public boolean accept(Path path) {
         return path.toString().endsWith(".properties");
-    }
-
-    public static class Builder implements Parser.Builder<Properties.File> {
-        private Listener onParse = Listener.NOOP;
-
-        @Override
-        public PropertiesParser.Builder doOnParse(Listener onParse) {
-            this.onParse = onParse;
-            return this;
-        }
-
-        @Override
-        public PropertiesParser build() {
-            return new PropertiesParser(onParse);
-        }
     }
 }
