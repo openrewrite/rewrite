@@ -29,4 +29,5 @@ tasks.named<JavaCompile>("compileJava") {
 
 tasks.withType<Javadoc> {
     isFailOnError = false
+    exclude("org/openrewrite/java/**")
 }

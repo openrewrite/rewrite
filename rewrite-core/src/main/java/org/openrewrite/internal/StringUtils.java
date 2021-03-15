@@ -241,7 +241,8 @@ public class StringUtils {
      * <p>
      * If the supplied text does not contain a comment indicator then this is equivalent to calling ensureNewlineCount()
      *
-     * @param text Original text to add newlines to
+     * @param text                Original text to add newlines to
+     * @param desiredNewlineCount The number of newlines that should be before the text
      * @return A copy of the supplied text with the desired number of newlines
      */
     public static String ensureNewlineCountBeforeComment(String text, int desiredNewlineCount) {

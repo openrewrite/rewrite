@@ -41,7 +41,7 @@ import java.util.function.Predicate;
  * declared between the opening and closing braces of a method. This means a method parameter variable will not be
  * considered as a target for adding the "final" modifier; nor instance variables (non-static fields) nor class variables (static fields).
  * <p>
- * {@see <a href="https://docs.oracle.com/javase/tutorial/java/nutsandbolts/variables.html">https://docs.oracle.com/javase/tutorial/java/nutsandbolts/variables.html</a>}
+ * See the official <a href="https://docs.oracle.com/javase/tutorial/java/nutsandbolts/variables.html">variables tutorial</a>.
  * <p>
  * There are specific situations which count as a "local variable". In fact, "local variable" has a specific
  * technical definition, even though it is occasionally referred to when discussing other things (such as method parameter variables, or
@@ -55,7 +55,7 @@ public class FinalizeLocalVariablesVisitor<P> extends JavaIsoVisitor<P> {
     public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
         J.VariableDeclarations mv = visitAndCast(multiVariable, p, super::visitVariableDeclarations);
 
-        // first off, if this already has "final", we don't need to bother going any further; we're done
+        // if this already has "final", we don't need to bother going any further; we're done
         if (mv.hasModifier(J.Modifier.Type.Final)) {
             return mv;
         }
