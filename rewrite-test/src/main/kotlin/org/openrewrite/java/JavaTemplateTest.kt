@@ -28,7 +28,8 @@ import kotlin.Comparator
 interface JavaTemplateTest : JavaRecipeTest {
     companion object {
         private val logger = LoggerFactory.getLogger(JavaTemplateTest::class.java)
-        private val logEvent = Consumer<String> { s -> logger.info(s) }
+//        private val logEvent = Consumer<String> { s -> logger.info(s) }
+        private val logEvent = Consumer<String> { s -> /* do nothing */ }
     }
 
     @Test
