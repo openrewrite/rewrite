@@ -197,6 +197,9 @@ public class StringUtils {
      * /* multi-line
      * <p>
      * If the provided input contains anything except whitespace and c-style comments this will probably explode
+     *
+     * @param text The space to split
+     * @return A list of raw whitespace, single line comments, and multi-line comments
      */
     public static List<String> splitCStyleComments(String text) {
         List<String> result = new ArrayList<>();
@@ -237,6 +240,9 @@ public class StringUtils {
      * that indicate the beginning of a C-style comment, "//" and "/*".
      * <p>
      * If the supplied text does not contain a comment indicator then this is equivalent to calling ensureNewlineCount()
+     *
+     * @param text Original text to add newlines to
+     * @return A copy of the supplied text with the desired number of newlines
      */
     public static String ensureNewlineCountBeforeComment(String text, int desiredNewlineCount) {
         StringBuilder result = new StringBuilder();
@@ -271,8 +277,10 @@ public class StringUtils {
     }
 
     /**
-     * Return the index of the first character for which the predicate returns "true".
-     * Or -1 if no character in the string matches the predicate.
+     * @param text Text to scan
+     * @param test The predicate to match
+     * @return The index of the first character for which the predicate returns <code>true</code>,
+     * or <code>-1</code> if no character in the string matches the predicate.
      */
     public static int indexOf(String text, Predicate<Character> test) {
         for (int i = 0; i < text.length(); i++) {

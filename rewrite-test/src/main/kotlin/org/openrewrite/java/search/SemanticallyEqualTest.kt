@@ -60,6 +60,7 @@ interface SemanticallyEqualTest {
             """)
         val c1Anno = cu1[0].classes[0].leadingAnnotations[0]
         val c2Anno = cu1[0].classes[1].leadingAnnotations[0]
+
         assertThat(SemanticallyEqual.areEqual(c2Anno, c2Anno)).isTrue()
         assertThat(SemanticallyEqual.areEqual(c1Anno, c2Anno)).isTrue()
     }
@@ -343,7 +344,7 @@ interface SemanticallyEqualTest {
         assertThat(
             SemanticallyEqual
                 .areEqual(
-                    intLiteral,
+                    intLiteral!!,
                     J.Literal(
                         randomId(),
                         Space.EMPTY,
@@ -358,7 +359,7 @@ interface SemanticallyEqualTest {
         assertThat(
             SemanticallyEqual
                 .areEqual(
-                    strLiteral,
+                    strLiteral!!,
                     J.Literal(
                         randomId(),
                         Space.EMPTY,
@@ -373,7 +374,7 @@ interface SemanticallyEqualTest {
         assertThat(
             SemanticallyEqual
                 .areEqual(
-                    nullLiteral,
+                    nullLiteral!!,
                     J.Literal(
                         randomId(),
                         Space.EMPTY,

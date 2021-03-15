@@ -60,22 +60,24 @@ public class Result {
     }
 
     /**
-     * @return Git-style patch diff representing the changes to this compilation unit
+     * @return Git-style patch diff representing the changes to this compilation unit.
      */
     public String diff() {
         return diff(TreePrinter.identity());
     }
 
     /**
-     * @return Git-style patch diff representing the changes to this compilation unit
+     * @param treePrinter Influences the printing of individual tree elements.
+     * @return Git-style patch diff representing the changes to this compilation unit.
      */
     public String diff(TreePrinter<?> treePrinter) {
         return diff(null, treePrinter);
     }
 
     /**
-     * @param relativeTo Optional relative path that is used to relativize file paths of reported differences.
-     * @return Git-style patch diff representing the changes to this compilation unit
+     * @param relativeTo  Optional relative path that is used to relativize file paths of reported differences.
+     * @param treePrinter Influences the printing of individual tree elements.
+     * @return Git-style patch diff representing the changes to this compilation unit.
      */
     public String diff(@Nullable Path relativeTo, TreePrinter<?> treePrinter) {
         Path sourcePath;

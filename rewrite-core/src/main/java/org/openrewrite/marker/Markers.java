@@ -84,6 +84,7 @@ public class Markers {
      *
      * @param identity          A new marker to add if it doesn't already exist.
      * @param remappingFunction The function that merges an existing marker.
+     * @param <M>               The type of marker.
      * @return A new {@link Markers} with an added or updated marker.
      */
     public <M extends Marker> Markers compute(M identity, BinaryOperator<M> remappingFunction) {

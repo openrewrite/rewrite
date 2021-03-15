@@ -21,10 +21,11 @@ import java.nio.file.Path;
 
 public interface SourceFile extends Tree {
     /**
-     * This can refer to an absolute or relative file path or a remote location like an HTTP(s) URL.
+     * @return An absolute or relative file path.
      */
     Path getSourcePath();
 
+    @SuppressWarnings("unused")
     @JsonProperty("@c")
     default String getJacksonPolymorphicTypeTag() {
         return getClass().getName();

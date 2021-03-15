@@ -62,6 +62,7 @@ public interface Validated extends Iterable<Validated> {
      * @param message  The failure message if the test doesn't pass
      * @param value    The value of the property
      * @param test     The test predicate
+     * @param <T>      The property value type.
      * @return A validation result
      */
     static <T> Validated test(String property, String message, @Nullable T value, Predicate<T> test) {

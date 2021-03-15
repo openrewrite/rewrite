@@ -122,7 +122,8 @@ public abstract class Recipe {
     private final List<Recipe> recipeList = new ArrayList<>();
 
     /**
-     * @param recipe {@link Recipe} to append to the doNext chain
+     * @param recipe {@link Recipe} to add to this recipe's pipeline.
+     * @return This recipe.
      */
     public Recipe doNext(Recipe recipe) {
         recipeList.add(recipe);

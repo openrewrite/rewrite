@@ -140,7 +140,13 @@ public final class ListUtils {
 
     /**
      * Apply function to each element of the list. If any element has been modified then
-     * a new list will be returned where the modifed elements have been replaced with their new version.
+     * a new list will be returned where the modified elements have been replaced with their new version.
+     *
+     * @param ls   The original list
+     * @param pool A pool to parallelize the mapping operation
+     * @param map  The mapping function. If a null value is returned, the item is dropped from the resultant list
+     * @param <T>  The type of the list
+     * @return The original list if no element has changed, or a new list.
      */
     public static <T> List<T> map(List<T> ls, ForkJoinPool pool, BiFunction<Integer, T, T> map) {
         if (ls.isEmpty()) {

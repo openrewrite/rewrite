@@ -32,8 +32,8 @@ import java.util.function.BiFunction;
  * postProcessing via afterVisit for conditionally chaining other operations with the expectation is that after
  * TreeVisitors are invoked immediately after visiting SourceFile
  *
- * @param <T>
- * @param <P>
+ * @param <T> The type of tree.
+ * @param <P> An input object that is passed to every visit method.
  */
 public abstract class TreeVisitor<T extends Tree, P> {
 
