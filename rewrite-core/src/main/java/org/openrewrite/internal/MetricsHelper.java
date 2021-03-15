@@ -28,12 +28,11 @@ public class MetricsHelper {
 
     public static Timer.Builder errorTags(Timer.Builder timer, Throwable t) {
         StackTraceElement stackTraceElement = t.getStackTrace()[0];
-        String fileName = stackTraceElement.getFileName();
 
         return timer
                 .tag("outcome", "error")
                 .tag("exception", t.getClass().getSimpleName())
                 .tag("exception.line", Integer.toString(stackTraceElement.getLineNumber()))
-                .tag("exception.file", fileName == null ? "unknown" : fileName);
+                .tag("exception.declaring.class", stackTraceElement.getClassName());
     }
 }

@@ -18,13 +18,13 @@ package org.openrewrite;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.NullUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -173,7 +173,7 @@ public abstract class Recipe {
                     }
                     return afterFile;
                 } catch (Throwable t) {
-                    sample.stop(timer.tags("outcome", "error", "exception", t.getClass().getSimpleName()).register(Metrics.globalRegistry));
+                    sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
                     ctx.getOnError().accept(t);
                     return s;
                 }

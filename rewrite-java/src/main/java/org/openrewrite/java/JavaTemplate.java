@@ -142,9 +142,7 @@ public class JavaTemplate {
         private final String code;
         private final Set<String> imports = new HashSet<>();
 
-        private JavaParser javaParser = JavaParser.fromJavaVersion()
-                .logCompilationWarningsAndErrors(false)
-                .build();
+        private JavaParser javaParser = JavaParser.fromJavaVersion().build();
 
         private String parameterMarker = "#{}";
 

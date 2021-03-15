@@ -325,7 +325,7 @@ class MavenDependencyResolutionIntegTest {
     }
 
     @Test
-    fun springBootParent(@TempDir tempDir: Path) {
+    fun springBootParent() {
         val pom = """
             <project>
               <modelVersion>4.0.0</modelVersion>
@@ -405,7 +405,7 @@ class MavenDependencyResolutionIntegTest {
     }
 
     @Test
-    fun importDependencies(@TempDir tempDir: Path) {
+    fun importDependencies() {
         val pom = """
             <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
               xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">

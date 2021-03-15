@@ -43,9 +43,7 @@ object RewriteJavaProjectOnDisk {
             .limit(if (args.size > 2) args[2].toLong() else Long.MAX_VALUE)
             .toList()
 
-        val parser: JavaParser = JavaParser.fromJavaVersion()
-            .logCompilationWarningsAndErrors(false) // optional, for quiet parsing
-            .build()
+        val parser: JavaParser = JavaParser.fromJavaVersion().build()
 
         val sourceFiles: List<SourceFile> = parser.parse(paths, srcDir, InMemoryExecutionContext())
         recipe.run(sourceFiles).map {

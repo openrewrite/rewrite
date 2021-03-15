@@ -18,7 +18,6 @@ package org.openrewrite.java
 import io.micrometer.core.instrument.Meter
 import io.micrometer.core.instrument.config.MeterFilter
 import io.micrometer.core.instrument.distribution.DistributionStatisticConfig
-import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.MetricsDestinations
 import java.nio.file.Files
@@ -55,9 +54,7 @@ object ParseJavaProjectOnDisk {
             .toList()
 
         var start = System.nanoTime()
-        val parser: JavaParser = JavaParser.fromJavaVersion()
-            .logCompilationWarningsAndErrors(false) // optional, for quiet parsing
-            .build()
+        val parser: JavaParser = JavaParser.fromJavaVersion().build()
 
         println("Loaded ${paths.size} files in ${(System.nanoTime() - start) * 1e-6}ms")
 

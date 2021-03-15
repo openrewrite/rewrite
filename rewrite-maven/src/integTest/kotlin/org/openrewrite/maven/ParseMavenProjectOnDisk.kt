@@ -16,7 +16,6 @@
 package org.openrewrite.maven
 
 import org.openrewrite.InMemoryExecutionContext
-import org.openrewrite.Parser
 import org.openrewrite.java.JavaParser
 import org.openrewrite.maven.cache.LocalMavenArtifactCache
 import org.openrewrite.maven.cache.MapdbMavenPomCache
@@ -24,7 +23,6 @@ import org.openrewrite.maven.cache.ReadOnlyLocalMavenArtifactCache
 import org.openrewrite.maven.internal.MavenParsingException
 import org.openrewrite.maven.utilities.MavenArtifactDownloader
 import org.openrewrite.maven.utilities.MavenProjectParser
-import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.function.Consumer
 
@@ -38,17 +36,6 @@ object ParseMavenProjectOnDisk {
                 println("  ${t.message}")
             } else {
                 t.printStackTrace()
-            }
-        }
-
-        val onParse = object : Parser.Listener {
-            var n = 1
-            override fun onParseSucceeded(sourcePath: Path) {
-                println("${n++} SUCCESS - $sourcePath")
-            }
-
-            override fun onParseFailed(sourcePath: Path) {
-                println("${n++} FAILED - $sourcePath")
             }
         }
 
@@ -66,7 +53,6 @@ object ParseMavenProjectOnDisk {
         )
 
         val mavenParserBuilder = MavenParser.builder()
-            .doOnParse(onParse)
             .cache(pomCache)
             .resolveOptional(false)
             .mavenConfig(projectDir.resolve(".mvn/maven.config"))

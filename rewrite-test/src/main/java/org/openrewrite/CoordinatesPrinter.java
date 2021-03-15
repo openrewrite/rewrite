@@ -35,11 +35,11 @@ public class CoordinatesPrinter {
     /**
      * This will print out the compilation unit and embed the tree coordinates (at each Space position). If a filter
      * is supplied, the printer will only print coordinates for the tree elements of that given type.
-     *
+     * <p>
      * See {@link CoordinatesPrinter#printCoordinatesWithColor(J.CompilationUnit, Class)} for a variant of this method
      * that will output the string with ASCII color codes.
      *
-     * @param cu The compilation unit to print
+     * @param cu           The compilation unit to print
      * @param cursorFilter An optional cursor filter.
      * @return The printed tree.
      */
@@ -53,7 +53,7 @@ public class CoordinatesPrinter {
      * is supplied, the printer will only print coordinates for the tree elements of that given type. This variant also
      * uses ANSI Color codes to better highlight the differences between the coordinates and the actual source code.
      *
-     * @param cu The compilation unit to print
+     * @param cu           The compilation unit to print
      * @param cursorFilter An optional cursor filter.
      * @return The printed tree.
      */
@@ -63,10 +63,12 @@ public class CoordinatesPrinter {
     }
 
     private static class MapSpaces extends JavaIsoVisitor<ExecutionContext> {
-
+        @Nullable
         private final Class<? extends J> cursorFilter;
+
         private final boolean useColor;
-        public MapSpaces(Class<? extends J> cursorFilter, boolean useColor) {
+
+        public MapSpaces(@Nullable Class<? extends J> cursorFilter, boolean useColor) {
             this.cursorFilter = cursorFilter;
             this.useColor = useColor;
         }
@@ -80,7 +82,7 @@ public class CoordinatesPrinter {
                 J tree = getCursor().firstEnclosing(J.class);
                 spaceOut.append(space.getWhitespace());
 
-                if(useColor) {
+                if (useColor) {
                     spaceOut.append(ANSI_RESET).append(ANSI_FOREGROUND_GREY);
                 }
                 spaceOut
@@ -89,9 +91,9 @@ public class CoordinatesPrinter {
                         .append(",")
                         .append(loc)
                         .append(">>");
-                        if (useColor) {
-                            spaceOut.append(ANSI_BACKGROUND_GREEN).append(ANSI_FOREGROUND_WHITE);
-                        }
+                if (useColor) {
+                    spaceOut.append(ANSI_BACKGROUND_GREEN).append(ANSI_FOREGROUND_WHITE);
+                }
             } else {
                 J tree = getCursor().firstEnclosing(J.class);
                 if (tree != null && tree.getClass() == cursorFilter) {

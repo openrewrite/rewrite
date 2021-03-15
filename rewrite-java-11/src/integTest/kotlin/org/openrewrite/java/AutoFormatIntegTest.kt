@@ -40,9 +40,7 @@ class AutoFormatIntegTest : RecipeTest {
     fun tabsAndIndents() {
         paths.forEach {
             assertUnchanged(
-                parser = JavaParser.fromJavaVersion()
-                    .logCompilationWarningsAndErrors(false) // optional, for quiet parsing
-                    .build(),
+                parser = JavaParser.fromJavaVersion().build(),
                 recipe = TabsAndIndents(),
                 before = it.toFile()
             )
