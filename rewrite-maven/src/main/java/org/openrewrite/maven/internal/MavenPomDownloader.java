@@ -183,8 +183,7 @@ public class MavenPomDownloader {
         // First try to match the requested download with one of the project poms so we don't needlessly ping remote repos
         for (RawMaven projectPom : projectPoms.values()) {
             if (groupId.equals(projectPom.getPom().getGroupId()) &&
-                    artifactId.equals(projectPom.getPom().getArtifactId()) &&
-                    version.equals(projectPom.getPom().getVersion())) {
+                    artifactId.equals(projectPom.getPom().getArtifactId())) {
                 return projectPom;
             }
         }
