@@ -1365,7 +1365,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             message.append("--- END PATH ---\n");
 
             ctx.getOnError().accept(new JavaParsingException(message.toString(), ex));
-            return null;
+            throw ex;
         }
     }
 
