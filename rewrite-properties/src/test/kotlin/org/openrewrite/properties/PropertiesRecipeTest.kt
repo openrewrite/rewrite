@@ -112,6 +112,43 @@ interface PropertiesRecipeTest : RecipeTest {
         super.assertChanged(parser, recipe, before, dependsOn, after, cycles, afterConditions)
     }
 
+    fun assertUnchanged(
+        parser: Parser<*>?,
+        recipe: Recipe?,
+        @Language("properties") before: String,
+    ) {
+        super.assertUnchanged(parser, recipe, before, emptyArray())
+    }
+
+    fun assertUnchanged(
+        recipe: Recipe?,
+        @Language("properties") before: String,
+    ) {
+        super.assertUnchanged(parser, recipe, before, emptyArray())
+    }
+
+    fun assertUnchanged(
+        @Language("properties") before: String
+    ) {
+        super.assertUnchanged(parser, recipe, before, emptyArray())
+    }
+
+    fun assertUnchanged(
+        recipe: Recipe?,
+        @Language("properties") before: String,
+        @Language("properties") dependsOn: Array<String>
+    ) {
+        super.assertUnchanged(parser, recipe, before, dependsOn)
+    }
+
+    fun assertUnchanged(
+        parser: Parser<*>?,
+        @Language("properties") before: String,
+        @Language("properties") dependsOn: Array<String>
+    ) {
+        super.assertUnchanged(parser, recipe, before, dependsOn)
+    }
+    
     override fun assertUnchanged(
         parser: Parser<*>?,
         recipe: Recipe?,

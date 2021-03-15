@@ -114,6 +114,43 @@ interface JavaRecipeTest : RecipeTest {
         super.assertChanged(parser, recipe, before, dependsOn, after, cycles, afterConditions)
     }
 
+    fun assertUnchanged(
+        parser: Parser<*>?,
+        recipe: Recipe?,
+        @Language("java") before: String,
+    ) {
+        super.assertUnchanged(parser, recipe, before, emptyArray())
+    }
+
+    fun assertUnchanged(
+        recipe: Recipe?,
+        @Language("java") before: String,
+    ) {
+        super.assertUnchanged(parser, recipe, before, emptyArray())
+    }
+
+    fun assertUnchanged(
+        @Language("java") before: String
+    ) {
+        super.assertUnchanged(parser, recipe, before, emptyArray())
+    }
+
+    fun assertUnchanged(
+        recipe: Recipe?,
+        @Language("java") before: String,
+        @Language("java") dependsOn: Array<String>
+    ) {
+        super.assertUnchanged(parser, recipe, before, dependsOn)
+    }
+
+    fun assertUnchanged(
+        parser: Parser<*>?,
+        @Language("java") before: String,
+        @Language("java") dependsOn: Array<String>
+    ) {
+        super.assertUnchanged(parser, recipe, before, dependsOn)
+    }
+
     override fun assertUnchanged(
         parser: Parser<*>?,
         recipe: Recipe?,
