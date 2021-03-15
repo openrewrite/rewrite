@@ -2256,9 +2256,9 @@ public interface J extends Serializable, Tree {
          * Retrieve just the package from the import.
          * e.g.:
          * <code>
-         * import org.foo.A;            -> "org.foo"
-         * import static org.foo.A.bar; -> "org.foo"
-         * import org.foo.*;            -> "org.foo"
+         * import org.foo.A;            => "org.foo"
+         * import static org.foo.A.bar; => "org.foo"
+         * import org.foo.*;            => "org.foo"
          * </code>
          */
 

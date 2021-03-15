@@ -33,7 +33,6 @@ tasks.withType<Javadoc> {
     // generated ANTLR sources violate doclint
     (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:none", "-quiet")
 
-    // TODO
     // ChangePackage and OrderImports due to lombok error which looks similar to this:
     //     openrewrite/rewrite/rewrite-java/src/main/java/org/openrewrite/java/OrderImports.java:42: error: cannot find symbol
     // @AllArgsConstructor(onConstructor_=@JsonCreator)

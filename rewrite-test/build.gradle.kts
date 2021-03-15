@@ -28,6 +28,5 @@ tasks.named<JavaCompile>("compileJava") {
 }
 
 tasks.withType<Javadoc> {
-    // todo
     isFailOnError = false
 }

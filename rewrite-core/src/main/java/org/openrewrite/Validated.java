@@ -55,8 +55,14 @@ public interface Validated extends Iterable<Validated> {
     /**
      * Validate that the Predicate will evaluate to 'true' on the supplied value.
      * When the Predicate evaluates to 'false' the error message will be of the form:
-     *
+     * <p>
      * "[property] was '[value]' but it [message]"
+     *
+     * @param property The property name to test
+     * @param message  The failure message if the test doesn't pass
+     * @param value    The value of the property
+     * @param test     The test predicate
+     * @return A validation result
      */
     static <T> Validated test(String property, String message, @Nullable T value, Predicate<T> test) {
         return test.test(value) ?
@@ -83,7 +89,7 @@ public interface Validated extends Iterable<Validated> {
     }
 
     static Invalid invalid(String property, @Nullable Object value, String message,
-                                  @Nullable Throwable exception) {
+                           @Nullable Throwable exception) {
         return new Invalid(property, value, message, exception);
     }
 
@@ -101,8 +107,7 @@ public interface Validated extends Iterable<Validated> {
         return new Either(this, validated);
     }
 
-    @Nullable
-    <T> T getValue();
+    @Nullable <T> T getValue();
 
     /**
      * Indicates that no validation has occurred. None is considered "valid", effectively a no-op validation.
