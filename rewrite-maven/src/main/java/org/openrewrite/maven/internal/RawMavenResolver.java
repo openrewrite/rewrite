@@ -95,15 +95,15 @@ public class RawMavenResolver {
      */
     @Nullable
     public Pom resolve(RawMaven rawMaven, Scope scope, @Nullable String requestedVersion, Map<String, String> effectiveProperties, Collection<MavenRepository> repositories) {
-        return resolve(rawMaven, scope, requestedVersion, effectiveProperties, null, repositories, null, false);
+        return resolve(rawMaven, scope, requestedVersion, effectiveProperties, null, repositories, null);
     }
 
     @Nullable
     private Pom resolve(RawMaven rawMaven, Scope scope, @Nullable String requestedVersion, Map<String, String> effectiveProperties, @Nullable PartialMaven rootPom, Collection<MavenRepository> repositories,
-                        @Nullable LinkedHashSet<PartialTreeKey> seenParentPoms, boolean managed) {
+                        @Nullable LinkedHashSet<PartialTreeKey> seenParentPoms) {
 
         ResolutionTask rootTask = new ResolutionTask(scope, rawMaven, emptySet(),
-                false, null, null, requestedVersion, effectiveProperties, rootPom, repositories, seenParentPoms, managed);
+                false, null, null, requestedVersion, effectiveProperties, rootPom, repositories, seenParentPoms);
 
         workQueue.add(rootTask);
 
@@ -288,13 +288,8 @@ public class RawMavenResolver {
                     String version = partialMaven.getValue(dep.getVersion());
                     managedVersion = partialMaven.getValue(managedVersion);
 
-                    boolean isManaged = false;
                     if (managedVersion != null && version == null) {
                         version = managedVersion;
-                        isManaged = true;
-                    } else if (version != null && version.equals(managedVersion)) {
-                        //If the explicit version is the same as the managed version, its managed.
-                        isManaged = true;
                     }
 
                     if (version == null) {
@@ -378,8 +373,7 @@ public class RawMavenResolver {
                             new HashMap<>(partialMaven.getEffectiveProperties()),
                             task.getRootPom() == null ? partialMaven : task.getRootPom(),
                             partialMaven.getRepositories(),
-                            null,
-                            isManaged
+                            null
                     );
 
                     if (!partialResults.containsKey(resolutionTask)) {
@@ -428,7 +422,7 @@ public class RawMavenResolver {
                 //noinspection OptionalAssignedToNull
                 if (maybeParent == null) {
                     parent = new RawMavenResolver(downloader, activeProfiles, resolveOptional, ctx, projectDir)
-                            .resolve(rawParentModel, Scope.Compile, rawParent.getVersion(), partialMaven.getEffectiveProperties(), task.getRootPom(), partialMaven.getRepositories(), parentPomSightings, false);
+                            .resolve(rawParentModel, Scope.Compile, rawParent.getVersion(), partialMaven.getEffectiveProperties(), task.getRootPom(), partialMaven.getRepositories(), parentPomSightings);
                     resolved.put(parentKey, Optional.ofNullable(parent));
                 } else {
                     parent = maybeParent.orElse(null);
@@ -537,7 +531,7 @@ public class RawMavenResolver {
                                                     partial.effectiveProperties,
                                                     task.getRootPom(),
                                                     task.getRepositories(),
-                                                    null, false), nextAssemblyStack);
+                                                    null), nextAssemblyStack);
 
                             if (conflictResolved == null) {
                                 dependencies.add(ancestorDep);
@@ -671,9 +665,6 @@ public class RawMavenResolver {
 
         @Nullable
         LinkedHashSet<PartialTreeKey> seenParentPoms;
-
-        boolean managed;
-
 
         public Set<GroupArtifact> getExclusions() {
             return exclusions == null ? emptySet() : exclusions;
