@@ -893,15 +893,9 @@ class MavenParserTest {
             )
             .find { it.model.artifactId == "a" }
 
-        assertThat(a!!.model.dependencies)
-            .hasSize(1)
-        val b = a.model.dependencies.first()
-        assertThat(b)
-            .matches { it.artifactId == "b" }
-            .matches { it.model.dependencies.size == 1 }
-            .matches(
-                { it.model.dependencies.first().artifactId == "d" && it.model.dependencies.first().version == "0.1.0-SNAPSHOT" },
-                "Because of a-parent's dependencyManagement, b should depend on d 0.1.0-SNAPSHOT"
-            )
+        assertThat(a!!.model.getDependencies(Scope.Compile))
+            .hasSize(2)
+            .anyMatch { it.artifactId == "b" && it.version == "0.1.0-SNAPSHOT" }
+            .anyMatch { it.artifactId == "d" && it.version == "0.1.0-SNAPSHOT" }
     }
 }
