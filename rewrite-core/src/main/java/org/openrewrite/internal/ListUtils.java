@@ -207,4 +207,29 @@ public final class ListUtils {
         newLs.addAll(index, t);
         return newLs;
     }
+
+    /**
+     * Lists of elements may be extracted from their padding into new list instances.
+     * this will return true if the lists are referentially equal or the elements are
+     * equal and in the same order
+     * @param ls1
+     * @param ls2
+     * @param <T>
+     * @return
+     */
+    public static <T> boolean areEqual(List<T> ls1, List<T> ls2) {
+        if (ls1 == ls2) {
+            return true;
+        }
+        if (ls1.size() != ls2.size()) {
+            return false;
+        }
+        for (int i = 0; i < ls1.size(); i++) {
+            if (ls1.get(i) != ls2.get(i)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
 }
