@@ -244,6 +244,9 @@ public class RawMavenResolver {
 
                     if (task.getRootPom() != null) {
                         managedVersion = task.getRootPom().getDependencyManagement().getManagedVersion(groupId, artifactId);
+                        if(managedVersion == null) {
+                            managedVersion = task.getRootPom().getParent().getManagedVersion(groupId, artifactId);
+                        }
                     }
                     // loop so that when dependencyManagement refers to a property that we take another pass to resolve the property.
                     int i = 0;

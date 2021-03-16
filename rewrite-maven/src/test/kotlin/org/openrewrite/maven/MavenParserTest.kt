@@ -767,7 +767,6 @@ class MavenParserTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/376")
-    @Disabled
     @Test
     fun dependencyManagementPropagatesToDependencies() {
         // a depends on b
