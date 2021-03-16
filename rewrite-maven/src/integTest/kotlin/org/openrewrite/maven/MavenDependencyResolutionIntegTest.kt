@@ -499,6 +499,75 @@ class MavenDependencyResolutionIntegTest {
         )
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/294")
+    @Test
+    fun parseWithSubmodule() {
+        val bom = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>bom</artifactId>
+                <version>1</version>
+                <packaging>pom</packaging>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>30.0-jre</version>
+                            <scope>import</scope>
+                            <type>pom</type>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+        """.trimIndent()
+
+        val parentPom = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <modules>
+                    <module>submodule</module>
+                </modules>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.mycompany</groupId>
+                            <artifactId>bom</artifactId>
+                            <version>1</version>
+                            <type>pom</type>
+                            <scope>import</scope>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+        """.trimIndent()
+
+        val submodulePom = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </parent>
+                <artifactId>submodule</artifactId>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                  </dependency>
+                </dependencies>
+            </project>
+        """.trimIndent()
+
+        val parser = MavenParser.builder().build()
+        parser.parse(bom, parentPom, submodulePom)
+    }
+
     @Test
     fun springCloudSecurityOauth2(@TempDir tempDir: Path) {
         assertDependencyResolutionEqualsAether(
