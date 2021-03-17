@@ -94,12 +94,40 @@ public abstract class Recipe {
         }
     };
 
+    /**
+     * A human-readable display name for the recipe, initial capped with no period.
+     * For example, "Find text". The display name can be assumed to be rendered in
+     * documentation and other places where markdown is understood, so it is possible
+     * to use stylistic markers like backticks to indicate types. For example,
+     * "Find uses of `java.util.List`".
+     *
+     * @return The display name.
+     */
     public abstract String getDisplayName();
 
+    /**
+     * A human-readable description for the recipe, consisting of one or more full
+     * sentences ending with a period.
+     *
+     * "Find methods by pattern." is an example. The description can be assumed to be rendered in
+     * documentation and other places where markdown is understood, so it is possible
+     * to use stylistic markers like backticks to indicate types. For example,
+     * "Find uses of `java.util.List`.".
+     *
+     * @return The display name.
+     */
     public String getDescription() {
         return "";
     }
 
+    /**
+     * A set of strings used for categorizing related recipes. For example
+     * "testing", "junit", "spring". Tags should not include information about
+     * the language(s) this recipe is applicable to. See {@link #getLanguages()} instead.
+     * Any individual tag should consist of a single word, all lowercase.
+     *
+     * @return The tags.
+     */
     public Set<String> getTags() {
         return Collections.emptySet();
     }
