@@ -96,6 +96,10 @@ class Java11FindMethodsTest : Java11Test, FindMethodsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11FindTextTest : Java11Test, FindTextTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11FindTypesTest : Java11Test, FindTypesTest
 
 @DebugOnly
