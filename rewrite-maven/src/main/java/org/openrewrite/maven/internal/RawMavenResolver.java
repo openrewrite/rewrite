@@ -95,15 +95,15 @@ public class RawMavenResolver {
      */
     @Nullable
     public Pom resolve(RawMaven rawMaven, Scope scope, @Nullable String requestedVersion, Map<String, String> effectiveProperties, Collection<MavenRepository> repositories) {
-        return resolve(rawMaven, scope, requestedVersion, effectiveProperties, null, repositories, null);
+        return resolve(rawMaven, scope, requestedVersion, effectiveProperties, null, repositories, null, false);
     }
 
     @Nullable
     private Pom resolve(RawMaven rawMaven, Scope scope, @Nullable String requestedVersion, Map<String, String> effectiveProperties, @Nullable PartialMaven rootPom, Collection<MavenRepository> repositories,
-                        @Nullable LinkedHashSet<PartialTreeKey> seenParentPoms) {
+                        @Nullable LinkedHashSet<PartialTreeKey> seenParentPoms, boolean managed) {
 
         ResolutionTask rootTask = new ResolutionTask(scope, rawMaven, emptySet(),
-                false, null, null, requestedVersion, effectiveProperties, rootPom, repositories, seenParentPoms);
+                false, null, null, requestedVersion, effectiveProperties, rootPom, repositories, seenParentPoms, managed);
 
         workQueue.add(rootTask);
 
@@ -172,7 +172,7 @@ public class RawMavenResolver {
                         partialMaven.getRepositories(), ctx);
                 if (rawMaven != null) {
                     Pom maven = new RawMavenResolver(downloader, activeProfiles, resolveOptional, ctx, projectDir)
-                            .resolve(rawMaven, Scope.Compile, d.getVersion(), new HashMap<>(partialMaven.getEffectiveProperties()), partialMaven.getRepositories());
+                            .resolve(rawMaven, Scope.Compile, d.getVersion(), new HashMap<>(), partialMaven.getRepositories());
 
                     if (maven != null) {
                         managedDependencies.add(new DependencyManagementDependency.Imported(groupId, artifactId,
@@ -283,13 +283,18 @@ public class RawMavenResolver {
                     //version and it is not a transitive dependency of a managed dependency, the artifact
                     //version "wins" over the managed dependency.
 
-                    //If the explicit version is missing or the artifact is a transitive dependency of
-                    //a managed dependency, the managed version is used (if it exists)
                     String version = partialMaven.getValue(dep.getVersion());
                     managedVersion = partialMaven.getValue(managedVersion);
 
-                    if (managedVersion != null && version == null) {
+                    boolean isManaged = false;
+                    if (managedVersion != null && (task.isManaged() || version == null)) {
+                        //If the explicit version is missing or the artifact is a dependency of a managed dependency,
+                        //the managed version is used (if it exists)
                         version = managedVersion;
+                        isManaged = true;
+                    } else if (version != null && version.equals(managedVersion)) {
+                        //If the explicit version is the same as the managed version, its managed.
+                        isManaged = true;
                     }
 
                     if (version == null) {
@@ -373,7 +378,8 @@ public class RawMavenResolver {
                             new HashMap<>(partialMaven.getEffectiveProperties()),
                             task.getRootPom() == null ? partialMaven : task.getRootPom(),
                             partialMaven.getRepositories(),
-                            null
+                            null,
+                            isManaged
                     );
 
                     if (!partialResults.containsKey(resolutionTask)) {
@@ -422,7 +428,7 @@ public class RawMavenResolver {
                 //noinspection OptionalAssignedToNull
                 if (maybeParent == null) {
                     parent = new RawMavenResolver(downloader, activeProfiles, resolveOptional, ctx, projectDir)
-                            .resolve(rawParentModel, Scope.Compile, rawParent.getVersion(), partialMaven.getEffectiveProperties(), task.getRootPom(), partialMaven.getRepositories(), parentPomSightings);
+                            .resolve(rawParentModel, Scope.Compile, rawParent.getVersion(), partialMaven.getEffectiveProperties(), task.getRootPom(), partialMaven.getRepositories(), parentPomSightings, false);
                     resolved.put(parentKey, Optional.ofNullable(parent));
                 } else {
                     parent = maybeParent.orElse(null);
@@ -531,7 +537,7 @@ public class RawMavenResolver {
                                                     partial.effectiveProperties,
                                                     task.getRootPom(),
                                                     task.getRepositories(),
-                                                    null), nextAssemblyStack);
+                                                    null, false), nextAssemblyStack);
 
                             if (conflictResolved == null) {
                                 dependencies.add(ancestorDep);
@@ -665,6 +671,8 @@ public class RawMavenResolver {
 
         @Nullable
         LinkedHashSet<PartialTreeKey> seenParentPoms;
+
+        boolean managed;
 
         public Set<GroupArtifact> getExclusions() {
             return exclusions == null ? emptySet() : exclusions;

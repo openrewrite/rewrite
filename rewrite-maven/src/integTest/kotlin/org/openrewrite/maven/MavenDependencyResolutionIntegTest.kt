@@ -82,6 +82,37 @@ class MavenDependencyResolutionIntegTest {
         }
     }
 
+    @Test
+    fun funWithJackson(@TempDir tempDir: Path) {
+        assertDependencyResolutionEqualsAether(
+            tempDir,
+            """
+                 <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.2.11.RELEASE</version>
+                      <relativePath/> 
+                  </parent>
+                  <groupId>com.foo</groupId>
+                  <artifactId>test</artifactId>
+                  <version>1.0.0</version>
+                  <name>test</name>
+                  <properties>
+                      <jackson-bom.version>2.12.1</jackson-bom.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-databind</artifactId>
+                      </dependency>
+                  </dependencies>
+                </project>
+            """
+        )
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/281")
     @Test
     @Disabled
@@ -597,6 +628,14 @@ class MavenDependencyResolutionIntegTest {
         assertDependencyResolutionEqualsAether(
             tempDir,
             singleDependencyPom("org.springframework.boot:spring-boot-starter-actuator:2.3.2.RELEASE")
+        )
+    }
+
+    @Test
+    fun hibernateCore(@TempDir tempDir: Path) {
+        assertDependencyResolutionEqualsAether(
+            tempDir,
+            singleDependencyPom("org.hibernate:hibernate-core:5.4.28.Final")
         )
     }
 
