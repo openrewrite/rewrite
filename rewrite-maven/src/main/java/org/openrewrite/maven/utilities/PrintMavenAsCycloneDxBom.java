@@ -67,7 +67,7 @@ public final class PrintMavenAsCycloneDxBom {
         bom.append("                <version>7.0.0</version>\n");
         bom.append("            </tool>\n");
         bom.append("        </tools>\n");
-        String bomReference = getBomReference(pom.getGroupId(), pom.getArtifactId(), pom.getVersion());
+        String bomReference = getBomReference(pom.getGroupId(), pom.getArtifactId(), pom.getValue(pom.getVersion()));
 
         writeComponent(pom, bomReference, pom.getVersion(), Scope.Compile, "        ",  bom);
         bom.append("    </metadata>\n");
@@ -202,10 +202,6 @@ public final class PrintMavenAsCycloneDxBom {
     }
 
     private static boolean isDependencyInScope(Pom.Dependency dependency) {
-        boolean check = !dependency.isOptional() && dependency.getScope() != Scope.Test;
-        if (check) {
-            System.out.println(dependency.getScope() + " - " + dependency.getGroupId() + "/" + dependency.getArtifactId());
-        }
-        return check;
+        return !dependency.isOptional() && dependency.getScope() != Scope.Test;
     }
 }

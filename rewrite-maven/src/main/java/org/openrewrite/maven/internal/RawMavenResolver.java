@@ -428,7 +428,7 @@ public class RawMavenResolver {
                 //noinspection OptionalAssignedToNull
                 if (maybeParent == null) {
                     parent = new RawMavenResolver(downloader, activeProfiles, resolveOptional, ctx, projectDir)
-                            .resolve(rawParentModel, Scope.Compile, rawParent.getVersion(), partialMaven.getEffectiveProperties(), task.getRootPom(), partialMaven.getRepositories(), parentPomSightings, false);
+                            .resolve(rawParentModel, Scope.Compile, rawParent.getVersion(), partialMaven.getEffectiveProperties(), task.getRootPom(), partialMaven.getRepositories(), parentPomSightings, task.isManaged());
                     resolved.put(parentKey, Optional.ofNullable(parent));
                 } else {
                     parent = maybeParent.orElse(null);
