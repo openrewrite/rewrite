@@ -22,6 +22,7 @@ import mockwebserver3.RecordedRequest
 import okhttp3.Credentials
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.intellij.lang.annotations.Language
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
@@ -315,6 +316,51 @@ class MavenParserTest {
         // So long as we don't produce an AST with cycles it's OK
         assertThat(maven.model.dependencies).hasSize(1)
         assertThat(maven.model.dependencies.first().model.dependencies).hasSize(0)
+    }
+
+    @Test
+    fun managedDependenciesInParentInfluenceTransitives() {
+        @Language("xml")
+        val parent = """
+            <project>
+                <groupId>com.foo</groupId>
+                <artifactId>parent</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.glassfish.jaxb</groupId>
+                            <artifactId>jaxb-runtime</artifactId>
+                            <version>2.3.3</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+        """
+
+        @Language("xml")
+        val pomSource = """
+            <project>
+                <parent>
+                    <groupId>com.foo</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                </parent>
+                <groupId>com.foo</groupId>
+                <artifactId>test</artifactId>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.hibernate</groupId> 
+                        <artifactId>hibernate-core</artifactId>
+                        <version>5.4.28.Final</version>
+                    </dependency>
+                </dependencies>
+            </project>
+        """
+
+        val maven = MavenParser.builder().build().parse(pomSource, parent)[0]
+        assertThat(maven.model.dependencies.first().model.dependencies.map { it.artifactId to it.version })
+            .contains("jaxb-runtime" to "2.3.3")
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/323")
