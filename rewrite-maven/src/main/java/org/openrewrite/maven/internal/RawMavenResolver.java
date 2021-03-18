@@ -329,8 +329,8 @@ public class RawMavenResolver {
                     //version and it is not a transitive dependency of a managed dependency, the artifact
                     //version "wins" over the managed dependency.
 
-                    String version = partialMaven.getRequiredValue(dep.getVersion());
-                    managedVersion = partialMaven.getRequiredValue(managedVersion);
+                    String version = partialMaven.getValue(dep.getVersion(), false);
+                    managedVersion = partialMaven.getValue(managedVersion, false);
 
                     if((task.getProjectPom() != null || version == null) && managedVersion != null) {
                         version = managedVersion;
