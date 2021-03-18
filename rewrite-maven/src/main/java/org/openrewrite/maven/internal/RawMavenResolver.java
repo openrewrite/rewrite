@@ -233,6 +233,40 @@ public class RawMavenResolver {
                         return null;
                     }
 
+                    int i = 0;
+                    String last;
+
+                    //Resolve the dependency scope. if the scope is set in the pom, it take precedence over the
+                    //managed scope. This allows a downstream pom to override the managed scope.
+                    String scope = dep.getScope() != null ? partialMaven.getRequiredValue(dep.getScope()) : null;
+
+                    if (scope == null) {
+                        // loop so that when dependencyManagement refers to a property that we take another pass to resolve the property.
+                        do {
+                            last = scope;
+                            String result = null;
+                            if (last != null) {
+                                String partialMavenScope = partialMaven.getRequiredValue(last);
+                                if (partialMavenScope != null) {
+                                    result = partialMavenScope;
+                                }
+                            }
+                            if (result == null) {
+                                result = partialMaven.getDependencyManagement().getManagedScope(groupId, artifactId);
+                                if (result == null && partialMaven.getParent() != null) {
+                                    result = partialMaven.getParent().getManagedScope(groupId, artifactId);
+                                }
+                            }
+                            scope = result;
+                        } while (i++ < 2 || !Objects.equals(scope, last));
+                    }
+                    Scope requestedScope = Scope.fromName(scope);
+                    Scope effectiveScope = requestedScope.transitiveOf(task.getScope());
+
+                    if (effectiveScope == null || Scope.Invalid.equals(effectiveScope)) {
+                        return null;
+                    }
+
                     // Handle dependency exclusions
                     for (GroupArtifact e : task.getExclusions()) {
                         try {
@@ -248,7 +282,6 @@ public class RawMavenResolver {
 
                     //Determine if there is a managed version of the artifact.
                     String managedVersion = null;
-                    String last;
 
                     PartialMaven projectPom = task.getProjectPom();
                     if (projectPom != null) {
@@ -260,7 +293,6 @@ public class RawMavenResolver {
                     }
 
                     // loop so that when dependencyManagement refers to a property that we take another pass to resolve the property.
-                    int i = 0;
                     do {
                         last = managedVersion;
                         String result = null;
@@ -303,39 +335,6 @@ public class RawMavenResolver {
                     if (version == null) {
                         ctx.getOnError().accept(new MavenParsingException("Failed to determine version for %s:%s. Initial value was %s. Including POM is at %s",
                                 groupId, artifactId, dep.getVersion(), rawMaven));
-                        return null;
-                    }
-
-                    //Resolve the dependency scope. if the scope is set in the pom, it take precedence over the
-                    //managed scope. This allows a downstream pom to override the managed scope.
-                    String scope = dep.getScope() != null ? partialMaven.getRequiredValue(dep.getScope()) : null;
-
-                    if (scope == null) {
-
-                        // loop so that when dependencyManagement refers to a property that we take another pass to resolve the property.
-                        i = 0;
-                        do {
-                            last = scope;
-                            String result = null;
-                            if (last != null) {
-                                String partialMavenScope = partialMaven.getRequiredValue(last);
-                                if (partialMavenScope != null) {
-                                    result = partialMavenScope;
-                                }
-                            }
-                            if (result == null) {
-                                result = partialMaven.getDependencyManagement().getManagedScope(groupId, artifactId);
-                                if (result == null && partialMaven.getParent() != null) {
-                                    result = partialMaven.getParent().getManagedScope(groupId, artifactId);
-                                }
-                            }
-                            scope = result;
-                        } while (i++ < 2 || !Objects.equals(scope, last));
-                    }
-                    Scope requestedScope = Scope.fromName(scope);
-                    Scope effectiveScope = requestedScope.transitiveOf(task.getScope());
-
-                    if (effectiveScope == null || Scope.Invalid.equals(effectiveScope)) {
                         return null;
                     }
 
