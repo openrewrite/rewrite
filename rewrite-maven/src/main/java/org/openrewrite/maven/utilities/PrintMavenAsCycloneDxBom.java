@@ -15,11 +15,11 @@
  */
 package org.openrewrite.maven.utilities;
 
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.maven.MavenParser;
-import org.openrewrite.maven.cache.MapdbMavenPomCache;
-import org.openrewrite.maven.cache.MavenPomCache;
+import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.Scope;
@@ -44,10 +44,9 @@ public final class PrintMavenAsCycloneDxBom {
                 .append(maven.getId().toString()).append("\" version=\"1\">\n");
         writeMetadata(maven.getModel(), bom);
 
-        //Collect all transitive dependencies, The returned map is a bomReference -> dependency. This method will add
-        //a dependency the first time it is encountered. A linked hash map is used to maintain the order in which
-        //the dependencies are inserted into the map.
-        Map <String, Pom.Dependency> dependencies = traverseDependencies(pom.getDependencies(), new LinkedHashMap<>());
+        //Collect all transitive dependencies, The returned map is a (gav + a set of exclusions) -> dependency. Because
+        //of exclusions, we may encounter the same gav multiple times.
+        Map <DependencyKey, Pom.Dependency> dependencies = traverseDependencies(pom.getDependencies(), new LinkedHashMap<>());
         writeComponents(dependencies, bom);
         writeDependencies(dependencies, bom);
 
@@ -69,32 +68,42 @@ public final class PrintMavenAsCycloneDxBom {
         bom.append("        </tools>\n");
         String bomReference = getBomReference(pom.getGroupId(), pom.getArtifactId(), pom.getValue(pom.getVersion()));
 
-        writeComponent(pom, bomReference, pom.getVersion(), Scope.Compile, "        ",  bom);
+        writeComponent(pom, bomReference, pom.getVersion(), Scope.Compile, bom);
         bom.append("    </metadata>\n");
     }
-    private static void writeComponents(Map <String, Pom.Dependency> dependencyMap, StringBuilder bom) {
+
+    private static void writeComponents(Map <DependencyKey, Pom.Dependency> dependencyMap, StringBuilder bom) {
         if (dependencyMap.isEmpty()) {
             return;
         }
+        //The components are a flattened view of the dependencies (where we might see the same gav multiple times,
+        //we only want to print the component once.
+        Set<String> componentsWritten = new HashSet<>(dependencyMap.size());
         bom.append("    <components>\n");
-        for (Map.Entry<String, Pom.Dependency> entry : dependencyMap.entrySet()) {
-            writeComponent(entry.getValue().getModel(), entry.getKey(), entry.getValue().getVersion(), entry.getValue().getScope(), "        ", bom);
+        for (Pom.Dependency component : dependencyMap.values()) {
+            String bomReference = getBomReference(component.getGroupId(), component.getArtifactId(), component.getVersion());
+            if (componentsWritten.contains(bomReference)) {
+                continue;
+            }
+            writeComponent(component.getModel(), bomReference, component.getVersion(), component.getScope(), bom);
+            componentsWritten.add(bomReference);
         }
         bom.append("    </components>\n");
     }
 
-    private static void writeDependencies(Map <String, Pom.Dependency> dependencyMap, StringBuilder bom) {
+    private static void writeDependencies(Map <DependencyKey, Pom.Dependency> dependencyMap, StringBuilder bom) {
         if (dependencyMap.isEmpty()) {
             return;
         }
         bom.append("    <dependencies>\n");
-        for (Map.Entry<String, Pom.Dependency> entry : dependencyMap.entrySet()) {
-            writeDependency(entry.getKey(), entry.getValue(), bom);
+        for (Pom.Dependency dependency : dependencyMap.values()) {
+            writeDependency(dependency, bom);
         }
         bom.append("    </dependencies>\n");
     }
 
-    private static void writeDependency(String bomReference, Pom.Dependency dependency, StringBuilder bom) {
+    private static void writeDependency(Pom.Dependency dependency, StringBuilder bom) {
+        String bomReference = getBomReference(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion());
         bom.append("        <dependency ref=\"").append(bomReference).append("\">\n");
         if (dependency.getModel().getDependencies() != null) {
             for (Pom.Dependency nested : dependency.getModel().getDependencies()) {
@@ -109,12 +118,13 @@ public final class PrintMavenAsCycloneDxBom {
         bom.append("        </dependency>\n");
     }
 
-    private static void writeComponent(Pom pom, String bomReference, String version, Scope scope, String indent, StringBuilder bom) {
+    private static void writeComponent(Pom pom, String bomReference, String version, Scope scope, StringBuilder bom) {
         String type = "library";
         if (pom.getPackaging().equals("war") || pom.getPackaging().equals("ear")) {
             type = "application";
         }
-        bom.append(indent).append("<component bom-ref=\"").append(bomReference).append("\" type=\"library\">\n");
+        String indent = "        ";
+        bom.append(indent).append("<component bom-ref=\"").append(bomReference).append("\" type=\"").append(type).append("\">\n");
         bom.append(indent).append("    <group>").append(pom.getGroupId()).append("</group>\n");
         bom.append(indent).append("    <name>").append(pom.getArtifactId()).append("</name>\n");
         bom.append(indent).append("    <version>").append(version).append("</version>\n");
@@ -185,16 +195,16 @@ public final class PrintMavenAsCycloneDxBom {
         return "pkg:maven/" + group + "/" + artifactId + "@" + version + "?type=jar";
     }
 
-    private static Map<String, Pom.Dependency> traverseDependencies(Collection<Pom.Dependency> dependencies, final Map<String, Pom.Dependency> dependencyMap) {
+    private static Map<DependencyKey, Pom.Dependency> traverseDependencies(Collection<Pom.Dependency> dependencies, final Map<DependencyKey, Pom.Dependency> dependencyMap) {
         if (dependencies == null) {
             return dependencyMap;
         }
         dependencies.stream()
                 .filter(PrintMavenAsCycloneDxBom::isDependencyInScope)
                 .forEach(d -> {
-                    String bomReference = getBomReference(d.getGroupId(), d.getArtifactId(), d.getVersion());
-                    if (!dependencyMap.containsKey(bomReference)) {
-                        dependencyMap.put(bomReference, d);
+                    DependencyKey key = getDependencyKey(d);
+                    if (!dependencyMap.containsKey(key)) {
+                        dependencyMap.put(key, d);
                         traverseDependencies(d.getModel().getDependencies() , dependencyMap);
                     }
                 });
@@ -204,4 +214,17 @@ public final class PrintMavenAsCycloneDxBom {
     private static boolean isDependencyInScope(Pom.Dependency dependency) {
         return !dependency.isOptional() && dependency.getScope() != Scope.Test;
     }
+
+    private static DependencyKey getDependencyKey(Pom.Dependency dependency) {
+        return new DependencyKey(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), dependency.getExclusions());
+    }
+
+    @Value
+    static class DependencyKey {
+        String groupId;
+        String artifactId;
+        String version;
+        Set<GroupArtifact> exclusions;
+    }
+
 }
