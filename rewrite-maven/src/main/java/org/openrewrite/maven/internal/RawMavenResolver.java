@@ -630,7 +630,6 @@ public class RawMavenResolver {
         @EqualsAndHashCode.Include
         RawMaven rawMaven;
 
-        @EqualsAndHashCode.Include
         @Nullable
         Set<GroupArtifact> exclusions;
 
@@ -644,7 +643,6 @@ public class RawMavenResolver {
         @EqualsAndHashCode.Include
         String type;
 
-        @EqualsAndHashCode.Include
         @Nullable
         String requestedVersion;
 
