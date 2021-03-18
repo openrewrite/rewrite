@@ -233,6 +233,10 @@ public class RawMavenResolver {
                         return null;
                     }
 
+                    if(dep.getOptional() != null && dep.getOptional() && task.getProjectPom() != null) {
+                        return null;
+                    }
+
                     int i = 0;
                     String last;
 
