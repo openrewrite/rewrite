@@ -152,31 +152,38 @@ public class RawMavenResolver {
             }
             assert d.getVersion() != null;
 
-            String groupId = partialMaven.getValue(d.getGroupId());
-            String artifactId = partialMaven.getValue(d.getArtifactId());
-            String version = partialMaven.getValue(d.getVersion());
+            String groupId = partialMaven.getRequiredValue(d.getGroupId());
+            String artifactId = partialMaven.getRequiredValue(d.getArtifactId());
+            String version = partialMaven.getValue(d.getVersion(), false);
 
-            if (groupId == null || artifactId == null || version == null) {
+            if (groupId == null || artifactId == null) {
                 ctx.getOnError().accept(new MavenParsingException(
-                        "Problem with dependencyManagement section of %s:%s:%s. Unable to determine groupId, " +
-                                "artifactId, or version of managed dependency %s:%s.",
+                        "Problem with dependencyManagement section of %s:%s:%s. Unable to determine groupId or " +
+                                "artifactId of managed dependency %s:%s.",
                         pom.getGroupId(), pom.getArtifactId(), pom.getVersion(), d.getGroupId(), d.getArtifactId()));
             }
             assert groupId != null;
             assert artifactId != null;
-            assert version != null;
 
             // https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#importing-dependencies
             if (Objects.equals(d.getType(), "pom") && Objects.equals(d.getScope(), "import")) {
-                RawMaven rawMaven = downloader.download(groupId, artifactId, version, null, null,
-                        partialMaven.getRepositories(), ctx);
-                if (rawMaven != null) {
-                    Pom maven = new RawMavenResolver(downloader, activeProfiles, resolveOptional, ctx, projectDir)
-                            .resolve(rawMaven, Scope.Compile, d.getVersion(), new HashMap<>(), partialMaven.getRepositories());
+                if(version == null) {
+                    ctx.getOnError().accept(new MavenParsingException(
+                            "Problem with dependencyManagement section of %s:%s:%s. Unable to determine version of " +
+                                    "managed dependency %s:%s.",
+                            pom.getGroupId(), pom.getArtifactId(), pom.getVersion(), d.getGroupId(), d.getArtifactId()));
+                }
+                else {
+                    RawMaven rawMaven = downloader.download(groupId, artifactId, version, null, null,
+                            partialMaven.getRepositories(), ctx);
+                    if (rawMaven != null) {
+                        Pom maven = new RawMavenResolver(downloader, activeProfiles, resolveOptional, ctx, projectDir)
+                                .resolve(rawMaven, Scope.Compile, d.getVersion(), new HashMap<>(), partialMaven.getRepositories());
 
-                    if (maven != null) {
-                        managedDependencies.add(new DependencyManagementDependency.Imported(groupId, artifactId,
-                                version, d.getVersion(), maven));
+                        if (maven != null) {
+                            managedDependencies.add(new DependencyManagementDependency.Imported(groupId, artifactId,
+                                    version, d.getVersion(), maven));
+                        }
                     }
                 }
             } else {
@@ -209,8 +216,8 @@ public class RawMavenResolver {
                 .filter(dep -> rawMaven.isProjectPom() || (resolveOptional || dep.getOptional() == null || !dep.getOptional()))
                 .map(dep -> {
                     // replace property references, source versions from dependency management sections, etc.
-                    String groupId = partialMaven.getValue(dep.getGroupId());
-                    String artifactId = partialMaven.getValue(dep.getArtifactId());
+                    String groupId = partialMaven.getRequiredValue(dep.getGroupId());
+                    String artifactId = partialMaven.getRequiredValue(dep.getArtifactId());
 
                     RawPom includingPom = rawMaven.getPom();
                     if (groupId == null) {
@@ -258,7 +265,7 @@ public class RawMavenResolver {
                         last = managedVersion;
                         String result = null;
                         if (last != null) {
-                            String partialMavenVersion = partialMaven.getValue(last);
+                            String partialMavenVersion = partialMaven.getRequiredValue(last);
                             if (partialMavenVersion != null) {
                                 result = partialMavenVersion;
                             }
@@ -267,8 +274,8 @@ public class RawMavenResolver {
                             OUTER:
                             for (DependencyManagementDependency managed : partialMaven.getDependencyManagement().getDependencies()) {
                                 for (DependencyDescriptor dependencyDescriptor : managed.getDependencies()) {
-                                    if (groupId.equals(partialMaven.getValue(dependencyDescriptor.getGroupId())) &&
-                                            artifactId.equals(partialMaven.getValue(dependencyDescriptor.getArtifactId()))) {
+                                    if (groupId.equals(partialMaven.getRequiredValue(dependencyDescriptor.getGroupId())) &&
+                                            artifactId.equals(partialMaven.getRequiredValue(dependencyDescriptor.getArtifactId()))) {
                                         result = dependencyDescriptor.getVersion();
                                         break OUTER;
                                     }
@@ -286,8 +293,8 @@ public class RawMavenResolver {
                     //version and it is not a transitive dependency of a managed dependency, the artifact
                     //version "wins" over the managed dependency.
 
-                    String version = partialMaven.getValue(dep.getVersion());
-                    managedVersion = partialMaven.getValue(managedVersion);
+                    String version = partialMaven.getRequiredValue(dep.getVersion());
+                    managedVersion = partialMaven.getRequiredValue(managedVersion);
 
                     if((task.getProjectPom() != null || version == null) && managedVersion != null) {
                         version = managedVersion;
@@ -301,7 +308,7 @@ public class RawMavenResolver {
 
                     //Resolve the dependency scope. if the scope is set in the pom, it take precedence over the
                     //managed scope. This allows a downstream pom to override the managed scope.
-                    String scope = dep.getScope() != null ? partialMaven.getValue(dep.getScope()) : null;
+                    String scope = dep.getScope() != null ? partialMaven.getRequiredValue(dep.getScope()) : null;
 
                     if (scope == null) {
 
@@ -311,7 +318,7 @@ public class RawMavenResolver {
                             last = scope;
                             String result = null;
                             if (last != null) {
-                                String partialMavenScope = partialMaven.getValue(last);
+                                String partialMavenScope = partialMaven.getRequiredValue(last);
                                 if (partialMavenScope != null) {
                                     result = partialMavenScope;
                                 }
@@ -359,8 +366,8 @@ public class RawMavenResolver {
                                     emptySet() :
                                     dep.getExclusions().stream()
                                             .map(ex -> new GroupArtifact(
-                                                    partialMaven.getValue(ex.getGroupId()),
-                                                    partialMaven.getValue(ex.getArtifactId())
+                                                    partialMaven.getRequiredValue(ex.getGroupId()),
+                                                    partialMaven.getRequiredValue(ex.getArtifactId())
                                             ))
                                             .map(ex -> new GroupArtifact(
                                                     ex.getGroupId() == null ? ".*" : ex.getGroupId().replace("*", ".*"),
@@ -602,7 +609,7 @@ public class RawMavenResolver {
         if (repo == null) {
             return null;
         }
-        String url = partialMaven.getValue(repo.getUrl());
+        String url = partialMaven.getRequiredValue(repo.getUrl());
         return url == null ? null : processRepository(repo.withUrl(url));
     }
 
@@ -722,15 +729,8 @@ public class RawMavenResolver {
             return allRepositories;
         }
 
-        /**
-         * Recursively substitutes properties for their values until the value is no longer
-         * a property reference.
-         *
-         * @param v The starting value, which may or may not be a property reference.
-         * @return A fixed value or <code>null</code> if the referenced property cannot be found.
-         */
         @Nullable
-        public String getValue(@Nullable String v) {
+        public String getValue(@Nullable String v, boolean required) {
             if (v == null) {
                 return null;
             }
@@ -779,14 +779,29 @@ public class RawMavenResolver {
                         return value;
                     }
 
-                    ctx.getOnError().accept(new MavenParsingException("Unable to resolve property %s. Including POM is at %s", v, rawPom));
-
+                    if(required) {
+                        ctx.getOnError().accept(new MavenParsingException("Unable to resolve property %s. Including POM is at %s", v, rawPom));
+                    }
                     return null;
                 });
             } catch (Throwable t) {
-                ctx.getOnError().accept(new MavenParsingException("Unable to resolve property %s. Including POM is at %s", v, rawPom));
+                if(required) {
+                    ctx.getOnError().accept(new MavenParsingException("Unable to resolve property %s. Including POM is at %s", v, rawPom));
+                }
                 return null;
             }
+        }
+
+        /**
+         * Recursively substitutes properties for their values until the value is no longer
+         * a property reference.
+         *
+         * @param v The starting value, which may or may not be a property reference.
+         * @return A fixed value or <code>null</code> if the referenced property cannot be found.
+         */
+        @Nullable
+        public String getRequiredValue(@Nullable String v) {
+            return getValue(v, true);
         }
     }
 
