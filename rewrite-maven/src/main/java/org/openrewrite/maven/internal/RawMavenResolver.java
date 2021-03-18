@@ -403,7 +403,8 @@ public class RawMavenResolver {
                 parentPomSightings = new LinkedHashSet<>(task.getSeenParentPoms());
             }
 
-            PartialTreeKey gav = new PartialTreeKey(rawParent.getGroupId(), rawParent.getArtifactId(), rawParent.getVersion());
+            PartialTreeKey gav = new PartialTreeKey(rawParent.getGroupId(), rawParent.getArtifactId(), rawParent.getVersion(),
+                    task.getExclusions());
             if (parentPomSightings.contains(gav)) {
                 ctx.getOnError().accept(new MavenParsingException("Cycle in parent poms detected: " + gav.getGroupId() + ":" + gav.getArtifactId() + ":" + gav.getVersion() + " is its own parent by way of these poms:\n" + parentPomSightings.stream()
                         .map(it -> it.groupId + ":" + it.getArtifactId() + ":" + it.getVersion())
@@ -417,7 +418,8 @@ public class RawMavenResolver {
                     rawParent.getVersion(), rawParent.getRelativePath(), rawMaven,
                     partialMaven.getRepositories(), ctx);
             if (rawParentModel != null) {
-                PartialTreeKey parentKey = new PartialTreeKey(rawParent.getGroupId(), rawParent.getArtifactId(), rawParent.getVersion());
+                PartialTreeKey parentKey = new PartialTreeKey(rawParent.getGroupId(), rawParent.getArtifactId(), rawParent.getVersion(),
+                        task.getExclusions());
                 Optional<Pom> maybeParent = resolved.get(parentKey);
 
                 //noinspection OptionalAssignedToNull
@@ -467,7 +469,8 @@ public class RawMavenResolver {
 
         RawMaven rawMaven = task.getRawMaven();
         RawPom rawPom = rawMaven.getPom();
-        PartialTreeKey taskKey = new PartialTreeKey(rawPom.getGroupId(), rawPom.getArtifactId(), rawPom.getVersion());
+        PartialTreeKey taskKey = new PartialTreeKey(rawPom.getGroupId(), rawPom.getArtifactId(), rawPom.getVersion(),
+                task.getExclusions());
 
         Optional<Pom> result = resolved.get(taskKey);
 
@@ -477,6 +480,9 @@ public class RawMavenResolver {
 
         //noinspection OptionalAssignedToNull
         if (result == null) {
+            List<ResolutionTask> hibernateCores = partialResults.keySet().stream().filter(r -> r.getRawMaven().getPom().getArtifactId().equals("hibernate-core"))
+                    .collect(toList());
+
             PartialMaven partial = partialResults.get(task);
             if (partial != null) {
                 List<Pom.Dependency> dependencies = partial.getDependencyTasks().stream()
@@ -620,10 +626,9 @@ public class RawMavenResolver {
         }
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-    @Data
-    private static class ResolutionTask {
+    @Value
+    public static class ResolutionTask {
         @EqualsAndHashCode.Include
         Scope scope;
 
@@ -670,13 +675,12 @@ public class RawMavenResolver {
         }
     }
 
-    // FIXME may be able to eliminate this and go straight to ResolutionTask as the key
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
+    @Value
     static class PartialTreeKey {
         String groupId;
         String artifactId;
         String version;
+        Set<GroupArtifact> exclusions;
     }
 
     @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -684,9 +688,10 @@ public class RawMavenResolver {
     @RequiredArgsConstructor
     @Getter
     @Setter
-    class PartialMaven {
+    public class PartialMaven {
         @EqualsAndHashCode.Include
         final RawPom rawPom;
+
         Pom parent;
         Pom.DependencyManagement dependencyManagement;
         Collection<ResolutionTask> dependencyTasks = emptyList();

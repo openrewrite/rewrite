@@ -392,7 +392,7 @@ class MavenDependencyResolutionIntegTest {
         // This asserts that the versions match Maven's expectation
         val expected = javaClass.getResource("/springBootParentExpected.txt").readText()
         assertThat(printTreeRecursive(parse(pom).model, false))
-                .isEqualTo(expected)
+            .isEqualTo(expected)
     }
 
     @Test
@@ -488,7 +488,7 @@ class MavenDependencyResolutionIntegTest {
         // This asserts that the versions match Maven's expectation
         val importDependenciesExpected = javaClass.getResource("/importDependenciesExpected.txt").readText()
         assertThat(printTreeRecursive(parse(pom).model, false))
-                .isEqualTo(importDependenciesExpected)
+            .isEqualTo(importDependenciesExpected)
     }
 
     @Test
@@ -710,11 +710,42 @@ class MavenDependencyResolutionIntegTest {
         assertDependencyResolutionEqualsAether(tempDir, singleDependencyPom("net.openhft:lang:6.6.2"))
     }
 
+    @Test
+    fun jbossTransaction(@TempDir tempDir: Path) {
+        assertDependencyResolutionEqualsAether(
+            tempDir,
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-dependencies</artifactId>
+                        <version>2.2.11.RELEASE</version>
+                        <relativePath/> 
+                    </parent>
+                    <groupId>com.foo</groupId>
+                    <artifactId>test</artifactId>
+                    <version>1</version>
+                    <name>test</name>
+                
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.hibernate</groupId> 
+                            <artifactId>hibernate-core</artifactId>
+                            <version>5.4.28.Final</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+        )
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/346")
     @Test
     fun sampleApp(@TempDir tempDir: Path) {
-        assertDependencyResolutionEqualsAether(tempDir,
-        """
+        assertDependencyResolutionEqualsAether(
+            tempDir,
+            """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
                     <parent>
@@ -856,15 +887,16 @@ class MavenDependencyResolutionIntegTest {
                         </dependencies>
                     </dependencyManagement>
                 </project>
-                """)
+                """
+        )
     }
 
     fun parse(pom: String) = MavenParser.builder()
-            .cache(mavenCache)
-            .resolveOptional(false)
-            .build()
-            .parse(executionContext, pom)
-            .first()
+        .cache(mavenCache)
+        .resolveOptional(false)
+        .build()
+        .parse(executionContext, pom)
+        .first()
 
     private fun assertDependencyResolutionEqualsAether(tempDir: Path, pom: String, ignoreScopes: Boolean = false) {
         val pomFile = tempDir.resolve("pom.xml").toFile().apply { writeText(pom) }

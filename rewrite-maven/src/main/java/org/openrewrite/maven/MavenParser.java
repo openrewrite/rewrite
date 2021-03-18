@@ -126,9 +126,13 @@ public class MavenParser implements Parser<Maven> {
     public static class Builder {
         private MavenPomCache mavenPomCache = new InMemoryMavenPomCache();
         private final Collection<String> activeProfiles = new HashSet<>();
-        private boolean resolveOptional = true;
+        private boolean resolveOptional = false;
 
-        public Builder resolveOptional(@Nullable Boolean optional) {
+        /**
+         * @deprecated When we are confident in optional depedency resolution in general, we can remove this flag and
+         * all its effects.
+         */
+        Builder resolveOptional(@Nullable Boolean optional) {
             this.resolveOptional = optional == null || optional;
             return this;
         }

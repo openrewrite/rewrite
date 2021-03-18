@@ -44,7 +44,10 @@ public interface DependencyManagementDependency {
             DependencyDescriptor {
         String groupId;
         String artifactId;
+
+        @Nullable
         String version;
+
         String requestedVersion;
 
         @Nullable
