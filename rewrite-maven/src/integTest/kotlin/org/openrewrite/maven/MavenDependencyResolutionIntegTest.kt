@@ -632,6 +632,30 @@ class MavenDependencyResolutionIntegTest {
     }
 
     @Test
+    fun tomcatExclusion(@TempDir tempDir: Path) {
+        assertDependencyResolutionEqualsAether(
+            tempDir,
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.foo</groupId>
+                    <artifactId>test</artifactId>
+                    <version>1</version>
+                    <name>test</name>
+                
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter-tomcat</artifactId>
+                            <version>2.2.11.RELEASE</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+        )
+    }
+
+    @Test
     fun hibernateCore(@TempDir tempDir: Path) {
         assertDependencyResolutionEqualsAether(
             tempDir,

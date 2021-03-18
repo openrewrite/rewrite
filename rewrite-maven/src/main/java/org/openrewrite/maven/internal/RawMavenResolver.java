@@ -362,21 +362,29 @@ public class RawMavenResolver {
                         return null;
                     }
 
+                    Set<GroupArtifact> exclusions;
+                    if (dep.getExclusions() == null) {
+                        exclusions = task.getExclusions();
+                    }
+                    else {
+                        exclusions = new HashSet<>(task.getExclusions());
+                        for (GroupArtifact ex : dep.getExclusions()) {
+                            GroupArtifact groupArtifact = new GroupArtifact(
+                                    partialMaven.getRequiredValue(ex.getGroupId()),
+                                    partialMaven.getRequiredValue(ex.getArtifactId())
+                            );
+                            GroupArtifact artifact = new GroupArtifact(
+                                    groupArtifact.getGroupId() == null ? ".*" : groupArtifact.getGroupId().replace("*", ".*"),
+                                    groupArtifact.getArtifactId() == null ? ".*" : groupArtifact.getArtifactId().replace("*", ".*")
+                            );
+                            exclusions.add(artifact);
+                        }
+                    }
+
                     ResolutionTask resolutionTask = new ResolutionTask(
                             requestedScope,
                             download,
-                            dep.getExclusions() == null ?
-                                    emptySet() :
-                                    dep.getExclusions().stream()
-                                            .map(ex -> new GroupArtifact(
-                                                    partialMaven.getRequiredValue(ex.getGroupId()),
-                                                    partialMaven.getRequiredValue(ex.getArtifactId())
-                                            ))
-                                            .map(ex -> new GroupArtifact(
-                                                    ex.getGroupId() == null ? ".*" : ex.getGroupId().replace("*", ".*"),
-                                                    ex.getArtifactId() == null ? ".*" : ex.getArtifactId().replace("*", ".*")
-                                            ))
-                                            .collect(Collectors.toSet()),
+                            exclusions,
                             dep.getOptional() != null && dep.getOptional(),
                             dep.getClassifier(),
                             dep.getType(),
