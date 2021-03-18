@@ -480,9 +480,6 @@ public class RawMavenResolver {
 
         //noinspection OptionalAssignedToNull
         if (result == null) {
-            List<ResolutionTask> hibernateCores = partialResults.keySet().stream().filter(r -> r.getRawMaven().getPom().getArtifactId().equals("hibernate-core"))
-                    .collect(toList());
-
             PartialMaven partial = partialResults.get(task);
             if (partial != null) {
                 List<Pom.Dependency> dependencies = partial.getDependencyTasks().stream()
@@ -635,6 +632,7 @@ public class RawMavenResolver {
         @EqualsAndHashCode.Include
         RawMaven rawMaven;
 
+        @EqualsAndHashCode.Include
         @Nullable
         Set<GroupArtifact> exclusions;
 
@@ -648,6 +646,7 @@ public class RawMavenResolver {
         @EqualsAndHashCode.Include
         String type;
 
+        @EqualsAndHashCode.Include
         @Nullable
         String requestedVersion;
 
