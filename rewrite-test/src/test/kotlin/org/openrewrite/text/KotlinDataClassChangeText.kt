@@ -29,10 +29,10 @@ data class KotlinDataClassChangeText (
 ) : Recipe() {
     override fun getDisplayName(): String = name
     override fun getTags() = mutableSetOf("plain text")
-    override fun getVisitor(): TreeVisitor<PlainText, ExecutionContext> = ChangeTextVisitor(toText!!)
+    override fun getVisitor(): PlainTextVisitor<ExecutionContext> = ChangeTextVisitor(toText!!)
     override fun validate(): Validated = Validated.required("toText", toText)
 
-    private class ChangeTextVisitor(val toText: String) : TreeVisitor<PlainText, ExecutionContext>() {
+    private class ChangeTextVisitor(val toText: String) : PlainTextVisitor<ExecutionContext>() {
         override fun preVisit(tree: PlainText, ctx: ExecutionContext?): PlainText {
             return tree.withText(toText)
         }

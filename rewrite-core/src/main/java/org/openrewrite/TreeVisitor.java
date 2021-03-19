@@ -131,14 +131,17 @@ public abstract class TreeVisitor<T extends Tree, P> {
 
         setCursor(new Cursor(cursor, tree));
 
-        @SuppressWarnings("unchecked") T t = preVisit((T) tree, p);
-        if (t != null) {
-            t = t.accept(this, p);
+        T t = null;
+        if(tree.isAcceptable(this, p)) {
+            //noinspection unchecked
+            t = preVisit((T) tree, p);
+            if (t != null) {
+                t = t.accept(this, p);
+            }
+            if (t != null) {
+                t = postVisit(t, p);
+            }
         }
-        if (t != null) {
-            t = postVisit(t, p);
-        }
-
         setCursor(cursor.getParent());
 
         if (topLevel) {

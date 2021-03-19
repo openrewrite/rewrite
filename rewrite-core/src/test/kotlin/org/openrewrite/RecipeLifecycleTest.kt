@@ -17,9 +17,15 @@ package org.openrewrite
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.parallel.Execution
 import org.openrewrite.Tree.randomId
+import org.openrewrite.marker.Markable
 import org.openrewrite.marker.Markers
 import org.openrewrite.text.PlainText
+import org.openrewrite.text.PlainTextVisitor
+import java.lang.RuntimeException
+import java.nio.file.Path
+import java.util.*
 
 class RecipeLifecycleTest {
     @Test
@@ -62,8 +68,8 @@ class RecipeLifecycleTest {
                 return name
             }
 
-            override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
-                return object: TreeVisitor<PlainText, ExecutionContext>() {
+            override fun getVisitor(): PlainTextVisitor<ExecutionContext> {
+                return object: PlainTextVisitor<ExecutionContext>() {
                     override fun visit(tree: Tree?, p: ExecutionContext): PlainText? = null
                 }
 
@@ -72,5 +78,48 @@ class RecipeLifecycleTest {
         }.run(listOf(PlainText(randomId(), Markers.EMPTY, "test")))
 
         assertThat(results.map { it.recipesThatMadeChanges.map { r -> r.name }.first() }).containsExactly("test.DeletingRecipe")
+    }
+
+    @Suppress("USELESS_IS_CHECK")
+    class FooVisitor<P> : TreeVisitor<FooSource, P>() {
+
+        override fun preVisit(tree: FooSource, p: P): FooSource {
+            if(tree !is FooSource) {
+                throw RuntimeException("tree is not a FooSource")
+            }
+            return tree;
+        }
+
+        override fun postVisit(tree: FooSource, p: P): FooSource {
+            if(tree !is FooSource) {
+                throw RuntimeException("tree is not a FooSource")
+            }
+            return tree;
+        }
+    }
+
+    class FooSource : SourceFile {
+        override fun <P : Any?> isAcceptable(v: TreeVisitor<*, P>, p: P) = v is FooVisitor
+
+        override fun getMarkers(): Markers = throw NotImplementedError()
+        override fun <M : Markable?> withMarkers(markers: Markers): M = throw NotImplementedError()
+        override fun getId(): UUID = throw NotImplementedError()
+        override fun <P : Any?> print(printer: TreePrinter<P>, p: P) = throw NotImplementedError()
+        override fun getSourcePath() = throw NotImplementedError()
+    }
+
+    // https://github.com/openrewrite/rewrite/issues/389
+    @Test
+    fun sourceFilesAcceptOnlyApplicableVisitors() {
+        val sources = listOf(FooSource(), PlainText(randomId(), Markers.build(listOf()), "Hello"))
+        val fooVisitor = FooVisitor<ExecutionContext>()
+        val textVisitor = PlainTextVisitor<ExecutionContext>()
+        val ctx = InMemoryExecutionContext {
+            throw it
+        }
+        sources.forEach {
+            fooVisitor.visit(it, ctx)
+            textVisitor.visit(it, ctx)
+        }
     }
 }

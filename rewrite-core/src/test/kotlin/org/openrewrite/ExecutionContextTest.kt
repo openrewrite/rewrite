@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Tree.randomId
 import org.openrewrite.marker.Markers
 import org.openrewrite.text.PlainText
+import org.openrewrite.text.PlainTextVisitor
 
 class ExecutionContextTest {
     @Test
@@ -31,8 +32,8 @@ class ExecutionContextTest {
                 return name
             }
 
-            override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
-                return object : TreeVisitor<PlainText, ExecutionContext>() {
+            override fun getVisitor(): PlainTextVisitor<ExecutionContext> {
+                return object : PlainTextVisitor<ExecutionContext>() {
                     override fun visit(tree: Tree?, p: ExecutionContext): PlainText? {
                         if(p.pollMessage<String>("test") == null) {
                             p.putMessage("test", "test")

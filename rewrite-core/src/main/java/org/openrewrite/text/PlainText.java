@@ -18,6 +18,7 @@ package org.openrewrite.text;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.Markers;
 
 import java.nio.file.Path;
@@ -38,6 +39,11 @@ public class PlainText implements SourceFile, Tree {
         this.id = id;
         this.markers = markers;
         this.text = text;
+    }
+
+    @Override
+    public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
+        return v instanceof PlainTextVisitor;
     }
 
     @Override

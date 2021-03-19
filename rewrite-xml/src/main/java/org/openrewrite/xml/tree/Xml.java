@@ -60,6 +60,11 @@ public interface Xml extends Serializable, Tree {
         return v.defaultValue(this, p);
     }
 
+    @Override
+    default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
+        return v instanceof XmlVisitor;
+    }
+
     default <P> String print(TreePrinter<P> printer, P p) {
         return new XmlPrinter<>(printer).print(this, p);
     }

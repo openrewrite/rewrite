@@ -146,6 +146,11 @@ public class Maven extends Xml.Document {
     }
 
     @Override
+    public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
+        return v instanceof XmlVisitor;
+    }
+
+    @Override
     public Maven withRoot(Tag root) {
         Document m = super.withRoot(root);
         if (m instanceof Maven) {

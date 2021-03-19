@@ -52,8 +52,12 @@ public interface Properties extends Serializable, Tree {
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
-        return v instanceof PropertiesVisitor ?
-                (R) acceptProperties((PropertiesVisitor<P>) v, p) : v.defaultValue(this, p);
+        return (R) acceptProperties((PropertiesVisitor<P>) v, p);
+    }
+
+    @Override
+    default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
+        return v instanceof PropertiesVisitor;
     }
 
     @Nullable

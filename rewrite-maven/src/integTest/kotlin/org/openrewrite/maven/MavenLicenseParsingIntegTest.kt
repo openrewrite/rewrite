@@ -66,7 +66,6 @@ class MavenLicenseParsingIntegTest {
 
         val pomAst: Maven = MavenParser.builder()
                 .cache(mavenCache)
-                .resolveOptional(false)
                 .build()
                 .parse(listOf(pomFile.toPath()), null, InMemoryExecutionContext())
                 .first()

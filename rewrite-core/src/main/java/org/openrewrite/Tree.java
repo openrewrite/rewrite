@@ -58,6 +58,17 @@ public interface Tree extends Markable {
         return v.defaultValue(this, p);
     }
 
+    /**
+     * Checks the supplied argument to see if the supplied visitor and its context would be valid arguments
+     * to accept().
+     * Typically this involves checking that the visitor is of a type that operates on this kind of tree.
+     * e.g.: A Java Tree implementation would return true for JavaVisitors and false for MavenVisitors
+     *
+     * @param <P> the visitor's context argument
+     * @return 'true' if the arguments to this function would be valid arguments to accept()
+     */
+    <P> boolean isAcceptable(TreeVisitor<?, P> v, P p);
+
     <P> String print(TreePrinter<P> printer, P p);
 
     default <P> String print(P p) {

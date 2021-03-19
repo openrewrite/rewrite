@@ -34,7 +34,7 @@ import org.openrewrite.maven.tree.Scope
 import java.nio.file.Paths
 
 class MavenParserTest {
-    private val parser = MavenParser.builder().resolveOptional(false).build()
+    private val parser = MavenParser.builder().build()
     private val ctx = InMemoryExecutionContext { t -> throw t }
 
     @Test
@@ -264,7 +264,6 @@ class MavenParserTest {
     @Test
     fun selfRecursiveParent() {
         MavenParser.builder()
-            .resolveOptional(false)
             .build()
             .parse(
                 """
@@ -289,7 +288,6 @@ class MavenParserTest {
     @Test
     fun selfRecursiveDependency() {
         val maven = MavenParser.builder()
-            .resolveOptional(false)
             .build()
             .parse(
                 """
@@ -731,7 +729,6 @@ class MavenParserTest {
     @Test
     fun parseNotInProfileActivation() {
         MavenParser.builder()
-            .resolveOptional(false)
             .build()
             .parse(
                 """
@@ -755,7 +752,6 @@ class MavenParserTest {
     @Test
     fun parentPomProfileProperty() {
         val maven = MavenParser.builder()
-            .resolveOptional(false)
             .build()
             .parse(
                 """
@@ -821,7 +817,6 @@ class MavenParserTest {
         // b-parent manages version of d to 0.2
         // Therefore the version of b that wins is 0.1
         val a = MavenParser.builder()
-            .resolveOptional(false)
             .build()
             .parse(
                 """

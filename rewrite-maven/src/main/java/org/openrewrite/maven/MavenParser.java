@@ -129,7 +129,7 @@ public class MavenParser implements Parser<Maven> {
         private boolean resolveOptional = false;
 
         /**
-         * @deprecated When we are confident in optional depedency resolution in general, we can remove this flag and
+         * @deprecated When we are confident in optional dependency resolution in general, we can remove this flag and
          * all its effects.
          */
         Builder resolveOptional(@Nullable Boolean optional) {

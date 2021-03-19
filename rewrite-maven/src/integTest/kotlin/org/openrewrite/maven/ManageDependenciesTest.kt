@@ -28,7 +28,6 @@ class ManageDependenciesTest : RecipeTest {
     }
 
     override val parser: Parser<Maven> = MavenParser.builder()
-        .resolveOptional(false)
         .cache(mavenCache)
         .build()
 

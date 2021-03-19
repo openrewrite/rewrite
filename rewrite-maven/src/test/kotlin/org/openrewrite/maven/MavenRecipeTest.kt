@@ -27,7 +27,6 @@ interface MavenRecipeTest : RecipeTest {
 
     override val parser: Parser<*>?
         get() = MavenParser.builder()
-            .resolveOptional(false)
             .cache(mavenCache)
             .build()
 

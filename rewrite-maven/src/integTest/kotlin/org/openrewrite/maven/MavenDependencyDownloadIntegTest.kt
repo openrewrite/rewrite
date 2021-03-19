@@ -47,7 +47,6 @@ class MavenDependencyDownloadIntegTest {
     @Test
     fun springWebMvc(@TempDir tempDir: Path) {
         val maven: Maven = MavenParser.builder()
-            .resolveOptional(false)
             .build()
             .parse(ctx, singleDependencyPom("org.springframework:spring-webmvc:5.3.2"))
             .first()
@@ -67,7 +66,6 @@ class MavenDependencyDownloadIntegTest {
     @Test
     fun rewriteCore(@TempDir tempDir: Path) {
         val maven: Maven = MavenParser.builder()
-            .resolveOptional(false)
             .build()
             .parse(ctx, singleDependencyPom("org.openrewrite:rewrite-core:6.0.1"))
             .first()
