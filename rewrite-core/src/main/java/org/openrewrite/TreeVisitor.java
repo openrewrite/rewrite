@@ -132,7 +132,8 @@ public abstract class TreeVisitor<T extends Tree, P> {
         setCursor(new Cursor(cursor, tree));
 
         T t = null;
-        if(tree.isAcceptable(this, p)) {
+        boolean isAcceptable = tree.isAcceptable(this, p);
+        if(isAcceptable) {
             //noinspection unchecked
             t = preVisit((T) tree, p);
             if (t != null) {
@@ -159,7 +160,8 @@ public abstract class TreeVisitor<T extends Tree, P> {
             afterVisit = null;
         }
 
-        return t;
+        //noinspection unchecked
+        return (isAcceptable) ? t : (T) tree;
     }
 
     @SuppressWarnings("unused")
