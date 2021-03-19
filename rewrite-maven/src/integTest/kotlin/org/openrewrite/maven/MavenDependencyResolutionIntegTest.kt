@@ -43,6 +43,7 @@ import org.openrewrite.Issue
 import org.openrewrite.maven.cache.InMemoryMavenPomCache
 import org.openrewrite.maven.internal.MavenParsingException
 import org.openrewrite.maven.tree.Pom
+import org.openrewrite.maven.tree.Scope
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -228,7 +229,6 @@ class MavenDependencyResolutionIntegTest {
 
         val maven = MavenParser.builder()
             .cache(mavenCache)
-            .resolveOptional(false)
             .build()
             .parse(pom)
             .first()
@@ -915,9 +915,73 @@ class MavenDependencyResolutionIntegTest {
         )
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/322")
+    @Test
+    fun testGetDependencies() {
+        val pomSource = """
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.superbiz.jsf</groupId>
+                <artifactId>jsf-managedBean-and-ejb</artifactId>
+                <packaging>jar</packaging>
+                <version>8.0.5-SNAPSHOT</version>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.junit.jupiter</groupId>
+                            <artifactId>junit-jupiter</artifactId>
+                            <version>5.7.1</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.junit.jupiter</groupId>
+                        <artifactId>junit-jupiter</artifactId>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.junit.jupiter</groupId>
+                        <artifactId>junit-jupiter-api</artifactId>
+                        <version>5.6.3</version>
+                        <scope>test</scope>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.mockito</groupId>
+                        <artifactId>mockito-core</artifactId>
+                        <version>3.7.7</version>
+                        <scope>provided</scope>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.apache.tomee</groupId>
+                        <artifactId>openejb-core-hibernate</artifactId>
+                        <version>8.0.5</version>
+                        <type>pom</type>
+                    </dependency>
+                </dependencies>
+            </project>
+            """
+
+        val mavenParser = MavenParser.builder().build()
+        val mavens = mavenParser.parse(pomSource)
+        val maven = mavens.get(0)
+        val dependencies = maven.getModel().getDependencies()
+
+        assertThat(dependencies).hasSize(4)
+        assertThat(dependencies).anyMatch {
+            it.groupId == "org.junit.jupiter" && it.artifactId == "junit-jupiter" && it.version == "5.7.1" && it.scope == Scope.Test
+        }.anyMatch {
+            it.groupId == "org.junit.jupiter" && it.artifactId == "junit-jupiter-api" && it.version == "5.6.3" && it.scope == Scope.Test
+        }.anyMatch {
+            it.groupId == "org.mockito" && it.artifactId == "mockito-core" && it.version == "3.7.7" && it.scope == Scope.Provided
+        }.anyMatch {
+            it.groupId == "org.apache.tomee" && it.artifactId == "openejb-core-hibernate" && it.version == "8.0.5" && it.type == "pom"
+        }
+    }
+
     fun parse(pom: String) = MavenParser.builder()
         .cache(mavenCache)
-        .resolveOptional(false)
         .build()
         .parse(executionContext, pom)
         .first()
