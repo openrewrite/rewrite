@@ -17,6 +17,7 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.config.Environment
+import org.openrewrite.java.search.FindText
 
 interface FindTextTest : JavaRecipeTest {
 
@@ -52,7 +53,7 @@ interface FindTextTest : JavaRecipeTest {
         recipe = Environment.builder()
             .scanClasspath(emptyList())
             .build()
-            .activateRecipes("org.openrewrite.java.FindSecrets"),
+            .activateRecipes("org.openrewrite.java.search.FindSecrets"),
         before = """
             class Test {
                 String uhOh = "-----BEGIN RSA PRIVATE KEY-----";
