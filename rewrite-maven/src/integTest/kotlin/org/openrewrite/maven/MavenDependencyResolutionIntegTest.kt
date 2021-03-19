@@ -34,7 +34,6 @@ import org.eclipse.aether.internal.impl.DefaultRemoteRepositoryManager
 import org.eclipse.aether.repository.RemoteRepository
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.ExecutionContext
@@ -116,7 +115,6 @@ class MavenDependencyResolutionIntegTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/281")
     @Test
-    @Disabled
     fun jbossJaxbApi(@TempDir tempDir: Path) {
         assertDependencyResolutionEqualsAether(
             tempDir,
@@ -125,7 +123,6 @@ class MavenDependencyResolutionIntegTest {
     }
 
     @Test
-    @Disabled
     fun resteasyCore(@TempDir tempDir: Path) {
         assertDependencyResolutionEqualsAether(
             tempDir,
@@ -135,7 +132,6 @@ class MavenDependencyResolutionIntegTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/346")
     @Test
-    @Disabled
     fun overrideParentVersion(@TempDir tempDir: Path) {
         assertDependencyResolutionEqualsAether(
             tempDir,
