@@ -23,7 +23,8 @@ public class MetricsHelper {
                 .tag("outcome", "success")
                 .tag("exception", "none")
                 .tag("exception.line", "none")
-                .tag("exception.file", "none");
+                .tag("exception.declaring.class", "none")
+                .tag("step", "none");
     }
 
     public static Timer.Builder errorTags(Timer.Builder timer, Throwable t) {
@@ -33,6 +34,7 @@ public class MetricsHelper {
                 .tag("outcome", "error")
                 .tag("exception", t.getClass().getSimpleName())
                 .tag("exception.line", Integer.toString(stackTraceElement.getLineNumber()))
-                .tag("exception.declaring.class", stackTraceElement.getClassName());
+                .tag("exception.declaring.class", stackTraceElement.getClassName())
+                .tag("step", "none");
     }
 }
