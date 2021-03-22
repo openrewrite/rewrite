@@ -18,13 +18,17 @@ package org.openrewrite.internal;
 import io.micrometer.core.instrument.Timer;
 
 public class MetricsHelper {
-    public static Timer.Builder successTags(Timer.Builder timer) {
+    public static Timer.Builder successTags(Timer.Builder timer, String detailedOutcome) {
         return timer
-                .tag("outcome", "success")
+                .tag("outcome", detailedOutcome)
                 .tag("exception", "none")
                 .tag("exception.line", "none")
                 .tag("exception.declaring.class", "none")
                 .tag("step", "none");
+    }
+
+    public static Timer.Builder successTags(Timer.Builder timer) {
+        return successTags(timer, "success");
     }
 
     public static Timer.Builder errorTags(Timer.Builder timer, Throwable t) {
