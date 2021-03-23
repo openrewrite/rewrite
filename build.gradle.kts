@@ -52,30 +52,33 @@ allprojects {
 
 subprojects {
     apply(plugin = "java-library")
-    apply(plugin = "maven-publish")
-    apply(plugin = "signing")
-
-    apply(plugin = "nebula.maven-resolved-dependencies")
     apply(plugin = "org.jetbrains.kotlin.jvm")
-    apply(plugin = "org.gradle.test-retry")
     apply(plugin = "com.github.jk1.dependency-license-report")
 
-    apply(plugin = "nebula.maven-publish")
-    apply(plugin = "nebula.contacts")
-    apply(plugin = "nebula.info")
+    if(!name.contains("benchmark")) {
+        apply(plugin = "maven-publish")
+        apply(plugin = "signing")
 
-    apply(plugin = "nebula.javadoc-jar")
-    apply(plugin = "nebula.source-jar")
-    apply(plugin = "nebula.maven-apache-license")
+        apply(plugin = "nebula.maven-resolved-dependencies")
+        apply(plugin = "org.gradle.test-retry")
 
-    signing {
-        setRequired({
-            !project.version.toString().endsWith("SNAPSHOT") || project.hasProperty("forceSigning")
-        })
-        val signingKey: String? by project
-        val signingPassword: String? by project
-        useInMemoryPgpKeys(signingKey, signingPassword)
-        sign(publishing.publications["nebula"])
+        apply(plugin = "nebula.maven-publish")
+        apply(plugin = "nebula.contacts")
+        apply(plugin = "nebula.info")
+
+        apply(plugin = "nebula.javadoc-jar")
+        apply(plugin = "nebula.source-jar")
+        apply(plugin = "nebula.maven-apache-license")
+
+        signing {
+            setRequired({
+                !project.version.toString().endsWith("SNAPSHOT") || project.hasProperty("forceSigning")
+            })
+            val signingKey: String? by project
+            val signingPassword: String? by project
+            useInMemoryPgpKeys(signingKey, signingPassword)
+            sign(publishing.publications["nebula"])
+        }
     }
 
     repositories {
@@ -135,13 +138,6 @@ subprojects {
         options.compilerArgs.addAll(listOf("--release", "8"))
     }
 
-    configure<ContactsExtension> {
-        val j = Contact("jkschneider@gmail.com")
-        j.moniker("Jonathan Schneider")
-
-        people["jkschneider@gmail.com"] = j
-    }
-
     configure<LicenseExtension> {
         ext.set("year", Calendar.getInstance().get(Calendar.YEAR))
         skipExistingHeaders = true
@@ -171,28 +167,37 @@ subprojects {
         renderers = arrayOf(com.github.jk1.license.render.CsvReportRenderer())
     }
 
-    configure<PublishingExtension> {
-        publications {
-            named("nebula", MavenPublication::class.java) {
-                suppressPomMetadataWarningsFor("runtimeElements")
+    if(!name.contains("benchmark")) {
+        configure<ContactsExtension> {
+            val j = Contact("jkschneider@gmail.com")
+            j.moniker("Jonathan Schneider")
 
-                pom.withXml {
-                    (asElement().getElementsByTagName("dependencies")
-                        .item(0) as org.w3c.dom.Element).let { dependencies ->
-                        dependencies.getElementsByTagName("dependency").let { dependencyList ->
-                            var i = 0
-                            var length = dependencyList.length
-                            while (i < length) {
-                                (dependencyList.item(i) as org.w3c.dom.Element).let { dependency ->
-                                    if ((dependency.getElementsByTagName("scope")
-                                            .item(0) as org.w3c.dom.Element).textContent == "provided"
-                                    ) {
-                                        dependencies.removeChild(dependency)
-                                        i--
-                                        length--
+            people["jkschneider@gmail.com"] = j
+        }
+
+        configure<PublishingExtension> {
+            publications {
+                named("nebula", MavenPublication::class.java) {
+                    suppressPomMetadataWarningsFor("runtimeElements")
+
+                    pom.withXml {
+                        (asElement().getElementsByTagName("dependencies")
+                            .item(0) as org.w3c.dom.Element).let { dependencies ->
+                            dependencies.getElementsByTagName("dependency").let { dependencyList ->
+                                var i = 0
+                                var length = dependencyList.length
+                                while (i < length) {
+                                    (dependencyList.item(i) as org.w3c.dom.Element).let { dependency ->
+                                        if ((dependency.getElementsByTagName("scope")
+                                                .item(0) as org.w3c.dom.Element).textContent == "provided"
+                                        ) {
+                                            dependencies.removeChild(dependency)
+                                            i--
+                                            length--
+                                        }
                                     }
+                                    i++
                                 }
-                                i++
                             }
                         }
                     }
@@ -200,7 +205,6 @@ subprojects {
             }
         }
     }
-
 }
 
 defaultTasks("build")

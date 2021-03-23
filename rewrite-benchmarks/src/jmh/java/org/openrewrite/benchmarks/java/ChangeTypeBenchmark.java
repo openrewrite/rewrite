@@ -22,15 +22,15 @@ import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openrewrite.java.ChangeType;
+import org.openrewrite.java.ChangeType2;
 
-import java.net.URISyntaxException;
 import java.util.concurrent.TimeUnit;
 
 @Fork(1)
 @Measurement(iterations = 2)
 @Warmup(iterations = 2)
-@BenchmarkMode(Mode.AverageTime)
-@OutputTimeUnit(TimeUnit.MILLISECONDS)
+@BenchmarkMode(Mode.SampleTime)
+@OutputTimeUnit(TimeUnit.SECONDS)
 @Threads(16)
 public class ChangeTypeBenchmark {
 
@@ -40,7 +40,13 @@ public class ChangeTypeBenchmark {
             .run(state.getSourceFiles());
     }
 
-    public static void main(String[] args) throws RunnerException, URISyntaxException {
+    @Benchmark
+    public void changeType2(JavaCompilationUnitState state) {
+        new ChangeType2("java.util.List", "java.util.Collection")
+                .run(state.getSourceFiles());
+    }
+
+    public static void main(String[] args) throws RunnerException {
         Options opt = new OptionsBuilder()
                 .include(ChangeTypeBenchmark.class.getSimpleName())
                 .addProfiler(GCProfiler.class)

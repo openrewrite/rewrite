@@ -68,6 +68,7 @@ public class ChangeType extends Recipe {
 
     private class ChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
         private final JavaType targetType;
+        private final JavaType.Class originalType = JavaType.Class.build(oldFullyQualifiedTypeName);
 
         private ChangeTypeVisitor(String targetType) {
             JavaType type = JavaType.Primitive.fromKeyword(targetType);
@@ -147,9 +148,8 @@ public class ChangeType extends Recipe {
             // if the ident's type is equal to the type we're looking for, and the classname of the type we're looking for is equal to the ident's string representation
             // Then transform it, otherwise leave it alone
             J.Identifier i = visitAndCast(ident, ctx, super::visitIdentifier);
-            JavaType.Class original = JavaType.Class.build(oldFullyQualifiedTypeName);
 
-            if (TypeUtils.isOfClassType(i.getType(), oldFullyQualifiedTypeName) && i.getSimpleName().equals(original.getClassName())) {
+            if (TypeUtils.isOfClassType(i.getType(), oldFullyQualifiedTypeName) && i.getSimpleName().equals(originalType.getClassName())) {
                 if (targetType instanceof JavaType.FullyQualified) {
                     i = i.withName(((JavaType.FullyQualified) targetType).getClassName());
                 } else if (targetType instanceof JavaType.Primitive) {
