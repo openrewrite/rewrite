@@ -20,6 +20,7 @@ import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.Parser
 import org.openrewrite.java.tree.J
+import org.openrewrite.java.tree.Statement
 import org.slf4j.LoggerFactory
 import java.util.*
 import java.util.function.Consumer
@@ -187,6 +188,52 @@ interface JavaTemplateTest : JavaRecipeTest {
                     n++;
                     others.add(m);
                     n++;
+                }
+            }
+        """
+    )
+
+    /**
+     * Test to make sure when the current cursor is a parent but the element having the template applied is a child. This
+     * tests that the logic to find the insertion point starts from the cursor rather than the "Changing element"
+     */
+    @Test
+    fun templateOnNestedChild(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val template = template("others.add(#{});")
+                .doAfterVariableSubstitution(logEvent)
+                .doBeforeParseTemplate(logEvent)
+                .build()
+
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
+                val m = super.visitMethodDeclaration(method, p)
+                val statements = m.body!!.statements
+                statements[1] = statements[1].withTemplate(
+                    template,
+                    statements[1].coordinates.replace(),
+                    (m.parameters[0] as J.VariableDeclarations).variables[0]
+                )
+                return m.withBody(m.body!!.withStatements(statements))
+            }
+        }.toRecipe(),
+        before = """
+            import java.util.List;
+            public class A {
+                int n = 0;
+                void foo(String m, List<String> others) {
+                    n++;
+                    n++;
+                }
+            }
+        """,
+        after = """
+            import java.util.List;
+            public class A {
+                int n = 0;
+                void foo(String m, List<String> others) {
+                    n++;
+                    others.add(m);
                 }
             }
         """
@@ -464,11 +511,13 @@ interface JavaTemplateTest : JavaRecipeTest {
                     if (countLetters("fred") == 4) {
                         System.out.println("Letter Count :" + countLetters(name));
                     }
-                    int letterCount = countLetters("fred") == 4 ? countLetters("fred") : 0;
-                    letterCount = countLetters(name) != 3 ? 0 : countLetters(name);
+                    int letterCount = countLetters(name) == 4 ? countLetters("notfred") : countLetters(name);
+                    int letterCount2 = countLetters(name) != 3 ? 0 : countLetters(name);
+                    System.out.println("Letter Count :" + letterCount);
+                    System.out.println("Letter Count :" + letterCount2);
                     String sub = "Fred".substring(0, countLetters("fred"));
-                    Integer count = Integer.valueOf(countLetters("fred"));
                     for (int index = 0; index < countLetters(name); index++) {
+                      letterCount++;
                     }
                     int index = 0;
                     while (index < countLetters(name)) {
@@ -476,6 +525,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                     }
                     switch (countLetters(name)) {
                         case 4:
+                        case 1:
+                        case 2:
                         default:
                             break;
                     }
@@ -514,11 +565,13 @@ interface JavaTemplateTest : JavaRecipeTest {
                     if (withString("fred").length() == 4) {
                         System.out.println("Letter Count :" + withString(name).length());
                     }
-                    int letterCount = withString("fred").length() == 4 ? withString("fred").length() : 0;
-                    letterCount = withString(name).length() != 3 ? 0 : withString(name).length();
+                    int letterCount = withString(name).length() == 4 ? withString("notfred").length() : withString(name).length();
+                    int letterCount2 = withString(name).length() != 3 ? 0 : withString(name).length();
+                    System.out.println("Letter Count :" + letterCount);
+                    System.out.println("Letter Count :" + letterCount2);
                     String sub = "Fred".substring(0, withString("fred").length());
-                    Integer count = Integer.valueOf(withString("fred").length());
                     for (int index = 0; index < withString(name).length(); index++) {
+                      letterCount++;
                     }
                     int index = 0;
                     while (index < withString(name).length()) {
@@ -526,6 +579,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                     }
                     switch (withString(name).length()) {
                         case 4:
+                        case 1:
+                        case 2:
                         default:
                             break;
                     }
@@ -633,7 +688,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 if (a.simpleName.equals("Anno1")) {
                     return a.withTemplate(template, a.coordinates.replace())
                 }
-                return a;
+                return a
             }
         }.toRecipe(),
         before = """
@@ -692,7 +747,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 if (a.simpleName.equals("Deprecated")) {
                     return a.withTemplate(template, a.coordinates.replace())
                 }
-                return a;
+                return a
             }
         }.toRecipe(),
         before = """
@@ -858,7 +913,7 @@ interface JavaTemplateTest : JavaRecipeTest {
             public class A {
                 int n = 0;
                 void foo(String m, List<String> others) {
-                    boolean flag = true;
+                    boolean flag = others.contains(m);
                     List<String> clone;
                     if (flag) {
                         clone.add(m);
@@ -888,7 +943,7 @@ interface JavaTemplateTest : JavaRecipeTest {
             public class A {
                 int n = 0;
                 void foo(String m, List<String> others) {
-                    boolean flag = true;
+                    boolean flag = others.contains(m);
                     List<String> clone;
                     if (flag) {
                         clone.add(m);
@@ -1169,7 +1224,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceMethodDeclarationThrows(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("throws Exception, Throwable")
+            val template = template("throws RuntimeException")
                 .doAfterVariableSubstitution(logEvent)
                 .doBeforeParseTemplate(logEvent)
                 .build()
@@ -1187,7 +1242,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         """,
         after = """
             public class A {
-                void foo() throws Exception, Throwable {
+                void foo() throws RuntimeException {
                 }
             }
         """

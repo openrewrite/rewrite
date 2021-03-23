@@ -345,7 +345,7 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
      */
     public static Cursor findCoordinateCursor(Cursor parentScope, Tree changing, JavaCoordinates coordinates) {
         AtomicReference<Cursor> cursorReference = new AtomicReference<>(parentScope);
-        new ExtractInsertionCursor(coordinates, parentScope).visit(changing, cursorReference);
+        new ExtractInsertionCursor(coordinates, parentScope).visit(parentScope.firstEnclosingOrThrow(J.class), cursorReference);
         return cursorReference.get();
     }
 
