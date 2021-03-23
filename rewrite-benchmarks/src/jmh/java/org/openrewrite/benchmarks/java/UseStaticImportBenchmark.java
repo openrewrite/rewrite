@@ -21,11 +21,7 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.java.ChangeType;
-import org.openrewrite.java.RemoveImport;
+import org.openrewrite.java.UseStaticImport;
 
 import java.util.concurrent.TimeUnit;
 
@@ -33,28 +29,18 @@ import java.util.concurrent.TimeUnit;
 @Measurement(iterations = 2)
 @Warmup(iterations = 2)
 @BenchmarkMode(Mode.SampleTime)
-@OutputTimeUnit(TimeUnit.SECONDS)
+@OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Threads(4)
-public class RemoveImportBenchmark {
+public class UseStaticImportBenchmark {
 
     @Benchmark
-    public void removeImport(JavaCompilationUnitState state) {
-        new Recipe() {
-            @Override
-            public String getDisplayName() {
-                return "Remove Function";
-            }
-
-            @Override
-            protected TreeVisitor<?, ExecutionContext> getVisitor() {
-                return new RemoveImport("java.util.function.Function");
-            }
-        }.run(state.getSourceFiles());
+    public void useStaticImport(JavaCompilationUnitState state) {
+        new UseStaticImport("java.util.List remove(..)").run(state.getSourceFiles());
     }
 
     public static void main(String[] args) throws RunnerException {
         Options opt = new OptionsBuilder()
-                .include(RemoveImportBenchmark.class.getSimpleName())
+                .include(UseStaticImportBenchmark.class.getSimpleName())
                 .addProfiler(GCProfiler.class)
                 .build();
         new Runner(opt).run();

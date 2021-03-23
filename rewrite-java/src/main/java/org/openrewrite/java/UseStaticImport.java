@@ -15,12 +15,14 @@
  */
 package org.openrewrite.java;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
 import org.openrewrite.Option;
+import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
@@ -28,7 +30,10 @@ import org.openrewrite.java.tree.JavaType;
  * This recipe will find any method invocations that match the method pattern, ensure the method is statically imported
  * and convert's the invocation to use the static import by dropping the invocation's select.
  */
-@Value
+@ToString
+@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+@Getter
+@RequiredArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 public class UseStaticImport extends Recipe {
 
@@ -51,20 +56,22 @@ public class UseStaticImport extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new UseStaticImportVisitor(new MethodMatcher(methodPattern));
+        return new UseStaticImportVisitor();
     }
 
-    private static class UseStaticImportVisitor extends JavaIsoVisitor<ExecutionContext> {
-        private final MethodMatcher methodMatcher;
+    @NonFinal
+    @Nullable
+    transient MethodMatcher methodMatcher;
 
-        private UseStaticImportVisitor(MethodMatcher methodMatcher) {
-            this.methodMatcher = methodMatcher;
-        }
-
+    private class UseStaticImportVisitor extends JavaIsoVisitor<ExecutionContext> {
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            if(methodMatcher == null) {
+                methodMatcher = new MethodMatcher(methodPattern);
+            }
+
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if (methodMatcher.matches(m) && m.getSelect() != null) {
+            if (m.getSelect() != null && methodMatcher.matches(m)) {
                 if (m.getType() != null) {
                     JavaType.FullyQualified receiverType = m.getType().getDeclaringType();
                     maybeRemoveImport(receiverType);

@@ -19,20 +19,17 @@ import lombok.Getter;
 import lombok.Setter;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.grammar.AspectJLexer;
 import org.openrewrite.java.internal.grammar.RefactorMethodSignatureParser;
 import org.openrewrite.java.internal.grammar.RefactorMethodSignatureParserBaseVisitor;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.regex.Pattern;
 
 import static java.util.stream.Collectors.joining;
@@ -91,14 +88,12 @@ public class MethodMatcher {
 
         JavaType.Method methodType = (JavaType.Method) type;
 
-        String signaturePattern = methodType.getGenericSignature().getParamTypes().stream()
-                .map(this::typePattern)
-                .filter(Objects::nonNull)
-                .collect(joining(","));
-
         return matchesTargetType(methodType.getDeclaringType()) &&
                 methodNamePattern.matcher(methodType.getName()).matches() &&
-                argumentPattern.matcher(signaturePattern).matches();
+                argumentPattern.matcher(methodType.getGenericSignature().getParamTypes().stream()
+                        .map(this::typePattern)
+                        .filter(Objects::nonNull)
+                        .collect(joining(","))).matches();
     }
 
     public boolean matches(J.MethodDeclaration method, J.ClassDeclaration enclosing) {
@@ -106,27 +101,25 @@ public class MethodMatcher {
             return false;
         }
 
-        String signaturePattern = method.getParameters().stream()
-                .map(v -> {
-                    if (v instanceof J.VariableDeclarations) {
-                        J.VariableDeclarations vd = (J.VariableDeclarations) v;
-                        if (vd.getTypeAsClass() != null) {
-                            return vd.getTypeAsClass();
-                        } else {
-                            return vd.getTypeExpression() != null ? vd.getTypeExpression().getType() : null;
-                        }
-                    } else {
-                        return null;
-                    }
-                })
-                .filter(Objects::nonNull)
-                .map(this::typePattern)
-                .filter(Objects::nonNull)
-                .collect(joining(","));
-
         return matchesTargetType(TypeUtils.asClass(enclosing.getType())) &&
                 methodNamePattern.matcher(method.getSimpleName()).matches() &&
-                argumentPattern.matcher(signaturePattern).matches();
+                argumentPattern.matcher(method.getParameters().stream()
+                        .map(v -> {
+                            if (v instanceof J.VariableDeclarations) {
+                                J.VariableDeclarations vd = (J.VariableDeclarations) v;
+                                if (vd.getTypeAsClass() != null) {
+                                    return vd.getTypeAsClass();
+                                } else {
+                                    return vd.getTypeExpression() != null ? vd.getTypeExpression().getType() : null;
+                                }
+                            } else {
+                                return null;
+                            }
+                        })
+                        .filter(Objects::nonNull)
+                        .map(this::typePattern)
+                        .filter(Objects::nonNull)
+                        .collect(joining(","))).matches();
     }
 
     public boolean matches(J.MethodInvocation method) {
@@ -139,28 +132,28 @@ public class MethodMatcher {
             return false;
         }
 
-        String resolvedSignaturePattern = method.getType().getResolvedSignature().getParamTypes().stream()
-                .map(this::typePattern)
-                .filter(Objects::nonNull)
-                .collect(joining(","));
-
         return matchesTargetType(method.getType().getDeclaringType()) &&
                 methodNamePattern.matcher(method.getSimpleName()).matches() &&
-                argumentPattern.matcher(resolvedSignaturePattern).matches();
+                argumentPattern.matcher(method.getType().getResolvedSignature().getParamTypes().stream()
+                        .map(this::typePattern)
+                        .filter(Objects::nonNull)
+                        .collect(joining(","))).matches();
     }
 
     public boolean matches(J.NewClass constructor) {
         if (constructor.getType() == null) {
             return false;
         }
-        String signaturePattern = Optional.ofNullable(constructor.getArguments())
-                .map(args -> args.getElements().stream()
-                        .map(Expression::getType)
-                        .filter(Objects::nonNull)
-                        .map(this::typePattern)
-                        .filter(Objects::nonNull)
-                        .collect(joining(","))
-                ).orElse("");
+        JContainer<Expression> args = constructor.getArguments();
+        String signaturePattern = "";
+        if (args != null) {
+            signaturePattern = args.getElements().stream()
+                    .map(Expression::getType)
+                    .filter(Objects::nonNull)
+                    .map(this::typePattern)
+                    .filter(Objects::nonNull)
+                    .collect(joining(","));
+        }
 
         JavaType.Class type = TypeUtils.asClass(constructor.getType());
         assert type != null;
@@ -195,9 +188,11 @@ public class MethodMatcher {
 class TypeVisitor extends RefactorMethodSignatureParserBaseVisitor<String> {
     @Override
     public String visitClassNameOrInterface(RefactorMethodSignatureParser.ClassNameOrInterfaceContext ctx) {
-        String className = ctx.children.stream()
-                .map(c -> AspectjUtils.aspectjNameToPattern(c.getText()))
-                .collect(joining(""));
+        StringBuilder classNameBuilder = new StringBuilder();
+        for (ParseTree c : ctx.children) {
+            classNameBuilder.append(AspectjUtils.aspectjNameToPattern(c.getText()));
+        }
+        String className = classNameBuilder.toString();
 
         if (!className.contains(".")) {
             try {

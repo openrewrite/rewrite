@@ -3,6 +3,8 @@ plugins {
 }
 
 dependencies {
+    jmh("com.google.code.findbugs:jsr305:latest.release")
+
     jmh(project(":rewrite-core"))
     jmh(project(":rewrite-java-11"))
     jmh("org.openjdk.jmh:jmh-core:latest.release")
