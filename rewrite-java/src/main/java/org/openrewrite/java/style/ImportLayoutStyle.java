@@ -27,6 +27,7 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import org.jetbrains.annotations.NotNull;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
@@ -34,6 +35,7 @@ import org.openrewrite.java.tree.Space;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -173,7 +175,7 @@ public class ImportLayoutStyle implements JavaStyle {
         }
 
         public Builder importPackage(String packageWildcard, Boolean withSubpackages) {
-            blocks.add(new Block.ImportPackage(false, packageWildcard, withSubpackages, classCountToUseStarImport, nameCountToUseStarImport));
+            blocks.add(new Block.ImportPackage(false, packageWildcard, withSubpackages));
             return this;
         }
 
@@ -182,7 +184,7 @@ public class ImportLayoutStyle implements JavaStyle {
         }
 
         public Builder staticImportPackage(String packageWildcard, Boolean withSubpackages) {
-            blocks.add(new Block.ImportPackage(true, packageWildcard, withSubpackages, classCountToUseStarImport, nameCountToUseStarImport));
+            blocks.add(new Block.ImportPackage(true, packageWildcard, withSubpackages));
             return this;
         }
 
@@ -299,8 +301,7 @@ public class ImportLayoutStyle implements JavaStyle {
             private final Boolean statik;
             private final Pattern packageWildcard;
 
-            public ImportPackage(Boolean statik, String packageWildcard, boolean withSubpackages,
-                                 int classCountToUseStarImport, int nameCountToUseStarImport) {
+            public ImportPackage(Boolean statik, String packageWildcard, boolean withSubpackages) {
                 this.statik = statik;
                 this.packageWildcard = Pattern.compile(packageWildcard
                         .replace(".", "\\.")
@@ -333,19 +334,7 @@ public class ImportLayoutStyle implements JavaStyle {
                         .stream()
                         .sorted(IMPORT_SORTING)
                         .collect(groupingBy(
-                                anImport -> {
-                                    String typeName = anImport.getElement().getTypeName();
-                                    if (anImport.getElement().isStatic()) {
-                                        return typeName;
-                                    } else {
-                                        String className = anImport.getElement().getClassName();
-                                        if (className.contains(".")) {
-                                            return anImport.getElement().getPackageName() +
-                                                    className.substring(0, className.lastIndexOf('.'));
-                                        }
-                                        return anImport.getElement().getPackageName();
-                                    }
-                                },
+                                this::packageOrOuterClassName,
                                 LinkedHashMap::new, // Use an ordered map to preserve sorting
                                 Collectors.toList()
                         ));
@@ -381,9 +370,12 @@ public class ImportLayoutStyle implements JavaStyle {
                         }
                     }
 
-                    importGroup.stream()
-                            .filter(distinctBy(t -> t.getElement().printTrimmed()))
-                            .forEach(ordered::add);
+                    Predicate<JRightPadded<J.Import>> predicate = distinctBy(t -> t.getElement().printTrimmed());
+                    for (JRightPadded<J.Import> importJRightPadded : importGroup) {
+                        if (predicate.test(importJRightPadded)) {
+                            ordered.add(importJRightPadded);
+                        }
+                    }
                 }
 
                 // interleaves inner classes and outer classes back together which are separated into different groups
@@ -393,6 +385,21 @@ public class ImportLayoutStyle implements JavaStyle {
 
                 return ordered;
             }
+
+            @NotNull
+            private String packageOrOuterClassName(JRightPadded<J.Import> anImport) {
+                String typeName = anImport.getElement().getTypeName();
+                if (anImport.getElement().isStatic()) {
+                    return typeName;
+                } else {
+                    String className = anImport.getElement().getClassName();
+                    if (className.contains(".")) {
+                        return anImport.getElement().getPackageName() +
+                                className.substring(0, className.lastIndexOf('.'));
+                    }
+                    return anImport.getElement().getPackageName();
+                }
+            }
         }
 
         class AllOthers extends Block.ImportPackage {
@@ -400,8 +407,8 @@ public class ImportLayoutStyle implements JavaStyle {
             private Collection<ImportPackage> packageImports = emptyList();
 
             public AllOthers(boolean statik, int classCountToUseStarImport, int nameCountToUseStarImport) {
-                super(statik, "*", true,
-                        classCountToUseStarImport, nameCountToUseStarImport);
+                super(statik, "*", true
+                );
                 this.statik = statik;
             }
 
@@ -415,7 +422,14 @@ public class ImportLayoutStyle implements JavaStyle {
 
             @Override
             public boolean accept(LayoutState layoutState, JRightPadded<J.Import> anImport) {
-                if (packageImports.stream().noneMatch(pi -> pi.accept(layoutState, anImport))) {
+                boolean b = true;
+                for (ImportPackage pi : packageImports) {
+                    if (pi.accept(layoutState, anImport)) {
+                        b = false;
+                        break;
+                    }
+                }
+                if (b) {
                     super.accept(layoutState, anImport);
                 }
                 return anImport.getElement().isStatic() == statik;
