@@ -3,7 +3,9 @@ plugins {
 }
 
 dependencies {
+    jmh("org.eclipse.jgit:org.eclipse.jgit:latest.release")
     jmh("com.google.code.findbugs:jsr305:latest.release")
+    jmh("org.projectlombok:lombok:latest.release")
 
     jmh(project(":rewrite-core"))
     jmh(project(":rewrite-java-11"))

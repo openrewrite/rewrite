@@ -38,13 +38,39 @@ public class JavaCompilationUnitState {
 
         List<Path> inputs = Arrays.asList(
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/internal/lang/Nullable.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/internal/lang/NullUtils.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/internal/MetricsHelper.java"),
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/internal/ListUtils.java"),
-                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/internal/PropertyPlaceholderHelper.java")
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/internal/StringUtils.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/internal/PropertyPlaceholderHelper.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/internal/RecipeIntrospectionUtils.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/Tree.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/ExecutionContext.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/InMemoryExecutionContext.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/marker/Marker.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/marker/Markers.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/style/Style.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/config/DeclarativeNamedStyles.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/style/NamedStyles.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/TreePrinter.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/Option.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/config/OptionDescriptor.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/config/RecipeDescriptor.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/Result.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/SourceFile.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/Recipe.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/Validated.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/config/DeclarativeRecipe.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/config/ResourceLoader.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/config/YamlResourceLoader.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/config/ClasspathScanningLoader.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/config/RecipeIntrospectionException.java")
         );
 
         sourceFiles = JavaParser.fromJavaVersion()
-                .classpath("jsr305")
-                .logCompilationWarningsAndErrors(true)
+                .classpath("jsr305", "classgraph", "jackson-annotations", "micrometer-core", "slf4j-api",
+                        "org.eclipse.jgit")
+//                .logCompilationWarningsAndErrors(true)
                 .build()
                 .parse(inputs, null, new InMemoryExecutionContext(Throwable::printStackTrace));
     }
