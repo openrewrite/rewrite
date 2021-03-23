@@ -18,8 +18,8 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
 import org.openrewrite.Option;
+import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
@@ -27,7 +27,6 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -68,6 +67,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
 
     private class ChangeMethodTargetToStaticVisitor extends JavaIsoVisitor<ExecutionContext> {
         private final MethodMatcher methodMatcher;
+        private final JavaType.FullyQualified classType = JavaType.Class.build(fullyQualifiedTargetTypeName);
 
         public ChangeMethodTargetToStaticVisitor(MethodMatcher methodMatcher) {
             this.methodMatcher = methodMatcher;
@@ -77,8 +77,6 @@ public class ChangeMethodTargetToStatic extends Recipe {
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             if (methodMatcher.matches(method)) {
-                JavaType.FullyQualified classType = JavaType.Class.build(fullyQualifiedTargetTypeName);
-
                 m = method.withSelect(J.Identifier.build(randomId(),
                         method.getSelect() == null ?
                                 Space.EMPTY :
