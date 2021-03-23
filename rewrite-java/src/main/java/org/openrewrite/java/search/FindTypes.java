@@ -75,7 +75,7 @@ public class FindTypes extends Recipe {
                 J.FieldAccess fa = (J.FieldAccess) super.visitFieldAccess(fieldAccess, ctx);
                 JavaType.Class asClass = TypeUtils.asClass(fa.getTarget().getType());
                 if (asClass != null && asClass.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
-                    fa.getName().getSimpleName().equals("class")) {
+                        fa.getName().getSimpleName().equals("class")) {
                     ctx.putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY, asClass);
                     return fa.withMarker(new RecipeSearchResult(FindTypes.this));
                 }
