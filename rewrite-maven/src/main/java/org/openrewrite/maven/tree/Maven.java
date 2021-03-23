@@ -187,6 +187,6 @@ public class Maven extends Xml.Document {
     }
 
     public Maven withModel(Pom model) {
-        return withMarkers(getMarkers().compute(model, (old, n) -> n));
+        return withMarkers(getMarkers().computeByType(model, (old, n) -> n));
     }
 }
