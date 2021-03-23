@@ -61,15 +61,7 @@ public class TypeUtils {
             return true;
         }
 
-        try {
-            Class<?> classFromReflect = Class.forName(classFrom.getFullyQualifiedName(), false, TypeUtils.class.getClassLoader());
-            if (classFromReflect.getSuperclass() != null && isAssignableTo(to, JavaType.Class.build(classFromReflect.getSuperclass().getName()))) {
-                return true;
-            }
-            return Arrays.stream(classFromReflect.getInterfaces()).anyMatch(i -> isAssignableTo(to, JavaType.Class.build(i.getName())));
-        } catch (ClassNotFoundException ignored) {
-            return false;
-        }
+        return false;
     }
 
     @Nullable
