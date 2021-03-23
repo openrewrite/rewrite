@@ -8,6 +8,7 @@
         <processorPath useClasspath="false">
           <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.projectlombok/lombok/1.18.18/481f5bfed3ae29f656eedfe9e98c8365b8ba5c57/lombok-1.18.18.jar" />
         </processorPath>
+        <module name="rewrite.rewrite-benchmarks.main" />
         <module name="rewrite.rewrite-test.main" />
         <module name="rewrite.rewrite-core.main" />
         <module name="rewrite.rewrite-java-11.main" />
@@ -16,6 +17,16 @@
         <module name="rewrite.rewrite-java.main" />
         <module name="rewrite.rewrite-yaml.main" />
         <module name="rewrite.rewrite-properties.main" />
+      </profile>
+      <profile name="Gradle Imported" enabled="true">
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-generator-annprocess/1.28/b0f61484d64740014b34b86654420053d8657095/jmh-generator-annprocess-1.28.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.28/5be859dee27a80704efa99cae9017818d7d39f58/jmh-core-1.28.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/net.sf.jopt-simple/jopt-simple/4.6/306816fb57cf94f108a43c95731b08934dcae15c/jopt-simple-4.6.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.apache.commons/commons-math3/3.2/ec2544ab27e110d2d431bdad7d538ed509b21e62/commons-math3-3.2.jar" />
+        </processorPath>
+        <module name="rewrite.rewrite-benchmarks.jmh" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel target="11" />
