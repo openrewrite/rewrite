@@ -22,7 +22,6 @@ import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openrewrite.java.ChangeType;
-import org.openrewrite.java.ChangeType2;
 
 import java.util.concurrent.TimeUnit;
 
@@ -34,23 +33,17 @@ import java.util.concurrent.TimeUnit;
 @Threads(16)
 public class ChangeTypeBenchmark {
 
-    @Benchmark
-    public void changeType(JavaCompilationUnitState state) {
-        new ChangeType("java.util.List", "java.util.Collection")
-            .run(state.getSourceFiles());
-    }
-
-    @Benchmark
-    public void changeType2(JavaCompilationUnitState state) {
-        new ChangeType2("java.util.List", "java.util.Collection")
-                .run(state.getSourceFiles());
-    }
-
     public static void main(String[] args) throws RunnerException {
         Options opt = new OptionsBuilder()
                 .include(ChangeTypeBenchmark.class.getSimpleName())
                 .addProfiler(GCProfiler.class)
                 .build();
         new Runner(opt).run();
+    }
+
+    @Benchmark
+    public void changeType(JavaCompilationUnitState state) {
+        new ChangeType("java.util.List", "java.util.Collection")
+                .run(state.getSourceFiles());
     }
 }
