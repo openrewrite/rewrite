@@ -30,7 +30,7 @@ import java.util.concurrent.TimeUnit;
 @Warmup(iterations = 2)
 @BenchmarkMode(Mode.SampleTime)
 @OutputTimeUnit(TimeUnit.SECONDS)
-@Threads(16)
+@Threads(4)
 public class ChangeTypeBenchmark {
 
     public static void main(String[] args) throws RunnerException {
