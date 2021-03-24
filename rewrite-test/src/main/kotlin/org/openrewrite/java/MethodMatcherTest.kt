@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 
@@ -40,6 +41,7 @@ interface MethodMatcherTest {
         assertTrue(typeRegex("com.bar.MyClass foo()").matches("com.bar.MyClass"))
         assertTrue(typeRegex("com.*.MyClass foo()").matches("com.bar.MyClass"))
     }
+
 
     @Test
     fun matchesMethodNameWithDotSeparator(jp: JavaParser) {
@@ -170,5 +172,37 @@ interface MethodMatcherTest {
         assertTrue(MethodMatcher("a.A getInt()").matches(getIntMethod, classDecl))
         assertTrue(MethodMatcher("a.A setInteger(Integer)").matches(setIntegerMethod, classDecl))
         assertTrue(MethodMatcher("a.A getInteger()").matches(getIntegerMethod, classDecl))
+    }
+
+    @Disabled
+    @Issue("#383")
+    @Test
+    fun matchesMethodWithWildcardForClassInPackage(jp: JavaParser) {
+        val cu = jp.parse(
+            """
+            package a;
+            
+            class A {
+                void foo() {}
+            }
+        """
+        ).first()
+        val classDecl = cu.classes.first()
+        val fooMethod = classDecl.body.statements[0] as J.MethodDeclaration
+        assertTrue(MethodMatcher("* foo(..)").matches(fooMethod, classDecl))
+    }
+
+    @Test
+    fun matchesMethodWithWildcardForClassNotInPackage(jp: JavaParser) {
+        val cu = jp.parse(
+            """
+            class A {
+                void foo() {}
+            }
+        """
+        ).first()
+        val classDecl = cu.classes.first()
+        val fooMethod = classDecl.body.statements[0] as J.MethodDeclaration
+        assertTrue(MethodMatcher("* foo(..)").matches(fooMethod, classDecl))
     }
 }
