@@ -79,7 +79,7 @@ public class Maven extends Xml.Document {
     }
 
     public List<Path> getJavaSources(Path projectDir, ExecutionContext ctx) {
-        if (!"jar".equals(model.getPackaging())) {
+        if (!"jar".equals(model.getPackaging()) && !"bundle".equals(model.getPackaging())) {
             return emptyList();
         }
         return getSources(projectDir.resolve(getSourcePath()).getParent().resolve(Paths.get("src", "main", "java")),
@@ -87,7 +87,7 @@ public class Maven extends Xml.Document {
     }
 
     public List<Path> getTestJavaSources(Path projectDir, ExecutionContext ctx) {
-        if (!"jar".equals(model.getPackaging())) {
+        if (!"jar".equals(model.getPackaging()) && !"bundle".equals(model.getPackaging())) {
             return emptyList();
         }
         return getSources(projectDir.resolve(getSourcePath()).getParent().resolve(Paths.get("src", "test", "java")),
@@ -95,7 +95,7 @@ public class Maven extends Xml.Document {
     }
 
     public List<Path> getResources(Path projectDir, ExecutionContext ctx) {
-        if (!"jar".equals(model.getPackaging())) {
+        if (!"jar".equals(model.getPackaging()) && !"bundle".equals(model.getPackaging())) {
             return emptyList();
         }
         return getSources(projectDir.resolve(getSourcePath()).getParent().resolve(Paths.get("src", "main", "resources")),
@@ -103,7 +103,7 @@ public class Maven extends Xml.Document {
     }
 
     public List<Path> getTestResources(Path projectDir, ExecutionContext ctx) {
-        if (!"jar".equals(model.getPackaging())) {
+        if (!"jar".equals(model.getPackaging()) && !"bundle".equals(model.getPackaging())) {
             return emptyList();
         }
         return getSources(projectDir.resolve(getSourcePath()).getParent().resolve(Paths.get("src", "test", "resources")),
