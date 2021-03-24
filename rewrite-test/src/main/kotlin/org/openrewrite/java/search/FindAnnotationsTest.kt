@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.java.tree.JavaType
 
 interface FindAnnotationsTest : JavaRecipeTest {
     companion object {
@@ -202,5 +203,35 @@ interface FindAnnotationsTest : JavaRecipeTest {
         recipe = FindAnnotations("@com.netflix.foo.Foo(baz=\"bar\",bar=\"quux\")")
         valid = recipe.validate()
         assertThat(valid.isValid).isTrue()
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/394")
+    @Test
+    fun findAnnotationWithClassTypeArgument(jp: JavaParser) {
+        val fooClass = jp.parse("""
+            package com.foo;
+            
+            import java.lang.annotation.ElementType;
+            import java.lang.annotation.Inherited;
+            import java.lang.annotation.Retention;
+            import java.lang.annotation.RetentionPolicy;
+            import java.lang.annotation.Target;
+            
+            @Retention(RetentionPolicy.RUNTIME)
+            @Target({ElementType.TYPE})
+            @Inherited
+            public @interface Example { 
+                Class<?> value();
+            }
+        """,
+        """
+            package com.foo;
+            
+            @Example(Foo.class)
+            public class Foo {}
+        """).find { it.classes.first().simpleName == "Foo" }!!
+
+        val maybeExample = FindAnnotations.find(fooClass, "@com.foo.Example(Foo.class)")
+        assertThat(maybeExample).hasSize(1)
     }
 }

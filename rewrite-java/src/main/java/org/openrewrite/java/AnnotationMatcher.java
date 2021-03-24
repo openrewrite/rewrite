@@ -102,8 +102,13 @@ public class AnnotationMatcher {
             }
             if (arg instanceof J.FieldAccess && ((J.FieldAccess) arg).getSimpleName().equals("class") &&
                     matchText.endsWith(".class")) {
-                return JavaType.Class.build(matchText.replaceAll("\\.class$", ""))
-                        .equals(((J.FieldAccess) arg).getTarget().getType());
+                // If the matchText isn't fully qualified there's no way to know if the user meant org.foo.Bar or com.baz.Bar
+                JavaType targetType = ((J.FieldAccess) arg).getTarget().getType();
+                String matchWithoutDotClass = matchText.substring(0, matchText.lastIndexOf('.'));
+                if(targetType instanceof JavaType.FullyQualified) {
+                    return ((JavaType.FullyQualified) targetType).getFullyQualifiedName().endsWith(matchWithoutDotClass);
+                }
+                return false;
             }
             if (arg instanceof J.NewArray) {
                 J.NewArray na = (J.NewArray) arg;
