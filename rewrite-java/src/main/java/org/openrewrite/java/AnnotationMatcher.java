@@ -42,6 +42,7 @@ import org.openrewrite.java.tree.TypeUtils;
  * {@literal @}myhttp.Get(serviceName="payments", path="recentPayments")  - Matches references to myhttp.Get where the parameters are also matched.
  * {@literal @}myhttp.Get(path="recentPayments", serviceName="payments")  - Exaclty the same results from the previous example, order of parameters does not matter.
  * {@literal @}java.lang.SuppressWarnings("deprecation")                  - Matches java.langSupressWarning with a single parameter.
+ * {@literal @}org.junit.runner.RunWith(org.junit.runners.JUnit4.class)   - Matches JUnit4's @RunWith(JUnit4.class)
  * </PRE>
  */
 public class AnnotationMatcher {
@@ -102,11 +103,11 @@ public class AnnotationMatcher {
             }
             if (arg instanceof J.FieldAccess && ((J.FieldAccess) arg).getSimpleName().equals("class") &&
                     matchText.endsWith(".class")) {
-                // If the matchText isn't fully qualified there's no way to know if the user meant org.foo.Bar or com.baz.Bar
-                JavaType targetType = ((J.FieldAccess) arg).getTarget().getType();
-                String matchWithoutDotClass = matchText.substring(0, matchText.lastIndexOf('.'));
-                if(targetType instanceof JavaType.FullyQualified) {
-                    return ((JavaType.FullyQualified) targetType).getFullyQualifiedName().endsWith(matchWithoutDotClass);
+                JavaType argType = ((J.FieldAccess) arg).getTarget().getType();
+                if(argType instanceof JavaType.FullyQualified) {
+                    String queryTypeFqn = JavaType.Class.build(matchText.replaceAll("\\.class$", "")).getFullyQualifiedName();
+                    String targetTypeFqn = ((JavaType.FullyQualified) argType).getFullyQualifiedName();
+                    return queryTypeFqn.equals(targetTypeFqn);
                 }
                 return false;
             }

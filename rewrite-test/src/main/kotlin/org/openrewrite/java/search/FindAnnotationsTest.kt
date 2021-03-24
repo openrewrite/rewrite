@@ -231,7 +231,8 @@ interface FindAnnotationsTest : JavaRecipeTest {
             public class Foo {}
         """).find { it.classes.first().simpleName == "Foo" }!!
 
-        val maybeExample = FindAnnotations.find(fooClass, "@com.foo.Example(Foo.class)")
+        val maybeExample = FindAnnotations.find(fooClass, "@com.foo.Example(com.foo.Foo.class)")
         assertThat(maybeExample).hasSize(1)
     }
 }
+    
