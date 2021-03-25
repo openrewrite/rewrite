@@ -17,34 +17,37 @@ package org.openrewrite.java.style
 
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.config.DeclarativeNamedStyles
 import org.openrewrite.style.Style
 
 class ImportLayoutStyleTest {
     companion object {
         private val mapper = ObjectMapper()
-            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .registerModule(ParameterNamesModule())
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
     }
 
     @Test
     fun deserializeStyle() {
         val styleConfig = mapOf(
-            "@c" to ImportLayoutStyle::class.qualifiedName,
-            "@ref" to 1,
-            "classCountToUseStarImport" to 999,
-            "nameCountToUseStarImport" to 998,
-            "layout" to listOf(
-                "import java.*",
-                "<blank line>",
-                "import javax.*",
-                "<blank line>",
-                "import all other imports",
-                "<blank line>",
-                "import org.springframework.*",
-                "<blank line>",
-                "import static all other imports"
-            )
+                "@c" to ImportLayoutStyle::class.qualifiedName,
+                "@ref" to 1,
+                "classCountToUseStarImport" to 999,
+                "nameCountToUseStarImport" to 998,
+                "layout" to listOf(
+                        "import java.*",
+                        "<blank line>",
+                        "import javax.*",
+                        "<blank line>",
+                        "import all other imports",
+                        "<blank line>",
+                        "import org.springframework.*",
+                        "<blank line>",
+                        "import static all other imports"
+                )
         )
 
         val style = mapper.convertValue(styleConfig, ImportLayoutStyle::class.java)
@@ -53,5 +56,32 @@ class ImportLayoutStyleTest {
 
         // round trip
         mapper.readValue(mapper.writeValueAsBytes(style), Style::class.java)
+    }
+
+    @Test
+    fun deserializeInDeclarativeNamedStyles() {
+
+        val style = DeclarativeNamedStyles(
+                "name",
+                "displayName",
+                "description",
+                setOf("tag1", "tag2"),
+                listOf<Style>(ImportLayoutStyle.builder()
+                        .classCountToUseStarImport(5)
+                        .nameCountToUseStarImport(5)
+                        .importPackage("java.*")
+                        .blankLine()
+                        .importPackage("javax.*")
+                        .blankLine()
+                        .importAllOthers()
+                        .blankLine()
+                        .importPackage("org.springframework.*")
+                        .blankLine()
+                        .importStaticAllOthers()
+                        .build()
+                )
+        )
+        mapper.readValue(mapper.writeValueAsBytes(style),
+                DeclarativeNamedStyles::class.java)
     }
 }

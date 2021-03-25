@@ -15,16 +15,17 @@
  */
 package org.openrewrite.java.style;
 
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.core.type.WritableTypeId;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
@@ -57,7 +58,6 @@ import static org.openrewrite.internal.StreamUtils.distinctBy;
  */
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Getter
-@JsonTypeInfo(use = JsonTypeInfo.Id.NONE)
 @JsonDeserialize(using = Deserializer.class)
 @JsonSerialize(using = Serializer.class)
 public class ImportLayoutStyle implements JavaStyle {
@@ -493,10 +493,23 @@ class Deserializer extends JsonDeserializer<ImportLayoutStyle> {
 }
 
 class Serializer extends JsonSerializer<ImportLayoutStyle> {
+
+    @Override
+    public void serializeWithType(ImportLayoutStyle value, JsonGenerator gen, SerializerProvider serializers, TypeSerializer typeSer) throws IOException {
+        WritableTypeId typeId = typeSer.typeId(value, JsonToken.START_OBJECT);
+        typeSer.writeTypePrefix(gen, typeId);
+        serializeFields(value, gen);
+        typeSer.writeTypeSuffix(gen, typeId);
+    }
+
     @Override
     public void serialize(ImportLayoutStyle value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
         gen.writeStartObject();
-        gen.writeStringField("@c", ImportLayoutStyle.class.getName());
+        serializeFields(value, gen);
+        gen.writeEndObject();
+    }
+
+    private void serializeFields(ImportLayoutStyle value, JsonGenerator gen) throws IOException {
         gen.writeNumberField("classCountToUseStarImport", value.getClassCountToUseStarImport());
         gen.writeNumberField("nameCountToUseStarImport", value.getNameCountToUseStarImport());
 
@@ -519,6 +532,6 @@ class Serializer extends JsonSerializer<ImportLayoutStyle> {
         gen.writeArrayFieldStart("layout");
         gen.writeArray(blocks, 0, blocks.length);
         gen.writeEndArray();
-        gen.writeEndObject();
     }
+
 }
