@@ -32,11 +32,11 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
     public TabsAndIndentsVisitor(TabsAndIndentsStyle style) {
         this.style = style;
-        String s = new String();
+        StringBuilder s = new StringBuilder();
         for (int i = 0; i < style.getTabSize(); i++) {
-            s = s + " ";
+            s.append(' ');
         }
-        spacesForTab = s;
+        spacesForTab = s.toString();
     }
 
     @Override
@@ -281,7 +281,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                             } else {
                                 J.MethodInvocation methodInvocation = (J.MethodInvocation) elem;
                                 Expression select = methodInvocation.getSelect();
-                                if (select != null && (select instanceof J.FieldAccess || select instanceof J.Identifier)) {
+                                if (select instanceof J.FieldAccess || select instanceof J.Identifier) {
                                     getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
                                 }
                             }
@@ -391,7 +391,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private String indent(String whitespace, int shift) {
-        if (!style.getUseTabCharacter() && whitespace.contains("\t")) {
+        if (!style.isUseTabCharacter() && whitespace.contains("\t")) {
             whitespace = whitespace.replaceAll("\t", spacesForTab);
         }
         StringBuilder newWhitespace = new StringBuilder(whitespace);
@@ -401,7 +401,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
     private void shift(StringBuilder text, int shift) {
         int tabIndent = style.getTabSize();
-        if (!style.getUseTabCharacter()) {
+        if (!style.isUseTabCharacter()) {
             tabIndent = Integer.MAX_VALUE;
         }
 
@@ -414,7 +414,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 text.append(' ');
             }
         } else {
-            if (style.getUseTabCharacter()) {
+            if (style.isUseTabCharacter()) {
                 text.delete(text.length() + (shift / tabIndent), text.length());
             } else {
                 text.delete(text.length() + shift, text.length());
@@ -438,7 +438,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         Cursor forCursor = getCursor().dropParentUntil(J.ForLoop.class::isInstance);
         J.ForLoop forLoop = forCursor.getValue();
         Object parent = forCursor.getParentOrThrow().getValue();
-        J alignTo = parent instanceof J.Label ?
+        @SuppressWarnings("ConstantConditions") J alignTo = parent instanceof J.Label ?
                 ((J.Label) parent).withStatement(forLoop.withBody(null)) :
                 forLoop.withBody(null);
 
