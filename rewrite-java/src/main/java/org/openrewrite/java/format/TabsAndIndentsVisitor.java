@@ -421,7 +421,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 text.append(' ');
             }
         } else {
-            if (Boolean.TRUE.equals(useTabCharacter)) {
+            if (useTabCharacter) {
                 text.delete(text.length() + (shift / tabIndent), text.length());
             } else {
                 text.delete(text.length() + shift, text.length());
