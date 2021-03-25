@@ -833,6 +833,10 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     public <T> JRightPadded<T> visitRightPadded(JRightPadded<T> right, JRightPadded.Location loc, P p) {
 
+        if (right == null) {
+            return null;
+        }
+
         setCursor(new Cursor(getCursor(), right));
 
         T t = right.getElement();
