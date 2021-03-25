@@ -20,6 +20,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.*;
 
@@ -27,14 +28,20 @@ import java.util.List;
 import java.util.Optional;
 
 class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
-    private final TabsAndIndentsStyle style;
+    private final int indentSize;
+    private final int continuationIndent;
+    private final boolean useTabCharacter;
+    private final int tabSize;
     private final String spacesForTab;
 
     public TabsAndIndentsVisitor(TabsAndIndentsStyle style) {
-        this.style = style;
-        String s = new String();
-        for (int i = 0; i < style.getTabSize(); i++) {
-            s = s + " ";
+        useTabCharacter = style.getUseTabCharacter() != null ? style.getUseTabCharacter() : IntelliJ.tabsAndIndents().getUseTabCharacter();
+        tabSize = style.getTabSize() != null ? style.getTabSize() : IntelliJ.tabsAndIndents().getTabSize();
+        indentSize = style.getIndentSize() != null ? style.getIndentSize() : IntelliJ.tabsAndIndents().getIndentSize();
+        continuationIndent = style.getContinuationIndent() != null ? style.getContinuationIndent() : IntelliJ.tabsAndIndents().getContinuationIndent();
+        String s = "";
+        for (int i = 0; i < tabSize; i++) {
+            s += " ";
         }
         spacesForTab = s;
     }
@@ -138,10 +145,10 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             case ALIGN:
                 break;
             case INDENT:
-                indent += style.getIndentSize();
+                indent += indentSize;
                 break;
             case CONTINUATION_INDENT:
-                indent += style.getContinuationIndent();
+                indent += continuationIndent;
                 break;
         }
 
@@ -171,7 +178,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         Space initPrefix = control.getPadding().getInit().getElement().getPrefix();
                         if (!initPrefix.getLastWhitespace().contains("\n")) {
                             int initIndent = forInitColumn();
-                            getCursor().getParentOrThrow().putMessage("lastIndent", initIndent - style.getContinuationIndent());
+                            getCursor().getParentOrThrow().putMessage("lastIndent", initIndent - continuationIndent);
                             elem = visitAndCast(elem, p);
                             getCursor().getParentOrThrow().putMessage("lastIndent", indent);
                             after = indentTo(right.getAfter(), initIndent);
@@ -229,7 +236,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         getCursor().getParentOrThrow().putMessage("lastIndent", indent);
                         elem = visitAndCast(elem, p);
                         after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
-                        getCursor().getParentOrThrow().putMessage("lastIndent", indent + style.getContinuationIndent());
+                        getCursor().getParentOrThrow().putMessage("lastIndent", indent + continuationIndent);
                         break;
                     }
                     case ANNOTATION_ARGUMENT:
@@ -275,14 +282,14 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         }
                         if (!(elem instanceof J.Binary)) {
                             if (!(elem instanceof J.MethodInvocation)) {
-                                getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
+                                getCursor().putMessage("lastIndent", indent + continuationIndent);
                             } else if (elem.getPrefix().getLastWhitespace().contains("\n")) {
-                                getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
+                                getCursor().putMessage("lastIndent", indent + continuationIndent);
                             } else {
                                 J.MethodInvocation methodInvocation = (J.MethodInvocation) elem;
                                 Expression select = methodInvocation.getSelect();
                                 if (select != null && (select instanceof J.FieldAccess || select instanceof J.Identifier)) {
-                                    getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
+                                    getCursor().putMessage("lastIndent", indent + continuationIndent);
                                 }
                             }
                         }
@@ -319,9 +326,9 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 case IMPLEMENTS:
                 case THROWS:
                 case NEW_CLASS_ARGUMENTS:
-                    before = indentTo(container.getBefore(), indent + style.getContinuationIndent());
+                    before = indentTo(container.getBefore(), indent + continuationIndent);
                     getCursor().putMessage("indentType", IndentType.ALIGN);
-                    getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
+                    getCursor().putMessage("lastIndent", indent + continuationIndent);
                     js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
                     break;
                 default:
@@ -391,7 +398,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private String indent(String whitespace, int shift) {
-        if (!style.getUseTabCharacter() && whitespace.contains("\t")) {
+        if (!useTabCharacter && whitespace.contains("\t")) {
             whitespace = whitespace.replaceAll("\t", spacesForTab);
         }
         StringBuilder newWhitespace = new StringBuilder(whitespace);
@@ -400,8 +407,8 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private void shift(StringBuilder text, int shift) {
-        int tabIndent = style.getTabSize();
-        if (!style.getUseTabCharacter()) {
+        int tabIndent = tabSize;
+        if (!useTabCharacter) {
             tabIndent = Integer.MAX_VALUE;
         }
 
@@ -414,7 +421,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 text.append(' ');
             }
         } else {
-            if (style.getUseTabCharacter()) {
+            if (Boolean.TRUE.equals(useTabCharacter)) {
                 text.delete(text.length() + (shift / tabIndent), text.length());
             } else {
                 text.delete(text.length() + shift, text.length());
@@ -426,7 +433,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         String indent = space.getIndent();
         int size = 0;
         for (char c : indent.toCharArray()) {
-            size += c == '\t' ? style.getTabSize() : 1;
+            size += c == '\t' ? tabSize : 1;
             if (c == '\n' || c == '\r') {
                 size = 0;
             }
