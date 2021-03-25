@@ -39,7 +39,7 @@ import java.util.Set;
 @EqualsAndHashCode(callSuper = true)
 public class FindTypes extends Recipe {
 
-    @Option(displayName = "Full-qualified type name",
+    @Option(displayName = "Fully-qualified type name",
             description = "A fully-qualified type name, that is used to find matching type references.",
             example = "java.util.List")
     String fullyQualifiedTypeName;
