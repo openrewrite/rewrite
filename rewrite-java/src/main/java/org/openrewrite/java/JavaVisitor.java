@@ -831,7 +831,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return w;
     }
 
-    public <T> JRightPadded<T> visitRightPadded(JRightPadded<T> right, JRightPadded.Location loc, P p) {
+    public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P p) {
 
         if (right == null) {
             return null;
