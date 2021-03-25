@@ -88,6 +88,7 @@ public class MavenPomDownloader {
                 .filter(Objects::nonNull)
                 .map(repo -> {
                     Timer.Builder timer = Timer.builder("rewrite.maven.download")
+                            .tag("repo.id", repo.getUri().toString())
                             .tag("group.id", groupId)
                             .tag("artifact.id", artifactId)
                             .tag("type", "metadata");

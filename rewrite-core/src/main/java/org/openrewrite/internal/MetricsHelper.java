@@ -16,35 +16,78 @@
 package org.openrewrite.internal;
 
 import io.micrometer.core.instrument.Timer;
+import org.jetbrains.annotations.NotNull;
+import org.openrewrite.SourceFile;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.GitProvenance;
+
+import java.util.Optional;
 
 public class MetricsHelper {
     public static Timer.Builder successTags(Timer.Builder timer, String detailedOutcome) {
-        return timer
-                .tag("outcome", detailedOutcome)
-                .tag("exception", "none")
-                .tag("exception.line", "none")
-                .tag("exception.declaring.class", "none")
-                .tag("step", "none");
+        return successTags(timer, null, detailedOutcome);
     }
 
     public static Timer.Builder successTags(Timer.Builder timer) {
         return successTags(timer, "success");
     }
 
+    public static <S extends SourceFile> Timer.Builder successTags(Timer.Builder timer, @Nullable S sourceFile) {
+        return successTags(timer, sourceFile, "success");
+    }
+
+    public static <S extends SourceFile> Timer.Builder successTags(Timer.Builder timer, @Nullable S sourceFile, String detailedOutcome) {
+        String originRepository = getOriginRepository(sourceFile);
+        return timer
+            .tag("outcome", detailedOutcome)
+            .tag("exception", "none")
+            .tag("exception.line", "none")
+            .tag("exception.declaring.class", "none")
+            .tag("step", "none")
+            .tag("repo.id", originRepository);
+    }
+
     public static Timer.Builder errorTags(Timer.Builder timer, Throwable t) {
+        return errorTags(timer, null, t);
+    }
+
+    public static <S extends SourceFile> Timer.Builder errorTags(Timer.Builder timer, @Nullable S sourceFile, Throwable t) {
+        String originRepository = getOriginRepository(sourceFile);
+
         StackTraceElement stackTraceElement = null;
         if (t.getStackTrace().length > 0) {
             stackTraceElement = t.getStackTrace()[0];
         }
 
-        Timer.Builder tag = timer
-                .tag("outcome", "error")
-                .tag("exception", t.getClass().getSimpleName())
-                .tag("step", "none");
+        String exceptionLine = "none";
+        String exceptionDeclaringClass = "none";
         if (stackTraceElement != null) {
-            tag = tag.tag("exception.line", Integer.toString(stackTraceElement.getLineNumber()))
-                    .tag("exception.declaring.class", stackTraceElement.getClassName());
+            exceptionLine = Integer.toString(stackTraceElement.getLineNumber());
+            exceptionDeclaringClass = stackTraceElement.getClassName();
         }
-        return tag;
+
+        return timer
+            .tag("outcome", "error")
+            .tag("exception", t.getClass().getSimpleName())
+            .tag("step", "none")
+            .tag("repo.id", originRepository)
+            .tag("exception.line", exceptionLine)
+            .tag("exception.declaring.class", exceptionDeclaringClass);
+    }
+
+    @NotNull
+    private static <S extends SourceFile> String getOriginRepository(@Nullable S sourceFile) {
+        String originRepository = "none";
+        if (sourceFile != null) {
+            Optional<GitProvenance> maybeGitProvenance = sourceFile.getMarkers().findFirst(GitProvenance.class);
+            if (maybeGitProvenance.isPresent()) {
+                GitProvenance gitProvenance = maybeGitProvenance.get();
+                String origin = gitProvenance.getOrigin();
+                if (origin != null) {
+                    originRepository = origin;
+                }
+            }
+        }
+        return originRepository;
     }
 }
