@@ -32,13 +32,19 @@ public class MetricsHelper {
     }
 
     public static Timer.Builder errorTags(Timer.Builder timer, Throwable t) {
-        StackTraceElement stackTraceElement = t.getStackTrace()[0];
+        StackTraceElement stackTraceElement = null;
+        if (t.getStackTrace().length > 0) {
+            stackTraceElement = t.getStackTrace()[0];
+        }
 
-        return timer
+        Timer.Builder tag = timer
                 .tag("outcome", "error")
                 .tag("exception", t.getClass().getSimpleName())
-                .tag("exception.line", Integer.toString(stackTraceElement.getLineNumber()))
-                .tag("exception.declaring.class", stackTraceElement.getClassName())
                 .tag("step", "none");
+        if (stackTraceElement != null) {
+            tag = tag.tag("exception.line", Integer.toString(stackTraceElement.getLineNumber()))
+                    .tag("exception.declaring.class", stackTraceElement.getClassName());
+        }
+        return tag;
     }
 }
