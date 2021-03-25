@@ -193,16 +193,16 @@ public abstract class Recipe {
                                     r1.recipes.addAll(r2.recipes);
                                     return r1;
                                 }));
-                        sample.stop(MetricsHelper.successTags(timer, "changed").register(Metrics.globalRegistry));
+                        sample.stop(MetricsHelper.successTags(timer, s, "changed").register(Metrics.globalRegistry));
                     } else if (afterFile == null) {
                         recipeThatDeletedSourceFile.put(s.getId(), this);
-                        sample.stop(MetricsHelper.successTags(timer, "deleted").register(Metrics.globalRegistry));
+                        sample.stop(MetricsHelper.successTags(timer, s, "deleted").register(Metrics.globalRegistry));
                     } else {
-                        sample.stop(MetricsHelper.successTags(timer, "unchanged").register(Metrics.globalRegistry));
+                        sample.stop(MetricsHelper.successTags(timer, s, "unchanged").register(Metrics.globalRegistry));
                     }
                     return afterFile;
                 } catch (Throwable t) {
-                    sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
+                    sample.stop(MetricsHelper.errorTags(timer, s, t).register(Metrics.globalRegistry));
                     ctx.getOnError().accept(t);
                     return s;
                 }
