@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.internal;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.micrometer.core.instrument.Timer;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -40,7 +41,10 @@ import static java.util.Collections.singletonList;
 @RequiredArgsConstructor
 @Getter
 public class RawMaven {
+
+    @JsonIgnore
     final Timer.Sample sample = Timer.start();
+
     final Xml.Document document;
     final RawPom pom;
 
