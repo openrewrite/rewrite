@@ -18,6 +18,7 @@ dependencies {
     implementation("io.github.resilience4j:resilience4j-retry:latest.release")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:latest.release")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:latest.release")
 
     compileOnly("org.rocksdb:rocksdbjni:latest.release")
     compileOnly("org.mapdb:mapdb:latest.release")

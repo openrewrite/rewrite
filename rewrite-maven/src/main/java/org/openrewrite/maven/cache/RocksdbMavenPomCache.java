@@ -36,6 +36,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.smile.SmileFactory;
 import com.fasterxml.jackson.dataformat.smile.SmileGenerator;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenMetadata;
@@ -60,6 +61,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         f.configure(SmileGenerator.Feature.CHECK_SHARED_STRING_VALUES, true);
         ObjectMapper m = new ObjectMapper(f)
                 .registerModule(new ParameterNamesModule())
+                .registerModule(new Jdk8Module())
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
                 .setSerializationInclusion(JsonInclude.Include.NON_NULL);
