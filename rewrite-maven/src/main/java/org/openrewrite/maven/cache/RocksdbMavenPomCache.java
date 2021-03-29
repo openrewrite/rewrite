@@ -22,10 +22,13 @@ import java.io.InputStreamReader;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -70,10 +73,27 @@ public class RocksdbMavenPomCache implements MavenPomCache {
                 .withGetterVisibility(JsonAutoDetect.Visibility.NONE)
                 .withSetterVisibility(JsonAutoDetect.Visibility.NONE)
                 .withCreatorVisibility(JsonAutoDetect.Visibility.PUBLIC_ONLY));
+
+        //Init the rockdb native jni library
+        RocksDB.loadLibrary();
     }
 
-    //All three caches are put into the same database, they could be separated out at some point if we find we have
-    //a need.
+    //While the RocksDB instance is thread-safe, attempts to create two instances of the database to the same
+    //folder will fail.
+    private static final Map<String, RocksDB> cacheMap = new HashMap<>();
+    static synchronized RocksDB getCache(String workspace) {
+        return cacheMap.computeIfAbsent(workspace, k -> {
+            final Options options = new Options();
+            options.setCreateIfMissing(true);
+            try {
+                return RocksDB.open(options, k);
+            } catch (RocksDBException exception) {
+                throw new IllegalStateException(("Unable to create cache database." + exception.getMessage()));
+            }
+        });
+    }
+
+
     private final RocksDB cache;
     private final Set<String> unresolvablePoms = new HashSet<>();
 
@@ -90,15 +110,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         } else if (!workspace.isDirectory()) {
             throw new IllegalStateException("The maven cache workspace must be a directory");
         }
-
-        RocksDB.loadLibrary();
-        final Options options = new Options();
-        options.setCreateIfMissing(true);
-        try {
-            cache = RocksDB.open(options, workspace.getAbsolutePath());
-        } catch (RocksDBException exception) {
-            throw new IllegalStateException(("Unable to create cache database."));
-        }
+        cache = getCache(workspace.getAbsolutePath());
         fillUnresolvablePoms();
     }
 
