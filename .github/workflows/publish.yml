@@ -9,7 +9,7 @@ on:
 
 env:
   GRADLE_OPTS: '-Dorg.gradle.jvmargs="-Xmx2048m -XX:+HeapDumpOnOutOfMemoryError"'
-  GRADLE_SWITCHES: "-s --console=plain --info --stacktrace"
+  GRADLE_SWITCHES: "--console=plain --info --stacktrace --no-daemon"
 
 jobs:
   release:
@@ -36,7 +36,7 @@ jobs:
       - name: publish-candidate
         if: contains(github.ref, '-rc.')
         timeout-minutes: 30
-        run: ./gradlew ${GRADLE_SWITCHES} -Prelease.disableGitChecks=true -Prelease.useLastTag=true candidate publish closeAndReleaseSonatypeStagingRepository
+        run: ./gradlew ${GRADLE_SWITCHES} -Prelease.disableGitChecks=true -Prelease.useLastTag=true candidate publish closeAndReleaseSonatypeStagingRepository -x test
         env:
           ORG_GRADLE_PROJECT_sonatypeUsername: ${{ secrets.OSSRH_USERNAME }}
           ORG_GRADLE_PROJECT_sonatypePassword: ${{ secrets.OSSRH_TOKEN }}
@@ -46,7 +46,7 @@ jobs:
       - name: publish-release
         if: (!contains(github.ref, '-rc.'))
         timeout-minutes: 30
-        run: ./gradlew ${GRADLE_SWITCHES} -Prelease.disableGitChecks=true -Prelease.useLastTag=true final publish closeAndReleaseSonatypeStagingRepository
+        run: ./gradlew ${GRADLE_SWITCHES} -Prelease.disableGitChecks=true -Prelease.useLastTag=true final publish closeAndReleaseSonatypeStagingRepository -x test
         env:
           ORG_GRADLE_PROJECT_sonatypeUsername: ${{ secrets.OSSRH_USERNAME }}
           ORG_GRADLE_PROJECT_sonatypePassword: ${{ secrets.OSSRH_TOKEN }}
