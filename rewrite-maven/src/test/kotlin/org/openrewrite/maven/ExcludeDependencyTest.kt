@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 
 class ExcludeDependencyTest : MavenRecipeTest {
-    override val recipe = ExcludeDependency("org.junit.vintage","junit-vintage-engine")
+    override val recipe = ExcludeDependency("org.junit.vintage","junit-vintage-engine", null)
 
     @Test
     fun excludeJUnitVintageEngineSpringBoot2_3() = assertChanged(
@@ -105,6 +105,45 @@ class ExcludeDependencyTest : MavenRecipeTest {
         """
     )
 
+    @Test
+    fun excludeJUnitInCompileScope() = assertChanged(
+        recipe = ExcludeDependency("junit","junit", "compile"),
+        before = """
+            <project>
+                <groupId>com.example</groupId>
+                <artifactId>demo</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.neo4j</groupId>
+                        <artifactId>neo4j-ogm-core</artifactId>
+                        <version>3.2.21</version>
+                    </dependency>
+                </dependencies>
+            </project>
+        """,
+        after = """
+            <project>
+                <groupId>com.example</groupId>
+                <artifactId>demo</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.neo4j</groupId>
+                        <artifactId>neo4j-ogm-core</artifactId>
+                        <version>3.2.21</version>
+                        <exclusions>
+                            <exclusion>
+                                <groupId>junit</groupId>
+                                <artifactId>junit</artifactId>
+                            </exclusion>
+                        </exclusions>
+                    </dependency>
+                </dependencies>
+            </project>
+        """
+    )
+
     @Issue("#92")
     @Test
     fun playsNiceWithAddDependency() = assertChanged(
@@ -142,26 +181,26 @@ class ExcludeDependencyTest : MavenRecipeTest {
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = ExcludeDependency(null, null)
+        var recipe = ExcludeDependency(null, null, null)
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("artifactId")
         assertThat(valid.failures()[1].property).isEqualTo("groupId")
 
-        recipe = ExcludeDependency(null, "rewrite-maven")
+        recipe = ExcludeDependency(null, "rewrite-maven", null)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("groupId")
 
-        recipe = ExcludeDependency("org.openrewrite", null)
+        recipe = ExcludeDependency("org.openrewrite", null, null)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("artifactId")
 
-        recipe = ExcludeDependency("org.openrewrite", "rewrite-maven")
+        recipe = ExcludeDependency("org.openrewrite", "rewrite-maven", null)
         valid = recipe.validate()
         assertThat(valid.isValid).isTrue()
     }

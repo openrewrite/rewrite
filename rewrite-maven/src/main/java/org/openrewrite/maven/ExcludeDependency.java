@@ -17,11 +17,10 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -42,6 +41,29 @@ public class ExcludeDependency extends Recipe {
             example = "guava")
     String artifactId;
 
+    @Option(displayName = "Scope",
+            description = "Match dependencies with the specified scope. If you specify `compile`, this will NOT match dependencies in `runtime`. " +
+                "The purpose of this is to be able to exclude dependencies that should be in a higher scope, e.g. a compile dependency that should be a test dependency.",
+            valid = {"compile", "test", "runtime", "provided"},
+            required = false)
+    @Nullable
+    String scope;
+
+    @Override
+    public Validated validate() {
+        return super.validate().and(Validated.test("scope", "scope is a valid Maven scope", scope, s -> {
+            try {
+                if (s != null) {
+                    //noinspection ResultOfMethodCallIgnored
+                    Scope.fromName(s);
+                }
+                return true;
+            } catch (Throwable t) {
+                return false;
+            }
+        }));
+    }
+
     @Override
     public String getDisplayName() {
         return "Exclude Maven dependency";
@@ -58,12 +80,15 @@ public class ExcludeDependency extends Recipe {
     }
 
     private class ExcludeDependencyVisitor extends MavenVisitor {
+        @Nullable
+        private final Scope scope = ExcludeDependency.this.scope == null ? null : Scope.fromName(ExcludeDependency.this.scope);
 
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (isDependencyTag()) {
                 Pom.Dependency dependency = findDependency(tag);
-                if (dependency != null && !dependency.findDependencies(groupId, artifactId).isEmpty()) {
+                if (dependency != null && (scope == null || scope.equals(dependency.getScope())) &&
+                        !dependency.findDependencies(groupId, artifactId).isEmpty()) {
                     Optional<Xml.Tag> maybeExclusions = tag.getChild("exclusions");
                     if (maybeExclusions.isPresent()) {
                         Xml.Tag exclusions = maybeExclusions.get();
@@ -77,7 +102,6 @@ public class ExcludeDependency extends Recipe {
                                     "<artifactId>" + artifactId + "</artifactId>\n" +
                                     "</exclusion>")));
                         }
-
                     } else {
                         doAfterVisit(new AddToTagVisitor<>(tag, Xml.Tag.build("<exclusions>\n" +
                                 "<exclusion>\n" +
