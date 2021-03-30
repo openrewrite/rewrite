@@ -17,6 +17,7 @@ package org.openrewrite.java.tree
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTreeTest
@@ -27,7 +28,7 @@ interface MethodDeclarationTest : JavaTreeTest {
 
     @Test
     fun default(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, CompilationUnit, """
+            jp, CompilationUnit, """
             public @interface A {
                 String foo() default "foo";
             }
@@ -36,7 +37,7 @@ interface MethodDeclarationTest : JavaTreeTest {
 
     @Test
     fun constructor(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, CompilationUnit, """
+            jp, CompilationUnit, """
             public class A {
                 public A() { }
             }
@@ -45,7 +46,7 @@ interface MethodDeclarationTest : JavaTreeTest {
 
     @Test
     fun typeArguments(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, Class, """
+            jp, Class, """
             public <P, R> R foo(P p, String s, String... args) {
                 return null;
             }
@@ -54,7 +55,7 @@ interface MethodDeclarationTest : JavaTreeTest {
 
     @Test
     fun interfaceMethodDecl(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, CompilationUnit, """
+            jp, CompilationUnit, """
             public interface A {
                 String getName() ;
             }
@@ -63,21 +64,21 @@ interface MethodDeclarationTest : JavaTreeTest {
 
     @Test
     fun throws(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, Class, """
+            jp, Class, """
             public void foo()  throws Exception { }
         """
     )
 
     @Test
     fun nativeModifier(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, Class, """
+            jp, Class, """
             public native void foo();
         """
     )
 
     @Test
     fun methodWithSuffixMultiComment(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, Class, """
+            jp, Class, """
             public void foo() { }/*Comments*/
         """
     )
@@ -85,9 +86,9 @@ interface MethodDeclarationTest : JavaTreeTest {
     @Test
     fun hasModifier(jp: JavaParser) {
         val a = jp.parse(
-            """
+                """
             public class A {
-                private static boolean foo() { return true; };
+                private static boolean foo() { return true; }
             }
         """
         )[0]
@@ -97,4 +98,18 @@ interface MethodDeclarationTest : JavaTreeTest {
         assertTrue(inv.hasModifier(J.Modifier.Type.Private))
         assertTrue(inv.hasModifier(J.Modifier.Type.Static))
     }
+
+    @Test()
+    @Disabled("Issue #405")
+    fun unicodeCharacterLiterals(jp: JavaParser) = assertParsePrintAndProcess(jp, CompilationUnit,
+            """
+                public class A {
+                    private boolean isSockJsSpecialChar(char ch) {
+                        return (ch <= '\u001F') || (ch >= '\u200C' && ch <= '\u200F') ||
+                            (ch >= '\u2028' && ch <= '\u202F') || (ch >= '\u2060' && ch <= '\u206F') ||
+                            (ch >= '\uFFF0') || (ch >= '\uD800' && ch <= '\uDFFF');
+                    }
+                }
+            """
+    )
 }
