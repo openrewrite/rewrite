@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.utilities;
 
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
 import org.openrewrite.maven.cache.LocalMavenArtifactCache;
@@ -22,19 +23,14 @@ import org.openrewrite.maven.cache.ReadOnlyLocalMavenArtifactCache;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.RawMaven;
 import org.openrewrite.maven.internal.RawMavenResolver;
-import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.maven.tree.MavenRepository;
-import org.openrewrite.maven.tree.Pom;
-import org.openrewrite.maven.tree.Scope;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.tree.Xml;
 
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
+import java.util.function.Predicate;
 
 public class MavenArtifactHelper {
 
@@ -85,9 +81,46 @@ public class MavenArtifactHelper {
                 Collections.emptyMap(),
                 Collections.emptyMap()
         ), null, null, Collections.emptySet())));
-        for (Pom.Dependency dependency : maven.getModel().getDependencies()) {
+        for (Pom.Dependency dependency : collectTransitiveDependencies(maven.getModel().getDependencies(),
+                d -> !d.isOptional() && d.getScope() != Scope.Test)) {
             artifactPaths.add(mavenArtifactDownloader.downloadArtifact(dependency));
         }
         return artifactPaths;
+    }
+
+    public static List<Pom.Dependency> collectTransitiveDependencies(Collection<Pom.Dependency> dependencies, Predicate<Pom.Dependency> dependencyFilter) {
+        return new ArrayList<>(traverseDependencies(dependencies, new LinkedHashMap<>(), dependencyFilter).values());
+    }
+
+    private static Map<DependencyKey, Pom.Dependency> traverseDependencies(
+            Collection<Pom.Dependency> dependencies,
+            final Map<DependencyKey, Pom.Dependency> dependencyMap,
+            Predicate<Pom.Dependency> dependencyFilter) {
+        if (dependencies == null) {
+            return dependencyMap;
+        }
+        dependencies.stream()
+                .filter(dependencyFilter)
+                .forEach(d -> {
+                    DependencyKey key = getDependencyKey(d);
+                    if (!dependencyMap.containsKey(key)) {
+                        dependencyMap.put(key, d);
+                        traverseDependencies(d.getModel().getDependencies(), dependencyMap, dependencyFilter);
+                    }
+                });
+        return dependencyMap;
+    }
+
+    private static DependencyKey getDependencyKey(Pom.Dependency dependency) {
+        return new DependencyKey(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(),
+                dependency.getExclusions());
+    }
+
+    @Value
+    static class DependencyKey {
+        String groupId;
+        String artifactId;
+        String version;
+        Set<GroupArtifact> exclusions;
     }
 }
