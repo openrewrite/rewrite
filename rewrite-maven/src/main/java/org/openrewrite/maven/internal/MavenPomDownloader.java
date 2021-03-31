@@ -33,7 +33,6 @@ import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.MavenRepositoryCredentials;
 import org.openrewrite.maven.tree.MavenRepositoryMirror;
 
-import javax.net.ssl.SSLException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
@@ -72,11 +71,17 @@ public class MavenPomDownloader {
     private final MavenPomCache mavenPomCache;
     private final Map<Path, RawMaven> projectPoms;
     private final MavenExecutionContextView ctx;
+    private final boolean normalizeRepositories;
 
     public MavenPomDownloader(MavenPomCache mavenPomCache, Map<Path, RawMaven> projectPoms, ExecutionContext ctx) {
+        this(mavenPomCache, projectPoms, ctx, true);
+    }
+
+    public MavenPomDownloader(MavenPomCache mavenPomCache, Map<Path, RawMaven> projectPoms, ExecutionContext ctx, boolean normalizeRepositories) {
         this.mavenPomCache = mavenPomCache;
         this.projectPoms = projectPoms;
         this.ctx = new MavenExecutionContextView(ctx);
+        this.normalizeRepositories = normalizeRepositories;
     }
 
     public MavenMetadata downloadMetadata(String groupId, String artifactId, Collection<MavenRepository> repositories) {
@@ -317,6 +322,9 @@ public class MavenPomDownloader {
 
     @Nullable
     private MavenRepository normalizeRepository(MavenRepository originalRepository) {
+        if (!normalizeRepositories) {
+            return originalRepository;
+        }
         CacheResult<MavenRepository> result;
         try {
             MavenRepository repository = applyAuthenticationToRepository(applyMirrors(originalRepository));
