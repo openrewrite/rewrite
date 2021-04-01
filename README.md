@@ -28,10 +28,10 @@ When building from the command line invoke the wrapper with `./gradlew build` on
 
 ### IDE Configuration
 
-We use [IntellJ IDEA](https://www.jetbrains.com/idea/) to develop this project. 
+We use [IntelliJ IDEA](https://www.jetbrains.com/idea/) to develop this project. 
 Other IDEs or versions of this IDE can be made to work. 
 These are one set of versions we know works:
 
 * IDEA version:  2020.3.2
 
-You must set the `-parameters` compiler flag to run Rewrite tests. Add this to the "additional command line parameters" field in Intellij -> Preferences -> Build, Execution, Deployment -> Compiler -> Java Compiler.
+You must set the `-parameters` compiler flag to run Rewrite tests. Add this to the "additional command line parameters" field in IntelliJ -> Preferences -> Build, Execution, Deployment -> Compiler -> Java Compiler.
