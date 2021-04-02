@@ -17,6 +17,7 @@ package org.openrewrite.maven.utilities;
 
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
 import org.openrewrite.maven.cache.LocalMavenArtifactCache;
 import org.openrewrite.maven.cache.ReadOnlyLocalMavenArtifactCache;
@@ -38,36 +39,35 @@ public class MavenArtifactHelper {
             URI.create("https://repo.maven.apache.org/maven2"), true, false, null, null);
 
     public static List<Path> downloadArtifactAndDependencies(String groupId, String artifactId, String version, ExecutionContext ctx) {
-        return downloadArtifactAndDependencies(groupId, artifactId, version, ctx, SUPER_POM_REPOSITORY, true);
-    }
-
-    public static List<Path> downloadArtifactAndDependencies(String groupId, String artifactId, String version, ExecutionContext ctx, MavenRepository repository) {
-        return downloadArtifactAndDependencies(groupId, artifactId, version, ctx, repository, true);
-    }
-
-    public static List<Path> downloadArtifactAndDependencies(String groupId, String artifactId, String version, ExecutionContext ctx, MavenRepository repository, boolean normalizeRepositories) {
-        MavenPomDownloader mavenPomDownloader = new MavenPomDownloader(new InMemoryMavenPomCache(),
-                Collections.emptyMap(), ctx, normalizeRepositories);
         List<MavenRepository> repositories = new ArrayList<>();
-        repositories.add(repository);
+        repositories.add(SUPER_POM_REPOSITORY);
+        return downloadArtifactAndDependencies(groupId, artifactId, version, ctx, repositories);
+    }
+
+    public static List<Path> downloadArtifactAndDependencies(String groupId, String artifactId, String version, ExecutionContext ctx, List<MavenRepository> repositories) {
+        MavenPomDownloader mavenPomDownloader = new MavenPomDownloader(new InMemoryMavenPomCache(),
+                Collections.emptyMap(), ctx);
         RawMaven rawMaven = mavenPomDownloader.download(groupId, artifactId, version, null, null,
                 repositories, ctx);
         if (rawMaven == null) {
             return Collections.emptyList();
         }
+        MavenExecutionContextView mavenCtx = new MavenExecutionContextView(ctx);
+        mavenCtx.setRepositories(repositories);
         Xml.Document xml = new RawMavenResolver(mavenPomDownloader, Collections.emptyList(), true, ctx, null).resolve(rawMaven, new HashMap<>());
         if (xml == null) {
             return Collections.emptyList();
         }
         Maven maven = new Maven(xml);
+        Pom pom = maven.getModel();
         MavenArtifactDownloader mavenArtifactDownloader = new MavenArtifactDownloader(ReadOnlyLocalMavenArtifactCache.MAVEN_LOCAL.orElse(
                 new LocalMavenArtifactCache(Paths.get(System.getProperty("user.home"), ".rewrite-cache", "artifacts"))
         ), null, ctx.getOnError());
         List<Path> artifactPaths = new ArrayList<>();
-        artifactPaths.add(mavenArtifactDownloader.downloadArtifact(new Pom.Dependency(repository, Scope.Compile, null, null, false, new Pom(
-                groupId,
-                artifactId,
-                version,
+        artifactPaths.add(mavenArtifactDownloader.downloadArtifact(new Pom.Dependency(pom.getRepositories().iterator().next(), Scope.Compile, null, null, false, new Pom(
+                pom.getGroupId(),
+                pom.getArtifactId(),
+                pom.getVersion(),
                 null,
                 null,
                 null,
@@ -80,7 +80,7 @@ public class MavenArtifactHelper {
                 repositories,
                 Collections.emptyMap(),
                 Collections.emptyMap()
-        ), null, null, Collections.emptySet())));
+        ), null, pom.getSnapshotVersion(), Collections.emptySet())));
         for (Pom.Dependency dependency : collectTransitiveDependencies(maven.getModel().getDependencies(),
                 d -> !d.isOptional() && d.getScope() != Scope.Test)) {
             artifactPaths.add(mavenArtifactDownloader.downloadArtifact(dependency));

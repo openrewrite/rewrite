@@ -17,7 +17,9 @@ package org.openrewrite.maven
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
+import org.openrewrite.maven.tree.MavenRepository
 import org.openrewrite.maven.utilities.MavenArtifactHelper
+import java.net.URI
 
 class MavenArtifactHelperIntegTest {
 
@@ -25,9 +27,10 @@ class MavenArtifactHelperIntegTest {
     fun downloadArtifactAndDependencies() {
         val artifactPaths = MavenArtifactHelper.downloadArtifactAndDependencies(
                 "org.openrewrite.recipe",
-                "rewrite-testing-frameworks",
-                "1.1.0",
-                InMemoryExecutionContext { t -> t.printStackTrace() })
+                "rewrite-spring",
+                "4.0.0",
+                InMemoryExecutionContext { t -> t.printStackTrace() }
+        )
         println(artifactPaths)
     }
 }

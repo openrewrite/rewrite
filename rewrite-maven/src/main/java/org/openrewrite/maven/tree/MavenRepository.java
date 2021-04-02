@@ -16,11 +16,9 @@
 package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.AccessLevel;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.With;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.net.URI;
@@ -28,6 +26,8 @@ import java.net.URI;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Data
+@RequiredArgsConstructor
+@AllArgsConstructor
 public class MavenRepository {
     @EqualsAndHashCode.Include
     @With
@@ -38,6 +38,8 @@ public class MavenRepository {
 
     boolean releases;
     boolean snapshots;
+    @NonFinal
+    boolean knownToExist = false;
 
     // Prevent user credentials from being inadvertently serialized
     @With
