@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.tree;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -27,7 +28,6 @@ import java.net.URI;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Data
 @RequiredArgsConstructor
-@AllArgsConstructor
 public class MavenRepository {
     @EqualsAndHashCode.Include
     @With
@@ -38,6 +38,7 @@ public class MavenRepository {
 
     boolean releases;
     boolean snapshots;
+
     @NonFinal
     boolean knownToExist = false;
 
@@ -51,6 +52,17 @@ public class MavenRepository {
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     @Nullable
     String password;
+
+    @JsonIgnore
+    public MavenRepository(String id, URI uri, boolean releases, boolean snapshots, boolean knownToExist, @Nullable String username, @Nullable String password) {
+        this.id = id;
+        this.uri = uri;
+        this.releases = releases;
+        this.snapshots = snapshots;
+        this.knownToExist = knownToExist;
+        this.username = username;
+        this.password = password;
+    }
 
     public boolean acceptsVersion(String version) {
         if (version.endsWith("-SNAPSHOT")) {
