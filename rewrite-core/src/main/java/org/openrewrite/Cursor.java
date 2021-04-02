@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -209,6 +210,15 @@ public class Cursor {
             messages = new HashMap<>();
         }
         messages.put(key, value);
+    }
+
+    @Incubating(since = "7.1.0")
+    public <T> T computeMessageIfAbsent(String key, Function<String, ? extends T> mappingFunction) {
+        if (messages == null) {
+            messages = new HashMap<>();
+        }
+        @SuppressWarnings("unchecked") T t = (T) messages.computeIfAbsent(key, mappingFunction);
+        return t;
     }
 
     /**

@@ -105,6 +105,26 @@ class ExcludeDependencyTest : MavenRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/407")
+    @Test
+    fun dontExcludeADependencyFromItself() = assertUnchanged(
+        recipe = ExcludeDependency("junit","junit", "compile"),
+        before = """
+            <project>
+                <groupId>com.example</groupId>
+                <artifactId>demo</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>junit</groupId>
+                        <artifactId>junit</artifactId>
+                        <version>4.13.2</version>
+                    </dependency>
+                </dependencies>
+            </project>
+        """
+    )
+
     @Test
     fun excludeJUnitInCompileScope() = assertChanged(
         recipe = ExcludeDependency("junit","junit", "compile"),

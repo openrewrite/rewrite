@@ -13,7 +13,7 @@ on:
 
 env:
   GRADLE_OPTS: '-Dorg.gradle.jvmargs="-Xmx2048m -XX:+HeapDumpOnOutOfMemoryError"'
-  GRADLE_SWITCHES: "-s --console=plain --info --stacktrace"
+  GRADLE_SWITCHES: "--console=plain --info --stacktrace --no-daemon"
 
 jobs:
   build:
@@ -68,7 +68,7 @@ jobs:
       - name: publish-snapshots
         if: github.event_name == 'push'
         timeout-minutes: 30
-        run: ./gradlew ${GRADLE_SWITCHES} snapshot publish -PforceSigning
+        run: ./gradlew ${GRADLE_SWITCHES} snapshot publish -PforceSigning -x test
         env:
           ORG_GRADLE_PROJECT_sonatypeUsername: ${{ secrets.OSSRH_USERNAME }}
           ORG_GRADLE_PROJECT_sonatypePassword: ${{ secrets.OSSRH_TOKEN }}

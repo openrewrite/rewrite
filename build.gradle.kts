@@ -32,6 +32,8 @@ plugins {
     id("nebula.javadoc-jar") version "17.3.2" apply false
     id("nebula.source-jar") version "17.3.2" apply false
     id("nebula.maven-apache-license") version "17.3.2" apply false
+
+    id("org.openrewrite.rewrite") version "3.1.0" apply false
 }
 
 configure<nebula.plugin.release.git.base.ReleasePluginExtension> {
@@ -69,6 +71,15 @@ subprojects {
         apply(plugin = "nebula.javadoc-jar")
         apply(plugin = "nebula.source-jar")
         apply(plugin = "nebula.maven-apache-license")
+
+        // applied on a small set of projects for the moment (rewrite-test) for testing, todo
+        if(name.contains("rewrite-test")) {
+            apply(plugin = "org.openrewrite.rewrite")
+            configure<org.openrewrite.gradle.RewriteExtension> {
+                activeRecipe("org.openrewrite.java.format.AutoFormat")
+                sourceSets = listOf(project.sourceSets.getByName("main"))
+            }
+        }
 
         signing {
             setRequired({

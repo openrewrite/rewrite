@@ -51,7 +51,7 @@ abstract class JavaVisitorCompatibilityKit {
     inner class ChangeMethodTargetToVariableTck : ChangeMethodTargetToVariableTest
 
     @Nested
-    inner class ChangePackage : ChangePackageTest
+    inner class ChangePackageTck : ChangePackageTest
 
     @Nested
     inner class ChangeTypeTck : ChangeTypeTest

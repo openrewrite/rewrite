@@ -35,6 +35,11 @@ import java.util.regex.Pattern;
 import static java.util.stream.Collectors.toList;
 
 public interface JavaParser extends Parser<J.CompilationUnit> {
+
+    List<Path> runtimeClasspath = Collections.unmodifiableList(Arrays.stream(System.getProperty("java.class.path").split("\\Q" + System.getProperty("path.separator") + "\\E"))
+            .map(cpEntry -> new File(cpEntry).toPath())
+            .collect(toList()));
+
     /**
      * Convenience utility for constructing a parser with binary dependencies on the runtime classpath of the process
      * constructing the parser.
@@ -50,9 +55,8 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
                 .map(name -> Pattern.compile(name + "-.*?\\.jar$"))
                 .collect(toList());
 
-        return Arrays.stream(System.getProperty("java.class.path").split("\\Q" + System.getProperty("path.separator") + "\\E"))
-                .filter(cpEntry -> artifactNamePatterns.stream().anyMatch(namePattern -> namePattern.matcher(cpEntry).find()))
-                .map(cpEntry -> new File(cpEntry).toPath())
+        return runtimeClasspath.stream()
+                .filter(cpEntry -> artifactNamePatterns.stream().anyMatch(namePattern -> namePattern.matcher(cpEntry.toString()).find()))
                 .collect(toList());
     }
 
@@ -118,7 +122,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     }
 
     /**
-     * Clear any in-memory parser caches that may prevent reparsing of classes with the same fully qualified name in
+     * Clear any in-memory parser caches that may prevent re-parsing of classes with the same fully qualified name in
      * different rounds
      */
     JavaParser reset();
@@ -133,7 +137,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     @SuppressWarnings("unchecked")
     abstract class Builder<P extends JavaParser, B extends Builder<P, B>> {
         @Nullable
-        protected Collection<Path> classpath;
+        protected Collection<Path> classpath = runtimeClasspath;
 
         @Nullable
         protected Collection<Input> dependsOn;
