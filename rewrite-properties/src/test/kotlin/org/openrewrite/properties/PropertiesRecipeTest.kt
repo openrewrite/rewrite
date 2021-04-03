@@ -24,7 +24,7 @@ interface PropertiesRecipeTest : RecipeTest {
         get() = PropertiesParser()
 
     override val treePrinter: TreePrinter<*>?
-        get() = SearchResult.printer("<!--~~>-->/", "<!--~~(%s)~~>-->")
+        get() = SearchResult.printer<Any>("<!--~~>-->/", "<!--~~(%s)~~>-->")
 
     fun assertChanged(
         @Language("properties") before: String,
@@ -88,7 +88,7 @@ interface PropertiesRecipeTest : RecipeTest {
     ) {
         super.assertChanged(parser, recipe, before, emptyArray(), after, cycles) {}
     }
-    
+
     override fun assertChanged(
         parser: Parser<*>?,
         recipe: Recipe?,
@@ -148,7 +148,7 @@ interface PropertiesRecipeTest : RecipeTest {
     ) {
         super.assertUnchanged(parser, recipe, before, dependsOn)
     }
-    
+
     override fun assertUnchanged(
         parser: Parser<*>?,
         recipe: Recipe?,

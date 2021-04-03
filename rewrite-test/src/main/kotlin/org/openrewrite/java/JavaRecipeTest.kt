@@ -25,8 +25,8 @@ interface JavaRecipeTest : RecipeTest {
             .logCompilationWarningsAndErrors(true)
             .build()
 
-    override val treePrinter: TreePrinter<*>?
-        get() = SearchResult.printer("/*~~>*/", "/*~~(%s)~~>*/")
+//    override val treePrinter: TreePrinter<*>?
+//        get() = SearchResult.printer<Nothing>("/*~~>*/", "/*~~(%s)~~>*/")
 
     fun assertChanged(
         @Language("java") before: String,

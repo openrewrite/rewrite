@@ -23,9 +23,6 @@ interface XmlRecipeTest : RecipeTest {
     override val parser: XmlParser
         get() = XmlParser()
 
-    override val treePrinter: TreePrinter<*>?
-        get() = SearchResult.printer("<!--~~>-->", "<!--~~(%s)~~>-->")
-
     fun assertChanged(
         @Language("xml") before: String,
         @Language("xml") dependsOn: Array<String>,
@@ -88,7 +85,7 @@ interface XmlRecipeTest : RecipeTest {
     ) {
         super.assertChanged(parser, recipe, before, emptyArray(), after, cycles) {}
     }
-    
+
     override fun assertChanged(
         parser: Parser<*>?,
         recipe: Recipe?,

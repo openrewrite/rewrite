@@ -28,6 +28,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.internal.XmlListMarkersVisitor;
@@ -47,6 +48,8 @@ import static org.openrewrite.Tree.randomId;
  */
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public interface Xml extends Serializable, Tree {
+
+    TreePrinter<?> DEFAULT_PRINTER = SearchResult.printer("<!--~~>-->", "<!--~~(%s)~~>-->");
 
     @SuppressWarnings("unchecked")
     @Override
@@ -71,7 +74,14 @@ public interface Xml extends Serializable, Tree {
 
     @Override
     default <P> String print(P p) {
-        return print(TreePrinter.identity(), p);
+        //noinspection unchecked
+        return print((TreePrinter<P>) DEFAULT_PRINTER, p);
+    }
+
+    @Override
+    default String print() {
+        //noinspection unchecked
+        return print((TreePrinter<Object>) DEFAULT_PRINTER, new Object());
     }
 
     String getPrefix();

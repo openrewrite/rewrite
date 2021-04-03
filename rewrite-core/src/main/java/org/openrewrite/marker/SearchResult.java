@@ -23,7 +23,7 @@ import org.openrewrite.internal.lang.Nullable;
 import java.util.Optional;
 
 /**
- * Mark any AST element with "paint". Used by search visitors to mark AST elements that
+ * Mark any AST element as the result of a search. Used by search visitors to mark AST elements that
  * match the search criteria. By painting AST elements in a tree, search results can be
  * contextualized in the tree that they are found in.
  */
@@ -31,13 +31,19 @@ import java.util.Optional;
 public interface SearchResult extends Marker {
     TreePrinter<Void> PRINTER = printer("~~>", "~~(%s)~~>");
 
-    static TreePrinter<Void> printer(String markerText, String markerTextWithDescription) {
-        return new TreePrinter<Void>() {
+    /**
+     * @param markerText The text to be output when encountering a SearchResult with no description
+     * @param markerTextWithDescription The text to be output when encountering a SearchResult with a description.
+     *                                  Use "%s" inside of this string where the description text should be interpolated in.
+     * @return a TreePrinter that uses the specified text for any SearchResult markers encountered on a Tree.
+     */
+    static <T> TreePrinter<T> printer(String markerText, String markerTextWithDescription) {
+        return new TreePrinter<T>() {
             private SearchResult marker;
             private Integer mark;
 
             @Override
-            public void doBefore(Tree tree, StringBuilder printerAcc, Void unused) {
+            public void doBefore(Tree tree, StringBuilder printerAcc, T unused) {
                 Optional<SearchResult> marker = tree.getMarkers().findFirst(SearchResult.class);
                 if (marker.isPresent()) {
                     this.marker = marker.get();
@@ -46,7 +52,7 @@ public interface SearchResult extends Marker {
             }
 
             @Override
-            public void doAfter(Tree tree, StringBuilder printerAcc, Void unused) {
+            public void doAfter(Tree tree, StringBuilder printerAcc, T unused) {
                 if (mark != null) {
                     for (int i = mark; i < printerAcc.length(); i++) {
                         if (!Character.isWhitespace(printerAcc.charAt(i))) {

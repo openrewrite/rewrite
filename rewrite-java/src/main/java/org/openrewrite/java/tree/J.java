@@ -31,6 +31,7 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.*;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
 
 import java.io.Serializable;
 import java.lang.ref.WeakReference;
@@ -51,6 +52,9 @@ import static java.util.stream.Collectors.toList;
 @SuppressWarnings("unused")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public interface J extends Serializable, Tree {
+
+    TreePrinter<?> DEFAULT_PRINTER = SearchResult.printer("/*~~>*/", "/*~~(%s)~~>*/");
+
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
@@ -73,7 +77,14 @@ public interface J extends Serializable, Tree {
 
     @Override
     default <P> String print(P p) {
-        return print(TreePrinter.identity(), p);
+        //noinspection unchecked
+        return print((TreePrinter<P>) DEFAULT_PRINTER, p);
+    }
+
+    @Override
+    default String print() {
+        //noinspection unchecked
+        return print((TreePrinter<Object>) DEFAULT_PRINTER, new Object());
     }
 
     <J2 extends J> J2 withPrefix(Space space);

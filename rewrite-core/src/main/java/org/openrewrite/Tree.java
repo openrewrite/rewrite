@@ -71,7 +71,7 @@ public interface Tree extends Markable {
 
     <P> String print(TreePrinter<P> printer, P p);
 
-    default <P> String print(P p) {
+    default <P> String  print(P p) {
         return print(TreePrinter.identity(), p);
     }
 
