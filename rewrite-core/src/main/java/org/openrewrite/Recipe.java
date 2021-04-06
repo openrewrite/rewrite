@@ -108,7 +108,7 @@ public abstract class Recipe {
     /**
      * A human-readable description for the recipe, consisting of one or more full
      * sentences ending with a period.
-     *
+     * <p>
      * "Find methods by pattern." is an example. The description can be assumed to be rendered in
      * documentation and other places where markdown is understood, so it is possible
      * to use stylistic markers like backticks to indicate types. For example,
@@ -173,11 +173,40 @@ public abstract class Recipe {
         return NOOP;
     }
 
+    /**
+     * A recipe can optionally include an applicability test that can be used to determine whether it should run on a
+     * set of source files (or even be listed in a suggested list of recipes for a particular codebase).
+     *
+     * To identify a tree as applicable, the visitor should mark or otherwise alter the tree at any level. The mutation
+     * that the applicability test visitor makes to the tree will not included in the results.
+     *
+     * @return A tree visitor that performs an applicability test.
+     */
+    @Nullable
+    protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
+        return null;
+    }
+
     @SuppressWarnings("SuspiciousMethodCalls")
     private <S extends SourceFile> List<SourceFile> visitInternal(List<S> before,
                                                                   ExecutionContext ctx,
                                                                   ForkJoinPool forkJoinPool,
                                                                   Map<UUID, Recipe> recipeThatDeletedSourceFile) {
+        if(getApplicableTest() != null) {
+            boolean applicable = false;
+            for (S s : before) {
+                if (getApplicableTest().visit(s, ctx) != s) {
+                    applicable = true;
+                    break;
+                }
+            }
+
+            if (!applicable) {
+                //noinspection unchecked
+                return (List<SourceFile>) before;
+            }
+        }
+
         List<S> after = before;
         // if this recipe isn't valid we just skip it and proceed to next
         if (validate(ctx).isValid()) {
