@@ -17,17 +17,33 @@ package org.openrewrite
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.parallel.Execution
 import org.openrewrite.Tree.randomId
 import org.openrewrite.marker.Markable
 import org.openrewrite.marker.Markers
 import org.openrewrite.text.PlainText
 import org.openrewrite.text.PlainTextVisitor
-import java.lang.RuntimeException
-import java.nio.file.Path
 import java.util.*
 
 class RecipeLifecycleTest {
+    @Test
+    fun notApplicableRecipe() {
+        val results = object : Recipe() {
+            override fun getName() = "test.NotApplicable"
+            override fun getDisplayName(): String {
+                return name
+            }
+
+            override fun getApplicableTest(): TreeVisitor<*, ExecutionContext>? {
+                return NOOP // never going to be applicable
+            }
+
+            override fun visit(before: List<SourceFile>, ctx: ExecutionContext) =
+                before + PlainText(randomId(), Markers.EMPTY, "test")
+        }.run(emptyList())
+
+        assertThat(results).isEmpty()
+    }
+
     @Test
     fun generateFile() {
         val results = object : Recipe() {
