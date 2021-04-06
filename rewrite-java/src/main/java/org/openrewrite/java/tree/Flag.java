@@ -24,6 +24,20 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public enum Flag {
 
+    // The bitmasks in the flags are mapped to their values defined in the Java Language Specification. For references:
+
+    // 0000 0000 0000 0001 public
+    // 0000 0000 0000 0010 private
+    // 0000 0000 0000 0100 protected
+    // 0000 0000 0000 1000 static
+    // 0000 0000 0001 0000 final
+    // 0000 0000 0010 0000 super
+    // 0000 0010 0000 0000 interface
+    // 0000 0100 0000 0000 abstract
+    // 0001 0000 0000 0000 sythetic
+    // 0010 0000 0000 0000 annotation
+    // 0100 0000 0000 0000 enum
+
     Public("public", 1),
     Private("private", 1<<1),
     Protected("protected", 1<<2),

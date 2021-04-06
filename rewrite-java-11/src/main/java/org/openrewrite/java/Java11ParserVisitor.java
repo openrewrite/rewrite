@@ -1174,7 +1174,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             }
         }
 
-        //noinspection unchecked
+        //noinspection unchecked,ConstantConditions
         return (T) expr;
     }
 
@@ -1250,9 +1250,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         JCExpression vartype = node.vartype;
 
         Map<Integer, JCAnnotation> annotationPosTable = new HashMap<>();
-        for (AnnotationTree annotationNode : node.getModifiers().getAnnotations()) {
-            JCAnnotation annotation = (JCAnnotation) annotationNode;
-            annotationPosTable.put(annotation.pos, annotation);
+        for (JCAnnotation annotationNode : node.getModifiers().getAnnotations()) {
+            annotationPosTable.put(annotationNode.pos, annotationNode);
         }
         ModifierResults modifierResults = sortedModifiersAndAnnotations(node.getModifiers(), annotationPosTable);
 
@@ -1433,7 +1432,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         return converted;
     }
 
-    private JContainer<Expression> convertTypeParameters(@Nullable List<? extends Tree> typeArguments) {
+    @Nullable private JContainer<Expression> convertTypeParameters(@Nullable List<? extends Tree> typeArguments) {
         if (typeArguments == null) {
             return null;
         }
@@ -1515,10 +1514,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     @Nullable
     private JavaType.Method methodType(com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol, String methodName) {
         // if the symbol is not a method symbol, there is a parser error in play
-        Symbol.MethodSymbol genericSymbol = symbol instanceof Symbol.MethodSymbol ? (Symbol.MethodSymbol) symbol : null;
+        Symbol.MethodSymbol methodSymbol = symbol instanceof Symbol.MethodSymbol ? (Symbol.MethodSymbol) symbol : null;
 
         JavaType.Method type = null;
-        if (genericSymbol != null && selectType != null) {
+        if (methodSymbol != null && selectType != null) {
             Function<com.sun.tools.javac.code.Type, JavaType.Method.Signature> signature = t -> {
                 if (t instanceof MethodType) {
                     MethodType mt = (MethodType) t;
@@ -1537,26 +1536,37 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             };
 
             JavaType.Method.Signature genericSignature;
-            if (genericSymbol.type instanceof com.sun.tools.javac.code.Type.ForAll) {
-                genericSignature = signature.apply(((com.sun.tools.javac.code.Type.ForAll) genericSymbol.type).qtype);
+            if (methodSymbol.type instanceof com.sun.tools.javac.code.Type.ForAll) {
+                genericSignature = signature.apply(((com.sun.tools.javac.code.Type.ForAll) methodSymbol.type).qtype);
             } else {
-                genericSignature = signature.apply(genericSymbol.type);
+                genericSignature = signature.apply(methodSymbol.type);
             }
 
             List<String> paramNames = new ArrayList<>();
-            for (Symbol.VarSymbol p : genericSymbol.params()) {
+            for (Symbol.VarSymbol p : methodSymbol.params()) {
                 String s = p.name.toString();
                 paramNames.add(s);
             }
 
+            List<JavaType.FullyQualified> exceptionTypes = new ArrayList<>();
+            if (selectType instanceof MethodType) {
+                for (com.sun.tools.javac.code.Type exceptionType : ((MethodType) selectType).thrown) {
+                    if (exceptionType != null) {
+                        JavaType.FullyQualified javaType = (JavaType.FullyQualified) type(exceptionType);
+                        exceptionTypes.add(javaType);
+                    }
+                }
+            }
+
             return JavaType.Method.build(
-                    TypeUtils.asClass(type(genericSymbol.owner)),
+                    //Currently only the first 16 bits are meaninful
+                    (int) methodSymbol.flags_field & 0xFFFF,
+                    TypeUtils.asClass(type(methodSymbol.owner)),
                     methodName,
                     genericSignature,
                     signature.apply(selectType),
                     paramNames,
-                    //Currently only the first 16 bits are meaninful
-                    (int) genericSymbol.flags_field & 0xFFFF
+                    Collections.unmodifiableList(exceptionTypes)
             );
         }
 
@@ -1617,10 +1627,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                         for (Symbol elem : sym.members_field.getSymbols()) {
                             if (elem instanceof Symbol.VarSymbol) {
                                 fields.add(new JavaType.Variable(
-                                        elem.name.toString(),
-                                        type(elem.type, stackWithSym),
                                         //Currently only the first 16 bits are meaninful
-                                        (int) elem.flags_field & 0xFFFF
+                                        (int) elem.flags_field & 0xFFFF,
+                                        elem.name.toString(),
+                                        type(elem.type, stackWithSym)
                                 ));
                             }
                         }
@@ -1670,9 +1680,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                         owner = TypeUtils.asClass(type(sym.owner.type, stackWithSym));
                     }
                     JavaType.Class clazz = JavaType.Class.build(
-                            sym.className(),
                             //Currently only the first 16 bits are meaninful
                             (int) sym.flags_field & 0xFFFF,
+                            sym.className(),
                             kind,
                             fields,
                             typeParameters,
