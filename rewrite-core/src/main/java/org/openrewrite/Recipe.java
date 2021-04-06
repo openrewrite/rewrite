@@ -182,6 +182,7 @@ public abstract class Recipe {
      *
      * @return A tree visitor that performs an applicability test.
      */
+    @Incubating(since = "7.2.0")
     @Nullable
     protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
         return null;
