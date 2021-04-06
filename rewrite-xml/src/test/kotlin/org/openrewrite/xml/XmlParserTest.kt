@@ -30,7 +30,7 @@ class XmlParserTest {
 
     private fun assertUnchanged(before: String) {
         val xmlDocument = parser.parse(StringUtils.trimIndent(before)).iterator().next()
-        val xmlPrinter = XmlPrinter<ExecutionContext>(TreePrinter.identity())
+        val xmlPrinter = XmlPrinter<ExecutionContext>(TreePrinter.defaultPrinter())
         val after = xmlPrinter.print(xmlDocument, InMemoryExecutionContext())
         assertThat(after).`as`("Source should not be changed").isEqualTo(before)
     }

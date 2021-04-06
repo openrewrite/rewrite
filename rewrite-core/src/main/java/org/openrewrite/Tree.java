@@ -72,11 +72,11 @@ public interface Tree extends Markable {
     <P> String print(TreePrinter printer, P p);
 
     default <P> String  print(P p) {
-        return print(TreePrinter.identity(), p);
+        return print(TreePrinter.defaultPrinter(), p);
     }
 
     default String print() {
-        return print(TreePrinter.identity(), new Object());
+        return print(TreePrinter.defaultPrinter(), new Object());
     }
 
     default <P> String printTrimmed(TreePrinter printer, P p) {
@@ -84,11 +84,11 @@ public interface Tree extends Markable {
     }
 
     default <P> String printTrimmed(P p) {
-        return printTrimmed(TreePrinter.identity(), p);
+        return printTrimmed(TreePrinter.defaultPrinter(), p);
     }
 
     default String printTrimmed() {
-        return printTrimmed(TreePrinter.identity(), new Object());
+        return printTrimmed(TreePrinter.defaultPrinter(), new Object());
     }
 
     default boolean isScope(@Nullable Tree tree) {

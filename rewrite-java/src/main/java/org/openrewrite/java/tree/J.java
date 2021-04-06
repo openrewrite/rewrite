@@ -31,7 +31,6 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.*;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.marker.SearchResult;
 
 import java.io.Serializable;
 import java.lang.ref.WeakReference;
@@ -76,13 +75,13 @@ public interface J extends Serializable, Tree {
     @Override
     default <P> String print(P p) {
         //noinspection unchecked
-        return print(TreePrinter.identity(), p);
+        return print(TreePrinter.defaultPrinter(), p);
     }
 
     @Override
     default String print() {
         //noinspection unchecked
-        return print(TreePrinter.identity(), new Object());
+        return print(TreePrinter.defaultPrinter(), new Object());
     }
 
     <J2 extends J> J2 withPrefix(Space space);

@@ -28,7 +28,7 @@ public class MethodDeclarationToString {
         return METHOD_PRINTER.print(method, null);
     }
 
-    private static final JavaPrinter<Void> METHOD_PRINTER = new JavaPrinter<Void>(TreePrinter.identity()) {
+    private static final JavaPrinter<Void> METHOD_PRINTER = new JavaPrinter<Void>(TreePrinter.defaultPrinter()) {
         @Override
         public J visitMethodDeclaration(J.MethodDeclaration method, Void unused) {
             visitModifiers(Space.formatFirstPrefix(method.getModifiers(), Space.EMPTY), unused);

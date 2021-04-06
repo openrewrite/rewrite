@@ -27,7 +27,7 @@ public class MethodInvocationToString {
         return METHOD_PRINTER.print(method, null);
     }
 
-    private static final JavaPrinter<Void> METHOD_PRINTER = new JavaPrinter<Void>(TreePrinter.identity()) {
+    private static final JavaPrinter<Void> METHOD_PRINTER = new JavaPrinter<Void>(TreePrinter.defaultPrinter()) {
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, Void unused) {
             StringBuilder acc = getPrinter();

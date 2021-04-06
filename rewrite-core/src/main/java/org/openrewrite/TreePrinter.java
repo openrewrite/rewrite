@@ -24,7 +24,7 @@ public interface TreePrinter {
     /**
      * Prints out the input it was given with no modifications.
      */
-    TreePrinter IDENTITY = new TreePrinter() {
+    TreePrinter DEFAULT = new TreePrinter() {
         private SearchResult marker;
         private Integer mark;
 
@@ -51,8 +51,8 @@ public interface TreePrinter {
         }
     };
 
-    static TreePrinter identity() {
-        return IDENTITY;
+    static TreePrinter defaultPrinter() {
+        return DEFAULT;
     }
 
     /**

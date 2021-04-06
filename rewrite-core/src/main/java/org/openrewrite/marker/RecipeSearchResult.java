@@ -43,23 +43,4 @@ public class RecipeSearchResult implements SearchResult {
         this.recipe = recipe;
         description = null;
     }
-
-    public Recipe getRecipe() {
-        return recipe;
-    }
-
-    @Override
-    public @Nullable String getDescription() {
-        return description;
-    }
-
-    @Override
-    public String print() {
-        String description = getDescription();
-        if(description == null) {
-            return "/*~~>*/";
-        } else {
-            return String.format("/*~~(%s)~~>*/", description);
-        }
-    }
 }

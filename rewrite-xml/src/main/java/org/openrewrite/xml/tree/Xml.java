@@ -28,7 +28,6 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.marker.SearchResult;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.internal.XmlListMarkersVisitor;
@@ -72,12 +71,12 @@ public interface Xml extends Serializable, Tree {
 
     @Override
     default <P> String print(P p) {
-        return print(TreePrinter.identity(), p);
+        return print(TreePrinter.defaultPrinter(), p);
     }
 
     @Override
     default String print() {
-        return print(TreePrinter.identity(), new Object());
+        return print(TreePrinter.defaultPrinter(), new Object());
     }
 
     String getPrefix();

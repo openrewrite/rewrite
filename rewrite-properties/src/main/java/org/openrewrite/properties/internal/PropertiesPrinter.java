@@ -29,9 +29,9 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<P> {
 
     private static final String PRINTER_ACC_KEY = "printed";
 
-    private final TreePrinter<P> treePrinter;
+    private final TreePrinter treePrinter;
 
-    public PropertiesPrinter(TreePrinter<P> treePrinter) {
+    public PropertiesPrinter(TreePrinter treePrinter) {
         this.treePrinter = treePrinter;
     }
 

@@ -104,7 +104,7 @@ class RecipeLifecycleTest {
         override fun getMarkers(): Markers = throw NotImplementedError()
         override fun <M : Markable?> withMarkers(markers: Markers): M = throw NotImplementedError()
         override fun getId(): UUID = throw NotImplementedError()
-        override fun <P : Any?> print(printer: TreePrinter<P>, p: P) = throw NotImplementedError()
+        override fun <P : Any?> print(printer: TreePrinter, p: P) = throw NotImplementedError()
         override fun getSourcePath() = throw NotImplementedError()
     }
 

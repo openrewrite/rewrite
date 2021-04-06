@@ -28,7 +28,7 @@ public class VariableDeclarationsToString {
         return VARIABLE_PRINTER.print(v, null);
     }
 
-    private static final JavaPrinter<Void> VARIABLE_PRINTER = new JavaPrinter<Void>(TreePrinter.identity()) {
+    private static final JavaPrinter<Void> VARIABLE_PRINTER = new JavaPrinter<Void>(TreePrinter.defaultPrinter()) {
         @Override
         public J visitVariableDeclarations(J.VariableDeclarations multiVariable, Void unused) {
             visitModifiers(Space.formatFirstPrefix(multiVariable.getModifiers(), Space.EMPTY), unused);

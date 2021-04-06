@@ -43,7 +43,7 @@ public class JavaTemplatePrinter extends JavaPrinter<Cursor> {
 
 
     public JavaTemplatePrinter(String code, Tree changing, JavaCoordinates coordinates, Set<String> imports) {
-        super(TreePrinter.identity());
+        super(TreePrinter.defaultPrinter());
         this.code = "/*" + SNIPPET_MARKER_START + "*/" + code + "/*" + SNIPPET_MARKER_END + "*/";
         this.coordinates = coordinates;
         this.changing = changing;

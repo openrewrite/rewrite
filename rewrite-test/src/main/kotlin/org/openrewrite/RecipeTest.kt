@@ -17,7 +17,9 @@ package org.openrewrite
 
 import org.assertj.core.api.Assertions.*
 import org.junit.jupiter.api.fail
+import org.openrewrite.marker.SearchResult
 import java.io.File
+import java.util.*
 
 interface RecipeTest {
     val recipe: Recipe?
@@ -128,7 +130,7 @@ interface RecipeTest {
 
         assertThat(result).`as`("The recipe must make changes").isNotNull
         assertThat(result!!.after).isNotNull
-        assertThat(result.after!!.printTrimmed(treePrinter ?: TreePrinter.identity()))
+        assertThat(result.after!!.printTrimmed(treePrinter ?: TreePrinter.defaultPrinter()))
             .isEqualTo(after.trimIndent())
         afterConditions(result.after as T)
     }
@@ -195,6 +197,45 @@ interface RecipeTest {
 
         override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
             return visitor
+        }
+    }
+
+    /**
+     * Returns a TreePrinter which ignores the result of SearchResult.print(), preferring markerText and markerTextWithDescription
+     */
+    fun printer(markerText: String, markerTextWithDescription: String): TreePrinter {
+        return object : TreePrinter {
+            private var marker: SearchResult? = null
+            private var mark: Int? = null
+            override fun doBefore(tree: Tree, printerAcc: StringBuilder, unused: Any) {
+                val marker: Optional<SearchResult> = tree.markers.findFirst(SearchResult::class.java)
+                if (marker.isPresent) {
+                    this.marker = marker.get()
+                    mark = printerAcc.length
+                }
+            }
+
+            override fun doAfter(tree: Tree?, printerAcc: StringBuilder, unused: Any) {
+                if (mark != null && marker != null) {
+                    for (i in mark!! until printerAcc.length) {
+                        if (!Character.isWhitespace(printerAcc[i])) {
+                            printerAcc.insert(
+                                i,
+                                if (marker!!.description == null) {
+                                    markerText
+                                } else {
+                                    String.format(
+                                        markerTextWithDescription,
+                                        marker!!.description
+                                    )
+                                }
+                            )
+                            break
+                        }
+                    }
+                    mark = null
+                }
+            }
         }
     }
 }

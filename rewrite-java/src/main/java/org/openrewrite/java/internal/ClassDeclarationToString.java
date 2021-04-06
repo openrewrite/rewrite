@@ -28,7 +28,7 @@ public class ClassDeclarationToString {
         return CLASS_DECL_PRINTER.print(clazz, null);
     }
 
-    private static final JavaPrinter<Void> CLASS_DECL_PRINTER = new JavaPrinter<Void>(TreePrinter.identity()) {
+    private static final JavaPrinter<Void> CLASS_DECL_PRINTER = new JavaPrinter<Void>(TreePrinter.defaultPrinter()) {
         @Override
         public J visitClassDeclaration(J.ClassDeclaration classDecl, Void unused) {
             visitModifiers(Space.formatFirstPrefix(classDecl.getModifiers(), Space.EMPTY), unused);

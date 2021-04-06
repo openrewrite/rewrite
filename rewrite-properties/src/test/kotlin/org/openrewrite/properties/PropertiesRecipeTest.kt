@@ -23,8 +23,8 @@ interface PropertiesRecipeTest : RecipeTest {
     override val parser: PropertiesParser
         get() = PropertiesParser()
 
-    override val treePrinter: TreePrinter<*>?
-        get() = SearchResult.printer<Any>("<!--~~>-->/", "<!--~~(%s)~~>-->")
+    override val treePrinter: TreePrinter?
+        get() = printer("<!--~~>-->/", "<!--~~(%s)~~>-->")
 
     fun assertChanged(
         @Language("properties") before: String,

@@ -63,7 +63,7 @@ public class Result {
      * @return Git-style patch diff representing the changes to this compilation unit.
      */
     public String diff() {
-        return diff(TreePrinter.identity());
+        return diff(TreePrinter.defaultPrinter());
     }
 
     /**

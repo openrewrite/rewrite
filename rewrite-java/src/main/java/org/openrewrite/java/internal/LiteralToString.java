@@ -25,7 +25,7 @@ public class LiteralToString {
         return LITERAL_PRINTER.print(clazz, null);
     }
 
-    private static final JavaPrinter<Void> LITERAL_PRINTER = new JavaPrinter<Void>(TreePrinter.identity()) {
+    private static final JavaPrinter<Void> LITERAL_PRINTER = new JavaPrinter<Void>(TreePrinter.defaultPrinter()) {
         @Override
         public J visitLiteral(J.Literal literal, Void unused) {
             StringBuilder acc = getPrinter();

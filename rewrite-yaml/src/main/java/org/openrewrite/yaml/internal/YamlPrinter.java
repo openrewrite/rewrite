@@ -29,9 +29,9 @@ public class YamlPrinter<P> extends YamlVisitor<P> {
 
     private static final String PRINTER_ACC_KEY = "printed";
 
-    private final TreePrinter<P> treePrinter;
+    private final TreePrinter treePrinter;
 
-    public YamlPrinter(TreePrinter<P> treePrinter) {
+    public YamlPrinter(TreePrinter treePrinter) {
         this.treePrinter = treePrinter;
     }
 
