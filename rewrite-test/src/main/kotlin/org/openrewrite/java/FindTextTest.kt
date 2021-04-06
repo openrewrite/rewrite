@@ -51,7 +51,7 @@ interface FindTextTest : JavaRecipeTest {
     fun findSecrets(jp: JavaParser) = assertChanged(
         jp,
         recipe = Environment.builder()
-            .scanClasspath(emptyList())
+            .scanRuntimeClasspath()
             .build()
             .activateRecipes("org.openrewrite.java.search.FindSecrets"),
         before = """

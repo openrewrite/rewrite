@@ -18,8 +18,8 @@ package org.openrewrite.maven.utilities;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.maven.MavenExecutionContextView;
-import org.openrewrite.maven.cache.InMemoryMavenPomCache;
 import org.openrewrite.maven.cache.LocalMavenArtifactCache;
+import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.cache.ReadOnlyLocalMavenArtifactCache;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.RawMaven;
@@ -38,14 +38,26 @@ public class MavenArtifactHelper {
     private static final MavenRepository SUPER_POM_REPOSITORY = new MavenRepository("central",
             URI.create("https://repo.maven.apache.org/maven2"), true, false, null, null);
 
-    public static List<Path> downloadArtifactAndDependencies(String groupId, String artifactId, String version, ExecutionContext ctx) {
+    public static List<Path> downloadArtifactAndDependencies(String groupId, String artifactId, String version, ExecutionContext ctx, MavenPomCache mavenPomCache) {
         List<MavenRepository> repositories = new ArrayList<>();
         repositories.add(SUPER_POM_REPOSITORY);
-        return downloadArtifactAndDependencies(groupId, artifactId, version, ctx, repositories);
+        return downloadArtifactAndDependencies(groupId, artifactId, version, ctx, mavenPomCache, repositories);
     }
 
-    public static List<Path> downloadArtifactAndDependencies(String groupId, String artifactId, String version, ExecutionContext ctx, List<MavenRepository> repositories) {
-        MavenPomDownloader mavenPomDownloader = new MavenPomDownloader(new InMemoryMavenPomCache(),
+    /**
+     * Download artifact specified by GAV from specified maven repositories, plus all runtime dependencies. Maven central
+     * will be added as a repository by default.
+     *
+     * @param groupId Group ID
+     * @param artifactId Artifact ID
+     * @param version Version
+     * @param ctx Execution context
+     * @param mavenPomCache Pom download cache
+     * @param repositories Maven repositories to download from
+     * @return List of paths to downloaded artifacts
+     */
+    public static List<Path> downloadArtifactAndDependencies(String groupId, String artifactId, String version, ExecutionContext ctx, MavenPomCache mavenPomCache, List<MavenRepository> repositories) {
+        MavenPomDownloader mavenPomDownloader = new MavenPomDownloader(mavenPomCache,
                 Collections.emptyMap(), ctx);
         RawMaven rawMaven = mavenPomDownloader.download(groupId, artifactId, version, null, null,
                 repositories, ctx);
@@ -61,7 +73,7 @@ public class MavenArtifactHelper {
         Maven maven = new Maven(xml);
         Pom pom = maven.getModel();
         MavenArtifactDownloader mavenArtifactDownloader = new MavenArtifactDownloader(ReadOnlyLocalMavenArtifactCache.MAVEN_LOCAL.orElse(
-                new LocalMavenArtifactCache(Paths.get(System.getProperty("user.home"), ".rewrite-cache", "artifacts"))
+                new LocalMavenArtifactCache(Paths.get(System.getProperty("user.home"), ".rewrite", "cache", "artifacts"))
         ), null, ctx.getOnError());
         List<Path> artifactPaths = new ArrayList<>();
         artifactPaths.add(mavenArtifactDownloader.downloadArtifact(new Pom.Dependency(pom.getRepositories().iterator().next(), Scope.Compile, null, null, false, new Pom(
@@ -81,14 +93,21 @@ public class MavenArtifactHelper {
                 Collections.emptyMap(),
                 Collections.emptyMap()
         ), null, pom.getSnapshotVersion(), Collections.emptySet())));
-        for (Pom.Dependency dependency : collectTransitiveDependencies(maven.getModel().getDependencies(),
+        for (Pom.Dependency dependency : collectDependencies(maven.getModel().getDependencies(),
                 d -> !d.isOptional() && d.getScope() != Scope.Test)) {
             artifactPaths.add(mavenArtifactDownloader.downloadArtifact(dependency));
         }
         return artifactPaths;
     }
 
-    public static List<Pom.Dependency> collectTransitiveDependencies(Collection<Pom.Dependency> dependencies, Predicate<Pom.Dependency> dependencyFilter) {
+    /**
+     * Collect all downstream dependencies of the specified set of dependencies that match the specified filter
+     *
+     * @param dependencies Original set of maven dependencies to collect dependencies for
+     * @param dependencyFilter Downstream dependency filter, which can be used to limit downstream dependency scopes, for example
+     * @return List of downstream dependencies
+     */
+    public static List<Pom.Dependency> collectDependencies(Collection<Pom.Dependency> dependencies, Predicate<Pom.Dependency> dependencyFilter) {
         return new ArrayList<>(traverseDependencies(dependencies, new LinkedHashMap<>(), dependencyFilter).values());
     }
 

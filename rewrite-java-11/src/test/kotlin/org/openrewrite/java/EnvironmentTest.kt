@@ -25,7 +25,7 @@ class EnvironmentTest {
 
     @Test
     fun listRecipeDescriptors() {
-        val env = Environment.builder().scanClasspath(Collections.emptySet()).build()
+        val env = Environment.builder().scanRuntimeClasspath().build()
         val recipeDescriptors = env.listRecipeDescriptors()
         recipeDescriptors.forEach {
             println()
@@ -58,7 +58,7 @@ class EnvironmentTest {
 
     @Test
     fun listStyles() {
-        val env = Environment.builder().scanClasspath(Collections.emptySet()).build()
+        val env = Environment.builder().scanRuntimeClasspath().build()
         val styles = env.listStyles()
         styles.forEach {
             println()

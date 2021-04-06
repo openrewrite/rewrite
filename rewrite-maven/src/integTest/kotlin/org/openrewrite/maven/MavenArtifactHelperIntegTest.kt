@@ -15,11 +15,11 @@
  */
 package org.openrewrite.maven
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
-import org.openrewrite.maven.tree.MavenRepository
+import org.openrewrite.maven.cache.InMemoryMavenPomCache
 import org.openrewrite.maven.utilities.MavenArtifactHelper
-import java.net.URI
 
 class MavenArtifactHelperIntegTest {
 
@@ -29,8 +29,13 @@ class MavenArtifactHelperIntegTest {
                 "org.openrewrite.recipe",
                 "rewrite-spring",
                 "4.0.0",
-                InMemoryExecutionContext { t -> t.printStackTrace() }
+                InMemoryExecutionContext { t -> t.printStackTrace() },
+                InMemoryMavenPomCache()
         )
+        assertThat(artifactPaths).hasSizeGreaterThan(0)
+        val firstArtifact = artifactPaths[0]
+        assertThat(firstArtifact.fileName.toString()).contains("rewrite-spring")
+        assertThat(firstArtifact.fileName.toString()).endsWith(".jar")
         println(artifactPaths)
     }
 }

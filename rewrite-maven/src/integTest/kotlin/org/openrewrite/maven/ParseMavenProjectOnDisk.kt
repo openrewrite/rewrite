@@ -41,14 +41,14 @@ object ParseMavenProjectOnDisk {
 
         val downloader = MavenArtifactDownloader(
             ReadOnlyLocalMavenArtifactCache.MAVEN_LOCAL.orElse(
-                LocalMavenArtifactCache(Paths.get(System.getProperty("user.home"), ".rewrite-cache", "artifacts"))
+                LocalMavenArtifactCache(Paths.get(System.getProperty("user.home"), ".rewrite", "cache", "artifacts"))
             ),
             null,
             errorConsumer
         )
 
         val pomCache = MapdbMavenPomCache(
-            Paths.get(System.getProperty("user.home"), ".rewrite-cache", "poms").toFile(),
+            Paths.get(System.getProperty("user.home"), ".rewrite", "cache", "poms").toFile(),
             null
         )
 

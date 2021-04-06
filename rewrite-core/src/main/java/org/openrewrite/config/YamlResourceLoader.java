@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.module.kotlin.KotlinModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.openrewrite.Recipe;
@@ -43,21 +44,16 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Validated.invalid;
 
 public class YamlResourceLoader implements ResourceLoader {
-    int refCount = 0;
 
-    private static final ObjectMapper mapper = JsonMapper.builder()
-            .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
-            .build()
-            .registerModule(new ParameterNamesModule())
-            .registerModule(new KotlinModule())
-            .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
-            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+    int refCount = 0;
 
     private static final PropertyPlaceholderHelper propertyPlaceholderHelper =
             new PropertyPlaceholderHelper("${", "}", ":");
 
     private final URI source;
     private final String yamlSource;
+
+    private final ObjectMapper mapper;
 
     private enum ResourceType {
         Recipe("specs.openrewrite.org/v1beta/recipe"),
@@ -82,8 +78,42 @@ public class YamlResourceLoader implements ResourceLoader {
         }
     }
 
+    /**
+     * Load a declarative recipe using the runtime classloader
+     *
+     * @param yamlInput Declarative recipe yaml input stream
+     * @param source Declarative recipe source
+     * @param properties Placeholder properties
+     * @throws UncheckedIOException On unexpected IOException
+     */
     public YamlResourceLoader(InputStream yamlInput, URI source, Properties properties) throws UncheckedIOException {
+        this(yamlInput, source, properties, null);
+    }
+
+    /**
+     * Load a declarative recipe, optionally using the specified classloader
+     *
+     * @param yamlInput Declarative recipe yaml input stream
+     * @param source Declarative recipe source
+     * @param properties Placeholder properties
+     * @param classLoader Optional classloader to use with jackson. If not specified, the runtime classloader will be used.
+     * @throws UncheckedIOException On unexpected IOException
+     */
+    public YamlResourceLoader(InputStream yamlInput, URI source, Properties properties, @Nullable ClassLoader classLoader) throws UncheckedIOException {
         this.source = source;
+
+        mapper = JsonMapper.builder()
+            .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
+            .build()
+            .registerModule(new ParameterNamesModule())
+            .registerModule(new KotlinModule())
+            .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
+        if (classLoader != null) {
+            TypeFactory tf = TypeFactory.defaultInstance().withClassLoader(classLoader);
+            mapper.setTypeFactory(tf);
+        }
 
         try {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
