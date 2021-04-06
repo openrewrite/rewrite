@@ -21,6 +21,7 @@ import org.openrewrite.*;
 import org.openrewrite.marker.RecipeSearchResult;
 import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.maven.tree.Maven;
+import org.openrewrite.xml.search.XmlSearchResult;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashSet;
@@ -70,7 +71,7 @@ public class FindDependency extends Recipe {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
                 if (isDependencyTag(groupId, artifactId)) {
-                    return tag.withMarker(new RecipeSearchResult(FindDependency.this));
+                    return tag.withMarker(new XmlSearchResult(FindDependency.this));
                 }
                 return super.visitTag(tag, context);
             }

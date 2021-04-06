@@ -69,9 +69,9 @@ public abstract class Recipe {
      * This tree printer is used when comparing before/after source files and reifies any markers as a list of
      * hash codes.
      */
-    private static final TreePrinter<ExecutionContext> MARKER_ID_PRINTER = new TreePrinter<ExecutionContext>() {
+    private static final TreePrinter MARKER_ID_PRINTER = new TreePrinter() {
         @Override
-        public void doBefore(@Nullable Tree tree, StringBuilder printerAcc, ExecutionContext executionContext) {
+        public void doBefore(@Nullable Tree tree, StringBuilder printerAcc, Object executionContext) {
             if (tree != null) {
                 String markerIds = tree.getMarkers().entries().stream()
                         .filter(marker -> !(marker instanceof RecipeThatMadeChanges))

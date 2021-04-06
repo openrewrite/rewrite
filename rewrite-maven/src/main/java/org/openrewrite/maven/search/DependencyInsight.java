@@ -22,6 +22,7 @@ import org.openrewrite.marker.RecipeSearchResult;
 import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.Scope;
+import org.openrewrite.xml.search.XmlSearchResult;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
@@ -97,9 +98,9 @@ public class DependencyInsight extends Recipe {
                         Optional<Pom.Dependency> match = dependencies.stream().filter(this::dependencyMatches).findFirst();
                         if(match.isPresent()) {
                             if(dependencyMatches(dependency)) {
-                                t = t.withMarker(new RecipeSearchResult(DependencyInsight.this));
+                                t = t.withMarker(new XmlSearchResult(DependencyInsight.this));
                             } else {
-                                t = t.withMarker(new RecipeSearchResult(DependencyInsight.this,
+                                t = t.withMarker(new XmlSearchResult(DependencyInsight.this,
                                         match.get().getCoordinates()));
                             }
                         }

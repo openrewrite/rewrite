@@ -30,9 +30,10 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
 
     private static final String PRINTER_ACC_KEY = "printed";
 
-    private final TreePrinter<P> treePrinter;
+    @Nullable
+    private final TreePrinter treePrinter;
 
-    public JavaPrinter(TreePrinter<P> treePrinter) {
+    public JavaPrinter(@Nullable TreePrinter treePrinter) {
         this.treePrinter = treePrinter;
     }
 

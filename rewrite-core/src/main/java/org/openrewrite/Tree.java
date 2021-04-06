@@ -69,7 +69,7 @@ public interface Tree extends Markable {
      */
     <P> boolean isAcceptable(TreeVisitor<?, P> v, P p);
 
-    <P> String print(TreePrinter<P> printer, P p);
+    <P> String print(TreePrinter printer, P p);
 
     default <P> String  print(P p) {
         return print(TreePrinter.identity(), p);
@@ -79,7 +79,7 @@ public interface Tree extends Markable {
         return print(TreePrinter.identity(), new Object());
     }
 
-    default <P> String printTrimmed(TreePrinter<P> printer, P p) {
+    default <P> String printTrimmed(TreePrinter printer, P p) {
         return StringUtils.trimIndent(print(printer, p).trim());
     }
 

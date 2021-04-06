@@ -53,8 +53,6 @@ import static java.util.stream.Collectors.toList;
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public interface J extends Serializable, Tree {
 
-    TreePrinter<?> DEFAULT_PRINTER = SearchResult.printer("/*~~>*/", "/*~~(%s)~~>*/");
-
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
@@ -71,20 +69,20 @@ public interface J extends Serializable, Tree {
         return v.defaultValue(this, p);
     }
 
-    default <P> String print(TreePrinter<P> printer, P p) {
+    default <P> String print(TreePrinter printer, P p) {
         return new JavaPrinter<>(printer).print(this, p);
     }
 
     @Override
     default <P> String print(P p) {
         //noinspection unchecked
-        return print((TreePrinter<P>) DEFAULT_PRINTER, p);
+        return print(TreePrinter.identity(), p);
     }
 
     @Override
     default String print() {
         //noinspection unchecked
-        return print((TreePrinter<Object>) DEFAULT_PRINTER, new Object());
+        return print(TreePrinter.identity(), new Object());
     }
 
     <J2 extends J> J2 withPrefix(Space space);

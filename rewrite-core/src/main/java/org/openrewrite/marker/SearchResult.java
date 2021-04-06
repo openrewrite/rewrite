@@ -29,45 +29,16 @@ import java.util.Optional;
  */
 @Incubating(since = "7.0.0")
 public interface SearchResult extends Marker {
-    TreePrinter<Void> PRINTER = printer("~~>", "~~(%s)~~>");
-
-    /**
-     * @param markerText The text to be output when encountering a SearchResult with no description
-     * @param markerTextWithDescription The text to be output when encountering a SearchResult with a description.
-     *                                  Use "%s" inside of this string where the description text should be interpolated in.
-     * @return a TreePrinter that uses the specified text for any SearchResult markers encountered on a Tree.
-     */
-    static <T> TreePrinter<T> printer(String markerText, String markerTextWithDescription) {
-        return new TreePrinter<T>() {
-            private SearchResult marker;
-            private Integer mark;
-
-            @Override
-            public void doBefore(Tree tree, StringBuilder printerAcc, T unused) {
-                Optional<SearchResult> marker = tree.getMarkers().findFirst(SearchResult.class);
-                if (marker.isPresent()) {
-                    this.marker = marker.get();
-                    this.mark = printerAcc.length();
-                }
-            }
-
-            @Override
-            public void doAfter(Tree tree, StringBuilder printerAcc, T unused) {
-                if (mark != null) {
-                    for (int i = mark; i < printerAcc.length(); i++) {
-                        if (!Character.isWhitespace(printerAcc.charAt(i))) {
-                            printerAcc.insert(i, marker.getDescription() == null ?
-                                    markerText :
-                                    String.format(markerTextWithDescription, marker.getDescription()));
-                            break;
-                        }
-                    }
-                    mark = null;
-                }
-            }
-        };
-    }
 
     @Nullable
     String getDescription();
+
+    /**
+     * Translate this SearchResult into a String to be printed into the resulting SourceFile.
+     * Subclasses should return something that works in their particular context, like wrapping the description in a
+     * language-appropriate comment.
+     */
+    default String print() {
+        return "";
+    }
 }

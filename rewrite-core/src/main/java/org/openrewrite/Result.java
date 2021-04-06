@@ -70,7 +70,7 @@ public class Result {
      * @param treePrinter Influences the printing of individual tree elements.
      * @return Git-style patch diff representing the changes to this compilation unit.
      */
-    public String diff(TreePrinter<?> treePrinter) {
+    public String diff(TreePrinter treePrinter) {
         return diff(null, treePrinter);
     }
 
@@ -79,7 +79,7 @@ public class Result {
      * @param treePrinter Influences the printing of individual tree elements.
      * @return Git-style patch diff representing the changes to this compilation unit.
      */
-    public String diff(@Nullable Path relativeTo, TreePrinter<?> treePrinter) {
+    public String diff(@Nullable Path relativeTo, TreePrinter treePrinter) {
         Path sourcePath;
         if (after != null) {
             sourcePath = after.getSourcePath();

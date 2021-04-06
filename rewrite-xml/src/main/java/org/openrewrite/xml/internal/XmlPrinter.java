@@ -29,9 +29,9 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
 
     private static final String PRINTER_ACC_KEY = "printed";
 
-    private final TreePrinter<P> treePrinter;
+    private final TreePrinter treePrinter;
 
-    public XmlPrinter(TreePrinter<P> treePrinter) {
+    public XmlPrinter(TreePrinter treePrinter) {
         this.treePrinter = treePrinter;
     }
 

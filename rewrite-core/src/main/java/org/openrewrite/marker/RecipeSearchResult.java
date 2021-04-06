@@ -15,7 +15,10 @@
  */
 package org.openrewrite.marker;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.ToString;
 import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.Nullable;
@@ -27,21 +30,36 @@ import org.openrewrite.internal.lang.Nullable;
  */
 @Incubating(since = "7.0.0")
 @EqualsAndHashCode
+@AllArgsConstructor
 @ToString
 @Getter
 public class RecipeSearchResult implements SearchResult {
-    @EqualsAndHashCode.Include
-    private final Recipe recipe;
+    final Recipe recipe;
 
     @Nullable
-    private final String description;
-
-    public RecipeSearchResult(Recipe recipe, @Nullable String description) {
-        this.recipe = recipe;
-        this.description = description;
-    }
+    final String description;
 
     public RecipeSearchResult(Recipe recipe) {
-        this(recipe, null);
+        this.recipe = recipe;
+        description = null;
+    }
+
+    public Recipe getRecipe() {
+        return recipe;
+    }
+
+    @Override
+    public @Nullable String getDescription() {
+        return description;
+    }
+
+    @Override
+    public String print() {
+        String description = getDescription();
+        if(description == null) {
+            return "/*~~>*/";
+        } else {
+            return String.format("/*~~(%s)~~>*/", description);
+        }
     }
 }

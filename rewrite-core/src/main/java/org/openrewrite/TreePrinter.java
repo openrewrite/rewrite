@@ -15,11 +15,44 @@
  */
 package org.openrewrite;
 
-public interface TreePrinter<P> {
+import org.openrewrite.marker.SearchResult;
 
-    static <P> TreePrinter<P> identity() {
-        return new TreePrinter<P>() {
-        };
+import java.util.Optional;
+
+public interface TreePrinter {
+
+    /**
+     * Prints out the input it was given with no modifications.
+     */
+    TreePrinter IDENTITY = new TreePrinter() {
+        private SearchResult marker;
+        private Integer mark;
+
+        @Override
+        public void doBefore(Tree tree, StringBuilder printerAcc, Object unused) {
+            Optional<SearchResult> marker = tree.getMarkers().findFirst(SearchResult.class);
+            if (marker.isPresent()) {
+                this.marker = marker.get();
+                this.mark = printerAcc.length();
+            }
+        }
+
+        @Override
+        public void doAfter(Tree tree, StringBuilder printerAcc, Object unused) {
+            if (mark != null) {
+                for (int i = mark; i < printerAcc.length(); i++) {
+                    if (!Character.isWhitespace(printerAcc.charAt(i))) {
+                        printerAcc.insert(i, marker.print());
+                        break;
+                    }
+                }
+                mark = null;
+            }
+        }
+    };
+
+    static TreePrinter identity() {
+        return IDENTITY;
     }
 
     /**
@@ -30,7 +63,7 @@ public interface TreePrinter<P> {
      *                   operation so far
      * @param p visit context
      */
-    default void doBefore(Tree tree, StringBuilder printerAcc, P p) {}
+    default void doBefore(Tree tree, StringBuilder printerAcc, Object p) {}
 
     /**
      * Called after tree has been printed, allows printing additional output after tree.
@@ -40,7 +73,7 @@ public interface TreePrinter<P> {
      *      *                   operation so far
      * @param p visit context
      */
-    default void doAfter(Tree tree, StringBuilder printerAcc, P p) {}
+    default void doAfter(Tree tree, StringBuilder printerAcc, Object p) {}
 
 
 }

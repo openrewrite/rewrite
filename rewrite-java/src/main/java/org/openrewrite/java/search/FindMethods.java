@@ -69,7 +69,7 @@ public class FindMethods extends Recipe {
                         ctx.putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY,
                                 method.getType().getDeclaringType());
                     }
-                    m = m.withMarker(new RecipeSearchResult(FindMethods.this));
+                    m = m.withMarker(new JavaSearchResult(FindMethods.this));
                 }
                 return m;
             }
@@ -81,7 +81,7 @@ public class FindMethods extends Recipe {
                     if(m.getType() != null) {
                         ctx.putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY, m.getType());
                     }
-                    m = m.withReference(m.getReference().withMarker(new RecipeSearchResult(FindMethods.this)));
+                    m = m.withReference(m.getReference().withMarker(new JavaSearchResult(FindMethods.this)));
                 }
                 return m;
             }

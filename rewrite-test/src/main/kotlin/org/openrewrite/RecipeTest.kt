@@ -23,7 +23,7 @@ interface RecipeTest {
     val recipe: Recipe?
         get() = null
 
-    val treePrinter: TreePrinter<*>?
+    val treePrinter: TreePrinter?
         get() = null
 
     val parser: Parser<*>?
@@ -128,7 +128,7 @@ interface RecipeTest {
 
         assertThat(result).`as`("The recipe must make changes").isNotNull
         assertThat(result!!.after).isNotNull
-        assertThat(result.after!!.printTrimmed(treePrinter ?: TreePrinter.identity<Any>()))
+        assertThat(result.after!!.printTrimmed(treePrinter ?: TreePrinter.identity()))
             .isEqualTo(after.trimIndent())
         afterConditions(result.after as T)
     }
