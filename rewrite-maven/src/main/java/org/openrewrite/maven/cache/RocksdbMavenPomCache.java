@@ -110,6 +110,12 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         } else if (!workspace.isDirectory()) {
             throw new IllegalStateException("The maven cache workspace must be a directory");
         }
+        // In case a stale lock file is left over from a previous run that was interrupted
+        File lock = new File(workspace, "LOCK");
+        if(lock.exists()) {
+            //noinspection ResultOfMethodCallIgnored
+            lock.delete();
+        }
         cache = getCache(workspace.getAbsolutePath());
         fillUnresolvablePoms();
     }
