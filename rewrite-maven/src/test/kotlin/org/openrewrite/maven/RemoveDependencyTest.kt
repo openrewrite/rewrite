@@ -16,7 +16,9 @@
 package org.openrewrite.maven
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 
 class RemoveDependencyTest : MavenRecipeTest {
     override val recipe = RemoveDependency("junit","junit", null)
@@ -170,6 +172,52 @@ class RemoveDependencyTest : MavenRecipeTest {
                         <scope>test</scope>
                     </dependency>
                 </dependencies>
+            </project>
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/422")
+    @Disabled
+    @Test
+    fun removeDependencyByEffectiveScope() = assertChanged(
+        recipe = RemoveDependency("junit","junit", "runtime"),
+        before = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>29.0-jre</version>
+                </dependency>
+                <dependency>
+                  <groupId>junit</groupId>
+                  <artifactId>junit</artifactId>
+                  <version>4.13.1</version>
+                </dependency>
+              </dependencies>
+            </project>
+        """,
+        after = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>29.0-jre</version>
+                </dependency>
+              </dependencies>
             </project>
         """
     )
