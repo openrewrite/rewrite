@@ -33,7 +33,7 @@ plugins {
     id("nebula.source-jar") version "17.3.2" apply false
     id("nebula.maven-apache-license") version "17.3.2" apply false
 
-    id("org.openrewrite.rewrite") version "3.1.0" apply false
+    id("org.openrewrite.rewrite") version "4.0.0" apply false
 }
 
 configure<nebula.plugin.release.git.base.ReleasePluginExtension> {
