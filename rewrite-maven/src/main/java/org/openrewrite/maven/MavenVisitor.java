@@ -16,9 +16,11 @@
 package org.openrewrite.maven;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
@@ -98,6 +100,20 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
                         tag.getChildValue("artifactId").orElse(model.getArtifactId()).equals(d.getArtifactId()))
                 .findAny()
                 .orElse(null);
+    }
+
+    @Incubating(since = "7.2.0")
+    @Nullable
+    public Scope findDependencyScope(Xml.Tag tag) {
+        Scope dependencyScope = tag.getChildValue("scope")
+                .map(Scope::fromName).orElse(null);
+        if (dependencyScope == null) {
+            Pom.Dependency dependency = findDependency(tag);
+            if (dependency != null) {
+                dependencyScope = dependency.getScope();
+            }
+        }
+        return dependencyScope;
     }
 
     /**

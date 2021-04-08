@@ -112,4 +112,65 @@ class RemoveDependencyTest : MavenRecipeTest {
         valid = recipe.validate()
         assertThat(valid.isValid).isTrue()
     }
+
+    @Test
+    fun shouldRemoveScopedDependency() = assertChanged(
+        recipe = RemoveDependency("org.junit.jupiter","junit-jupiter", "test"),
+        before = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                    <dependencies>
+                       <dependency>
+                            <groupId>org.junit.jupiter</groupId>
+                            <artifactId>junit-jupiter</artifactId>
+                            <version>5.7.1</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.junit.jupiter</groupId>
+                        <artifactId>junit-jupiter</artifactId>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.junit.jupiter</groupId>
+                        <artifactId>junit-jupiter-api</artifactId>
+                        <version>5.6.3</version>
+                        <scope>test</scope>
+                    </dependency>
+                </dependencies>
+            </project>
+        """,
+        after = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                    <dependencies>
+                       <dependency>
+                            <groupId>org.junit.jupiter</groupId>
+                            <artifactId>junit-jupiter</artifactId>
+                            <version>5.7.1</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.junit.jupiter</groupId>
+                        <artifactId>junit-jupiter-api</artifactId>
+                        <version>5.6.3</version>
+                        <scope>test</scope>
+                    </dependency>
+                </dependencies>
+            </project>
+        """
+    )
 }
