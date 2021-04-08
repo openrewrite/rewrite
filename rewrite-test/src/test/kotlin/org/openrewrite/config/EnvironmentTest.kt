@@ -175,7 +175,7 @@ class EnvironmentTest : RecipeTest {
 
     @Test
     fun scanClasspath() {
-        val env = Environment.builder().scanClasspath(Collections.emptySet()).build()
+        val env = Environment.builder().scanRuntimeClasspath().build()
 
         assertThat(env.listRecipes()).hasSizeGreaterThanOrEqualTo(2)
                 .extracting("name")
@@ -188,7 +188,7 @@ class EnvironmentTest : RecipeTest {
 
     @Test
     fun listRecipeDescriptors() {
-        val env = Environment.builder().scanClasspath(Collections.emptySet()).build()
+        val env = Environment.builder().scanRuntimeClasspath().build()
         val recipeDescriptors = env.listRecipeDescriptors()
         assertThat(recipeDescriptors).isNotNull.isNotEmpty
         val changeTextDescriptor = recipeDescriptors.filter { it.name == "org.openrewrite.text.ChangeText" }.firstOrNull()
@@ -200,7 +200,7 @@ class EnvironmentTest : RecipeTest {
 
     @Test
     fun listStyles() {
-        val env = Environment.builder().scanClasspath(Collections.emptySet()).build()
+        val env = Environment.builder().scanRuntimeClasspath().build()
         val styles = env.listStyles()
         assertThat(styles).isNotNull.isNotEmpty
         val sampleStyle = styles.filter { it.name == "org.openrewrite.SampleStyle" }.firstOrNull()
@@ -232,7 +232,7 @@ class EnvironmentTest : RecipeTest {
     fun environmentActivatedRecipeUsableInTests() = assertChanged(
             parser = plainTextParser,
             recipe = Environment.builder()
-                    .scanClasspath(Collections.emptySet())
+                    .scanRuntimeClasspath()
                     .build()
                     .activateRecipes("org.openrewrite.text.ChangeTextToJon"),
             before = "some text that isn't jon",
@@ -243,7 +243,7 @@ class EnvironmentTest : RecipeTest {
     fun deserializesKotlinRecipe() = assertChanged(
         parser = plainTextParser,
         recipe = Environment.builder()
-                .scanClasspath(Collections.emptySet())
+                .scanRuntimeClasspath()
                 .build()
                 .activateRecipes("org.openrewrite.text.HelloKotlin"),
         before = "some text",

@@ -130,8 +130,16 @@ public class Environment {
             this.properties = properties;
         }
 
+        public Builder scanRuntimeClasspath(String... acceptPackages) {
+            return load(new ClasspathScanningLoader(properties, acceptPackages));
+        }
+
         public Builder scanClasspath(Iterable<Path> compileClasspath, String... acceptPackages) {
             return load(new ClasspathScanningLoader(compileClasspath, properties, acceptPackages));
+        }
+
+        public Builder scanJar(String jarName, Iterable<Path> compileClasspath, String... acceptPackages) {
+            return load(new ClasspathScanningLoader(jarName, compileClasspath, properties, acceptPackages));
         }
 
         public Builder scanUserHome() {

@@ -133,6 +133,9 @@ public class MavenArtifactDownloader {
         if (authInfo != null) {
             String credentials = Credentials.basic(authInfo.getUsername(), authInfo.getPassword());
             request.header("Authorization", credentials);
+        } else if (repository.getUsername() != null && repository.getPassword() != null) {
+            String credentials = Credentials.basic(repository.getUsername(), repository.getPassword());
+            request.header("Authorization", credentials);
         }
         return request;
     }

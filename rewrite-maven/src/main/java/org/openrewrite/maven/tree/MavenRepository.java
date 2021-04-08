@@ -15,12 +15,11 @@
  */
 package org.openrewrite.maven.tree;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.AccessLevel;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.With;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.net.URI;
@@ -28,6 +27,7 @@ import java.net.URI;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Data
+@RequiredArgsConstructor
 public class MavenRepository {
     @EqualsAndHashCode.Include
     @With
@@ -39,6 +39,9 @@ public class MavenRepository {
     boolean releases;
     boolean snapshots;
 
+    @NonFinal
+    boolean knownToExist = false;
+
     // Prevent user credentials from being inadvertently serialized
     @With
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
@@ -49,6 +52,17 @@ public class MavenRepository {
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     @Nullable
     String password;
+
+    @JsonIgnore
+    public MavenRepository(String id, URI uri, boolean releases, boolean snapshots, boolean knownToExist, @Nullable String username, @Nullable String password) {
+        this.id = id;
+        this.uri = uri;
+        this.releases = releases;
+        this.snapshots = snapshots;
+        this.knownToExist = knownToExist;
+        this.username = username;
+        this.password = password;
+    }
 
     public boolean acceptsVersion(String version) {
         if (version.endsWith("-SNAPSHOT")) {

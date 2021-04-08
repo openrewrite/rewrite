@@ -33,7 +33,6 @@ import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.MavenRepositoryCredentials;
 import org.openrewrite.maven.tree.MavenRepositoryMirror;
 
-import javax.net.ssl.SSLException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
@@ -320,6 +319,9 @@ public class MavenPomDownloader {
         CacheResult<MavenRepository> result;
         try {
             MavenRepository repository = applyAuthenticationToRepository(applyMirrors(originalRepository));
+            if (repository.isKnownToExist()) {
+                return repository;
+            }
             String originalUrl = repository.getUri().toString();
             result = mavenPomCache.computeRepository(repository, () -> {
                 // Always prefer to use https, fallback to http only if https isn't available
