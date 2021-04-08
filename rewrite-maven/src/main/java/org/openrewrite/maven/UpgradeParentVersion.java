@@ -156,6 +156,7 @@ public class UpgradeParentVersion extends Recipe {
                         artifactId.equals(parent.getChildValue("artifactId").orElse(null)) &&
                         !toVersion.equals(tag.getValue().orElse(null))) {
                     doAfterVisit(new ChangeTagValueVisitor<>(tag, toVersion));
+                    doAfterVisit(new RemoveRedundantDependencyVersions());
                 }
             }
             return super.visitTag(tag, ctx);
