@@ -36,6 +36,5 @@ class MavenArtifactHelperIntegTest {
         val firstArtifact = artifactPaths[0]
         assertThat(firstArtifact.fileName.toString()).contains("rewrite-spring")
         assertThat(firstArtifact.fileName.toString()).endsWith(".jar")
-        println(artifactPaths)
     }
 }
