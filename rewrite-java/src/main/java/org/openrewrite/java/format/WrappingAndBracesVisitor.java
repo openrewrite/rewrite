@@ -130,17 +130,14 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     private Space withNewline(Space space) {
         if (space.getComments().isEmpty()) {
             space = space.withWhitespace("\n" + space.getWhitespace());
-        } else {
-            if (space.getComments().stream().anyMatch(
-                    comment -> comment.getStyle().equals(Comment.Style.BLOCK))) {
-                List<Comment> comments = new ArrayList<>();
-                for (int i = 0; i < space.getComments().size() - 1; ++i) {
-                    comments.add(space.getComments().get(i));
-                }
-                final Comment c = space.getComments().get(space.getComments().size() - 1).withSuffix("\n");
-                comments.add(c);
-                space = space.withComments(comments);
+        } else if (space.getComments().get(space.getComments().size()-1).getStyle() == Comment.Style.BLOCK) {
+            List<Comment> comments = new ArrayList<>();
+            for (int i = 0; i < space.getComments().size() - 1; ++i) {
+                comments.add(space.getComments().get(i));
             }
+            final Comment c = space.getComments().get(space.getComments().size() - 1).withSuffix("\n");
+            comments.add(c);
+            space = space.withComments(comments);
         }
 
         return space;
