@@ -17,6 +17,7 @@ package org.openrewrite.java.format
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
@@ -217,4 +218,26 @@ interface WrappingAndBracesTest : JavaRecipeTest {
                 }
             """
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/375")
+    @Test
+    fun retainTrailingComments(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+                @SuppressWarnings({"ALL"}) /* block comment 1 */ /* block comment 2 */ public class Test { /* block comment 3 */
+                String trailingLineComment = "case statement"; // line comment 1.
+                String trailingBlockAndLineComment = "case statement"; /* block comment 4 */ // line comment 2.
+                String trailingBlockCommentAndCode = "case statement"; /* block comment 5 */ String trailingBlockComment = "case statement"; /* block comment 6 */}
+            """,
+        after = """
+                @SuppressWarnings({"ALL"}) /* block comment 1 */ /* block comment 2 */
+                public class Test { /* block comment 3 */
+                String trailingLineComment = "case statement"; // line comment 1.
+                String trailingBlockAndLineComment = "case statement"; /* block comment 4 */ // line comment 2.
+                String trailingBlockCommentAndCode = "case statement"; /* block comment 5 */
+                String trailingBlockComment = "case statement"; /* block comment 6 */
+                }
+            """
+    )
+
 }
