@@ -18,10 +18,12 @@ package org.openrewrite.java.format;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
+import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
@@ -46,7 +48,8 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         return j;
     }
 
-    @Override public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
+    @Override
+    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
         // TODO make annotation wrapping configurable
         m = m.withLeadingAnnotations(withNewlines(m.getLeadingAnnotations()));
@@ -82,7 +85,8 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         return m;
     }
 
-    @Override public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
+    @Override
+    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration j = super.visitClassDeclaration(classDecl, p);
         // TODO make annotation wrapping configurable
         j = j.withLeadingAnnotations(withNewlines(j.getLeadingAnnotations()));
@@ -124,7 +128,22 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private Space withNewline(Space space) {
-        return space.withWhitespace("\n" + space.getWhitespace());
+        if (space.getComments().isEmpty()) {
+            space = space.withWhitespace("\n" + space.getWhitespace());
+        } else {
+            if (space.getComments().stream().anyMatch(
+                    comment -> comment.getStyle().equals(Comment.Style.BLOCK))) {
+                List<Comment> comments = new ArrayList<>();
+                for (int i = 0; i < space.getComments().size() - 1; ++i) {
+                    comments.add(space.getComments().get(i));
+                }
+                final Comment c = space.getComments().get(space.getComments().size() - 1).withSuffix("\n");
+                comments.add(c);
+                space = space.withComments(comments);
+            }
+        }
+
+        return space;
     }
 
     private List<J.Modifier> withNewline(List<J.Modifier> modifiers) {
