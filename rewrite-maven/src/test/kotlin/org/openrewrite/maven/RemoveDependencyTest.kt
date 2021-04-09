@@ -177,7 +177,6 @@ class RemoveDependencyTest : MavenRecipeTest {
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/422")
-    @Disabled
     @Test
     fun removeDependencyByEffectiveScope() = assertChanged(
         recipe = RemoveDependency("junit","junit", "runtime"),
