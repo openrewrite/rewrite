@@ -15,12 +15,12 @@
  */
 package org.openrewrite.java.tree;
 
+import org.openrewrite.internal.lang.Nullable;
+
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-
-import org.openrewrite.internal.lang.Nullable;
 
 public enum Flag {
 
