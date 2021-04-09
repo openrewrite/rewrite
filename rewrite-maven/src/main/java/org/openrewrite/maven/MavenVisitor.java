@@ -102,20 +102,6 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
                 .orElse(null);
     }
 
-    @Incubating(since = "7.2.0")
-    @Nullable
-    public Scope findDependencyScope(Xml.Tag tag) {
-        Scope dependencyScope = tag.getChildValue("scope")
-                .map(Scope::fromName).orElse(null);
-        if (dependencyScope == null) {
-            Pom.Dependency dependency = findDependency(tag);
-            if (dependency != null) {
-                dependencyScope = dependency.getScope();
-            }
-        }
-        return dependencyScope;
-    }
-
     /**
      * Finds dependencies in the model that match the provided group and artifact ids.
      *
