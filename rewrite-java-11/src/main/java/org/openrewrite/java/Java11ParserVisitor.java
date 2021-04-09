@@ -15,26 +15,16 @@
  */
 package org.openrewrite.java;
 
-import com.sun.source.tree.*;
-import com.sun.source.util.TreePathScanner;
-import com.sun.tools.javac.code.Flags;
-import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.code.Type.*;
-import com.sun.tools.javac.code.TypeTag;
-import com.sun.tools.javac.tree.EndPosTable;
-import com.sun.tools.javac.tree.JCTree;
-import com.sun.tools.javac.tree.JCTree.*;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.tree.*;
-import org.openrewrite.marker.Markers;
-import org.openrewrite.style.NamedStyles;
-
-import javax.lang.model.element.Modifier;
-import javax.lang.model.element.Name;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -42,6 +32,124 @@ import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import javax.lang.model.element.Modifier;
+import javax.lang.model.element.Name;
+
+import com.sun.source.tree.AnnotatedTypeTree;
+import com.sun.source.tree.AnnotationTree;
+import com.sun.source.tree.ArrayAccessTree;
+import com.sun.source.tree.ArrayTypeTree;
+import com.sun.source.tree.AssertTree;
+import com.sun.source.tree.AssignmentTree;
+import com.sun.source.tree.BinaryTree;
+import com.sun.source.tree.BlockTree;
+import com.sun.source.tree.BreakTree;
+import com.sun.source.tree.CaseTree;
+import com.sun.source.tree.CatchTree;
+import com.sun.source.tree.ClassTree;
+import com.sun.source.tree.CompilationUnitTree;
+import com.sun.source.tree.CompoundAssignmentTree;
+import com.sun.source.tree.ConditionalExpressionTree;
+import com.sun.source.tree.ContinueTree;
+import com.sun.source.tree.DoWhileLoopTree;
+import com.sun.source.tree.EmptyStatementTree;
+import com.sun.source.tree.EnhancedForLoopTree;
+import com.sun.source.tree.ExpressionStatementTree;
+import com.sun.source.tree.ExpressionTree;
+import com.sun.source.tree.ForLoopTree;
+import com.sun.source.tree.IdentifierTree;
+import com.sun.source.tree.IfTree;
+import com.sun.source.tree.ImportTree;
+import com.sun.source.tree.InstanceOfTree;
+import com.sun.source.tree.LabeledStatementTree;
+import com.sun.source.tree.LambdaExpressionTree;
+import com.sun.source.tree.LiteralTree;
+import com.sun.source.tree.MemberReferenceTree;
+import com.sun.source.tree.MemberSelectTree;
+import com.sun.source.tree.MethodInvocationTree;
+import com.sun.source.tree.MethodTree;
+import com.sun.source.tree.ModifiersTree;
+import com.sun.source.tree.NewArrayTree;
+import com.sun.source.tree.NewClassTree;
+import com.sun.source.tree.ParameterizedTypeTree;
+import com.sun.source.tree.ParenthesizedTree;
+import com.sun.source.tree.PrimitiveTypeTree;
+import com.sun.source.tree.ReturnTree;
+import com.sun.source.tree.StatementTree;
+import com.sun.source.tree.SwitchTree;
+import com.sun.source.tree.SynchronizedTree;
+import com.sun.source.tree.ThrowTree;
+import com.sun.source.tree.Tree;
+import com.sun.source.tree.TryTree;
+import com.sun.source.tree.TypeCastTree;
+import com.sun.source.tree.TypeParameterTree;
+import com.sun.source.tree.UnaryTree;
+import com.sun.source.tree.UnionTypeTree;
+import com.sun.source.tree.VariableTree;
+import com.sun.source.tree.WhileLoopTree;
+import com.sun.source.tree.WildcardTree;
+import com.sun.source.util.TreePathScanner;
+import com.sun.tools.javac.code.Flags;
+import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.code.Type.ArrayType;
+import com.sun.tools.javac.code.Type.ClassType;
+import com.sun.tools.javac.code.Type.ErrorType;
+import com.sun.tools.javac.code.Type.ForAll;
+import com.sun.tools.javac.code.Type.JCPrimitiveType;
+import com.sun.tools.javac.code.Type.MethodType;
+import com.sun.tools.javac.code.Type.TypeVar;
+import com.sun.tools.javac.code.TypeTag;
+import com.sun.tools.javac.tree.EndPosTable;
+import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.tree.JCTree.JCAnnotation;
+import com.sun.tools.javac.tree.JCTree.JCArrayTypeTree;
+import com.sun.tools.javac.tree.JCTree.JCAssert;
+import com.sun.tools.javac.tree.JCTree.JCAssign;
+import com.sun.tools.javac.tree.JCTree.JCAssignOp;
+import com.sun.tools.javac.tree.JCTree.JCBinary;
+import com.sun.tools.javac.tree.JCTree.JCBlock;
+import com.sun.tools.javac.tree.JCTree.JCBreak;
+import com.sun.tools.javac.tree.JCTree.JCClassDecl;
+import com.sun.tools.javac.tree.JCTree.JCCompilationUnit;
+import com.sun.tools.javac.tree.JCTree.JCContinue;
+import com.sun.tools.javac.tree.JCTree.JCDoWhileLoop;
+import com.sun.tools.javac.tree.JCTree.JCErroneous;
+import com.sun.tools.javac.tree.JCTree.JCExpression;
+import com.sun.tools.javac.tree.JCTree.JCExpressionStatement;
+import com.sun.tools.javac.tree.JCTree.JCFieldAccess;
+import com.sun.tools.javac.tree.JCTree.JCIdent;
+import com.sun.tools.javac.tree.JCTree.JCLabeledStatement;
+import com.sun.tools.javac.tree.JCTree.JCLiteral;
+import com.sun.tools.javac.tree.JCTree.JCMemberReference;
+import com.sun.tools.javac.tree.JCTree.JCMethodDecl;
+import com.sun.tools.javac.tree.JCTree.JCMethodInvocation;
+import com.sun.tools.javac.tree.JCTree.JCModifiers;
+import com.sun.tools.javac.tree.JCTree.JCNewArray;
+import com.sun.tools.javac.tree.JCTree.JCNewClass;
+import com.sun.tools.javac.tree.JCTree.JCReturn;
+import com.sun.tools.javac.tree.JCTree.JCStatement;
+import com.sun.tools.javac.tree.JCTree.JCThrow;
+import com.sun.tools.javac.tree.JCTree.JCUnary;
+import com.sun.tools.javac.tree.JCTree.JCVariableDecl;
+import com.sun.tools.javac.tree.JCTree.JCWildcard;
+import com.sun.tools.javac.tree.JCTree.Tag;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.Flag;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JContainer;
+import org.openrewrite.java.tree.JLeftPadded;
+import org.openrewrite.java.tree.JRightPadded;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.NameTree;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.TypeTree;
+import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.style.NamedStyles;
 
 import static java.lang.Math.max;
 import static java.util.Collections.emptyList;
@@ -1487,35 +1595,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         return converted;
     }
 
-    /**
-     * --------------
-     * Type conversion
-     * --------------
-     */
-
-    private final Map<Long, Flag> flagMasks = Map.of(
-            1L, Flag.Public,
-            1L << 1, Flag.Private,
-            1L << 2, Flag.Protected,
-            1L << 3, Flag.Static,
-            1L << 4, Flag.Final,
-            1L << 5, Flag.Synchronized,
-            1L << 6, Flag.Volatile,
-            1L << 7, Flag.Transient,
-            1L << 10, Flag.Abstract
-    );
-
-    private Set<Flag> filteredFlags(Symbol sym) {
-        Set<Flag> set = new HashSet<>();
-        for (Map.Entry<Long, Flag> mask : flagMasks.entrySet()) {
-            if ((sym.flags() & mask.getKey()) != 0L) {
-                Flag value = mask.getValue();
-                set.add(value);
-            }
-        }
-        return set;
-    }
-
     @Nullable
     private JavaType.Method methodType(com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol, String methodName) {
         // if the symbol is not a method symbol, there is a parser error in play
@@ -1559,7 +1638,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                     genericSignature,
                     signature.apply(selectType),
                     paramNames,
-                    filteredFlags(genericSymbol)
+                    genericSymbol.flags()
             );
         }
 
@@ -1619,7 +1698,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                                 fields.add(new JavaType.Variable(
                                         elem.name.toString(),
                                         type(elem.type, stackWithSym),
-                                        filteredFlags(elem)
+                                        Flag.bitMapToFlags(elem.flags())
                                 ));
                             }
                         }
@@ -1653,14 +1732,35 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                             }
                         }
                     }
+                    JavaType.Class.Kind kind;
+                    switch (sym.getKind()) {
+                        case ENUM:
+                            kind = JavaType.Class.Kind.Enum;
+                            break;
+                        case ANNOTATION_TYPE:
+                            kind = JavaType.Class.Kind.Annotation;
+                            break;
+                        case INTERFACE:
+                            kind = JavaType.Class.Kind.Interface;
+                            break;
+                        default:
+                            kind = JavaType.Class.Kind.Class;
+                    }
 
+                    JavaType.Class owner = null;
+                    if (sym.owner instanceof Symbol.ClassSymbol) {
+                        owner = TypeUtils.asClass(type(sym.owner.type, stackWithSym));
+                    }
                     JavaType.Class clazz = JavaType.Class.build(
                             sym.className(),
+                            Flag.bitMapToFlags(sym.flags()),
+                            kind,
                             fields,
                             typeParameters,
                             interfaces,
                             null,
                             TypeUtils.asClass(type(classType.supertype_field, stackWithSym)),
+                            owner,
                             relaxedClassTypeMatching);
 
                     sharedClassTypes.put(sym.className(), clazz);
