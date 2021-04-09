@@ -20,6 +20,7 @@ import io.micrometer.core.instrument.Timer;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
@@ -121,6 +122,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                         break;
                     case Scalar:
                         ScalarEvent scalar = (ScalarEvent) event;
+                        String scalarValue = scalar.getValue();
                         Yaml.Scalar.Style style;
                         switch (scalar.getScalarStyle()) {
                             case DOUBLE_QUOTED:
@@ -131,9 +133,11 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                                 break;
                             case LITERAL:
                                 style = Yaml.Scalar.Style.LITERAL;
+                                scalarValue = reader.readStringFromBuffer(event.getStartMark().getIndex() + 1, event.getEndMark().getIndex() - 1);
                                 break;
                             case FOLDED:
                                 style = Yaml.Scalar.Style.FOLDED;
+                                scalarValue = reader.readStringFromBuffer(event.getStartMark().getIndex() + 1, event.getEndMark().getIndex() - 1);
                                 break;
                             case PLAIN:
                             default:
@@ -141,7 +145,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                                 break;
                         }
 
-                        blockStack.peek().push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, scalar.getValue()));
+                        blockStack.peek().push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, scalarValue));
                         lastEnd = event.getEndMark().getIndex();
                         break;
                     case SequenceEnd:
@@ -231,9 +235,22 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
         @Override
         public void push(Yaml.Block block) {
             String entryPrefix = block.getPrefix();
-            block = block.withPrefix(entryPrefix.substring(entryPrefix.lastIndexOf('-') + 1));
-            entryPrefix = entryPrefix.substring(0, entryPrefix.lastIndexOf('-'));
-            entries.add(new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, block));
+            if (entryPrefix.indexOf(':') != -1) {
+                block = block.withPrefix(entryPrefix.substring(entryPrefix.lastIndexOf(':') + 1));
+                entryPrefix = entryPrefix.substring(0, entryPrefix.lastIndexOf(':'));
+            }
+            if (entryPrefix.indexOf('-') != -1) {
+                block = block.withPrefix(entryPrefix.substring(entryPrefix.lastIndexOf('-') + 1));
+                entryPrefix = entryPrefix.substring(0, entryPrefix.lastIndexOf('-'));
+            }
+            if (block instanceof Yaml.Mapping) {
+                Yaml.Mapping mapping = (Yaml.Mapping) block;
+                mapping = mapping.withEntries(ListUtils.map(mapping.getEntries(),
+                        e -> e.withPrefix(e.getPrefix().substring(e.getPrefix().lastIndexOf('-') + 1))));
+                entries.add(new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, mapping));
+            } else {
+                entries.add(new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, block));
+            }
         }
 
         public Yaml.Sequence build() {

@@ -133,12 +133,12 @@ public class YamlPrinter<P> extends YamlVisitor<P> {
         switch (scalar.getStyle()) {
             case DOUBLE_QUOTED:
                 acc.append('"')
-                        .append(scalar.getValue())
+                        .append(scalar.getValue().replaceAll("\\n", "\\\\n"))
                         .append('"');
                 break;
             case SINGLE_QUOTED:
                 acc.append('\'')
-                        .append(scalar.getValue())
+                        .append(scalar.getValue().replaceAll("\\n", "\\\\n"))
                         .append('\'');
                 break;
             case LITERAL:

@@ -17,11 +17,13 @@ package org.openrewrite.yaml
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.yaml.tree.Yaml
 
 class SequenceTest {
+
     @Test
-    fun sequence() {
+    fun blockSequence() {
         val yText = """
             - apples
             - oranges
@@ -30,8 +32,23 @@ class SequenceTest {
         val y = YamlParser().parse(yText)[0]
 
         assertThat((y.documents[0].blocks[0] as Yaml.Sequence).entries.map { it.block }.map { it as Yaml.Scalar }.map { it.value })
-                .containsExactly("apples", "oranges")
+            .containsExactly("apples", "oranges")
 
         assertThat(y.printTrimmed()).isEqualTo(yText)
+    }
+
+    @Test
+    fun blockSequenceOfMappings() {
+        val yamlText = """
+            - name: Fred
+              age: 45
+            - name: Barney
+              age: 25
+        """.trimIndent()
+        val y = YamlParser().parse(
+            InMemoryExecutionContext { t -> t.printStackTrace() },
+            yamlText
+        )[0]
+        assertThat(y.printTrimmed()).isEqualTo(yamlText)
     }
 }

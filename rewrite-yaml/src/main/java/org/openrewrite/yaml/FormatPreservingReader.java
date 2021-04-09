@@ -20,21 +20,18 @@ import org.yaml.snakeyaml.events.Event;
 
 import java.io.IOException;
 import java.io.Reader;
+import java.util.ArrayList;
 
 /**
- * Maintains a lookback window of characters used to determine format prefixes of
+ * Maintains a sliding buffer of characters used to determine format prefixes of
  * YAML AST elements.
  */
 class FormatPreservingReader extends Reader {
+
     private final Reader delegate;
 
-    private final char[] currentBuffer = new char[1025];
-    private int currentBufferIndex = 0;
-    private int currentBufferLength = 0;
-
-    private final char[] prevBuffer = new char[1025];
-    private int prevBufferIndex = 0;
-    private int prevBufferLength = 0;
+    private ArrayList<Character> buffer = new ArrayList<>();
+    private int bufferIndex = 0;
 
     FormatPreservingReader(Reader delegate) {
         this.delegate = delegate;
@@ -48,15 +45,12 @@ class FormatPreservingReader extends Reader {
         if (prefixLen > 0) {
             char[] prefix = new char[prefixLen];
 
-            if (lastEnd < currentBufferIndex) {
-                int prevBufferAvailable = prevBufferLength - prevBufferIndex - lastEnd;
-                System.arraycopy(prevBuffer, lastEnd - prevBufferIndex, prefix, 0,
-                        Math.min(prevBufferAvailable, prefixLen));
-                if (prefixLen > prevBufferAvailable) {
-                    System.arraycopy(currentBuffer, 0, prefix, prevBufferAvailable, prefixLen - prevBufferAvailable);
-                }
-            } else {
-                System.arraycopy(currentBuffer, lastEnd - currentBufferIndex, prefix, 0, prefixLen);
+            for (int i = 0; i < prefixLen; i++) {
+                prefix[i] = buffer.get(lastEnd - bufferIndex + i);
+            }
+            if (lastEnd > bufferIndex) {
+                buffer = new ArrayList<>(buffer.subList(lastEnd - bufferIndex, buffer.size()));
+                bufferIndex = lastEnd;
             }
 
             return new String(prefix);
@@ -68,20 +62,25 @@ class FormatPreservingReader extends Reader {
         return prefix(lastEnd, event.getStartMark().getIndex());
     }
 
+    public String readStringFromBuffer(int start, int end) {
+        int length = end - start + 1;
+        char[] readBuff = new char[length];
+        for (int i = 0; i < length; i++) {
+            int bufferOffset = start + i - bufferIndex;
+            readBuff[i] = buffer.get(bufferOffset);
+        }
+        return new String(readBuff);
+    }
+
     @Override
     public int read(@NonNull char[] cbuf, int off, int len) throws IOException {
-        System.arraycopy(currentBuffer, 0, prevBuffer, 0, currentBufferLength);
-        prevBufferIndex = currentBufferIndex;
-        prevBufferLength = currentBufferLength;
-
-        int read = delegate.read(currentBuffer, off, len);
-        currentBufferIndex += currentBufferLength;
-        currentBufferLength = len;
-
+        int read = delegate.read(cbuf, off, len);
         if (read > 0) {
-            System.arraycopy(currentBuffer, 0, cbuf, 0, read);
+            buffer.ensureCapacity(buffer.size() + read);
+            for (int i = 0; i < read; i++) {
+                buffer.add(cbuf[i]);
+            }
         }
-
         return read;
     }
 
