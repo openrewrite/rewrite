@@ -76,9 +76,15 @@ public class RemoveDependency extends Recipe {
 
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            if (isDependencyTag(groupId, artifactId) && (scope == null ||
-                    Scope.fromName(scope).equals(findDependencyScope(tag)))) {
-                doAfterVisit(new RemoveContentVisitor<>(tag, true));
+            if (isDependencyTag(groupId, artifactId)) {
+                Pom.Dependency dependency = findDependency(tag);
+                if (dependency != null) {
+                    Scope checkScope = scope != null ? Scope.fromName(scope) : null;
+                    if (checkScope == null || checkScope == dependency.getScope() ||
+                            (dependency.getScope() != null && dependency.getScope().isInClasspathOf(checkScope))) {
+                        doAfterVisit(new RemoveContentVisitor<>(tag, true));
+                    }
+                }
             }
 
             return super.visitTag(tag, ctx);
