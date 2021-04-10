@@ -17,11 +17,13 @@ package org.openrewrite.marker
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Tree
+import org.openrewrite.Tree.randomId
 
 class GitProvenanceTest {
-    private val sshRepo = GitProvenance("ssh://git@github.com/openrewrite/rewrite.git", "main", "123")
-    private val httpsRepo = GitProvenance("https://github.com/openrewrite/rewrite.git", "main", "123")
-    private val sshAlternateFormRepo = GitProvenance("git@github.com:openrewrite/rewrite.git", "main", "123")
+    private val sshRepo = GitProvenance("ssh://git@github.com/openrewrite/rewrite.git", "main", "123", randomId())
+    private val httpsRepo = GitProvenance("https://github.com/openrewrite/rewrite.git", "main", "123", randomId())
+    private val sshAlternateFormRepo = GitProvenance("git@github.com:openrewrite/rewrite.git", "main", "123", randomId())
 
     @Test
     fun getOrganizationName() {

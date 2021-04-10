@@ -29,6 +29,8 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.HashSet;
 import java.util.Set;
 
+import static org.openrewrite.Tree.randomId;
+
 @EqualsAndHashCode(callSuper = true)
 @Value
 public class FindTags extends Recipe {
@@ -57,7 +59,7 @@ public class FindTags extends Recipe {
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
                 if (xPathMatcher.matches(getCursor())) {
-                    t = t.withMarker(new RecipeSearchResult(FindTags.this));
+                    t = t.withMarker(new RecipeSearchResult(randomId(),FindTags.this));
                 }
                 return t;
             }

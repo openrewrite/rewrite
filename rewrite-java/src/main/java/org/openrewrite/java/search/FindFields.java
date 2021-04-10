@@ -29,6 +29,8 @@ import org.openrewrite.marker.RecipeSearchResult;
 import java.util.HashSet;
 import java.util.Set;
 
+import static org.openrewrite.Tree.randomId;
+
 /**
  * Finds fields that have a matching type.
  */
@@ -61,7 +63,7 @@ public class FindFields extends Recipe {
                 }
                 if (multiVariable.getTypeExpression() != null && TypeUtils.hasElementType(multiVariable.getTypeExpression()
                         .getType(), fullyQualifiedTypeName)) {
-                    return multiVariable.withMarker(new RecipeSearchResult(FindFields.this));
+                    return multiVariable.withMarker(new RecipeSearchResult(randomId(), FindFields.this));
                 }
                 return multiVariable;
             }

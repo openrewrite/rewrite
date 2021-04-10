@@ -26,6 +26,8 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.HashSet;
 import java.util.Set;
 
+import static org.openrewrite.Tree.randomId;
+
 @EqualsAndHashCode(callSuper = true)
 @Value
 public class FindDependency extends Recipe {
@@ -70,7 +72,7 @@ public class FindDependency extends Recipe {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
                 if (isDependencyTag(groupId, artifactId)) {
-                    return tag.withMarker(new RecipeSearchResult(FindDependency.this));
+                    return tag.withMarker(new RecipeSearchResult(randomId(),FindDependency.this));
                 }
                 return super.visitTag(tag, context);
             }

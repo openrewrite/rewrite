@@ -17,6 +17,8 @@ package org.openrewrite.java.format
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
+import org.openrewrite.Tree
+import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.java.style.IntelliJ
@@ -28,7 +30,7 @@ interface SpacesTest : JavaRecipeTest {
         get() = Spaces()
 
     fun namedStyles(styles: Collection<Style>) : Iterable<NamedStyles> {
-        return listOf(NamedStyles("Test", "test", "test", emptySet(), styles))
+        return listOf(NamedStyles("Test", "test", "test", emptySet(), styles, randomId()))
     }
 
     @Test

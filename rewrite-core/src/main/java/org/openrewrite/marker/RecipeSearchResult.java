@@ -15,10 +15,14 @@
  */
 package org.openrewrite.marker;
 
-import lombok.*;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.ToString;
 import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.Nullable;
+
+import java.util.UUID;
 
 /**
  * Mark any AST element with "paint". Used by search visitors to mark AST elements that
@@ -30,18 +34,21 @@ import org.openrewrite.internal.lang.Nullable;
 @ToString
 @Getter
 public class RecipeSearchResult implements SearchResult {
+    private final UUID id;
+
     @EqualsAndHashCode.Include
     private final Recipe recipe;
 
     @Nullable
     private final String description;
 
-    public RecipeSearchResult(Recipe recipe, @Nullable String description) {
+    public RecipeSearchResult(UUID id, Recipe recipe, @Nullable String description) {
         this.recipe = recipe;
         this.description = description;
+        this.id = id;
     }
 
-    public RecipeSearchResult(Recipe recipe) {
-        this(recipe, null);
+    public RecipeSearchResult(UUID id, Recipe recipe) {
+        this(id, recipe, null);
     }
 }

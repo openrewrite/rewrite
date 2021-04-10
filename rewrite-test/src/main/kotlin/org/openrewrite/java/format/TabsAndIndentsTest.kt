@@ -18,6 +18,8 @@ package org.openrewrite.java.format
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
+import org.openrewrite.Tree
+import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.java.style.IntelliJ
@@ -31,7 +33,8 @@ interface TabsAndIndentsTest : JavaRecipeTest {
     fun tabsAndIndents(with: TabsAndIndentsStyle.() -> TabsAndIndentsStyle = { this }) = listOf(
         NamedStyles(
             "test", "test", "test", emptySet(), listOf(
-                IntelliJ.tabsAndIndents().run { with(this) })
+                IntelliJ.tabsAndIndents().run { with(this) }),
+            randomId()
         )
     )
 

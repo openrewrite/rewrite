@@ -29,6 +29,8 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
+import static org.openrewrite.Tree.randomId;
+
 @EqualsAndHashCode(callSuper = true)
 @Value
 public class FindProperties extends Recipe {
@@ -51,12 +53,12 @@ public class FindProperties extends Recipe {
             public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, context);
                 if (isPropertyTag() && propertyMatcher.matcher(tag.getName()).matches()) {
-                    t = t.withMarker(new RecipeSearchResult(FindProperties.this));
+                    t = t.withMarker(new RecipeSearchResult(randomId(),FindProperties.this));
                 }
 
                 Optional<String> value = tag.getValue();
                 if (t.getContent() != null && value.isPresent() && value.get().contains("${")) {
-                    t = t.withContent(ListUtils.mapFirst(t.getContent(), v -> v.withMarker(new RecipeSearchResult(FindProperties.this,
+                    t = t.withContent(ListUtils.mapFirst(t.getContent(), v -> v.withMarker(new RecipeSearchResult(randomId(),FindProperties.this,
                             model.getValue(value.get())))));
                 }
                 return t;

@@ -16,11 +16,8 @@
 package org.openrewrite.marker;
 
 import org.openrewrite.Incubating;
-import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.lang.Nullable;
-
-import java.util.Optional;
 
 /**
  * Mark any AST element with "paint". Used by search visitors to mark AST elements that
@@ -29,39 +26,17 @@ import java.util.Optional;
  */
 @Incubating(since = "7.0.0")
 public interface SearchResult extends Marker {
-    TreePrinter<Void> PRINTER = printer("~~>", "~~(%s)~~>");
-
-    static TreePrinter<Void> printer(String markerText, String markerTextWithDescription) {
-        return new TreePrinter<Void>() {
-            private SearchResult marker;
-            private Integer mark;
-
-            @Override
-            public void doBefore(Tree tree, StringBuilder printerAcc, Void unused) {
-                Optional<SearchResult> marker = tree.getMarkers().findFirst(SearchResult.class);
-                if (marker.isPresent()) {
-                    this.marker = marker.get();
-                    this.mark = printerAcc.length();
-                }
-            }
-
-            @Override
-            public void doAfter(Tree tree, StringBuilder printerAcc, Void unused) {
-                if (mark != null) {
-                    for (int i = mark; i < printerAcc.length(); i++) {
-                        if (!Character.isWhitespace(printerAcc.charAt(i))) {
-                            printerAcc.insert(i, marker.getDescription() == null ?
-                                    markerText :
-                                    String.format(markerTextWithDescription, marker.getDescription()));
-                            break;
-                        }
-                    }
-                    mark = null;
-                }
-            }
-        };
-    }
 
     @Nullable
     String getDescription();
+
+    @Override
+    default <P> String print(TreePrinter<P> printer, P p) {
+        String desc = getDescription();
+        if(desc == null) {
+            return "~~>";
+        } else {
+            return String.format("~~(%s)~~>", desc);
+        }
+    }
 }

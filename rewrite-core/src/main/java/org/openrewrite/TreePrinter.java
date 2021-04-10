@@ -41,6 +41,4 @@ public interface TreePrinter<P> {
      * @param p visit context
      */
     default void doAfter(Tree tree, StringBuilder printerAcc, P p) {}
-
-
 }

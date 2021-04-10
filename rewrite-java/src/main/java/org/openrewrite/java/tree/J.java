@@ -30,6 +30,7 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.*;
 import org.openrewrite.java.search.FindTypes;
+import org.openrewrite.marker.Markable;
 import org.openrewrite.marker.Markers;
 
 import java.io.Serializable;
@@ -47,7 +48,7 @@ import static java.util.stream.Collectors.toList;
 
 @SuppressWarnings("unused")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-public interface J extends Serializable, Tree {
+public interface J extends Serializable, Tree, Markable {
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {

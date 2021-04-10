@@ -16,10 +16,11 @@
 package org.openrewrite;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.openrewrite.marker.Markable;
 
 import java.nio.file.Path;
 
-public interface SourceFile extends Tree {
+public interface SourceFile extends Tree, Markable {
     /**
      * @return An absolute or relative file path.
      */

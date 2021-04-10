@@ -18,6 +18,7 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.Tree
 import org.openrewrite.java.style.ImportLayoutStyle
 import org.openrewrite.style.NamedStyles
 
@@ -348,7 +349,8 @@ interface OrderImportsTest : JavaRecipeTest {
                                             .blankLine()
                                             .importStaticAllOthers()
                                             .build()
-                            )
+                            ),
+                                Tree.randomId()
                             )
                     )
             ).build(),

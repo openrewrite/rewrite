@@ -32,6 +32,8 @@ import org.openrewrite.marker.RecipeSearchResult;
 import java.util.HashSet;
 import java.util.Set;
 
+import static org.openrewrite.Tree.randomId;
+
 /**
  * This recipe finds all explicit references to a type.
  */
@@ -65,7 +67,7 @@ public class FindTypes extends Recipe {
                 if (asClass != null && asClass.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         getCursor().firstEnclosing(J.Import.class) == null) {
                     ctx.putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY, asClass);
-                    return n.withMarker(new RecipeSearchResult(FindTypes.this));
+                    return n.withMarker(new RecipeSearchResult(randomId(), FindTypes.this));
                 }
                 return n;
             }
@@ -77,7 +79,7 @@ public class FindTypes extends Recipe {
                 if (asClass != null && asClass.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         fa.getName().getSimpleName().equals("class")) {
                     ctx.putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY, asClass);
-                    return fa.withMarker(new RecipeSearchResult(FindTypes.this));
+                    return fa.withMarker(new RecipeSearchResult(randomId(),FindTypes.this));
                 }
                 return fa;
             }

@@ -20,6 +20,8 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Tree
+import org.openrewrite.Tree.randomId
 import org.openrewrite.config.DeclarativeNamedStyles
 import org.openrewrite.style.Style
 
@@ -79,7 +81,8 @@ class ImportLayoutStyleTest {
                         .blankLine()
                         .importStaticAllOthers()
                         .build()
-                )
+                ),
+            randomId()
         )
         mapper.readValue(mapper.writeValueAsBytes(style),
                 DeclarativeNamedStyles::class.java)

@@ -29,6 +29,7 @@ import org.openrewrite.TreePrinter;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Markable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.internal.YamlPrinter;
@@ -42,7 +43,7 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-public interface Yaml extends Serializable, Tree {
+public interface Yaml extends Serializable, Tree, Markable {
     @Override
     default <P> String print(P p) {
         return new YamlPrinter<>(TreePrinter.identity()).print(this, p);

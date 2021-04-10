@@ -36,12 +36,13 @@ import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
+import java.util.*;
 import java.util.regex.Pattern;
 
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.emptySet;
+import static org.openrewrite.Tree.randomId;
 
 /**
  * Adds a dependency if there is no dependency matching <code>groupId</code> and <code>artifactId</code>.
@@ -119,7 +120,7 @@ public class AddDependencyVisitor extends MavenVisitor {
                         classifier,
                         type,
                         false,
-                        new Pom(groupId, artifactId, version, null, null, null, packaging, classifier, null,
+                        new Pom(randomId(), groupId, artifactId, version, null, null, null, packaging, classifier, null,
                                 emptyList(), new Pom.DependencyManagement(emptyList()), emptyList(), emptyList(), emptyMap(), emptyMap()),
                         version,
                         null,

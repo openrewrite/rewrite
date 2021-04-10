@@ -18,6 +18,8 @@ package org.openrewrite.java.cleanup
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
+import org.openrewrite.Tree
+import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.java.style.IntelliJ
@@ -66,7 +68,8 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
                         false,
                         false
                     ).run { with(this) }
-                )
+                ),
+                randomId()
             )
         )
 
@@ -77,7 +80,8 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
                 NamedStyles(
                     "test", "test", "test", emptySet(), listOf(
                         IntelliJ.unnecessaryParentheses()
-                    )
+                    ),
+                    randomId()
                 )
             )
         ).build(),

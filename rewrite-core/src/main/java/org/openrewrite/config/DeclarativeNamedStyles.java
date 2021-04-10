@@ -22,13 +22,14 @@ import org.openrewrite.style.Style;
 
 import java.util.Collection;
 import java.util.Set;
+import java.util.UUID;
 
 public class DeclarativeNamedStyles extends NamedStyles {
     @JsonIgnore
     private Validated validation = Validated.none();
 
-    public DeclarativeNamedStyles(String name, String displayName, String description, Set<String> tags, Collection<Style> styles) {
-        super(name, displayName, description, tags, styles);
+    public DeclarativeNamedStyles(String name, String displayName, String description, Set<String> tags, Collection<Style> styles, UUID id) {
+        super(name, displayName, description, tags, styles, id);
     }
 
     void addValidation(Validated validated) {

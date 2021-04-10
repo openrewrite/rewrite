@@ -28,6 +28,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import static org.openrewrite.Tree.randomId;
+
 /**
  * Find direct and transitive dependencies, marking first order dependencies that
  * either match or transitively include a dependency matching {@link #groupIdPattern} and
@@ -97,9 +99,9 @@ public class DependencyInsight extends Recipe {
                         Optional<Pom.Dependency> match = dependencies.stream().filter(this::dependencyMatches).findFirst();
                         if(match.isPresent()) {
                             if(dependencyMatches(dependency)) {
-                                t = t.withMarker(new RecipeSearchResult(DependencyInsight.this));
+                                t = t.withMarker(new RecipeSearchResult(randomId(), DependencyInsight.this));
                             } else {
-                                t = t.withMarker(new RecipeSearchResult(DependencyInsight.this,
+                                t = t.withMarker(new RecipeSearchResult(randomId(),DependencyInsight.this,
                                         match.get().getCoordinates()));
                             }
                         }

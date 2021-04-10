@@ -28,6 +28,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Markable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.internal.PropertiesPrinter;
@@ -38,7 +39,7 @@ import java.util.List;
 import java.util.UUID;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-public interface Properties extends Serializable, Tree {
+public interface Properties extends Serializable, Tree, Markable {
 
     default <P> String print(TreePrinter<P> printer, P p) {
         return new PropertiesPrinter<>(printer).print(this, p);

@@ -16,33 +16,40 @@
 package org.openrewrite.marker;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Tree;
+import org.openrewrite.TreePrinter;
+import org.openrewrite.TreeVisitor;
 
 import java.util.Objects;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.Tree.randomId;
 
 public class MarkersTest {
     @Test
     public void addPreventsDuplicates() {
         Markers markers = Markers.EMPTY;
-        markers = markers.add(new TextMarker("test"));
-        markers = markers.add(new TextMarker("test"));
+        markers = markers.add(new TextMarker("test", randomId()));
+        markers = markers.add(new TextMarker("test", randomId()));
         assertThat(markers.findAll(TextMarker.class)).hasSize(1);
     }
 
     @Test
     public void addAcceptsNonDuplicates() {
         Markers markers = Markers.EMPTY;
-        markers = markers.add(new TextMarker("thing1"));
-        markers = markers.add(new TextMarker("thing2"));
+        markers = markers.add(new TextMarker("thing1", randomId()));
+        markers = markers.add(new TextMarker("thing2", randomId()));
         assertThat(markers.findAll(TextMarker.class)).hasSize(2);
     }
-    
+
     private static class TextMarker implements Marker {
         private final String text;
+        private final UUID id;
 
-        private TextMarker(String text) {
+        private TextMarker(String text, UUID id) {
             this.text = text;
+            this.id = id;
         }
 
         @Override
@@ -56,6 +63,21 @@ public class MarkersTest {
         @Override
         public int hashCode() {
             return Objects.hash(text);
+        }
+
+        @Override
+        public UUID getId() {
+            return id;
+        }
+
+        @Override
+        public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
+            return false;
+        }
+
+        @Override
+        public <P> String print(TreePrinter<P> printer, P p) {
+            return "";
         }
     }
 }

@@ -35,6 +35,8 @@ import java.util.stream.Stream;
 public class Pom implements Marker {
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
 
+    UUID id;
+
     @Nullable
     String groupId;
 
@@ -83,7 +85,8 @@ public class Pom implements Marker {
     //when the same property key is encountered multiple times.
     Map<String, String> effectiveProperties;
 
-    public Pom(@Nullable String groupId,
+    public Pom(UUID id,
+               @Nullable String groupId,
                String artifactId,
                @Nullable String version,
                @Nullable String name,
@@ -98,6 +101,7 @@ public class Pom implements Marker {
                Collection<MavenRepository> repositories,
                Map<String, String> properties,
                Map<String, String> effectiveProperties) {
+        this.id = id;
         this.groupId = groupId;
         this.artifactId = artifactId;
         this.version = version;

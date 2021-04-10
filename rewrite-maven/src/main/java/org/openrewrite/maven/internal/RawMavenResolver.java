@@ -17,24 +17,52 @@ package org.openrewrite.maven.internal;
 
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.Setter;
+import lombok.Value;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenExecutionContextView;
-import org.openrewrite.maven.tree.*;
+import org.openrewrite.maven.tree.DependencyDescriptor;
+import org.openrewrite.maven.tree.DependencyManagementDependency;
+import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.tree.MavenRepositoryCredentials;
+import org.openrewrite.maven.tree.MavenRepositoryMirror;
+import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.tree.Xml;
 
 import java.net.URI;
 import java.nio.file.Path;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.NavigableMap;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Queue;
+import java.util.Set;
+import java.util.Stack;
+import java.util.TreeMap;
 
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.emptySet;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.Tree.randomId;
 
 public class RawMavenResolver {
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
@@ -609,6 +637,7 @@ public class RawMavenResolver {
 
                 result = Optional.of(
                         new Pom(
+                                randomId(),
                                 groupId,
                                 rawPom.getArtifactId(),
                                 version,

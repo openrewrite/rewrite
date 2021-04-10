@@ -21,12 +21,14 @@ import lombok.Data;
 import lombok.experimental.FieldDefaults;
 import org.eclipse.jgit.lib.*;
 import org.openrewrite.Incubating;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.file.Path;
+import java.util.UUID;
 
 @Incubating(since = "7.0.0")
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -37,6 +39,7 @@ public class GitProvenance implements Marker {
 
     String branch;
     String change;
+    UUID id;
 
     @Nullable
     public String getOrganizationName() {
@@ -67,7 +70,7 @@ public class GitProvenance implements Marker {
     public static GitProvenance fromProjectDirectory(Path projectDir) {
         try {
             Repository repository = new RepositoryBuilder().findGitDir(projectDir.toFile()).build();
-            return new GitProvenance(getOrigin(repository), repository.getBranch(), getChangeset(repository));
+            return new GitProvenance(getOrigin(repository), repository.getBranch(), getChangeset(repository), Tree.randomId());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

@@ -24,6 +24,8 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 
+import static org.openrewrite.Tree.randomId;
+
 public class IntelliJ extends NamedStyles {
     private static final IntelliJ INSTANCE = new IntelliJ();
 
@@ -36,11 +38,12 @@ public class IntelliJ extends NamedStyles {
                         tabsAndIndents(),
                         spaces(),
                         wrappingAndBraces(),
-                        unnecessaryParentheses(),
+                        unnecessaryParentheses()
                         emptyBlock(),
                         equalsAvoidsNull(),
                         explicitInitialization()
-                )
+                ),
+                randomId()
         );
     }
 

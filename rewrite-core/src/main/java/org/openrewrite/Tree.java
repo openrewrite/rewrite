@@ -25,14 +25,18 @@ import org.openrewrite.style.Style;
 import java.util.UUID;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
-public interface Tree extends Markable {
+public interface Tree {
     static UUID randomId() {
         return UUID.randomUUID();
     }
 
     @Nullable
     default <S extends Style> S getStyle(Class<S> style) {
-        return NamedStyles.merge(style, getMarkers().findAll(NamedStyles.class));
+        if(this instanceof Markable) {
+            Markable m = (Markable)this;
+            return NamedStyles.merge(style, m.getMarkers().findAll(NamedStyles.class));
+        }
+        return null;
     }
 
     /**

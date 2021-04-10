@@ -29,6 +29,8 @@ import org.openrewrite.marker.RecipeSearchResult;
 import java.util.HashSet;
 import java.util.Set;
 
+import static org.openrewrite.Tree.randomId;
+
 @EqualsAndHashCode(callSuper = true)
 @Value
 public class FindAnnotations extends Recipe {
@@ -59,7 +61,7 @@ public class FindAnnotations extends Recipe {
             public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
                 J.Annotation a = super.visitAnnotation(annotation, ctx);
                 if (annotationMatcher.matches(annotation)) {
-                    a = a.withMarker(new RecipeSearchResult(FindAnnotations.this));
+                    a = a.withMarker(new RecipeSearchResult(randomId(), FindAnnotations.this));
                 }
                 return a;
             }

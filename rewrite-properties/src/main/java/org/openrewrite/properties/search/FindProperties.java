@@ -28,6 +28,8 @@ import org.openrewrite.properties.tree.Properties;
 import java.util.HashSet;
 import java.util.Set;
 
+import static org.openrewrite.Tree.randomId;
+
 /**
  * Finds occurrences of a property key.
  */
@@ -73,7 +75,7 @@ public class FindProperties extends Recipe {
             public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
                 Properties p = super.visitEntry(entry, ctx);
                 if (entry.getKey().equals(propertyKey)) {
-                    p = p.withMarker(new RecipeSearchResult(FindProperties.this));
+                    p = p.withMarker(new RecipeSearchResult(randomId(), FindProperties.this));
                 }
                 return p;
             }

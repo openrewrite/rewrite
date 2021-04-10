@@ -28,6 +28,7 @@ import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.NullUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Markable;
 import org.openrewrite.marker.Marker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,8 +73,8 @@ public abstract class Recipe {
     private static final TreePrinter<ExecutionContext> MARKER_ID_PRINTER = new TreePrinter<ExecutionContext>() {
         @Override
         public void doBefore(@Nullable Tree tree, StringBuilder printerAcc, ExecutionContext executionContext) {
-            if (tree != null) {
-                String markerIds = tree.getMarkers().entries().stream()
+            if (tree instanceof Markable) {
+                String markerIds = ((Markable)tree).getMarkers().entries().stream()
                         .filter(marker -> !(marker instanceof RecipeThatMadeChanges))
                         .map(marker -> String.valueOf(marker.hashCode()))
                         .collect(joining(","));
@@ -408,10 +409,27 @@ public abstract class Recipe {
     @EqualsAndHashCode
     private static class RecipeThatMadeChanges implements Marker {
         private final Set<Recipe> recipes;
+        private final UUID id;
 
         private RecipeThatMadeChanges(Recipe recipe) {
             this.recipes = new HashSet<>();
             this.recipes.add(recipe);
+            id = Tree.randomId();
+        }
+
+        @Override
+        public UUID getId() {
+            return id;
+        }
+
+        @Override
+        public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
+            return false;
+        }
+
+        @Override
+        public <P> String print(TreePrinter<P> printer, P p) {
+            return "";
         }
     }
 

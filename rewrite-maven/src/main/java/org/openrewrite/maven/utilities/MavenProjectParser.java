@@ -39,6 +39,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static org.openrewrite.Tree.randomId;
+
 /**
  * Parse a Maven project on disk into a list of {@link org.openrewrite.SourceFile} including
  * Maven, Java, YAML, properties, and XML AST representations of sources and resources found.
@@ -138,6 +140,7 @@ public class MavenProjectParser {
         );
 
         JavaProvenance mainProvenance = new JavaProvenance(
+                randomId(),
                 rootMavenModel.getName(),
                 "main",
                 buildTool,
@@ -146,6 +149,7 @@ public class MavenProjectParser {
         );
 
         JavaProvenance testProvenance = new JavaProvenance(
+                randomId(),
                 rootMavenModel.getName(),
                 "test",
                 buildTool,

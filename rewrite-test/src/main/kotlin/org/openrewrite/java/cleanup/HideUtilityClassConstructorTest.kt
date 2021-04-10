@@ -17,6 +17,8 @@ package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
+import org.openrewrite.Tree
+import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.style.NamedStyles
@@ -426,7 +428,8 @@ interface HideUtilityClassConstructorTest : JavaRecipeTest {
                                 """@java.lang.SuppressWarnings("checkstyle:HideUtilityClassConstructor")"""
                             )
                         )
-                    )
+                    ),
+                    randomId()
                 )
             )
         ).build(),

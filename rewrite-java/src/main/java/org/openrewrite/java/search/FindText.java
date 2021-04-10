@@ -31,6 +31,8 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
 
+import static org.openrewrite.Tree.randomId;
+
 @EqualsAndHashCode(callSuper = true)
 @Value
 public class FindText extends Recipe {
@@ -89,7 +91,7 @@ public class FindText extends Recipe {
             @Override
             public @Nullable J postVisit(J tree, ExecutionContext context) {
                 if(getCursor().pollMessage("foundText") != null) {
-                    return tree.withMarker(new RecipeSearchResult(FindText.this));
+                    return tree.withMarker(new RecipeSearchResult(randomId(), FindText.this));
                 }
                 return super.postVisit(tree, context);
             }
@@ -103,7 +105,7 @@ public class FindText extends Recipe {
                 assert literal.getValue() != null;
                 if (compiledPatterns.stream().anyMatch(p -> p
                         .matcher(literal.getValue().toString()).find())) {
-                    return literal.withMarker(new RecipeSearchResult(FindText.this));
+                    return literal.withMarker(new RecipeSearchResult(randomId(), FindText.this));
                 }
 
                 return literal;

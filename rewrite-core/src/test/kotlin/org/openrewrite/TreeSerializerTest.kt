@@ -29,7 +29,7 @@ class TreeSerializerTest {
 
         val styles = NamedStyles("utf8", "test", "test", emptySet(), listOf(TextStyle().apply {
             charset = "UTF-8"
-        }))
+        }), Tree.randomId())
 
         val plainText1 = PlainText(Tree.randomId(), Markers.EMPTY, "hi Jon").withMarker<PlainText>(styles)
         val plainText2 = PlainText(Tree.randomId(), Markers.EMPTY, "hi Jonathan").withMarker<PlainText>(styles)
