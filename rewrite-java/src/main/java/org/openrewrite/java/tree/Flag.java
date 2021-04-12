@@ -57,10 +57,9 @@ public enum Flag {
     }
 
     // ----------------------------------------------------------------------------------------------
-    // This code is similar to the code in the com.sun.tools.javac.code.Flags and we could move this
-    // into JavaType to be more memory efficient is we need to.
+    // This code is similar to the code in the com.sun.tools.javac.code.Flags.
     // ----------------------------------------------------------------------------------------------
-    private static final Map<Long, Set<Flag>> flagSets = new ConcurrentHashMap<>(64);
+    private static final Map<Integer, Set<Flag>> flagSets = new ConcurrentHashMap<>(64);
 
     /**
      * Convert the Java language specification's access flags bitmap into a set of Flag enumerations.
@@ -68,7 +67,7 @@ public enum Flag {
      * @param flagsBitMap The flag from the Javac symbol into a set of rewrite's Flag enum
      * @return A set of Flag enums.
      */
-    public static Set<Flag> bitMapToFlags(long flagsBitMap) {
+    public static Set<Flag> bitMapToFlags(int flagsBitMap) {
         Set<Flag> flags = flagSets.get(flagsBitMap);
         if (flags == null) {
             flags = java.util.EnumSet.noneOf(Flag.class);
