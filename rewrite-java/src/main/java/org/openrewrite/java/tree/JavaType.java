@@ -207,6 +207,20 @@ public interface JavaType extends Serializable {
             return build(fullyQualifiedName, 1, Kind.Class, emptyList(), emptyList(), emptyList(), null, null, null,true);
         }
 
+        /**
+         * Build a class type only from the class' fully qualified name and kind. Since we are not providing any member,
+         * type parameter, interface, or supertype information, this fully qualified name could potentially match on
+         * more than one version of the class found in the type cache. This method will simply pick one of them, because
+         * there is no way of selecting between the versions of the class based solely on the fully qualified class name.
+         *
+         * @param fullyQualifiedName The fully qualified name of the class to build
+         * @param kind The class kind : Class, Annotation, Enum, or Interface
+         * @return Any class found in the type cache
+         */
+        public static Class build(String fullyQualifiedName, Kind kind) {
+            return build(fullyQualifiedName, 1, kind, emptyList(), emptyList(), emptyList(), null, null, null,true);
+        }
+
         public static Class build(String fullyQualifiedName,
                                   Set<Flag> flags,
                                   Kind kind,
@@ -402,11 +416,10 @@ public interface JavaType extends Serializable {
         }
 
         public enum Kind {
-
             Class,
             Enum,
             Interface,
-            Annotation;
+            Annotation
         }
     }
 
