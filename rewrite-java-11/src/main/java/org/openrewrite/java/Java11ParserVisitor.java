@@ -1531,7 +1531,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                     genericSignature,
                     signature.apply(selectType),
                     paramNames,
-                    genericSymbol.flags()
+                    //Currently only the first 16 bits are meaninful
+                    (int) genericSymbol.flags() & 0xFFFF
             );
         }
 
@@ -1591,7 +1592,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                                 fields.add(new JavaType.Variable(
                                         elem.name.toString(),
                                         type(elem.type, stackWithSym),
-                                        Flag.bitMapToFlags(elem.flags())
+                                        //Currently only the first 16 bits are meaninful
+                                        (int) elem.flags() & 0xFFFF
                                 ));
                             }
                         }
@@ -1646,7 +1648,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                     }
                     JavaType.Class clazz = JavaType.Class.build(
                             sym.className(),
-                            Flag.bitMapToFlags(sym.flags()),
+                            //Currently only the first 16 bits are meaninful
+                            (int) sym.flags() & 0xFFFF,
                             kind,
                             fields,
                             typeParameters,

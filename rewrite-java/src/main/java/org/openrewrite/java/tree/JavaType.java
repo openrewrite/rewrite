@@ -137,7 +137,7 @@ public interface JavaType extends Serializable {
         private final String fullyQualifiedName;
 
         @Getter(AccessLevel.NONE)
-        private final long flagsBitMap;
+        private final int flagsBitMap;
 
         private final Kind kind;
 
@@ -157,7 +157,7 @@ public interface JavaType extends Serializable {
         private final String flyweightId;
 
         private Class(String fullyQualifiedName,
-                      long flagsBitMap,
+                      int flagsBitMap,
                       Kind kind,
                       List<Variable> members,
                       List<JavaType> typeParameters,
@@ -204,10 +204,9 @@ public interface JavaType extends Serializable {
          * @return Any class found in the type cache
          */
         public static Class build(String fullyQualifiedName) {
-            return build(fullyQualifiedName, Collections.singleton(Flag.Public), Kind.Class, emptyList(), emptyList(), emptyList(), null, null, null,true);
+            return build(fullyQualifiedName, 1, Kind.Class, emptyList(), emptyList(), emptyList(), null, null, null,true);
         }
 
-        @JsonCreator
         public static Class build(String fullyQualifiedName,
                                   Set<Flag> flags,
                                   Kind kind,
@@ -217,24 +216,24 @@ public interface JavaType extends Serializable {
                                   List<Method> constructors,
                                   @Nullable Class supertype,
                                   @Nullable Class owningClass) {
-            return build(fullyQualifiedName, flags, kind, members, typeParameters, interfaces, constructors, supertype, owningClass, false);
+            return build(fullyQualifiedName, Flag.flagsToBitMap(flags), kind, members, typeParameters, interfaces, constructors, supertype, owningClass, false);
         }
 
-        public static Class build(String fullyQualifiedName,
-                                  Set<Flag> flags,
+        @JsonCreator
+        protected static Class build(String fullyQualifiedName,
+                                  int flagsBitMap,
                                   Kind kind,
                                   List<Variable> members,
                                   List<JavaType> typeParameters,
                                   List<JavaType> interfaces,
                                   @Nullable List<Method> constructors,
                                   @Nullable Class supertype,
-                                  @Nullable Class owningClass,
-                                  boolean relaxedClassTypeMatching) {
-            return build(fullyQualifiedName, Flag.flagsToBitMap(flags), kind, members, typeParameters, interfaces, constructors, supertype, owningClass, relaxedClassTypeMatching);
+                                  @Nullable Class owningClass) {
+            return build(fullyQualifiedName, flagsBitMap, kind, members, typeParameters, interfaces, constructors, supertype, owningClass, false);
         }
 
         public static Class build(String fullyQualifiedName,
-                                  long flagsBitMap,
+                                  int flagsBitMap,
                                   Kind kind,
                                   List<Variable> members,
                                   List<JavaType> typeParameters,
@@ -450,12 +449,17 @@ public interface JavaType extends Serializable {
         private final JavaType type;
 
         @Getter(AccessLevel.NONE)
-        private final long flagsBitMap;
+        private final int flagsBitMap;
 
         public Variable(String name, @Nullable JavaType type, Set<Flag> flags) {
+            this(name, type, Flag.flagsToBitMap(flags));
+        }
+
+        @JsonCreator
+        public Variable(String name, @Nullable JavaType type, int flagsBitMap) {
             this.name = name;
             this.type = type;
-            flagsBitMap = Flag.flagsToBitMap(flags);
+            this.flagsBitMap = flagsBitMap;
         }
 
         public boolean hasFlags(Flag... test) {
@@ -488,9 +492,9 @@ public interface JavaType extends Serializable {
         private final List<String> paramNames;
 
         @Getter(AccessLevel.NONE)
-        private final long flagsBitMap;
+        private final int flagsBitMap;
 
-        private Method(FullyQualified declaringType, String name, Signature genericSignature, Signature resolvedSignature, List<String> paramNames, long flagsBitMap) {
+        private Method(FullyQualified declaringType, String name, Signature genericSignature, Signature resolvedSignature, List<String> paramNames, int flagsBitMap) {
             this.declaringType = declaringType;
             this.name = name;
             this.genericSignature = genericSignature;
@@ -499,14 +503,14 @@ public interface JavaType extends Serializable {
             this.flagsBitMap = flagsBitMap;
         }
 
-        @JsonCreator
         public static Method build(FullyQualified declaringType, String name, Signature genericSignature,
                                    Signature resolvedSignature, List<String> paramNames, Set<Flag> flags) {
             return build(declaringType, name, genericSignature, resolvedSignature, paramNames, Flag.flagsToBitMap(flags));
         }
 
+        @JsonCreator
         public static Method build(FullyQualified declaringType, String name, Signature genericSignature,
-                                   Signature resolvedSignature, List<String> paramNames, long flagsBitMap) {
+                                   Signature resolvedSignature, List<String> paramNames, int flagsBitMap) {
 
             Method test = new Method(declaringType, name, genericSignature, resolvedSignature, paramNames, flagsBitMap);
 

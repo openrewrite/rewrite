@@ -109,6 +109,10 @@ class Java11JavaParserTest: Java11Test, JavaParserTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11JavaTypeSerializerTest: Java11Test, JavaTypeSerializerTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11LabelTest: Java11Test, LabelTest
 
 @DebugOnly

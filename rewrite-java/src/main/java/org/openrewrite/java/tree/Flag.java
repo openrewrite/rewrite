@@ -63,7 +63,7 @@ public enum Flag {
     private static final Map<Long, Set<Flag>> flagSets = new ConcurrentHashMap<>(64);
 
     /**
-     * Convert the Java runtime's flag bitmask into a set of enumerations.
+     * Convert the Java language specification's access flags bitmap into a set of Flag enumerations.
      *
      * @param flagsBitMap The flag from the Javac symbol into a set of rewrite's Flag enum
      * @return A set of Flag enums.
@@ -89,13 +89,13 @@ public enum Flag {
     }
 
     /**
-     * Converts a set of flag enumerations into the Java runtime's bitmap.
+     * Converts a set of flag enumerations into the Java Language Specification's access_flags bitmap
      *
      * @param flags A set of Flag enumerations
      * @return The bitmask representation of those flags.
      */
-    public static long flagsToBitMap(@Nullable  Set<Flag> flags) {
-        long mask = 0;
+    public static int flagsToBitMap(@Nullable  Set<Flag> flags) {
+        int mask = 0;
         if (flags != null) {
             for (Flag flag : flags) {
                 mask = mask | flag.bitMask;
@@ -104,7 +104,12 @@ public enum Flag {
         return mask;
     }
 
-    public static boolean hasFlags(long flagsBitMap, Flag... flags) {
+    /**
+     * @param flagsBitMap Java Language Specification's access flags bitmap
+     * @param flags A set of flags to test
+     * @return Returns true if the access flags bitmap contains all the flags passed to this method.
+     */
+    public static boolean hasFlags(int flagsBitMap, Flag... flags) {
         for (Flag flag : flags) {
             if ((flag.bitMask & flagsBitMap) == 0) {
                 return false;
