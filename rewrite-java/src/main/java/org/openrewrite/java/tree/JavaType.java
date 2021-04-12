@@ -403,19 +403,10 @@ public interface JavaType extends Serializable {
 
         public enum Kind {
 
-            Class(0),
-            Enum(0x4000),
-            Interface(0x0200),
-            Annotation(0x2200);
-
-            private final int bitMask;
-
-            Kind(int bitMask) {
-                this.bitMask = bitMask;
-            }
-            public int getBitMask() {
-                return bitMask;
-            }
+            Class,
+            Enum,
+            Interface,
+            Annotation;
         }
     }
 
