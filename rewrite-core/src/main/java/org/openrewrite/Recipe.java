@@ -153,7 +153,7 @@ public abstract class Recipe {
      * Invoked once after recipe has finally completed
      * @param executionContext {@link ExecutionContext} from recipe execution
      */
-    @Incubating(since = "7.2.0-SNAPSHOT")
+    @Incubating(since = "7.2.0")
     protected void afterRecipe(ExecutionContext executionContext) {}
 
     /**
