@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 
@@ -195,6 +196,25 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
             public class A {
                 String a = STRING;
             }
+        """
+    )
+
+    @Disabled("https://github.com/openrewrite/rewrite/issues/429")
+    @Test
+    fun doesntRemoveImportsFromPackageInfo(jp: JavaParser) = assertUnchanged(
+        recipe = RemoveUnusedImports(),
+        dependsOn = arrayOf(
+            """
+                package foo;
+                @Target({ElementType.PACKAGE, ElementType.TYPE})
+                public @interface FooAnnotation {}
+            """
+        ),
+        before = """
+            @Foo
+            package foo.bar.baz;
+            
+            import foo.FooAnnotation;
         """
     )
 }
