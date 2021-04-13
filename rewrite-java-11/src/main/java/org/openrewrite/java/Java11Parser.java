@@ -88,7 +88,6 @@ public class Java11Parser implements JavaParser {
         this.context = new Context();
         this.compilerLog = new ResettableLog(context);
         this.pfm = new JavacFileManager(context, true, charset);
-        context.put(JavaFileManager.class, this.pfm);
 
         // otherwise, consecutive string literals in binary expressions are concatenated by the parser, losing the original
         // structure of the expression!
@@ -151,7 +150,7 @@ public class Java11Parser implements JavaParser {
             }
 
             try {
-                pfm.setLocation(StandardLocation.CLASS_PATH, classpath.stream().map(Path::toFile).collect(toList()));
+                pfm.setLocationFromPaths(StandardLocation.CLASS_PATH, new ArrayList<>(classpath));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
