@@ -199,7 +199,7 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
         """
     )
 
-    @Disabled("rewrite/429")
+    @Disabled("https://github.com/openrewrite/rewrite/issues/429")
     @Test
     fun doesntRemoveImportsFromPackageInfo(jp: JavaParser) = assertUnchanged(
         recipe = RemoveUnusedImports(),
