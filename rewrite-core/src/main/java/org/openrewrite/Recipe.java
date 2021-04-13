@@ -187,11 +187,12 @@ public abstract class Recipe {
      * To identify a tree as applicable, the visitor should mark or otherwise alter the tree at any level. The mutation
      * that the applicability test visitor makes to the tree will not included in the results.
      *
+     * @param executionContext {#{@link ExecutionContext} from recipe execution}
      * @return A tree visitor that performs an applicability test.
      */
     @Incubating(since = "7.2.0")
     @Nullable
-    protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
+    protected TreeVisitor<?, ExecutionContext> getApplicableTest(ExecutionContext executionContext) {
         return null;
     }
 
@@ -200,10 +201,10 @@ public abstract class Recipe {
                                                                   ExecutionContext ctx,
                                                                   ForkJoinPool forkJoinPool,
                                                                   Map<UUID, Recipe> recipeThatDeletedSourceFile) {
-        if(getApplicableTest() != null) {
+        if(getApplicableTest(ctx) != null) {
             boolean applicable = false;
             for (S s : before) {
-                if (getApplicableTest().visit(s, ctx) != s) {
+                if (getApplicableTest(ctx).visit(s, ctx) != s) {
                     applicable = true;
                     break;
                 }
@@ -245,7 +246,6 @@ public abstract class Recipe {
                 }
             });
         }
-        afterRecipe(ctx);
         // The type of the list is widened at this point, since a source file type may be generated that isn't
         // of a type that is in the original set of source files (e.g. only XML files are given, and the
         // recipe generates Java code).

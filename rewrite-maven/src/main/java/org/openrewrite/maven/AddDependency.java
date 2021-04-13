@@ -23,12 +23,15 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeTree;
+import org.openrewrite.marker.RecipeSearchResult;
 import org.openrewrite.semver.Semver;
 
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -135,20 +138,27 @@ public class AddDependency extends Recipe {
     }
 
     @Override
-    protected void afterRecipe(ExecutionContext executionContext) {
-        if (onlyIfUsing != null && !onlyIfUsing.isEmpty()
-            && onlyIfUsing.stream().filter(fqn -> foundTypesContainsFullyQualified(executionContext, fqn)).findAny().isPresent()) {
-                doNext(new AddDependency(groupId,
-                        artifactId,
-                        version,
-                        versionPattern,
-                        releasesOnly,
-                        classifier,
-                        scope,
-                        type,
-                        familyPattern,
-                        null));
+    protected @Nullable TreeVisitor<?, ExecutionContext> getApplicableTest(ExecutionContext executionContext) {
+        if (onlyIfUsing != null
+            && onlyIfUsing.stream().noneMatch(fqn -> foundTypesContainsFullyQualified(executionContext, fqn))) {
+            // Find any specified types which have not been found
+            return new JavaIsoVisitor<ExecutionContext>() {
+                @Override
+                public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+                    for (String fqn : onlyIfUsing) {
+                        if (!foundTypesContainsFullyQualified(executionContext, fqn)) {
+                            Set<JavaType> foundTypes = FindTypes.find(cu, fqn).stream().map(TypeTree.class::cast).map(TypeTree::getType).collect(Collectors.toSet());
+                            if (!foundTypes.isEmpty()) {
+                                executionContext.getMessage(JavaType.FOUND_TYPE_CONTEXT_KEY, new HashSet<>()).addAll(foundTypes);
+                                cu = cu.withMarker(new RecipeSearchResult(AddDependency.this));
+                            }
+                        }
+                    }
+                    return cu;
+                }
+            };
         }
+        return null;
     }
 
     protected boolean foundTypesContainsFullyQualified(ExecutionContext executionContext, String fullyQualifiedClassName) {
@@ -159,34 +169,16 @@ public class AddDependency extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        TreeVisitor<?, ExecutionContext> visitor;
-        if (onlyIfUsing != null && !onlyIfUsing.isEmpty()) {
-            // Find any specified types which have not been found
-            visitor = new JavaIsoVisitor<ExecutionContext>() {
-                @Override
-                public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
-                    onlyIfUsing.forEach(fqn -> {
-                        if (!foundTypesContainsFullyQualified(executionContext, fqn)) {
-                            executionContext.getMessage(JavaType.FOUND_TYPE_CONTEXT_KEY, new HashSet<>())
-                                .addAll(FindTypes.find(cu, fqn).stream().map(TypeTree.class::cast).map(TypeTree::getType).collect(Collectors.toSet()));
-                        }
-                    });
-                    return cu;
-                }
-            };
-        } else {
-            visitor = new AddDependencyVisitor(
-                    groupId,
-                    artifactId,
-                    version,
-                    versionPattern,
-                    releasesOnly,
-                    classifier,
-                    scope,
-                    type,
-                    familyPattern == null ? null : Pattern.compile(familyPattern.replace("*", ".*"))
-            );
-        }
-        return visitor;
+        return new AddDependencyVisitor(
+                groupId,
+                artifactId,
+                version,
+                versionPattern,
+                releasesOnly,
+                classifier,
+                scope,
+                type,
+                familyPattern == null ? null : Pattern.compile(familyPattern.replace("*", ".*"))
+        );
     }
 }

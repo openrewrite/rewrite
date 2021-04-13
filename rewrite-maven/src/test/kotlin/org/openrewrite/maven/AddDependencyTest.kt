@@ -76,6 +76,38 @@ class AddDependencyTest : MavenRecipeTest {
     )
 
     @Test
+    fun onlyIfUsingTypeNotFoundNoChange() = assertUnchanged(
+        recipe = object : MavenVisitor() {
+            override fun visitMaven(maven: Maven, ctx: ExecutionContext): Maven {
+                ctx.putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY, JavaType.Class.build("com.google.common.collect.CartesianList"))
+                return super.visitMaven(maven, ctx)
+            }
+        }.toRecipe().doNext(
+            AddDependency(
+                "com.google.guava",
+                "guava",
+                "29.0-jre",
+                null,
+                true,
+                null,
+                null,
+                null,
+                null,
+                listOf("com.google.common.collect.ImmutableMap")
+            )
+        ),
+        before = """
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <dependencies>
+              </dependencies>
+            </project>
+        """
+    )
+
+    @Test
     fun addToExistingDependencies() = assertChanged(
         before = """
             <project>
