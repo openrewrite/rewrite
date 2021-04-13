@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+
 import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
 import com.sun.tools.javac.code.Flags;
@@ -1487,35 +1488,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         return converted;
     }
 
-    /**
-     * --------------
-     * Type conversion
-     * --------------
-     */
-
-    private final Map<Long, Flag> flagMasks = Map.of(
-            1L, Flag.Public,
-            1L << 1, Flag.Private,
-            1L << 2, Flag.Protected,
-            1L << 3, Flag.Static,
-            1L << 4, Flag.Final,
-            1L << 5, Flag.Synchronized,
-            1L << 6, Flag.Volatile,
-            1L << 7, Flag.Transient,
-            1L << 10, Flag.Abstract
-    );
-
-    private Set<Flag> filteredFlags(Symbol sym) {
-        Set<Flag> set = new HashSet<>();
-        for (Map.Entry<Long, Flag> mask : flagMasks.entrySet()) {
-            if ((sym.flags() & mask.getKey()) != 0L) {
-                Flag value = mask.getValue();
-                set.add(value);
-            }
-        }
-        return set;
-    }
-
     @Nullable
     private JavaType.Method methodType(com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol, String methodName) {
         // if the symbol is not a method symbol, there is a parser error in play
@@ -1559,7 +1531,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                     genericSignature,
                     signature.apply(selectType),
                     paramNames,
-                    filteredFlags(genericSymbol)
+                    //Currently only the first 16 bits are meaninful
+                    (int) genericSymbol.flags() & 0xFFFF
             );
         }
 
@@ -1619,7 +1592,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                                 fields.add(new JavaType.Variable(
                                         elem.name.toString(),
                                         type(elem.type, stackWithSym),
-                                        filteredFlags(elem)
+                                        //Currently only the first 16 bits are meaninful
+                                        (int) elem.flags() & 0xFFFF
                                 ));
                             }
                         }
@@ -1653,14 +1627,36 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                             }
                         }
                     }
+                    JavaType.Class.Kind kind;
+                    switch (sym.getKind()) {
+                        case ENUM:
+                            kind = JavaType.Class.Kind.Enum;
+                            break;
+                        case ANNOTATION_TYPE:
+                            kind = JavaType.Class.Kind.Annotation;
+                            break;
+                        case INTERFACE:
+                            kind = JavaType.Class.Kind.Interface;
+                            break;
+                        default:
+                            kind = JavaType.Class.Kind.Class;
+                    }
 
+                    JavaType.Class owner = null;
+                    if (sym.owner instanceof Symbol.ClassSymbol) {
+                        owner = TypeUtils.asClass(type(sym.owner.type, stackWithSym));
+                    }
                     JavaType.Class clazz = JavaType.Class.build(
                             sym.className(),
+                            //Currently only the first 16 bits are meaninful
+                            (int) sym.flags() & 0xFFFF,
+                            kind,
                             fields,
                             typeParameters,
                             interfaces,
                             null,
                             TypeUtils.asClass(type(classType.supertype_field, stackWithSym)),
+                            owner,
                             relaxedClassTypeMatching);
 
                     sharedClassTypes.put(sym.className(), clazz);

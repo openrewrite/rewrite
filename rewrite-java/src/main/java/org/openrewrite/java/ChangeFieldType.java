@@ -26,17 +26,24 @@ import org.openrewrite.marker.Markers;
 @EqualsAndHashCode(callSuper = true)
 @Data
 public class ChangeFieldType<P> extends JavaIsoVisitor<P> {
-    private final JavaType.Class type;
-    private final String targetType;
 
+    private final String oldFullyQualifiedTypeName;
+    private final JavaType.FullyQualified newFieldType;
+
+    public ChangeFieldType(JavaType.FullyQualified oldFieldType, JavaType.FullyQualified newFieldType) {
+        assert oldFieldType != null;
+        assert newFieldType != null;
+
+        this.oldFullyQualifiedTypeName = oldFieldType.getFullyQualifiedName();
+        this.newFieldType  = newFieldType;
+    }
     @Override
     public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
         JavaType.Class typeAsClass = multiVariable.getTypeAsClass();
         J.VariableDeclarations mv = super.visitVariableDeclarations(multiVariable, p);
-        if (typeAsClass != null && typeAsClass.equals(type)) {
-            JavaType.Class type = JavaType.Class.build(targetType);
+        if (typeAsClass != null && oldFullyQualifiedTypeName.equals(typeAsClass.getFullyQualifiedName())) {
 
-            maybeAddImport(targetType);
+            maybeAddImport(newFieldType);
             maybeRemoveImport(typeAsClass);
 
             mv = mv.withTypeExpression(mv.getTypeExpression() == null ?
@@ -44,14 +51,14 @@ public class ChangeFieldType<P> extends JavaIsoVisitor<P> {
                     J.Identifier.build(mv.getTypeExpression().getId(),
                             mv.getTypeExpression().getPrefix(),
                             Markers.EMPTY,
-                            type.getClassName(),
-                            type)
+                            newFieldType.getClassName(),
+                            newFieldType)
             );
 
             mv = mv.withVariables(ListUtils.map(mv.getVariables(), var -> {
                 JavaType.Class varType = TypeUtils.asClass(var.getType());
-                if (varType != null && !varType.equals(type)) {
-                    return var.withType(type).withName(var.getName().withType(type));
+                if (varType != null && !varType.equals(newFieldType)) {
+                    return var.withType(newFieldType).withName(var.getName().withType(newFieldType));
                 }
                 return var;
             }));

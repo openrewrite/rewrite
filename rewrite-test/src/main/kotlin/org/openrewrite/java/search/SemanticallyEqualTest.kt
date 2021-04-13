@@ -21,10 +21,7 @@ import org.openrewrite.Issue
 import org.openrewrite.Parser
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.tree.J
-import org.openrewrite.java.tree.JLeftPadded
-import org.openrewrite.java.tree.JavaType
-import org.openrewrite.java.tree.Space
+import org.openrewrite.java.tree.*
 import org.openrewrite.marker.Markers
 import java.util.*
 
@@ -49,7 +46,7 @@ interface SemanticallyEqualTest {
                 package org.mco.anno;
                 public @interface McAnno {}
             """
-        val j = JavaParser.fromJavaVersion().dependsOn(Collections.singletonList(Parser.Input.fromString(mcAnnoClass))).build();
+        val j = JavaParser.fromJavaVersion().dependsOn(Collections.singletonList(Parser.Input.fromString(mcAnnoClass))).build()
         val cu1 = j.parse(
             """
                 import org.mco.anno.McAnno;
@@ -426,10 +423,13 @@ interface SemanticallyEqualTest {
             "name",
             JavaType.Class.build(
                 "org.foo.Bar",
+                Collections.singleton(Flag.Public),
+                JavaType.Class.Kind.Class,
                 listOf(),
                 listOf(),
                 listOf(JavaType.Class.build("org.foo.Baz")),
                 listOf(),
+                null,
                 null
             )
         )
