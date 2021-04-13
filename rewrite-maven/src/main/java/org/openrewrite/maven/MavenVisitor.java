@@ -139,7 +139,6 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
                 classifier,
                 scope,
                 type,
-                null,
                 null);
 
         if (!getAfterVisit().contains(op)) {

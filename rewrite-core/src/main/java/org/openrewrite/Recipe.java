@@ -150,6 +150,13 @@ public abstract class Recipe {
     private final List<Recipe> recipeList = new ArrayList<>();
 
     /**
+     * Invoked once after recipe has finally completed
+     * @param executionContext {@link ExecutionContext} from recipe execution
+     */
+    @Incubating(since = "7.2.0-SNAPSHOT")
+    protected void afterRecipe(ExecutionContext executionContext) {}
+
+    /**
      * @param recipe {@link Recipe} to add to this recipe's pipeline.
      * @return This recipe.
      */
@@ -238,7 +245,7 @@ public abstract class Recipe {
                 }
             });
         }
-
+        afterRecipe(ctx);
         // The type of the list is widened at this point, since a source file type may be generated that isn't
         // of a type that is in the original set of source files (e.g. only XML files are given, and the
         // recipe generates Java code).

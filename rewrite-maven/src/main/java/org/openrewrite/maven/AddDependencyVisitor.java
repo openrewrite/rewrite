@@ -77,20 +77,10 @@ public class AddDependencyVisitor extends MavenVisitor {
     private final Pattern familyPattern;
 
     @Nullable
-    private final List<String> onlyIfUsing;
-
-    @Nullable
     private VersionComparator versionComparator;
 
     @Override
     public Maven visitMaven(Maven maven, ExecutionContext ctx) {
-        if (onlyIfUsing != null) {
-            Set<JavaType> found = ctx.getMessage(JavaType.FOUND_TYPE_CONTEXT_KEY, emptySet());
-            if (onlyIfUsing.stream().noneMatch(t -> found.contains(JavaType.Class.build(t)))) {
-                return maven;
-            }
-        }
-
         model = maven.getModel();
 
         Validated versionValidation = Semver.validate(version, metadataPattern);
