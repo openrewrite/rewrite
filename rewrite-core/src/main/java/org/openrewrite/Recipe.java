@@ -238,6 +238,7 @@ public abstract class Recipe {
                 }
             });
         }
+
         // The type of the list is widened at this point, since a source file type may be generated that isn't
         // of a type that is in the original set of source files (e.g. only XML files are given, and the
         // recipe generates Java code).
