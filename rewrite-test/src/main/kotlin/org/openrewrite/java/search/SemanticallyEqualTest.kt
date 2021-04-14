@@ -284,6 +284,7 @@ interface SemanticallyEqualTest {
                     Markers.EMPTY,
                     true,
                     "true",
+                    null,
                     JavaType.Primitive.Boolean
                 ),
                 Markers.EMPTY
@@ -348,6 +349,7 @@ interface SemanticallyEqualTest {
                         Markers.EMPTY,
                         0,
                         "0",
+                        null,
                         JavaType.Primitive.Int
                     )
                 )
@@ -363,6 +365,7 @@ interface SemanticallyEqualTest {
                         Markers.EMPTY,
                         "thisString",
                         "thisString",
+                        null,
                         JavaType.Primitive.String
                     )
                 )
@@ -378,6 +381,7 @@ interface SemanticallyEqualTest {
                         Markers.EMPTY,
                         null,
                         "null",
+                        null,
                         JavaType.Primitive.String
                     )
                 )
@@ -393,6 +397,7 @@ interface SemanticallyEqualTest {
                         Markers.EMPTY,
                         0,
                         "0",
+                        null,
                         JavaType.Primitive.Int
                     )
                 )

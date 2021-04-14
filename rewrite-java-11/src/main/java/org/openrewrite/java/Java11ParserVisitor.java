@@ -689,13 +689,26 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         return new J.Lambda(randomId(), fmt, Markers.EMPTY, params, arrow, body, type(node));
     }
 
+    public final static int SURR_FIRST = 0xD800;
+    public final static int SURR_LAST = 0xDFFF;
+
     @Override
     public J visitLiteral(LiteralTree node, Space fmt) {
         cursor(endPos(node));
         Object value = node.getValue();
         JavaType.Primitive type = primitive(((JCTree.JCLiteral) node).typetag);
+        if (value instanceof Character) {
+            char c = (Character) value;
+            if (c >= SURR_FIRST && c <= SURR_LAST) {
+                String valueSource = source.substring(((JCLiteral) node).getStartPosition(), endPos(node));
+                int escapeIndex = valueSource.indexOf("\\u");
+                return new J.Literal(randomId(), fmt, Markers.EMPTY, null, null,
+                        new J.Literal.ModifiedUtf8Surrogate(valueSource.substring(0, escapeIndex),
+                                valueSource.substring(escapeIndex)), type);
+            }
+        }
         return new J.Literal(randomId(), fmt, Markers.EMPTY, value,
-                source.substring(((JCLiteral) node).getStartPosition(), endPos(node)), type);
+                source.substring(((JCLiteral) node).getStartPosition(), endPos(node)), null, type);
     }
 
     @Override

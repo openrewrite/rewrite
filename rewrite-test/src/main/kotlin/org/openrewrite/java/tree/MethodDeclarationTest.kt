@@ -100,8 +100,7 @@ interface MethodDeclarationTest : JavaTreeTest {
     }
 
     @Test()
-    @Disabled("Issue #405")
-    fun unicodeCharacterLiterals(jp: JavaParser) = assertParsePrintAndProcess(jp, CompilationUnit,
+    fun modifiedUtf8SurrogateCharacterLiterals(jp: JavaParser) = assertParsePrintAndProcess(jp, CompilationUnit,
             """
                 public class A {
                     private boolean isSockJsSpecialChar(char ch) {

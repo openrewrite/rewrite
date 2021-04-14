@@ -690,7 +690,12 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
     public J visitLiteral(Literal literal, P p) {
         visitSpace(literal.getPrefix(), Space.Location.LITERAL_PREFIX, p);
         StringBuilder acc = getPrinter();
-        acc.append(literal.getValueSource());
+        Literal.ModifiedUtf8Surrogate modifiedUtf8Surrogate = literal.getModifiedUtf8Surrogate();
+        if (modifiedUtf8Surrogate != null) {
+            acc.append(modifiedUtf8Surrogate.getEscapeSequence()).append(modifiedUtf8Surrogate.getCodePoint());
+        } else {
+            acc.append(literal.getValueSource());
+        }
         return literal;
     }
 
