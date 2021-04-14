@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * This recipe finds {@link J.CompilationUnit}s having any one of the supplied types
  */
+@Incubating(since = "7.2.0")
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class HasTypes extends Recipe {
@@ -62,6 +63,7 @@ public class HasTypes extends Recipe {
                 return cu;
             }
         };
+
     }
 
     public static Boolean find(J j, List<String> fullyQualifiedClassNames) {
