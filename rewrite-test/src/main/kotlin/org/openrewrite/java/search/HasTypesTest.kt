@@ -21,7 +21,7 @@ import org.openrewrite.java.JavaRecipeTest
 
 interface HasTypesTest : JavaRecipeTest {
     override val recipe: HasTypes
-        get() = HasTypes(listOf("a.A1","a.b.*"))
+        get() = HasTypes(listOf("a.A1","a.b.*","c.*"))
 
     companion object {
         private const val a1 = """
@@ -35,7 +35,50 @@ interface HasTypesTest : JavaRecipeTest {
             public class B1 {
             }
         """
+        private const val c1 = """
+            package c;
+            public class C {
+                public static void assertC(int num1, int num2) {
+                    if (num1 != num2) {
+                        throw new RuntimeException();
+                    }
+                }
+            }
+        """
     }
+
+    @Test
+    fun staticImport() = assertChanged(
+        before = """
+            import static c.C.assertC;
+            class T {
+                void testStaticReference() {
+                    assertC(1, 2);
+                }
+            }
+        """,
+        after = """
+            /*~~>*/import static c.C.assertC;
+            class T {
+                void testStaticReference() {
+                    assertC(1, 2);
+                }
+            }
+        """,
+        dependsOn = arrayOf(c1)
+    )
+
+    @Test
+    fun staticImportNotUsed() = assertUnchanged(
+        before = """
+            import static c.C.assertC;
+            class T {
+                void testStaticReference() {
+                }
+            }
+        """,
+        dependsOn = arrayOf(c1)
+    )
 
     @Test
     fun simpleName() = assertChanged(
@@ -96,7 +139,7 @@ interface HasTypesTest : JavaRecipeTest {
     )
 
     @Test
-    fun classDecl() = assertChanged(
+    fun classDeclaration() = assertChanged(
         before = """
             import a.A1;
             public class B extends A1 implements I1 {}
@@ -114,7 +157,7 @@ interface HasTypesTest : JavaRecipeTest {
             import a.A1;
             public class B {
                public void foo() throws A1 { 
-                 try {return null;} 
+                 try {Integer.valueOf("1");} 
                  catch (Exception ex) {throw new A1();}
                }
             }
@@ -123,7 +166,7 @@ interface HasTypesTest : JavaRecipeTest {
             /*~~>*/import a.A1;
             public class B {
                public void foo() throws A1 { 
-                 try {return null;} 
+                 try {Integer.valueOf("1");} 
                  catch (Exception ex) {throw new A1();}
                }
             }

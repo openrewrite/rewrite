@@ -103,6 +103,22 @@ public class HasTypes extends Recipe {
                 return fa;
             }
 
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean typeExists) {
+                if (typeExists.get()) {
+                    return method;
+                }
+                J.MethodInvocation methodInvocation = super.visitMethodInvocation(method, typeExists);
+                JavaType.Class targetClass = methodInvocation.getType() != null ? TypeUtils.asClass(methodInvocation.getType().getDeclaringType()) : null;
+                for (String fullyQualifiedTypeName : fullyQualifiedClassNames) {
+                    if (targetClass != null && targetClassMatches(targetClass, fullyQualifiedTypeName)) {
+                        typeExists.set(true);
+                        return methodInvocation;
+                    }
+                }
+                return methodInvocation;
+            }
+
             private boolean targetClassMatches(JavaType.Class targetClass, String fullyQualifiedTypeName) {
                 if (fullyQualifiedTypeName.endsWith(".*")) {
                     fullyQualifiedTypeName = fullyQualifiedTypeName.replaceAll("\\.\\*", "");
