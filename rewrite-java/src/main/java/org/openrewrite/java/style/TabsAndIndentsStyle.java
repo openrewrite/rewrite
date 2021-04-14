@@ -20,14 +20,20 @@ import lombok.Data;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.java.JavaStyle;
+import org.openrewrite.style.Style;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Data
 @With
 public class TabsAndIndentsStyle implements JavaStyle {
-    private boolean useTabCharacter;
-    private int tabSize;
-    private int indentSize;
-    private int continuationIndent;
-    private boolean indentsRelativeToExpressionStart;
+    private Boolean useTabCharacter;
+    private Integer tabSize;
+    private Integer indentSize;
+    private Integer continuationIndent;
+    private Boolean indentsRelativeToExpressionStart;
+
+    @Override
+    public Style applyDefaults() {
+        return StyleHelper.merge(IntelliJ.tabsAndIndents(), this);
+    }
 }
