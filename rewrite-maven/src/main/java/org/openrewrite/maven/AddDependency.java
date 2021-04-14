@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.search.HasTypes;
 import org.openrewrite.semver.Semver;
 
 import java.util.List;
@@ -125,6 +126,14 @@ public class AddDependency extends Recipe {
     }
 
     @Override
+    protected @Nullable TreeVisitor<?, ExecutionContext> getApplicableTest() {
+        if (onlyIfUsing != null) {
+            return new HasTypes(onlyIfUsing).getVisitor();
+        }
+        return null;
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new AddDependencyVisitor(
                 groupId,
@@ -135,8 +144,7 @@ public class AddDependency extends Recipe {
                 classifier,
                 scope,
                 type,
-                familyPattern == null ? null : Pattern.compile(familyPattern.replace("*", ".*")),
-                onlyIfUsing
+                familyPattern == null ? null : Pattern.compile(familyPattern.replace("*", ".*"))
         );
     }
 }

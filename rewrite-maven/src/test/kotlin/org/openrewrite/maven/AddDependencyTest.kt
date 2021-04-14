@@ -18,6 +18,9 @@ package org.openrewrite.maven
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
+import org.openrewrite.InMemoryExecutionContext
+import org.openrewrite.SourceFile
+import org.openrewrite.java.JavaParser
 import org.openrewrite.java.tree.JavaType
 import org.openrewrite.maven.tree.Maven
 
@@ -30,10 +33,121 @@ class AddDependencyTest : MavenRecipeTest {
         )
 
     @Test
-    fun onlyIfUsing() = assertChanged(
+    fun onlyIfUsing() {
+        val recipe = AddDependency(
+            "com.google.guava",
+            "guava",
+            "29.0-jre",
+            null,
+            true,
+            null,
+            null,
+            null,
+            null,
+            listOf("com.google.common.math.IntMath")
+        )
+        val javaSource = JavaParser.fromJavaVersion().build().parse("""
+            package org.openrewrite.java.testing;
+            import com.google.common.math.IntMath;
+            public class A {
+                boolean getMap() {
+                    return IntMath.isPrime(5);
+                }
+            }
+        """)[0]
+        val mavenSource = MavenParser.builder().build().parse("""
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <dependencies>
+              </dependencies>
+            </project>
+        """.trimIndent())[0]
+
+        val sources: List<SourceFile> = listOf(javaSource, mavenSource)
+        val results = recipe.run(sources, InMemoryExecutionContext{ error: Throwable -> throw error})
+        val mavenResult = results.find { it.before === mavenSource }
+        assertThat(mavenResult).isNotNull
+
+        assertThat(mavenResult?.after?.print()).isEqualTo( """
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>29.0-jre</version>
+                </dependency>
+              </dependencies>
+            </project>
+        """.trimIndent())
+    }
+
+    @Test
+    fun onlyIfUsingWildcard() {
+        val recipe = AddDependency(
+            "com.google.guava",
+            "guava",
+            "29.0-jre",
+            null,
+            true,
+            null,
+            null,
+            null,
+            null,
+            listOf("com.google.common.math.*", "org.springframework.boot")
+        )
+        val javaSource = JavaParser.fromJavaVersion().build().parse("""
+            package org.openrewrite.java.testing;
+            import com.google.common.math.IntMath;
+            public class A {
+                boolean getMap() {
+                    return IntMath.isPrime(5);
+                }
+                String getName() {
+                    return "bla";
+                }
+            }
+        """)[0]
+        val mavenSource = MavenParser.builder().build().parse("""
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <dependencies>
+              </dependencies>
+            </project>
+        """.trimIndent())[0]
+
+        val sources: List<SourceFile> = listOf(javaSource, mavenSource)
+        val results = recipe.run(sources, InMemoryExecutionContext{ error: Throwable -> throw error})
+        val mavenResult = results.find { it.before === mavenSource }
+        assertThat(mavenResult).isNotNull
+
+        assertThat(mavenResult?.after?.print()).isEqualTo( """
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>29.0-jre</version>
+                </dependency>
+              </dependencies>
+            </project>
+        """.trimIndent())
+    }
+
+    @Test
+    fun onlyIfUsingTypeNotFoundNoChange() = assertUnchanged(
         recipe = object : MavenVisitor() {
             override fun visitMaven(maven: Maven, ctx: ExecutionContext): Maven {
-                ctx.putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY, JavaType.Class.build("com.google.common.collect.ImmutableMap"))
+                ctx.putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY, JavaType.Class.build("com.google.common.collect.CartesianList"))
                 return super.visitMaven(maven, ctx)
             }
         }.toRecipe().doNext(
@@ -56,20 +170,6 @@ class AddDependencyTest : MavenRecipeTest {
               <artifactId>my-app</artifactId>
               <version>1</version>
               <dependencies>
-              </dependencies>
-            </project>
-        """,
-        after = """
-            <project>
-              <groupId>com.mycompany.app</groupId>
-              <artifactId>my-app</artifactId>
-              <version>1</version>
-              <dependencies>
-                <dependency>
-                  <groupId>com.google.guava</groupId>
-                  <artifactId>guava</artifactId>
-                  <version>29.0-jre</version>
-                </dependency>
               </dependencies>
             </project>
         """

@@ -53,6 +53,7 @@ dependencies {
     testImplementation("org.mapdb:mapdb:latest.release")
 
     testRuntimeOnly("org.mapdb:mapdb:latest.release")
+    testRuntimeOnly(project(":rewrite-java-11"))
 }
 
 tasks.register<JavaExec>("generateAntlrSources") {
