@@ -2612,6 +2612,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     final class Literal implements J, Expression {
+
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2626,7 +2627,12 @@ public interface J extends Serializable, Tree {
         Object value;
 
         @With
+        @Nullable
         String valueSource;
+
+        @With
+        @Nullable
+        ModifiedUtf8Surrogate modifiedUtf8Surrogate;
 
         /**
          * Including String literals
@@ -2640,7 +2646,7 @@ public interface J extends Serializable, Tree {
                 return this;
             }
             if (type instanceof JavaType.Primitive) {
-                return new Literal(id, prefix, markers, value, valueSource, (JavaType.Primitive) type);
+                return new Literal(id, prefix, markers, value, valueSource, modifiedUtf8Surrogate, (JavaType.Primitive) type);
             }
             return this;
         }
@@ -2655,22 +2661,18 @@ public interface J extends Serializable, Tree {
             return new Coordinates.Literal(this);
         }
 
-        public <T> String transformValue(Function<T, Object> transform) {
-            Matcher valueMatcher = Pattern.compile("(.*)" + Pattern.quote(value == null ? "null" : value.toString()) + "(.*)")
-                    .matcher(printTrimmed().replace("\\", ""));
-            if (valueMatcher.find()) {
-                String prefix = valueMatcher.group(1);
-                String suffix = valueMatcher.group(2);
-
-                //noinspection unchecked
-                return prefix + transform.apply((T) value) + suffix;
-            }
-            throw new IllegalStateException("Encountered a literal `" + this + "` that could not be transformed");
-        }
-
         @Override
         public String toString() {
             return "Literal(" + LiteralToString.toString(this) + ")";
+        }
+
+        @Value
+        public static class ModifiedUtf8Surrogate {
+            @With
+            String escapeSequence;
+
+            @With
+            String codePoint;
         }
     }
 
