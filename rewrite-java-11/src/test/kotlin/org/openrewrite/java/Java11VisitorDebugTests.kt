@@ -105,6 +105,7 @@ class Java11FindTypesTest : Java11Test, FindTypesTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11HasTypesTest : Java11Test, HasTypesTest
+
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11HideUtilityClassConstructorTest : Java11Test, HideUtilityClassConstructorTest

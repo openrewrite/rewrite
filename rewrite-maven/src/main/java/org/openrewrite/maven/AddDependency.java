@@ -19,17 +19,11 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.search.HasTypes;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.marker.RecipeSearchResult;
 import org.openrewrite.semver.Semver;
 
 import java.util.List;
 import java.util.regex.Pattern;
-
-import static java.util.Collections.emptySet;
 
 @Incubating(since = "7.0.0")
 @Getter
