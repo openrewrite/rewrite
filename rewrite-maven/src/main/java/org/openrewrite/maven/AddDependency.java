@@ -20,20 +20,14 @@ import lombok.*;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.search.FindTypes;
+import org.openrewrite.java.search.HasTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.NameTree;
-import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.RecipeSearchResult;
 import org.openrewrite.semver.Semver;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptySet;
 
@@ -138,33 +132,11 @@ public class AddDependency extends Recipe {
     }
 
     @Override
-    protected @Nullable TreeVisitor<?, ExecutionContext> getApplicableTest(ExecutionContext executionContext) {
-        if (onlyIfUsing != null
-            && onlyIfUsing.stream().noneMatch(fqn -> foundTypesContainsFullyQualified(executionContext, fqn))) {
-            // Find any specified types which have not been found
-            return new JavaIsoVisitor<ExecutionContext>() {
-                @Override
-                public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
-                    for (String fqn : onlyIfUsing) {
-                        if (!foundTypesContainsFullyQualified(executionContext, fqn)) {
-                            Set<JavaType> foundTypes = FindTypes.find(cu, fqn).stream().map(TypeTree.class::cast).map(TypeTree::getType).collect(Collectors.toSet());
-                            if (!foundTypes.isEmpty()) {
-                                executionContext.getMessage(JavaType.FOUND_TYPE_CONTEXT_KEY, new HashSet<>()).addAll(foundTypes);
-                                cu = cu.withMarker(new RecipeSearchResult(AddDependency.this));
-                            }
-                        }
-                    }
-                    return cu;
-                }
-            };
+    protected @Nullable TreeVisitor<?, ExecutionContext> getApplicableTest() {
+        if (onlyIfUsing != null) {
+            return new HasTypes(onlyIfUsing).getVisitor();
         }
         return null;
-    }
-
-    protected boolean foundTypesContainsFullyQualified(ExecutionContext executionContext, String fullyQualifiedClassName) {
-        return executionContext.getMessage(JavaType.FOUND_TYPE_CONTEXT_KEY, emptySet()).stream()
-                .filter(JavaType.FullyQualified.class::isInstance).map(JavaType.FullyQualified.class::cast)
-                .filter(f -> f.getFullyQualifiedName().equals(fullyQualifiedClassName)).findAny().isPresent();
     }
 
     @Override

@@ -150,13 +150,6 @@ public abstract class Recipe {
     private final List<Recipe> recipeList = new ArrayList<>();
 
     /**
-     * Invoked once after recipe has finally completed
-     * @param executionContext {@link ExecutionContext} from recipe execution
-     */
-    @Incubating(since = "7.2.0")
-    protected void afterRecipe(ExecutionContext executionContext) {}
-
-    /**
      * @param recipe {@link Recipe} to add to this recipe's pipeline.
      * @return This recipe.
      */
@@ -187,12 +180,11 @@ public abstract class Recipe {
      * To identify a tree as applicable, the visitor should mark or otherwise alter the tree at any level. The mutation
      * that the applicability test visitor makes to the tree will not included in the results.
      *
-     * @param executionContext {#{@link ExecutionContext} from recipe execution}
      * @return A tree visitor that performs an applicability test.
      */
     @Incubating(since = "7.2.0")
     @Nullable
-    protected TreeVisitor<?, ExecutionContext> getApplicableTest(ExecutionContext executionContext) {
+    protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
         return null;
     }
 
@@ -201,10 +193,10 @@ public abstract class Recipe {
                                                                   ExecutionContext ctx,
                                                                   ForkJoinPool forkJoinPool,
                                                                   Map<UUID, Recipe> recipeThatDeletedSourceFile) {
-        if(getApplicableTest(ctx) != null) {
+        if(getApplicableTest() != null) {
             boolean applicable = false;
             for (S s : before) {
-                if (getApplicableTest(ctx).visit(s, ctx) != s) {
+                if (getApplicableTest().visit(s, ctx) != s) {
                     applicable = true;
                     break;
                 }
