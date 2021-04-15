@@ -3653,6 +3653,9 @@ public interface J extends Serializable, Tree {
         @With
         Expression expression;
 
+        @With
+        List<Annotation> annotations;
+
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitPackage(this, p);

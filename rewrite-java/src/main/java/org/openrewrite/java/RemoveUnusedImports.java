@@ -101,17 +101,17 @@ public class RemoveUnusedImports extends Recipe {
                     if ("*".equals(anImport.getElement().getQualid().getSimpleName())) {
                         if (types.size() < layoutStyle.getClassCountToUseStarImport()) {
                             List<JRightPadded<J.Import>> unfoldedWildcardImports = types.stream().map(JavaType.FullyQualified::getClassName).sorted().map(typeClassName ->
-                                anImport.withElement(
-                                        new J.Import(
-                                                Tree.randomId(),
-                                                elem.getPrefix(),
-                                                elem.getMarkers(),
-                                                elem.getPadding().getStatic(),
-                                                elem.getQualid().withName(
-                                                        name.withName(typeClassName)
-                                                )
-                                        )
-                                )
+                                    anImport.withElement(
+                                            new J.Import(
+                                                    Tree.randomId(),
+                                                    elem.getPrefix(),
+                                                    elem.getMarkers(),
+                                                    elem.getPadding().getStatic(),
+                                                    elem.getQualid().withName(
+                                                            name.withName(typeClassName)
+                                                    )
+                                            )
+                                    )
                             ).collect(Collectors.toList());
 
                             importsWithUsage.addAll(ListUtils.map(unfoldedWildcardImports, (index, paddedImport) -> {
@@ -129,8 +129,12 @@ public class RemoveUnusedImports extends Recipe {
                         } else {
                             importsWithUsage.add(anImport);
                         }
-                    } else {
+                    } else if (types.stream()
+                            .filter(c -> anImport.getElement().isFromType(c.getFullyQualifiedName()))
+                            .findAny().isPresent()) {
                         importsWithUsage.add(anImport);
+                    } else {
+                        changed = true;
                     }
                 }
             }
@@ -167,6 +171,15 @@ public class RemoveUnusedImports extends Recipe {
                     ctx.computeIfAbsent(targetClass.getPackageName(), t -> new HashSet<>()).add(targetClass);
                 }
                 return super.visitFieldAccess(fieldAccess, ctx);
+            }
+
+            @Override
+            public J.Annotation visitAnnotation(J.Annotation annotation, Map<String, Set<JavaType.Class>> ctx) {
+                JavaType.Class clazz = TypeUtils.asClass(annotation.getType());
+                if (clazz != null) {
+                    ctx.computeIfAbsent(clazz.getPackageName(), t -> new HashSet<>()).add(clazz);
+                }
+                return super.visitAnnotation(annotation, ctx);
             }
         }
 
