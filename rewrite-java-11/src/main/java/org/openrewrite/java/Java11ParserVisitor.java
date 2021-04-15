@@ -448,13 +448,12 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         endPosTable = cu.endPositions;
 
         Map<Integer, JCAnnotation> annotationPosTable = new HashMap<>();
-        if (node.getPackageAnnotations() != null) {
-            for (AnnotationTree annotationNode : node.getPackageAnnotations()) {
-                JCAnnotation annotation = (JCAnnotation) annotationNode;
-                annotationPosTable.put(annotation.pos, annotation);
-            }
+        for (AnnotationTree annotationNode : node.getPackageAnnotations()) {
+            JCAnnotation annotation = (JCAnnotation) annotationNode;
+            annotationPosTable.put(annotation.pos, annotation);
         }
-        List<J.Annotation> kindAnnotations = annotationPosTable.isEmpty() ? null : collectAnnotations(annotationPosTable);
+        List<J.Annotation> kindAnnotations = collectAnnotations(annotationPosTable);
+
         J.Package packageDecl = null;
         if (cu.getPackageName() != null) {
             Space packagePrefix = sourceBefore("package");

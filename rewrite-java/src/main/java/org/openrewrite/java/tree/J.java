@@ -3654,7 +3654,6 @@ public interface J extends Serializable, Tree {
         Expression expression;
 
         @With
-        @Nullable
         List<Annotation> annotations;
 
         @Override
