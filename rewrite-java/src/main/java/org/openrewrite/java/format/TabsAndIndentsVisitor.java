@@ -355,7 +355,11 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         if (!space.getLastWhitespace().contains("\n")) {
             return space;
         }
-
+        if (style.getUseTabCharacter()) {
+            space = space.withWhitespace(space.getWhitespace().replaceAll(" ", ""));
+        } else {
+            space = space.withWhitespace(space.getWhitespace().replaceAll("\t", ""));
+        }
         int indent = findIndent(space);
         if (!space.getComments().isEmpty()) {
             indent = findIndent(Space.format(space.getComments().get(space.getComments().size() - 1).getSuffix()));
@@ -391,7 +395,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private String indent(String whitespace, int shift) {
-        if (!style.isUseTabCharacter() && whitespace.contains("\t")) {
+        if (!style.getUseTabCharacter() && whitespace.contains("\t")) {
             whitespace = whitespace.replaceAll("\t", spacesForTab);
         }
         StringBuilder newWhitespace = new StringBuilder(whitespace);
@@ -401,7 +405,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
     private void shift(StringBuilder text, int shift) {
         int tabIndent = style.getTabSize();
-        if (!style.isUseTabCharacter()) {
+        if (!style.getUseTabCharacter()) {
             tabIndent = Integer.MAX_VALUE;
         }
 
@@ -414,7 +418,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 text.append(' ');
             }
         } else {
-            if (style.isUseTabCharacter()) {
+            if (style.getUseTabCharacter()) {
                 text.delete(text.length() + (shift / tabIndent), text.length());
             } else {
                 text.delete(text.length() + shift, text.length());

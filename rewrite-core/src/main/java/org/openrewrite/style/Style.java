@@ -35,4 +35,6 @@ public interface Style {
     default Style merge(Style lowerPrecedence) {
         return this;
     }
+
+    default Style applyDefaults() { return this; }
 }

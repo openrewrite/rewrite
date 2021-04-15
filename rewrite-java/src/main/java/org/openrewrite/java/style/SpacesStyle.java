@@ -20,6 +20,7 @@ import lombok.Value;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.java.JavaStyle;
+import org.openrewrite.style.Style;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Value
@@ -170,5 +171,10 @@ public class SpacesStyle implements JavaStyle {
     public static class TypeParameters {
         Boolean beforeOpeningAngleBracket;
         Boolean aroundTypeBounds;
+    }
+
+    @Override
+    public Style applyDefaults() {
+        return StyleHelper.merge(IntelliJ.spaces(), this);
     }
 }

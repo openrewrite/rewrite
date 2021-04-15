@@ -20,6 +20,7 @@ import lombok.Value;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.java.JavaStyle;
+import org.openrewrite.style.Style;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Value
@@ -56,5 +57,10 @@ public class BlankLinesStyle implements JavaStyle {
         Integer aroundMethod;
         Integer beforeMethodBody;
         Integer aroundInitializer;
+    }
+
+    @Override
+    public Style applyDefaults() {
+        return StyleHelper.merge(IntelliJ.blankLines(), this);
     }
 }

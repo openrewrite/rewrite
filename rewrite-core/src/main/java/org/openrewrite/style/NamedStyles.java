@@ -49,6 +49,7 @@ public class NamedStyles implements Marker {
         for (NamedStyles namedStyle : namedStyles) {
             for (Style style : namedStyle.styles) {
                 if (styleClass.isInstance(style)) {
+                    style = style.applyDefaults();
                     if (merged == null) {
                         merged = (S) style;
                     } else {

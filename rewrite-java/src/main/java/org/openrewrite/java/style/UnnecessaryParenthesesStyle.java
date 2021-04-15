@@ -21,6 +21,7 @@ import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.JavaStyle;
+import org.openrewrite.style.Style;
 
 @Incubating(since = "7.0.0")
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -50,4 +51,9 @@ public class UnnecessaryParenthesesStyle implements JavaStyle {
     Boolean srAssign;
     Boolean starAssign;
     Boolean lambda;
+
+    @Override
+    public Style applyDefaults() {
+        return StyleHelper.merge(IntelliJ.unnecessaryParentheses(), this);
+    }
 }

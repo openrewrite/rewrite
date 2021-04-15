@@ -424,16 +424,16 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         jp.styles(tabsAndIndents { withUseTabCharacter(true) }).build(),
         before = """
             public class A {
-                public void method() {
-                int n = 0;
-                }
+            	public void method() {
+            	int n = 0;
+            	}
             }
         """,
         after = """
             public class A {
-                public void method() {
-                	int n = 0;
-                }
+            	public void method() {
+            		int n = 0;
+            	}
             }
         """
     )
@@ -474,28 +474,28 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         jp.styles(tabsAndIndents { withUseTabCharacter(true) }).build(),
         before = """
             public class Test {
-                public void test(boolean a, int x, int y) {
-                    try {
+            	public void test(boolean a, int x, int y) {
+            		try {
             	int someVariable = a ? x : y;
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    } finally {
-                        a = false;
-                    }
-                }
+            		} catch (Exception e) {
+            			e.printStackTrace();
+            		} finally {
+            			a = false;
+            		}
+            	}
             }
         """,
         after = """
             public class Test {
-                public void test(boolean a, int x, int y) {
-                    try {
+            	public void test(boolean a, int x, int y) {
+            		try {
             			int someVariable = a ? x : y;
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    } finally {
-                        a = false;
-                    }
-                }
+            		} catch (Exception e) {
+            			e.printStackTrace();
+            		} finally {
+            			a = false;
+            		}
+            	}
             }
         """
     )
@@ -536,9 +536,71 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         jp.styles(tabsAndIndents { withUseTabCharacter(true) }).build(),
         before = """
             public class Test {
+            	public void test(boolean a, int x, int y) {
+            		try {
+            				int someVariable = a ? x : y;
+            		} catch (Exception e) {
+            			e.printStackTrace();
+            		} finally {
+            			a = false;
+            		}
+            	}
+            }
+        """,
+        after = """
+            public class Test {
+            	public void test(boolean a, int x, int y) {
+            		try {
+            			int someVariable = a ? x : y;
+            		} catch (Exception e) {
+            			e.printStackTrace();
+            		} finally {
+            			a = false;
+            		}
+            	}
+            }
+        """
+    )
+
+    @Test
+    fun mixedToTabs(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(tabsAndIndents { withUseTabCharacter(true) }).build(),
+        before = """
+            public class Test {
+            	public void test(boolean a, int x, int y) {
+            		try {
+                            int someVariable = a ? x : y;
+            		} catch (Exception e) {
+            			e.printStackTrace();
+            		} finally {
+            			a = false;
+            		}
+            	}
+            }
+        """,
+        after = """
+            public class Test {
+            	public void test(boolean a, int x, int y) {
+            		try {
+            			int someVariable = a ? x : y;
+            		} catch (Exception e) {
+            			e.printStackTrace();
+            		} finally {
+            			a = false;
+            		}
+            	}
+            }
+        """
+    )
+
+    @Test
+    fun mixedToSpaces(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class Test {
                 public void test(boolean a, int x, int y) {
                     try {
-            				int someVariable = a ? x : y;
+                    		int someVariable = a ? x : y;
                     } catch (Exception e) {
                         e.printStackTrace();
                     } finally {
@@ -551,7 +613,7 @@ interface TabsAndIndentsTest : JavaRecipeTest {
             public class Test {
                 public void test(boolean a, int x, int y) {
                     try {
-            			int someVariable = a ? x : y;
+                        int someVariable = a ? x : y;
                     } catch (Exception e) {
                         e.printStackTrace();
                     } finally {
@@ -1175,5 +1237,30 @@ interface TabsAndIndentsTest : JavaRecipeTest {
             }
         }
         """
+    )
+
+    @Test
+    fun spaceToTab(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(tabsAndIndents {
+            withUseTabCharacter(true)
+                .withTabSize(1)
+                .withIndentSize(1)
+                .withContinuationIndent(2)
+                .withIndentsRelativeToExpressionStart(false)
+        }).build(),
+        before = """
+        public class A {
+        	@Deprecated
+         void normalizeWorks() {
+        	}
+        }
+        """,
+        after = """
+        public class A {
+        	@Deprecated
+        	void normalizeWorks() {
+        	}
+        }
+        """.trimIndent()
     )
 }
