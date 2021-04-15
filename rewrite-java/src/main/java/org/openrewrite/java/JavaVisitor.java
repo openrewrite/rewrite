@@ -651,6 +651,9 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         J.Package pa = pkg;
         pa = pa.withPrefix(visitSpace(pa.getPrefix(), Space.Location.PACKAGE_PREFIX, p));
         pa = pa.withExpression(visitAndCast(pa.getExpression(), p));
+        if (pa.getAnnotations() != null) {
+            pa = pa.withAnnotations(ListUtils.map(pa.getAnnotations(), a -> visitAndCast(a, p)));
+        }
         return pa;
     }
 

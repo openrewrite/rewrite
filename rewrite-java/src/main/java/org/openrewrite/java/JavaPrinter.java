@@ -801,6 +801,9 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
     @Override
     public J visitPackage(J.Package pkg, P p) {
         StringBuilder acc = getPrinter();
+        if (pkg.getAnnotations() != null) {
+            pkg.getAnnotations().forEach(a -> visitAnnotation(a, p));
+        }
         visitSpace(pkg.getPrefix(), Space.Location.PACKAGE_PREFIX, p);
         acc.append("package");
         visit(pkg.getExpression(), p);

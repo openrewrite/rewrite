@@ -15,9 +15,9 @@
  */
 package org.openrewrite.java
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
+import org.openrewrite.Issue
 
 interface RemoveUnusedImportsTest : JavaRecipeTest {
     fun removeImport(type: String) =
@@ -41,7 +41,7 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
         before = """
             import java.util.List;
             class A {
-               List list;
+               List<Integer> list;
             }
         """
     )
@@ -65,14 +65,14 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
             import java.util.*;
             
             class A {
-               Collection c;
+               Collection<Integer> c;
             }
         """,
         after = """
             import java.util.Collection;
             
             class A {
-               Collection c;
+               Collection<Integer> c;
             }
         """
     )
@@ -84,8 +84,8 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
         before = """
             import java.util.*;
             class A {
-               Collection c;
-               Set s;
+               Collection<Integer> c;
+               Set<Integer> s;
             }
         """
     )
@@ -199,22 +199,61 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
         """
     )
 
-    @Disabled("https://github.com/openrewrite/rewrite/issues/429")
+    @Issue("https://github.com/openrewrite/rewrite/issues/429")
     @Test
-    fun doesntRemoveImportsFromPackageInfo(jp: JavaParser) = assertUnchanged(
+    fun removePackageInfoImports(jp: JavaParser) = assertChanged(
         recipe = RemoveUnusedImports(),
         dependsOn = arrayOf(
             """
                 package foo;
-                @Target({ElementType.PACKAGE, ElementType.TYPE})
                 public @interface FooAnnotation {}
+                public @interface Foo {}
+                public @interface Bar {}
             """
         ),
         before = """
             @Foo
+            @Bar
             package foo.bar.baz;
             
+            import foo.Bar;
+            import foo.Foo;
             import foo.FooAnnotation;
+        """,
+        after = """
+            @Foo
+            @Bar
+            package foo.bar.baz;
+            
+            import foo.Bar;
+            import foo.Foo;
+        """
+    )
+    @Test
+    fun removePackageInfoStarImports(jp: JavaParser) = assertChanged(
+        recipe = RemoveUnusedImports(),
+        dependsOn = arrayOf(
+            """
+                package foo;
+                public @interface FooAnnotation {}
+                public @interface Foo {}
+                public @interface Bar {}
+            """
+        ),
+        before = """
+            @Foo
+            @Bar
+            package foo.bar.baz;
+            
+            import foo.*;
+        """,
+        after = """
+            @Foo
+            @Bar
+            package foo.bar.baz;
+            
+            import foo.Bar;
+            import foo.Foo;
         """
     )
 }
