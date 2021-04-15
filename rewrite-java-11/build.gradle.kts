@@ -14,6 +14,7 @@ dependencies {
 
     implementation("io.micrometer:micrometer-core:latest.release")
     implementation("io.github.classgraph:classgraph:latest.release")
+    implementation("org.ow2.asm:asm:latest.release")
 
     testImplementation(project(":rewrite-test"))
 
