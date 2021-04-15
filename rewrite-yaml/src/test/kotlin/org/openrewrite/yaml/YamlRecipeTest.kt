@@ -24,7 +24,7 @@ interface YamlRecipeTest : RecipeTest {
         get() = YamlParser()
 
     override val treePrinter: TreePrinter<*>?
-        get() = SearchResult.printer("#~~>\n", "#~~(%s)~~>\n")
+        get() = SearchResult.printer("~~>", "~~(%s)~~>")
 
     override fun assertChanged(
         parser: Parser<*>?,
