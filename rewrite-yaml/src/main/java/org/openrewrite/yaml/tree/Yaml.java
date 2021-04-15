@@ -100,9 +100,6 @@ public interface Yaml extends Serializable, Tree {
         UUID id;
 
         @With
-        String prefix;
-
-        @With
         Markers markers;
 
         @With
@@ -118,8 +115,26 @@ public interface Yaml extends Serializable, Tree {
 
         @Override
         public Documents copyPaste() {
-            return new Documents(randomId(), prefix, Markers.EMPTY,
+            return new Documents(randomId(), Markers.EMPTY,
                     sourcePath, documents.stream().map(Document::copyPaste).collect(toList()));
+        }
+
+        /**
+         * Prefixes will always be on {@link Mapping.Entry}.
+         *
+         * @return The empty string.
+         */
+        @Override
+        public String getPrefix() {
+            return "";
+        }
+
+        @Override
+        public Documents withPrefix(String prefix) {
+            if(!prefix.isEmpty()) {
+                throw new UnsupportedOperationException("Yaml.Documents may not have a non-empty prefix");
+            }
+            return this;
         }
     }
 
@@ -217,6 +232,10 @@ public interface Yaml extends Serializable, Tree {
         public Scalar copyPaste() {
             return new Scalar(randomId(), prefix, Markers.EMPTY, style, value);
         }
+
+        public String toString() {
+            return "Yaml.Scalar(" + value + ")";
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -225,9 +244,6 @@ public interface Yaml extends Serializable, Tree {
     class Mapping implements Block {
         @EqualsAndHashCode.Include
         UUID id;
-
-        @With
-        String prefix;
 
         @With
         Markers markers;
@@ -242,8 +258,26 @@ public interface Yaml extends Serializable, Tree {
 
         @Override
         public Mapping copyPaste() {
-            return new Mapping(randomId(), prefix, Markers.EMPTY,
-                    entries.stream().map(Entry::copyPaste).collect(toList()));
+            return new Mapping(randomId(), Markers.EMPTY, entries.stream().map(Entry::copyPaste)
+                    .collect(toList()));
+        }
+
+        /**
+         * Prefixes will always be on {@link Entry}.
+         *
+         * @return The empty string.
+         */
+        @Override
+        public String getPrefix() {
+            return "";
+        }
+
+        @Override
+        public Mapping withPrefix(String prefix) {
+            if(!prefix.isEmpty()) {
+                throw new UnsupportedOperationException("Yaml.Mapping may not have a non-empty prefix");
+            }
+            return this;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

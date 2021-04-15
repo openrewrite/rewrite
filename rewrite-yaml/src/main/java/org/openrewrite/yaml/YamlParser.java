@@ -17,6 +17,7 @@ package org.openrewrite.yaml;
 
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
+import lombok.Getter;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
@@ -74,6 +75,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                     }
                 })
                 .filter(Objects::nonNull)
+                .map(this::unwrapPrefixedMappings)
                 .collect(toList());
     }
 
@@ -171,7 +173,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                 }
             }
 
-            return new Yaml.Documents(randomId(), "", Markers.EMPTY, sourceFile, documents);
+            return new Yaml.Documents(randomId(), Markers.EMPTY, sourceFile, documents);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -211,15 +213,16 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                 String keyPrefix = key.getPrefix();
                 key = key.withPrefix("");
 
-                String beforeMappingValueIndicator = keySuffix.substring(0, keySuffix.lastIndexOf(':'));
+                String beforeMappingValueIndicator = keySuffix.substring(0,
+                        Math.max(keySuffix.lastIndexOf(':'), 0));
                 String entryPrefix = keyPrefix.substring(keyPrefix.lastIndexOf(':') + 1);
                 entries.add(new Yaml.Mapping.Entry(randomId(), entryPrefix, Markers.EMPTY, key, beforeMappingValueIndicator, block));
                 key = null;
             }
         }
 
-        public Yaml.Mapping build() {
-            return new Yaml.Mapping(randomId(), prefix, Markers.EMPTY, entries);
+        public MappingWithPrefix build() {
+            return new MappingWithPrefix(prefix, entries);
         }
     }
 
@@ -256,5 +259,35 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
         public Yaml.Sequence build() {
             return new Yaml.Sequence(randomId(), prefix, Markers.EMPTY, entries);
         }
+    }
+
+    @Getter
+    private static class MappingWithPrefix extends Yaml.Mapping {
+        private String prefix;
+
+        public MappingWithPrefix(String prefix, List<Yaml.Mapping.Entry> entries) {
+            super(randomId(), Markers.EMPTY, entries);
+            this.prefix = prefix;
+        }
+
+        @Override
+        public Mapping withPrefix(String prefix) {
+            this.prefix = prefix;
+            return this;
+        }
+    }
+
+    private Yaml.Documents unwrapPrefixedMappings(Yaml.Documents y) {
+        //noinspection ConstantConditions
+        return (Yaml.Documents) new YamlIsoVisitor<Integer>() {
+            @Override
+            public Yaml.Mapping visitMapping(Yaml.Mapping mapping, Integer p) {
+                if(mapping instanceof MappingWithPrefix) {
+                    MappingWithPrefix mappingWithPrefix = (MappingWithPrefix) mapping;
+                    return super.visitMapping(new Yaml.Mapping(mappingWithPrefix.getId(), mappingWithPrefix.getMarkers(), mappingWithPrefix.getEntries()), p);
+                }
+                return super.visitMapping(mapping, p);
+            }
+        }.visit(y, 0);
     }
 }

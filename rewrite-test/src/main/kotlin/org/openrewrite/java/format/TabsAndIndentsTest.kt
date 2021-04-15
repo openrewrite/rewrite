@@ -1201,6 +1201,7 @@ interface TabsAndIndentsTest : JavaRecipeTest {
             }
         """
     )
+
     @Test
     fun tabsFileWithSpacesFormat(jp: JavaParser) = assertChanged(
         jp,

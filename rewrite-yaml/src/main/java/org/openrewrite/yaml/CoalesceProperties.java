@@ -42,21 +42,21 @@ public class CoalesceProperties extends Recipe {
         return new CoalescePropertiesVisitor<>();
     }
 
-    public static class CoalescePropertiesVisitor<P> extends YamlVisitor<P> {
+    public static class CoalescePropertiesVisitor<P> extends YamlIsoVisitor<P> {
         public CoalescePropertiesVisitor() {
         }
 
         private final FindIndentYamlVisitor<P> findIndent = new FindIndentYamlVisitor<>(0);
 
         @Override
-        public Yaml visitDocument(Yaml.Document document, P p) {
+        public Yaml.Document visitDocument(Yaml.Document document, P p) {
             findIndent.visit(document, p);
             return super.visitDocument(document, p);
         }
 
         @Override
-        public Yaml visitMapping(Yaml.Mapping mapping, P p) {
-            Yaml.Mapping m = (Yaml.Mapping) super.visitMapping(mapping, p);
+        public Yaml.Mapping visitMapping(Yaml.Mapping mapping, P p) {
+            Yaml.Mapping m = super.visitMapping(mapping, p);
 
             boolean changed = false;
             List<Yaml.Mapping.Entry> entries = new ArrayList<>();

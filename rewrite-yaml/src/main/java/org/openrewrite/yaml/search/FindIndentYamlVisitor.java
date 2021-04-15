@@ -29,14 +29,13 @@ import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.counting;
 
 /**
- * Discover the most common indentation level of a tree, and whether this indentation is built with spaces or tabs.
+ * Discover the most common indentation level of a tree.
  */
 public class FindIndentYamlVisitor<P> extends YamlVisitor<P> {
     private final SortedMap<Integer, Long> indentFrequencies = new TreeMap<>();
     private final int enclosingIndent;
 
     private int linesWithSpaceIndents = 0;
-    private int linesWithTabIndents = 0;
 
     public FindIndentYamlVisitor(int enclosingIndent) {
         this.enclosingIndent = enclosingIndent;
@@ -83,16 +82,10 @@ public class FindIndentYamlVisitor<P> extends YamlVisitor<P> {
 
             if (indentTypeCounts.getOrDefault(true, 0L) >= indentTypeCounts.getOrDefault(false, 0L)) {
                 linesWithSpaceIndents++;
-            } else {
-                linesWithTabIndents++;
             }
         }
 
         return super.preVisit(tree, p);
-    }
-
-    public boolean isIndentedWithSpaces() {
-        return linesWithSpaceIndents >= linesWithTabIndents;
     }
 
     public int getMostCommonIndent() {
@@ -104,6 +97,6 @@ public class FindIndentYamlVisitor<P> extends YamlVisitor<P> {
      * @return The total number of source lines that this indent decision was made on.
      */
     public int getTotalLines() {
-        return linesWithSpaceIndents + linesWithTabIndents;
+        return linesWithSpaceIndents;
     }
 }

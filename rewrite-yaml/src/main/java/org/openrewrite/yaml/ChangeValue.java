@@ -51,10 +51,10 @@ public class ChangeValue extends Recipe {
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         XPathMatcher xPathMatcher = new XPathMatcher(oldKeyPath);
-        return new YamlVisitor<ExecutionContext>() {
+        return new YamlIsoVisitor<ExecutionContext>() {
             @Override
-            public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext context) {
-                Yaml.Mapping.Entry e = (Yaml.Mapping.Entry) super.visitMappingEntry(entry, context);
+            public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext context) {
+                Yaml.Mapping.Entry e = super.visitMappingEntry(entry, context);
                 if (xPathMatcher.matches(getCursor())) {
                     e = e.withValue(
                             new Yaml.Scalar(randomId(), e.getValue().getPrefix(), Markers.EMPTY,

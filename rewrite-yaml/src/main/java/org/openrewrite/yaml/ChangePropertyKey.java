@@ -68,11 +68,11 @@ public class ChangePropertyKey extends Recipe {
         return new ChangePropertyKeyVisitor<>();
     }
 
-    private class ChangePropertyKeyVisitor<P> extends YamlVisitor<P> {
+    private class ChangePropertyKeyVisitor<P> extends YamlIsoVisitor<P> {
 
         @Override
-        public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, P p) {
-            Yaml.Mapping.Entry e = (Yaml.Mapping.Entry) super.visitMappingEntry(entry, p);
+        public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, P p) {
+            Yaml.Mapping.Entry e = super.visitMappingEntry(entry, p);
 
             Deque<Yaml.Mapping.Entry> propertyEntries = getCursor().getPathAsStream()
                     .filter(Yaml.Mapping.Entry.class::isInstance)
@@ -110,7 +110,7 @@ public class ChangePropertyKey extends Recipe {
 
     }
 
-    private static class InsertSubpropertyVisitor<P> extends YamlVisitor<P> {
+    private static class InsertSubpropertyVisitor<P> extends YamlIsoVisitor<P> {
         private final Yaml.Mapping.Entry scope;
         private final String subproperty;
         private final Yaml.Block value;
@@ -122,8 +122,8 @@ public class ChangePropertyKey extends Recipe {
         }
 
         @Override
-        public Yaml visitMapping(Yaml.Mapping mapping, P p) {
-            Yaml.Mapping m = (Yaml.Mapping) super.visitMapping(mapping, p);
+        public Yaml.Mapping visitMapping(Yaml.Mapping mapping, P p) {
+            Yaml.Mapping m = super.visitMapping(mapping, p);
 
             if (m.getEntries().contains(scope)) {
                 String newEntryPrefix = scope.getPrefix();
@@ -150,7 +150,7 @@ public class ChangePropertyKey extends Recipe {
         }
     }
 
-    private static class DeletePropertyVisitor<P> extends YamlVisitor<P> {
+    private static class DeletePropertyVisitor<P> extends YamlIsoVisitor<P> {
         private final Yaml.Mapping.Entry scope;
 
         private DeletePropertyVisitor(Yaml.Mapping.Entry scope) {
@@ -158,8 +158,8 @@ public class ChangePropertyKey extends Recipe {
         }
 
         @Override
-        public Yaml visitMapping(Yaml.Mapping mapping, P p) {
-            Yaml.Mapping m = (Yaml.Mapping) super.visitMapping(mapping, p);
+        public Yaml.Mapping visitMapping(Yaml.Mapping mapping, P p) {
+            Yaml.Mapping m = super.visitMapping(mapping, p);
 
             boolean changed = false;
             List<Yaml.Mapping.Entry> entries = new ArrayList<>();

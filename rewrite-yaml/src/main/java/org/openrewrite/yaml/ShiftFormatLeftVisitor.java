@@ -17,7 +17,7 @@ package org.openrewrite.yaml;
 
 import org.openrewrite.yaml.tree.Yaml;
 
-public class ShiftFormatLeftVisitor<P> extends YamlVisitor<P> {
+public class ShiftFormatLeftVisitor<P> extends YamlIsoVisitor<P> {
     private final Yaml scope;
     private final int shift;
 
@@ -27,8 +27,8 @@ public class ShiftFormatLeftVisitor<P> extends YamlVisitor<P> {
     }
 
     @Override
-    public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, P p) {
-        Yaml.Mapping.Entry e = (Yaml.Mapping.Entry) super.visitMappingEntry(entry, p);
+    public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, P p) {
+        Yaml.Mapping.Entry e = super.visitMappingEntry(entry, p);
         if (getCursor().isScopeInPath(scope)) {
             String prefix = e.getPrefix();
             e = e.withPrefix(prefix.substring(0, prefix.indexOf('\n') + 1) +

@@ -57,10 +57,10 @@ public class DeleteProperty extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new YamlVisitor<ExecutionContext>() {
+        return new YamlIsoVisitor<ExecutionContext>() {
             @Override
-            public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
-                Yaml.Mapping.Entry e = (Yaml.Mapping.Entry) super.visitMappingEntry(entry, ctx);
+            public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
+                Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
 
                 Deque<Yaml.Mapping.Entry> propertyEntries = getCursor().getPathAsStream()
                         .filter(Yaml.Mapping.Entry.class::isInstance)

@@ -115,8 +115,7 @@ public class YamlPrinter<P> extends YamlVisitor<P> {
         StringBuilder acc = getPrinter();
         acc.append(entry.getPrefix());
         visit(entry.getKey(), p);
-        acc.append(entry.getBeforeMappingValueIndicator())
-                .append(':');
+        acc.append(entry.getBeforeMappingValueIndicator()).append(':');
         visit(entry.getValue(), p);
         return entry;
     }

@@ -107,7 +107,6 @@ class StringUtilsTest {
         assertThat(trimIndent(input)).isEqualTo(input.trimIndent())
     }
 
-
     @Test
     fun splitComments() {
         assertThat(splitCStyleComments("")).isEqualTo(listOf(""))
@@ -164,7 +163,7 @@ class StringUtilsTest {
     }
 
     @Test
-    fun occuranceCount() {
+    fun occurrenceCount() {
         assertThat(countOccurrences("yoyoyoyoyo", "yo")).isEqualTo(5)
         assertThat(countOccurrences("yoyoyoyoyo", "yoyo")).isEqualTo(2)
         assertThat(countOccurrences("nonononono", "yo")).isEqualTo(0)

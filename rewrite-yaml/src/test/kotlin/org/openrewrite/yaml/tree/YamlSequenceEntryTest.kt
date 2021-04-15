@@ -17,36 +17,18 @@ package org.openrewrite.yaml.tree
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.InMemoryExecutionContext
-import org.openrewrite.Recipe
 import org.openrewrite.yaml.YamlParser
-import org.openrewrite.yaml.YamlRecipeTest
 
-class YamlMappingEntryTest {
-
-    @Test
-    fun suffixBeforeColon() {
-        val y = """
-          data :
-            test : 0
-        """.trimIndent()
-
-        val parsed = YamlParser().parse(InMemoryExecutionContext { t -> t.printStackTrace() }, y)[0]
-        assertThat(parsed.print()).isEqualTo(y)
-    }
+class YamlSequenceEntryTest {
 
     @Test
-    fun literals() {
+    fun sequences() {
         val y = """
-          data:
-            prometheus.yml: |-
-              global:
-                scrape_interval: 10s
-                scrape_timeout: 9s
-                evaluation_interval: 10s
+            spec:
+              - action:
+                  type: Delete
         """.trimIndent()
 
-        val parsed = YamlParser().parse(InMemoryExecutionContext { t -> t.printStackTrace() }, y)[0]
-        assertThat(parsed.print()).isEqualTo(y)
+        assertThat(YamlParser().parse(y)[0].print()).isEqualTo(y)
     }
 }

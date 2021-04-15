@@ -130,6 +130,14 @@ class MavenDependencyResolutionIntegTest {
         )
     }
 
+    @Test
+    fun lombok(@TempDir tempDir: Path) {
+        assertDependencyResolutionEqualsAether(
+            tempDir,
+            singleDependencyPom("org.projectlombok:lombok:1.18.16")
+        )
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/346")
     @Test
     fun overrideParentVersion(@TempDir tempDir: Path) {

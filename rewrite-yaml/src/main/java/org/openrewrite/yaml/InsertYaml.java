@@ -17,45 +17,43 @@ package org.openrewrite.yaml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.yaml.tree.Yaml;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
-public class ChangeKey extends Recipe {
-    @Option(displayName = "Old key path",
-            description = "An XPath expression to locate a YAML entry.",
-            example = "subjects/kind")
-    String oldKeyPath;
+@Incubating(since = "7.2.0")
+public class InsertYaml extends Recipe {
+    @Option(displayName = "Key path",
+            description = "XPath expression used to find matching keys.",
+            example = "/metadata/labels")
+    String key;
 
-    @Option(displayName = "New key",
-            example = "kind")
-    String newKey;
+    @Option(displayName = "YAML snippet",
+            description = "The YAML snippet to insert. The snippet will be indented to match the style of its surroundings.",
+            example = "label-one: \"value-one\"")
+    String yaml;
 
     @Override
     public String getDisplayName() {
-        return "Change key";
+        return "Insert YAML snippet";
     }
 
     @Override
     public String getDescription() {
-        return "Change a YAML mapping entry key leaving the value intact.";
+        return "Insert a YAML snippet at a given key";
     }
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        XPathMatcher xPathMatcher = new XPathMatcher(oldKeyPath);
+        XPathMatcher xPathMatcher = new XPathMatcher(key);
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
-            public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext context) {
-                Yaml.Mapping.Entry e = super.visitMappingEntry(entry, context);
-                if (xPathMatcher.matches(getCursor())) {
-                    e = e.withKey(e.getKey().withValue(newKey));
+            public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
+                if(xPathMatcher.matches(getCursor())) {
+                    doAfterVisit(new InsertYamlVisitor<>(entry, yaml));
                 }
-                return e;
+                return super.visitMappingEntry(entry, ctx);
             }
         };
     }
