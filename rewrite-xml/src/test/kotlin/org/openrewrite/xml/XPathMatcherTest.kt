@@ -54,6 +54,7 @@ class XPathMatcherTest {
 
     @Test
     fun matchRelative() {
+        assertThat(visit("dependencies")).isTrue
         assertThat(visit("dependency")).isTrue
         assertThat(visit("//dependency")).isTrue
         assertThat(visit("dependency/*")).isTrue
