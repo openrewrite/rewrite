@@ -18,12 +18,8 @@ package org.openrewrite;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.Markable;
-import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.function.BiFunction;
 
@@ -186,26 +182,5 @@ public abstract class TreeVisitor<T extends Tree, P> {
     protected final <T2 extends T> T2 visitAndCast(@Nullable Tree tree, P p) {
         //noinspection unchecked
         return (T2) visit(tree, p);
-    }
-
-    protected <M extends Markable> M visitMarkable(Markable markable, P p) {
-        Collection<? extends Marker> originalMarkers = markable.getMarkers().entries();
-        List<Marker> visited = new ArrayList<>();
-        boolean changed = false;
-        for(Marker originalMarker : originalMarkers) {
-            Marker visitedMarker = visitMarker(originalMarker, p);
-            visited.add(visitedMarker);
-            changed = changed || (visitedMarker != originalMarker);
-        }
-        if(changed) {
-            return markable.withMarkers(Markers.build(visited));
-        }
-        //noinspection unchecked
-        return (M) markable;
-    }
-
-    protected <M extends Marker> M visitMarker(Marker marker, P p) {
-        //noinspection unchecked
-        return (M) marker;
     }
 }

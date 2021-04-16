@@ -16,15 +16,16 @@
 package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
-import org.openrewrite.marker.RecipeSearchResult;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -42,6 +43,9 @@ public class FindFields extends Recipe {
             description = "A fully-qualified Java type name, that is used to find matching fields.",
             example = "org.slf4j.api.Logger")
     String fullyQualifiedTypeName;
+
+    @ToString.Exclude
+    JavaSearchResult searchMarker = new JavaSearchResult(randomId(), FindFields.this);
 
     @Override
     public String getDisplayName() {
@@ -63,7 +67,7 @@ public class FindFields extends Recipe {
                 }
                 if (multiVariable.getTypeExpression() != null && TypeUtils.hasElementType(multiVariable.getTypeExpression()
                         .getType(), fullyQualifiedTypeName)) {
-                    return multiVariable.withMarker(new RecipeSearchResult(randomId(), FindFields.this));
+                    return multiVariable.withMarkers(multiVariable.getMarkers().addOrUpdate(searchMarker));
                 }
                 return multiVariable;
             }

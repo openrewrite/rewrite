@@ -16,6 +16,7 @@
 package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
@@ -26,7 +27,7 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.marker.RecipeSearchResult;
+import org.openrewrite.java.marker.JavaSearchResult;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -48,6 +49,9 @@ public class FindMethods extends Recipe {
             description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.",
             example = "java.util.List add(..)")
     String methodPattern;
+
+    @ToString.Exclude
+    JavaSearchResult searchMarker = new JavaSearchResult(randomId(), FindMethods.this);
 
     @Override
     public String getDisplayName() {
@@ -71,7 +75,7 @@ public class FindMethods extends Recipe {
                         ctx.putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY,
                                 method.getType().getDeclaringType());
                     }
-                    m = m.withMarker(new RecipeSearchResult(randomId(), FindMethods.this));
+                    m = m.withMarkers(m.getMarkers().addOrUpdate(searchMarker));
                 }
                 return m;
             }
@@ -83,7 +87,7 @@ public class FindMethods extends Recipe {
                     if(m.getType() != null) {
                         ctx.putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY, m.getType());
                     }
-                    m = m.withReference(m.getReference().withMarker(new RecipeSearchResult(randomId(), FindMethods.this)));
+                    m = m.withReference(m.getReference().withMarkers(m.getReference().getMarkers().addOrUpdate(searchMarker)));
                 }
                 return m;
             }

@@ -21,7 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.marker.RecipeSearchResult;
+import org.openrewrite.marker.JavaSearchResult;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 
@@ -75,7 +75,7 @@ public class FindProperties extends Recipe {
             public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
                 Properties p = super.visitEntry(entry, ctx);
                 if (entry.getKey().equals(propertyKey)) {
-                    p = p.withMarker(new RecipeSearchResult(randomId(), FindProperties.this));
+                    p = p.withMarker(new JavaSearchResult(randomId(), FindProperties.this));
                 }
                 return p;
             }

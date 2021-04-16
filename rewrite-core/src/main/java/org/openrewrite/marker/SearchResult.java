@@ -16,7 +16,6 @@
 package org.openrewrite.marker;
 
 import org.openrewrite.Incubating;
-import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.lang.Nullable;
 
 /**
@@ -29,14 +28,4 @@ public interface SearchResult extends Marker {
 
     @Nullable
     String getDescription();
-
-    @Override
-    default <P> String print(TreePrinter<P> printer, P p) {
-        String desc = getDescription();
-        if(desc == null) {
-            return "~~>";
-        } else {
-            return String.format("~~(%s)~~>", desc);
-        }
-    }
 }

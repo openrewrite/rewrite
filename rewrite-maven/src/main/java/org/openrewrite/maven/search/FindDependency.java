@@ -18,9 +18,9 @@ package org.openrewrite.maven.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.marker.RecipeSearchResult;
 import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.maven.tree.Maven;
+import org.openrewrite.xml.marker.XmlSearchResult;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashSet;
@@ -41,6 +41,8 @@ public class FindDependency extends Recipe {
             description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
             example = "guava")
     String artifactId;
+
+    XmlSearchResult searchMarker = new XmlSearchResult(randomId(),FindDependency.this);
 
     public static Set<Xml.Tag> find(Maven maven, String groupId, String artifactId) {
         Set<Xml.Tag> ds = new HashSet<>();
@@ -72,7 +74,7 @@ public class FindDependency extends Recipe {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
                 if (isDependencyTag(groupId, artifactId)) {
-                    return tag.withMarker(new RecipeSearchResult(randomId(),FindDependency.this));
+                    return tag.withMarkers(tag.getMarkers().addOrUpdate(searchMarker));
                 }
                 return super.visitTag(tag, context);
             }

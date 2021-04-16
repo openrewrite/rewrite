@@ -16,11 +16,14 @@
 package org.openrewrite;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.openrewrite.marker.Markable;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.style.NamedStyles;
+import org.openrewrite.style.Style;
 
 import java.nio.file.Path;
 
-public interface SourceFile extends Tree, Markable {
+public interface SourceFile extends Tree {
     /**
      * @return An absolute or relative file path.
      */
@@ -30,5 +33,14 @@ public interface SourceFile extends Tree, Markable {
     @JsonProperty("@c")
     default String getJacksonPolymorphicTypeTag() {
         return getClass().getName();
+    }
+
+    Markers getMarkers();
+
+    <T extends SourceFile> T withMarkers(Markers markers);
+
+    @Nullable
+    default <S extends Style> S getStyle(Class<S> style) {
+        return NamedStyles.merge(style, getMarkers().findAll(NamedStyles.class));
     }
 }

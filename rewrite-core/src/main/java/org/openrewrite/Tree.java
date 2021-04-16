@@ -18,9 +18,6 @@ package org.openrewrite;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.Markable;
-import org.openrewrite.style.NamedStyles;
-import org.openrewrite.style.Style;
 
 import java.util.UUID;
 
@@ -28,15 +25,6 @@ import java.util.UUID;
 public interface Tree {
     static UUID randomId() {
         return UUID.randomUUID();
-    }
-
-    @Nullable
-    default <S extends Style> S getStyle(Class<S> style) {
-        if(this instanceof Markable) {
-            Markable m = (Markable)this;
-            return NamedStyles.merge(style, m.getMarkers().findAll(NamedStyles.class));
-        }
-        return null;
     }
 
     /**

@@ -16,15 +16,15 @@
 package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.Comment;
+import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
-import org.openrewrite.marker.RecipeSearchResult;
 
 import java.util.List;
 import java.util.regex.Pattern;
@@ -41,6 +41,9 @@ public class FindText extends Recipe {
             description = "A list of regular expressions to search for.",
             example = "-----BEGIN RSA PRIVATE KEY-----")
     List<String> patterns;
+
+    @ToString.Exclude
+    JavaSearchResult searchMarker = new JavaSearchResult(randomId(), FindText.this);
 
     @Override
     public String getDisplayName() {
@@ -79,21 +82,12 @@ public class FindText extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public Space visitSpace(Space space, Space.Location loc, ExecutionContext context) {
-                for (Comment comment : space.getComments()) {
-                    if (compiledPatterns.stream().anyMatch(p -> p.matcher(comment.getText()).find())) {
-                        getCursor().putMessageOnFirstEnclosing(J.class, "foundText", true);
+                return space.withComments(ListUtils.map(space.getComments(), comment -> {
+                    if(compiledPatterns.stream().anyMatch(p -> p.matcher(comment.getText()).find())) {
+                        return comment.withMarkers(comment.getMarkers().addOrUpdate(searchMarker));
                     }
-                }
-
-                return space;
-            }
-
-            @Override
-            public @Nullable J postVisit(J tree, ExecutionContext context) {
-                if(getCursor().pollMessage("foundText") != null) {
-                    return tree.withMarker(new RecipeSearchResult(randomId(), FindText.this));
-                }
-                return super.postVisit(tree, context);
+                    return comment;
+                }));
             }
 
             @Override
@@ -105,7 +99,7 @@ public class FindText extends Recipe {
                 assert literal.getValue() != null;
                 if (compiledPatterns.stream().anyMatch(p -> p
                         .matcher(literal.getValue().toString()).find())) {
-                    return literal.withMarker(new RecipeSearchResult(randomId(), FindText.this));
+                    return literal.withMarkers(literal.getMarkers().addOrUpdate(searchMarker));
                 }
 
                 return literal;

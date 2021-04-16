@@ -22,7 +22,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.marker.RecipeSearchResult;
+import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -53,12 +53,12 @@ public class FindProperties extends Recipe {
             public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, context);
                 if (isPropertyTag() && propertyMatcher.matcher(tag.getName()).matches()) {
-                    t = t.withMarker(new RecipeSearchResult(randomId(),FindProperties.this));
+                    t = t.withMarker(new JavaSearchResult(randomId(),FindProperties.this));
                 }
 
                 Optional<String> value = tag.getValue();
                 if (t.getContent() != null && value.isPresent() && value.get().contains("${")) {
-                    t = t.withContent(ListUtils.mapFirst(t.getContent(), v -> v.withMarker(new RecipeSearchResult(randomId(),FindProperties.this,
+                    t = t.withContent(ListUtils.mapFirst(t.getContent(), v -> v.withMarker(new JavaSearchResult(randomId(),FindProperties.this,
                             model.getValue(value.get())))));
                 }
                 return t;

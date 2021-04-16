@@ -460,17 +460,16 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             packageDecl = new J.Package(randomId(), packagePrefix, Markers.EMPTY,
                     convert(cu.getPackageName()), packageAnnotations);
         }
-
         return new J.CompilationUnit(
                 randomId(),
                 fmt,
-                Markers.EMPTY,
+                Markers.build(styles),
                 sourcePath,
                 packageDecl == null ? null : padRight(packageDecl, sourceBefore(";")),
                 convertAll(node.getImports(), this::statementDelim, this::statementDelim),
                 convertAll(node.getTypeDecls().stream().filter(JCClassDecl.class::isInstance).collect(toList())),
                 format(source.substring(cursor))
-        ).withMarker(styles.toArray(NamedStyles[]::new));
+        );
     }
 
     @Override

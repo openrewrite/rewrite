@@ -28,7 +28,9 @@ interface FindTextTest : JavaRecipeTest {
             listOf("test", "12.*")
         ),
         before = """
+            // not this one
             // test
+            // not this one, either
             // comment 123
             class Test {
                 int n = 123;
@@ -37,8 +39,10 @@ interface FindTextTest : JavaRecipeTest {
             }
         """,
         after = """
+            // not this one
             /*~~>*/// test
-            // comment 123
+            // not this one, either
+            /*~~>*/// comment 123
             class Test {
                 int n = /*~~>*/123;
                 String s = /*~~>*/"test";

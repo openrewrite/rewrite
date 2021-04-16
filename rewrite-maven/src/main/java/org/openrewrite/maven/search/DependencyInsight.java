@@ -18,7 +18,7 @@ package org.openrewrite.maven.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.marker.RecipeSearchResult;
+import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.Scope;
@@ -99,9 +99,9 @@ public class DependencyInsight extends Recipe {
                         Optional<Pom.Dependency> match = dependencies.stream().filter(this::dependencyMatches).findFirst();
                         if(match.isPresent()) {
                             if(dependencyMatches(dependency)) {
-                                t = t.withMarker(new RecipeSearchResult(randomId(), DependencyInsight.this));
+                                t = t.withMarker(new JavaSearchResult(randomId(), DependencyInsight.this));
                             } else {
-                                t = t.withMarker(new RecipeSearchResult(randomId(),DependencyInsight.this,
+                                t = t.withMarker(new JavaSearchResult(randomId(),DependencyInsight.this,
                                         match.get().getCoordinates()));
                             }
                         }

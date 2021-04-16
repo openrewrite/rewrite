@@ -15,12 +15,12 @@
  */
 package org.openrewrite.yaml;
 
-import lombok.*;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;

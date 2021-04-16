@@ -16,6 +16,7 @@
 package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
@@ -27,7 +28,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeUtils;
-import org.openrewrite.marker.RecipeSearchResult;
+import org.openrewrite.java.marker.JavaSearchResult;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -56,6 +57,9 @@ public class FindTypes extends Recipe {
         return "Find type references by name.";
     }
 
+    @ToString.Exclude
+    JavaSearchResult searchMarker = new JavaSearchResult(randomId(), FindTypes.this);
+
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
@@ -67,7 +71,7 @@ public class FindTypes extends Recipe {
                 if (asClass != null && asClass.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         getCursor().firstEnclosing(J.Import.class) == null) {
                     ctx.putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY, asClass);
-                    return n.withMarker(new RecipeSearchResult(randomId(), FindTypes.this));
+                    return n.withMarkers(n.getMarkers().addOrUpdate(searchMarker));
                 }
                 return n;
             }
@@ -79,7 +83,7 @@ public class FindTypes extends Recipe {
                 if (asClass != null && asClass.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         fa.getName().getSimpleName().equals("class")) {
                     ctx.putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY, asClass);
-                    return fa.withMarker(new RecipeSearchResult(randomId(),FindTypes.this));
+                    return fa.withMarkers(fa.getMarkers().addOrUpdate(searchMarker));
                 }
                 return fa;
             }

@@ -26,7 +26,6 @@ import lombok.experimental.FieldDefaults;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.Markable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XmlParser;
@@ -47,7 +46,7 @@ import static org.openrewrite.Tree.randomId;
  * The XML <a href="https://www.w3.org/TR/xml11/#syntax">spec</a>.
  */
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-public interface Xml extends Serializable, Tree, Markable {
+public interface Xml extends Serializable, Tree {
 
     @SuppressWarnings("unchecked")
     @Override
