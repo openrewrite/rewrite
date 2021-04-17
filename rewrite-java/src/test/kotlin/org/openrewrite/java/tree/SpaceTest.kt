@@ -109,16 +109,16 @@ class SpaceTest {
 
     @Test
     fun findIndent() {
-        assertThat(Space.build(" ", listOf(Comment(Comment.Style.LINE, "hi", "\n   ")), Markers.EMPTY).indent)
+        assertThat(Space.build(" ", listOf(Comment(Comment.Style.LINE, "hi", "\n   ", Markers.EMPTY))).indent)
             .isEqualTo("   ")
 
-        assertThat(Space.build("   ", emptyList(), Markers.EMPTY).indent)
+        assertThat(Space.build("   ", emptyList()).indent)
             .isEqualTo("   ")
 
-        assertThat(Space.build("  \n ", emptyList(), Markers.EMPTY).indent)
+        assertThat(Space.build("  \n ", emptyList()).indent)
             .isEqualTo(" ")
 
-        assertThat(Space.build("  \n   \n    ", emptyList(), Markers.EMPTY).indent)
+        assertThat(Space.build("  \n   \n    ", emptyList()).indent)
             .isEqualTo("    ")
     }
 }

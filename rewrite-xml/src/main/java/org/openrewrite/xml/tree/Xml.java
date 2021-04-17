@@ -78,6 +78,10 @@ public interface Xml extends Serializable, Tree {
 
     Xml withPrefix(String prefix);
 
+    <T extends Xml> T withMarkers(Markers markers);
+
+    Markers getMarkers();
+
     /**
      * Find all subtrees marked with a particular marker rooted at this tree.
      *

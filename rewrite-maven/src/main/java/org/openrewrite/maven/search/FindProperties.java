@@ -22,11 +22,12 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.maven.MavenVisitor;
+import org.openrewrite.xml.marker.XmlSearchResult;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 import static org.openrewrite.Tree.randomId;
@@ -37,6 +38,8 @@ public class FindProperties extends Recipe {
 
     @Option(displayName = "Property pattern", description = "Regular expression pattern used to match property tag names.")
     String propertyPattern;
+
+    UUID searchId = randomId();
 
     @Override
     public String getDisplayName() {
@@ -53,13 +56,14 @@ public class FindProperties extends Recipe {
             public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, context);
                 if (isPropertyTag() && propertyMatcher.matcher(tag.getName()).matches()) {
-                    t = t.withMarker(new JavaSearchResult(randomId(),FindProperties.this));
+                    t = t.withMarkers(t.getMarkers().addOrUpdate(new XmlSearchResult(searchId, FindProperties.this)));
                 }
 
                 Optional<String> value = tag.getValue();
                 if (t.getContent() != null && value.isPresent() && value.get().contains("${")) {
-                    t = t.withContent(ListUtils.mapFirst(t.getContent(), v -> v.withMarker(new JavaSearchResult(randomId(),FindProperties.this,
-                            model.getValue(value.get())))));
+                    t = t.withContent(ListUtils.mapFirst(t.getContent(), v ->
+                            v.withMarkers(v.getMarkers().add(new XmlSearchResult(searchId,
+                                    FindProperties.this, model.getValue(value.get()))))));
                 }
                 return t;
             }

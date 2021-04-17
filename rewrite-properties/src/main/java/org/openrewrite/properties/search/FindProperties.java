@@ -16,12 +16,13 @@
 package org.openrewrite.properties.search;
 
 import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.marker.JavaSearchResult;
+import org.openrewrite.java.marker.PropertiesSearchResult;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 
@@ -41,6 +42,9 @@ public class FindProperties extends Recipe {
             description = "A property glob expression that properties are matched against.",
             example = "guava*")
     String propertyKey;
+
+    @ToString.Exclude
+    PropertiesSearchResult searchMarker = new PropertiesSearchResult(randomId(), FindProperties.this);
 
     public static Set<Properties.Entry> find(Properties p, String propertyKey) {
         PropertiesVisitor<Set<Properties.Entry>> findVisitor = new PropertiesVisitor<Set<Properties.Entry>>() {
@@ -75,7 +79,7 @@ public class FindProperties extends Recipe {
             public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
                 Properties p = super.visitEntry(entry, ctx);
                 if (entry.getKey().equals(propertyKey)) {
-                    p = p.withMarker(new JavaSearchResult(randomId(), FindProperties.this));
+                    p = p.withMarkers(p.getMarkers().addOrUpdate(searchMarker));
                 }
                 return p;
             }

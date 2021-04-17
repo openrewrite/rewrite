@@ -146,7 +146,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
     }
 
     @Override
-    protected <M extends Marker> M visitMarker(Marker marker, P p) {
+    public <M extends Marker> M visitMarker(Marker marker, P p) {
         StringBuilder acc = getPrinter();
         acc.append(marker.print(treePrinter, p));
         //noinspection unchecked

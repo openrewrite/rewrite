@@ -564,7 +564,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return markers;
     }
 
-    protected <M extends Marker> M visitMarker(Marker marker, P p) {
+    public <M extends Marker> M visitMarker(Marker marker, P p) {
         //noinspection unchecked
         return (M) marker;
     }

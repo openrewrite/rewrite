@@ -15,6 +15,7 @@
  */
 package org.openrewrite.xml.marker;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreePrinter;
@@ -25,6 +26,7 @@ import java.util.UUID;
 
 @Incubating(since = "7.2.0")
 public class XmlSearchResult extends RecipeSearchResult {
+    @JsonCreator
     public XmlSearchResult(UUID id, Recipe recipe, @Nullable String description) {
         super(id, recipe, description);
     }
@@ -35,9 +37,9 @@ public class XmlSearchResult extends RecipeSearchResult {
     @Override
     public <P> String print(TreePrinter<P> printer, P p) {
         if (getDescription() == null) {
-            return "/*~~>*/";
+            return "<!--~~>-->";
         } else {
-            return String.format("/*~~(%s)~~>*/", getDescription());
+            return String.format("<!--~~(%s)~~>-->", getDescription());
         }
     }
 }
