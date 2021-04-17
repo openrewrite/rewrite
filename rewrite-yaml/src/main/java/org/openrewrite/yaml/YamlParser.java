@@ -47,6 +47,7 @@ import java.util.Stack;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
@@ -76,6 +77,14 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                 })
                 .filter(Objects::nonNull)
                 .map(this::unwrapPrefixedMappings)
+                .map(docs -> {
+                    // ensure there is always at least one Document, even in an empty yaml file
+                    if (docs.getDocuments().isEmpty()) {
+                        return docs.withDocuments(singletonList(new Yaml.Document(randomId(), "", Markers.EMPTY,
+                                false, emptyList(), null)));
+                    }
+                    return docs;
+                })
                 .collect(toList());
     }
 
@@ -256,8 +265,8 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
             }
         }
 
-        public Yaml.Sequence build() {
-            return new Yaml.Sequence(randomId(), prefix, Markers.EMPTY, entries);
+        public SequenceWithPrefix build() {
+            return new SequenceWithPrefix(prefix, entries);
         }
     }
 
@@ -277,14 +286,45 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
         }
     }
 
+    @Getter
+    private static class SequenceWithPrefix extends Yaml.Sequence {
+        private String prefix;
+
+        public SequenceWithPrefix(String prefix, List<Yaml.Sequence.Entry> entries) {
+            super(randomId(), Markers.EMPTY, entries);
+            this.prefix = prefix;
+        }
+
+        @Override
+        public Sequence withPrefix(String prefix) {
+            this.prefix = prefix;
+            return this;
+        }
+    }
+
     private Yaml.Documents unwrapPrefixedMappings(Yaml.Documents y) {
         //noinspection ConstantConditions
         return (Yaml.Documents) new YamlIsoVisitor<Integer>() {
             @Override
+            public Yaml.Sequence visitSequence(Yaml.Sequence sequence, Integer p) {
+                if (sequence instanceof SequenceWithPrefix) {
+                    SequenceWithPrefix sequenceWithPrefix = (SequenceWithPrefix) sequence;
+                    return super.visitSequence(
+                            new Yaml.Sequence(
+                                    sequenceWithPrefix.getId(),
+                                    sequenceWithPrefix.getMarkers(),
+                                    ListUtils.mapFirst(sequenceWithPrefix.getEntries(), e -> e.withPrefix(sequenceWithPrefix.getPrefix()))
+                            ), p);
+                }
+                return super.visitSequence(sequence, p);
+            }
+
+            @Override
             public Yaml.Mapping visitMapping(Yaml.Mapping mapping, Integer p) {
-                if(mapping instanceof MappingWithPrefix) {
+                if (mapping instanceof MappingWithPrefix) {
                     MappingWithPrefix mappingWithPrefix = (MappingWithPrefix) mapping;
-                    return super.visitMapping(new Yaml.Mapping(mappingWithPrefix.getId(), mappingWithPrefix.getMarkers(), mappingWithPrefix.getEntries()), p);
+                    return super.visitMapping(new Yaml.Mapping(mappingWithPrefix.getId(),
+                            mappingWithPrefix.getMarkers(), mappingWithPrefix.getEntries()), p);
                 }
                 return super.visitMapping(mapping, p);
             }

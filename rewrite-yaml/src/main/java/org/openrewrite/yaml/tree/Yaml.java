@@ -324,9 +324,6 @@ public interface Yaml extends Serializable, Tree {
         UUID id;
 
         @With
-        String prefix;
-
-        @With
         Markers markers;
 
         @With
@@ -339,8 +336,21 @@ public interface Yaml extends Serializable, Tree {
 
         @Override
         public Sequence copyPaste() {
-            return new Sequence(randomId(), prefix, Markers.EMPTY,
+            return new Sequence(randomId(), Markers.EMPTY,
                     entries.stream().map(Entry::copyPaste).collect(toList()));
+        }
+
+        @Override
+        public String getPrefix() {
+            return "";
+        }
+
+        @Override
+        public Sequence withPrefix(String prefix) {
+            if(!prefix.isEmpty()) {
+                throw new UnsupportedOperationException("Yaml.Sequence may not have a non-empty prefix");
+            }
+            return this;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

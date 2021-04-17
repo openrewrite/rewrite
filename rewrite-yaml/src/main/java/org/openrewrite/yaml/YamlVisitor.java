@@ -17,7 +17,7 @@ package org.openrewrite.yaml;
 
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.yaml.cleanup.RemoveUnusedVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
 public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
@@ -58,8 +58,14 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
     }
 
     public void maybeCoalesceProperties() {
-        if (getAfterVisit().stream().noneMatch(CoalesceProperties.CoalescePropertiesVisitor.class::isInstance)) {
-            doAfterVisit(new CoalesceProperties());
+        if (getAfterVisit().stream().noneMatch(CoalescePropertiesVisitor.class::isInstance)) {
+            doAfterVisit(new CoalescePropertiesVisitor<>());
+        }
+    }
+
+    public void removeUnused() {
+        if (getAfterVisit().stream().noneMatch(RemoveUnusedVisitor.class::isInstance)) {
+            doAfterVisit(new RemoveUnusedVisitor<>());
         }
     }
 }
