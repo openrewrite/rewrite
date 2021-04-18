@@ -28,12 +28,7 @@ import org.openrewrite.java.tree.J;
 public class UnnecessaryParentheses extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Unnecessary parentheses";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Remove unnecessary parentheses.";
+        return "Remove unnecessary parentheses";
     }
 
     @Override
@@ -53,5 +48,3 @@ public class UnnecessaryParentheses extends Recipe {
         }
     }
 }
-
-

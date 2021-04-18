@@ -15,10 +15,8 @@
  */
 package org.openrewrite.java.cleanup;
 
-import lombok.AccessLevel;
-import lombok.Data;
+import lombok.Value;
 import lombok.With;
-import lombok.experimental.FieldDefaults;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
@@ -69,6 +67,7 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
         this.style = style;
     }
 
+    @SuppressWarnings("ConstantConditions")
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
@@ -282,8 +281,7 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
  * As such, this is not included in other named default styles.
  */
 @Incubating(since = "7.0.0")
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@Data
+@Value
 @With
 class HideUtilityClassConstructorStyle implements JavaStyle {
     /**

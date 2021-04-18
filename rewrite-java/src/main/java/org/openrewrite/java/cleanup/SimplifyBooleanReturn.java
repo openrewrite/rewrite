@@ -30,7 +30,7 @@ public class SimplifyBooleanReturn extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Simplifies Boolean expressions by removing redundancies. e.g.: `a && true` simplifies to `a`";
+        return "Simplifies Boolean expressions by removing redundancies, e.g.: `a && true` simplifies to `a`.";
     }
 
     @Override

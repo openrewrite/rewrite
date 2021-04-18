@@ -29,12 +29,6 @@ public class CovariantEquals extends Recipe {
     }
 
     @Override
-    public String getDescription() {
-        // TODO fill description
-        return "";
-    }
-
-    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new CovariantEqualsVisitor<>();
     }

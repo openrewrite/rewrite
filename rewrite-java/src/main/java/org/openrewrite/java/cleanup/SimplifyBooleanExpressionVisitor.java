@@ -26,14 +26,13 @@ import org.openrewrite.java.tree.J;
 
 @Incubating(since = "7.0.0")
 public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
-
     private static final String MAYBE_AUTO_FORMAT_ME = "MAYBE_AUTO_FORMAT_ME";
 
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu, P p) {
         J.CompilationUnit c = visitAndCast(cu, p, super::visitCompilationUnit);
         if (c != cu) {
-            doAfterVisit(new SimplifyBooleanExpressionVisitor());
+            doAfterVisit(new SimplifyBooleanExpressionVisitor<>());
         }
         return c;
     }
@@ -87,8 +86,9 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
         return j;
     }
 
+    @Nullable
     @Override
-    public @Nullable J postVisit(J tree, P p) {
+    public J postVisit(J tree, P p) {
         J j = super.postVisit(tree, p);
         if (getCursor().pollMessage(MAYBE_AUTO_FORMAT_ME) != null) {
             j = new AutoFormatVisitor<>().visit(j, p, getCursor());

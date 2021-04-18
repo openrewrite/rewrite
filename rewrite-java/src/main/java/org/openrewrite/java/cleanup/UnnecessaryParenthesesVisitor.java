@@ -41,6 +41,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         if (c != null && (c.getValue() instanceof J.Literal || c.getValue() instanceof J.Identifier)) {
             par = new UnwrapParentheses<>((J.Parentheses<?>) par).visit(par, p, getCursor());
         }
+        assert par != null;
         return par;
     }
 
@@ -89,6 +90,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
                 (style.getModAssign() && op == J.AssignmentOperation.Type.Modulo))) {
             a = (J.AssignmentOperation) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment()).visit(a, p, getCursor());
         }
+        assert a != null;
         return a;
     }
 
@@ -98,6 +100,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         if (style.getAssign() && a.getAssignment() instanceof J.Parentheses) {
             a = (J.Assignment) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment()).visit(a, p, getCursor());
         }
+        assert a != null;
         return a;
     }
 
@@ -107,6 +110,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         if (style.getAssign() && v.getInitializer() != null && v.getInitializer() instanceof J.Parentheses) {
             v = (J.VariableDeclarations.NamedVariable) new UnwrapParentheses<>((J.Parentheses<?>) v.getInitializer()).visit(v, p, getCursor());
         }
+        assert v != null;
         return v;
     }
 
@@ -121,7 +125,4 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         }
         return l;
     }
-
 }
-
-

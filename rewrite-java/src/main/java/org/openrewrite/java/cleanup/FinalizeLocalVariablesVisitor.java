@@ -177,7 +177,5 @@ public class FinalizeLocalVariablesVisitor<P> extends JavaIsoVisitor<P> {
             findVisitor.visit(j, refs);
             return refs;
         }
-
     }
-
 }
