@@ -122,6 +122,8 @@ abstract class JavaVisitorCompatibilityKit {
     @Nested
     inner class ReorderMethodArgumentsTck : ReorderMethodArgumentsTest
 
+    @Nested
+    inner class ResultOfMethodCallIgnoredTck : ResultOfMethodCallIgnoredTest
 
     @Nested
     inner class SemanticallyEqualTck : SemanticallyEqualTest

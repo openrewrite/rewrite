@@ -154,6 +154,9 @@ class Java11RemoveUnusedImportsTest : Java11Test, RemoveUnusedImportsTest
 @ExtendWith(JavaParserResolver::class)
 class Java11RenameVariableTest : Java11Test, RenameVariableTest
 
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11ResultOfMethodCallIgnoredTest : Java11Test, ResultOfMethodCallIgnoredTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

@@ -142,15 +142,15 @@ interface RecipeTest {
         val results = recipe!!.run(listOf(source))
 
         results.forEach { result ->
-            if (result.diff().isEmpty()) {
+            if (result.diff(treePrinter ?: TreePrinter.identity<Any>()).isEmpty()) {
                 fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.")
             }
         }
 
         for (result in results) {
-            assertThat(result.after?.print())
+            assertThat(result.after?.print(treePrinter ?: TreePrinter.identity<Any>(), null))
                 .`as`("The recipe must not make changes")
-                .isEqualTo(result.before?.print())
+                .isEqualTo(result.before?.print(treePrinter ?: TreePrinter.identity<Any>(), null))
         }
     }
 
@@ -170,15 +170,15 @@ interface RecipeTest {
         val results = recipe!!.run(listOf(source))
 
         results.forEach { result ->
-            if (result.diff().isEmpty()) {
+            if (result.diff(treePrinter ?: TreePrinter.identity<Any>()).isEmpty()) {
                 fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.")
             }
         }
 
         for (result in results) {
-            assertThat(result.after?.print())
+            assertThat(result.after?.print(treePrinter ?: TreePrinter.identity<Any>(), null))
                 .`as`("The recipe must not make changes")
-                .isEqualTo(result.before?.print())
+                .isEqualTo(result.before?.print(treePrinter ?: TreePrinter.identity<Any>(), null))
         }
     }
 
