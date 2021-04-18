@@ -24,6 +24,7 @@ import org.openrewrite.yaml.style.Autodetect;
 import org.openrewrite.yaml.style.YamlDefaultStyles;
 import org.openrewrite.yaml.tree.Yaml;
 
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Incubating(since = "7.2.0")
@@ -56,9 +57,8 @@ public class InsertYamlVisitor<P> extends YamlIsoVisitor<P> {
                     leadingIndentBuilder.append(' ');
                 }
             }
-            String leadingIndent = leadingIndentBuilder.toString();
 
-            // indent to position underneath scope
+            // place the first entry to insert on a new line
             docs = (Yaml.Documents) new YamlIsoVisitor<Integer>() {
                 boolean firstBlock = true;
 
@@ -69,14 +69,14 @@ public class InsertYamlVisitor<P> extends YamlIsoVisitor<P> {
                         tree = tree.withPrefix("\n");
                         firstBlock = false;
                     }
-                    if (tree.getPrefix().contains("\n")) {
-                        tree = tree.withPrefix(tree.getPrefix() + leadingIndent);
-                    }
                     return tree;
                 }
             }.visit(docs, 0);
 
+            // indent to position underneath scope
             assert docs != null;
+            docs = shiftRight(docs, leadingIndentBuilder.toString());
+
             yaml = docs.getDocuments()
                     .get(0)
                     .getBlock();
@@ -90,7 +90,7 @@ public class InsertYamlVisitor<P> extends YamlIsoVisitor<P> {
 
         if (scope.isScope(d)) {
             if (d.getBlock() instanceof Yaml.Mapping) {
-                d = d.withBlock(addEntries((Yaml.Mapping) d.getBlock()));
+                d = d.withBlock(addEntries((Yaml.Mapping) d.getBlock(), yaml));
                 return d;
             } else {
                 // TODO support insertion into sequence
@@ -106,25 +106,37 @@ public class InsertYamlVisitor<P> extends YamlIsoVisitor<P> {
 
         if (scope.isScope(entry)) {
             Yaml.Block value = e.getValue();
-            if (value instanceof Yaml.Scalar && ((Yaml.Scalar) value).getValue().isEmpty()) {
-                e = e.withValue(yaml);
-            } else if (value instanceof Yaml.Mapping) {
-                Yaml.Mapping map = (Yaml.Mapping) value;
-                e = e.withValue(addEntries(map));
-            } else if (value instanceof Yaml.Sequence) {
-                Yaml.Sequence seq = (Yaml.Sequence) value;
-                // TODO implement me!
-                throw new UnsupportedOperationException("Inserting sequence entries not yet supported");
-            }
+            assert yaml != null;
+            e = e.withValue(insertIntoBlock(value, yaml));
         }
 
         return e;
     }
 
-    private Yaml.Mapping addEntries(Yaml.Mapping map) {
-        assert yaml instanceof Yaml.Mapping;
+    private Yaml.Block insertIntoBlock(Yaml.Block block, Yaml.Block insert) {
+        if (block instanceof Yaml.Scalar && ((Yaml.Scalar) block).getValue().isEmpty()) {
+            return insert;
+        } else if (block instanceof Yaml.Mapping) {
+            return addEntries((Yaml.Mapping) block, insert);
+        } else if (block instanceof Yaml.Sequence) {
+            Yaml.Sequence seq = (Yaml.Sequence) block;
+            return seq.withEntries(ListUtils.map(seq.getEntries(), entry -> {
+                if (entry.getBlock() instanceof Yaml.Mapping) {
+                    Yaml.Mapping mapping = (Yaml.Mapping) entry.getBlock();
+                    Yaml.Block shiftedInsert = shiftRight(insert,
+                            mapping.getEntries().iterator().next().getPrefix() + " ");
+                    return entry.withBlock(insertIntoBlock(entry.getBlock(), shiftedInsert));
+                }
+                return entry;
+            }));
+        }
+        return block;
+    }
+
+    private Yaml.Mapping addEntries(Yaml.Mapping map, @Nullable Yaml.Block insert) {
+        assert insert instanceof Yaml.Mapping;
         return map.withEntries(ListUtils.concatAll(map.getEntries(),
-                ((Yaml.Mapping) yaml).getEntries().stream()
+                ((Yaml.Mapping) insert).getEntries().stream()
                         .filter(newEntry -> map.getEntries().stream()
                                 .noneMatch(existingEntry -> existingEntry.getKey().getValue().equals(newEntry.getKey().getValue())))
                         .collect(Collectors.toList()))
@@ -140,5 +152,18 @@ public class InsertYamlVisitor<P> extends YamlIsoVisitor<P> {
             }
         }
         return size;
+    }
+
+    private <Y extends Yaml> Y shiftRight(Y y, String shift) {
+        //noinspection unchecked
+        return (Y) Objects.requireNonNull(new YamlIsoVisitor<Integer>() {
+            @Override
+            public Yaml preVisit(Yaml tree, Integer integer) {
+                if (tree.getPrefix().contains("\n")) {
+                    tree = tree.withPrefix(tree.getPrefix() + shift);
+                }
+                return tree;
+            }
+        }.visit(y, 0));
     }
 }

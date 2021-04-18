@@ -17,6 +17,7 @@ package org.openrewrite.yaml
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.config.Environment
 
 class InsertYamlTest : YamlRecipeTest {
 
@@ -67,6 +68,27 @@ class InsertYamlTest : YamlRecipeTest {
           apiVersion: policy/v1beta1
           kind: PodSecurityPolicy
           spec: 0
+        """
+    )
+
+    @Test
+    fun insertInSequenceEntries() = assertChanged(
+        recipe = InsertYaml(
+            "/spec/containers",
+            "imagePullPolicy: Always"
+        ),
+        before = """
+            kind: Pod
+            spec:
+              containers:
+                - name: <container name>
+        """,
+        after = """
+            kind: Pod
+            spec:
+              containers:
+                - name: <container name>
+                  imagePullPolicy: Always
         """
     )
 }
