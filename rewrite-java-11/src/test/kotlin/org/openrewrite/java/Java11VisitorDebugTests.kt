@@ -28,6 +28,10 @@ class Java11AddImportTest : Java11Test, AddImportTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11AddLicenseHeaderTest : Java11Test, AddLicenseHeaderTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11BlankLinesTest : Java11Test, BlankLinesTest
 
 @DebugOnly

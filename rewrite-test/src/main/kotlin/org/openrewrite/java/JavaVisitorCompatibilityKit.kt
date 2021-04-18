@@ -30,6 +30,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class AddImportTck : AddImportTest
 
     @Nested
+    inner class AddLicenseHeaderTck : AddLicenseHeaderTest
+
+    @Nested
     inner class BlankLinesTck : BlankLinesTest
 
     @Nested
