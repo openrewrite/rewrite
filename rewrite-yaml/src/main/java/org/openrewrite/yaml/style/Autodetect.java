@@ -25,6 +25,8 @@ public class Autodetect {
         //noinspection ConstantConditions
         findIndent.visit(yaml, null);
 
-        return new IndentsStyle(findIndent.getMostCommonIndent());
+        return findIndent.nonZeroIndents() > 0 ?
+                new IndentsStyle(findIndent.getMostCommonIndent()) :
+                orElse;
     }
 }

@@ -131,7 +131,7 @@ public interface Yaml extends Serializable, Tree {
 
         @Override
         public Documents withPrefix(String prefix) {
-            if(!prefix.isEmpty()) {
+            if (!prefix.isEmpty()) {
                 throw new UnsupportedOperationException("Yaml.Documents may not have a non-empty prefix");
             }
             return this;
@@ -155,7 +155,7 @@ public interface Yaml extends Serializable, Tree {
         boolean explicit;
 
         @With
-        List<Block> blocks;
+        Block block;
 
         @Nullable
         @With
@@ -168,9 +168,14 @@ public interface Yaml extends Serializable, Tree {
 
         @Override
         public Document copyPaste() {
-            return new Document(randomId(), prefix, Markers.EMPTY,
-                    explicit, blocks.stream().map(Block::copyPaste).collect(toList()),
-                    end == null ? null : end.copyPaste());
+            return new Document(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    explicit,
+                    block.copyPaste(),
+                    end == null ? null : end.copyPaste()
+            );
         }
 
         /**
@@ -274,7 +279,7 @@ public interface Yaml extends Serializable, Tree {
 
         @Override
         public Mapping withPrefix(String prefix) {
-            if(!prefix.isEmpty()) {
+            if (!prefix.isEmpty()) {
                 throw new UnsupportedOperationException("Yaml.Mapping may not have a non-empty prefix");
             }
             return this;
@@ -347,7 +352,7 @@ public interface Yaml extends Serializable, Tree {
 
         @Override
         public Sequence withPrefix(String prefix) {
-            if(!prefix.isEmpty()) {
+            if (!prefix.isEmpty()) {
                 throw new UnsupportedOperationException("Yaml.Sequence may not have a non-empty prefix");
             }
             return this;

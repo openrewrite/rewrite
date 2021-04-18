@@ -29,7 +29,7 @@ class MappingTest {
         """.trimIndent()
         val y = YamlParser().parse(yText)[0]
 
-        assertThat((y.documents[0].blocks[0] as Yaml.Mapping).entries.map { it.key.value })
+        assertThat((y.documents[0].block as Yaml.Mapping).entries.map { it.key.value })
                 .containsExactly("type", "name")
         assertThat(y.printTrimmed()).isEqualTo(yText)
     }
@@ -42,7 +42,7 @@ class MappingTest {
         """.trimIndent()
         val y = YamlParser().parse(yText)[0]
 
-        val mapping = y.documents[0].blocks[0] as Yaml.Mapping
+        val mapping = y.documents[0].block as Yaml.Mapping
         assertThat(mapping.entries.map { it.key.value }).containsExactly("type")
         assertThat(mapping.entries[0].value).isInstanceOf(Yaml.Mapping::class.java)
         assertThat(y.print()).isEqualTo(yText)

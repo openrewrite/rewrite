@@ -47,11 +47,22 @@ public class InsertYaml extends Recipe {
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         XPathMatcher xPathMatcher = new XPathMatcher(key);
+
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
+            public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
+                if (key.equals("/")) {
+                    doAfterVisit(new InsertYamlVisitor<>(document, yaml));
+                    return document;
+                }
+                return super.visitDocument(document, ctx);
+            }
+
+            @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
-                if(xPathMatcher.matches(getCursor())) {
+                if (xPathMatcher.matches(getCursor())) {
                     doAfterVisit(new InsertYamlVisitor<>(entry, yaml));
+                    return entry;
                 }
                 return super.visitMappingEntry(entry, ctx);
             }

@@ -31,7 +31,7 @@ class SequenceTest {
 
         val y = YamlParser().parse(yText)[0]
 
-        assertThat((y.documents[0].blocks[0] as Yaml.Sequence).entries.map { it.block }.map { it as Yaml.Scalar }.map { it.value })
+        assertThat((y.documents[0].block as Yaml.Sequence).entries.map { it.block }.map { it as Yaml.Scalar }.map { it.value })
             .containsExactly("apples", "oranges")
 
         assertThat(y.printTrimmed()).isEqualTo(yText)

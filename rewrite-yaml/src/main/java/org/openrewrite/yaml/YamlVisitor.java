@@ -32,7 +32,7 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
     }
 
     public Yaml visitDocument(Yaml.Document document, P p) {
-        return document.withBlocks(ListUtils.map(document.getBlocks(), b -> visitAndCast(b, p)));
+        return document.withBlock((Yaml.Block) visit(document.getBlock(), p));
     }
 
     public Yaml visitMapping(Yaml.Mapping mapping, P p) {

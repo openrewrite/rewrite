@@ -49,6 +49,24 @@ class InsertYamlTest : YamlRecipeTest {
                           type: Delete
                       condition:
                           age: 7
+        """,
+        cycles = 2
+    )
+
+    @Test
+    fun insertAtRoot() = assertChanged(
+        recipe = InsertYaml(
+            "/",
+            "spec: 0",
+        ),
+        before = """
+          apiVersion: policy/v1beta1
+          kind: PodSecurityPolicy
+        """,
+        after = """
+          apiVersion: policy/v1beta1
+          kind: PodSecurityPolicy
+          spec: 0
         """
     )
 }

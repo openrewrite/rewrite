@@ -83,7 +83,7 @@ public class YamlPrinter<P> extends YamlVisitor<P> {
         if (document.isExplicit()) {
             acc.append("---");
         }
-        visit(document.getBlocks(), p);
+        visit(document.getBlock(), p);
         if (document.getEnd() != null) {
             acc.append(document.getEnd().getPrefix()).append("...");
         }

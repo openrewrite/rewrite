@@ -44,7 +44,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Stack;
-import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -81,7 +80,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                     // ensure there is always at least one Document, even in an empty yaml file
                     if (docs.getDocuments().isEmpty()) {
                         return docs.withDocuments(singletonList(new Yaml.Document(randomId(), "", Markers.EMPTY,
-                                false, emptyList(), null)));
+                                false, new Yaml.Mapping(randomId(), Markers.EMPTY, emptyList()), null)));
                     }
                     return docs;
                 })
@@ -123,7 +122,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                                 fmt,
                                 Markers.EMPTY,
                                 event.getEndMark().getIndex() - event.getStartMark().getIndex() > 0,
-                                emptyList(),
+                                new Yaml.Mapping(randomId(), Markers.EMPTY, emptyList()),
                                 null
                         );
                         lastEnd = event.getEndMark().getIndex();
@@ -163,11 +162,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                     case MappingEnd:
                         Yaml.Block mappingOrSequence = blockStack.pop().build();
                         if (blockStack.isEmpty()) {
-                            //noinspection ConstantConditions
-                            document = document.withBlocks(Stream.concat(
-                                    document.getBlocks().stream(),
-                                    Stream.of(mappingOrSequence)
-                            ).collect(toList()));
+                            document = document.withBlock(mappingOrSequence);
                         } else {
                             blockStack.peek().push(mappingOrSequence);
                         }

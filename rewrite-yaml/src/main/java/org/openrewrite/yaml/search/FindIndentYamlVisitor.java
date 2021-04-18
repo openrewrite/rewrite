@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static java.util.function.Function.identity;
@@ -93,10 +94,7 @@ public class FindIndentYamlVisitor<P> extends YamlVisitor<P> {
         return StringUtils.mostCommonIndent(indentFrequencies);
     }
 
-    /**
-     * @return The total number of source lines that this indent decision was made on.
-     */
-    public int getTotalLines() {
-        return linesWithSpaceIndents;
+    public long nonZeroIndents() {
+        return indentFrequencies.tailMap(1).values().stream().mapToLong(f -> f).sum();
     }
 }
