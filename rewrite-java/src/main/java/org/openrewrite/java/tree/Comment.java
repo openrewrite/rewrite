@@ -20,7 +20,7 @@ import lombok.experimental.FieldDefaults;
 import org.openrewrite.marker.Markers;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+@EqualsAndHashCode
 @Data
 public class Comment {
     @With

@@ -24,6 +24,8 @@ import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.WeakHashMap;
 
 import static java.util.Collections.emptyList;
 
@@ -41,6 +43,13 @@ public class Space {
     @Nullable
     private final String whitespace;
 
+    /*
+     * Most occurrences of spaces will have no comments or markers and will be repeated frequently throughout a source file.
+     * e.g.: a single space between keywords, or the common indentation of every line in a block.
+     * So use flyweights to avoid storing many instances of functionally identical spaces
+     */
+    private static final Map<String, Space> flyweights = new WeakHashMap<>();
+
     private Space(@Nullable String whitespace, List<Comment> comments) {
         this.comments = comments;
         this.whitespace = whitespace == null || whitespace.isEmpty() ? null : whitespace;
@@ -48,8 +57,11 @@ public class Space {
 
     @JsonCreator
     public static Space build(@Nullable String whitespace, List<Comment> comments) {
-        if (comments.isEmpty() && (whitespace == null || whitespace.isEmpty())) {
+        if(comments.isEmpty()) {
+            if(whitespace == null || whitespace.isEmpty()) {
                 return Space.EMPTY;
+            }
+            return flyweights.computeIfAbsent(whitespace, k -> new Space(whitespace, comments));
         }
         return new Space(whitespace, comments);
     }
