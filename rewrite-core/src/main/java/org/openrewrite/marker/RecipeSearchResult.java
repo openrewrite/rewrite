@@ -15,6 +15,7 @@
  */
 package org.openrewrite.marker;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.Incubating;
@@ -29,6 +30,7 @@ import java.util.UUID;
  */
 @Incubating(since = "7.0.0")
 @Data
+@AllArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class RecipeSearchResult implements SearchResult {
     @EqualsAndHashCode.Include
@@ -38,4 +40,10 @@ public class RecipeSearchResult implements SearchResult {
 
     @Nullable
     private final String description;
+
+    public RecipeSearchResult(UUID id, Recipe recipe) {
+        this.id = id;
+        this.recipe = recipe;
+        this.description = null;
+    }
 }

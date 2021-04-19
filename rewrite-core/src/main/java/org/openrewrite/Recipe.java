@@ -42,6 +42,7 @@ import java.util.function.Function;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singleton;
 import static java.util.stream.Collectors.*;
+import static org.openrewrite.Tree.randomId;
 
 /**
  * Provides a formalized link list data structure of {@link Recipe recipes} and a {@link Recipe#run(List)} method which will
@@ -406,30 +407,22 @@ public abstract class Recipe {
         return getClass().getName();
     }
 
-    @EqualsAndHashCode
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
     private static class RecipeThatMadeChanges implements Marker {
         private final Set<Recipe> recipes;
+
+        @EqualsAndHashCode.Include
         private final UUID id;
 
         private RecipeThatMadeChanges(Recipe recipe) {
             this.recipes = new HashSet<>();
             this.recipes.add(recipe);
-            id = Tree.randomId();
+            id = randomId();
         }
 
         @Override
         public UUID getId() {
             return id;
-        }
-
-        @Override
-        public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-            return false;
-        }
-
-        @Override
-        public <P> String print(TreePrinter<P> printer, P p) {
-            return "";
         }
     }
 

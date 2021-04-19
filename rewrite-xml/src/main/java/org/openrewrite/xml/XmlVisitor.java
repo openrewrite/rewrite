@@ -17,13 +17,7 @@ package org.openrewrite.xml;
 
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.tree.Xml;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
 
 public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
 
@@ -86,25 +80,5 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
 
     public Xml visitElement(Xml.Element element, P p) {
         return element.withSubset(ListUtils.map(element.getSubset(), i -> visitAndCast(i, p)));
-    }
-
-    public Markers visitMarkers(Markers markers, P p) {
-        Collection<? extends Marker> originalMarkers = markers.entries();
-        List<Marker> visited = new ArrayList<>();
-        boolean anyChanged = false;
-        for(Marker originalMarker : originalMarkers) {
-            Marker visitedMarker = visitMarker(originalMarker, p);
-            visited.add(visitedMarker);
-            anyChanged = anyChanged || (visitedMarker != originalMarker);
-        }
-        if(anyChanged) {
-            return Markers.build(visited);
-        }
-        return markers;
-    }
-
-    public <M extends Marker> M visitMarker(Marker marker, P p) {
-        //noinspection unchecked
-        return (M) marker;
     }
 }

@@ -23,20 +23,17 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.TreeVisitor;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.BinaryOperator;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.Tree.randomId;
 
 @Incubating(since = "7.0.0")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public class Markers implements Tree {
-    public static final Markers EMPTY = new Markers(Tree.randomId(), emptyList()) {
+    public static final Markers EMPTY = new Markers(randomId(), emptyList()) {
         @Override
         public String toString() {
             return "Markers{EMPTY}";
@@ -53,7 +50,7 @@ public class Markers implements Tree {
 
     @JsonCreator
     public static Markers build(Collection<? extends Marker> markers) {
-        return markers.isEmpty() ? EMPTY : new Markers(Tree.randomId(), markers);
+        return markers.isEmpty() ? EMPTY : new Markers(randomId(), markers);
     }
 
     /**
