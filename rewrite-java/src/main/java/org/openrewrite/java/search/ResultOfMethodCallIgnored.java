@@ -20,8 +20,8 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.marker.RecipeSearchResult;
 
 import java.util.UUID;
 
@@ -55,7 +55,7 @@ public class ResultOfMethodCallIgnored extends Recipe {
                 J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
                 if (methodMatcher.matches(method)) {
                     if (getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.Block) {
-                        m = m.withMarkers(m.getMarkers().addOrUpdate(new RecipeSearchResult(id, ResultOfMethodCallIgnored.this)));
+                        m = m.withMarkers(m.getMarkers().addOrUpdate(new JavaSearchResult(id, ResultOfMethodCallIgnored.this)));
                     }
                 }
                 return m;
