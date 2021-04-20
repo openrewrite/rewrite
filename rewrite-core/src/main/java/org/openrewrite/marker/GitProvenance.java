@@ -35,12 +35,12 @@ import static org.openrewrite.Tree.randomId;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Data
 public class GitProvenance implements Marker {
+    UUID id;
     @Nullable
     String origin;
 
     String branch;
     String change;
-    UUID id;
 
     @Nullable
     public String getOrganizationName() {
@@ -71,7 +71,7 @@ public class GitProvenance implements Marker {
     public static GitProvenance fromProjectDirectory(Path projectDir) {
         try {
             Repository repository = new RepositoryBuilder().findGitDir(projectDir.toFile()).build();
-            return new GitProvenance(getOrigin(repository), repository.getBranch(), getChangeset(repository), randomId());
+            return new GitProvenance(randomId(), getOrigin(repository), repository.getBranch(), getChangeset(repository));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
