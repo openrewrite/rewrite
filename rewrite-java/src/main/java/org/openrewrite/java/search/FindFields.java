@@ -16,7 +16,6 @@
 package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
-import lombok.ToString;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
@@ -29,6 +28,7 @@ import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -44,8 +44,7 @@ public class FindFields extends Recipe {
             example = "org.slf4j.api.Logger")
     String fullyQualifiedTypeName;
 
-    @ToString.Exclude
-    JavaSearchResult searchMarker = new JavaSearchResult(randomId(), FindFields.this);
+    UUID id = randomId();
 
     @Override
     public String getDisplayName() {
@@ -67,7 +66,7 @@ public class FindFields extends Recipe {
                 }
                 if (multiVariable.getTypeExpression() != null && TypeUtils.hasElementType(multiVariable.getTypeExpression()
                         .getType(), fullyQualifiedTypeName)) {
-                    return multiVariable.withMarkers(multiVariable.getMarkers().addOrUpdate(searchMarker));
+                    return multiVariable.withMarkers(multiVariable.getMarkers().addOrUpdate(new JavaSearchResult(id, FindFields.this)));
                 }
                 return multiVariable;
             }

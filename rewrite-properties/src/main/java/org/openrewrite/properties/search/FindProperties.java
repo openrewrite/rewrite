@@ -16,18 +16,18 @@
 package org.openrewrite.properties.search;
 
 import lombok.EqualsAndHashCode;
-import lombok.ToString;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.properties.marker.PropertiesSearchResult;
 import org.openrewrite.properties.PropertiesVisitor;
+import org.openrewrite.properties.marker.PropertiesSearchResult;
 import org.openrewrite.properties.tree.Properties;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -43,8 +43,7 @@ public class FindProperties extends Recipe {
             example = "guava*")
     String propertyKey;
 
-    @ToString.Exclude
-    PropertiesSearchResult searchMarker = new PropertiesSearchResult(randomId(), FindProperties.this);
+    UUID id = randomId();
 
     public static Set<Properties.Entry> find(Properties p, String propertyKey) {
         PropertiesVisitor<Set<Properties.Entry>> findVisitor = new PropertiesVisitor<Set<Properties.Entry>>() {
@@ -79,7 +78,7 @@ public class FindProperties extends Recipe {
             public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
                 Properties p = super.visitEntry(entry, ctx);
                 if (entry.getKey().equals(propertyKey)) {
-                    p = p.withMarkers(p.getMarkers().addOrUpdate(searchMarker));
+                    p = p.withMarkers(p.getMarkers().addOrUpdate(new PropertiesSearchResult(id, FindProperties.this)));
                 }
                 return p;
             }

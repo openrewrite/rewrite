@@ -16,7 +16,6 @@
 package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
-import lombok.ToString;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
@@ -24,11 +23,12 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.J;
 import org.openrewrite.java.marker.JavaSearchResult;
+import org.openrewrite.java.tree.J;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -44,8 +44,7 @@ public class FindAnnotations extends Recipe {
             example = "@java.lang.SuppressWarnings(\"deprecation\")")
     String annotationPattern;
 
-    @ToString.Exclude
-    JavaSearchResult searchMarker = new JavaSearchResult(randomId(), FindAnnotations.this);
+    UUID id = randomId();
 
     @Override
     public String getDisplayName() {
@@ -65,7 +64,7 @@ public class FindAnnotations extends Recipe {
             public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
                 J.Annotation a = super.visitAnnotation(annotation, ctx);
                 if (annotationMatcher.matches(annotation)) {
-                    a = a.withMarkers(a.getMarkers().addOrUpdate(searchMarker));
+                    a = a.withMarkers(a.getMarkers().addOrUpdate(new JavaSearchResult(id, FindAnnotations.this)));
                 }
                 return a;
             }

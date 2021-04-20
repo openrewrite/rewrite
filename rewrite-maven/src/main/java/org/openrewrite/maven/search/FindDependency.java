@@ -25,6 +25,7 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -42,7 +43,7 @@ public class FindDependency extends Recipe {
             example = "guava")
     String artifactId;
 
-    XmlSearchResult searchMarker = new XmlSearchResult(randomId(),FindDependency.this);
+    UUID id = randomId();
 
     public static Set<Xml.Tag> find(Maven maven, String groupId, String artifactId) {
         Set<Xml.Tag> ds = new HashSet<>();
@@ -74,7 +75,7 @@ public class FindDependency extends Recipe {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
                 if (isDependencyTag(groupId, artifactId)) {
-                    return tag.withMarkers(tag.getMarkers().addOrUpdate(searchMarker));
+                    return tag.withMarkers(tag.getMarkers().addOrUpdate(new XmlSearchResult(id, FindDependency.this)));
                 }
                 return super.visitTag(tag, context);
             }

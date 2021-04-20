@@ -16,7 +16,6 @@
 package org.openrewrite.xml.search;
 
 import lombok.EqualsAndHashCode;
-import lombok.ToString;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
@@ -29,6 +28,7 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -51,8 +51,7 @@ public class FindTags extends Recipe {
         return "Find XML tags by XPath expression.";
     }
 
-    @ToString.Exclude
-    XmlSearchResult searchMarker = new XmlSearchResult(randomId(),FindTags.this);
+    UUID id = randomId();
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -63,7 +62,7 @@ public class FindTags extends Recipe {
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
                 if (xPathMatcher.matches(getCursor())) {
-                    t = t.withMarkers(t.getMarkers().addOrUpdate(searchMarker));
+                    t = t.withMarkers(t.getMarkers().addOrUpdate(new XmlSearchResult(id,FindTags.this)));
                 }
                 return t;
             }

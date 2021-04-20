@@ -16,7 +16,6 @@
 package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
-import lombok.ToString;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
@@ -24,13 +23,14 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.marker.JavaSearchResult;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -50,8 +50,7 @@ public class FindMethods extends Recipe {
             example = "java.util.List add(..)")
     String methodPattern;
 
-    @ToString.Exclude
-    JavaSearchResult searchMarker = new JavaSearchResult(randomId(), FindMethods.this);
+    UUID id = randomId();
 
     @Override
     public String getDisplayName() {
@@ -75,7 +74,7 @@ public class FindMethods extends Recipe {
                         ctx.putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY,
                                 method.getType().getDeclaringType());
                     }
-                    m = m.withMarkers(m.getMarkers().addOrUpdate(searchMarker));
+                    m = m.withMarkers(m.getMarkers().addOrUpdate(new JavaSearchResult(id, FindMethods.this)));
                 }
                 return m;
             }
@@ -87,7 +86,7 @@ public class FindMethods extends Recipe {
                     if(m.getType() != null) {
                         ctx.putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY, m.getType());
                     }
-                    m = m.withReference(m.getReference().withMarkers(m.getReference().getMarkers().addOrUpdate(searchMarker)));
+                    m = m.withReference(m.getReference().withMarkers(m.getReference().getMarkers().addOrUpdate(new JavaSearchResult(id, FindMethods.this))));
                 }
                 return m;
             }
