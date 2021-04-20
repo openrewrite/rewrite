@@ -22,26 +22,29 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.J;
 
-public class EmptyBlock extends Recipe {
-
+public class EqualsAvoidsNull extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Remove empty blocks";
+        return "Equals avoids null";
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new EmptyBlockFromCompilationUnitStyle();
+    public String getDescription() {
+        return "Checks that any combination of String literals is on the left side of an `equals()` comparison. Also checks for String literals assigned to some field (such as `someString.equals(anotherString = \"text\"))`.";
     }
 
-    private static class EmptyBlockFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new EqualsAvoidsNullFromCompilationUnitStyle();
+    }
+
+    private static class EqualsAvoidsNullFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
-            EmptyBlockStyle style = cu.getStyle(EmptyBlockStyle.class);
+            EqualsAvoidsNullStyle style = cu.getStyle(EqualsAvoidsNullStyle.class);
             if (style == null) {
-                style = IntelliJ.emptyBlock();
+                style = IntelliJ.equalsAvoidsNull();
             }
-            doAfterVisit(new EmptyBlockVisitor<>(style));
+            doAfterVisit(new EqualsAvoidsNullVisitor<>(style));
             return cu;
         }
     }

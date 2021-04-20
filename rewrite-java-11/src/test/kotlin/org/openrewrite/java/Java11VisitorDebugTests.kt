@@ -84,6 +84,10 @@ class Java11EmptyBlockTest : Java11Test, EmptyBlockTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11EqualsAvoidsNullTest : Java11Test, EqualsAvoidsNullTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11FinalizeLocalVariablesTest : Java11Test, FinalizeLocalVariablesTest
 
 @DebugOnly

@@ -72,6 +72,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class EmptyBlockTck : EmptyBlockTest
 
     @Nested
+    inner class EqualsAvoidsNullTck : EqualsAvoidsNullTest
+
+    @Nested
     inner class FinalizeLocalVariablesTck : FinalizeLocalVariablesTest
 
     @Nested
