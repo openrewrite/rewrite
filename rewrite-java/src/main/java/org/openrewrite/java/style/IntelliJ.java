@@ -16,10 +16,7 @@
 package org.openrewrite.java.style;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import org.openrewrite.java.cleanup.EmptyBlockStyle;
-import org.openrewrite.java.cleanup.EqualsAvoidsNull;
-import org.openrewrite.java.cleanup.EqualsAvoidsNullStyle;
-import org.openrewrite.java.cleanup.UnnecessaryParenthesesStyle;
+import org.openrewrite.java.cleanup.*;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
@@ -41,7 +38,8 @@ public class IntelliJ extends NamedStyles {
                         wrappingAndBraces(),
                         unnecessaryParentheses(),
                         emptyBlock(),
-                        equalsAvoidsNull()
+                        equalsAvoidsNull(),
+                        explicitInitialization()
                 )
         );
     }
@@ -107,5 +105,9 @@ public class IntelliJ extends NamedStyles {
 
     public static EqualsAvoidsNullStyle equalsAvoidsNull() {
         return new EqualsAvoidsNullStyle(false);
+    }
+
+    public static ExplicitInitializationStyle explicitInitialization() {
+        return new ExplicitInitializationStyle(false);
     }
 }

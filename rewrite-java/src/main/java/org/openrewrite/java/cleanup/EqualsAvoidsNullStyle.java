@@ -26,6 +26,6 @@ public class EqualsAvoidsNullStyle implements Style {
 
     @Override
     public Style applyDefaults() {
-        return StyleHelper.merge(IntelliJ.tabsAndIndents(), this);
+        return StyleHelper.merge(IntelliJ.equalsAvoidsNull(), this);
     }
 }

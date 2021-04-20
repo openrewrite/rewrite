@@ -75,6 +75,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class EqualsAvoidsNullTck : EqualsAvoidsNullTest
 
     @Nested
+    inner class ExplicitInitializationTck : ExplicitInitializationTest
+
+    @Nested
     inner class FinalizeLocalVariablesTck : FinalizeLocalVariablesTest
 
     @Nested

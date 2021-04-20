@@ -88,6 +88,10 @@ class Java11EqualsAvoidsNullTest : Java11Test, EqualsAvoidsNullTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11ExplicitInitializationTest : Java11Test, ExplicitInitializationTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11FinalizeLocalVariablesTest : Java11Test, FinalizeLocalVariablesTest
 
 @DebugOnly

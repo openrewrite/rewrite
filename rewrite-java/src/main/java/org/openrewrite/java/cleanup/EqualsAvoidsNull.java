@@ -23,6 +23,7 @@ import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.J;
 
 public class EqualsAvoidsNull extends Recipe {
+
     @Override
     public String getDisplayName() {
         return "Equals avoids null";
