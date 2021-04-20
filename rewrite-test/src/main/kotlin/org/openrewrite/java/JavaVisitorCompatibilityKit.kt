@@ -163,4 +163,7 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class WrappingAndBracesTck : WrappingAndBracesTest
+
+    @Nested
+    inner class XmlParserXXEVulnerabilityFixTck : XmlParserXXEVulnerabilityFixTest
 }
