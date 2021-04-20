@@ -17,10 +17,7 @@ package org.openrewrite.yaml.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.marker.RecipeSearchResult;
 import org.openrewrite.yaml.XPathMatcher;
 import org.openrewrite.yaml.YamlVisitor;
@@ -28,6 +25,9 @@ import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
+
+import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -37,6 +37,8 @@ public class FindKey extends Recipe {
             description = "XPath expression used to find matching keys.",
             example = "/subjects/kind")
     String key;
+
+    UUID id = randomId();
 
     @Override
     public String getDisplayName() {
@@ -56,7 +58,7 @@ public class FindKey extends Recipe {
             public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry e = (Yaml.Mapping.Entry) super.visitMappingEntry(entry, ctx);
                 if (xPathMatcher.matches(getCursor())) {
-                    e = e.withMarker(new RecipeSearchResult(FindKey.this));
+                    e = e.withMarkers(e.getMarkers().addOrUpdate(new RecipeSearchResult(id, FindKey.this)));
                 }
                 return e;
             }

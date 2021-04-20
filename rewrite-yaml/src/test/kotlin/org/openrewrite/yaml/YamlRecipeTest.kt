@@ -17,6 +17,7 @@ package org.openrewrite.yaml
 
 import org.intellij.lang.annotations.Language
 import org.openrewrite.*
+import org.openrewrite.marker.SearchResult
 
 interface YamlRecipeTest : RecipeTest {
     override val parser: YamlParser

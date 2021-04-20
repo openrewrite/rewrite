@@ -22,6 +22,7 @@ import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markers;
 
 import java.util.List;
 
@@ -148,9 +149,20 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
     @Override
     public <M extends Marker> M visitMarker(Marker marker, P p) {
         StringBuilder acc = getPrinter();
+        treePrinter.doBefore(marker, acc, p);
         acc.append(marker.print(treePrinter, p));
+        treePrinter.doAfter(marker, acc, p);
         //noinspection unchecked
         return (M) marker;
+    }
+
+    @Override
+    public Markers visitMarkers(Markers markers, P p) {
+        StringBuilder acc = getPrinter();
+        treePrinter.doBefore(markers, acc, p);
+        Markers m = super.visitMarkers(markers, p);
+        treePrinter.doAfter(markers, acc, p);
+        return m;
     }
 
     protected void visitModifiers(Iterable<Modifier> modifiers, P p) {

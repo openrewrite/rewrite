@@ -27,7 +27,10 @@ import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.RecipeSearchResult;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import static org.openrewrite.Tree.randomId;
 
 /**
  * This recipe finds {@link J.CompilationUnit}s having any one of the supplied types
@@ -41,6 +44,8 @@ public class HasTypes extends Recipe {
             description = "Find J.CompilationUnits having one of the supplied types. Types should be identified by fully qualified class name or a glob expression",
             example = "com.google.guava.*")
     List<String> fullyQualifiedTypeNames;
+
+    UUID id = randomId();
 
     @Override
     public String getDisplayName() {
@@ -58,7 +63,7 @@ public class HasTypes extends Recipe {
             @Override
             public J visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
                 if (find(cu, fullyQualifiedTypeNames)){
-                    cu = cu.withMarker(new RecipeSearchResult(HasTypes.this));
+                    cu = cu.withMarkers(cu.getMarkers().addOrUpdate(new RecipeSearchResult(id, HasTypes.this)));
                 }
                 return cu;
             }

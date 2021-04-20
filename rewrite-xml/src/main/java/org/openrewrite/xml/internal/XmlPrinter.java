@@ -21,6 +21,7 @@ import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -223,8 +224,19 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
     @Override
     public <M extends Marker> M visitMarker(Marker marker, P p) {
         StringBuilder acc = getPrinter();
+        treePrinter.doBefore(marker, acc, p);
         acc.append(marker.print(treePrinter, p));
+        treePrinter.doAfter(marker, acc, p);
         //noinspection unchecked
         return (M) marker;
+    }
+
+    @Override
+    public Markers visitMarkers(Markers markers, P p) {
+        StringBuilder acc = getPrinter();
+        treePrinter.doBefore(markers, acc, p);
+        Markers m = super.visitMarkers(markers, p);
+        treePrinter.doAfter(markers, acc, p);
+        return m;
     }
 }

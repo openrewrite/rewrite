@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.marker;
+package org.openrewrite.properties.marker;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import org.openrewrite.Incubating;

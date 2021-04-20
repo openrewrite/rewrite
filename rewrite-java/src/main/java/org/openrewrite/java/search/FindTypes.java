@@ -16,24 +16,19 @@
 package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
-import lombok.ToString;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeUtils;
-import org.openrewrite.java.marker.JavaSearchResult;
 
 import java.util.HashSet;
 import java.util.Set;
-
-import static org.openrewrite.Tree.randomId;
+import java.util.UUID;
 
 /**
  * This recipe finds all explicit references to a type.
@@ -57,8 +52,7 @@ public class FindTypes extends Recipe {
         return "Find type references by name.";
     }
 
-    @ToString.Exclude
-    JavaSearchResult searchMarker = new JavaSearchResult(randomId(), FindTypes.this);
+    UUID id = Tree.randomId();
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -71,7 +65,7 @@ public class FindTypes extends Recipe {
                 if (asClass != null && asClass.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         getCursor().firstEnclosing(J.Import.class) == null) {
                     ctx.putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY, asClass);
-                    return n.withMarkers(n.getMarkers().addOrUpdate(searchMarker));
+                    return n.withMarkers(n.getMarkers().addOrUpdate(new JavaSearchResult(id, FindTypes.this)));
                 }
                 return n;
             }
@@ -83,7 +77,7 @@ public class FindTypes extends Recipe {
                 if (asClass != null && asClass.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         fa.getName().getSimpleName().equals("class")) {
                     ctx.putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY, asClass);
-                    return fa.withMarkers(fa.getMarkers().addOrUpdate(searchMarker));
+                    return fa.withMarkers(fa.getMarkers().addOrUpdate(new JavaSearchResult(id, FindTypes.this)));
                 }
                 return fa;
             }

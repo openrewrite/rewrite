@@ -33,6 +33,8 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Predicate;
 
+import static org.openrewrite.Tree.randomId;
+
 public class MavenArtifactHelper {
 
     private static final MavenRepository SUPER_POM_REPOSITORY = new MavenRepository("central",
@@ -77,6 +79,7 @@ public class MavenArtifactHelper {
         ), null, ctx.getOnError());
         List<Path> artifactPaths = new ArrayList<>();
         artifactPaths.add(mavenArtifactDownloader.downloadArtifact(new Pom.Dependency(pom.getRepositories().iterator().next(), Scope.Compile, null, null, false, new Pom(
+                randomId(),
                 pom.getGroupId(),
                 pom.getArtifactId(),
                 pom.getVersion(),
