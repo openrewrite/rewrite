@@ -29,5 +29,5 @@ displayName: Allows attacker to create a directory with elevated permissions.
 tags:
   - security
 recipeList:
-  - org.openrewrite.java.ResultOfMethodCallIgnored:
-        methodPattern: 'java.io.File mkdir*()'
+  - org.openrewrite.java.search.ResultOfMethodCallIgnored:
+      methodPattern: 'java.io.File mkdir*()'
