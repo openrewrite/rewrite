@@ -24,7 +24,6 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Space;
 
 import java.util.Calendar;
 import java.util.Collections;
@@ -54,8 +53,8 @@ public class AddLicenseHeader extends Recipe {
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.Package visitPackage(J.Package pkg, ExecutionContext ctx) {
-                if (pkg.getComments().isEmpty()) {
+            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+                if (cu.getComments().isEmpty()) {
                     PropertyPlaceholderHelper propertyPlaceholderHelper = new PropertyPlaceholderHelper("${", "}", null);
                     String formattedLicenseText = "\n * " + propertyPlaceholderHelper.replacePlaceholders(licenseText,
                             k -> {
@@ -65,11 +64,11 @@ public class AddLicenseHeader extends Recipe {
                                 return System.getProperty(k);
                             }).replace("\n", "\n * ") + "\n ";
 
-                    pkg = pkg.withComments(Collections.singletonList(
+                    cu = cu.withComments(Collections.singletonList(
                             new Comment(Comment.Style.BLOCK, formattedLicenseText, "\n")
                     ));
                 }
-                return pkg;
+                return cu;
             }
 
             @Override
