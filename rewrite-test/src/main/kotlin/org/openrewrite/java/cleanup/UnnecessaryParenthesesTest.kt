@@ -21,7 +21,6 @@ import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.java.style.IntelliJ
-import org.openrewrite.java.style.UnnecessaryParenthesesStyle
 import org.openrewrite.style.NamedStyles
 
 interface UnnecessaryParenthesesTest : JavaRecipeTest {
@@ -311,7 +310,7 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
     @Test
     fun unwrapBandAssign(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(unnecessaryParentheses {
-            withBandAssign(true)
+            withBitAndAssign(true)
         }).build(),
         before = """
             public class A {
@@ -338,7 +337,7 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
     @Test
     fun unwrapBorAssign(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(unnecessaryParentheses {
-            withBorAssign(true)
+            withBitOrAssign(true)
         }).build(),
         before = """
             public class A {
@@ -365,7 +364,7 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
     @Test
     fun unwrapBsrAssign(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(unnecessaryParentheses {
-            withBsrAssign(true)
+            withBitShiftRightAssign(true)
         }).build(),
         before = """
             public class A {
@@ -390,7 +389,7 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
     @Test
     fun unwrapBxorAssign(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(unnecessaryParentheses {
-            withBxorAssign(true)
+            withBitXorAssign(true)
         }).build(),
         before = """
             public class A {
@@ -525,7 +524,7 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
     @Test
     fun unwrapSlAssign(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(unnecessaryParentheses {
-            withSlAssign(true)
+            withShiftLeftAssign(true)
         }).build(),
         before = """
             public class A {
@@ -552,7 +551,7 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
     @Test
     fun unwrapSrAssign(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(unnecessaryParentheses {
-            withSrAssign(true)
+            withShiftRightAssign(true)
         }).build(),
         before = """
             public class A {

@@ -58,10 +58,14 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return maybeAutoFormat(before, after, p, getCursor());
     }
 
-    @SuppressWarnings({"unchecked", "ConstantConditions"})
     public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, P p, Cursor cursor) {
+        return maybeAutoFormat(before, after, null, p, cursor);
+    }
+
+    @SuppressWarnings({"unchecked", "ConstantConditions"})
+    public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, @Nullable J stopAfter, P p, Cursor cursor) {
         if (before != after) {
-            return (J2) new AutoFormatVisitor<>().visit(after, p, cursor);
+            return (J2) new AutoFormatVisitor<>(stopAfter).visit(after, p, cursor);
         }
         return after;
     }
@@ -70,9 +74,13 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return autoFormat(j, p, getCursor());
     }
 
-    @SuppressWarnings({"ConstantConditions", "unchecked"})
     public <J2 extends J> J2 autoFormat(J2 j, P p, Cursor cursor) {
-        return (J2) new AutoFormatVisitor<>().visit(j, p, cursor);
+        return autoFormat(j, null, p, cursor);
+    }
+
+    @SuppressWarnings({"ConstantConditions", "unchecked"})
+    public <J2 extends J> J2 autoFormat(J2 j, @Nullable J stopAfter, P p, Cursor cursor) {
+        return (J2) new AutoFormatVisitor<>(stopAfter).visit(j, p, cursor);
     }
 
     /**
@@ -833,7 +841,6 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P p) {
-
         if (right == null) {
             return null;
         }

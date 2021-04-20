@@ -140,5 +140,4 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
     private boolean isLiteralFalse(@Nullable Expression expression) {
         return expression instanceof J.Literal && ((J.Literal) expression).getValue() == Boolean.valueOf(false);
     }
-
 }

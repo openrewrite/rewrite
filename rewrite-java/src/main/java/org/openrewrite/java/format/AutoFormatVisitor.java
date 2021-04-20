@@ -19,13 +19,23 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
 
 import java.util.Optional;
 
 public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
+    @Nullable
+    private final Tree stopAfter;
+
+    public AutoFormatVisitor() {
+        this(null);
+    }
+
+    public AutoFormatVisitor(@Nullable Tree stopAfter) {
+        this.stopAfter = stopAfter;
+    }
+
     @Override
     public J visit(@Nullable Tree tree, P p, Cursor cursor) {
         J.CompilationUnit cu = cursor.firstEnclosingOrThrow(J.CompilationUnit.class);
@@ -37,19 +47,19 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
         t = new RemoveTrailingWhitespaceVisitor<>().visit(t, p, cursor);
 
         t = new BlankLinesVisitor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
-                .orElse(IntelliJ.blankLines()))
+                .orElse(IntelliJ.blankLines()), stopAfter)
                 .visit(t, p, cursor);
 
         t = new SpacesVisitor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
-                .orElse(IntelliJ.spaces()))
+                .orElse(IntelliJ.spaces()), stopAfter)
                 .visit(t, p, cursor);
 
         t = new WrappingAndBracesVisitor<>(Optional.ofNullable(cu.getStyle(WrappingAndBracesStyle.class))
-                .orElse(IntelliJ.wrappingAndBraces()))
+                .orElse(IntelliJ.wrappingAndBraces()), stopAfter)
                 .visit(t, p, cursor);
 
         t = new TabsAndIndentsVisitor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
-                .orElse(IntelliJ.tabsAndIndents()))
+                .orElse(IntelliJ.tabsAndIndents()), stopAfter)
                 .visit(t, p, cursor);
 
         return t;
@@ -58,21 +68,22 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
         J.CompilationUnit t = (J.CompilationUnit) new BlankLinesVisitor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
-                .orElse(IntelliJ.blankLines()))
+                .orElse(IntelliJ.blankLines()), stopAfter)
                 .visit(cu, p);
 
         t = (J.CompilationUnit) new SpacesVisitor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
-                .orElse(IntelliJ.spaces()))
+                .orElse(IntelliJ.spaces()), stopAfter)
                 .visit(t, p);
 
         t = (J.CompilationUnit) new WrappingAndBracesVisitor<>(Optional.ofNullable(cu.getStyle(WrappingAndBracesStyle.class))
-                .orElse(IntelliJ.wrappingAndBraces()))
+                .orElse(IntelliJ.wrappingAndBraces()), stopAfter)
                 .visit(t, p);
 
         t = (J.CompilationUnit) new TabsAndIndentsVisitor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
-                .orElse(IntelliJ.tabsAndIndents()))
+                .orElse(IntelliJ.tabsAndIndents()), stopAfter)
                 .visit(t, p);
 
+        assert t != null;
         return t;
     }
 }

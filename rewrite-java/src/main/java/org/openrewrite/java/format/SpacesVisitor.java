@@ -15,13 +15,17 @@
  */
 package org.openrewrite.java.format;
 
+import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.tree.*;
 
 public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
+    @Nullable
+    private final Tree stopAfter;
 
     /*
     TODO Finish support for SpacesStyle properties, from SpacesStyle.Within.groupingParentheses down
@@ -30,7 +34,12 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     private final SpacesStyle style;
 
     public SpacesVisitor(SpacesStyle style) {
+        this(style, null);
+    }
+
+    public SpacesVisitor(SpacesStyle style, @Nullable Tree stopAfter) {
         this.style = style;
+        this.stopAfter = stopAfter;
     }
 
     <T extends J> T spaceBefore(T j, boolean spaceBefore) {
@@ -1072,5 +1081,23 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             );
         }
         return tp;
+    }
+
+    @Nullable
+    @Override
+    public J postVisit(J tree, P p) {
+        if (stopAfter != null && stopAfter == tree) {
+            getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "stop", true);
+        }
+        return super.postVisit(tree, p);
+    }
+
+    @Nullable
+    @Override
+    public J visit(@Nullable Tree tree, P p) {
+        if (getCursor().getNearestMessage("stop") != null) {
+            return (J) tree;
+        }
+        return super.visit(tree, p);
     }
 }

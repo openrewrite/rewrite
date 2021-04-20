@@ -69,6 +69,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class DeleteStatementTck : DeleteStatementTest
 
     @Nested
+    inner class EmptyBlockTck : EmptyBlockTest
+
+    @Nested
     inner class FinalizeLocalVariablesTck : FinalizeLocalVariablesTest
 
     @Nested

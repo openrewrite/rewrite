@@ -27,11 +27,20 @@ import java.util.List;
 import java.util.Optional;
 
 class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
+    @Nullable
+    private final Tree stopAfter;
+
     private final TabsAndIndentsStyle style;
     private final String spacesForTab;
 
     public TabsAndIndentsVisitor(TabsAndIndentsStyle style) {
+        this(style, null);
+    }
+
+    public TabsAndIndentsVisitor(TabsAndIndentsStyle style, @Nullable Tree stopAfter) {
         this.style = style;
+        this.stopAfter = stopAfter;
+
         StringBuilder s = new StringBuilder();
         for (int i = 0; i < style.getTabSize(); i++) {
             s.append(' ');
@@ -457,6 +466,24 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             column++;
         }
         throw new IllegalStateException("For loops must have a control section");
+    }
+
+    @Nullable
+    @Override
+    public J postVisit(J tree, P p) {
+        if (stopAfter != null && stopAfter == tree) {
+            getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "stop", true);
+        }
+        return super.postVisit(tree, p);
+    }
+
+    @Nullable
+    @Override
+    public J visit(@Nullable Tree tree, P p) {
+        if (getCursor().getNearestMessage("stop") != null) {
+            return (J) tree;
+        }
+        return super.visit(tree, p);
     }
 
     private enum IndentType {

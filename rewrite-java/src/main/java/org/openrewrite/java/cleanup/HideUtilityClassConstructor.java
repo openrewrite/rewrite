@@ -43,7 +43,7 @@ public class HideUtilityClassConstructor extends Recipe {
                 style = HideUtilityClassConstructorStyle.hideUtilityClassConstructorStyle();
             }
             doAfterVisit(new HideUtilityClassConstructorVisitor<>(style));
-            return super.visitCompilationUnit(cu, executionContext);
+            return cu;
         }
     }
 }

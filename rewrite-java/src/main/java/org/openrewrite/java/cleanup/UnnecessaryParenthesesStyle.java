@@ -13,18 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.style;
+package org.openrewrite.java.cleanup;
 
-import lombok.AccessLevel;
 import lombok.Value;
 import lombok.With;
-import lombok.experimental.FieldDefaults;
-import org.openrewrite.Incubating;
 import org.openrewrite.java.JavaStyle;
+import org.openrewrite.java.style.IntelliJ;
+import org.openrewrite.java.style.StyleHelper;
 import org.openrewrite.style.Style;
 
-@Incubating(since = "7.0.0")
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Value
 @With
 public class UnnecessaryParenthesesStyle implements JavaStyle {
@@ -39,16 +36,16 @@ public class UnnecessaryParenthesesStyle implements JavaStyle {
     Boolean literalFalse;
     Boolean literalTrue;
     Boolean assign;
-    Boolean bandAssign;
-    Boolean borAssign;
-    Boolean bsrAssign;
-    Boolean bxorAssign;
+    Boolean bitAndAssign;
+    Boolean bitOrAssign;
+    Boolean bitShiftRightAssign;
+    Boolean bitXorAssign;
     Boolean divAssign;
     Boolean minusAssign;
     Boolean modAssign;
     Boolean plusAssign;
-    Boolean slAssign;
-    Boolean srAssign;
+    Boolean shiftLeftAssign;
+    Boolean shiftRightAssign;
     Boolean starAssign;
     Boolean lambda;
 

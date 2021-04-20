@@ -80,6 +80,10 @@ class Java11DeleteStatementTest : Java11Test, DeleteStatementTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11EmptyBlockTest : Java11Test, EmptyBlockTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11FinalizeLocalVariablesTest : Java11Test, FinalizeLocalVariablesTest
 
 @DebugOnly

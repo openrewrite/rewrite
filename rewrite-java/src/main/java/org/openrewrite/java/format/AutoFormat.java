@@ -32,6 +32,6 @@ public class AutoFormat extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new AutoFormatVisitor<>();
+        return new AutoFormatVisitor<>(null);
     }
 }

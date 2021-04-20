@@ -37,9 +37,6 @@ import java.lang.ref.WeakReference;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Function;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.util.Arrays.stream;
@@ -387,7 +384,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public List<Tree> getSideEffects() {
+        public List<J> getSideEffects() {
             return singletonList(this);
         }
 
@@ -476,7 +473,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public List<Tree> getSideEffects() {
+        public List<J> getSideEffects() {
             return singletonList(this);
         }
 
@@ -573,8 +570,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public List<Tree> getSideEffects() {
-            List<Tree> sideEffects = new ArrayList<>(2);
+        public List<J> getSideEffects() {
+            List<J> sideEffects = new ArrayList<>(2);
             sideEffects.addAll(left.getSideEffects());
             sideEffects.addAll(right.getSideEffects());
             return sideEffects;
@@ -1497,7 +1494,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public List<Tree> getSideEffects() {
+        public List<J> getSideEffects() {
             return target.getSideEffects();
         }
 
@@ -3163,7 +3160,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public List<Tree> getSideEffects() {
+        public List<J> getSideEffects() {
             return singletonList(this);
         }
 
@@ -3594,7 +3591,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public List<Tree> getSideEffects() {
+        public List<J> getSideEffects() {
             return singletonList(this);
         }
 
@@ -3802,8 +3799,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public List<Tree> getSideEffects() {
-            return tree instanceof Expression ? ((Expression) tree).getSideEffects() : emptyList();
+        public List<J> getSideEffects() {
+            return tree.getElement() instanceof Expression ? ((Expression) tree.getElement()).getSideEffects() : emptyList();
         }
 
         @Override
@@ -3893,7 +3890,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public List<Tree> getSideEffects() {
+        public List<J> getSideEffects() {
             return tree instanceof Expression ? ((Expression) tree).getSideEffects() : emptyList();
         }
 
@@ -4251,7 +4248,7 @@ public interface J extends Serializable, Tree {
             return finallie == null ? null : finallie.getElement();
         }
 
-        public Try withFinally(Block finallie) {
+        public Try withFinally(@Nullable Block finallie) {
             return getPadding().withFinally(JLeftPadded.withElement(this.finallie, finallie));
         }
 
@@ -4612,7 +4609,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public List<Tree> getSideEffects() {
+        public List<J> getSideEffects() {
             return expression.getSideEffects();
         }
 

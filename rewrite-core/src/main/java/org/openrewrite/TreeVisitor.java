@@ -172,14 +172,14 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     @Incubating(since = "7.0.0")
-    protected <T2 extends Tree> T2 visitAndCast(T2 t, P p, BiFunction<T2, P, Tree> callSuper) {
+    protected final <T2 extends Tree> T2 visitAndCast(T2 t, P p, BiFunction<T2, P, Tree> callSuper) {
         //noinspection unchecked
         return (T2) callSuper.apply(t, p);
     }
 
     @Incubating(since = "7.0.0")
     @Nullable
-    protected <T2 extends T> T2 visitAndCast(@Nullable Tree tree, P p) {
+    protected final <T2 extends T> T2 visitAndCast(@Nullable Tree tree, P p) {
         //noinspection unchecked
         return (T2) visit(tree, p);
     }

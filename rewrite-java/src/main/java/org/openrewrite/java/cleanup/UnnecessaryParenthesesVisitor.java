@@ -16,16 +16,12 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.Cursor;
-import org.openrewrite.Incubating;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.UnwrapParentheses;
-import org.openrewrite.java.style.UnnecessaryParenthesesStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
-@Incubating(since = "7.0.0")
 public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
-
     private final UnnecessaryParenthesesStyle style;
 
     private static final String UNNECESSARY_PARENTHESES_MARKER = "unnecessaryParenthesesUnwrapTarget";
@@ -77,12 +73,12 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     public J visitAssignmentOperation(J.AssignmentOperation assignOp, P p) {
         J.AssignmentOperation a = visitAndCast(assignOp, p, super::visitAssignmentOperation);
         J.AssignmentOperation.Type op = a.getOperator();
-        if (a.getAssignment() instanceof J.Parentheses && ((style.getBandAssign() && op == J.AssignmentOperation.Type.BitAnd) ||
-                (style.getBorAssign() && op == J.AssignmentOperation.Type.BitOr) ||
-                (style.getBsrAssign() && op == J.AssignmentOperation.Type.UnsignedRightShift) ||
-                (style.getBxorAssign() && op == J.AssignmentOperation.Type.BitXor) ||
-                (style.getSrAssign() && op == J.AssignmentOperation.Type.RightShift) ||
-                (style.getSlAssign() && op == J.AssignmentOperation.Type.LeftShift) ||
+        if (a.getAssignment() instanceof J.Parentheses && ((style.getBitAndAssign() && op == J.AssignmentOperation.Type.BitAnd) ||
+                (style.getBitOrAssign() && op == J.AssignmentOperation.Type.BitOr) ||
+                (style.getBitShiftRightAssign() && op == J.AssignmentOperation.Type.UnsignedRightShift) ||
+                (style.getBitXorAssign() && op == J.AssignmentOperation.Type.BitXor) ||
+                (style.getShiftRightAssign() && op == J.AssignmentOperation.Type.RightShift) ||
+                (style.getShiftLeftAssign() && op == J.AssignmentOperation.Type.LeftShift) ||
                 (style.getMinusAssign() && op == J.AssignmentOperation.Type.Subtraction) ||
                 (style.getDivAssign() && op == J.AssignmentOperation.Type.Division) ||
                 (style.getPlusAssign() && op == J.AssignmentOperation.Type.Addition) ||

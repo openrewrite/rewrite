@@ -15,7 +15,9 @@
  */
 package org.openrewrite.java.format;
 
+import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.BlankLinesStyle;
 import org.openrewrite.java.tree.J;
@@ -27,10 +29,18 @@ import java.util.Iterator;
 import java.util.List;
 
 class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
+    @Nullable
+    private final Tree stopAfter;
+
     private final BlankLinesStyle style;
 
     public BlankLinesVisitor(BlankLinesStyle style) {
+        this(style, null);
+    }
+
+    public BlankLinesVisitor(BlankLinesStyle style, @Nullable Tree stopAfter) {
         this.style = style;
+        this.stopAfter = stopAfter;
     }
 
     @Override
@@ -234,5 +244,23 @@ class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
             minWhitespace = "\n" + minWhitespace;
         }
         return minWhitespace;
+    }
+
+    @Nullable
+    @Override
+    public J postVisit(J tree, P p) {
+        if (stopAfter != null && stopAfter == tree) {
+            getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "stop", true);
+        }
+        return super.postVisit(tree, p);
+    }
+
+    @Nullable
+    @Override
+    public J visit(@Nullable Tree tree, P p) {
+        if (getCursor().getNearestMessage("stop") != null) {
+            return (J) tree;
+        }
+        return super.visit(tree, p);
     }
 }

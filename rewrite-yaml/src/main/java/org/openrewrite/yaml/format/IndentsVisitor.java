@@ -90,8 +90,9 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
         return y;
     }
 
+    @Nullable
     @Override
-    public @Nullable Yaml postVisit(Yaml tree, P p) {
+    public Yaml postVisit(Yaml tree, P p) {
         if (stopAfter != null && stopAfter == tree) {
             getCursor().putMessageOnFirstEnclosing(Yaml.Documents.class, "stop", true);
         }

@@ -16,15 +16,12 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.style.UnnecessaryParenthesesStyle;
 import org.openrewrite.java.tree.J;
 
-@Incubating(since = "7.0.0")
 public class UnnecessaryParentheses extends Recipe {
     @Override
     public String getDisplayName() {
@@ -44,7 +41,7 @@ public class UnnecessaryParentheses extends Recipe {
                 style = IntelliJ.unnecessaryParentheses();
             }
             doAfterVisit(new UnnecessaryParenthesesVisitor<>(style));
-            return super.visitCompilationUnit(cu, executionContext);
+            return cu;
         }
     }
 }
