@@ -209,3 +209,7 @@ class Java11UseStaticImportTest : Java11Test, UseStaticImportTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11WrappingAndBracesTest : Java11Test, WrappingAndBracesTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11XmlParserXXEVulnerabilityFixTest: Java11Test, XmlParserXXEVulnerabilityFixTest
