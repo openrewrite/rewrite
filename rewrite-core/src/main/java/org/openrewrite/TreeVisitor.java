@@ -190,7 +190,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
     @Incubating(since = "7.2.0")
     public Markers visitMarkers(Markers markers, P p) {
         Collection<? extends Marker> originalMarkers = markers.entries();
-        List<Marker> visited = new ArrayList<>();
+        List<Marker> visited = new ArrayList<>(originalMarkers.size());
         boolean anyChanged = false;
         for(Marker originalMarker : originalMarkers) {
             Marker visitedMarker = visitMarker(originalMarker, p);

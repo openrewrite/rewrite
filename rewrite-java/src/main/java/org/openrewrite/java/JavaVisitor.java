@@ -549,26 +549,6 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return l;
     }
 
-    public Markers visitMarkers(Markers markers, P p) {
-        Collection<? extends Marker> originalMarkers = markers.entries();
-        List<Marker> visited = new ArrayList<>();
-        boolean anyChanged = false;
-        for(Marker originalMarker : originalMarkers) {
-            Marker visitedMarker = visitMarker(originalMarker, p);
-            visited.add(visitedMarker);
-            anyChanged = anyChanged || (visitedMarker != originalMarker);
-        }
-        if(anyChanged) {
-            return Markers.build(visited);
-        }
-        return markers;
-    }
-
-    public <M extends Marker> M visitMarker(Marker marker, P p) {
-        //noinspection unchecked
-        return (M) marker;
-    }
-
     public J visitMemberReference(J.MemberReference memberRef, P p) {
         J.MemberReference m = memberRef;
         m = m.withPrefix(visitSpace(m.getPrefix(), Space.Location.MEMBER_REFERENCE_PREFIX, p));
