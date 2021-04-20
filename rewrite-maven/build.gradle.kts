@@ -41,6 +41,7 @@ dependencies {
     integTestImplementation("org.apache.maven:maven-aether-provider:latest.release")
     integTestImplementation("org.apache.maven:maven-core:latest.release")
     integTestImplementation("io.micrometer:micrometer-registry-prometheus:latest.release")
+    integTestImplementation("org.rocksdb:rocksdbjni:latest.release")
 
     integTestImplementation(project(":rewrite-java-11"))
     integTestImplementation(project(":rewrite-properties"))
