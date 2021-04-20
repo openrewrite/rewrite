@@ -30,24 +30,24 @@ public class MarkersTest {
     @Test
     public void addPreventsDuplicates() {
         Markers markers = Markers.EMPTY;
-        markers = markers.add(new TextMarker("test", randomId()));
-        markers = markers.add(new TextMarker("test", randomId()));
+        markers = markers.add(new TextMarker(randomId(), "test"));
+        markers = markers.add(new TextMarker(randomId(), "test"));
         assertThat(markers.findAll(TextMarker.class)).hasSize(1);
     }
 
     @Test
     public void addAcceptsNonDuplicates() {
         Markers markers = Markers.EMPTY;
-        markers = markers.add(new TextMarker("thing1", randomId()));
-        markers = markers.add(new TextMarker("thing2", randomId()));
+        markers = markers.add(new TextMarker(randomId(), "thing1"));
+        markers = markers.add(new TextMarker(randomId(), "thing2"));
         assertThat(markers.findAll(TextMarker.class)).hasSize(2);
     }
 
     private static class TextMarker implements Marker {
-        private final String text;
         private final UUID id;
+        private final String text;
 
-        private TextMarker(String text, UUID id) {
+        private TextMarker( UUID id, String text) {
             this.text = text;
             this.id = id;
         }
