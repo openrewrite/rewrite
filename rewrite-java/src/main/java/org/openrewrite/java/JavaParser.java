@@ -139,6 +139,8 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
         @Nullable
         protected Collection<Path> classpath = runtimeClasspath;
 
+        protected Collection<byte[]> classBytesClasspath = Collections.emptyList();
+
         @Nullable
         protected Collection<Input> dependsOn;
 
@@ -174,6 +176,11 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
 
         public B classpath(String... classpath) {
             this.classpath = dependenciesFromClasspath(classpath);
+            return (B) this;
+        }
+
+        public B classpath(byte[]... classpath) {
+            this.classBytesClasspath = Arrays.asList(classpath);
             return (B) this;
         }
 

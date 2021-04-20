@@ -21,15 +21,56 @@ import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Parser
 import org.openrewrite.TreeSerializer
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.search.FindTypes
 import java.nio.file.Paths
 import java.util.Collections.singletonList
+import java.util.zip.ZipFile
+import kotlin.io.path.ExperimentalPathApi
 
 interface JavaParserTest {
+    @ExperimentalPathApi
+    @Test
+    fun byteArrayAsClasspathElement(jp: JavaParser.Builder<*, *>) {
+        val zipFile = ZipFile(JavaParser.dependenciesFromClasspath("junit-jupiter-api").first().toFile())
+
+        zipFile.use { zip ->
+            val classpath = zip.entries().asSequence()
+                .filter { entry -> entry.name.endsWith(".class") }
+                .map { entry ->
+                    zip.getInputStream(entry).use { input ->
+                        input.readBytes()
+                    }
+                }
+                .toList()
+
+            val context = InMemoryExecutionContext { t -> println(t.printStackTrace()) }
+            val cus = jp.classpath(*classpath.toTypedArray())
+                .logCompilationWarningsAndErrors(true)
+                .build()
+                .parse(context,
+                    """
+                    class Test {
+                        @org.junit.jupiter.api.Test
+                        void test() {
+                        }
+                    }
+                """.trimIndent()
+                )
+
+            assertThat(FindTypes("org.junit.jupiter.api.Test").run(cus)).isNotEmpty
+        }
+    }
+
     @Test
     fun relativeSourcePath(jp: JavaParser) {
         val projectDir = Paths.get("/Users/jon/Projects/github/Netflix/eureka")
-        val sourcePath = Paths.get("/Users/jon/Projects/github/Netflix/eureka/eureka-client-archaius2/src/main/java/com/netflix/discovery/EurekaArchaius2ClientConfig.java")
-        val cu = jp.parseInputs(listOf(Parser.Input(sourcePath) { "class Test {}".byteInputStream() }), projectDir, InMemoryExecutionContext())[0]
+        val sourcePath =
+            Paths.get("/Users/jon/Projects/github/Netflix/eureka/eureka-client-archaius2/src/main/java/com/netflix/discovery/EurekaArchaius2ClientConfig.java")
+        val cu = jp.parseInputs(
+            listOf(Parser.Input(sourcePath) { "class Test {}".byteInputStream() }),
+            projectDir,
+            InMemoryExecutionContext()
+        )[0]
 
         assertThat(cu.sourcePath).isEqualTo(Paths.get("eureka-client-archaius2/src/main/java/com/netflix/discovery/EurekaArchaius2ClientConfig.java"))
         val serializer = TreeSerializer<J.CompilationUnit>()
