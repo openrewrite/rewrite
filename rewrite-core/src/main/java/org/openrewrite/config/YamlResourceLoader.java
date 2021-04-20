@@ -25,7 +25,6 @@ import com.fasterxml.jackson.module.kotlin.KotlinModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
-import org.openrewrite.Tree;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -42,6 +41,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.invalid;
 
 public class YamlResourceLoader implements ResourceLoader {
@@ -225,7 +225,7 @@ public class YamlResourceLoader implements ResourceLoader {
                     if (rawTags != null) {
                         tags = new HashSet<>(rawTags);
                     }
-                    DeclarativeNamedStyles namedStyles = new DeclarativeNamedStyles(name, displayName, description, tags, styles, Tree.randomId());
+                    DeclarativeNamedStyles namedStyles = new DeclarativeNamedStyles(randomId(), name, displayName, description, tags, styles);
                     List<Object> styleConfigs = (List<Object>) s.get("styleConfigs");
                     if (styleConfigs != null) {
                         for (int i = 0; i < styleConfigs.size(); i++) {

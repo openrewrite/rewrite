@@ -420,7 +420,7 @@ interface HideUtilityClassConstructorTest : JavaRecipeTest {
         jp.styles(
             listOf(
                 NamedStyles(
-                    "test", "test", "test", emptySet(), listOf(
+                        randomId(), "test", "test", "test", emptySet(), listOf(
                         HideUtilityClassConstructorStyle(
                             listOf(
                                 "@lombok.experimental.UtilityClass",
@@ -428,8 +428,7 @@ interface HideUtilityClassConstructorTest : JavaRecipeTest {
                                 """@java.lang.SuppressWarnings("checkstyle:HideUtilityClassConstructor")"""
                             )
                         )
-                    ),
-                    randomId()
+                    )
                 )
             )
         ).build(),

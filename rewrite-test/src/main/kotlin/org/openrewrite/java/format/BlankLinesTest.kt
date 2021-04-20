@@ -32,9 +32,8 @@ interface BlankLinesTest : JavaRecipeTest {
 
     fun blankLines(with: BlankLinesStyle.() -> BlankLinesStyle = { this }) = listOf(
         NamedStyles(
-            "test", "test", "test", emptySet(), listOf(
-                IntelliJ.blankLines().run { with(this) }),
-            randomId()
+                randomId(), "test", "test", "test", emptySet(), listOf(
+                IntelliJ.blankLines().run { with(this) })
         )
     )
 

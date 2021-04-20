@@ -336,7 +336,7 @@ interface OrderImportsTest : JavaRecipeTest {
             JavaParser.fromJavaVersion().styles(
                     listOf(
                             NamedStyles(
-                                    "spring", "spring", "spring", emptySet(), listOf(
+                                    randomId(), "spring", "spring", "spring", emptySet(), listOf(
                                     ImportLayoutStyle.builder()
                                             .classCountToUseStarImport(999)
                                             .nameCountToUseStarImport(999)
@@ -349,9 +349,7 @@ interface OrderImportsTest : JavaRecipeTest {
                                             .importPackage("org.springframework.*")
                                             .blankLine()
                                             .importStaticAllOthers()
-                                            .build()
-                            ),
-                                randomId()
+                                            .build())
                             )
                     )
             ).build(),

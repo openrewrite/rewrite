@@ -64,6 +64,7 @@ class ImportLayoutStyleTest {
     fun deserializeInDeclarativeNamedStyles() {
 
         val style = DeclarativeNamedStyles(
+                randomId(),
                 "name",
                 "displayName",
                 "description",
@@ -81,8 +82,7 @@ class ImportLayoutStyleTest {
                         .blankLine()
                         .importStaticAllOthers()
                         .build()
-                ),
-            randomId()
+                )
         )
         mapper.readValue(mapper.writeValueAsBytes(style),
                 DeclarativeNamedStyles::class.java)

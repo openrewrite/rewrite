@@ -31,6 +31,7 @@ import java.util.UUID;
 @Data
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class NamedStyles implements Marker {
+    private final UUID id;
     @EqualsAndHashCode.Include
     private final String name;
 
@@ -39,7 +40,6 @@ public class NamedStyles implements Marker {
     private final String description;
     private final Set<String> tags;
     private final Collection<Style> styles;
-    private final UUID id;
 
     @SuppressWarnings("unchecked")
     @Nullable

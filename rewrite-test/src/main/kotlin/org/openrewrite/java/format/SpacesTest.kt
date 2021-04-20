@@ -30,7 +30,7 @@ interface SpacesTest : JavaRecipeTest {
         get() = Spaces()
 
     fun namedStyles(styles: Collection<Style>) : Iterable<NamedStyles> {
-        return listOf(NamedStyles("Test", "test", "test", emptySet(), styles, randomId()))
+        return listOf(NamedStyles(randomId(), "Test", "test", "test", emptySet(), styles))
     }
 
     @Test

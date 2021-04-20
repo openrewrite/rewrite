@@ -28,8 +28,8 @@ public class DeclarativeNamedStyles extends NamedStyles {
     @JsonIgnore
     private Validated validation = Validated.none();
 
-    public DeclarativeNamedStyles(String name, String displayName, String description, Set<String> tags, Collection<Style> styles, UUID id) {
-        super(name, displayName, description, tags, styles, id);
+    public DeclarativeNamedStyles(UUID id, String name, String displayName, String description, Set<String> tags, Collection<Style> styles) {
+        super(id, name, displayName, description, tags, styles);
     }
 
     void addValidation(Validated validated) {

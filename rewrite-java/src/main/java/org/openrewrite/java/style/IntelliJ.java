@@ -30,7 +30,8 @@ public class IntelliJ extends NamedStyles {
     private static final IntelliJ INSTANCE = new IntelliJ();
 
     private IntelliJ() {
-        super("intellij-idea", "IntelliJ IDEA", "IntelliJ IDEA defaults for all ",
+        super(randomId(),
+                "intellij-idea", "IntelliJ IDEA", "IntelliJ IDEA defaults for all ",
                 Collections.emptySet(),
                 Arrays.asList(
                         importLayout(),
@@ -38,12 +39,11 @@ public class IntelliJ extends NamedStyles {
                         tabsAndIndents(),
                         spaces(),
                         wrappingAndBraces(),
-                        unnecessaryParentheses()
+                        unnecessaryParentheses(),
                         emptyBlock(),
                         equalsAvoidsNull(),
                         explicitInitialization()
-                ),
-                randomId()
+                )
         );
     }
 
