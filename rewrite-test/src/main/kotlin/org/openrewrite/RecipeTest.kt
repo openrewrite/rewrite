@@ -62,7 +62,7 @@ interface RecipeTest {
         val inputs = arrayOf(before.trimIndent()) + dependsOn
         val sources = parser!!.parse(*inputs)
         assertThat(sources.size)
-                .`as`("The parser was provided with ${inputs.size} which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
+                .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
                 .isEqualTo(inputs.size)
 
         val results = recipe
@@ -109,11 +109,13 @@ interface RecipeTest {
     ) {
         assertThat(recipe).`as`("A recipe must be specified").isNotNull
 
-        val source = parser!!.parse(
-            (listOf(before) + dependsOn).map { it.toPath() },
-            null,
-            InMemoryExecutionContext()
-        ).first()
+        val inputs = (arrayOf(before) + dependsOn).map { it.toPath() }.toList()
+        val sources = parser!!.parse(inputs, null, InMemoryExecutionContext())
+        assertThat(sources.size)
+                .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
+                .isEqualTo(inputs.size)
+
+        val source = sources.first()
 
         val results = recipe!!.run(
             listOf(source),
@@ -142,7 +144,12 @@ interface RecipeTest {
     ) {
         assertThat(recipe).`as`("A recipe must be specified").isNotNull
 
-        val source = parser!!.parse(*(arrayOf(before.trimIndent()) + dependsOn)).iterator().next()
+        val inputs = (arrayOf(before.trimIndent()) + dependsOn)
+        val sources = parser!!.parse(*inputs)
+        assertThat(sources.size)
+                .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
+                .isEqualTo(inputs.size)
+        val source = sources.first()
         val results = recipe!!.run(listOf(source))
 
         results.forEach { result ->
@@ -165,12 +172,16 @@ interface RecipeTest {
         dependsOn: Array<File> = emptyArray()
     ) {
         assertThat(recipe).`as`("A recipe must be specified").isNotNull
-
-        val source = parser!!.parse(
-            (listOf(before) + dependsOn).map { it.toPath() },
+        val inputs = (listOf(before) + dependsOn).map { it.toPath() }
+        val sources = parser!!.parse(
+                inputs,
             null,
             InMemoryExecutionContext()
-        ).first()
+        )
+        assertThat(sources.size)
+                .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
+                .isEqualTo(inputs.size)
+        val source = sources.first()
         val results = recipe!!.run(listOf(source))
 
         results.forEach { result ->
