@@ -35,7 +35,7 @@ public interface SearchResult extends Marker {
      * Most SearchResult implementations have a default printed representation, which is returned by their print() method.
      * For example:
      * Normally RecipeSearchResult.print() will return the empty string.
-     * Normally JavaSearchResult.print() will return something like "~~>" surrounded by a comment.
+     * Normally JavaSearchResult.print() will return something like an arrow surrounded by a comment.
      * TreePrinters returned by this method overwrite the default printed form of SearchResults with the text you specify.
      *
      * @param markerText The text to be emitted when printing a SearchResult with no description

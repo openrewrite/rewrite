@@ -219,11 +219,11 @@ class EnvironmentTest : RecipeTest {
         }
 
         override fun parseInputs(sources: MutableIterable<Parser.Input>, relativeTo: Path?, ctx: ExecutionContext): MutableList<PlainText> {
-            throw NotImplementedError("Not needed for test")
+            return mutableListOf()
         }
 
         override fun accept(path: Path): Boolean {
-            throw NotImplementedError("Not needed for test")
+            return true
         }
     }
 
