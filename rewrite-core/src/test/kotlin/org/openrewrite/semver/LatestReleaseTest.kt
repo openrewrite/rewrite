@@ -68,6 +68,8 @@ class LatestReleaseTest {
     @Test
     fun normalizeVersionStripReleaseSuffix() {
         assertThat(LatestRelease.normalizeVersion("1.5.1.RELEASE")).isEqualTo("1.5.1")
+        assertThat(LatestRelease.normalizeVersion("1.5.1.FINAL")).isEqualTo("1.5.1")
+        assertThat(LatestRelease.normalizeVersion("1.5.1.Final")).isEqualTo("1.5.1")
     }
 
     @Test

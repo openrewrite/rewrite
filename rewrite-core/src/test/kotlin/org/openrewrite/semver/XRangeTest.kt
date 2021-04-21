@@ -67,4 +67,12 @@ class XRangeTest {
         assertThat(xRange.isValid("1.2.0")).isTrue()
         assertThat(xRange.isValid("1.3.0")).isFalse()
     }
+
+    @Test
+    fun matchingJavaxValidation() {
+        val xRange: XRange = XRange.build("2.X", null).getValue()
+
+        // The version pattern of javax.validation:validation-api
+        assertThat(xRange.isValid("2.0.1.Final")).isTrue()
+    }
 }
