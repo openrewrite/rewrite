@@ -61,6 +61,11 @@ import static org.openrewrite.java.tree.Space.format;
  */
 public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
+
+    public static final int KIND_BITMASK_INTERFACE    = 1<<9;
+    public static final int KIND_BITMASK_ANNOTATION   = 1<<13;
+    public static final int KIND_BITMASK_ENUM         = 1<<14;
+
     private final Path sourcePath;
     private final String source;
     private final boolean relaxedClassTypeMatching;
@@ -1551,7 +1556,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                     signature.apply(selectType),
                     paramNames,
                     //Currently only the first 16 bits are meaninful
-                    (int) genericSymbol.flags() & 0xFFFF
+                    (int) genericSymbol.flags_field & 0xFFFF
             );
         }
 
@@ -1580,6 +1585,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
     @Nullable
     private JavaType type(@Nullable com.sun.tools.javac.code.Type type, List<Symbol> stack, boolean shallow) {
+        //Word of caution, during attribution, we will likely encounter symbols that have been parsed but are not
+        //on the parser's classpath. Calling a method on the symbol that calls complete() will result in an exception
+        // being thrown. That is why this method uses the symbol's underlying fields directly vs the accessor methods.
         if (type instanceof ClassType) {
             if (type instanceof com.sun.tools.javac.code.Type.ErrorType) {
                 return null;
@@ -1612,7 +1620,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                                         elem.name.toString(),
                                         type(elem.type, stackWithSym),
                                         //Currently only the first 16 bits are meaninful
-                                        (int) elem.flags() & 0xFFFF
+                                        (int) elem.flags_field & 0xFFFF
                                 ));
                             }
                         }
@@ -1647,18 +1655,14 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                         }
                     }
                     JavaType.Class.Kind kind;
-                    switch (sym.getKind()) {
-                        case ENUM:
-                            kind = JavaType.Class.Kind.Enum;
-                            break;
-                        case ANNOTATION_TYPE:
-                            kind = JavaType.Class.Kind.Annotation;
-                            break;
-                        case INTERFACE:
-                            kind = JavaType.Class.Kind.Interface;
-                            break;
-                        default:
-                            kind = JavaType.Class.Kind.Class;
+                    if ((sym.flags_field & KIND_BITMASK_ENUM) != 0) {
+                        kind = JavaType.Class.Kind.Enum;
+                    } else if ((sym.flags_field & KIND_BITMASK_ANNOTATION) != 0) {
+                        kind = JavaType.Class.Kind.Annotation;
+                    } else if ((sym.flags_field & KIND_BITMASK_INTERFACE) != 0) {
+                        kind = JavaType.Class.Kind.Interface;
+                    } else {
+                        kind = JavaType.Class.Kind.Class;
                     }
 
                     JavaType.Class owner = null;
@@ -1668,7 +1672,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                     JavaType.Class clazz = JavaType.Class.build(
                             sym.className(),
                             //Currently only the first 16 bits are meaninful
-                            (int) sym.flags() & 0xFFFF,
+                            (int) sym.flags_field & 0xFFFF,
                             kind,
                             fields,
                             typeParameters,
