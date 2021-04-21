@@ -167,14 +167,14 @@ public class MavenProjectParser {
             javaParser.setClasspath(downloadArtifacts(maven.getModel().getDependencies(Scope.Test)));
             sourceFiles.addAll(
                     ListUtils.map(javaParser.parse(maven.getTestJavaSources(projectDirectory, ctx), projectDirectory, ctx),
-                            s -> s.withMarkers(s.getMarkers().addOrUpdate(mainProvenance))
+                            s -> s.withMarkers(s.getMarkers().addOrUpdate(testProvenance))
                     ));
 
             parseResources(maven.getResources(projectDirectory, ctx), projectDirectory, sourceFiles, mainProvenance);
             parseResources(maven.getTestResources(projectDirectory, ctx), projectDirectory, sourceFiles, testProvenance);
         }
 
-        return ListUtils.map(sourceFiles, s -> s.withMarkers(s.getMarkers().addOrUpdate(mainProvenance)));
+        return ListUtils.map(sourceFiles, s -> s.withMarkers(s.getMarkers().addOrUpdate(gitProvenance)));
     }
 
     private void parseResources(List<Path> resources, Path projectDirectory, List<SourceFile> sourceFiles, JavaProvenance javaProvenance) {
