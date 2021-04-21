@@ -29,11 +29,13 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
     public Xml visitDocument(Xml.Document document, P p) {
         Xml.Document d = document;
         d = d.withProlog(visitAndCast(d.getProlog(), p));
-        return d.withRoot(visitAndCast(d.getRoot(), p));
+        d = d.withRoot(visitAndCast(d.getRoot(), p));
+        return d.withMarkers(visitMarkers(d.getMarkers(), p));
     }
 
     public Xml visitProcessingInstruction(Xml.ProcessingInstruction pi, P p) {
-        return pi.withAttributes(ListUtils.map(pi.getAttributes(), a -> visitAndCast(a, p)));
+        pi = pi.withAttributes(ListUtils.map(pi.getAttributes(), a -> visitAndCast(a, p)));
+        return pi.withMarkers(visitMarkers(pi.getMarkers(), p));
     }
 
     public Xml visitTag(Xml.Tag tag, P p) {
@@ -42,35 +44,38 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
         if(t.getContent() != null) {
             t = t.withContent(ListUtils.map(t.getContent(), c -> visitAndCast(c, p)));
         }
-        return t.withClosing(visitAndCast(t.getClosing(), p));
+        t = t.withClosing(visitAndCast(t.getClosing(), p));
+        return t.withMarkers(visitMarkers(t.getMarkers(), p));
     }
 
     public Xml visitAttribute(Xml.Attribute attribute, P p) {
-        return attribute;
+        return attribute.withMarkers(visitMarkers(attribute.getMarkers(), p));
     }
 
     public Xml visitCharData(Xml.CharData charData, P p) {
-        return charData;
+        return charData.withMarkers(visitMarkers(charData.getMarkers(), p));
     }
 
     public Xml visitComment(Xml.Comment comment, P p) {
-        return comment;
+        return comment.withMarkers(visitMarkers(comment.getMarkers(), p));
     }
 
     public Xml visitDocTypeDecl(Xml.DocTypeDecl docTypeDecl, P p) {
         Xml.DocTypeDecl d = docTypeDecl;
         d = d.withInternalSubset(ListUtils.map(d.getInternalSubset(), i -> visitAndCast(i, p)));
-        return d.withExternalSubsets(visitAndCast(d.getExternalSubsets(), p));
+        d = d.withExternalSubsets(visitAndCast(d.getExternalSubsets(), p));
+        return d.withMarkers(visitMarkers(d.getMarkers(), p));
     }
 
     public Xml visitProlog(Xml.Prolog prolog, P p) {
         Xml.Prolog pl = prolog;
         pl = pl.withXmlDecls(ListUtils.map(pl.getXmlDecls(), d -> visitAndCast(d, p)));
-        return pl.withMisc(ListUtils.map(pl.getMisc(), m -> visitAndCast(m, p)));
+        pl = pl.withMisc(ListUtils.map(pl.getMisc(), m -> visitAndCast(m, p)));
+        return pl.withMarkers(visitMarkers(pl.getMarkers(), p));
     }
 
     public Xml visitIdent(Xml.Ident ident, P p) {
-        return ident;
+        return ident.withMarkers(visitMarkers(ident.getMarkers(), p));
     }
 
     public Xml visitElement(Xml.Element element, P p) {

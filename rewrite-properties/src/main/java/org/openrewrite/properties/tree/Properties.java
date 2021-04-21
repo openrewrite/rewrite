@@ -69,6 +69,10 @@ public interface Properties extends Serializable, Tree {
 
     Properties withPrefix(String prefix);
 
+    <T extends Properties> T withMarkers(Markers markers);
+
+    Markers getMarkers();
+
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data

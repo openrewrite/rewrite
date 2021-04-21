@@ -23,13 +23,16 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.marker.RecipeSearchResult;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
+
+import static org.openrewrite.Tree.randomId;
 
 /**
  * Finds matching method invocations.
@@ -46,6 +49,8 @@ public class FindMethods extends Recipe {
             description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.",
             example = "java.util.List add(..)")
     String methodPattern;
+
+    UUID id = randomId();
 
     @Override
     public String getDisplayName() {
@@ -69,7 +74,7 @@ public class FindMethods extends Recipe {
                         ctx.putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY,
                                 method.getType().getDeclaringType());
                     }
-                    m = m.withMarker(new RecipeSearchResult(FindMethods.this));
+                    m = m.withMarkers(m.getMarkers().addOrUpdate(new JavaSearchResult(id, FindMethods.this)));
                 }
                 return m;
             }
@@ -81,7 +86,7 @@ public class FindMethods extends Recipe {
                     if(m.getType() != null) {
                         ctx.putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY, m.getType());
                     }
-                    m = m.withReference(m.getReference().withMarker(new RecipeSearchResult(FindMethods.this)));
+                    m = m.withReference(m.getReference().withMarkers(m.getReference().getMarkers().addOrUpdate(new JavaSearchResult(id, FindMethods.this))));
                 }
                 return m;
             }

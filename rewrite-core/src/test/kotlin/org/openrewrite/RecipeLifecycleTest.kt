@@ -18,7 +18,6 @@ package org.openrewrite
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Tree.randomId
-import org.openrewrite.marker.Markable
 import org.openrewrite.marker.Markers
 import org.openrewrite.text.PlainText
 import org.openrewrite.text.PlainTextVisitor
@@ -118,7 +117,7 @@ class RecipeLifecycleTest {
         override fun <P : Any?> isAcceptable(v: TreeVisitor<*, P>, p: P) = v is FooVisitor
 
         override fun getMarkers(): Markers = throw NotImplementedError()
-        override fun <M : Markable?> withMarkers(markers: Markers): M = throw NotImplementedError()
+        override fun <T : SourceFile?> withMarkers(markers: Markers): T = throw NotImplementedError()
         override fun getId(): UUID = throw NotImplementedError()
         override fun <P : Any?> print(printer: TreePrinter<P>, p: P) = throw NotImplementedError()
         override fun getSourcePath() = throw NotImplementedError()

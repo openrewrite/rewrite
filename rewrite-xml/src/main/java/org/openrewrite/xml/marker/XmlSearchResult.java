@@ -13,37 +13,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.marker;
+package org.openrewrite.xml.marker;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.RecipeSearchResult;
 
 import java.util.UUID;
 
-/**
- * Used by search visitors to mark AST elements that match the search criteria. By marking AST elements in a tree,
- * search results can be contextualized in the tree that they are found in.
- */
-@Incubating(since = "7.0.0")
-@Data
-@AllArgsConstructor
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class RecipeSearchResult implements SearchResult {
-    @EqualsAndHashCode.Include
-    private final UUID id;
+@Incubating(since = "7.2.0")
+public class XmlSearchResult extends RecipeSearchResult {
+    @JsonCreator
+    public XmlSearchResult(UUID id, Recipe recipe, @Nullable String description) {
+        super(id, recipe, description);
+    }
+    public XmlSearchResult(UUID id, Recipe recipe) {
+        super(id, recipe, null);
+    }
 
-    private final Recipe recipe;
-
-    @Nullable
-    private final String description;
-
-    public RecipeSearchResult(UUID id, Recipe recipe) {
-        this.id = id;
-        this.recipe = recipe;
-        this.description = null;
+    @Override
+    public <P> String print(TreePrinter<P> printer, P p) {
+        if (getDescription() == null) {
+            return "<!--~~>-->";
+        } else {
+            return String.format("<!--~~(%s)~~>-->", getDescription());
+        }
     }
 }

@@ -28,33 +28,39 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
     }
 
     public Yaml visitDocuments(Yaml.Documents documents, P p) {
-        return documents.withDocuments(ListUtils.map(documents.getDocuments(), d -> visitAndCast(d, p)));
+        return documents.withDocuments(ListUtils.map(documents.getDocuments(), d -> visitAndCast(d, p)))
+                .withMarkers(visitMarkers(documents.getMarkers(), p));
     }
 
     public Yaml visitDocument(Yaml.Document document, P p) {
-        return document.withBlock((Yaml.Block) visit(document.getBlock(), p));
+        return document.withBlock((Yaml.Block) visit(document.getBlock(), p))
+                .withMarkers(visitMarkers(document.getMarkers(), p));
     }
 
     public Yaml visitMapping(Yaml.Mapping mapping, P p) {
-        return mapping.withEntries(ListUtils.map(mapping.getEntries(), e -> visitAndCast(e, p)));
+        return mapping.withEntries(ListUtils.map(mapping.getEntries(), e -> visitAndCast(e, p)))
+                .withMarkers(visitMarkers(mapping.getMarkers(), p));
     }
 
     public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, P p) {
         Yaml.Mapping.Entry e = entry;
         e = e.withKey(visitAndCast(e.getKey(), p));
-        return e.withValue(visitAndCast(e.getValue(), p));
+        e = e.withValue(visitAndCast(e.getValue(), p));
+        return e.withMarkers(visitMarkers(e.getMarkers(), p));
     }
 
     public Yaml visitScalar(Yaml.Scalar scalar, P p) {
-        return scalar;
+        return scalar.withMarkers(visitMarkers(scalar.getMarkers(), p));
     }
 
     public Yaml visitSequence(Yaml.Sequence sequence, P p) {
-        return sequence.withEntries(ListUtils.map(sequence.getEntries(), e -> visitAndCast(e, p)));
+        return sequence.withEntries(ListUtils.map(sequence.getEntries(), e -> visitAndCast(e, p)))
+                .withMarkers(visitMarkers(sequence.getMarkers(), p));
     }
 
     public Yaml visitSequenceEntry(Yaml.Sequence.Entry entry, P p) {
-        return entry.withBlock(visitAndCast(entry.getBlock(), p));
+        return entry.withBlock(visitAndCast(entry.getBlock(), p))
+                .withMarkers(visitMarkers(entry.getMarkers(), p));
     }
 
     public void maybeCoalesceProperties() {

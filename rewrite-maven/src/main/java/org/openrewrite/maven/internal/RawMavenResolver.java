@@ -30,11 +30,11 @@ import org.openrewrite.xml.tree.Xml;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.*;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.Tree.randomId;
 
 public class RawMavenResolver {
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
@@ -517,11 +517,12 @@ public class RawMavenResolver {
                 }
 
                 List<Pom.Dependency> dependencies = new ArrayList<>(partial.getDependencyTasks().size());
-                nextDep: for (ResolutionTask depTask : partial.getDependencyTasks()) {
+                nextDep:
+                for (ResolutionTask depTask : partial.getDependencyTasks()) {
                     RawPom depTaskPom = depTask.getRawMaven().getPom();
                     for (GroupArtifact exclusion : exclusions) {
-                        if(exclusion.getGroupId().equals(depTaskPom.getGroupId()) &&
-                            exclusion.getArtifactId().equals(depTaskPom.getArtifactId())) {
+                        if (exclusion.getGroupId().equals(depTaskPom.getGroupId()) &&
+                                exclusion.getArtifactId().equals(depTaskPom.getArtifactId())) {
                             continue nextDep;
                         }
                     }
@@ -609,6 +610,7 @@ public class RawMavenResolver {
 
                 result = Optional.of(
                         new Pom(
+                                randomId(),
                                 groupId,
                                 rawPom.getArtifactId(),
                                 version,

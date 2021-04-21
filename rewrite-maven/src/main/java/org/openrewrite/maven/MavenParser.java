@@ -42,6 +42,7 @@ import java.util.regex.Pattern;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.StreamSupport.stream;
+import static org.openrewrite.Tree.randomId;
 
 public class MavenParser implements Parser<Maven> {
     private final MavenPomCache mavenPomCache;
@@ -107,7 +108,7 @@ public class MavenParser implements Parser<Maven> {
             }
 
             if (!modules.isEmpty()) {
-                parsed.set(i, maven.withMarkers(maven.getMarkers().compute(new Modules(modules), (old, n) -> n)));
+                parsed.set(i, maven.withMarkers(maven.getMarkers().compute(new Modules(randomId(), modules), (old, n) -> n)));
             }
         }
 

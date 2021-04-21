@@ -3,31 +3,6 @@
   <component name="CompilerConfiguration">
     <annotationProcessing>
       <profile default="true" name="Default" enabled="true" />
-      <profile name="Gradle Imported" enabled="true">
-        <outputRelativeToContentRoot value="true" />
-        <processorPath useClasspath="false">
-          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-generator-annprocess/1.29/fd5896eae79d3db657b282e596901cc1f8f94037/jmh-generator-annprocess-1.29.jar" />
-          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.29/c801e462e04b8403c93efb21b9d039689a0c6bd7/jmh-core-1.29.jar" />
-          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/net.sf.jopt-simple/jopt-simple/4.6/306816fb57cf94f108a43c95731b08934dcae15c/jopt-simple-4.6.jar" />
-          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.apache.commons/commons-math3/3.2/ec2544ab27e110d2d431bdad7d538ed509b21e62/commons-math3-3.2.jar" />
-        </processorPath>
-        <module name="rewrite.rewrite-benchmarks.jmh" />
-      </profile>
-      <profile name="Gradle Imported" enabled="true">
-        <outputRelativeToContentRoot value="true" />
-        <processorPath useClasspath="false">
-          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.projectlombok/lombok/1.18.20/18bcea7d5df4d49227b4a0743a536208ce4825bb/lombok-1.18.20.jar" />
-        </processorPath>
-        <module name="rewrite.rewrite-benchmarks.main" />
-        <module name="rewrite.rewrite-test.main" />
-        <module name="rewrite.rewrite-core.main" />
-        <module name="rewrite.rewrite-java-11.main" />
-        <module name="rewrite.rewrite-xml.main" />
-        <module name="rewrite.rewrite-maven.main" />
-        <module name="rewrite.rewrite-java.main" />
-        <module name="rewrite.rewrite-yaml.main" />
-        <module name="rewrite.rewrite-properties.main" />
-      </profile>
     </annotationProcessing>
     <bytecodeTargetLevel target="11" />
   </component>

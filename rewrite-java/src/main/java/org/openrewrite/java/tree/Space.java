@@ -20,7 +20,6 @@ import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.Markable;
 import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
@@ -36,40 +35,35 @@ import static java.util.Collections.emptyList;
  */
 @EqualsAndHashCode
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-public class Space implements Markable {
-    public static final Space EMPTY = new Space("", emptyList(), Markers.EMPTY);
-
-    /**
-     * Most occurrences of spaces will have no comments or markers, and there is a lot of repetition
-     * of occurrences of, for example, the single space between elements.
-     */
-    private static final Map<String, Space> flyweights = new WeakHashMap<>();
+public class Space {
+    public static final Space EMPTY = new Space("", emptyList());
 
     private final List<Comment> comments;
 
     @Nullable
     private final String whitespace;
 
-    private final Markers markers;
+    /*
+     * Most occurrences of spaces will have no comments or markers and will be repeated frequently throughout a source file.
+     * e.g.: a single space between keywords, or the common indentation of every line in a block.
+     * So use flyweights to avoid storing many instances of functionally identical spaces
+     */
+    private static final Map<String, Space> flyweights = new WeakHashMap<>();
 
-    private Space(@Nullable String whitespace, List<Comment> comments, Markers markers) {
+    private Space(@Nullable String whitespace, List<Comment> comments) {
         this.comments = comments;
         this.whitespace = whitespace == null || whitespace.isEmpty() ? null : whitespace;
-        this.markers = markers;
     }
 
     @JsonCreator
-    public static Space build(@Nullable String whitespace, List<Comment> comments, Markers markers) {
-        if (comments.isEmpty()) {
-            if (whitespace == null || whitespace.isEmpty()) {
-                if (markers == Markers.EMPTY) {
-                    return Space.EMPTY;
-                }
-                return flyweights.computeIfAbsent(whitespace == null ? "" : whitespace,
-                        ws -> new Space(ws, emptyList(), Markers.EMPTY));
+    public static Space build(@Nullable String whitespace, List<Comment> comments) {
+        if(comments.isEmpty()) {
+            if(whitespace == null || whitespace.isEmpty()) {
+                return Space.EMPTY;
             }
+            return flyweights.computeIfAbsent(whitespace, k -> new Space(whitespace, comments));
         }
-        return new Space(whitespace, comments, markers);
+        return new Space(whitespace, comments);
     }
 
     public String getIndent() {
@@ -107,21 +101,11 @@ public class Space implements Markable {
         return whitespace == null ? "" : whitespace;
     }
 
-    public Markers getMarkers() {
-        return markers;
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public Space withMarkers(Markers markers) {
-        return Space.build(whitespace, comments, markers);
-    }
-
     public Space withComments(List<Comment> comments) {
         if (comments.isEmpty() && (whitespace == null || whitespace.isEmpty())) {
             return Space.EMPTY;
         }
-        return build(whitespace, comments, markers);
+        return build(whitespace, comments);
     }
 
     public Space withWhitespace(String whitespace) {
@@ -129,7 +113,7 @@ public class Space implements Markable {
             return Space.EMPTY;
         }
         if (!whitespace.equals(this.whitespace)) {
-            return build(whitespace, comments, markers);
+            return build(whitespace, comments);
         }
         return this;
     }
@@ -163,14 +147,14 @@ public class Space implements Markable {
                     } else if (last == '*' && inMultiLineComment && comment.length() > 0) {
                         inMultiLineComment = false;
                         comment.setLength(comment.length() - 1); // trim the last '*'
-                        comments.add(new Comment(Comment.Style.BLOCK, comment.toString(), prefix.toString()));
+                        comments.add(new Comment(Comment.Style.BLOCK, comment.toString(), prefix.toString(), Markers.EMPTY));
                         prefix = new StringBuilder();
                         comment = new StringBuilder();
                         continue;
                     } else if (last == '*' && inJavadoc) {
                         inJavadoc = false;
                         comment.setLength(comment.length() - 1); // trim the last '*'
-                        comments.add(new Comment(Comment.Style.JAVADOC, comment.toString(), prefix.toString()));
+                        comments.add(new Comment(Comment.Style.JAVADOC, comment.toString(), prefix.toString(), Markers.EMPTY));
                         prefix = new StringBuilder();
                         comment = new StringBuilder();
                         continue;
@@ -182,7 +166,7 @@ public class Space implements Markable {
                 case '\n':
                     if (inSingleLineComment) {
                         inSingleLineComment = false;
-                        comments.add(new Comment(Comment.Style.LINE, comment.toString(), prefix.toString()));
+                        comments.add(new Comment(Comment.Style.LINE, comment.toString(), prefix.toString(), Markers.EMPTY));
                         prefix = new StringBuilder();
                         comment = new StringBuilder();
                         prefix.append(c);
@@ -227,7 +211,7 @@ public class Space implements Markable {
             }
         }
 
-        return build(whitespace, comments, Markers.EMPTY);
+        return build(whitespace, comments);
     }
 
     @SuppressWarnings("ConstantConditions")

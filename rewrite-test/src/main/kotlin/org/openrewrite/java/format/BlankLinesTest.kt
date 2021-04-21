@@ -18,6 +18,8 @@ package org.openrewrite.java.format
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
+import org.openrewrite.Tree
+import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.java.style.BlankLinesStyle
@@ -30,7 +32,7 @@ interface BlankLinesTest : JavaRecipeTest {
 
     fun blankLines(with: BlankLinesStyle.() -> BlankLinesStyle = { this }) = listOf(
         NamedStyles(
-            "test", "test", "test", emptySet(), listOf(
+                randomId(), "test", "test", "test", emptySet(), listOf(
                 IntelliJ.blankLines().run { with(this) })
         )
     )

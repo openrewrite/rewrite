@@ -20,36 +20,37 @@ import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
+import org.openrewrite.TreePrinter;
 import org.openrewrite.TreeVisitor;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.BinaryOperator;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.Tree.randomId;
 
 @Incubating(since = "7.0.0")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-public class Markers {
-    public static final Markers EMPTY = new Markers(emptyList()) {
+public class Markers implements Tree {
+    public static final Markers EMPTY = new Markers(randomId(), emptyList()) {
         @Override
         public String toString() {
             return "Markers{EMPTY}";
         }
     };
 
+    private final UUID id;
     private final Collection<? extends Marker> markers;
 
-    private Markers(Collection<? extends Marker> markers) {
+    private Markers(UUID id, Collection<? extends Marker> markers) {
+        this.id = id;
         this.markers = markers;
     }
 
     @JsonCreator
     public static Markers build(Collection<? extends Marker> markers) {
-        return markers.isEmpty() ? EMPTY : new Markers(markers);
+        return markers.isEmpty() ? EMPTY : new Markers(randomId(), markers);
     }
 
     /**
@@ -74,7 +75,7 @@ public class Markers {
         } else {
             List<Marker> updatedmarker = new ArrayList<>(markers);
             updatedmarker.add(marker);
-            return new Markers(updatedmarker);
+            return new Markers(id, updatedmarker);
         }
     }
 
@@ -101,14 +102,14 @@ public class Markers {
         if (!updated) {
             updatedmarker.add(identity);
         }
-        return new Markers(updatedmarker);
+        return new Markers(id, updatedmarker);
     }
 
     /**
      * Add a new marker or update some existing marker.
      *
      * @param identity          A new marker to add if it doesn't already exist. Existence is determined by regular equality.
-     * @param remappingFunction The function that merges an existing marker.
+     * @param remappingFunction The function that merges an existing marker with the new marker.
      * @param <M>               The type of marker.
      * @return A new {@link Markers} with an added or updated marker.
      */
@@ -127,7 +128,17 @@ public class Markers {
         if (!updated) {
             updatedmarker.add(identity);
         }
-        return new Markers(updatedmarker);
+        return new Markers(id, updatedmarker);
+    }
+
+    /**
+     * Add a new marker or update some existing marker.
+     * @param identity
+     * @param <M>
+     * @return
+     */
+    public <M extends Marker> Markers addOrUpdate(M identity) {
+        return compute(identity, (m1, m2) -> m2);
     }
 
     public <M extends Marker> List<M> findAll(Class<M> markerType) {
@@ -142,5 +153,20 @@ public class Markers {
                 .filter(markerType::isInstance)
                 .map(markerType::cast)
                 .findFirst();
+    }
+
+    @Override
+    public UUID getId() {
+        return id;
+    }
+
+    @Override
+    public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
+        return false;
+    }
+
+    @Override
+    public <P> String print(TreePrinter<P> printer, P p) {
+        return "";
     }
 }

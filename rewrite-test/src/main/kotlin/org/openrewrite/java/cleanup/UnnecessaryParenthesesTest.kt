@@ -18,6 +18,7 @@ package org.openrewrite.java.cleanup
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
+import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.java.style.IntelliJ
@@ -40,7 +41,7 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
     fun unnecessaryParentheses(with: UnnecessaryParenthesesStyle.() -> UnnecessaryParenthesesStyle = { this }) =
         listOf(
             NamedStyles(
-                "test", "test", "test", emptySet(), listOf(
+                    randomId(), "test", "test", "test", emptySet(), listOf(
                     UnnecessaryParenthesesStyle(
                         false,
                         false,
@@ -75,7 +76,7 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
         jp.styles(
             listOf(
                 NamedStyles(
-                    "test", "test", "test", emptySet(), listOf(
+                        randomId(), "test", "test", "test", emptySet(), listOf(
                         IntelliJ.unnecessaryParentheses()
                     )
                 )

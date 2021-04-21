@@ -22,10 +22,13 @@ import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 
+import java.util.UUID;
+
 @Incubating(since = "7.0.0")
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Data
 public class JavaProvenance implements Marker {
+    UUID id;
     String projectName;
     String sourceSetName;
     BuildTool buildTool;

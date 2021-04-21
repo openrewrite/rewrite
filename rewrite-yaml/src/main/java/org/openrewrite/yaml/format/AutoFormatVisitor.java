@@ -36,12 +36,12 @@ public class AutoFormatVisitor<P> extends YamlVisitor<P> {
 
     @Override
     public @Nullable Yaml visit(@Nullable Tree tree, P p, Cursor cursor) {
-        Yaml docs = cursor.firstEnclosingOrThrow(Yaml.Documents.class);
+        Yaml.Documents docs = cursor.firstEnclosingOrThrow(Yaml.Documents.class);
 
-        docs = new IndentsVisitor<>(Optional.ofNullable(docs.getStyle(IndentsStyle.class))
+        Yaml result = new IndentsVisitor<>(Optional.ofNullable(docs.getStyle(IndentsStyle.class))
                 .orElse(Autodetect.tabsAndIndents(docs, YamlDefaultStyles.indents())), stopAfter)
                 .visit(docs, p, cursor);
 
-        return docs;
+        return result;
     }
 }

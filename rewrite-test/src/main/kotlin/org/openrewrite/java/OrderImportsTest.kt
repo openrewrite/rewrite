@@ -18,6 +18,8 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.Tree
+import org.openrewrite.Tree.randomId
 import org.openrewrite.java.style.ImportLayoutStyle
 import org.openrewrite.style.NamedStyles
 
@@ -334,7 +336,7 @@ interface OrderImportsTest : JavaRecipeTest {
             JavaParser.fromJavaVersion().styles(
                     listOf(
                             NamedStyles(
-                                    "spring", "spring", "spring", emptySet(), listOf(
+                                    randomId(), "spring", "spring", "spring", emptySet(), listOf(
                                     ImportLayoutStyle.builder()
                                             .classCountToUseStarImport(999)
                                             .nameCountToUseStarImport(999)
@@ -347,8 +349,7 @@ interface OrderImportsTest : JavaRecipeTest {
                                             .importPackage("org.springframework.*")
                                             .blankLine()
                                             .importStaticAllOthers()
-                                            .build()
-                            )
+                                            .build())
                             )
                     )
             ).build(),

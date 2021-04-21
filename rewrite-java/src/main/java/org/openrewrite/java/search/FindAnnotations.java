@@ -23,11 +23,14 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.marker.RecipeSearchResult;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
+
+import static org.openrewrite.Tree.randomId;
 
 @EqualsAndHashCode(callSuper = true)
 @Value
@@ -40,6 +43,8 @@ public class FindAnnotations extends Recipe {
             description = "An annotation pattern, expressed as a pointcut expression.",
             example = "@java.lang.SuppressWarnings(\"deprecation\")")
     String annotationPattern;
+
+    UUID id = randomId();
 
     @Override
     public String getDisplayName() {
@@ -59,7 +64,7 @@ public class FindAnnotations extends Recipe {
             public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
                 J.Annotation a = super.visitAnnotation(annotation, ctx);
                 if (annotationMatcher.matches(annotation)) {
-                    a = a.withMarker(new RecipeSearchResult(FindAnnotations.this));
+                    a = a.withMarkers(a.getMarkers().addOrUpdate(new JavaSearchResult(id, FindAnnotations.this)));
                 }
                 return a;
             }

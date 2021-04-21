@@ -92,6 +92,10 @@ public interface J extends Serializable, Tree {
         return template.withTemplate(this, coordinates, parameters);
     }
 
+    <J2 extends J> J2 withMarkers(Markers markers);
+
+    Markers getMarkers();
+
     @SuppressWarnings("unchecked")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)

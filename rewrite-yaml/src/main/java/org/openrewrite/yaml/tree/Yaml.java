@@ -91,6 +91,10 @@ public interface Yaml extends Serializable, Tree {
 
     Yaml withPrefix(String prefix);
 
+    <Y extends Yaml> Y withMarkers(Markers markers);
+
+    Markers getMarkers();
+
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data

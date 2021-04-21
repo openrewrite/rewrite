@@ -59,7 +59,11 @@ interface RecipeTest {
                 .isEqualTo(recipe)
         }
 
-        val sources = parser!!.parse(*(arrayOf(before.trimIndent()) + dependsOn))
+        val inputs = arrayOf(before.trimIndent()) + dependsOn
+        val sources = parser!!.parse(*inputs)
+        assertThat(sources.size)
+                .`as`("The parser was provided with ${inputs.size} which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
+                .isEqualTo(inputs.size)
 
         val results = recipe
             .run(

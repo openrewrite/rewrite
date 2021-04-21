@@ -15,20 +15,14 @@
  */
 package org.openrewrite.maven.tree;
 
-import lombok.EqualsAndHashCode;
+import lombok.Data;
 import org.openrewrite.marker.Marker;
 
 import java.util.Collection;
+import java.util.UUID;
 
-@EqualsAndHashCode
+@Data
 public class Modules implements Marker {
+    private final UUID id;
     private final Collection<Pom> modules;
-
-    public Modules(Collection<Pom> modules) {
-        this.modules = modules;
-    }
-
-    public Collection<Pom> getModules() {
-        return modules;
-    }
 }

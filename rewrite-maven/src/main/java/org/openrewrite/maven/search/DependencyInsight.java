@@ -18,15 +18,18 @@ package org.openrewrite.maven.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.marker.RecipeSearchResult;
 import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.Scope;
+import org.openrewrite.xml.marker.XmlSearchResult;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Pattern;
+
+import static org.openrewrite.Tree.randomId;
 
 /**
  * Find direct and transitive dependencies, marking first order dependencies that
@@ -52,6 +55,8 @@ public class DependencyInsight extends Recipe {
             description = "Match dependencies with the specified scope",
             valid = {"compile", "test", "runtime", "provided"})
     String scope;
+
+    UUID searchId = randomId();
 
     @Override
     public Validated validate() {
@@ -97,10 +102,10 @@ public class DependencyInsight extends Recipe {
                         Optional<Pom.Dependency> match = dependencies.stream().filter(this::dependencyMatches).findFirst();
                         if(match.isPresent()) {
                             if(dependencyMatches(dependency)) {
-                                t = t.withMarker(new RecipeSearchResult(DependencyInsight.this));
+                                t = t.withMarkers(t.getMarkers().addOrUpdate(new XmlSearchResult(searchId, DependencyInsight.this)));
                             } else {
-                                t = t.withMarker(new RecipeSearchResult(DependencyInsight.this,
-                                        match.get().getCoordinates()));
+                                t = t.withMarkers(t.getMarkers().addOrUpdate(new XmlSearchResult(searchId,DependencyInsight.this,
+                                        match.get().getCoordinates())));
                             }
                         }
                     }

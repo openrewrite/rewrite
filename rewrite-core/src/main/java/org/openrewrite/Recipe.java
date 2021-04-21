@@ -29,6 +29,7 @@ import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.NullUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,6 +42,7 @@ import java.util.function.Function;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singleton;
 import static java.util.stream.Collectors.*;
+import static org.openrewrite.Tree.randomId;
 
 /**
  * Provides a formalized link list data structure of {@link Recipe recipes} and a {@link Recipe#run(List)} method which will
@@ -72,8 +74,8 @@ public abstract class Recipe {
     private static final TreePrinter<ExecutionContext> MARKER_ID_PRINTER = new TreePrinter<ExecutionContext>() {
         @Override
         public void doBefore(@Nullable Tree tree, StringBuilder printerAcc, ExecutionContext executionContext) {
-            if (tree != null) {
-                String markerIds = tree.getMarkers().entries().stream()
+            if (tree instanceof Markers) {
+                String markerIds = ((Markers)tree).entries().stream()
                         .filter(marker -> !(marker instanceof RecipeThatMadeChanges))
                         .map(marker -> String.valueOf(marker.hashCode()))
                         .collect(joining(","));
@@ -333,7 +335,7 @@ public abstract class Recipe {
                     results.add(new Result(null, s, singleton(recipeThatDeletedSourceFile.get(s.getId()))));
                 } else {
                     //printing both the before and after (and including markers in the output) and then comparing the
-                    //output to dermine if a change has been made.
+                    //output to determine if a change has been made.
                     if (!original.print(MARKER_ID_PRINTER, ctx).equals(s.print(MARKER_ID_PRINTER, ctx))) {
                         results.add(new Result(original, s, s.getMarkers()
                                 .findFirst(RecipeThatMadeChanges.class)
@@ -405,13 +407,22 @@ public abstract class Recipe {
         return getClass().getName();
     }
 
-    @EqualsAndHashCode
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
     private static class RecipeThatMadeChanges implements Marker {
         private final Set<Recipe> recipes;
+
+        @EqualsAndHashCode.Include
+        private final UUID id;
 
         private RecipeThatMadeChanges(Recipe recipe) {
             this.recipes = new HashSet<>();
             this.recipes.add(recipe);
+            id = randomId();
+        }
+
+        @Override
+        public UUID getId() {
+            return id;
         }
     }
 

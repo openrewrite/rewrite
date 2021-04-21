@@ -15,14 +15,12 @@
  */
 package org.openrewrite.java.tree;
 
-import lombok.AccessLevel;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.With;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.openrewrite.marker.Markers;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+@EqualsAndHashCode
 @Data
 public class Comment {
     @With
@@ -33,6 +31,9 @@ public class Comment {
 
     @With
     String suffix;
+
+    @With
+    Markers markers;
 
     public enum Style {
         LINE,

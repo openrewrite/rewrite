@@ -19,7 +19,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.Markable;
 import org.openrewrite.marker.Markers;
 
 import java.util.List;
@@ -39,7 +38,7 @@ import static java.util.Collections.emptyList;
  *
  * @param <T> The type of the inner list of elements.
  */
-public class JContainer<T> implements Markable {
+public class JContainer<T> {
     private transient Padding<T> padding;
 
     private static final JContainer<?> EMPTY = new JContainer<>(Space.EMPTY, emptyList(), Markers.EMPTY);
@@ -80,17 +79,16 @@ public class JContainer<T> implements Markable {
         return build(getBefore(), elements, markers);
     }
 
+    public Markers getMarkers() {
+        return markers;
+    }
+
     public List<T> getElements() {
         return JRightPadded.getElements(elements);
     }
 
     public Space getBefore() {
         return before;
-    }
-
-    @Override
-    public Markers getMarkers() {
-        return markers;
     }
 
     public JContainer<T> map(UnaryOperator<T> map) {

@@ -20,6 +20,8 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -80,6 +82,7 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
     public Xml visitDocument(Xml.Document document, P p) {
         StringBuilder acc = getPrinter();
         acc.append(document.getPrefix());
+        visitMarkers(document.getMarkers(), p);
         document = (Xml.Document) super.visitDocument(document, p);
         acc.append(document.getEof());
         return document;
@@ -88,14 +91,16 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
     @Override
     public Xml visitProlog(Xml.Prolog prolog, P p) {
         getPrinter().append(prolog.getPrefix());
+        visitMarkers(prolog.getMarkers(), p);
         return super.visitProlog(prolog, p);
     }
 
     @Override
     public Xml visitTag(Xml.Tag tag, P p) {
         StringBuilder acc = getPrinter();
-        acc.append(tag.getPrefix())
-                .append('<')
+        acc.append(tag.getPrefix());
+        visitMarkers(tag.getMarkers(), p);
+        acc.append('<')
                 .append(tag.getName());
         visit(tag.getAttributes(), p);
         acc.append(tag.getBeforeTagDelimiterPrefix());
@@ -123,8 +128,9 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
         } else {
             valueDelim = '\'';
         }
-        acc.append(attribute.getPrefix())
-                .append(attribute.getKey().getPrefix())
+        acc.append(attribute.getPrefix());
+        visitMarkers(attribute.getMarkers(), p);
+        acc.append(attribute.getKey().getPrefix())
                 .append(attribute.getKeyAsString())
                 .append('=')
                 .append(attribute.getValue().getPrefix())
@@ -139,8 +145,9 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
     @Override
     public Xml visitComment(Xml.Comment comment, P p) {
         StringBuilder acc = getPrinter();
-        acc.append(comment.getPrefix())
-                .append("<!--")
+        acc.append(comment.getPrefix());
+        visitMarkers(comment.getMarkers(), p);
+        acc.append("<!--")
                 .append(comment.getText())
                 .append("-->");
         return comment;
@@ -149,8 +156,9 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
     @Override
     public Xml visitProcessingInstruction(Xml.ProcessingInstruction pi, P p) {
         StringBuilder acc = getPrinter();
-        acc.append(pi.getPrefix())
-                .append("<?")
+        acc.append(pi.getPrefix());
+        visitMarkers(pi.getMarkers(), p);
+        acc.append("<?")
                 .append(pi.getName());
         visit(pi.getAttributes(), p);
         acc.append(pi.getBeforeTagDelimiterPrefix())
@@ -162,6 +170,7 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
     public Xml visitCharData(Xml.CharData charData, P p) {
         StringBuilder acc = getPrinter();
         acc.append(charData.getPrefix());
+        visitMarkers(charData.getMarkers(), p);
         if (charData.isCdata()) {
             acc.append("<![CDATA[")
                     .append(charData.getText())
@@ -176,8 +185,9 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
     @Override
     public Xml visitDocTypeDecl(Xml.DocTypeDecl docTypeDecl, P p) {
         StringBuilder acc = getPrinter();
-        acc.append(docTypeDecl.getPrefix())
-                .append("<!DOCTYPE");
+        acc.append(docTypeDecl.getPrefix());
+        visitMarkers(docTypeDecl.getMarkers(), p);
+        acc.append("<!DOCTYPE");
         visit(docTypeDecl.getName(), p);
         visit(docTypeDecl.getExternalId(), p);
         visit(docTypeDecl.getInternalSubset(), p);
@@ -194,8 +204,9 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
     @Override
     public Xml visitElement(Xml.Element element, P p) {
         StringBuilder acc = getPrinter();
-        acc.append(element.getPrefix())
-                .append("<!ELEMENT");
+        acc.append(element.getPrefix());
+        visitMarkers(element.getMarkers(), p);
+        acc.append("<!ELEMENT");
         visit(element.getSubset(), p);
         acc.append('>');
         return element;
@@ -203,8 +214,29 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
 
     @Override
     public Xml visitIdent(Xml.Ident ident, P p) {
-        getPrinter().append(ident.getPrefix())
-                .append(ident.getName());
+        StringBuilder acc = getPrinter();
+        acc.append(ident.getPrefix());
+        visitMarkers(ident.getMarkers(), p);
+        acc.append(ident.getName());
         return ident;
+    }
+
+    @Override
+    public <M extends Marker> M visitMarker(Marker marker, P p) {
+        StringBuilder acc = getPrinter();
+        treePrinter.doBefore(marker, acc, p);
+        acc.append(marker.print(treePrinter, p));
+        treePrinter.doAfter(marker, acc, p);
+        //noinspection unchecked
+        return (M) marker;
+    }
+
+    @Override
+    public Markers visitMarkers(Markers markers, P p) {
+        StringBuilder acc = getPrinter();
+        treePrinter.doBefore(markers, acc, p);
+        Markers m = super.visitMarkers(markers, p);
+        treePrinter.doAfter(markers, acc, p);
+        return m;
     }
 }

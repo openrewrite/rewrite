@@ -20,8 +20,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.Optional;
-
 /**
  * Mark any AST element with "paint". Used by search visitors to mark AST elements that
  * match the search criteria. By painting AST elements in a tree, search results can be
@@ -29,8 +27,22 @@ import java.util.Optional;
  */
 @Incubating(since = "7.0.0")
 public interface SearchResult extends Marker {
-    TreePrinter<Void> PRINTER = printer("~~>", "~~(%s)~~>");
 
+    @Nullable
+    String getDescription();
+
+    /**
+     * Most SearchResult implementations have a default printed representation, which is returned by their print() method.
+     * For example:
+     * Normally RecipeSearchResult.print() will return the empty string.
+     * Normally JavaSearchResult.print() will return something like an arrow surrounded by a comment.
+     * TreePrinters returned by this method overwrite the default printed form of SearchResults with the text you specify.
+     *
+     * @param markerText The text to be emitted when printing a SearchResult with no description
+     * @param markerTextWithDescription The text to be emitted when printing a SearchResult that has a description.
+     *                                  Use "%s" to specify where the description should be printed.
+     * @return A TreePrinter which will overwrite the natural result of Marker.print() with markerText/markerTextDescription
+     */
     static TreePrinter<Void> printer(String markerText, String markerTextWithDescription) {
         return new TreePrinter<Void>() {
             private SearchResult marker;
@@ -38,9 +50,8 @@ public interface SearchResult extends Marker {
 
             @Override
             public void doBefore(Tree tree, StringBuilder printerAcc, Void unused) {
-                Optional<SearchResult> marker = tree.getMarkers().findFirst(SearchResult.class);
-                if (marker.isPresent()) {
-                    this.marker = marker.get();
+                if (tree instanceof SearchResult) {
+                    this.marker = (SearchResult)tree;
                     this.mark = printerAcc.length();
                 }
             }
@@ -48,20 +59,13 @@ public interface SearchResult extends Marker {
             @Override
             public void doAfter(Tree tree, StringBuilder printerAcc, Void unused) {
                 if (mark != null) {
-                    for (int i = mark; i < printerAcc.length(); i++) {
-                        if (!Character.isWhitespace(printerAcc.charAt(i))) {
-                            printerAcc.insert(i, marker.getDescription() == null ?
-                                    markerText :
-                                    String.format(markerTextWithDescription, marker.getDescription()));
-                            break;
-                        }
-                    }
+                    printerAcc.delete(mark, printerAcc.length());
+                    printerAcc.append(marker.getDescription() == null ?
+                            markerText :
+                            String.format(markerTextWithDescription, marker.getDescription()));
                     mark = null;
                 }
             }
         };
     }
-
-    @Nullable
-    String getDescription();
 }

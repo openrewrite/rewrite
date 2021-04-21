@@ -39,6 +39,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static org.openrewrite.Tree.randomId;
+
 /**
  * Parse a Maven project on disk into a list of {@link org.openrewrite.SourceFile} including
  * Maven, Java, YAML, properties, and XML AST representations of sources and resources found.
@@ -138,6 +140,7 @@ public class MavenProjectParser {
         );
 
         JavaProvenance mainProvenance = new JavaProvenance(
+                randomId(),
                 rootMavenModel.getName(),
                 "main",
                 buildTool,
@@ -146,6 +149,7 @@ public class MavenProjectParser {
         );
 
         JavaProvenance testProvenance = new JavaProvenance(
+                randomId(),
                 rootMavenModel.getName(),
                 "test",
                 buildTool,
@@ -157,20 +161,20 @@ public class MavenProjectParser {
             javaParser.setClasspath(downloadArtifacts(maven.getModel().getDependencies(Scope.Compile)));
             sourceFiles.addAll(
                     ListUtils.map(javaParser.parse(maven.getJavaSources(projectDirectory, ctx), projectDirectory, ctx),
-                            s -> s.withMarker(mainProvenance)
+                            s -> s.withMarkers(s.getMarkers().addOrUpdate(mainProvenance))
                     ));
 
             javaParser.setClasspath(downloadArtifacts(maven.getModel().getDependencies(Scope.Test)));
             sourceFiles.addAll(
                     ListUtils.map(javaParser.parse(maven.getTestJavaSources(projectDirectory, ctx), projectDirectory, ctx),
-                            s -> s.withMarker(testProvenance)
+                            s -> s.withMarkers(s.getMarkers().addOrUpdate(mainProvenance))
                     ));
 
             parseResources(maven.getResources(projectDirectory, ctx), projectDirectory, sourceFiles, mainProvenance);
             parseResources(maven.getTestResources(projectDirectory, ctx), projectDirectory, sourceFiles, testProvenance);
         }
 
-        return ListUtils.map(sourceFiles, s -> s.withMarker(gitProvenance));
+        return ListUtils.map(sourceFiles, s -> s.withMarkers(s.getMarkers().addOrUpdate(mainProvenance)));
     }
 
     private void parseResources(List<Path> resources, Path projectDirectory, List<SourceFile> sourceFiles, JavaProvenance javaProvenance) {
@@ -182,7 +186,7 @@ public class MavenProjectParser {
                                         .collect(Collectors.toList()),
                                 projectDirectory,
                                 ctx
-                        ), s -> s.withMarker(javaProvenance)
+                        ), s -> s.withMarkers(s.getMarkers().addOrUpdate(javaProvenance))
                 ));
 
         sourceFiles.addAll(
@@ -192,7 +196,7 @@ public class MavenProjectParser {
                                 .collect(Collectors.toList()),
                         projectDirectory,
                         ctx
-                        ), s -> s.withMarker(javaProvenance)
+                        ), s -> s.withMarkers(s.getMarkers().addOrUpdate(javaProvenance))
                 ));
 
         sourceFiles.addAll(
@@ -202,7 +206,7 @@ public class MavenProjectParser {
                                 .collect(Collectors.toList()),
                         projectDirectory,
                         ctx
-                        ), s -> s.withMarker(javaProvenance)
+                        ), s -> s.withMarkers(s.getMarkers().addOrUpdate(javaProvenance))
                 ));
     }
 

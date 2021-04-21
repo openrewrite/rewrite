@@ -36,7 +36,6 @@ import lombok.EqualsAndHashCode;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.Markable;
 import org.openrewrite.marker.Markers;
 
 import java.util.function.UnaryOperator;
@@ -52,7 +51,7 @@ import java.util.function.UnaryOperator;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @Data
-public class JLeftPadded<T> implements Markable {
+public class JLeftPadded<T> {
     @With
     Space before;
 

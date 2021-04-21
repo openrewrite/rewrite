@@ -99,7 +99,7 @@ interface YamlRecipeTest : RecipeTest {
     ) {
         super.assertChanged(parser, recipe, before, emptyArray(), after, cycles) {}
     }
-    
+
     override fun <T : SourceFile> assertChanged(
         parser: Parser<T>?,
         recipe: Recipe?,
@@ -148,7 +148,7 @@ interface YamlRecipeTest : RecipeTest {
     ) {
         super.assertUnchanged(parser, recipe, before, dependsOn)
     }
-    
+
     override fun assertUnchanged(
         parser: Parser<*>?,
         recipe: Recipe?,

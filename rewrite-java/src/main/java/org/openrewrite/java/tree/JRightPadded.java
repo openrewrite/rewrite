@@ -21,7 +21,6 @@ import lombok.EqualsAndHashCode;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.Markable;
 import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
@@ -40,7 +39,7 @@ import java.util.stream.Collectors;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @Data
-public class JRightPadded<T> implements Markable {
+public class JRightPadded<T> {
     @With
     T element;
 
