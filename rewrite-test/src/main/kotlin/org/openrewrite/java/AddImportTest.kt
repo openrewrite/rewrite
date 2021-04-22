@@ -383,6 +383,33 @@ interface AddImportTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/477")
+    @Test
+    fun dontAddImportForStaticImportsIndirectlyReferenced(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.classpath("jackson-databind").build(),
+        recipe = object: JavaIsoVisitor<ExecutionContext>() {
+            override fun visitCompilationUnit(cu: J.CompilationUnit, p: ExecutionContext): J.CompilationUnit {
+                maybeAddImport("com.fasterxml.jackson.databind.ObjectMapper")
+                return super.visitCompilationUnit(cu, p)
+            }
+        }.toRecipe(),
+        dependsOn = arrayOf(
+            """
+                import com.fasterxml.jackson.databind.ObjectMapper;
+                class Helper {
+                    static ObjectMapper OBJECT_MAPPER;
+                }
+            """
+        ),
+        before = """
+            class Test {
+                void test() {
+                    Helper.OBJECT_MAPPER.writer();
+                }
+            }
+        """
+    )
+
     /**
      * This visitor removes the "java.util.Collections" receiver from method invocations of "java.util.Collections.emptyList()".
      * This allows us to test that AddImport with setOnlyIfReferenced = true will add a static import when an applicable static method call is present

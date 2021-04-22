@@ -121,6 +121,17 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         return cu;
     }
 
+    private boolean isTypeReference(NameTree t) {
+        @SuppressWarnings("ConstantConditions") String ref = new JavaIsoVisitor<Integer>() {
+            @Override
+            public Space visitSpace(Space space, Space.Location loc, Integer n) {
+                return Space.EMPTY;
+            }
+        }.visit(t, 0).printTrimmed();
+
+        return JavaType.Class.build(type).getClassName().equals(ref);
+    }
+
     /**
      * Returns true if there is at least one matching references for this associated import.
      * An import is considered a match if:
@@ -131,13 +142,13 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
      * @param compilationUnit The compilation passed to the visitCompilationUnit
      * @return true if the import is referenced by the class either explicitly or through a method reference.
      */
-
     //Note that using anyMatch when a stream is empty ends up returning true, which is not the behavior needed here!
     private boolean hasReference(J.CompilationUnit compilationUnit) {
         if (statik == null) {
             //Non-static imports, we just look for field accesses.
             for (NameTree t : FindTypes.find(compilationUnit, type)) {
-                if (!(t instanceof J.FieldAccess) || !((J.FieldAccess) t).isFullyQualifiedClassReference(type)) {
+                if ((!(t instanceof J.FieldAccess) || !((J.FieldAccess) t).isFullyQualifiedClassReference(type)) &&
+                        isTypeReference(t)) {
                     return true;
                 }
             }
