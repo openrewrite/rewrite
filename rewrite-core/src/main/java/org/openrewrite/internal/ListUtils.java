@@ -18,6 +18,7 @@ package org.openrewrite.internal;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ForkJoinPool;
@@ -27,6 +28,8 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
+
+import static java.util.Collections.singletonList;
 
 public final class ListUtils {
     private ListUtils() {
@@ -45,6 +48,10 @@ public final class ListUtils {
      * @return A new list with the element inserted in an approximately ordered place.
      */
     public static <T> List<T> insertInOrder(List<T> ls, T insert, Comparator<T> naturalOrdering) {
+        if(ls == null || ls.isEmpty()) {
+            return singletonList(insert);
+        }
+
         List<T> ordered = new ArrayList<>(ls);
         ordered.add(insert);
         ordered.sort(naturalOrdering);
@@ -72,7 +79,7 @@ public final class ListUtils {
     }
 
     public static <T> List<T> mapLast(List<T> ls, UnaryOperator<T> mapLast) {
-        if (ls.isEmpty()) {
+        if (ls == null || ls.isEmpty()) {
             return ls;
         }
         T last = ls.get(ls.size() - 1);
@@ -90,7 +97,7 @@ public final class ListUtils {
     }
 
     public static <T> List<T> mapFirst(List<T> ls, UnaryOperator<T> mapFirst) {
-        if (ls.isEmpty()) {
+        if (ls == null || ls.isEmpty()) {
             return ls;
         }
         T first = ls.iterator().next();
@@ -108,7 +115,7 @@ public final class ListUtils {
     }
 
     public static <T> List<T> map(List<T> ls, BiFunction<Integer, T, T> map) {
-        if (ls.isEmpty()) {
+        if (ls == null || ls.isEmpty()) {
             return ls;
         }
         List<T> newLs = ls;
@@ -150,7 +157,7 @@ public final class ListUtils {
      * @return The original list if no element has changed, or a new list.
      */
     public static <T> List<T> map(List<T> ls, ForkJoinPool pool, BiFunction<Integer, T, T> map) {
-        if (ls.isEmpty()) {
+        if (ls == null || ls.isEmpty()) {
             return ls;
         }
 
@@ -204,6 +211,9 @@ public final class ListUtils {
     }
 
     public static <T> List<T> insertAll(List<T> ls, int index, List<T> t) {
+        if(ls == null) {
+            return t;
+        }
         List<T> newLs = new ArrayList<>(ls);
         newLs.addAll(index, t);
         return newLs;
