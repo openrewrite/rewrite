@@ -71,24 +71,24 @@ interface PrimitiveWrapperClassConstructorToValueOfTest : JavaRecipeTest {
     fun newIntegerToValueOfValueRef(jp: JavaParser) = assertChanged(
         before = """
             class A {
-                boolean fls = "true";
+                boolean fls = true;
                 Boolean b2 = new Boolean(fls);
                 char ch = 'c';
                 Character c = new Character(ch);
                 double d1 = 1.1;
-                Double d = new Double(d1.doubleValue());
+                Double d = new Double(d1);
                 int k = 1;
                 Integer k2 = new Integer(k);
             }
         """,
         after = """
             class A {
-                boolean fls = "true";
+                boolean fls = true;
                 Boolean b2 = Boolean.valueOf(fls);
                 char ch = 'c';
                 Character c = Character.valueOf(ch);
                 double d1 = 1.1;
-                Double d = Double.valueOf(d1.doubleValue());
+                Double d = Double.valueOf(d1);
                 int k = 1;
                 Integer k2 = Integer.valueOf(k);
             }
