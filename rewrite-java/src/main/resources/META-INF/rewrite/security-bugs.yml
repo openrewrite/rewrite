@@ -15,16 +15,17 @@
 #
 ---
 type: specs.openrewrite.org/v1beta/recipe
-name: org.openrewrite.java.secbugs.JavaSecurityBestPractices
+name: org.openrewrite.java.security.JavaSecurityBestPractices
 displayName: Java security best practices
 description: Applies security best practices to Java code.
 tags:
   - security
 recipeList:
-  - org.openrewrite.java.secbugs.ResultOfFileMkdirsIgnored
+  - org.openrewrite.java.security.ResultOfFileMkdirsIgnored
+  - org.openrewrite.java.security.XmlParserXXEVulnerability
 ---
 type: specs.openrewrite.org/v1beta/recipe
-name: org.openrewrite.java.secbugs.ResultOfFileMkdirsIgnored
+name: org.openrewrite.java.security.ResultOfFileMkdirsIgnored
 displayName: Allows attacker to create a directory with elevated permissions.
 tags:
   - security
