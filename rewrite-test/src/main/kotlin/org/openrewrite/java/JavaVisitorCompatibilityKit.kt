@@ -189,4 +189,7 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class XmlParserXXEVulnerabilityTck : XmlParserXXEVulnerabilityTest
+
+    @Nested
+    inner class PrimitiveWrapperClassConstructorToValueOfTck : PrimitiveWrapperClassConstructorToValueOfTest
 }

@@ -17,6 +17,7 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
+import org.openrewrite.java.cleanup.PrimitiveWrapperClassConstructorToValueOfTest
 import org.openrewrite.java.tree.*
 
 //----------------------------------------------------------------------------------------------
@@ -206,3 +207,7 @@ class Java11VariableDeclarationsTest: Java11Test, VariableDeclarationsTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11WhileLoopTest: Java11Test, WhileLoopTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11PrimitiveWrapperClassConstructorToValueOfTest: Java11Test, PrimitiveWrapperClassConstructorToValueOfTest
