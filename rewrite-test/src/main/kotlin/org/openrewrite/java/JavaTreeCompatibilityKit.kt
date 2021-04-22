@@ -19,12 +19,14 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.java.tree.*
 
+//----------------------------------------------------------------------------------------
+// If test classes are added here, they should also be added to Java11TreeDebugTests.kt
+// Tests are in alphabetical order.
+//----------------------------------------------------------------------------------------
+
 @ExtendWith(JavaParserResolver::class)
 abstract class JavaTreeCompatibilityKit {
     abstract fun javaParser(): JavaParser.Builder<*, *>
-
-    @Nested
-    inner class JavaParserTck : JavaParserTest
 
     @Nested
     inner class AnnotationTck : AnnotationTest
@@ -87,7 +89,13 @@ abstract class JavaTreeCompatibilityKit {
     inner class ImportTck : ImportTest
 
     @Nested
-    inner class InstanceofTck : InstanceOfTest
+    inner class InstanceOfTck : InstanceOfTest
+
+    @Nested
+    inner class JavaParserTck : JavaParserTest
+
+    @Nested
+    inner class JavaTypeSerializerTck : JavaTypeSerializerTest
 
     @Nested
     inner class LabelTck : LabelTest

@@ -22,6 +22,11 @@ import org.openrewrite.java.format.*
 import org.openrewrite.java.search.*
 import org.openrewrite.java.tree.TypeTreeTest
 
+//----------------------------------------------------------------------------------------
+// If test classes are added here, they should also be added to Java11VisitorDebugTests.kt
+// Tests are in alphabetical order.
+//----------------------------------------------------------------------------------------
+
 @ExtendWith(JavaParserResolver::class)
 abstract class JavaVisitorCompatibilityKit {
     abstract fun javaParser(): JavaParser.Builder<*, *>
@@ -100,6 +105,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class FindTypesTck : FindTypesTest
+
+    @Nested
+    inner class HasTypesTck : HasTypesTest
 
     @Nested
     inner class HideUtilityClassConstructorTck : HideUtilityClassConstructorTest

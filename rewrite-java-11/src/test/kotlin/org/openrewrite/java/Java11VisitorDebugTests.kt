@@ -21,7 +21,10 @@ import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.format.*
 import org.openrewrite.java.search.*
 import org.openrewrite.java.tree.TypeTreeTest
-
+//----------------------------------------------------------------------------------------------
+// If test classes are added here, they should also be added to JavaVisitorCompatibilityKit.kt
+// Tests are in alphabetical order.
+//----------------------------------------------------------------------------------------------
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11AddImportTest : Java11Test, AddImportTest
@@ -132,10 +135,6 @@ class Java11HideUtilityClassConstructorTest : Java11Test, HideUtilityClassConstr
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11SemanticallyEqualTest : Java11Test, SemanticallyEqualTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
 class Java11ImplementInterfaceTest : Java11Test, ImplementInterfaceTest
 
 @DebugOnly
@@ -164,7 +163,7 @@ class Java11OrderImportsTest : Java11Test, OrderImportsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11RemoveAnnotation: Java11Test, RemoveAnnotationTest
+class Java11RemoveAnnotationTest: Java11Test, RemoveAnnotationTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
@@ -180,11 +179,15 @@ class Java11RenameVariableTest : Java11Test, RenameVariableTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11ReorderMethodArgumentsTest : Java11Test, ReorderMethodArgumentsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11ResultOfMethodCallIgnoredTest : Java11Test, ResultOfMethodCallIgnoredTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11ReorderMethodArgumentsTest : Java11Test, ReorderMethodArgumentsTest
+class Java11SemanticallyEqualTest : Java11Test, SemanticallyEqualTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

@@ -20,11 +20,11 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeUtils;
-import org.openrewrite.marker.RecipeSearchResult;
 
 import java.util.List;
 import java.util.UUID;
@@ -63,7 +63,7 @@ public class HasTypes extends Recipe {
             @Override
             public J visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
                 if (find(cu, fullyQualifiedTypeNames)){
-                    cu = cu.withMarkers(cu.getMarkers().addOrUpdate(new RecipeSearchResult(id, HasTypes.this)));
+                    cu = cu.withMarkers(cu.getMarkers().addOrUpdate(new JavaSearchResult(id, HasTypes.this)));
                 }
                 return cu;
             }

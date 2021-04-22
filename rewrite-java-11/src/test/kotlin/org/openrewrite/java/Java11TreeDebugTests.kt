@@ -19,6 +19,10 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
 import org.openrewrite.java.tree.*
 
+//----------------------------------------------------------------------------------------------
+// If test classes are added here, they should also be added to JavaTreeCompatibilityKit.kt
+// Tests are in alphabetical order.
+//----------------------------------------------------------------------------------------------
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11AnnotationTest: Java11Test, AnnotationTest
