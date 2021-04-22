@@ -159,12 +159,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
 
         byte[] key = serialize(repo.toString() + ":" + artifactCoordinates);
         Optional<RawMaven> rawMavenEntry = null;
-        try {
-            rawMavenEntry = deserializeRawMaven(cache.get(key));
-        } catch (Exception ex) {
-            // upon serialization exceptions delete the cache entry and force it to be re-downloaded
-            cache.database.delete(key);
-        }
+        rawMavenEntry = deserializeRawMaven(cache.get(key));
 
         //noinspection OptionalAssignedToNull
         if (rawMavenEntry == null) {
@@ -235,10 +230,10 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         }
         try {
             return mapper.readValue(bytes, new TypeReference<Optional<MavenRepository>>() {});
-        } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Unable to deserialize object to byte array.");
-        } catch (IOException e) {
-            throw new IllegalArgumentException("IO exception while deserializing object to byte array.");
+        } catch (Exception e) {
+            //Treat deserialization errors as a cache miss, this will force rewrite to re-download and re-cache the
+            //results.
+            return null;
         }
     }
 
@@ -249,10 +244,10 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         }
         try {
             return mapper.readValue(bytes, new TypeReference<Optional<RawMaven>>() {});
-        } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Unable to deserialize object to byte array.");
-        } catch (IOException e) {
-            throw new IllegalArgumentException("IO exception while deserializing object to byte array.");
+        } catch (Exception e) {
+            //Treat deserialization errors as a cache miss, this will force rewrite to re-download and re-cache the
+            //results.
+            return null;
         }
     }
 
@@ -263,10 +258,10 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         }
         try {
             return mapper.readValue(bytes, new TypeReference<Optional<MavenMetadata>>() {});
-        } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Unable to deserialize object to byte array.");
-        } catch (IOException e) {
-            throw new IllegalArgumentException("IO exception while deserializing object to byte array.");
+        } catch (Exception e) {
+            //Treat deserialization errors as a cache miss, this will force rewrite to re-download and re-cache the
+            //results.
+            return null;
         }
     }
 
