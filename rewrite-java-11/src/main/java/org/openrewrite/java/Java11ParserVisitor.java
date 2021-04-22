@@ -1548,10 +1548,18 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 paramNames.add(s);
             }
 
-            List<JavaType.FullyQualified> exceptionTypes = new ArrayList<>();
+            List<JavaType.Class> exceptionTypes = new ArrayList<>();
             if (selectType instanceof MethodType) {
                 for (com.sun.tools.javac.code.Type exceptionType : ((MethodType) selectType).thrown) {
-                    JavaType.FullyQualified javaType = (JavaType.FullyQualified) type(exceptionType);
+                    JavaType.Class javaType = TypeUtils.asClass(type(exceptionType));
+                    if (javaType == null) {
+                        //If the type cannot be resolved to a class (it might not be on the classpath or it might have
+                        //been mapped to cyclic, build the class.
+                        if (exceptionType instanceof ClassType) {
+                            Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
+                            javaType = JavaType.Class.build(sym.className());
+                        }
+                    }
                     if (javaType != null) {
                         //If the exception type is not resolved, it is not added to the list of exceptions.
                         exceptionTypes.add(javaType);

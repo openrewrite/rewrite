@@ -305,23 +305,6 @@ public interface JavaType extends Serializable {
         }
 
         /**
-         * This method can be used to find a class by just its qualified type name if it exists in the flyweights map.
-         * If there is more than on Class mapped to the type name, this method returns the first one.
-         *
-         * @param fullyQualifiedName The fully qualified name of the class
-         * @return A class object (if it exists in the flyweights map).
-         */
-        @Nullable public static Class findClass(String fullyQualifiedName) {
-            Set<Class> classes;
-           synchronized (flyweights) {
-               classes = flyweights.get(fullyQualifiedName);
-           }
-           if (classes != null) {
-               return classes.stream().findFirst().orElse(null);
-           }
-           return null;
-        }
-        /**
          * Lazily built so that a {@link org.openrewrite.java.internal.grammar.JavaParser} operating over a set of code
          * has an opportunity to build {@link Class} instances for sources found in the repo that can provide richer information
          * for constructor parameter types.

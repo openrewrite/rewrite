@@ -118,10 +118,9 @@ interface MethodDeclarationTest : JavaTreeTest {
         val a = jp.parse(
             """
             import java.io.IOException;
-            import org.example.WhatTypeOfExceptionIsThis;
             
             public class A {
-                private static boolean foo(boolean flag) throws IOException, ArithmeticException, WhatTypeOfExceptionIsThis {
+                private static boolean foo(boolean flag) throws IOException, ArithmeticException, org.example.WhatTypeOfExceptionIsThis {
                     if (flag) {
                         throw new WhatTypeOfExceptionIsThis();
                     } else {
@@ -133,12 +132,12 @@ interface MethodDeclarationTest : JavaTreeTest {
         )[0]
 
         val inv = a.classes[0].body.statements.filterIsInstance<J.MethodDeclaration>().first()
-        assertThat(inv.type!!.thrownExceptions).hasSize(2)
+        assertThat(inv.type!!.thrownExceptions).hasSize(3)
 
         val fullyQualifiedNames = inv.type!!.thrownExceptions.stream()
             .map(JavaType.FullyQualified::getFullyQualifiedName)
             .collect(Collectors.toList())
-        assertThat(fullyQualifiedNames).contains("java.io.IOException", "java.lang.ArithmeticException")
+        assertThat(fullyQualifiedNames).contains("java.io.IOException", "java.lang.ArithmeticException", "org.example.WhatTypeOfExceptionIsThis")
     }
 
 }
