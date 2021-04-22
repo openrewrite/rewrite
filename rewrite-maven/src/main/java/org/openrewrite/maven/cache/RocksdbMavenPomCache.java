@@ -15,21 +15,6 @@
  */
 package org.openrewrite.maven.cache;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.atomic.AtomicReference;
-
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -51,6 +36,15 @@ import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.WriteOptions;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.concurrent.Callable;
 
 /**
  * Implementation of the maven cache that leverages Rocksdb. The keys and values are serialized to/from byte arrays
@@ -164,7 +158,13 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         }
 
         byte[] key = serialize(repo.toString() + ":" + artifactCoordinates);
-        Optional<RawMaven> rawMavenEntry = deserializeRawMaven(cache.get(key));
+        Optional<RawMaven> rawMavenEntry = null;
+        try {
+            rawMavenEntry = deserializeRawMaven(cache.get(key));
+        } catch (Exception ex) {
+            // upon serialization exceptions delete the cache entry and force it to be re-downloaded
+            cache.database.delete(key);
+        }
 
         //noinspection OptionalAssignedToNull
         if (rawMavenEntry == null) {
