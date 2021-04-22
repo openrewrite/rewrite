@@ -17,7 +17,6 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
-import org.openrewrite.java.internal.typegeneration.TypeExtractionVisitorTest
 import org.openrewrite.java.tree.*
 
 //----------------------------------------------------------------------------------------------
