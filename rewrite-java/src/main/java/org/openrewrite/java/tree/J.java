@@ -3098,6 +3098,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Nullable
+        @With
         JContainer<Expression> typeParameters;
 
         @Nullable

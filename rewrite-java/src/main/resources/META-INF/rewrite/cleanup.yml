@@ -30,4 +30,6 @@ recipeList:
   - org.openrewrite.java.cleanup.SimplifyBooleanExpression
   - org.openrewrite.java.cleanup.SimplifyBooleanReturn
   - org.openrewrite.java.cleanup.StaticMethodNotFinal
+  - org.openrewrite.java.cleanup.UnnecessaryExplicitTypeArguments
   - org.openrewrite.java.cleanup.UnnecessaryParentheses
+  - org.openrewrite.java.cleanup.UseDiamondOperator

@@ -208,11 +208,19 @@ class Java11TypeTreeTest : Java11Test, TypeTreeTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11UnnecessaryExplicitTypeArgumentsTest : Java11Test, UnnecessaryExplicitTypeArgumentsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11UnnecessaryParenthesesTest : Java11Test, UnnecessaryParenthesesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11UnwrapParenthesesTest : Java11Test, UnwrapParenthesesTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11UseDiamondOperatorTest : Java11Test, UseDiamondOperatorTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

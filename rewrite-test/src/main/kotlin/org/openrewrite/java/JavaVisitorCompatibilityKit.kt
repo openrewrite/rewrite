@@ -162,10 +162,16 @@ abstract class JavaVisitorCompatibilityKit {
     inner class TypeTreeTck : TypeTreeTest
 
     @Nested
+    inner class UnnecessaryExplicitTypeArgumentsTck : UnnecessaryExplicitTypeArgumentsTest
+
+    @Nested
     inner class UnnecessaryParenthesesTck : UnnecessaryParenthesesTest
 
     @Nested
     inner class UnwrapParenthesesTck : UnwrapParenthesesTest
+
+    @Nested
+    inner class UseDiamondOperatorTck : UseDiamondOperatorTest
 
     @Nested
     inner class UseStaticImportTck : UseStaticImportTest
