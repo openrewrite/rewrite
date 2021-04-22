@@ -19,9 +19,9 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
 import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.format.*
-import org.openrewrite.java.internal.typegeneration.TypeExtractionVisitorTest
 import org.openrewrite.java.search.*
 import org.openrewrite.java.tree.TypeTreeTest
+
 //----------------------------------------------------------------------------------------------
 // If test classes are added here, they should also be added to JavaVisitorCompatibilityKit.kt
 // Tests are in alphabetical order.
@@ -37,10 +37,6 @@ class Java11AddLicenseHeaderTest : Java11Test, AddLicenseHeaderTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11BlankLinesTest : Java11Test, BlankLinesTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
-class Java11TypeExtractionVisitorTest : Java11Test, TypeExtractionVisitorTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
