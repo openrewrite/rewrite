@@ -15,21 +15,6 @@
  */
 package org.openrewrite.maven.cache;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.atomic.AtomicReference;
-
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -51,6 +36,14 @@ import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.WriteOptions;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.InputStreamReader;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.concurrent.Callable;
 
 /**
  * Implementation of the maven cache that leverages Rocksdb. The keys and values are serialized to/from byte arrays
@@ -164,7 +157,8 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         }
 
         byte[] key = serialize(repo.toString() + ":" + artifactCoordinates);
-        Optional<RawMaven> rawMavenEntry = deserializeRawMaven(cache.get(key));
+        Optional<RawMaven> rawMavenEntry = null;
+        rawMavenEntry = deserializeRawMaven(cache.get(key));
 
         //noinspection OptionalAssignedToNull
         if (rawMavenEntry == null) {
@@ -235,10 +229,10 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         }
         try {
             return mapper.readValue(bytes, new TypeReference<Optional<MavenRepository>>() {});
-        } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Unable to deserialize object to byte array.");
-        } catch (IOException e) {
-            throw new IllegalArgumentException("IO exception while deserializing object to byte array.");
+        } catch (Exception e) {
+            //Treat deserialization errors as a cache miss, this will force rewrite to re-download and re-cache the
+            //results.
+            return null;
         }
     }
 
@@ -249,10 +243,10 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         }
         try {
             return mapper.readValue(bytes, new TypeReference<Optional<RawMaven>>() {});
-        } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Unable to deserialize object to byte array.");
-        } catch (IOException e) {
-            throw new IllegalArgumentException("IO exception while deserializing object to byte array.");
+        } catch (Exception e) {
+            //Treat deserialization errors as a cache miss, this will force rewrite to re-download and re-cache the
+            //results.
+            return null;
         }
     }
 
@@ -263,10 +257,10 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         }
         try {
             return mapper.readValue(bytes, new TypeReference<Optional<MavenMetadata>>() {});
-        } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Unable to deserialize object to byte array.");
-        } catch (IOException e) {
-            throw new IllegalArgumentException("IO exception while deserializing object to byte array.");
+        } catch (Exception e) {
+            //Treat deserialization errors as a cache miss, this will force rewrite to re-download and re-cache the
+            //results.
+            return null;
         }
     }
 
