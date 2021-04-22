@@ -22,6 +22,7 @@ import org.openrewrite.Tree
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.style.ImportLayoutStyle
 import org.openrewrite.style.NamedStyles
+import org.openrewrite.style.Style
 
 interface OrderImportsTest : JavaRecipeTest {
     override val recipe: OrderImports
@@ -51,8 +52,8 @@ interface OrderImportsTest : JavaRecipeTest {
 
     @Test
     fun orderImports(jp: JavaParser) = assertChanged(
-            jp,
-            before = """
+        jp,
+        before = """
             import static java.util.stream.Collectors.joining;
             import java.util.ArrayList;
             import java.util.regex.Pattern;
@@ -63,7 +64,7 @@ interface OrderImportsTest : JavaRecipeTest {
             
             class A {}
         """,
-            after = """
+        after = """
             import org.openrewrite.java.tree.JavaType;
             import org.openrewrite.java.tree.TypeUtils;
             
@@ -106,10 +107,12 @@ interface OrderImportsTest : JavaRecipeTest {
             
             class Test {}
         """,
-        dependsOn = arrayOf("""
+        dependsOn = arrayOf(
+            """
             package org.another;
             public class Comment {}
-        """)
+        """
+        )
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/352")
@@ -140,8 +143,8 @@ interface OrderImportsTest : JavaRecipeTest {
 
     @Test
     fun blankLineThenEmptyBlockThenNonEmptyBlock(jp: JavaParser) = assertChanged(
-            jp,
-            before = """
+        jp,
+        before = """
             import java.util.ArrayList;
             import java.util.Objects;
 
@@ -149,7 +152,7 @@ interface OrderImportsTest : JavaRecipeTest {
             
             class A {}
         """,
-            after = """
+        after = """
             import org.openrewrite.java.tree.JavaType;
             
             import java.util.ArrayList;
@@ -161,8 +164,8 @@ interface OrderImportsTest : JavaRecipeTest {
 
     @Test
     fun foldIntoStar(jp: JavaParser) = assertChanged(
-            jp,
-            before = """
+        jp,
+        before = """
             import java.util.List;
             import java.util.ArrayList;
             import java.util.regex.Pattern;
@@ -172,7 +175,7 @@ interface OrderImportsTest : JavaRecipeTest {
             
             class A {}
         """,
-            after = """
+        after = """
             import java.util.*;
             import java.util.regex.Pattern;
             
@@ -182,8 +185,8 @@ interface OrderImportsTest : JavaRecipeTest {
 
     @Test
     fun blankLinesNotFollowedByBlockArentAdded(jp: JavaParser) = assertUnchanged(
-            jp,
-            before = """
+        jp,
+        before = """
             import java.util.List;
             
             import static java.util.Collections.*;
@@ -194,8 +197,8 @@ interface OrderImportsTest : JavaRecipeTest {
 
     @Test
     fun foldIntoExistingStar(jp: JavaParser) = assertChanged(
-            jp,
-            before = """
+        jp,
+        before = """
             import java.util.*;
             import java.util.ArrayList;
             import java.util.regex.Pattern;
@@ -203,7 +206,7 @@ interface OrderImportsTest : JavaRecipeTest {
             
             class A {}
         """,
-            after = """
+        after = """
             import java.util.*;
             import java.util.regex.Pattern;
             
@@ -213,8 +216,8 @@ interface OrderImportsTest : JavaRecipeTest {
 
     @Test
     fun idempotence(jp: JavaParser) = assertUnchanged(
-            jp,
-            before = """
+        jp,
+        before = """
             import java.util.*;
             import java.util.regex.Pattern;
 
@@ -224,9 +227,9 @@ interface OrderImportsTest : JavaRecipeTest {
 
     @Test
     fun unfoldStar(jp: JavaParser) = assertChanged(
-            jp,
-            recipe = recipe.withRemoveUnused(true),
-            before = """
+        jp,
+        recipe = recipe.withRemoveUnused(true),
+        before = """
             import java.util.*;
             
             class A {
@@ -234,7 +237,7 @@ interface OrderImportsTest : JavaRecipeTest {
                 List list2;
             }
         """,
-            after = """
+        after = """
             import java.util.List;
             
             class A {
@@ -246,9 +249,9 @@ interface OrderImportsTest : JavaRecipeTest {
 
     @Test
     fun unfoldStarMultiple(jp: JavaParser) = assertChanged(
-            jp,
-            recipe = recipe.withRemoveUnused(true),
-            before = """
+        jp,
+        recipe = recipe.withRemoveUnused(true),
+        before = """
             import java.util.*;
             
             class A {
@@ -257,7 +260,7 @@ interface OrderImportsTest : JavaRecipeTest {
                 Map map;
             }
         """,
-            after = """
+        after = """
             import java.util.List;
             import java.util.Map;
             
@@ -271,15 +274,15 @@ interface OrderImportsTest : JavaRecipeTest {
 
     @Test
     fun removeUnused(jp: JavaParser) = assertChanged(
-            jp,
-            recipe = recipe.withRemoveUnused(true),
-            before = """
+        jp,
+        recipe = recipe.withRemoveUnused(true),
+        before = """
             import java.util.*;
             
             class A {
             }
         """,
-            after = """
+        after = """
             class A {
             }
         """
@@ -287,9 +290,9 @@ interface OrderImportsTest : JavaRecipeTest {
 
     @Test
     fun unfoldStaticStar(jp: JavaParser) = assertChanged(
-            jp,
-            recipe = recipe.withRemoveUnused(true),
-            before = """
+        jp,
+        recipe = recipe.withRemoveUnused(true),
+        before = """
             import java.util.List;
             
             import static java.util.Collections.*;
@@ -298,7 +301,7 @@ interface OrderImportsTest : JavaRecipeTest {
                 List list = emptyList();
             }
         """,
-            after = """
+        after = """
             import java.util.List;
             
             import static java.util.Collections.emptyList;
@@ -311,8 +314,8 @@ interface OrderImportsTest : JavaRecipeTest {
 
     @Test
     fun packagePatternEscapesDots(jp: JavaParser) = assertUnchanged(
-            jp,
-            before = """
+        jp,
+        before = """
             import javax.annotation.Nonnull;
             
             class A {}
@@ -321,8 +324,8 @@ interface OrderImportsTest : JavaRecipeTest {
 
     @Test
     fun twoImportsFollowedByStar(jp: JavaParser) = assertUnchanged(
-            jp,
-            before = """
+        jp,
+        before = """
             import java.io.IOException;
             import java.io.UncheckedIOException;
             import java.nio.files.*;
@@ -333,27 +336,28 @@ interface OrderImportsTest : JavaRecipeTest {
 
     @Test
     fun springCloudFormat() = assertUnchanged(
-            JavaParser.fromJavaVersion().styles(
-                    listOf(
-                            NamedStyles(
-                                    randomId(), "spring", "spring", "spring", emptySet(), listOf(
-                                    ImportLayoutStyle.builder()
-                                            .classCountToUseStarImport(999)
-                                            .nameCountToUseStarImport(999)
-                                            .importPackage("java.*")
-                                            .blankLine()
-                                            .importPackage("javax.*")
-                                            .blankLine()
-                                            .importAllOthers()
-                                            .blankLine()
-                                            .importPackage("org.springframework.*")
-                                            .blankLine()
-                                            .importStaticAllOthers()
-                                            .build())
-                            )
+        JavaParser.fromJavaVersion().styles(
+            listOf(
+                NamedStyles(
+                    randomId(), "spring", "spring", "spring", emptySet(), listOf(
+                        ImportLayoutStyle.builder()
+                            .classCountToUseStarImport(999)
+                            .nameCountToUseStarImport(999)
+                            .importPackage("java.*")
+                            .blankLine()
+                            .importPackage("javax.*")
+                            .blankLine()
+                            .importAllOthers()
+                            .blankLine()
+                            .importPackage("org.springframework.*")
+                            .blankLine()
+                            .importStaticAllOthers()
+                            .build()
                     )
-            ).build(),
-            before = """
+                )
+            )
+        ).build(),
+        before = """
             import java.io.ByteArrayOutputStream;
             import java.nio.charset.StandardCharsets;
             import java.util.Collections;
@@ -383,8 +387,8 @@ interface OrderImportsTest : JavaRecipeTest {
 
     @Test
     fun importSorting(jp: JavaParser) = assertChanged(
-            jp,
-            before = """
+        jp,
+        before = """
             import r.core.Flux;
             import s.core.Flux;
             import com.fasterxml.jackson.databind.ObjectMapper;
@@ -393,7 +397,7 @@ interface OrderImportsTest : JavaRecipeTest {
             
             class A {}
         """,
-            after = """
+        after = """
             import com.fasterxml.jackson.databind.ObjectMapper;
             import org.apache.commons.logging.Log;
             import r.core.Flux;
@@ -406,15 +410,15 @@ interface OrderImportsTest : JavaRecipeTest {
 
     @Test
     fun foldGroupOfStaticImportsThatAppearLast(jp: JavaParser) = assertChanged(
-            jp,
-            before = """
+        jp,
+        before = """
             import static java.util.stream.Collectors.toList;
             import static java.util.stream.Collectors.toMap;
             import static java.util.stream.Collectors.toSet;
             
             class A {}
         """,
-            after = """
+        after = """
             import static java.util.stream.Collectors.*;
             
             class A {}
@@ -423,9 +427,9 @@ interface OrderImportsTest : JavaRecipeTest {
 
     @Test
     fun preservesStaticStarImportWhenRemovingUnused(jp: JavaParser) = assertUnchanged(
-            jp,
-            dependsOn = arrayOf(
-                    """
+        jp,
+        dependsOn = arrayOf(
+            """
                 package com.foo;
                 
                 public class A {
@@ -437,8 +441,8 @@ interface OrderImportsTest : JavaRecipeTest {
                     public static void baz2() {}
                 }
             """
-            ),
-            before = """
+        ),
+        before = """
             package org.bar;
             
             import static com.foo.A.*;
@@ -459,10 +463,10 @@ interface OrderImportsTest : JavaRecipeTest {
 
     @Test
     fun preservesStaticInheritanceImport(jp: JavaParser) = assertUnchanged(
-            jp,
-            recipe = recipe.withRemoveUnused(true),
-            dependsOn = arrayOf(
-                    """
+        jp,
+        recipe = recipe.withRemoveUnused(true),
+        dependsOn = arrayOf(
+            """
                 package com.baz;
                 
                 public class A {
@@ -474,15 +478,15 @@ interface OrderImportsTest : JavaRecipeTest {
                     public static void baz2() {}
                 }
             """,
-                    """
+            """
                 package com.foo;
                 
                 import com.baz.A; 
                 
                 public class B extends A { }
             """
-            ),
-            before = """
+        ),
+        before = """
             package org.bar;
             
             import static com.foo.B.*;
@@ -502,10 +506,10 @@ interface OrderImportsTest : JavaRecipeTest {
 
     @Test
     fun preservesStaticMethodArguments(jp: JavaParser) = assertUnchanged(
-            jp,
-            recipe = recipe.withRemoveUnused(true),
-            dependsOn = arrayOf(
-                    """
+        jp,
+        recipe = recipe.withRemoveUnused(true),
+        dependsOn = arrayOf(
+            """
                 package com.foo;
                 
                 public class A {
@@ -517,8 +521,8 @@ interface OrderImportsTest : JavaRecipeTest {
                     public static Integer numberTwo() { return 2; }
                 }
             """
-            ),
-            before = """
+        ),
+        before = """
             package org.bar;
             
             import static com.foo.A.*;
@@ -534,10 +538,10 @@ interface OrderImportsTest : JavaRecipeTest {
 
     @Test
     fun preservesDifferentStaticImportsFromSamePackage(jp: JavaParser) = assertUnchanged(
-            jp,
-            recipe = recipe.withRemoveUnused(true),
-            dependsOn = arrayOf(a, b),
-            before = """
+        jp,
+        recipe = recipe.withRemoveUnused(true),
+        dependsOn = arrayOf(a, b),
+        before = """
             package org.bar;
             
             import static com.foo.A.one;
@@ -555,10 +559,10 @@ interface OrderImportsTest : JavaRecipeTest {
 
     @Test
     fun collapsesDifferentStaticImportsFromSamePackage(jp: JavaParser) = assertChanged(
-            jp,
-            recipe = recipe.withRemoveUnused(true),
-            dependsOn = arrayOf(a, b),
-            before = """
+        jp,
+        recipe = recipe.withRemoveUnused(true),
+        dependsOn = arrayOf(a, b),
+        before = """
             package org.bar;
             
             import static com.foo.A.one;
@@ -576,7 +580,7 @@ interface OrderImportsTest : JavaRecipeTest {
                 }
             }
         """,
-            after = """
+        after = """
             package org.bar;
             
             import static com.foo.A.*;
@@ -594,9 +598,9 @@ interface OrderImportsTest : JavaRecipeTest {
 
     @Test
     fun removesRedundantImports(jp: JavaParser) = assertChanged(
-            jp,
-            dependsOn = arrayOf(a, b),
-            before = """
+        jp,
+        dependsOn = arrayOf(a, b),
+        before = """
             package org.bar;
             
             import com.foo.B;
@@ -612,7 +616,7 @@ interface OrderImportsTest : JavaRecipeTest {
                 }
             }
         """,
-            after = """
+        after = """
             package org.bar;
             
             import com.foo.B;
@@ -628,13 +632,54 @@ interface OrderImportsTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/474")
+    @Test
+    fun blankLinesBetweenImports(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(
+            listOf(
+                NamedStyles(
+                    randomId(),
+                    "custom",
+                    "custom style",
+                    null,
+                    emptySet(),
+                    listOf(
+                        ImportLayoutStyle.builder()
+                            .classCountToUseStarImport(9999)
+                            .nameCountToUseStarImport(9999)
+                            .importStaticAllOthers()
+                            .blankLine()
+                            .importAllOthers()
+                            .blankLine()
+                            .build() as Style
+                    )
+                )
+            )
+        ).build(),
+        before = """
+            import java.util.List;
+            import static java.util.Collections.singletonList;
+            class Test {
+            }
+        """,
+        after = """
+            import static java.util.Collections.singletonList;
+            
+            import java.util.List;
+            
+            class Test {
+            }
+        """
+    )
+
     @Disabled
     @Issue("#352")
     @Test
     fun groupImportsIsAwareOfNestedClasses(jp: JavaParser) = assertChanged(
         jp,
         recipe = recipe.withRemoveUnused(false),
-        dependsOn = arrayOf("""
+        dependsOn = arrayOf(
+            """
             package org.abc;
             public class A {}
             public class B {}
@@ -646,7 +691,8 @@ interface OrderImportsTest : JavaRecipeTest {
             public class H {
                 public class H1 {}
             }
-        """),
+        """
+        ),
         before = """
             package org.bar;
     
