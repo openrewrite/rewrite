@@ -1551,8 +1551,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             List<JavaType.FullyQualified> exceptionTypes = new ArrayList<>();
             if (selectType instanceof MethodType) {
                 for (com.sun.tools.javac.code.Type exceptionType : ((MethodType) selectType).thrown) {
-                    if (exceptionType != null) {
-                        JavaType.FullyQualified javaType = (JavaType.FullyQualified) type(exceptionType);
+                    JavaType.FullyQualified javaType = (JavaType.FullyQualified) type(exceptionType);
+                    if (javaType != null) {
+                        //If the exception type is not resolved, it is not added to the list of exceptions.
                         exceptionTypes.add(javaType);
                     }
                 }

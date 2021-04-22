@@ -23,6 +23,7 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTreeTest
 import org.openrewrite.java.JavaTreeTest.NestingLevel.Class
 import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
+import java.util.stream.Collectors
 
 interface MethodDeclarationTest : JavaTreeTest {
 
@@ -111,4 +112,33 @@ interface MethodDeclarationTest : JavaTreeTest {
                 }
             """
     )
+
+    @Test
+    fun hasThrownExceptionInType(jp: JavaParser) {
+        val a = jp.parse(
+            """
+            import java.io.IOException;
+            import org.example.WhatTypeOfExceptionIsThis;
+            
+            public class A {
+                private static boolean foo(boolean flag) throws IOException, ArithmeticException, WhatTypeOfExceptionIsThis {
+                    if (flag) {
+                        throw new WhatTypeOfExceptionIsThis();
+                    } else {
+                        throw new IOException();
+                    }
+                } 
+            }
+        """
+        )[0]
+
+        val inv = a.classes[0].body.statements.filterIsInstance<J.MethodDeclaration>().first()
+        assertThat(inv.type!!.thrownExceptions).hasSize(2)
+
+        val fullyQualifiedNames = inv.type!!.thrownExceptions.stream()
+            .map(JavaType.FullyQualified::getFullyQualifiedName)
+            .collect(Collectors.toList())
+        assertThat(fullyQualifiedNames).contains("java.io.IOException", "java.lang.ArithmeticException")
+    }
+
 }
