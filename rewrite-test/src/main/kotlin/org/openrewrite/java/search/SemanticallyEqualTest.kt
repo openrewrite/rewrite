@@ -427,8 +427,8 @@ interface SemanticallyEqualTest {
             Markers.EMPTY,
             "name",
             JavaType.Class.build(
-                "org.foo.Bar",
                 Collections.singleton(Flag.Public),
+                "org.foo.Bar",
                 JavaType.Class.Kind.Class,
                 listOf(),
                 listOf(),

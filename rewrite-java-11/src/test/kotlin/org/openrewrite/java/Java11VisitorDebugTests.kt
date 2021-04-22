@@ -21,6 +21,7 @@ import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.format.*
 import org.openrewrite.java.search.*
 import org.openrewrite.java.tree.TypeTreeTest
+
 //----------------------------------------------------------------------------------------------
 // If test classes are added here, they should also be added to JavaVisitorCompatibilityKit.kt
 // Tests are in alphabetical order.

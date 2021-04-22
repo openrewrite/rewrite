@@ -138,7 +138,6 @@ public interface JavaType extends Serializable {
 
         @Getter(AccessLevel.NONE)
         private final int flagsBitMap;
-
         private final Kind kind;
 
         private final List<Variable> members;
@@ -156,8 +155,8 @@ public interface JavaType extends Serializable {
 
         private final String flyweightId;
 
-        private Class(String fullyQualifiedName,
-                      int flagsBitMap,
+        private Class(int flagsBitMap,
+                      String fullyQualifiedName,
                       Kind kind,
                       List<Variable> members,
                       List<JavaType> typeParameters,
@@ -204,7 +203,7 @@ public interface JavaType extends Serializable {
          * @return Any class found in the type cache
          */
         public static Class build(String fullyQualifiedName) {
-            return build(fullyQualifiedName, 1, Kind.Class, emptyList(), emptyList(), emptyList(), null, null, null,true);
+            return build(1, fullyQualifiedName, Kind.Class, emptyList(), emptyList(), emptyList(), null, null, null,true);
         }
 
         /**
@@ -218,11 +217,11 @@ public interface JavaType extends Serializable {
          * @return Any class found in the type cache
          */
         public static Class build(String fullyQualifiedName, Kind kind) {
-            return build(fullyQualifiedName, 1, kind, emptyList(), emptyList(), emptyList(), null, null, null,true);
+            return build(1, fullyQualifiedName, kind, emptyList(), emptyList(), emptyList(), null, null, null,true);
         }
 
-        public static Class build(String fullyQualifiedName,
-                                  Set<Flag> flags,
+        public static Class build(Set<Flag> flags,
+                                  String fullyQualifiedName,
                                   Kind kind,
                                   List<Variable> members,
                                   List<JavaType> typeParameters,
@@ -230,24 +229,24 @@ public interface JavaType extends Serializable {
                                   List<Method> constructors,
                                   @Nullable Class supertype,
                                   @Nullable Class owningClass) {
-            return build(fullyQualifiedName, Flag.flagsToBitMap(flags), kind, members, typeParameters, interfaces, constructors, supertype, owningClass, false);
+            return build(Flag.flagsToBitMap(flags), fullyQualifiedName, kind, members, typeParameters, interfaces, constructors, supertype, owningClass, false);
         }
 
         @JsonCreator
-        protected static Class build(String fullyQualifiedName,
-                                  int flagsBitMap,
-                                  Kind kind,
-                                  List<Variable> members,
-                                  List<JavaType> typeParameters,
-                                  List<JavaType> interfaces,
-                                  @Nullable List<Method> constructors,
-                                  @Nullable Class supertype,
-                                  @Nullable Class owningClass) {
-            return build(fullyQualifiedName, flagsBitMap, kind, members, typeParameters, interfaces, constructors, supertype, owningClass, false);
+        protected static Class build(int flagsBitMap,
+                                     String fullyQualifiedName,
+                                     Kind kind,
+                                     List<Variable> members,
+                                     List<JavaType> typeParameters,
+                                     List<JavaType> interfaces,
+                                     @Nullable List<Method> constructors,
+                                     @Nullable Class supertype,
+                                     @Nullable Class owningClass) {
+            return build(flagsBitMap, fullyQualifiedName, kind, members, typeParameters, interfaces, constructors, supertype, owningClass, false);
         }
 
-        public static Class build(String fullyQualifiedName,
-                                  int flagsBitMap,
+        public static Class build(int flagsBitMap,
+                                  String fullyQualifiedName,
                                   Kind kind,
                                   List<Variable> members,
                                   List<JavaType> typeParameters,
@@ -268,7 +267,7 @@ public interface JavaType extends Serializable {
             }
             sortedMembers.sort(comparing(Variable::getName));
 
-            JavaType.Class candidate = new Class(fullyQualifiedName, flagsBitMap, kind, sortedMembers, typeParameters, interfaces, constructors, supertype, owningClass);
+            JavaType.Class candidate = new Class( flagsBitMap, fullyQualifiedName, kind, sortedMembers, typeParameters, interfaces, constructors, supertype, owningClass);
 
             // This logic will attempt to match the candidate against a candidate in the flyweights. If a match is found,
             // that instance is used over the new candidate to prevent a large memory footprint. If relaxed class type
@@ -340,8 +339,8 @@ public interface JavaType extends Serializable {
                         // Name each constructor "<reflection_constructor>" to intentionally disambiguate from method signatures parsed
                         // by JavaParser, which may have richer information but which would only be available for types found in the source
                         // repository.
-                        reflectedConstructors.add(Method.build(selfType, "<reflection_constructor>", resolvedSignature, resolvedSignature,
-                                parameterNames, singleton(Flag.Public)));
+                        reflectedConstructors.add(Method.build(singleton(Flag.Public), selfType, "<reflection_constructor>",
+                                resolvedSignature, resolvedSignature, parameterNames, Collections.emptyList()));
                     }
                     constructors = reflectedConstructors;
                 } catch (ClassNotFoundException ignored) {
@@ -403,7 +402,7 @@ public interface JavaType extends Serializable {
 
             Class c = (Class) type;
             return
-                    this == c || (kind == c.kind && flagsBitMap == flagsBitMap &&
+                    this == c || (kind == c.kind && flagsBitMap == c.flagsBitMap &&
                             fullyQualifiedName.equals(c.fullyQualifiedName) &&
                                     TypeUtils.deepEquals(members, c.members) &&
                                     TypeUtils.deepEquals(supertype, c.supertype) &&
@@ -455,12 +454,12 @@ public interface JavaType extends Serializable {
         @Getter(AccessLevel.NONE)
         private final int flagsBitMap;
 
-        public Variable(String name, @Nullable JavaType type, Set<Flag> flags) {
-            this(name, type, Flag.flagsToBitMap(flags));
+        public Variable(Set<Flag> flags, String name, @Nullable JavaType type) {
+            this(Flag.flagsToBitMap(flags), name, type);
         }
 
         @JsonCreator
-        public Variable(String name, @Nullable JavaType type, int flagsBitMap) {
+        public Variable(int flagsBitMap, String name, @Nullable JavaType type) {
             this.name = name;
             this.type = type;
             this.flagsBitMap = flagsBitMap;
@@ -489,34 +488,40 @@ public interface JavaType extends Serializable {
     class Method implements JavaType {
         private static final Map<FullyQualified, Map<String, Set<Method>>> flyweights = new WeakHashMap<>();
 
+        @Getter(AccessLevel.NONE)
+        private final int flagsBitMap;
+
         private final FullyQualified declaringType;
         private final String name;
         private final Signature genericSignature;
         private final Signature resolvedSignature;
         private final List<String> paramNames;
+        private final List<FullyQualified> thrownExceptions;
 
-        @Getter(AccessLevel.NONE)
-        private final int flagsBitMap;
-
-        private Method(FullyQualified declaringType, String name, Signature genericSignature, Signature resolvedSignature, List<String> paramNames, int flagsBitMap) {
+        private Method(int flagsBitMap, FullyQualified declaringType, String name,
+                       @Nullable Signature genericSignature, Signature resolvedSignature, List<String> paramNames,
+                       List<FullyQualified> thrownExceptions) {
+            this.flagsBitMap = flagsBitMap;
             this.declaringType = declaringType;
             this.name = name;
             this.genericSignature = genericSignature;
             this.resolvedSignature = resolvedSignature;
             this.paramNames = paramNames;
-            this.flagsBitMap = flagsBitMap;
+            this.thrownExceptions = thrownExceptions;
         }
 
-        public static Method build(FullyQualified declaringType, String name, Signature genericSignature,
-                                   Signature resolvedSignature, List<String> paramNames, Set<Flag> flags) {
-            return build(declaringType, name, genericSignature, resolvedSignature, paramNames, Flag.flagsToBitMap(flags));
+        public static Method build(Set<Flag> flags, FullyQualified declaringType, String name,
+                                    @Nullable Signature genericSignature, Signature resolvedSignature,
+                                   List<String> paramNames, List<FullyQualified> thrownExceptions) {
+            return build(Flag.flagsToBitMap(flags), declaringType, name, genericSignature, resolvedSignature, paramNames, thrownExceptions);
         }
 
         @JsonCreator
-        public static Method build(FullyQualified declaringType, String name, Signature genericSignature,
-                                   Signature resolvedSignature, List<String> paramNames, int flagsBitMap) {
+        public static Method build(int flagsBitMap, FullyQualified declaringType, String name,
+                                   @Nullable Signature genericSignature, Signature resolvedSignature, List<String> paramNames,
+                                   List<FullyQualified> thrownExceptions) {
 
-            Method test = new Method(declaringType, name, genericSignature, resolvedSignature, paramNames, flagsBitMap);
+            Method test = new Method(flagsBitMap, declaringType, name, genericSignature, resolvedSignature, paramNames, thrownExceptions);
 
             synchronized (flyweights) {
                 Set<Method> methods = flyweights
@@ -557,11 +562,11 @@ public interface JavaType extends Serializable {
         }
 
         public Method withFlags(Set<Flag> flags) {
-            return new Method(this.declaringType, this.name, this.genericSignature, this.resolvedSignature, this.paramNames, Flag.flagsToBitMap(flags));
+            return new Method(Flag.flagsToBitMap(flags), this.declaringType, this.name, this.genericSignature, this.resolvedSignature, this.paramNames, this.thrownExceptions);
         }
 
         public Method withDeclaringType(FullyQualified declaringType) {
-            return new Method(declaringType, this.name, this.genericSignature, this.resolvedSignature, this.paramNames, this.flagsBitMap);
+            return new Method(this.flagsBitMap, declaringType, this.name, this.genericSignature, this.resolvedSignature, this.paramNames, this.thrownExceptions);
         }
 
         @Override
@@ -571,12 +576,12 @@ public interface JavaType extends Serializable {
             }
 
             Method m = (Method) type;
-            return this == m || (
-                    paramNames.equals(m.paramNames) &&
-                            flagsBitMap == m.flagsBitMap &&
-                            declaringType.deepEquals(m.declaringType) &&
-                            signatureDeepEquals(genericSignature, m.genericSignature) &&
-                            signatureDeepEquals(resolvedSignature, m.resolvedSignature));
+            return this == m || (paramNames.equals(m.paramNames) &&
+                    flagsBitMap == m.flagsBitMap &&
+                    declaringType.deepEquals(m.declaringType) &&
+                    signatureDeepEquals(genericSignature, m.genericSignature) &&
+                    signatureDeepEquals(resolvedSignature, m.resolvedSignature) &&
+                    TypeUtils.deepEquals(thrownExceptions, m.thrownExceptions));
         }
     }
 
