@@ -140,6 +140,10 @@ class Java11JavaTemplateTest : Java11Test, JavaTemplateTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11MethodNameCasingTest : Java11Test, MethodNameCasingTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11MinimumViableSpacingTest : Java11Test, MinimumViableSpacingTest
 
 @DebugOnly

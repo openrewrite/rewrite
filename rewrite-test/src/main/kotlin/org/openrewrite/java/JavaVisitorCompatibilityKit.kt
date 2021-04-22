@@ -108,6 +108,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class JavaTemplateTck : JavaTemplateTest
 
     @Nested
+    inner class MethodNameCasingTck : MethodNameCasingTest
+
+    @Nested
     inner class MinimumViableSpacingTck : MinimumViableSpacingTest
 
     @Nested

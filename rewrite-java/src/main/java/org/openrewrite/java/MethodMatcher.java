@@ -91,7 +91,7 @@ public class MethodMatcher {
         return matchesTargetType(methodType.getDeclaringType()) &&
                 methodNamePattern.matcher(methodType.getName()).matches() &&
                 argumentPattern.matcher(methodType.getGenericSignature().getParamTypes().stream()
-                        .map(this::typePattern)
+                        .map(MethodMatcher::typePattern)
                         .filter(Objects::nonNull)
                         .collect(joining(","))).matches();
     }
@@ -117,7 +117,7 @@ public class MethodMatcher {
                             }
                         })
                         .filter(Objects::nonNull)
-                        .map(this::typePattern)
+                        .map(MethodMatcher::typePattern)
                         .filter(Objects::nonNull)
                         .collect(joining(","))).matches();
     }
@@ -135,7 +135,7 @@ public class MethodMatcher {
         return matchesTargetType(method.getType().getDeclaringType()) &&
                 methodNamePattern.matcher(method.getSimpleName()).matches() &&
                 argumentPattern.matcher(method.getType().getResolvedSignature().getParamTypes().stream()
-                        .map(this::typePattern)
+                        .map(MethodMatcher::typePattern)
                         .filter(Objects::nonNull)
                         .collect(joining(","))).matches();
     }
@@ -150,7 +150,7 @@ public class MethodMatcher {
             signaturePattern = args.getElements().stream()
                     .map(Expression::getType)
                     .filter(Objects::nonNull)
-                    .map(this::typePattern)
+                    .map(MethodMatcher::typePattern)
                     .filter(Objects::nonNull)
                     .collect(joining(","));
         }
@@ -170,7 +170,7 @@ public class MethodMatcher {
     }
 
     @Nullable
-    private String typePattern(JavaType type) {
+    private static String typePattern(JavaType type) {
         if (type instanceof JavaType.Primitive) {
             return ((JavaType.Primitive) type).getKeyword();
         } else if (type instanceof JavaType.Class) {
@@ -182,6 +182,19 @@ public class MethodMatcher {
             }
         }
         return null;
+    }
+
+    public static String methodPattern(J.MethodDeclaration method) {
+        assert method.getType() != null;
+
+        return method.getType().getDeclaringType().getFullyQualifiedName() + " " +
+                method.getSimpleName() +
+                "(" +
+                method.getType().getResolvedSignature().getParamTypes().stream()
+                        .map(MethodMatcher::typePattern)
+                        .filter(Objects::nonNull)
+                        .collect(joining(",")) +
+                ")";
     }
 }
 
