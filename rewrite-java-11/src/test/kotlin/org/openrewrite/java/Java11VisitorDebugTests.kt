@@ -96,6 +96,10 @@ class Java11FinalizeLocalVariablesTest : Java11Test, FinalizeLocalVariablesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11StaticMethodNotFinalTest : Java11Test, StaticMethodNotFinalTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11FindAnnotationsTest : Java11Test, FindAnnotationsTest
 
 @DebugOnly
@@ -145,6 +149,10 @@ class Java11MethodNameCasingTest : Java11Test, MethodNameCasingTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11MinimumViableSpacingTest : Java11Test, MinimumViableSpacingTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11ModifierOrderTest : Java11Test, ModifierOrderTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

@@ -81,6 +81,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class FinalizeLocalVariablesTck : FinalizeLocalVariablesTest
 
     @Nested
+    inner class StaticMethodNotFinalTck : StaticMethodNotFinalTest
+
+    @Nested
     inner class FindAnnotationsTck : FindAnnotationsTest
 
     @Nested
@@ -112,6 +115,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class MinimumViableSpacingTck : MinimumViableSpacingTest
+
+    @Nested
+    inner class ModifierOrderTck : ModifierOrderTest
 
     @Nested
     inner class NormalizeFormatTck : NormalizeFormatTest
