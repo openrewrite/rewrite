@@ -108,6 +108,11 @@ public class TypeUtils {
     }
 
     static boolean deepEquals(List<? extends JavaType> ts1, List<? extends JavaType> ts2) {
+
+        if (ts1 == null || ts2 == null) {
+            return ts1 == null && ts2 == null;
+        }
+
         if (ts1.size() != ts2.size()) {
             return false;
         }
