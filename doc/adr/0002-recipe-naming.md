@@ -38,7 +38,7 @@ public class DeleteKey extends Recipe {
 ### Display names
 
 * **DO** provide a short name ideally consisting of less than 5 words, but definitely less than 10 words.
-* **DO** use initial capping (i.e. don't capitalize every word).
+* **DO** use sentence-casing (i.e. capitalize only the first word). For a more precise definition, see the C-level heading description in the [O'Reilly style guide](http://oreillymedia.github.io/production-resources/styleguide/#headings).
 * **DO NOT** end with a period.
 * **DO** use markdown backticks to delimit words representing code symbols, as in "JUnit4 `@RunWith` to JUnit Jupiter `@ExtendWith`".
 * **DO** describe what the end result is positively whenever possible.
@@ -52,5 +52,7 @@ public class DeleteKey extends Recipe {
 ## Consequences
 
 Various user experiences listing OpenRewrite recipes are able to present a clean view of available recipes by relying strictly on the metadata provided by the recipe.
+
+![image](https://user-images.githubusercontent.com/1697736/115929956-80745500-a43d-11eb-8d48-551a5ba74ee4.png)
 
 ![image](https://user-images.githubusercontent.com/1697736/115926276-74859480-a437-11eb-9c50-2d2d30cc4c24.png)
