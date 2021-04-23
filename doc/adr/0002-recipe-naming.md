@@ -35,6 +35,16 @@ public class DeleteKey extends Recipe {
 }
 ```
 
+### Recipe package naming
+
+Recipes are currently organized hierarchically by package name. These package naming guidelines apply to both recipes defined in code as well as the name given to declarative recipes defined in YAML.
+
+* **DO** start every OpenRewrite recipe package with with `org.openrewrite.<LANGUAGE>`.
+* **DO** place every general-purpose search recipe in `org.openrewrite.<LANGUAGE>.search`.
+* **DO** place every general-purpose security recipe in `org.openrewrite.<LANGUAGE>.security`.
+* **DO** place every general-purpose formatting recipe in `org.openrewrite.<LANGUAGE>.format`.
+* **DO** place every general-purpose cleanup recipe in `org.openrewrite.<LANGUAGE>.cleanup`. Note that in IDEs, "Code cleanup" is typically a separate action from "Format code", which is why the two hygiene-related tasks of formatting and cleanup are in distinct packages.
+
 ### Display names
 
 * **DO** provide a short name ideally consisting of less than 5 words, but definitely less than 10 words.
@@ -48,6 +58,13 @@ public class DeleteKey extends Recipe {
 * **DO** use at least one full sentence to describe the recipe, ending in a period.
 * **DO** use markdown backticks (`) to delimit words representing code symbols.
 * **DO NOT** reference alternatives in other static analyzers or products.
+
+### Tagging
+
+Tags are independent of one another. A recipe containing a tag will show up in any categorical listing by that tag.
+
+* **DO** use all lower-case tag names, e.g. "security", "testing".
+* **DO NOT** tag with language name.
 
 ## Consequences
 
