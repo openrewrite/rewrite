@@ -219,7 +219,7 @@ public abstract class Recipe {
                 try {
                     @SuppressWarnings("unchecked") S afterFile = (S) getVisitor().visit(s, ctx);
                     if (afterFile != null && afterFile != s) {
-                        afterFile = afterFile.withMarkers(afterFile.getMarkers().compute(
+                        afterFile = afterFile.withMarkers(afterFile.getMarkers().computeByType(
                                 new RecipeThatMadeChanges(this),
                                 (r1, r2) -> {
                                     r1.recipes.addAll(r2.recipes);
@@ -415,7 +415,7 @@ public abstract class Recipe {
         private final UUID id;
 
         private RecipeThatMadeChanges(Recipe recipe) {
-            this.recipes = new HashSet<>();
+            this.recipes = new LinkedHashSet<>();
             this.recipes.add(recipe);
             id = randomId();
         }
