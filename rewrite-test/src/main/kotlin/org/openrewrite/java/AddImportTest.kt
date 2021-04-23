@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.*
 import org.openrewrite.java.tree.J
@@ -66,6 +67,40 @@ interface AddImportTest : JavaRecipeTest {
             package a;
             
             class A {}
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/484")
+    @Disabled
+    @Test
+    fun addImportIfReferenced(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object: JavaIsoVisitor<ExecutionContext>() {
+            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
+                val c = super.visitClassDeclaration(classDecl, p)
+                var b = c.body
+                b = b.withTemplate(template("BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);")
+                    .imports("java.math.BigDecimal", "java.math.RoundingMode").build(), b.coordinates.lastStatement())
+                maybeAddImport("java.math.BigDecimal")
+                maybeAddImport("java.math.RoundingMode")
+                return c.withBody(b)
+            }
+        }.toRecipe(),
+        before = """
+            package a;
+
+            class A {
+            }
+        """,
+        after = """
+            package a;
+            
+            import java.math.BigDecimal;
+            import java.math.RoundingMode;
+            
+            class A {
+                BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);
+            }
         """
     )
 
