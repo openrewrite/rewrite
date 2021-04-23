@@ -29,12 +29,12 @@ public class PrimitiveWrapperClassConstructorToValueOf extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Convert Primitive Wrapper Class Constructors to valueOf Method";
+        return "Use primitive wrapper `valueOf` method";
     }
 
     @Override
     public String getDescription() {
-        return "The constructor of all primitive types has been deprecated in favor of using the static factory method valueOf available of each of the primitive types. This is a recipe to convert these constructors to their valueOf counterparts";
+        return "The constructor of all primitive types has been deprecated in favor of using the static factory method `valueOf` available for each of the primitive type wrappers.";
     }
 
     @Override
@@ -44,7 +44,7 @@ public class PrimitiveWrapperClassConstructorToValueOf extends Recipe {
             public J visitNewClass(J.NewClass newClass, ExecutionContext executionContext) {
                 J j = super.visitNewClass(newClass, executionContext);
                 J.NewClass nc = (J.NewClass) j;
-                if (nc.getType() instanceof JavaType.FullyQualified && nc.getArguments() != null && nc.getArguments().getElements().size() == 1) {
+                if (nc.getType() instanceof JavaType.FullyQualified && nc.getArguments() != null && nc.getArguments().size() == 1) {
                     JavaType.FullyQualified fqn = (JavaType.FullyQualified) nc.getType();
                     switch (fqn.getFullyQualifiedName()) {
                         case "java.lang.Boolean":
@@ -55,7 +55,7 @@ public class PrimitiveWrapperClassConstructorToValueOf extends Recipe {
                         case "java.lang.Integer":
                         case "java.lang.Long":
                         case "java.lang.Short":
-                            j = nc.withTemplate(template(fqn.getClassName() + ".valueOf(#{});").javaParser(JAVA_PARSER_THREAD_LOCAL.get()).build(), nc.getCoordinates().replace(), nc.getArguments().getElements().get(0));
+                            j = nc.withTemplate(template(fqn.getClassName() + ".valueOf(#{});").javaParser(JAVA_PARSER_THREAD_LOCAL.get()).build(), nc.getCoordinates().replace(), nc.getArguments().get(0));
                             break;
                         default:
                             break;

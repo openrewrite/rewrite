@@ -25,7 +25,10 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.grammar.AspectJLexer;
 import org.openrewrite.java.internal.grammar.RefactorMethodSignatureParser;
 import org.openrewrite.java.internal.grammar.RefactorMethodSignatureParserBaseVisitor;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -144,10 +147,10 @@ public class MethodMatcher {
         if (constructor.getType() == null) {
             return false;
         }
-        JContainer<Expression> args = constructor.getArguments();
+        List<Expression> args = constructor.getArguments();
         String signaturePattern = "";
         if (args != null) {
-            signaturePattern = args.getElements().stream()
+            signaturePattern = args.stream()
                     .map(Expression::getType)
                     .filter(Objects::nonNull)
                     .map(MethodMatcher::typePattern)

@@ -25,12 +25,14 @@ recipeList:
   - org.openrewrite.java.cleanup.ExplicitInitialization
   - org.openrewrite.java.cleanup.FinalizeLocalVariables
   - org.openrewrite.java.cleanup.HideUtilityClassConstructor
-  - org.openrewrite.java.cleanup.MethodNameCasing
+#  - org.openrewrite.java.cleanup.MethodNameCasing
   - org.openrewrite.java.cleanup.ModifierOrder
+  - org.openrewrite.java.cleanup.RedundantFileCreation
   - org.openrewrite.java.cleanup.SimplifyBooleanExpression
   - org.openrewrite.java.cleanup.SimplifyBooleanReturn
   - org.openrewrite.java.cleanup.StaticMethodNotFinal
   - org.openrewrite.java.cleanup.UnnecessaryExplicitTypeArguments
   - org.openrewrite.java.cleanup.UnnecessaryParentheses
+  - org.openrewrite.java.cleanup.UnnecessaryThrows
   - org.openrewrite.java.cleanup.UseDiamondOperator
   - org.openrewrite.java.cleanup.PrimitiveWrapperClassConstructorToValueOf

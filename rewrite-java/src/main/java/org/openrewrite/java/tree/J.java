@@ -3559,7 +3559,7 @@ public interface J extends Serializable, Tree {
             if (nooh == this.nooh) {
                 return this;
             }
-            return new NewClass(id, prefix, markers, enclosing, nooh, clazz, arguments, body, type);
+            return new NewClass(id, prefix, markers, enclosing, nooh, clazz, arguments, body, constructorType, type);
         }
 
         @Nullable
@@ -3571,8 +3571,8 @@ public interface J extends Serializable, Tree {
         JContainer<Expression> arguments;
 
         @Nullable
-        public JContainer<Expression> getArguments() {
-            return arguments;
+        public List<Expression> getArguments() {
+            return arguments == null ? null : arguments.getElements();
         }
 
         public NewClass withArguments(@Nullable List<Expression> arguments) {
@@ -3583,6 +3583,11 @@ public interface J extends Serializable, Tree {
         @Nullable
         @Getter
         Block body;
+
+        @With
+        @Nullable
+        @Getter
+        JavaType.Method constructorType;
 
         @With
         @Nullable
@@ -3629,7 +3634,7 @@ public interface J extends Serializable, Tree {
             }
 
             public NewClass withEnclosing(@Nullable JRightPadded<Expression> enclosing) {
-                return t.enclosing == enclosing ? t : new NewClass(t.id, t.prefix, t.markers, enclosing, t.nooh, t.clazz, t.arguments, t.body, t.type);
+                return t.enclosing == enclosing ? t : new NewClass(t.id, t.prefix, t.markers, enclosing, t.nooh, t.clazz, t.arguments, t.body, t.constructorType, t.type);
             }
 
             @Nullable
@@ -3638,7 +3643,7 @@ public interface J extends Serializable, Tree {
             }
 
             public NewClass withArguments(@Nullable JContainer<Expression> arguments) {
-                return t.arguments == arguments ? t : new NewClass(t.id, t.prefix, t.markers, t.enclosing, t.nooh, t.clazz, arguments, t.body, t.type);
+                return t.arguments == arguments ? t : new NewClass(t.id, t.prefix, t.markers, t.enclosing, t.nooh, t.clazz, arguments, t.body, t.constructorType, t.type);
             }
         }
     }

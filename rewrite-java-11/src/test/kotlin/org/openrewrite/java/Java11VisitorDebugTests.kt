@@ -164,6 +164,10 @@ class Java11OrderImportsTest : Java11Test, OrderImportsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11RedundantFileCreationTest : Java11Test, RedundantFileCreationTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11RemoveAnnotationTest: Java11Test, RemoveAnnotationTest
 
 @DebugOnly
@@ -217,6 +221,10 @@ class Java11UnnecessaryExplicitTypeArgumentsTest : Java11Test, UnnecessaryExplic
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11UnnecessaryParenthesesTest : Java11Test, UnnecessaryParenthesesTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11UnnecessaryThrowsTest : Java11Test, UnnecessaryThrowsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

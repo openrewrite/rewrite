@@ -969,8 +969,12 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                     convertAll(members, noDelim, noDelim), sourceBefore("}"));
         }
 
+        JCNewClass jcNewClass = (JCNewClass) node;
+        JavaType.Method constructorType = methodType(jcNewClass.constructorType, jcNewClass.constructor, "<constructor>");
+
         return new J.NewClass(randomId(), fmt, Markers.EMPTY, encl, whitespaceBeforeNew,
-                clazz, args, body, type(((JCNewClass) node).type));
+                clazz, args, body, constructorType,
+                type(jcNewClass.type));
     }
 
     @Override
@@ -1395,7 +1399,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
     private <J2 extends J> JRightPadded<J2> convert(Tree t, Function<Tree, Space> suffix) {
         J2 j = convert(t);
-        JRightPadded<J2> rightPadded = j == null ? null : new JRightPadded<>(j, suffix.apply(t), Markers.EMPTY);
+        @SuppressWarnings("ConstantConditions") JRightPadded<J2> rightPadded = j == null ? null :
+                new JRightPadded<>(j, suffix.apply(t), Markers.EMPTY);
         cursor(max(endPos(t), cursor)); // if there is a non-empty suffix, the cursor may have already moved past it
         return rightPadded;
     }
@@ -1512,11 +1517,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     @Nullable
-    private JavaType.Method methodType(com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol, String methodName) {
+    private JavaType.Method methodType(@Nullable com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol, String methodName) {
         // if the symbol is not a method symbol, there is a parser error in play
         Symbol.MethodSymbol methodSymbol = symbol instanceof Symbol.MethodSymbol ? (Symbol.MethodSymbol) symbol : null;
 
-        JavaType.Method type = null;
         if (methodSymbol != null && selectType != null) {
             Function<com.sun.tools.javac.code.Type, JavaType.Method.Signature> signature = t -> {
                 if (t instanceof MethodType) {
@@ -1548,16 +1552,16 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 paramNames.add(s);
             }
 
-            List<JavaType.FullyQualified> exceptionTypes = new ArrayList<>();
+            List<JavaType.Class> exceptionTypes = new ArrayList<>();
             if (selectType instanceof MethodType) {
                 for (com.sun.tools.javac.code.Type exceptionType : ((MethodType) selectType).thrown) {
-                    JavaType.FullyQualified javaType = (JavaType.FullyQualified) type(exceptionType, emptyList(), true);
+                    JavaType.Class javaType = TypeUtils.asClass(type(exceptionType));
                     if (javaType == null) {
                         //If the type cannot be resolved to a class (it might not be on the classpath or it might have
                         //been mapped to cyclic, build the class.
                         if (exceptionType instanceof ClassType) {
                             Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
-                            javaType = new JavaType.ShallowClass(sym.className());
+                            javaType = JavaType.Class.build(sym.className());
                         }
                     }
                     if (javaType != null) {
@@ -1567,10 +1571,13 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 }
             }
 
+            JavaType.Class declaringType = TypeUtils.asClass(type(methodSymbol.owner));
+            assert declaringType != null;
+
             return JavaType.Method.build(
                     //Currently only the first 16 bits are meaninful
                     (int) methodSymbol.flags_field & 0xFFFF,
-                    TypeUtils.asClass(type(methodSymbol.owner)),
+                    declaringType,
                     methodName,
                     genericSignature,
                     signature.apply(selectType),

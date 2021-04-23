@@ -606,7 +606,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
         if (enoom.getInitializer() != null) {
             visitSpace(initializer.getPrefix(), Space.Location.NEW_CLASS_PREFIX, p);
             visitSpace(initializer.getNew(), Space.Location.NEW_PREFIX, p);
-            visitContainer("(", initializer.getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
+            visitContainer("(", initializer.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
             visit(initializer.getBody(), p);
         }
         return enoom;
@@ -855,7 +855,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
         visitSpace(newClass.getNew(), Space.Location.NEW_PREFIX, p);
         acc.append("new");
         visit(newClass.getClazz(), p);
-        visitContainer("(", newClass.getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
+        visitContainer("(", newClass.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
         visit(newClass.getBody(), p);
         return newClass;
     }

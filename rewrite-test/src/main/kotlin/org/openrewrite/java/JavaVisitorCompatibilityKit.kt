@@ -134,6 +134,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class OrderImportsTck : OrderImportsTest
 
     @Nested
+    inner class RedundantFileCreationTck : RedundantFileCreationTest
+
+    @Nested
     inner class RemoveAnnotationTck : RemoveAnnotationTest
 
     @Nested
@@ -174,6 +177,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class UnnecessaryParenthesesTck : UnnecessaryParenthesesTest
+
+    @Nested
+    inner class UnnecessaryThrowsTck : UnnecessaryThrowsTest
 
     @Nested
     inner class UnwrapParenthesesTck : UnwrapParenthesesTest
