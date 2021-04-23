@@ -40,7 +40,7 @@ public class DeleteKey extends Recipe {
 * **DO** provide a short name ideally consisting of less than 5 words, but definitely less than 10 words.
 * **DO** use initial capping (i.e. don't capitalize every word).
 * **DO NOT** end with a period.
-* **DO** use markdown backticks (`) to delimit words representing code symbols, as in "JUnit4 `@RunWith` to JUnit Jupiter `@ExtendWith`".
+* **DO** use markdown backticks to delimit words representing code symbols, as in "JUnit4 `@RunWith` to JUnit Jupiter `@ExtendWith`".
 * **DO** describe what the end result is positively whenever possible.
 
 ### Description text
