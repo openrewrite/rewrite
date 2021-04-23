@@ -58,7 +58,7 @@ public class MethodNameCasing extends Recipe {
                             }
                         } else {
                             if (!Character.isLetterOrDigit(c)) {
-                                while (!Character.isLetterOrDigit(name[i]) || name[i] > 'z') {
+                                while (i < name.length && (!Character.isLetterOrDigit(name[i]) || name[i] > 'z')) {
                                     i++;
                                 }
                                 standardized.append(Character.toUpperCase(name[i]));
