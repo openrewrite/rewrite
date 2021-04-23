@@ -71,5 +71,3 @@ Tags are independent of one another. A recipe containing a tag will show up in a
 Various user experiences listing OpenRewrite recipes are able to present a clean view of available recipes by relying strictly on the metadata provided by the recipe.
 
 ![image](https://user-images.githubusercontent.com/1697736/115929956-80745500-a43d-11eb-8d48-551a5ba74ee4.png)
-
-![image](https://user-images.githubusercontent.com/1697736/115926276-74859480-a437-11eb-9c50-2d2d30cc4c24.png)
