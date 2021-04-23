@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.*
 import org.openrewrite.java.tree.J
@@ -71,7 +70,6 @@ interface AddImportTest : JavaRecipeTest {
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/484")
-    @Disabled
     @Test
     fun addImportIfReferenced(jp: JavaParser) = assertChanged(
         jp,

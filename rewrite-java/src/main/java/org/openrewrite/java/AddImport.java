@@ -122,14 +122,13 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
     }
 
     private boolean isTypeReference(NameTree t) {
-        @SuppressWarnings("ConstantConditions") String ref = new JavaIsoVisitor<Integer>() {
-            @Override
-            public Space visitSpace(Space space, Space.Location loc, Integer n) {
-                return Space.EMPTY;
-            }
-        }.visit(t, 0).printTrimmed();
-
-        return JavaType.Class.build(type).getClassName().equals(ref);
+        boolean isTypRef = true;
+        if (t instanceof J.FieldAccess) {
+            J.FieldAccess fa = (J.FieldAccess)t;
+            isTypRef = fa.getTarget().getType() instanceof JavaType.FullyQualified &&
+                    ((JavaType.FullyQualified)fa.getTarget().getType()).getFullyQualifiedName().equals(type);
+        }
+        return isTypRef;
     }
 
     /**
