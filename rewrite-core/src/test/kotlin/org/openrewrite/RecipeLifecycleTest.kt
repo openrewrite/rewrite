@@ -21,9 +21,50 @@ import org.openrewrite.Tree.randomId
 import org.openrewrite.marker.Markers
 import org.openrewrite.text.PlainText
 import org.openrewrite.text.PlainTextVisitor
+import java.time.Duration
 import java.util.*
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 class RecipeLifecycleTest {
+
+    @Test
+    fun recipeTimeout() {
+        val latch = CountDownLatch(1)
+        val timeouts = AtomicInteger(0)
+
+        object : Recipe() {
+            override fun getDisplayName(): String = "Slow"
+
+            override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
+                return object : TreeVisitor<Tree, ExecutionContext>() {
+                    override fun visit(tree: Tree, p: ExecutionContext): Tree {
+                        Thread.sleep(2)
+                        return tree
+                    }
+                }
+            }
+        }.run(
+            listOf(
+                PlainText(randomId(), Markers.EMPTY, "hello"),
+                PlainText(randomId(), Markers.EMPTY, "world")
+            ),
+            InMemoryExecutionContext(
+                { t ->
+                    assertThat(t).isInstanceOf(RecipeTimeoutException::class.java)
+                    timeouts.incrementAndGet()
+                    latch.countDown()
+                },
+                { Duration.ofMillis(1) }
+            ),
+            1
+        )
+
+        latch.await(2, TimeUnit.SECONDS)
+        assertThat(timeouts.get()).isEqualTo(1)
+    }
+
     @Test
     fun notApplicableRecipe() {
         val results = object : Recipe() {
@@ -55,7 +96,8 @@ class RecipeLifecycleTest {
                 before + PlainText(randomId(), Markers.EMPTY, "test")
         }.run(emptyList())
 
-        assertThat(results.map { it.recipesThatMadeChanges.map { r -> r.name }.first() }.distinct()).containsExactly("test.GeneratingRecipe")
+        assertThat(results.map { it.recipesThatMadeChanges.map { r -> r.name }.first() }
+            .distinct()).containsExactly("test.GeneratingRecipe")
     }
 
     @Test
@@ -71,7 +113,9 @@ class RecipeLifecycleTest {
                 emptyList<SourceFile>()
         }.run(listOf(PlainText(randomId(), Markers.EMPTY, "test")))
 
-        assertThat(results.map { it.recipesThatMadeChanges.map { r -> r.name }.first() }).containsExactly("test.DeletingRecipe")
+        assertThat(results.map {
+            it.recipesThatMadeChanges.map { r -> r.name }.first()
+        }).containsExactly("test.DeletingRecipe")
     }
 
     @Test
@@ -84,7 +128,7 @@ class RecipeLifecycleTest {
             }
 
             override fun getVisitor(): PlainTextVisitor<ExecutionContext> {
-                return object: PlainTextVisitor<ExecutionContext>() {
+                return object : PlainTextVisitor<ExecutionContext>() {
                     override fun visit(tree: Tree?, p: ExecutionContext): PlainText? = null
                 }
 
@@ -92,21 +136,23 @@ class RecipeLifecycleTest {
 
         }.run(listOf(PlainText(randomId(), Markers.EMPTY, "test")))
 
-        assertThat(results.map { it.recipesThatMadeChanges.map { r -> r.name }.first() }).containsExactly("test.DeletingRecipe")
+        assertThat(results.map {
+            it.recipesThatMadeChanges.map { r -> r.name }.first()
+        }).containsExactly("test.DeletingRecipe")
     }
 
     @Suppress("USELESS_IS_CHECK")
     class FooVisitor<P> : TreeVisitor<FooSource, P>() {
 
         override fun preVisit(tree: FooSource, p: P): FooSource {
-            if(tree !is FooSource) {
+            if (tree !is FooSource) {
                 throw RuntimeException("tree is not a FooSource")
             }
             return tree;
         }
 
         override fun postVisit(tree: FooSource, p: P): FooSource {
-            if(tree !is FooSource) {
+            if (tree !is FooSource) {
                 throw RuntimeException("tree is not a FooSource")
             }
             return tree;
@@ -174,29 +220,29 @@ class RecipeLifecycleTest {
                 }
             })
             doNext(
-                    object : Recipe() {
-                        override fun getDisplayName() = "Change2"
-                        override fun getName() = displayName
-                        override fun toString() = displayName
-                        override fun getVisitor(): PlainTextVisitor<ExecutionContext> {
-                            return object : PlainTextVisitor<ExecutionContext>() {
-                                override fun visit(tree: Tree, p: ExecutionContext): PlainText {
-                                    var pt = tree as PlainText;
-                                    if (!pt.print().endsWith("Change2")) {
-                                        pt = pt.withText(pt.print() + "Change2")
-                                    }
-                                    return pt;
+                object : Recipe() {
+                    override fun getDisplayName() = "Change2"
+                    override fun getName() = displayName
+                    override fun toString() = displayName
+                    override fun getVisitor(): PlainTextVisitor<ExecutionContext> {
+                        return object : PlainTextVisitor<ExecutionContext>() {
+                            override fun visit(tree: Tree, p: ExecutionContext): PlainText {
+                                var pt = tree as PlainText;
+                                if (!pt.print().endsWith("Change2")) {
+                                    pt = pt.withText(pt.print() + "Change2")
                                 }
+                                return pt;
                             }
-
                         }
-                    },
+
+                    }
+                },
             )
         }
         val results = recipe.run(sources, InMemoryExecutionContext { throw it })
         assertThat(results.size)
-                .isEqualTo(1)
+            .isEqualTo(1)
         assertThat(results.first().recipesThatMadeChanges.map { it.name })
-                .containsExactly("Change1", "Change2")
+            .containsExactly("Change1", "Change2")
     }
 }

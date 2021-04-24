@@ -17,6 +17,7 @@ package org.openrewrite;
 
 import org.openrewrite.internal.lang.Nullable;
 
+import java.time.Duration;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
@@ -71,4 +72,13 @@ public interface ExecutionContext {
     }
 
     Consumer<Throwable> getOnError();
+
+    /**
+     * @param inputs The number of inputs to the run. Allows the duration to be scaled to the number of inputs.
+     * @return The maximum duration a run (e.g. parse operation, recipe run) can take.
+     */
+    @Incubating(since = "7.3.0")
+    default Duration getRunTimeout(int inputs) {
+        return Duration.ofHours(2);
+    }
 }

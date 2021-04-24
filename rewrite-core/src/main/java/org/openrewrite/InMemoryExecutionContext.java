@@ -17,13 +17,16 @@ package org.openrewrite;
 
 import org.openrewrite.internal.lang.Nullable;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 public class InMemoryExecutionContext implements ExecutionContext {
     private final Map<String, Object> messages = new ConcurrentHashMap<>();
     private final Consumer<Throwable> onError;
+    private final Function<Integer, Duration> runTimeout;
 
     public InMemoryExecutionContext() {
         this(
@@ -33,7 +36,13 @@ public class InMemoryExecutionContext implements ExecutionContext {
     }
 
     public InMemoryExecutionContext(Consumer<Throwable> onError) {
+        this(onError, n -> Duration.ofHours(2));
+    }
+
+    public InMemoryExecutionContext(Consumer<Throwable> onError,
+                                    Function<Integer, Duration> runTimeout) {
         this.onError = onError;
+        this.runTimeout = runTimeout;
     }
 
     @Override
@@ -57,5 +66,10 @@ public class InMemoryExecutionContext implements ExecutionContext {
 
     public Consumer<Throwable> getOnError() {
         return onError;
+    }
+
+    @Override
+    public Duration getRunTimeout(int inputs) {
+        return runTimeout.apply(inputs);
     }
 }

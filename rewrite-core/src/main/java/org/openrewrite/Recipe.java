@@ -34,8 +34,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -75,7 +77,7 @@ public abstract class Recipe {
         @Override
         public void doBefore(@Nullable Tree tree, StringBuilder printerAcc, ExecutionContext executionContext) {
             if (tree instanceof Markers) {
-                String markerIds = ((Markers)tree).entries().stream()
+                String markerIds = ((Markers) tree).entries().stream()
                         .filter(marker -> !(marker instanceof RecipeThatMadeChanges))
                         .map(marker -> String.valueOf(marker.hashCode()))
                         .collect(joining(","));
@@ -178,7 +180,7 @@ public abstract class Recipe {
     /**
      * A recipe can optionally include an applicability test that can be used to determine whether it should run on a
      * set of source files (or even be listed in a suggested list of recipes for a particular codebase).
-     *
+     * <p>
      * To identify a tree as applicable, the visitor should mark or otherwise alter the tree at any level. The mutation
      * that the applicability test visitor makes to the tree will not included in the results.
      *
@@ -195,7 +197,10 @@ public abstract class Recipe {
                                                                   ExecutionContext ctx,
                                                                   ForkJoinPool forkJoinPool,
                                                                   Map<UUID, Recipe> recipeThatDeletedSourceFile) {
-        if(getApplicableTest() != null) {
+        long startTime = System.nanoTime();
+        AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean(false);
+
+        if (getApplicableTest() != null) {
             boolean applicable = false;
             for (S s : before) {
                 if (getApplicableTest().visit(s, ctx) != s) {
@@ -214,6 +219,14 @@ public abstract class Recipe {
         // if this recipe isn't valid we just skip it and proceed to next
         if (validate(ctx).isValid()) {
             after = ListUtils.map(after, forkJoinPool, s -> {
+                Duration duration = Duration.ofNanos(System.nanoTime() - startTime);
+                if (duration.compareTo(ctx.getRunTimeout(before.size())) > 0) {
+                    if (thrownErrorOnTimeout.compareAndSet(false, true)) {
+                        ctx.getOnError().accept(new RecipeTimeoutException(this));
+                    }
+                    return s;
+                }
+
                 Timer.Builder timer = Timer.builder("rewrite.recipe.visit").tag("recipe", getDisplayName());
                 Timer.Sample sample = Timer.start();
                 try {
@@ -466,6 +479,11 @@ public abstract class Recipe {
         @Override
         public Consumer<Throwable> getOnError() {
             return delegate.getOnError();
+        }
+
+        @Override
+        public Duration getRunTimeout(int inputs) {
+            return delegate.getRunTimeout(inputs);
         }
     }
 }
