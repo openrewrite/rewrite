@@ -36,6 +36,10 @@ class Java11AddLicenseHeaderTest : Java11Test, AddLicenseHeaderTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11BigDecimalRoundingConstantsToEnumsTestTest : Java11Test, BigDecimalRoundingConstantsToEnumsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11BlankLinesTest : Java11Test, BlankLinesTest
 
 @DebugOnly
@@ -164,6 +168,10 @@ class Java11OrderImportsTest : Java11Test, OrderImportsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11PrimitiveWrapperClassConstructorToValueOfTest: Java11Test, PrimitiveWrapperClassConstructorToValueOfTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11RedundantFileCreationTest : Java11Test, RedundantFileCreationTest
 
 @DebugOnly
@@ -245,7 +253,3 @@ class Java11WrappingAndBracesTest : Java11Test, WrappingAndBracesTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11XmlParserXXEVulnerabilityTest: Java11Test, XmlParserXXEVulnerabilityTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
-class Java11PrimitiveWrapperClassConstructorToValueOfTest: Java11Test, PrimitiveWrapperClassConstructorToValueOfTest
