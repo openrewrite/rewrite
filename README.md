@@ -1,4 +1,4 @@
-![Logo](https://github.com/openrewrite/rewrite/raw/master/doc/logo-oss.png)
+![Logo](https://github.com/openrewrite/rewrite/raw/main/doc/logo-oss.png)
 # Semantic code search and transformation
 
 [![ci](https://github.com/openrewrite/rewrite/actions/workflows/ci.yml/badge.svg)](https://github.com/openrewrite/rewrite/actions/workflows/ci.yml)

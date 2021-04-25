@@ -21,7 +21,7 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 
 interface PrimitiveWrapperClassConstructorToValueOfTest : JavaRecipeTest {
-    override val recipe: Recipe?
+    override val recipe: Recipe
         get() = PrimitiveWrapperClassConstructorToValueOf()
 
     @Test
@@ -30,7 +30,7 @@ interface PrimitiveWrapperClassConstructorToValueOfTest : JavaRecipeTest {
             class A {
                 Integer i = Integer.valueOf(1);
                 String hello = new String("Hello" + " world " + i);
-                Long l = 11;
+                Long l = 11L;
             }
         """
     )
