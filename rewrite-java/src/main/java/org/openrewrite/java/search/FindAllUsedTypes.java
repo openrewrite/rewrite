@@ -78,7 +78,7 @@ public class FindAllUsedTypes {
             @Override
             public J.MemberReference visitMemberReference(J.MemberReference memberRef, Set<JavaType> javaTypes) {
                 javaTypes.add(memberRef.getType());
-                javaTypes.add(memberRef.getReferenceType());
+                javaTypes.add(memberRef.getReferenceMethodType());
                 return super.visitMemberReference(memberRef, javaTypes);
             }
 

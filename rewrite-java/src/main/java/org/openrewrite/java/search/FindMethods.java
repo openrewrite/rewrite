@@ -77,7 +77,7 @@ public class FindMethods extends Recipe {
             @Override
             public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
                 J.MemberReference m = super.visitMemberReference(memberRef, ctx);
-                if (methodMatcher.matches(m.getReferenceType())) {
+                if (methodMatcher.matches(m.getReferenceMethodType())) {
                     m = m.withReference(m.getReference().withMarkers(m.getReference().getMarkers().addIfAbsent(new JavaSearchResult(FindMethods.this))));
                 }
                 return m;
@@ -103,7 +103,7 @@ public class FindMethods extends Recipe {
 
             @Override
             public J.MemberReference visitMemberReference(J.MemberReference memberRef, Set<J> ms) {
-                if (methodMatcher.matches(memberRef.getReferenceType())) {
+                if (methodMatcher.matches(memberRef.getReferenceMethodType())) {
                     ms.add(memberRef);
                 }
                 return super.visitMemberReference(memberRef, ms);

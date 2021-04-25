@@ -23,6 +23,7 @@ import org.openrewrite.java.search.*
 import org.openrewrite.java.security.SecureTempFileCreationTest
 import org.openrewrite.java.security.XmlParserXXEVulnerabilityTest
 import org.openrewrite.java.tree.TypeTreeTest
+import org.openrewrite.java.typegeneration.TypeGenerationTest
 
 //----------------------------------------------------------------------------------------------
 // If test classes are added here, they should also be added to JavaVisitorCompatibilityKit.kt
@@ -235,6 +236,10 @@ class Java11SpacesTest : Java11Test, SpacesTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11TabsAndIndentsTest : Java11Test, TabsAndIndentsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11TypeGenerationTest : Java11Test, TypeGenerationTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

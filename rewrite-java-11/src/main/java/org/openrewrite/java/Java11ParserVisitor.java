@@ -18,13 +18,13 @@ package org.openrewrite.java;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
-import com.sun.tools.javac.code.Flags;
-import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.code.*;
+import com.sun.tools.javac.code.Scope;
 import com.sun.tools.javac.code.Type.*;
-import com.sun.tools.javac.code.TypeTag;
 import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
+import com.sun.tools.javac.util.Context;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
@@ -697,7 +697,23 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             body = convert(node.getBody());
         }
 
-        return new J.Lambda(randomId(), fmt, Markers.EMPTY, params, arrow, body, type(node));
+        JCLambda lambda = (JCLambda) node;
+        //Look for the method that this lambda is associated with on the target. There should be a single, abstract
+        //method on the interface.
+        JavaType.Method referenceMethod = null;
+        if (lambda.type != null && lambda.type.tsym instanceof Symbol.ClassSymbol) {
+            Scope.WriteableScope fields = ((Symbol.ClassSymbol) lambda.type.tsym).members_field;
+            if (fields != null) {
+                for (Symbol elem : fields.getSymbols()) {
+                    if (elem instanceof Symbol.MethodSymbol && (elem.flags_field & Flag.Abstract.getBitMask()) != 0) {
+                        Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) elem;
+                        referenceMethod = methodType(methodSymbol.type, methodSymbol, methodSymbol.name.toString());
+                    }
+                }
+            }
+        }
+
+        return new J.Lambda(randomId(), fmt, Markers.EMPTY, params, arrow, body, type(node), referenceMethod);
     }
 
     public final static int SURR_FIRST = 0xD800;
@@ -737,10 +753,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 break;
         }
 
-        JavaType referenceType = null;
+        JavaType.Method referenceMethodType = null;
         if (ref.sym instanceof Symbol.MethodSymbol) {
             Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) ref.sym;
-            referenceType = methodType(methodSymbol.owner.type, methodSymbol, referenceName);
+            referenceMethodType = methodType(methodSymbol.owner.type, methodSymbol, referenceName);
         }
 
         return new J.MemberReference(randomId(),
@@ -754,7 +770,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                         referenceName,
                         null)),
                 type(node),
-                referenceType);
+                referenceMethodType);
     }
 
     @Override
@@ -1539,12 +1555,44 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 }
                 return null;
             };
+            Function<com.sun.tools.javac.code.Type, List<JavaType.FullyQualified>> exceptions = t -> {
+                if (t instanceof MethodType) {
+                    List<JavaType.FullyQualified> exceptionList = new ArrayList<>();
+                    for (com.sun.tools.javac.code.Type exceptionType : ((MethodType) t).thrown) {
+                        JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(exceptionType));
+                        if (javaType == null) {
+                            //If the type cannot be resolved to a class (it might not be on the classpath or it might have
+                            //been mapped to cyclic, build the class.
+                            if (exceptionType instanceof ClassType) {
+                                Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
+                                javaType = JavaType.Class.build(sym.className());
+                            }
+                        }
+                        if (javaType != null) {
+                            //If the exception type is not resolved, it is not added to the list of exceptions.
+                            exceptionList.add(javaType);
+                        }
+                    }
+                    return exceptionList;
+                }
+                return Collections.emptyList();
+            };
 
             JavaType.Method.Signature genericSignature;
+            List<JavaType> typeParameters = null;
+            List<JavaType.FullyQualified> exceptionTypes;
             if (methodSymbol.type instanceof com.sun.tools.javac.code.Type.ForAll) {
-                genericSignature = signature.apply(((com.sun.tools.javac.code.Type.ForAll) methodSymbol.type).qtype);
+                ForAll forAll = (com.sun.tools.javac.code.Type.ForAll) methodSymbol.type;
+                genericSignature = signature.apply(forAll.qtype);
+                exceptionTypes = exceptions.apply(forAll.qtype);
+                if (forAll.tvars != null) {
+                    typeParameters = forAll.tvars.stream()
+                            .map( tp -> type(tp, emptyList(), true))
+                            .filter(Objects::nonNull).collect(toList());
+                }
             } else {
                 genericSignature = signature.apply(methodSymbol.type);
+                exceptionTypes = exceptions.apply(methodSymbol.type);
             }
 
             List<String> paramNames = new ArrayList<>();
@@ -1553,34 +1601,23 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 paramNames.add(s);
             }
 
-            List<JavaType.FullyQualified> exceptionTypes = new ArrayList<>();
-            if (selectType instanceof MethodType) {
-                for (com.sun.tools.javac.code.Type exceptionType : ((MethodType) selectType).thrown) {
-                    JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(exceptionType));
-                    if (javaType == null) {
-                        //If the type cannot be resolved to a class (it might not be on the classpath or it might have
-                        //been mapped to cyclic, build the class.
-                        if (exceptionType instanceof ClassType) {
-                            Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
-                            javaType = JavaType.Class.build(sym.className());
-                        }
-                    }
-                    if (javaType != null) {
-                        //If the exception type is not resolved, it is not added to the list of exceptions.
-                        exceptionTypes.add(javaType);
-                    }
-                }
-            }
-
             JavaType.FullyQualified declaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner));
             if (declaringType == null) {
                 return null;
             }
 
+            //the javac compiler uses a long for flags and varargs for the compiler is at the 35th bit
+            //However, ASM use the 7th bit for representing varargs. So, this is essentially converting
+            //the varargs flag to an ASM value.
+            // Javac                                 ASM
+            //10000000000000000000000000000000000 -> 1000000
+            int varargsMask = ((methodSymbol.flags_field & 1L<<34) == 0) ? 0 : 0x0080;
+
             return JavaType.Method.build(
-                    //Currently only the first 16 bits are meaninful
-                    (int) methodSymbol.flags_field & 0xFFFF,
+                    //Currently only the first 16 bits are meaningful
+                    (int) (methodSymbol.flags_field | varargsMask) & 0xFFFF,
                     declaringType,
+                    typeParameters == null ? Collections.emptyList() : typeParameters,
                     methodName,
                     genericSignature,
                     signature.apply(selectType),
@@ -1715,6 +1752,28 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             return JavaType.Primitive.Void;
         } else if (type instanceof ArrayType) {
             return new JavaType.Array(type(((ArrayType) type).elemtype, stack));
+        } else if (type instanceof WildcardType) {
+            WildcardType wildcard = (WildcardType) type;
+            String fullyQualifiedName;
+            if (wildcard.type instanceof ClassType) {
+                fullyQualifiedName = ((Symbol.ClassSymbol) wildcard.type.tsym).className();
+            } else {
+                fullyQualifiedName = wildcard.type.tsym.name.toString();
+            }
+            JavaType.Wildcard.BoundKind kind;
+            switch (wildcard.kind) {
+                case EXTENDS:
+                    kind = JavaType.Wildcard.BoundKind.Extends;
+                    break;
+                case SUPER:
+                    kind = JavaType.Wildcard.BoundKind.Super;
+                    break;
+                default:
+                    kind = JavaType.Wildcard.BoundKind.Unbound;
+                    fullyQualifiedName = "?";
+            }
+            return new JavaType.Wildcard(fullyQualifiedName, kind, TypeUtils.asFullyQualified(type(wildcard.type, stack)));
+
         } else if (com.sun.tools.javac.code.Type.noType.equals(type)) {
             return null;
         } else {

@@ -105,7 +105,7 @@ public class ChangeMethodName extends Recipe {
         @Override
         public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext context) {
             J.MemberReference m = super.visitMemberReference(memberRef, context);
-            if (methodMatcher.matches(m.getReferenceType()) && !m.getReference().getSimpleName().equals(newMethodName)) {
+            if (methodMatcher.matches(m.getReferenceMethodType()) && !m.getReference().getSimpleName().equals(newMethodName)) {
                 m = m.withReference(m.getReference().withName(newMethodName));
             }
             return m;

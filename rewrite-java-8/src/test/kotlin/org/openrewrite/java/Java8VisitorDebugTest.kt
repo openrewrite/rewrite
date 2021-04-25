@@ -23,6 +23,7 @@ import org.openrewrite.java.search.*
 import org.openrewrite.java.security.SecureTempFileCreationTest
 import org.openrewrite.java.security.XmlParserXXEVulnerabilityTest
 import org.openrewrite.java.tree.TypeTreeTest
+import org.openrewrite.java.typegeneration.TypeGenerationTest
 
 //----------------------------------------------------------------------------------------------
 // If test classes are added here, they should also be added to JavaVisitorCompatibilityKit.kt
@@ -111,10 +112,6 @@ class Java8FallThroughTest : Java8Test, FallThroughTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java8FinalizeLocalVariablesTest : Java8Test, FinalizeLocalVariablesTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
-class Java8StaticMethodNotFinalTest : Java8Test, StaticMethodNotFinalTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
@@ -234,7 +231,15 @@ class Java8SpacesTest : Java8Test, SpacesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8StaticMethodNotFinalTest : Java8Test, StaticMethodNotFinalTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8TabsAndIndentsTest : Java8Test, TabsAndIndentsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8TypeGenerationTest : Java8Test, TypeGenerationTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

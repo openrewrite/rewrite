@@ -2548,6 +2548,10 @@ public interface J extends Serializable, Tree {
         @Nullable
         JavaType type;
 
+        @With
+        @Nullable
+        JavaType.Method referenceMethodType;
+
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitLambda(this, p);
@@ -2760,7 +2764,7 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         @Getter
-        JavaType referenceType;
+        JavaType.Method referenceMethodType;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -2797,7 +2801,7 @@ public interface J extends Serializable, Tree {
             }
 
             public MemberReference withTypeParameters(@Nullable JContainer<Expression> typeParameters) {
-                return t.typeParameters == typeParameters ? t : new MemberReference(t.id, t.prefix, t.markers, t.containing, typeParameters, t.reference, t.type, t.referenceType);
+                return t.typeParameters == typeParameters ? t : new MemberReference(t.id, t.prefix, t.markers, t.containing, typeParameters, t.reference, t.type, t.referenceMethodType);
             }
 
             public JLeftPadded<Identifier> getReference() {
@@ -2805,7 +2809,7 @@ public interface J extends Serializable, Tree {
             }
 
             public MemberReference withReference(JLeftPadded<Identifier> reference) {
-                return t.reference == reference ? t : new MemberReference(t.id, t.prefix, t.markers, t.containing, t.typeParameters, reference, t.type, t.referenceType);
+                return t.reference == reference ? t : new MemberReference(t.id, t.prefix, t.markers, t.containing, t.typeParameters, reference, t.type, t.referenceMethodType);
             }
         }
     }

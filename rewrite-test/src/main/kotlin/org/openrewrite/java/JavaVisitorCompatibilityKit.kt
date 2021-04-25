@@ -23,6 +23,7 @@ import org.openrewrite.java.search.*
 import org.openrewrite.java.security.SecureTempFileCreationTest
 import org.openrewrite.java.security.XmlParserXXEVulnerabilityTest
 import org.openrewrite.java.tree.TypeTreeTest
+import org.openrewrite.java.typegeneration.TypeGenerationTest
 
 //----------------------------------------------------------------------------------------
 // If test classes are added here, they should also be added to Java11VisitorDebugTests.kt
@@ -188,6 +189,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class TabsAndIndentsTck : TabsAndIndentsTest
+
+    @Nested
+    inner class TypeGenerationTck : TypeGenerationTest
 
     @Nested
     inner class TypeTreeTck : TypeTreeTest

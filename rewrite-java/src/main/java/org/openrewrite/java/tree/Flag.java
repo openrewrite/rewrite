@@ -59,6 +59,9 @@ public enum Flag {
     public String getKeyword() {
         return this.keyword;
     }
+    public int getBitMask() {
+        return this.bitMask;
+    }
 
     @Nullable
     public static Flag fromKeyword(String keyword) {
