@@ -213,7 +213,7 @@ interface RecipeTest {
     }
 
     private class RecipeCheckingExpectedCycles(private val recipe: Recipe, private val expectedCyclesToComplete: Int): Recipe() {
-        private val executedCycles = 0
+        private var executedCycles = 0
 
         override fun getDisplayName(): String = "Check expected cycles"
 
@@ -223,7 +223,8 @@ interface RecipeTest {
 
         override fun visit(before: List<SourceFile>, ctx: ExecutionContext): List<SourceFile> {
             val afterList = recipe.visit(before, ctx)
-            if(executedCycles.inc() > expectedCyclesToComplete && afterList != before) {
+            executedCycles = executedCycles.inc()
+            if(executedCycles > expectedCyclesToComplete && afterList != before) {
                 fail("Expected recipe to complete in $expectedCyclesToComplete cycle")
             }
             return afterList
