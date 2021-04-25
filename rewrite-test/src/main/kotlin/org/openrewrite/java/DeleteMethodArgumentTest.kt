@@ -36,7 +36,8 @@ interface DeleteMethodArgumentTest : JavaRecipeTest {
         dependsOn = arrayOf(b),
         recipe = DeleteMethodArgument("B foo(int, int, int)", 1),
         before = "public class A {{ B.foo(0, 1, 2); }}",
-        after = "public class A {{ B.foo(0, 2); }}"
+        after = "public class A {{ B.foo(0, 2); }}",
+        cycles = 1
     )
 
     @Test
@@ -45,7 +46,8 @@ interface DeleteMethodArgumentTest : JavaRecipeTest {
         dependsOn = arrayOf(b),
         recipe = DeleteMethodArgument("B foo(int, int, int)", 1),
         before = "public class A {{ B.foo(0, 1, 2); }}",
-        after = "public class A {{ B.foo(0, 2); }}"
+        after = "public class A {{ B.foo(0, 2); }}",
+        cycles = 1
     )
 
     @Test
@@ -84,5 +86,4 @@ interface DeleteMethodArgumentTest : JavaRecipeTest {
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
     }
-
 }

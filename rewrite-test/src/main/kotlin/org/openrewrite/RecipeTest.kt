@@ -35,7 +35,7 @@ interface RecipeTest {
         before: String,
         dependsOn: Array<String> = emptyArray(),
         after: String,
-        cycles: Int = 1
+        cycles: Int = 2
     ) {
         assertChanged(parser, recipe, before, dependsOn, after, cycles) {}
     }
@@ -47,7 +47,8 @@ interface RecipeTest {
         before: String,
         dependsOn: Array<String> = emptyArray(),
         after: String,
-        cycles: Int = 1,
+        cycles: Int = 2,
+        expectedCyclesToComplete: Int = cycles - 1,
         afterConditions: (T) -> Unit = { }
     ) {
         assertThat(recipe).`as`("A recipe must be specified").isNotNull
@@ -65,7 +66,7 @@ interface RecipeTest {
                 .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
                 .isEqualTo(inputs.size)
 
-        val results = recipe
+        val results = RecipeCheckingExpectedCycles(recipe, expectedCyclesToComplete)
             .run(
                 sources,
                 InMemoryExecutionContext { t: Throwable? -> fail<Any>("Recipe threw an exception", t) },
@@ -92,7 +93,7 @@ interface RecipeTest {
         before: File,
         dependsOn: Array<File> = emptyArray(),
         after: String,
-        cycles: Int = 1
+        cycles: Int = 2
     ) {
         assertChanged(parser, recipe, before, dependsOn, after, cycles) {}
     }
@@ -104,7 +105,8 @@ interface RecipeTest {
         before: File,
         dependsOn: Array<File> = emptyArray(),
         after: String,
-        cycles: Int = 1,
+        cycles: Int = 2,
+        expectedCyclesToComplete: Int = cycles - 1,
         afterConditions: (T) -> Unit = { }
     ) {
         assertThat(recipe).`as`("A recipe must be specified").isNotNull
@@ -117,7 +119,7 @@ interface RecipeTest {
 
         val source = sources.first()
 
-        val results = recipe!!.run(
+        val results = RecipeCheckingExpectedCycles(recipe!!, expectedCyclesToComplete).run(
             listOf(source),
             InMemoryExecutionContext { t: Throwable? -> fail<Any>("Recipe threw an exception", t) },
             cycles
@@ -150,7 +152,7 @@ interface RecipeTest {
                 .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
                 .isEqualTo(inputs.size)
         val source = sources.first()
-        val results = recipe!!.run(listOf(source))
+        val results = recipe!!.run(listOf(source), InMemoryExecutionContext { t -> t.printStackTrace() }, 1)
 
         results.forEach { result ->
             if (result.diff(treePrinter ?: TreePrinter.identity<Any>()).isEmpty()) {
@@ -182,7 +184,7 @@ interface RecipeTest {
                 .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
                 .isEqualTo(inputs.size)
         val source = sources.first()
-        val results = recipe!!.run(listOf(source))
+        val results = recipe!!.run(listOf(source), InMemoryExecutionContext { t -> t.printStackTrace() }, 1)
 
         results.forEach { result ->
             if (result.diff(treePrinter ?: TreePrinter.identity<Any>()).isEmpty()) {
@@ -207,6 +209,24 @@ interface RecipeTest {
 
         override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
             return visitor
+        }
+    }
+
+    private class RecipeCheckingExpectedCycles(private val recipe: Recipe, private val expectedCyclesToComplete: Int): Recipe() {
+        private val executedCycles = 0
+
+        override fun getDisplayName(): String = "Check expected cycles"
+
+        init {
+            doNext(recipe)
+        }
+
+        override fun visit(before: List<SourceFile>, ctx: ExecutionContext): List<SourceFile> {
+            val afterList = recipe.visit(before, ctx)
+            if(executedCycles.inc() > expectedCyclesToComplete && afterList != before) {
+                fail("Expected recipe to complete in $expectedCyclesToComplete cycle")
+            }
+            return afterList
         }
     }
 }

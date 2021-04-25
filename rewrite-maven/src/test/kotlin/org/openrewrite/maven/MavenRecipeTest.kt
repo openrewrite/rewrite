@@ -16,8 +16,10 @@
 package org.openrewrite.maven
 
 import org.intellij.lang.annotations.Language
-import org.openrewrite.*
-import org.openrewrite.marker.SearchResult
+import org.openrewrite.Parser
+import org.openrewrite.Recipe
+import org.openrewrite.RecipeTest
+import org.openrewrite.SourceFile
 import org.openrewrite.maven.cache.InMemoryMavenPomCache
 
 interface MavenRecipeTest : RecipeTest {
@@ -35,14 +37,14 @@ interface MavenRecipeTest : RecipeTest {
         @Language("xml") dependsOn: Array<String>,
         @Language("xml") after: String,
     ) {
-        super.assertChanged(parser, recipe, before, dependsOn, after, 1) {}
+        super.assertChanged(parser, recipe, before, dependsOn, after, 2, 1) {}
     }
 
     fun assertChanged(
         @Language("xml") before: String,
         @Language("xml") after: String,
     ) {
-        super.assertChanged(parser, recipe, before, emptyArray(), after, 1) {}
+        super.assertChanged(parser, recipe, before, emptyArray(), after, 2, 1) {}
     }
 
     fun assertChanged(
@@ -52,7 +54,7 @@ interface MavenRecipeTest : RecipeTest {
         @Language("xml") after: String,
         cycles: Int
     ) {
-        super.assertChanged(parser, recipe, before, dependsOn, after, cycles) {}
+        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, cycles -1) {}
     }
 
     fun assertChanged(
@@ -62,7 +64,7 @@ interface MavenRecipeTest : RecipeTest {
         @Language("xml") after: String,
         cycles: Int
     ) {
-        super.assertChanged(parser, recipe, before, dependsOn, after, cycles) {}
+        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, cycles -1) {}
     }
 
     fun assertChanged(
@@ -71,7 +73,7 @@ interface MavenRecipeTest : RecipeTest {
         @Language("xml") after: String,
         cycles: Int
     ) {
-        super.assertChanged(parser, recipe, before, dependsOn, after, cycles) {}
+        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, cycles -1) {}
     }
 
     fun assertChanged(
@@ -80,7 +82,7 @@ interface MavenRecipeTest : RecipeTest {
         @Language("xml") after: String,
         cycles: Int,
     ) {
-        super.assertChanged(parser, recipe, before, emptyArray(), after, cycles) {}
+        super.assertChanged(parser, recipe, before, emptyArray(), after, cycles, cycles -1) {}
     }
 
     fun <T : SourceFile> assertChanged(
@@ -90,7 +92,7 @@ interface MavenRecipeTest : RecipeTest {
         @Language("xml") after: String,
         cycles: Int,
     ) {
-        super.assertChanged(parser, recipe, before, emptyArray(), after, cycles) {}
+        super.assertChanged(parser, recipe, before, emptyArray(), after, cycles, cycles -1) {}
     }
 
     override fun assertChanged(
@@ -101,7 +103,7 @@ interface MavenRecipeTest : RecipeTest {
         @Language("xml") after: String,
         cycles: Int
     ) {
-        super.assertChanged(parser, recipe, before, dependsOn, after, cycles) {}
+        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, cycles -1) {}
     }
 
     override fun <T : SourceFile> assertChanged(
@@ -111,9 +113,10 @@ interface MavenRecipeTest : RecipeTest {
         @Language("xml") dependsOn: Array<String>,
         @Language("xml") after: String,
         cycles: Int,
+        expectedCyclesToComplete: Int,
         afterConditions: (T) -> Unit
     ) {
-        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, afterConditions)
+        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, expectedCyclesToComplete, afterConditions)
     }
 
     fun assertUnchanged(

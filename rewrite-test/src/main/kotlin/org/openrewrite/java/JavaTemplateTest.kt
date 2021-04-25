@@ -20,11 +20,9 @@ import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.Parser
 import org.openrewrite.java.tree.J
-import org.openrewrite.java.tree.Statement
 import org.slf4j.LoggerFactory
 import java.util.*
 import java.util.function.Consumer
-import kotlin.Comparator
 
 interface JavaTemplateTest : JavaRecipeTest {
     companion object {
@@ -78,7 +76,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                 void method() {
                 }
             }
-        """
+        """,
+        cycles = 1
     )
 
     @Test
@@ -145,7 +144,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                 public String bar = "hey!";
                 public String fuz;
             }
-        """
+        """,
+        cycles = 1
     )
 
     @Test
@@ -190,7 +190,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                     n++;
                 }
             }
-        """
+        """,
+        cycles = 1
     )
 
     /**
@@ -280,7 +281,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                     others.add(m);
                 }
             }
-        """
+        """,
+        cycles = 1
     )
 
     @Test
@@ -320,7 +322,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                     others.add(m);
                 }
             }
-        """
+        """,
+        cycles = 1
     )
 
     @Test
@@ -373,7 +376,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                     return 'f';
                 }
             }
-        """
+        """,
+        cycles = 1
     )
 
     @Test
@@ -476,7 +480,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                     return 'f';
                 }
             }
-        """
+        """,
+        cycles = 1
     )
 
     @Test
@@ -879,7 +884,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                     return 'f';
                 }
             }
-        """
+        """,
+        cycles = 1
     )
 
     @Test
@@ -966,7 +972,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                     private String nope = "nothing here";
                 }
             }
-        """
+        """,
+        cycles = 1
     )
     @Test
     fun templateMethodIntoClass(jp: JavaParser) = assertChanged(
@@ -1217,7 +1224,8 @@ interface JavaTemplateTest : JavaRecipeTest {
             public abstract class Customer {
                 public abstract void setCustomerInfo(Date dateOfBirth, String firstName, String lastName);
             }
-        """
+        """,
+        cycles = 1
     )
 
     @Test

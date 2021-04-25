@@ -88,8 +88,6 @@ interface EmptyBlockTest : JavaRecipeTest {
         """,
         after = """
             public class A {
-                {
-                }
             }
         """
     )

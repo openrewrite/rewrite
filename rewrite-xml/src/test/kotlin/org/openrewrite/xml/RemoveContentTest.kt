@@ -39,7 +39,8 @@ class RemoveContentTest : XmlRecipeTest {
             <dependency>
                 <groupId>group</groupId>
             </dependency>
-        """
+        """,
+        cycles = 1
     )
 
     @Test
@@ -65,7 +66,8 @@ class RemoveContentTest : XmlRecipeTest {
             <project>
                 <name>my.company</name>
             </project>
-        """
+        """,
+        cycles = 1
     )
 
     @Test
@@ -88,6 +90,7 @@ class RemoveContentTest : XmlRecipeTest {
         """,
         after = """
             <project/>
-        """
+        """,
+        cycles = 1
     )
 }

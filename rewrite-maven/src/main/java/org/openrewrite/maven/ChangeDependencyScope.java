@@ -49,7 +49,7 @@ public class ChangeDependencyScope extends Recipe {
     @Option(displayName = "New scope",
             description = "Scope to apply to specified Maven dependency. " +
                     "May be omitted, which indicates that no scope should be added and any existing scope be removed from the dependency.",
-            valid = { "compile", "test", "runtime", "provided" },
+            valid = {"compile", "test", "runtime", "provided"},
             required = false)
     @Nullable
     String newScope;
@@ -83,7 +83,7 @@ public class ChangeDependencyScope extends Recipe {
                         } else if (!newScope.equals(scope.get().getValue().orElse(null))) {
                             doAfterVisit(new ChangeTagValueVisitor<>(scope.get(), newScope));
                         }
-                    } else {
+                    } else if (newScope != null) {
                         doAfterVisit(new AddToTagVisitor<>(tag, Xml.Tag.build("<scope>" + newScope + "</scope>")));
                     }
                 }

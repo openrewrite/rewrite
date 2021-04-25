@@ -76,7 +76,8 @@ interface ReorderMethodArgumentsTest : JavaRecipeTest {
                    );
                }
             }
-        """
+        """,
+        cycles = 1
     )
 
     @Test
@@ -109,7 +110,8 @@ interface ReorderMethodArgumentsTest : JavaRecipeTest {
                    a.foo(0, 1, "s");
                }
             }
-        """
+        """,
+        cycles = 1
     )
 
     @Test
@@ -142,7 +144,8 @@ interface ReorderMethodArgumentsTest : JavaRecipeTest {
                    a.foo("mystring", "a", "b", 0);
                }
             }
-        """
+        """,
+        cycles = 1
     )
 
     @Test

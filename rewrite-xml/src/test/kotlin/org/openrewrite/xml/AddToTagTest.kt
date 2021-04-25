@@ -39,7 +39,8 @@ class AddToTagTest : XmlRecipeTest {
                 <bean id="myBean"/>
                 <bean id="myBean2"/>
             </beans>
-        """
+        """,
+        cycles = 1
     )
 
     @Test
@@ -66,7 +67,8 @@ class AddToTagTest : XmlRecipeTest {
                     <property name="myprop" ref="collaborator"/>
                 </bean>
             </beans>
-        """
+        """,
+        cycles = 1
     )
 
     @Test
@@ -84,7 +86,8 @@ class AddToTagTest : XmlRecipeTest {
             <beans>
                 <bean id="myBean"/>
             </beans>
-        """
+        """,
+        cycles = 1
     )
 
     @Test
@@ -108,6 +111,7 @@ class AddToTagTest : XmlRecipeTest {
                 <apple/>
                 <banana/>
             </beans>
-        """
+        """,
+        cycles = 1
     )
 }
