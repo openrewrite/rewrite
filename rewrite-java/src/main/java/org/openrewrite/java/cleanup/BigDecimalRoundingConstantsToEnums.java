@@ -43,7 +43,7 @@ public class BigDecimalRoundingConstantsToEnums extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "`BigDecimal` rounding constants to `RoundingMode` Enums";
+        return "`BigDecimal` rounding constants to `RoundingMode` enums";
     }
 
     @Override
@@ -136,5 +136,4 @@ public class BigDecimalRoundingConstantsToEnums extends Recipe {
             }
         };
     }
-
 }

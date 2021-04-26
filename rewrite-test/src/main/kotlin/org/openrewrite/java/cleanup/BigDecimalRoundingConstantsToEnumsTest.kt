@@ -20,7 +20,7 @@ import org.openrewrite.Recipe
 import org.openrewrite.java.JavaRecipeTest
 
 interface BigDecimalRoundingConstantsToEnumsTest : JavaRecipeTest {
-    override val recipe: Recipe?
+    override val recipe: Recipe
         get() = BigDecimalRoundingConstantsToEnums()
 
     @Test
