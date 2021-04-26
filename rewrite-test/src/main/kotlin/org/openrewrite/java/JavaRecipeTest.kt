@@ -63,6 +63,17 @@ interface JavaRecipeTest : RecipeTest {
     }
 
     fun assertChanged(
+        recipe: Recipe?,
+        @Language("java") before: String,
+        @Language("java") dependsOn: Array<String>,
+        @Language("java") after: String,
+        cycles: Int,
+        expectedCyclesToComplete: Int
+    ) {
+        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, expectedCyclesToComplete) {}
+    }
+
+    fun assertChanged(
         @Language("java") before: String,
         @Language("java") dependsOn: Array<String>,
         @Language("java") after: String,
@@ -78,6 +89,16 @@ interface JavaRecipeTest : RecipeTest {
         cycles: Int,
     ) {
         super.assertChanged(parser, recipe, before, emptyArray(), after, cycles, cycles - 1) {}
+    }
+
+    fun assertChanged(
+        recipe: Recipe?,
+        @Language("java") before: String,
+        @Language("java") after: String,
+        cycles: Int,
+        expectedCyclesToComplete: Int
+    ) {
+        super.assertChanged(parser, recipe, before, emptyArray(), after, cycles, expectedCyclesToComplete) {}
     }
 
     fun <T : SourceFile> assertChanged(

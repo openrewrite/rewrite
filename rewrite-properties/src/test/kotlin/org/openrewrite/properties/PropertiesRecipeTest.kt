@@ -61,6 +61,17 @@ interface PropertiesRecipeTest : RecipeTest {
     }
 
     fun assertChanged(
+        recipe: Recipe?,
+        @Language("properties") before: String,
+        @Language("properties") dependsOn: Array<String>,
+        @Language("properties") after: String,
+        cycles: Int,
+        expectedCyclesToComplete: Int
+    ) {
+        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, expectedCyclesToComplete) {}
+    }
+
+    fun assertChanged(
         @Language("properties") before: String,
         @Language("properties") dependsOn: Array<String>,
         @Language("properties") after: String,
@@ -76,6 +87,16 @@ interface PropertiesRecipeTest : RecipeTest {
         cycles: Int,
     ) {
         super.assertChanged(parser, recipe, before, emptyArray(), after, cycles, cycles -1) {}
+    }
+
+    fun assertChanged(
+        recipe: Recipe?,
+        @Language("properties") before: String,
+        @Language("properties") after: String,
+        cycles: Int,
+        expectedCyclesToComplete: Int
+    ) {
+        super.assertChanged(parser, recipe, before, emptyArray(), after, cycles, expectedCyclesToComplete) {}
     }
 
     fun <T : SourceFile> assertChanged(

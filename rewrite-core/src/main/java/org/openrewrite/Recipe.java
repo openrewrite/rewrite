@@ -150,6 +150,18 @@ public abstract class Recipe {
 //                .collect(toList());
     }
 
+    /**
+     * @return Determines if another cycle is ran when this recipe makes a change. In some cases, like changing method declaration names,
+     * a further cycle is needed to update method invocations of that declaration that were visited prior to the declaration change. But other
+     * visitors never need to cause another cycle, such as those that format whitespace or add search markers. Note that even when this is false,
+     * the recipe will still run on another cycle if any other recipe causes another cycle to run. But if every recipe reports no need to run
+     * another cycle (or if there are no changes made in a cycle), then another will not run.
+     */
+    @Incubating(since = "7.3.0")
+    public boolean causesAnotherCycle() {
+        return false;
+    }
+
     @JsonIgnore
     private final List<Recipe> recipeList = new ArrayList<>();
 
@@ -193,10 +205,10 @@ public abstract class Recipe {
     }
 
     @SuppressWarnings("SuspiciousMethodCalls")
-    private <S extends SourceFile> List<SourceFile> visitInternal(List<S> before,
-                                                                  ExecutionContext ctx,
-                                                                  ForkJoinPool forkJoinPool,
-                                                                  Map<UUID, Recipe> recipeThatDeletedSourceFile) {
+    <S extends SourceFile> List<SourceFile> visitInternal(List<S> before,
+                                                          ExecutionContext ctx,
+                                                          ForkJoinPool forkJoinPool,
+                                                          Map<UUID, Recipe> recipeThatDeletedSourceFile) {
         long startTime = System.nanoTime();
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean(false);
 
@@ -303,13 +315,15 @@ public abstract class Recipe {
     }
 
     public final List<Result> run(List<? extends SourceFile> before, ExecutionContext ctx, int maxCycles) {
-        return run(before, ctx, ForkJoinPool.commonPool(), maxCycles);
+        return run(before, ctx, ForkJoinPool.commonPool(), maxCycles, 1);
     }
 
+    @Incubating(since = "7.3.0")
     public final List<Result> run(List<? extends SourceFile> before,
                                   ExecutionContext ctx,
                                   ForkJoinPool forkJoinPool,
-                                  int maxCycles) {
+                                  int maxCycles,
+                                  int minCycles) {
         DistributionSummary.builder("rewrite.recipe.run")
                 .tag("recipe", getDisplayName())
                 .description("The distribution of recipe runs and the size of source file batches given to them to process.")
@@ -324,7 +338,7 @@ public abstract class Recipe {
         WatchForNewMessageExecutionContext ctxWithWatch = new WatchForNewMessageExecutionContext(ctx);
         for (int i = 0; i < maxCycles; i++) {
             after = visitInternal(acc, ctxWithWatch, forkJoinPool, recipeThatDeletedSourceFile);
-            if (after == acc && !ctxWithWatch.needAnotherCycle) {
+            if (i + 1 >= minCycles && ((after == acc && !ctxWithWatch.needAnotherCycle) || !causesAnotherCycle())) {
                 break;
             }
             acc = after;
@@ -453,7 +467,7 @@ public abstract class Recipe {
     }
 
     private static class WatchForNewMessageExecutionContext implements ExecutionContext {
-        private boolean needAnotherCycle = true;
+        private boolean needAnotherCycle = false;
         private final ExecutionContext delegate;
 
         private WatchForNewMessageExecutionContext(ExecutionContext delegate) {

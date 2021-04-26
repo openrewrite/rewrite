@@ -16,7 +16,6 @@
 package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.search.FindMethods;
@@ -24,7 +23,6 @@ import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import javax.lang.model.type.ExecutableType;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -106,10 +104,6 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             importToAdd = cu.getPackageDeclaration() == null ?
                     importToAdd.withPrefix(cu.getClasses().get(0).getPrefix()) :
                     importToAdd.withPrefix(Space.format("\n\n"));
-        }
-
-        if(p instanceof ExecutionContext) {
-            ((ExecutionContext) p).putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY, classType);
         }
 
         imports.add(new JRightPadded<>(importToAdd, Space.EMPTY, Markers.EMPTY));

@@ -18,6 +18,8 @@ package org.openrewrite
 import org.assertj.core.api.Assertions.*
 import org.junit.jupiter.api.fail
 import java.io.File
+import java.util.*
+import java.util.concurrent.ForkJoinPool
 
 interface RecipeTest {
     val recipe: Recipe?
@@ -63,16 +65,20 @@ interface RecipeTest {
         val inputs = arrayOf(before.trimIndent()) + dependsOn
         val sources = parser!!.parse(*inputs)
         assertThat(sources.size)
-                .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
-                .isEqualTo(inputs.size)
+            .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
+            .isEqualTo(inputs.size)
 
-        val results = RecipeCheckingExpectedCycles(recipe, expectedCyclesToComplete)
+        val recipeCheckingExpectedCycles = RecipeCheckingExpectedCycles(recipe, expectedCyclesToComplete)
+        val results = recipeCheckingExpectedCycles
             .run(
                 sources,
                 InMemoryExecutionContext { t: Throwable? -> fail<Any>("Recipe threw an exception", t) },
-                cycles
+                ForkJoinPool.commonPool(),
+                cycles,
+                expectedCyclesToComplete + 1
             )
             .filter { it.before == sources.first() }
+        recipeCheckingExpectedCycles.verify()
 
         if (results.isEmpty()) {
             fail<Any>("The recipe must make changes")
@@ -114,16 +120,21 @@ interface RecipeTest {
         val inputs = (arrayOf(before) + dependsOn).map { it.toPath() }.toList()
         val sources = parser!!.parse(inputs, null, InMemoryExecutionContext())
         assertThat(sources.size)
-                .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
-                .isEqualTo(inputs.size)
+            .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
+            .isEqualTo(inputs.size)
 
         val source = sources.first()
 
-        val results = RecipeCheckingExpectedCycles(recipe!!, expectedCyclesToComplete).run(
-            listOf(source),
-            InMemoryExecutionContext { t: Throwable? -> fail<Any>("Recipe threw an exception", t) },
-            cycles
-        )
+        val recipeCheckingExpectedCycles = RecipeCheckingExpectedCycles(recipe!!, expectedCyclesToComplete)
+        val results = recipeCheckingExpectedCycles
+            .run(
+                listOf(source),
+                InMemoryExecutionContext { t: Throwable -> fail<Any>("Recipe threw an exception", t) },
+                ForkJoinPool.commonPool(),
+                cycles,
+                expectedCyclesToComplete + 1
+            )
+        recipeCheckingExpectedCycles.verify()
 
         if (results.isEmpty()) {
             fail<Any>("The recipe must make changes")
@@ -149,10 +160,13 @@ interface RecipeTest {
         val inputs = (arrayOf(before.trimIndent()) + dependsOn)
         val sources = parser!!.parse(*inputs)
         assertThat(sources.size)
-                .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
-                .isEqualTo(inputs.size)
+            .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
+            .isEqualTo(inputs.size)
         val source = sources.first()
-        val results = recipe!!.run(listOf(source), InMemoryExecutionContext { t -> t.printStackTrace() }, 1)
+        val recipeCheckingExpectedCycles = RecipeCheckingExpectedCycles(recipe!!, 2)
+        val results = recipeCheckingExpectedCycles
+            .run(listOf(source), InMemoryExecutionContext { t -> t.printStackTrace() }, ForkJoinPool.commonPool(), 2, 2)
+        recipeCheckingExpectedCycles.verify()
 
         results.forEach { result ->
             if (result.diff(treePrinter ?: TreePrinter.identity<Any>()).isEmpty()) {
@@ -176,15 +190,24 @@ interface RecipeTest {
         assertThat(recipe).`as`("A recipe must be specified").isNotNull
         val inputs = (listOf(before) + dependsOn).map { it.toPath() }
         val sources = parser!!.parse(
-                inputs,
+            inputs,
             null,
             InMemoryExecutionContext()
         )
         assertThat(sources.size)
-                .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
-                .isEqualTo(inputs.size)
+            .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
+            .isEqualTo(inputs.size)
         val source = sources.first()
-        val results = recipe!!.run(listOf(source), InMemoryExecutionContext { t -> t.printStackTrace() }, 1)
+        val recipeCheckingExpectedCycles = RecipeCheckingExpectedCycles(recipe!!, 2)
+        val results = recipeCheckingExpectedCycles
+            .run(
+                listOf(source),
+                InMemoryExecutionContext { t -> fail<Any>("Recipe threw an exception", t) },
+                ForkJoinPool.commonPool(),
+                2,
+                2
+            )
+        recipeCheckingExpectedCycles.verify()
 
         results.forEach { result ->
             if (result.diff(treePrinter ?: TreePrinter.identity<Any>()).isEmpty()) {
@@ -212,8 +235,11 @@ interface RecipeTest {
         }
     }
 
-    private class RecipeCheckingExpectedCycles(private val recipe: Recipe, private val expectedCyclesToComplete: Int): Recipe() {
-        private var executedCycles = 0
+    private class RecipeCheckingExpectedCycles(
+        private val recipe: Recipe,
+        private val expectedCyclesToComplete: Int
+    ) : Recipe() {
+        var cyclesThatResultedInChanges = 0
 
         override fun getDisplayName(): String = "Check expected cycles"
 
@@ -221,13 +247,23 @@ interface RecipeTest {
             doNext(recipe)
         }
 
-        override fun visit(before: List<SourceFile>, ctx: ExecutionContext): List<SourceFile> {
-            val afterList = recipe.visit(before, ctx)
-            executedCycles = executedCycles.inc()
-            if(executedCycles > expectedCyclesToComplete && afterList != before) {
-                fail("Expected recipe to complete in $expectedCyclesToComplete cycle")
+        override fun <S : SourceFile?> visitInternal(
+            before: List<S>,
+            ctx: ExecutionContext,
+            forkJoinPool: ForkJoinPool,
+            recipeThatDeletedSourceFile: Map<UUID, Recipe>
+        ): List<SourceFile> {
+            val afterList = recipe.visitInternal(before, ctx, forkJoinPool, recipeThatDeletedSourceFile)
+            if (afterList !== before) {
+                cyclesThatResultedInChanges = cyclesThatResultedInChanges.inc()
             }
             return afterList
+        }
+
+        fun verify() {
+            if (cyclesThatResultedInChanges != expectedCyclesToComplete) {
+                fail("Expected recipe to complete in $expectedCyclesToComplete cycle${if(expectedCyclesToComplete > 1) "s" else ""}, but took $cyclesThatResultedInChanges cycle${if(cyclesThatResultedInChanges > 1) "s" else ""}.")
+            }
         }
     }
 }

@@ -73,6 +73,17 @@ interface YamlRecipeTest : RecipeTest {
     }
 
     fun assertChanged(
+        recipe: Recipe?,
+        @Language("yml") before: String,
+        @Language("yml") dependsOn: Array<String>,
+        @Language("yml") after: String,
+        cycles: Int,
+        expectedCyclesToComplete: Int
+    ) {
+        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, expectedCyclesToComplete) {}
+    }
+
+    fun assertChanged(
         @Language("yml") before: String,
         @Language("yml") dependsOn: Array<String>,
         @Language("yml") after: String,
@@ -88,6 +99,16 @@ interface YamlRecipeTest : RecipeTest {
         cycles: Int,
     ) {
         super.assertChanged(parser, recipe, before, emptyArray(), after, cycles, cycles -1) {}
+    }
+
+    fun assertChanged(
+        recipe: Recipe?,
+        @Language("yml") before: String,
+        @Language("yml") after: String,
+        cycles: Int,
+        expectedCyclesToComplete: Int
+    ) {
+        super.assertChanged(parser, recipe, before, emptyArray(), after, cycles, expectedCyclesToComplete) {}
     }
 
     fun <T : SourceFile> assertChanged(

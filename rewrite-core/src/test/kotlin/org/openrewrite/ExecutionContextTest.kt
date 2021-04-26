@@ -32,6 +32,10 @@ class ExecutionContextTest {
                 return name
             }
 
+            override fun causesAnotherCycle(): Boolean {
+                return true
+            }
+
             override fun getVisitor(): PlainTextVisitor<ExecutionContext> {
                 return object : PlainTextVisitor<ExecutionContext>() {
                     override fun visit(tree: Tree?, p: ExecutionContext): PlainText? {
@@ -43,7 +47,6 @@ class ExecutionContextTest {
                     }
                 }
             }
-
         }.run(listOf(PlainText(randomId(), Markers.EMPTY, "hello world")))
 
         assertThat(cycles).isEqualTo(2)

@@ -24,9 +24,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.JavaSearchResult;
-import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -70,10 +68,6 @@ public class FindMethods extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if (methodMatcher.matches(method)) {
-                    if(method.getType() != null && method.getType().hasFlags(Flag.Static)) {
-                        ctx.putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY,
-                                method.getType().getDeclaringType());
-                    }
                     m = m.withMarkers(m.getMarkers().addOrUpdate(new JavaSearchResult(id, FindMethods.this)));
                 }
                 return m;
@@ -83,9 +77,6 @@ public class FindMethods extends Recipe {
             public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
                 J.MemberReference m = super.visitMemberReference(memberRef, ctx);
                 if (methodMatcher.matches(m.getReferenceType())) {
-                    if(m.getType() != null) {
-                        ctx.putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY, m.getType());
-                    }
                     m = m.withReference(m.getReference().withMarkers(m.getReference().getMarkers().addOrUpdate(new JavaSearchResult(id, FindMethods.this))));
                 }
                 return m;

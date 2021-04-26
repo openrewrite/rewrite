@@ -68,6 +68,17 @@ interface MavenRecipeTest : RecipeTest {
     }
 
     fun assertChanged(
+        recipe: Recipe?,
+        @Language("xml") before: String,
+        @Language("xml") dependsOn: Array<String>,
+        @Language("xml") after: String,
+        cycles: Int,
+        expectedCyclesToComplete: Int
+    ) {
+        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, expectedCyclesToComplete) {}
+    }
+
+    fun assertChanged(
         @Language("xml") before: String,
         @Language("xml") dependsOn: Array<String>,
         @Language("xml") after: String,
@@ -83,6 +94,16 @@ interface MavenRecipeTest : RecipeTest {
         cycles: Int,
     ) {
         super.assertChanged(parser, recipe, before, emptyArray(), after, cycles, cycles -1) {}
+    }
+
+    fun assertChanged(
+        recipe: Recipe?,
+        @Language("xml") before: String,
+        @Language("xml") after: String,
+        cycles: Int,
+        expectedCyclesToComplete: Int
+    ) {
+        super.assertChanged(parser, recipe, before, emptyArray(), after, cycles, expectedCyclesToComplete) {}
     }
 
     fun <T : SourceFile> assertChanged(

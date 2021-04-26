@@ -55,6 +55,11 @@ public class FindTypes extends Recipe {
     UUID id = Tree.randomId();
 
     @Override
+    public boolean causesAnotherCycle() {
+        return false;
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
 
@@ -64,7 +69,6 @@ public class FindTypes extends Recipe {
                 JavaType.Class asClass = TypeUtils.asClass(n.getType());
                 if (asClass != null && asClass.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         getCursor().firstEnclosing(J.Import.class) == null) {
-                    ctx.putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY, asClass);
                     return n.withMarkers(n.getMarkers().addOrUpdate(new JavaSearchResult(id, FindTypes.this)));
                 }
                 return n;
@@ -76,7 +80,6 @@ public class FindTypes extends Recipe {
                 JavaType.Class asClass = TypeUtils.asClass(fa.getTarget().getType());
                 if (asClass != null && asClass.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         fa.getName().getSimpleName().equals("class")) {
-                    ctx.putMessageInSet(JavaType.FOUND_TYPE_CONTEXT_KEY, asClass);
                     return fa.withMarkers(fa.getMarkers().addOrUpdate(new JavaSearchResult(id, FindTypes.this)));
                 }
                 return fa;

@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 
+@Suppress("RedundantOperationOnEmptyContainer")
 interface FindMethodsTest : JavaRecipeTest {
 
     @Test
