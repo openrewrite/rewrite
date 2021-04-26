@@ -58,7 +58,7 @@ public class FindKey extends Recipe {
             public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry e = (Yaml.Mapping.Entry) super.visitMappingEntry(entry, ctx);
                 if (xPathMatcher.matches(getCursor())) {
-                    e = e.withMarkers(e.getMarkers().addOrUpdate(new RecipeSearchResult(id, FindKey.this)));
+                    e = e.withMarkers(e.getMarkers().addIfAbsent(new RecipeSearchResult(id, FindKey.this)));
                 }
                 return e;
             }

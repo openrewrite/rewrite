@@ -63,7 +63,7 @@ public class HasTypes extends Recipe {
             @Override
             public J visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
                 if (find(cu, fullyQualifiedTypeNames)){
-                    cu = cu.withMarkers(cu.getMarkers().addOrUpdate(new JavaSearchResult(id, HasTypes.this)));
+                    cu = cu.withMarkers(cu.getMarkers().addIfAbsent(new JavaSearchResult(id, HasTypes.this)));
                 }
                 return cu;
             }

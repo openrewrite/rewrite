@@ -30,6 +30,7 @@ public class JavaSearchResult extends RecipeSearchResult {
     public JavaSearchResult(UUID id, Recipe recipe, @Nullable String description) {
         super(id, recipe, description);
     }
+
     public JavaSearchResult(UUID id, Recipe recipe) {
         super(id, recipe, null);
     }

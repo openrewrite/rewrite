@@ -64,7 +64,7 @@ public class FindAnnotations extends Recipe {
             public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
                 J.Annotation a = super.visitAnnotation(annotation, ctx);
                 if (annotationMatcher.matches(annotation)) {
-                    a = a.withMarkers(a.getMarkers().addOrUpdate(new JavaSearchResult(id, FindAnnotations.this)));
+                    a = a.withMarkers(a.getMarkers().addIfAbsent(new JavaSearchResult(id, FindAnnotations.this)));
                 }
                 return a;
             }

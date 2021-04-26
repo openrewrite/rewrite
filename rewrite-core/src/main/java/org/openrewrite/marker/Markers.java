@@ -18,13 +18,15 @@ package org.openrewrite.marker;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
-import io.micrometer.core.instrument.config.MeterFilter;
+import lombok.With;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.ListUtils;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BinaryOperator;
 
 import static java.util.Collections.emptyList;
@@ -42,16 +44,26 @@ public class Markers implements Tree {
     };
 
     private final UUID id;
-    private final Collection<? extends Marker> markers;
 
-    private Markers(UUID id, Collection<? extends Marker> markers) {
+    @With
+    private final List<Marker> markers;
+
+    private Markers(UUID id, List<Marker> markers) {
         this.id = id;
         this.markers = markers;
     }
 
     @JsonCreator
     public static Markers build(Collection<? extends Marker> markers) {
-        return markers.isEmpty() ? EMPTY : new Markers(randomId(), markers);
+        List<Marker> markerList;
+        if (markers instanceof List) {
+            //noinspection unchecked
+            markerList = (List<Marker>) markers;
+        } else {
+            markerList = new ArrayList<>(markers.size());
+            markerList.addAll(markers);
+        }
+        return markers.isEmpty() ? EMPTY : new Markers(randomId(), markerList);
     }
 
     /**
@@ -115,31 +127,33 @@ public class Markers implements Tree {
      * @return A new {@link Markers} with an added or updated marker.
      */
     public <M extends Marker> Markers compute(M identity, BinaryOperator<M> remappingFunction) {
-        List<Marker> updatedmarker = new ArrayList<>(markers.size() + 1);
-        boolean updated = false;
-        for (Marker m : this.markers) {
+        AtomicBoolean foundEqualMarker = new AtomicBoolean(false);
+        List<Marker> updatedMarkers = ListUtils.map(markers, m -> {
             if (m.equals(identity)) {
+                foundEqualMarker.set(true);
                 //noinspection unchecked
-                updatedmarker.add(remappingFunction.apply((M) m, identity));
-                updated = true;
-            } else {
-                updatedmarker.add(m);
+                return remappingFunction.apply((M) m, identity);
             }
+            return m;
+        });
+
+        if(!foundEqualMarker.get()) {
+            updatedMarkers = ListUtils.concat(updatedMarkers, identity);
         }
-        if (!updated) {
-            updatedmarker.add(identity);
-        }
-        return new Markers(id, updatedmarker);
+
+        return withMarkers(updatedMarkers);
     }
 
     /**
      * Add a new marker or update some existing marker.
-     * @param identity
-     * @param <M>
-     * @return
+     *
+     * @param m   A marker, which may or may not already exist already.
+     * @param <M> The marker type.
+     * @return If a marker already exists that matches by object equality, an unchanged markers reference
+     * is returned. Otherwise, the supplied marker is added.
      */
-    public <M extends Marker> Markers addOrUpdate(M identity) {
-        return compute(identity, (m1, m2) -> m2);
+    public <M extends Marker> Markers addIfAbsent(M m) {
+        return compute(m, (m1, m2) -> m1);
     }
 
     public <M extends Marker> List<M> findAll(Class<M> markerType) {

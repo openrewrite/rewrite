@@ -161,20 +161,20 @@ public class MavenProjectParser {
             javaParser.setClasspath(downloadArtifacts(maven.getModel().getDependencies(Scope.Compile)));
             sourceFiles.addAll(
                     ListUtils.map(javaParser.parse(maven.getJavaSources(projectDirectory, ctx), projectDirectory, ctx),
-                            s -> s.withMarkers(s.getMarkers().addOrUpdate(mainProvenance))
+                            s -> s.withMarkers(s.getMarkers().addIfAbsent(mainProvenance))
                     ));
 
             javaParser.setClasspath(downloadArtifacts(maven.getModel().getDependencies(Scope.Test)));
             sourceFiles.addAll(
                     ListUtils.map(javaParser.parse(maven.getTestJavaSources(projectDirectory, ctx), projectDirectory, ctx),
-                            s -> s.withMarkers(s.getMarkers().addOrUpdate(testProvenance))
+                            s -> s.withMarkers(s.getMarkers().addIfAbsent(testProvenance))
                     ));
 
             parseResources(maven.getResources(projectDirectory, ctx), projectDirectory, sourceFiles, mainProvenance);
             parseResources(maven.getTestResources(projectDirectory, ctx), projectDirectory, sourceFiles, testProvenance);
         }
 
-        return ListUtils.map(sourceFiles, s -> s.withMarkers(s.getMarkers().addOrUpdate(gitProvenance)));
+        return ListUtils.map(sourceFiles, s -> s.withMarkers(s.getMarkers().addIfAbsent(gitProvenance)));
     }
 
     private void parseResources(List<Path> resources, Path projectDirectory, List<SourceFile> sourceFiles, JavaProvenance javaProvenance) {
@@ -186,7 +186,7 @@ public class MavenProjectParser {
                                         .collect(Collectors.toList()),
                                 projectDirectory,
                                 ctx
-                        ), s -> s.withMarkers(s.getMarkers().addOrUpdate(javaProvenance))
+                        ), s -> s.withMarkers(s.getMarkers().addIfAbsent(javaProvenance))
                 ));
 
         sourceFiles.addAll(
@@ -196,7 +196,7 @@ public class MavenProjectParser {
                                 .collect(Collectors.toList()),
                         projectDirectory,
                         ctx
-                        ), s -> s.withMarkers(s.getMarkers().addOrUpdate(javaProvenance))
+                        ), s -> s.withMarkers(s.getMarkers().addIfAbsent(javaProvenance))
                 ));
 
         sourceFiles.addAll(
@@ -206,7 +206,7 @@ public class MavenProjectParser {
                                 .collect(Collectors.toList()),
                         projectDirectory,
                         ctx
-                        ), s -> s.withMarkers(s.getMarkers().addOrUpdate(javaProvenance))
+                        ), s -> s.withMarkers(s.getMarkers().addIfAbsent(javaProvenance))
                 ));
     }
 

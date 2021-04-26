@@ -68,7 +68,7 @@ public class FindMethods extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if (methodMatcher.matches(method)) {
-                    m = m.withMarkers(m.getMarkers().addOrUpdate(new JavaSearchResult(id, FindMethods.this)));
+                    m = m.withMarkers(m.getMarkers().addIfAbsent(new JavaSearchResult(id, FindMethods.this)));
                 }
                 return m;
             }
@@ -77,7 +77,7 @@ public class FindMethods extends Recipe {
             public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
                 J.MemberReference m = super.visitMemberReference(memberRef, ctx);
                 if (methodMatcher.matches(m.getReferenceType())) {
-                    m = m.withReference(m.getReference().withMarkers(m.getReference().getMarkers().addOrUpdate(new JavaSearchResult(id, FindMethods.this))));
+                    m = m.withReference(m.getReference().withMarkers(m.getReference().getMarkers().addIfAbsent(new JavaSearchResult(id, FindMethods.this))));
                 }
                 return m;
             }

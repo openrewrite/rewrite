@@ -16,10 +16,10 @@
 package org.openrewrite.marker;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.TreeVisitor;
 
+import java.util.Collections;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -27,8 +27,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 
 public class MarkersTest {
+
     @Test
-    public void addPreventsDuplicates() {
+    void computeThatDoesntChangeReference() {
+        TestMarker marker = new TestMarker();
+        Markers markers = Markers.build(Collections.singletonList(marker));
+        assertThat(markers).isSameAs(markers.addIfAbsent(marker));
+    }
+
+    @Test
+    void computeThatAddsNewMarker() {
+        TestMarker marker = new TestMarker();
+        Markers markers = Markers.EMPTY;
+        assertThat(markers).isNotSameAs(markers.addIfAbsent(marker));
+    }
+
+    @Test
+    void addPreventsDuplicates() {
         Markers markers = Markers.EMPTY;
         markers = markers.add(new TextMarker(randomId(), "test"));
         markers = markers.add(new TextMarker(randomId(), "test"));
@@ -36,7 +51,7 @@ public class MarkersTest {
     }
 
     @Test
-    public void addAcceptsNonDuplicates() {
+    void addAcceptsNonDuplicates() {
         Markers markers = Markers.EMPTY;
         markers = markers.add(new TextMarker(randomId(), "thing1"));
         markers = markers.add(new TextMarker(randomId(), "thing2"));
@@ -78,6 +93,13 @@ public class MarkersTest {
         @Override
         public <P> String print(TreePrinter<P> printer, P p) {
             return "";
+        }
+    }
+
+    private static class TestMarker implements Marker {
+        @Override
+        public UUID getId() {
+            return randomId();
         }
     }
 }

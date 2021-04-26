@@ -69,7 +69,7 @@ public class FindTypes extends Recipe {
                 JavaType.Class asClass = TypeUtils.asClass(n.getType());
                 if (asClass != null && asClass.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         getCursor().firstEnclosing(J.Import.class) == null) {
-                    return n.withMarkers(n.getMarkers().addOrUpdate(new JavaSearchResult(id, FindTypes.this)));
+                    return n.withMarkers(n.getMarkers().addIfAbsent(new JavaSearchResult(id, FindTypes.this)));
                 }
                 return n;
             }
@@ -80,7 +80,7 @@ public class FindTypes extends Recipe {
                 JavaType.Class asClass = TypeUtils.asClass(fa.getTarget().getType());
                 if (asClass != null && asClass.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         fa.getName().getSimpleName().equals("class")) {
-                    return fa.withMarkers(fa.getMarkers().addOrUpdate(new JavaSearchResult(id, FindTypes.this)));
+                    return fa.withMarkers(fa.getMarkers().addIfAbsent(new JavaSearchResult(id, FindTypes.this)));
                 }
                 return fa;
             }

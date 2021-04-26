@@ -56,7 +56,7 @@ public class FindProperties extends Recipe {
             public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, context);
                 if (isPropertyTag() && propertyMatcher.matcher(tag.getName()).matches()) {
-                    t = t.withMarkers(t.getMarkers().addOrUpdate(new XmlSearchResult(searchId, FindProperties.this)));
+                    t = t.withMarkers(t.getMarkers().addIfAbsent(new XmlSearchResult(searchId, FindProperties.this)));
                 }
 
                 Optional<String> value = tag.getValue();

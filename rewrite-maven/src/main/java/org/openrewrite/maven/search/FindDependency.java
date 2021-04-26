@@ -75,7 +75,7 @@ public class FindDependency extends Recipe {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
                 if (isDependencyTag(groupId, artifactId)) {
-                    return tag.withMarkers(tag.getMarkers().addOrUpdate(new XmlSearchResult(id, FindDependency.this)));
+                    return tag.withMarkers(tag.getMarkers().addIfAbsent(new XmlSearchResult(id, FindDependency.this)));
                 }
                 return super.visitTag(tag, context);
             }

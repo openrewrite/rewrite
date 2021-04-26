@@ -102,9 +102,9 @@ public class DependencyInsight extends Recipe {
                         Optional<Pom.Dependency> match = dependencies.stream().filter(this::dependencyMatches).findFirst();
                         if(match.isPresent()) {
                             if(dependencyMatches(dependency)) {
-                                t = t.withMarkers(t.getMarkers().addOrUpdate(new XmlSearchResult(searchId, DependencyInsight.this)));
+                                t = t.withMarkers(t.getMarkers().addIfAbsent(new XmlSearchResult(searchId, DependencyInsight.this)));
                             } else {
-                                t = t.withMarkers(t.getMarkers().addOrUpdate(new XmlSearchResult(searchId,DependencyInsight.this,
+                                t = t.withMarkers(t.getMarkers().addIfAbsent(new XmlSearchResult(searchId,DependencyInsight.this,
                                         match.get().getCoordinates())));
                             }
                         }
