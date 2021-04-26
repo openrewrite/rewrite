@@ -36,3 +36,4 @@ recipeList:
   - org.openrewrite.java.cleanup.UnnecessaryThrows
   - org.openrewrite.java.cleanup.UseDiamondOperator
   - org.openrewrite.java.cleanup.PrimitiveWrapperClassConstructorToValueOf
+  - org.openrewrite.java.cleanup.BigDecimalRoundingConstantsToEnums

@@ -38,6 +38,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class AddLicenseHeaderTck : AddLicenseHeaderTest
 
     @Nested
+    inner class BigDecimalRoundingConstantsToEnumsTck : BigDecimalRoundingConstantsToEnumsTest
+
+    @Nested
     inner class BlankLinesTck : BlankLinesTest
 
     @Nested
@@ -134,6 +137,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class OrderImportsTck : OrderImportsTest
 
     @Nested
+    inner class PrimitiveWrapperClassConstructorToValueOfTck : PrimitiveWrapperClassConstructorToValueOfTest
+
+    @Nested
     inner class RedundantFileCreationTck : RedundantFileCreationTest
 
     @Nested
@@ -195,7 +201,4 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class XmlParserXXEVulnerabilityTck : XmlParserXXEVulnerabilityTest
-
-    @Nested
-    inner class PrimitiveWrapperClassConstructorToValueOfTck : PrimitiveWrapperClassConstructorToValueOfTest
 }
