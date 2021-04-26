@@ -66,7 +66,7 @@ public class MavenPomDownloader {
 
     // https://maven.apache.org/ref/3.6.3/maven-model-builder/super-pom.html
     private static final MavenRepository SUPER_POM_REPOSITORY = new MavenRepository("central",
-            URI.create("https://repo.maven.apache.org/maven2"), true, false, null, null);
+            URI.create("https://repo.maven.apache.org/maven2"), true, false, true, null, null);
 
     private final MavenPomCache mavenPomCache;
     private final Map<Path, RawMaven> projectPoms;
