@@ -38,6 +38,17 @@ class JRightPaddedTest {
     }
 
     @Test
+    fun withElementsThatReordersElements() {
+        val t = J.Empty(randomId(), Space.EMPTY, Markers.EMPTY)
+        val t2 = J.Empty(randomId(), Space.EMPTY, Markers.EMPTY)
+        val trees = listOf(
+            JRightPadded(t, Space.EMPTY, Markers.EMPTY),
+            JRightPadded(t2, Space.EMPTY, Markers.EMPTY)
+        )
+        assertThat(JRightPadded.withElements(trees, listOf(t2, t))).isNotSameAs(trees)
+    }
+
+    @Test
     fun withElementsThatDeletesElement() {
         val t = J.Empty(randomId(), Space.EMPTY, Markers.EMPTY)
         val trees = listOf(JRightPadded(t, Space.EMPTY, Markers.EMPTY))
