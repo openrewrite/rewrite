@@ -23,7 +23,7 @@ interface ChangePackageTest: JavaRecipeTest {
     @Test
     fun changePackage(jp: JavaParser) = assertChanged(
         jp,
-        cycles = 3,
+        cycles = 2,
         recipe = ChangePackage(
             "org.openrewrite",
             "org.openrewrite.test"
@@ -46,7 +46,7 @@ interface ChangePackageTest: JavaRecipeTest {
     @Test
     fun changePackageRecursive(jp: JavaParser) = assertChanged(
         jp,
-        cycles = 3,
+        cycles = 2,
         recipe = ChangePackage(
             "org.openrewrite",
             "org.openrewrite.test"

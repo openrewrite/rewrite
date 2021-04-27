@@ -50,7 +50,7 @@ interface RecipeTest {
         dependsOn: Array<String> = emptyArray(),
         after: String,
         cycles: Int = 2,
-        expectedCyclesToComplete: Int = cycles - 1,
+        expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (T) -> Unit = { }
     ) {
         assertThat(recipe).`as`("A recipe must be specified").isNotNull
@@ -68,14 +68,14 @@ interface RecipeTest {
             .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
             .isEqualTo(inputs.size)
 
-        val recipeCheckingExpectedCycles = RecipeCheckingExpectedCycles(recipe, expectedCyclesToComplete)
+        val recipeCheckingExpectedCycles = RecipeCheckingExpectedCycles(recipe, expectedCyclesThatMakeChanges)
         val results = recipeCheckingExpectedCycles
             .run(
                 sources,
                 InMemoryExecutionContext { t: Throwable? -> fail<Any>("Recipe threw an exception", t) },
                 ForkJoinPool.commonPool(),
                 cycles,
-                expectedCyclesToComplete + 1
+                expectedCyclesThatMakeChanges + 1
             )
             .filter { it.before == sources.first() }
         recipeCheckingExpectedCycles.verify()
@@ -163,7 +163,7 @@ interface RecipeTest {
             .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
             .isEqualTo(inputs.size)
         val source = sources.first()
-        val recipeCheckingExpectedCycles = RecipeCheckingExpectedCycles(recipe!!, 2)
+        val recipeCheckingExpectedCycles = RecipeCheckingExpectedCycles(recipe!!, 0)
         val results = recipeCheckingExpectedCycles
             .run(listOf(source), InMemoryExecutionContext { t -> t.printStackTrace() }, ForkJoinPool.commonPool(), 2, 2)
         recipeCheckingExpectedCycles.verify()
@@ -198,7 +198,7 @@ interface RecipeTest {
             .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
             .isEqualTo(inputs.size)
         val source = sources.first()
-        val recipeCheckingExpectedCycles = RecipeCheckingExpectedCycles(recipe!!, 2)
+        val recipeCheckingExpectedCycles = RecipeCheckingExpectedCycles(recipe!!, 0)
         val results = recipeCheckingExpectedCycles
             .run(
                 listOf(source),
@@ -237,7 +237,7 @@ interface RecipeTest {
 
     private class RecipeCheckingExpectedCycles(
         private val recipe: Recipe,
-        private val expectedCyclesToComplete: Int
+        private val expectedCyclesThatMakeChanges: Int
     ) : Recipe() {
         var cyclesThatResultedInChanges = 0
 
@@ -261,8 +261,8 @@ interface RecipeTest {
         }
 
         fun verify() {
-            if (cyclesThatResultedInChanges != expectedCyclesToComplete) {
-                fail("Expected recipe to complete in $expectedCyclesToComplete cycle${if(expectedCyclesToComplete > 1) "s" else ""}, but took $cyclesThatResultedInChanges cycle${if(cyclesThatResultedInChanges > 1) "s" else ""}.")
+            if (cyclesThatResultedInChanges != expectedCyclesThatMakeChanges) {
+                fail("Expected recipe to complete in $expectedCyclesThatMakeChanges cycle${if(expectedCyclesThatMakeChanges > 1) "s" else ""}, but took $cyclesThatResultedInChanges cycle${if(cyclesThatResultedInChanges > 1) "s" else ""}.")
             }
         }
     }

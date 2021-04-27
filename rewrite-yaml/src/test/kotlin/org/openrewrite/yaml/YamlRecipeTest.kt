@@ -128,10 +128,10 @@ interface YamlRecipeTest : RecipeTest {
         @Language("yml") dependsOn: Array<String>,
         @Language("yml") after: String,
         cycles: Int,
-        expectedCyclesToComplete: Int,
+        expectedCyclesThatMakeChanges: Int,
         afterConditions: (T) -> Unit
     ) {
-        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, expectedCyclesToComplete, afterConditions)
+        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
 
     fun assertUnchanged(

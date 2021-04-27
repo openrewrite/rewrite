@@ -129,10 +129,10 @@ interface JavaRecipeTest : RecipeTest {
         @Language("java") dependsOn: Array<String>,
         @Language("java") after: String,
         cycles: Int,
-        expectedCyclesToComplete: Int,
+        expectedCyclesThatMakeChanges: Int,
         afterConditions: (T) -> Unit
     ) {
-        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, expectedCyclesToComplete, afterConditions)
+        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
 
     fun assertUnchanged(

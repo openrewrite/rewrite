@@ -37,7 +37,8 @@ interface DeleteMethodArgumentTest : JavaRecipeTest {
         recipe = DeleteMethodArgument("B foo(int, int, int)", 1),
         before = "public class A {{ B.foo(0, 1, 2); }}",
         after = "public class A {{ B.foo(0, 2); }}",
-        cycles = 1
+        cycles = 1,
+        expectedCyclesThatMakeChanges = 1
     )
 
     @Test
@@ -47,7 +48,8 @@ interface DeleteMethodArgumentTest : JavaRecipeTest {
         recipe = DeleteMethodArgument("B foo(int, int, int)", 1),
         before = "public class A {{ B.foo(0, 1, 2); }}",
         after = "public class A {{ B.foo(0, 2); }}",
-        cycles = 1
+        cycles = 1,
+        expectedCyclesThatMakeChanges = 1
     )
 
     @Test
