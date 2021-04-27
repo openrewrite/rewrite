@@ -21,6 +21,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
+import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -39,6 +40,8 @@ import java.util.function.BiFunction;
  * @param <P> An input object that is passed to every visit method.
  */
 public abstract class TreeVisitor<T extends Tree, P> {
+    private static final boolean IS_DEBUGGING = System.getProperty("org.openrewrite.debug") != null ||
+            ManagementFactory.getRuntimeMXBean().getInputArguments().toString().indexOf("-agentlib:jdwp") > 0;
 
     private Cursor cursor;
 
@@ -136,7 +139,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
 
         T t = null;
         boolean isAcceptable = tree.isAcceptable(this, p);
-        if(isAcceptable) {
+        if (isAcceptable) {
             //noinspection unchecked
             t = preVisit((T) tree, p);
             if (t != null) {
@@ -144,6 +147,9 @@ public abstract class TreeVisitor<T extends Tree, P> {
             }
             if (t != null) {
                 t = postVisit(t, p);
+            }
+            if (IS_DEBUGGING && t != tree) {
+                debugOnChange(tree, t);
             }
         }
         setCursor(cursor.getParent());
@@ -165,6 +171,14 @@ public abstract class TreeVisitor<T extends Tree, P> {
 
         //noinspection unchecked
         return (isAcceptable) ? t : (T) tree;
+    }
+
+    /**
+     * A debugging probe that is only called if a tree changes and either the org.openrewrite.debug
+     * system property is set or the process is running in debug mode.
+     */
+    @Incubating(since = "7.3.0")
+    protected void debugOnChange(@Nullable Tree before, @Nullable Tree after) {
     }
 
     @SuppressWarnings("unused")
@@ -192,12 +206,12 @@ public abstract class TreeVisitor<T extends Tree, P> {
         Collection<? extends Marker> originalMarkers = markers.entries();
         List<Marker> visited = new ArrayList<>(originalMarkers.size());
         boolean anyChanged = false;
-        for(Marker originalMarker : originalMarkers) {
+        for (Marker originalMarker : originalMarkers) {
             Marker visitedMarker = visitMarker(originalMarker, p);
             visited.add(visitedMarker);
             anyChanged = anyChanged || (visitedMarker != originalMarker);
         }
-        if(anyChanged) {
+        if (anyChanged) {
             return Markers.build(visited);
         }
         return markers;
