@@ -19,6 +19,7 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.LocalMavenArtifactCache;
+import org.openrewrite.maven.cache.MavenArtifactCache;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.cache.ReadOnlyLocalMavenArtifactCache;
 import org.openrewrite.maven.internal.MavenPomDownloader;
@@ -59,6 +60,29 @@ public class MavenArtifactHelper {
      * @return List of paths to downloaded artifacts
      */
     public static List<Path> downloadArtifactAndDependencies(String groupId, String artifactId, String version, ExecutionContext ctx, MavenPomCache mavenPomCache, List<MavenRepository> repositories) {
+        return downloadArtifactAndDependenciesInternal(groupId, artifactId, version, ctx, mavenPomCache, repositories, ReadOnlyLocalMavenArtifactCache.MAVEN_LOCAL.orElse(
+                new LocalMavenArtifactCache(Paths.get(System.getProperty("user.home"), ".rewrite", "cache", "artifacts"))
+        ));
+    }
+
+    /**
+     * Download artifact specified by GAV from specified maven repositories, plus all runtime dependencies. Maven central
+     * will be added as a repository by default.
+     *
+     * @param groupId Group ID
+     * @param artifactId Artifact ID
+     * @param version Version
+     * @param ctx Execution context
+     * @param mavenPomCache Pom download cache
+     * @param repositories Maven repositories to download from
+     * @param path Path of local Maven cache
+     * @return List of paths to downloaded artifacts
+     */
+    public static List<Path> downloadArtifactAndDependencies(String groupId, String artifactId, String version, ExecutionContext ctx, MavenPomCache mavenPomCache, List<MavenRepository> repositories, Path path) {
+        return downloadArtifactAndDependenciesInternal(groupId, artifactId, version, ctx, mavenPomCache, repositories, new LocalMavenArtifactCache(path));
+    }
+
+    private static List<Path> downloadArtifactAndDependenciesInternal(String groupId, String artifactId, String version, ExecutionContext ctx, MavenPomCache mavenPomCache, List<MavenRepository> repositories, MavenArtifactCache mavenArtifactCache) {
         MavenPomDownloader mavenPomDownloader = new MavenPomDownloader(mavenPomCache,
                 Collections.emptyMap(), ctx);
         RawMaven rawMaven = mavenPomDownloader.download(groupId, artifactId, version, null, null,
@@ -74,9 +98,7 @@ public class MavenArtifactHelper {
         }
         Maven maven = new Maven(xml);
         Pom pom = maven.getModel();
-        MavenArtifactDownloader mavenArtifactDownloader = new MavenArtifactDownloader(ReadOnlyLocalMavenArtifactCache.MAVEN_LOCAL.orElse(
-                new LocalMavenArtifactCache(Paths.get(System.getProperty("user.home"), ".rewrite", "cache", "artifacts"))
-        ), null, ctx.getOnError());
+        MavenArtifactDownloader mavenArtifactDownloader = new MavenArtifactDownloader(mavenArtifactCache, null, ctx.getOnError());
         List<Path> artifactPaths = new ArrayList<>();
         artifactPaths.add(mavenArtifactDownloader.downloadArtifact(new Pom.Dependency(pom.getRepositories().iterator().next(), Scope.Compile, null, null, false, new Pom(
                 randomId(),
