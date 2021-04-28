@@ -106,11 +106,13 @@ class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
                 minimumLines(j, style.getMinimum().getAroundClass());
 
         if (!hasImports && firstClass) {
-            j = minimumLines(j, style.getMinimum().getAfterPackage());
-        }
-
-        if(!hasImports && firstClass && cu.getPackageDeclaration() == null) {
-                j = j.withPrefix(j.getPrefix().withWhitespace(""));
+            if(cu.getPackageDeclaration() == null) {
+                if(!j.getPrefix().getWhitespace().isEmpty()) {
+                    j = j.withPrefix(j.getPrefix().withWhitespace(""));
+                }
+            } else {
+                j = minimumLines(j, style.getMinimum().getAfterPackage());
+            }
         }
 
         return j;
@@ -120,7 +122,7 @@ class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     public J.Import visitImport(J.Import impoort, P p) {
         J.Import i = super.visitImport(impoort, p);
         J.CompilationUnit cu = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
-        if(i.equals(cu.getImports().get(0)) && cu.getPackageDeclaration() == null && cu.getPrefix().equals(Space.EMPTY)) {
+        if (i.equals(cu.getImports().get(0)) && cu.getPackageDeclaration() == null && cu.getPrefix().equals(Space.EMPTY)) {
             i = i.withPrefix(i.getPrefix().withWhitespace(""));
         }
         return i;

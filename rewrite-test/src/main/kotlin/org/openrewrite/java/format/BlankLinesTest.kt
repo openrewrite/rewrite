@@ -237,14 +237,14 @@ interface BlankLinesTest : JavaRecipeTest {
             withMinimum(minimum.withBeforePackage(1)) // this takes precedence over the "keep max"
         }).build(),
         before = """
-            /** Comment */
+            /* Comment */
             package com.intellij.samples;
 
             public class Test {
             }
         """,
         after = """
-            /** Comment */
+            /* Comment */
 
             package com.intellij.samples;
 
