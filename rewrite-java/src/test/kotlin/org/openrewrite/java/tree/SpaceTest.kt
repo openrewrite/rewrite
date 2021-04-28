@@ -17,9 +17,18 @@ package org.openrewrite.java.tree
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Tree
 import org.openrewrite.marker.Markers
 
 class SpaceTest {
+
+    @Test
+    fun spaceWithSameCommentsDoesntChangeReference() {
+        val comments = listOf(Comment(Comment.Style.BLOCK, "test", "", Markers.EMPTY))
+        val s = Space.build("", comments)
+        assertThat(s.withComments(comments)).isSameAs(s)
+    }
+
     @Test
     fun singleLineComment() {
         val cf = Space.format("""

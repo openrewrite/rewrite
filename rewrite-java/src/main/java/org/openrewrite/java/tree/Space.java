@@ -57,8 +57,8 @@ public class Space {
 
     @JsonCreator
     public static Space build(@Nullable String whitespace, List<Comment> comments) {
-        if(comments.isEmpty()) {
-            if(whitespace == null || whitespace.isEmpty()) {
+        if (comments.isEmpty()) {
+            if (whitespace == null || whitespace.isEmpty()) {
                 return Space.EMPTY;
             }
             return flyweights.computeIfAbsent(whitespace, k -> new Space(whitespace, comments));
@@ -102,6 +102,9 @@ public class Space {
     }
 
     public Space withComments(List<Comment> comments) {
+        if (comments == this.comments) {
+            return this;
+        }
         if (comments.isEmpty() && (whitespace == null || whitespace.isEmpty())) {
             return Space.EMPTY;
         }
