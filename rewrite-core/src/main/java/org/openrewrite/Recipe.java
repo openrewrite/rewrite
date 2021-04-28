@@ -338,7 +338,7 @@ public abstract class Recipe {
         WatchForNewMessageExecutionContext ctxWithWatch = new WatchForNewMessageExecutionContext(ctx);
         for (int i = 0; i < maxCycles; i++) {
             after = visitInternal(acc, ctxWithWatch, forkJoinPool, recipeThatDeletedSourceFile);
-            if (i + 1 >= minCycles && ((after == acc && !ctxWithWatch.needAnotherCycle) || !causesAnotherCycle())) {
+            if (i + 1 >= minCycles || ((after == acc && !ctxWithWatch.needAnotherCycle) || !causesAnotherCycle())) {
                 break;
             }
             acc = after;

@@ -77,7 +77,7 @@ interface ReorderMethodArgumentsTest : JavaRecipeTest {
                }
             }
         """,
-        cycles = 1
+        cycles = 2
     )
 
     @Test
@@ -111,7 +111,7 @@ interface ReorderMethodArgumentsTest : JavaRecipeTest {
                }
             }
         """,
-        cycles = 1
+        cycles = 2
     )
 
     @Test
@@ -145,7 +145,7 @@ interface ReorderMethodArgumentsTest : JavaRecipeTest {
                }
             }
         """,
-        cycles = 1
+        cycles = 2
     )
 
     @Test

@@ -77,7 +77,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 }
             }
         """,
-        cycles = 1
+        cycles = 2
     )
 
     @Test
@@ -145,7 +145,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 public String fuz;
             }
         """,
-        cycles = 1
+        cycles = 2
     )
 
     @Test
@@ -191,7 +191,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 }
             }
         """,
-        cycles = 1
+        cycles = 2
     )
 
     /**
@@ -282,7 +282,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 }
             }
         """,
-        cycles = 1
+        cycles = 2
     )
 
     @Test
@@ -323,7 +323,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 }
             }
         """,
-        cycles = 1
+        cycles = 2
     )
 
     @Test
@@ -377,7 +377,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 }
             }
         """,
-        cycles = 1
+        cycles = 2
     )
 
     @Test
@@ -481,7 +481,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 }
             }
         """,
-        cycles = 1
+        cycles = 2
     )
 
     @Test
@@ -885,7 +885,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 }
             }
         """,
-        cycles = 1
+        cycles = 2
     )
 
     @Test
@@ -973,7 +973,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 }
             }
         """,
-        cycles = 1
+        cycles = 2
     )
     @Test
     fun templateMethodIntoClass(jp: JavaParser) = assertChanged(
@@ -1225,7 +1225,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 public abstract void setCustomerInfo(Date dateOfBirth, String firstName, String lastName);
             }
         """,
-        cycles = 1
+        cycles = 2
     )
 
     @Test
