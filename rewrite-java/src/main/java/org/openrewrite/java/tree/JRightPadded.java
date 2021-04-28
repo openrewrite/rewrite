@@ -23,10 +23,7 @@ import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
@@ -129,16 +126,28 @@ public class JRightPadded<T> {
         Map<UUID, JRightPadded<J2>> beforeById = before.stream().collect(Collectors
                 .toMap(j -> j.getElement().getId(), Function.identity()));
 
-        for (J2 t : elements) {
-            JRightPadded<J2> found = beforeById.get(t.getId());
-            if (found != null) {
-                after.add(found.withElement(t));
+        boolean hasChanged = before.size() != elements.size();
+        for (int i = 0; i < elements.size(); ++i) {
+            J2 j = elements.get(i);
+            if (beforeById.get(j.getId()) != null) {
+                JRightPadded<J2> found = beforeById.get(j.getId());
+                // Check if the order of elements is different than the original list.
+                if (i != before.indexOf(found) ||
+                        // Check if the element has been modified.
+                        System.identityHashCode(found) != System.identityHashCode(found.withElement(j))) {
+                    hasChanged = true;
+                }
+                after.add(found.withElement(j));
             } else {
-                after.add(new JRightPadded<>(t, Space.EMPTY, Markers.EMPTY));
+                hasChanged = true;
+                after.add(new JRightPadded<>(j, Space.EMPTY, Markers.EMPTY));
             }
         }
 
-        return after;
+        if (hasChanged) {
+            return after;
+        }
+        return before;
     }
 
     public static <T> JRightPadded<T> build(T element) {
