@@ -60,7 +60,7 @@ public class MavenArtifactHelper {
      * @return List of paths to downloaded artifacts
      */
     public static List<Path> downloadArtifactAndDependencies(String groupId, String artifactId, String version, ExecutionContext ctx, MavenPomCache mavenPomCache, List<MavenRepository> repositories) {
-        return downloadArtifactAndDependenciesInternal(groupId, artifactId, version, ctx, mavenPomCache, repositories, ReadOnlyLocalMavenArtifactCache.MAVEN_LOCAL.orElse(
+        return downloadArtifactAndDependenciesInternal(groupId, artifactId, version, ctx, mavenPomCache, repositories, ReadOnlyLocalMavenArtifactCache.mavenLocal().orElse(
                 new LocalMavenArtifactCache(Paths.get(System.getProperty("user.home"), ".rewrite", "cache", "artifacts"))
         ));
     }

@@ -24,11 +24,13 @@ import java.nio.file.Paths;
 import java.util.function.Consumer;
 
 public class ReadOnlyLocalMavenArtifactCache extends LocalMavenArtifactCache {
-    public static ReadOnlyLocalMavenArtifactCache MAVEN_LOCAL = new ReadOnlyLocalMavenArtifactCache(
-            Paths.get(System.getProperty("user.home"), ".m2", "repository"));
-
     public ReadOnlyLocalMavenArtifactCache(Path cache) {
         super(cache);
+    }
+
+    public static ReadOnlyLocalMavenArtifactCache mavenLocal() {
+        return new ReadOnlyLocalMavenArtifactCache(
+                Paths.get(System.getProperty("user.home"), ".m2", "repository"));
     }
 
     @Override
