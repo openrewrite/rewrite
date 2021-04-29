@@ -140,13 +140,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         if (space.getComments().isEmpty()) {
             space = space.withWhitespace("\n" + space.getWhitespace());
         } else if (space.getComments().get(space.getComments().size()-1).getStyle() == Comment.Style.BLOCK) {
-            List<Comment> comments = new ArrayList<>();
-            for (int i = 0; i < space.getComments().size() - 1; ++i) {
-                comments.add(space.getComments().get(i));
-            }
-            final Comment c = space.getComments().get(space.getComments().size() - 1).withSuffix("\n");
-            comments.add(c);
-            space = space.withComments(comments);
+            space = space.withComments(ListUtils.mapLast(space.getComments(), c -> c.withSuffix("\n")));
         }
 
         return space;
