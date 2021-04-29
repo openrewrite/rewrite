@@ -315,7 +315,7 @@ public class MavenPomDownloader {
     }
 
     @Nullable
-    private MavenRepository normalizeRepository(MavenRepository originalRepository) {
+    protected MavenRepository normalizeRepository(MavenRepository originalRepository) {
         CacheResult<MavenRepository> result;
         try {
             MavenRepository repository = applyAuthenticationToRepository(applyMirrors(originalRepository));
@@ -333,29 +333,26 @@ public class MavenPomDownloader {
 
                 Request.Builder request = applyAuthenticationToRequest(repository, new Request.Builder()
                         .url(httpsUri).get());
-                try (Response response = sendRequest.apply(request.build())) {
-                    return response.isSuccessful() ?
-                            repository.withUri(URI.create(httpsUri)) :
-                            null;
+                try {
+                    sendRequest.apply(request.build());
+                    return repository.withUri(URI.create(httpsUri));
                 } catch (Throwable t) {
                     // Fallback to http if https is unavailable and the original URL was an http URL
                     if (httpsUri.equals(originalUrl)) {
                         return null;
                     }
-                    try (Response httpResponse = sendRequest.apply(request.url(originalUrl).build())) {
-                        if (httpResponse.isSuccessful()) {
-                            return new MavenRepository(
-                                    repository.getId(),
-                                    URI.create(originalUrl),
-                                    repository.isReleases(),
-                                    repository.isSnapshots(),
-                                    repository.getUsername(),
-                                    repository.getPassword());
-                        }
+                    try {
+                        sendRequest.apply(request.url(originalUrl).build());
+                        return new MavenRepository(
+                                repository.getId(),
+                                URI.create(originalUrl),
+                                repository.isReleases(),
+                                repository.isSnapshots(),
+                                repository.getUsername(),
+                                repository.getPassword());
                     } catch (Throwable t2) {
                         return null;
                     }
-                    return null;
                 }
             });
         } catch (Exception e) {
