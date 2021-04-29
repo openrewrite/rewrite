@@ -40,7 +40,7 @@ object ParseMavenProjectOnDisk {
         }
 
         val downloader = MavenArtifactDownloader(
-            ReadOnlyLocalMavenArtifactCache.MAVEN_LOCAL.orElse(
+            ReadOnlyLocalMavenArtifactCache.mavenLocal().orElse(
                 LocalMavenArtifactCache(Paths.get(System.getProperty("user.home"), ".rewrite", "cache", "artifacts"))
             ),
             null,

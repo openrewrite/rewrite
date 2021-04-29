@@ -32,13 +32,12 @@ import org.openrewrite.maven.tree.Maven
 import org.openrewrite.maven.tree.Scope
 import org.openrewrite.maven.utilities.MavenArtifactDownloader
 import java.nio.file.Path
-import java.nio.file.Paths
 
 class MavenDependencyDownloadIntegTest {
     private val ctx = InMemoryExecutionContext { t -> t.printStackTrace() }
 
     private fun downloader(path: Path) = MavenArtifactDownloader(
-        ReadOnlyLocalMavenArtifactCache.MAVEN_LOCAL.orElse(
+        ReadOnlyLocalMavenArtifactCache.mavenLocal().orElse(
             LocalMavenArtifactCache(path)
         ),
         null
