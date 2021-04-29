@@ -78,7 +78,6 @@ interface RecipeTest {
                 expectedCyclesThatMakeChanges + 1
             )
             .filter { it.before == sources.first() }
-        recipeCheckingExpectedCycles.verify()
 
         if (results.isEmpty()) {
             fail<Any>("The recipe must make changes")
@@ -91,6 +90,8 @@ interface RecipeTest {
         assertThat(result.after!!.print(treePrinter ?: TreePrinter.identity<Any>(), null))
             .isEqualTo(after.trimIndent())
         afterConditions(result.after as T)
+
+        recipeCheckingExpectedCycles.verify()
     }
 
     fun assertChanged(
@@ -134,7 +135,6 @@ interface RecipeTest {
                 cycles,
                 expectedCyclesToComplete + 1
             )
-        recipeCheckingExpectedCycles.verify()
 
         if (results.isEmpty()) {
             fail<Any>("The recipe must make changes")
@@ -147,6 +147,8 @@ interface RecipeTest {
         assertThat(result.after!!.printTrimmed(treePrinter ?: TreePrinter.identity<Any>()))
             .isEqualTo(after.trimIndent())
         afterConditions(result.after as T)
+
+        recipeCheckingExpectedCycles.verify()
     }
 
     fun assertUnchanged(
@@ -166,7 +168,6 @@ interface RecipeTest {
         val recipeCheckingExpectedCycles = RecipeCheckingExpectedCycles(recipe!!, 0)
         val results = recipeCheckingExpectedCycles
             .run(listOf(source), InMemoryExecutionContext { t -> t.printStackTrace() }, ForkJoinPool.commonPool(), 2, 2)
-        recipeCheckingExpectedCycles.verify()
 
         results.forEach { result ->
             if (result.diff(treePrinter ?: TreePrinter.identity<Any>()).isEmpty()) {
@@ -179,6 +180,8 @@ interface RecipeTest {
                 .`as`("The recipe must not make changes")
                 .isEqualTo(result.before?.print(treePrinter ?: TreePrinter.identity<Any>(), null))
         }
+
+        recipeCheckingExpectedCycles.verify()
     }
 
     fun assertUnchanged(
@@ -207,7 +210,6 @@ interface RecipeTest {
                 2,
                 2
             )
-        recipeCheckingExpectedCycles.verify()
 
         results.forEach { result ->
             if (result.diff(treePrinter ?: TreePrinter.identity<Any>()).isEmpty()) {
@@ -220,19 +222,15 @@ interface RecipeTest {
                 .`as`("The recipe must not make changes")
                 .isEqualTo(result.before?.print(treePrinter ?: TreePrinter.identity<Any>(), null))
         }
+
+        recipeCheckingExpectedCycles.verify()
     }
 
     fun TreeVisitor<*, ExecutionContext>.toRecipe() = AdHocRecipe(this)
 
     class AdHocRecipe(private val visitor: TreeVisitor<*, ExecutionContext>) : Recipe() {
-
-        override fun getDisplayName(): String {
-            return "Ad hoc recipe"
-        }
-
-        override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
-            return visitor
-        }
+        override fun getDisplayName(): String = "Ad hoc recipe"
+        override fun getVisitor(): TreeVisitor<*, ExecutionContext> = visitor
     }
 
     private class RecipeCheckingExpectedCycles(

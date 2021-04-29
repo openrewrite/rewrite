@@ -106,8 +106,8 @@ class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
                 minimumLines(j, style.getMinimum().getAroundClass());
 
         if (!hasImports && firstClass) {
-            if(cu.getPackageDeclaration() == null) {
-                if(!j.getPrefix().getWhitespace().isEmpty()) {
+            if (cu.getPackageDeclaration() == null) {
+                if (!j.getPrefix().getWhitespace().isEmpty()) {
                     j = j.withPrefix(j.getPrefix().withWhitespace(""));
                 }
             } else {
@@ -169,26 +169,36 @@ class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
                 J.Block block = (J.Block) parentTree;
                 J.ClassDeclaration classDecl = (J.ClassDeclaration) grandparentTree;
 
-                j = keepMaximumLines(j, style.getKeepMaximum().getInDeclarations());
+                int declMax = style.getKeepMaximum().getInDeclarations();
 
                 // don't adjust the first statement in a block
                 if (!block.getStatements().isEmpty() && block.getStatements().iterator().next() != j) {
                     if (j instanceof J.VariableDeclarations) {
                         if (classDecl.getKind() == J.ClassDeclaration.Kind.Type.Interface) {
+                            declMax = Math.max(declMax, style.getMinimum().getAroundFieldInInterface());
                             j = minimumLines(j, style.getMinimum().getAroundFieldInInterface());
                         } else {
+                            declMax = Math.max(declMax, style.getMinimum().getAroundField());
                             j = minimumLines(j, style.getMinimum().getAroundField());
                         }
                     } else if (j instanceof J.MethodDeclaration) {
                         if (classDecl.getKind() == J.ClassDeclaration.Kind.Type.Interface) {
+                            declMax = Math.max(declMax, style.getMinimum().getAroundMethodInInterface());
                             j = minimumLines(j, style.getMinimum().getAroundMethodInInterface());
                         } else {
+                            declMax = Math.max(declMax, style.getMinimum().getAroundMethod());
                             j = minimumLines(j, style.getMinimum().getAroundMethod());
                         }
                     } else if (j instanceof J.Block) {
+                        declMax = Math.max(declMax, style.getMinimum().getAroundInitializer());
                         j = minimumLines(j, style.getMinimum().getAroundInitializer());
+                    } else if (j instanceof J.ClassDeclaration) {
+                        declMax = Math.max(declMax, style.getMinimum().getAroundClass());
+                        j = minimumLines(j, style.getMinimum().getAroundClass());
                     }
                 }
+
+                j = keepMaximumLines(j, declMax);
             } else {
                 return keepMaximumLines(j, style.getKeepMaximum().getInCode());
             }
