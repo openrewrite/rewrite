@@ -47,7 +47,9 @@ public class UseDiamondOperator extends Recipe {
                 if (n.getClazz() instanceof J.ParameterizedType && n.getBody() == null) {
                     J.ParameterizedType parameterizedType = (J.ParameterizedType) n.getClazz();
                     if (parameterizedType.getTypeParameters() != null && !parameterizedType.getTypeParameters().isEmpty()) {
-                        n = n.withClazz(parameterizedType.withTypeParameters(singletonList(new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY))));
+                        if (parameterizedType.getTypeParameters().size() == 1 && !(parameterizedType.getTypeParameters().get(0) instanceof J.Empty)) {
+                            n = n.withClazz(parameterizedType.withTypeParameters(singletonList(new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY))));
+                        }
                     }
                 }
                 return n;
