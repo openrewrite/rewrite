@@ -134,7 +134,7 @@ public class JRightPadded<T> {
                 // Check if the order of elements is different than the original list.
                 if (i != before.indexOf(found) ||
                         // Check if the element has been modified.
-                        System.identityHashCode(found) != System.identityHashCode(found.withElement(j))) {
+                        found != found.withElement(j)) {
                     hasChanged = true;
                 }
                 after.add(found.withElement(j));

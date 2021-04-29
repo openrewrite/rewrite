@@ -23,6 +23,13 @@ import org.openrewrite.marker.Markers
 class JRightPaddedTest {
 
     @Test
+    fun withElementThatDoesntChangeReference() {
+        val t = J.Empty(randomId(), Space.EMPTY, Markers.EMPTY)
+        val trees = JRightPadded(t, Space.EMPTY, Markers.EMPTY)
+        assertThat(JRightPadded.withElement(trees, t)).isSameAs(trees)
+    }
+
+    @Test
     fun withElementsThatDoesntChangeReference() {
         val t = J.Empty(randomId(), Space.EMPTY, Markers.EMPTY)
         val trees = listOf(JRightPadded(t, Space.EMPTY, Markers.EMPTY))
