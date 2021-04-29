@@ -224,7 +224,7 @@ public class Space {
             return null;
         }
 
-        if (!trees.isEmpty()) {
+        if (!trees.isEmpty() && !trees.get(trees.size() - 1).getAfter().equals(suffix)) {
             List<JRightPadded<J2>> formattedTrees = new ArrayList<>(trees);
             formattedTrees.set(
                     formattedTrees.size() - 1,
@@ -237,7 +237,7 @@ public class Space {
     }
 
     public static <J2 extends J> List<J2> formatFirstPrefix(List<J2> trees, Space prefix) {
-        if (!trees.isEmpty()) {
+        if (!trees.isEmpty() && !trees.get(0).getPrefix().equals(prefix)) {
             List<J2> formattedTrees = new ArrayList<>(trees);
             formattedTrees.set(0, formattedTrees.get(0).withPrefix(prefix));
             return formattedTrees;

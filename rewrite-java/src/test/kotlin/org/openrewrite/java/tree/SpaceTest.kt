@@ -17,10 +17,24 @@ package org.openrewrite.java.tree
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.Tree
+import org.openrewrite.Tree.randomId
 import org.openrewrite.marker.Markers
 
 class SpaceTest {
+
+    @Test
+    fun formatLastSuffixWithSameSuffixDoesntChangeReference() {
+        val suffix = Space.format(" ")
+        val trees = listOf(JRightPadded(J.Empty(randomId(), suffix, Markers.EMPTY), suffix, Markers.EMPTY))
+        assertThat(Space.formatLastSuffix(trees, suffix)).isSameAs(trees)
+    }
+
+    @Test
+    fun formatFirstPrefixWithSamePrefixDoesntChangeReference() {
+        val prefix = Space.format(" ")
+        val trees = listOf(J.Empty(randomId(), prefix, Markers.EMPTY))
+        assertThat(Space.formatFirstPrefix(trees, prefix)).isSameAs(trees)
+    }
 
     @Test
     fun spaceWithSameCommentsDoesntChangeReference() {
