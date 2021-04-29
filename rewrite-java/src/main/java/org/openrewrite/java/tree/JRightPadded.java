@@ -127,20 +127,20 @@ public class JRightPadded<T> {
                 .toMap(j -> j.getElement().getId(), Function.identity()));
 
         boolean hasChanged = before.size() != elements.size();
-        for (int i = 0; i < elements.size(); ++i) {
-            J2 j = elements.get(i);
-            if (beforeById.get(j.getId()) != null) {
-                JRightPadded<J2> found = beforeById.get(j.getId());
+        for (int i = 0; i < elements.size(); i++) {
+            J2 t = elements.get(i);
+            if (beforeById.get(t.getId()) != null) {
+                JRightPadded<J2> found = beforeById.get(t.getId());
                 // Check if the order of elements is different than the original list.
-                if (i != before.indexOf(found) ||
+                if ((i < before.size() && before.get(i) != found) ||
                         // Check if the element has been modified.
-                        found != found.withElement(j)) {
+                        found.getElement() != t) {
                     hasChanged = true;
                 }
-                after.add(found.withElement(j));
+                after.add(found.withElement(t));
             } else {
                 hasChanged = true;
-                after.add(new JRightPadded<>(j, Space.EMPTY, Markers.EMPTY));
+                after.add(new JRightPadded<>(t, Space.EMPTY, Markers.EMPTY));
             }
         }
 
