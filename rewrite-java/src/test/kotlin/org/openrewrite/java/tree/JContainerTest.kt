@@ -23,6 +23,20 @@ import org.openrewrite.marker.Markers
 class JContainerTest {
 
     @Test
+    fun withBeforeThatDoesntChangeReference() {
+        val t = J.Empty(randomId(), Space.EMPTY, Markers.EMPTY)
+        val trees = JContainer.build(listOf(JRightPadded(t, Space.EMPTY, Markers.EMPTY)))
+        assertThat(trees.withBefore(Space.EMPTY)).isSameAs(trees)
+    }
+
+    @Test
+    fun withMarkerThatDoesntChangeReference() {
+        val t = J.Empty(randomId(), Space.EMPTY, Markers.EMPTY)
+        val trees = JContainer.build(listOf(JRightPadded(t, Space.EMPTY, Markers.EMPTY)))
+        assertThat(trees.withMarkers(Markers.EMPTY)).isSameAs(trees)
+    }
+
+    @Test
     fun withElementsThatDoesntChangeReference() {
         val t = J.Empty(randomId(), Space.EMPTY, Markers.EMPTY)
         val trees = JContainer.build(listOf(JRightPadded(t, Space.EMPTY, Markers.EMPTY)))

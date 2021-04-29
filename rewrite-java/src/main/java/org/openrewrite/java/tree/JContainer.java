@@ -71,12 +71,11 @@ public class JContainer<T> {
     }
 
     public JContainer<T> withBefore(Space before) {
-        return build(before, elements, markers);
+        return getBefore() == before ? this : build(before, elements, markers);
     }
 
-    @SuppressWarnings("unchecked")
     public JContainer<T> withMarkers(Markers markers) {
-        return build(getBefore(), elements, markers);
+        return getMarkers() == markers ? this : build(before, elements, markers);
     }
 
     public Markers getMarkers() {
