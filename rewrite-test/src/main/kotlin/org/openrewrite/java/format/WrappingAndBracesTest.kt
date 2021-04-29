@@ -23,38 +23,39 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.java.style.WrappingAndBracesStyle
 
+@Suppress("UnusedAssignment", "ClassInitializerMayBeStatic")
 interface WrappingAndBracesTest : JavaRecipeTest {
     override val recipe: Recipe
         get() = WrappingAndBracesVisitor<ExecutionContext>(WrappingAndBracesStyle()).toRecipe()
 
     @Test
     fun blockLevelStatements(jp: JavaParser) = assertChanged(
-            jp,
-            before = """
-                public class Test {
-                    {        int n = 0;
-                        n++;
-                    }
+        jp,
+        before = """
+            public class Test {
+                {        int n = 0;
+                    n++;
                 }
-            """,
-            after = """
-                public class Test {
-                    {
-                        int n = 0;
-                        n++;
-                    }
+            }
+        """,
+        after = """
+            public class Test {
+                {
+                    int n = 0;
+                    n++;
                 }
-            """
+            }
+        """
     )
 
     @Test
     fun blockEndOnOwnLine(jp: JavaParser) = assertChanged(
-            jp,
-            before = """
+        jp,
+        before = """
             class Test {
                 int n = 0;}
         """,
-            after = """
+        after = """
             class Test {
                 int n = 0;
             }
@@ -63,160 +64,160 @@ interface WrappingAndBracesTest : JavaRecipeTest {
 
     @Test
     fun annotatedMethod(jp: JavaParser) = assertChanged(
-            jp,
-            before = """
-                public class Test {
-                    @SuppressWarnings({"ALL"}) Object method() {
-                        return new Object();
-                    }
+        jp,
+        before = """
+            public class Test {
+                @SuppressWarnings({"ALL"}) Object method() {
+                    return new Object();
                 }
-            """,
-            after = """
-                public class Test {
-                    @SuppressWarnings({"ALL"})
-                 Object method() {
-                        return new Object();
-                    }
+            }
+        """,
+        after = """
+            public class Test {
+                @SuppressWarnings({"ALL"})
+             Object method() {
+                    return new Object();
                 }
-            """
+            }
+        """
     )
 
     @Test
     fun annotatedMethodWithModifier(jp: JavaParser) = assertChanged(
-            jp,
-            before = """
-                public class Test {
-                    @SuppressWarnings({"ALL"}) public Object method() {
-                        return new Object();
-                    }
+        jp,
+        before = """
+            public class Test {
+                @SuppressWarnings({"ALL"}) public Object method() {
+                    return new Object();
                 }
-            """,
-            after = """
-                public class Test {
-                    @SuppressWarnings({"ALL"})
-                 public Object method() {
-                        return new Object();
-                    }
+            }
+        """,
+        after = """
+            public class Test {
+                @SuppressWarnings({"ALL"})
+             public Object method() {
+                    return new Object();
                 }
-            """
+            }
+        """
     )
 
     @Test
     fun annotatedMethodWithModifiers(jp: JavaParser) = assertChanged(
-            jp,
-            before = """
-                public class Test {
-                    @SuppressWarnings({"ALL"}) public final Object method() {
-                        return new Object();
-                    }
+        jp,
+        before = """
+            public class Test {
+                @SuppressWarnings({"ALL"}) public final Object method() {
+                    return new Object();
                 }
-            """,
-            after = """
-                public class Test {
-                    @SuppressWarnings({"ALL"})
-                 public final Object method() {
-                        return new Object();
-                    }
+            }
+        """,
+        after = """
+            public class Test {
+                @SuppressWarnings({"ALL"})
+             public final Object method() {
+                    return new Object();
                 }
-            """
+            }
+        """
     )
 
     @Test
     fun annotatedMethodWithTypeParameter(jp: JavaParser) = assertChanged(
-            jp,
-            before = """
-                public class Test {
-                    @SuppressWarnings({"ALL"}) <T> T method() {
-                        return null;
-                    }
+        jp,
+        before = """
+            public class Test {
+                @SuppressWarnings({"ALL"}) <T> T method() {
+                    return null;
                 }
-            """,
-            after = """
-                public class Test {
-                    @SuppressWarnings({"ALL"})
-                 <T> T method() {
-                        return null;
-                    }
+            }
+        """,
+        after = """
+            public class Test {
+                @SuppressWarnings({"ALL"})
+             <T> T method() {
+                    return null;
                 }
-            """
+            }
+        """
     )
 
     @Test
     fun multipleAnnotatedMethod(jp: JavaParser) = assertChanged(
-            jp,
-            before = """
-                public class Test {
-                    @SuppressWarnings({"ALL"}) @Deprecated Object method() {
-                        return new Object();
-                    }
+        jp,
+        before = """
+            public class Test {
+                @SuppressWarnings({"ALL"}) @Deprecated Object method() {
+                    return new Object();
                 }
-            """,
-            after = """
-                public class Test {
-                    @SuppressWarnings({"ALL"})
-                 @Deprecated
-                 Object method() {
-                        return new Object();
-                    }
+            }
+        """,
+        after = """
+            public class Test {
+                @SuppressWarnings({"ALL"})
+             @Deprecated
+             Object method() {
+                    return new Object();
                 }
-            """
+            }
+        """
     )
 
     @Test
     fun annotatedConstructor(jp: JavaParser) = assertChanged(
-            jp,
-            before = """
-                public class Test {
-                    @SuppressWarnings({"ALL"}) @Deprecated Test() {
-                    }
+        jp,
+        before = """
+            public class Test {
+                @SuppressWarnings({"ALL"}) @Deprecated Test() {
                 }
-            """,
-            after = """
-                public class Test {
-                    @SuppressWarnings({"ALL"})
-                 @Deprecated
-                 Test() {
-                    }
+            }
+        """,
+        after = """
+            public class Test {
+                @SuppressWarnings({"ALL"})
+             @Deprecated
+             Test() {
                 }
-            """
+            }
+        """
     )
 
     @Test
     fun annotatedClassDecl(jp: JavaParser) = assertChanged(
-            jp,
-            before = """
-                @SuppressWarnings({"ALL"}) class Test {
-                }
-            """,
-            after = """
-                @SuppressWarnings({"ALL"})
-                 class Test {
-                }
-            """
+        jp,
+        before = """
+            @SuppressWarnings({"ALL"}) class Test {
+            }
+        """,
+        after = """
+            @SuppressWarnings({"ALL"})
+             class Test {
+            }
+        """
     )
 
     @Test
     fun annotatedClassDeclAlreadyCorrect(jp: JavaParser) = assertUnchanged(
-            jp,
-            before = """
-                @SuppressWarnings({"ALL"}) 
-                class Test {
-                }
-            """
+        jp,
+        before = """
+            @SuppressWarnings({"ALL"}) 
+            class Test {
+            }
+        """
     )
 
     @Test
     fun annotatedClassDeclWithModifiers(jp: JavaParser) = assertChanged(
-            jp,
-            before = """
-                @SuppressWarnings({"ALL"}) public class Test {
-                }
-            """,
-            after = """
-                @SuppressWarnings({"ALL"})
-                 public class Test {
-                }
-            """
+        jp,
+        before = """
+            @SuppressWarnings({"ALL"}) public class Test {
+            }
+        """,
+        after = """
+            @SuppressWarnings({"ALL"})
+             public class Test {
+            }
+        """
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/375")
@@ -224,20 +225,20 @@ interface WrappingAndBracesTest : JavaRecipeTest {
     fun retainTrailingComments(jp: JavaParser) = assertChanged(
         jp,
         before = """
-                @SuppressWarnings({"ALL"}) /* block comment 1 */ /* block comment 2 */ public class Test { /* block comment 3 */
-                String trailingLineComment = "case statement"; // line comment 1.
-                String trailingBlockAndLineComment = "case statement"; /* block comment 4 */ // line comment 2.
-                String trailingBlockCommentAndCode = "case statement"; /* block comment 5 */ String trailingBlockComment = "case statement"; /* block comment 6 */}
-            """,
+            @SuppressWarnings({"ALL"}) /* block comment 1 */ /* block comment 2 */ public class Test { /* block comment 3 */
+            String trailingLineComment = "case statement"; // line comment 1.
+            String trailingBlockAndLineComment = "case statement"; /* block comment 4 */ // line comment 2.
+            String trailingBlockCommentAndCode = "case statement"; /* block comment 5 */ String trailingBlockComment = "case statement"; /* block comment 6 */}
+        """,
         after = """
-                @SuppressWarnings({"ALL"}) /* block comment 1 */ /* block comment 2 */
-                public class Test { /* block comment 3 */
-                String trailingLineComment = "case statement"; // line comment 1.
-                String trailingBlockAndLineComment = "case statement"; /* block comment 4 */ // line comment 2.
-                String trailingBlockCommentAndCode = "case statement"; /* block comment 5 */
-                String trailingBlockComment = "case statement"; /* block comment 6 */
-                }
-            """
+            @SuppressWarnings({"ALL"}) /* block comment 1 */ /* block comment 2 */
+            public class Test { /* block comment 3 */
+            String trailingLineComment = "case statement"; // line comment 1.
+            String trailingBlockAndLineComment = "case statement"; /* block comment 4 */ // line comment 2.
+            String trailingBlockCommentAndCode = "case statement"; /* block comment 5 */
+            String trailingBlockComment = "case statement"; /* block comment 6 */
+            }
+        """
     )
 
 }
