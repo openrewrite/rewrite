@@ -23,11 +23,15 @@ import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.java.JavaVisitor
 import org.openrewrite.java.tree.Space
 
+@Suppress("StatementWithEmptyBody")
 interface MinimumViableSpacingTest : JavaRecipeTest {
     override val recipe: Recipe
         get() = object : JavaVisitor<ExecutionContext>() {
-            override fun visitSpace(space: Space, loc: Space.Location, p: ExecutionContext): Space {
-                return space.withWhitespace("")
+            override fun visitSpace(space: Space, loc: Space.Location, ctx: ExecutionContext): Space {
+                if(ctx.getMessage<Int>("cyclesThatResultedInChanges") == 0) {
+                    return space.withWhitespace("")
+                }
+                return space
             }
         }.toRecipe().doNext(MinimumViableSpacingVisitor<ExecutionContext>().toRecipe())
 

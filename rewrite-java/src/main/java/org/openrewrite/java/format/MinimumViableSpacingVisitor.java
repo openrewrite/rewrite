@@ -27,10 +27,7 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
 
-        boolean first = true;
-        if (!c.getLeadingAnnotations().isEmpty()) {
-            first = false;
-        }
+        boolean first = c.getLeadingAnnotations().isEmpty();
         if (!c.getModifiers().isEmpty()) {
             if (!first && Space.firstPrefix(c.getModifiers()).getWhitespace().isEmpty()) {
                 c = c.withModifiers(Space.formatFirstPrefix(c.getModifiers(),
@@ -83,10 +80,7 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
 
-        boolean first = true;
-        if (!m.getLeadingAnnotations().isEmpty()) {
-            first = false;
-        }
+        boolean first = m.getLeadingAnnotations().isEmpty();
         if (!m.getModifiers().isEmpty()) {
             if (!first && Space.firstPrefix(m.getModifiers()).getWhitespace().isEmpty()) {
                 m = m.withModifiers(Space.formatFirstPrefix(m.getModifiers(),
@@ -154,11 +148,10 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         if (!v.getModifiers().isEmpty()) {
             v = v.withModifiers(
                     ListUtils.map(v.getModifiers(), (index, modifier) -> {
+                        //noinspection StatementWithEmptyBody
                         if (index == 0) {
-                            /*
-                             * Skip the first modifier in the modifier list (if any). We only
-                             * care about ensuring there is at least one space between multiple modifiers.
-                             */
+                            // Skip the first modifier in the modifier list (if any). We only
+                            // care about ensuring there is at least one space between multiple modifiers.
                         } else {
                             if (modifier.getPrefix().getWhitespace().isEmpty())
                                 modifier = modifier.withPrefix(modifier.getPrefix().withWhitespace(" "));

@@ -251,6 +251,7 @@ interface RecipeTest {
             forkJoinPool: ForkJoinPool,
             recipeThatDeletedSourceFile: Map<UUID, Recipe>
         ): List<SourceFile> {
+            ctx.putMessage("cyclesThatResultedInChanges", cyclesThatResultedInChanges)
             val afterList = recipe.visitInternal(before, ctx, forkJoinPool, recipeThatDeletedSourceFile)
             if (afterList !== before) {
                 cyclesThatResultedInChanges = cyclesThatResultedInChanges.inc()
