@@ -73,14 +73,22 @@ interface AddImportTest : JavaRecipeTest {
     @Test
     fun addImportIfReferenced(jp: JavaParser) = assertChanged(
         jp,
-        recipe = object: JavaIsoVisitor<ExecutionContext>() {
-            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
-                val c = super.visitClassDeclaration(classDecl, p)
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            override fun visitClassDeclaration(
+                classDecl: J.ClassDeclaration,
+                ctx: ExecutionContext
+            ): J.ClassDeclaration {
+                val c = super.visitClassDeclaration(classDecl, ctx)
                 var b = c.body
-                b = b.withTemplate(template("BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);")
-                    .imports("java.math.BigDecimal", "java.math.RoundingMode").build(), b.coordinates.lastStatement())
-                maybeAddImport("java.math.BigDecimal")
-                maybeAddImport("java.math.RoundingMode")
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    b = b.withTemplate(
+                        template("BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);")
+                            .imports("java.math.BigDecimal", "java.math.RoundingMode").build(),
+                        b.coordinates.lastStatement()
+                    )
+                    maybeAddImport("java.math.BigDecimal")
+                    maybeAddImport("java.math.RoundingMode")
+                }
                 return c.withBody(b)
             }
         }.toRecipe(),
@@ -99,8 +107,7 @@ interface AddImportTest : JavaRecipeTest {
             class A {
                 BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);
             }
-        """,
-        expectedCyclesThatMakeChanges = 1
+        """
     )
 
     @Test
@@ -421,7 +428,7 @@ interface AddImportTest : JavaRecipeTest {
     @Test
     fun dontAddImportForStaticImportsIndirectlyReferenced(jp: JavaParser.Builder<*, *>) = assertUnchanged(
         jp.classpath("jackson-databind").build(),
-        recipe = object: JavaIsoVisitor<ExecutionContext>() {
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
             override fun visitCompilationUnit(cu: J.CompilationUnit, p: ExecutionContext): J.CompilationUnit {
                 maybeAddImport("com.fasterxml.jackson.databind.ObjectMapper")
                 return super.visitCompilationUnit(cu, p)
