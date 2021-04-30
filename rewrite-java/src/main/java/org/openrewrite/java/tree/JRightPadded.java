@@ -122,32 +122,33 @@ public class JRightPadded<T> {
     }
 
     public static <J2 extends J> List<JRightPadded<J2>> withElements(List<JRightPadded<J2>> before, List<J2> elements) {
-        List<JRightPadded<J2>> after = new ArrayList<>();
+        // a cheaper check for the most common case when there are no changes
+        if (elements.size() == before.size()) {
+            boolean hasChanges = false;
+            for (int i = 0; i < before.size(); i++) {
+                if (before.get(i).getElement() != elements.get(i)) {
+                    hasChanges = true;
+                }
+            }
+            if (!hasChanges) {
+                return before;
+            }
+        }
+
+        List<JRightPadded<J2>> after = new ArrayList<>(elements.size());
         Map<UUID, JRightPadded<J2>> beforeById = before.stream().collect(Collectors
                 .toMap(j -> j.getElement().getId(), Function.identity()));
 
-        boolean hasChanged = before.size() != elements.size();
-        for (int i = 0; i < elements.size(); i++) {
-            J2 t = elements.get(i);
+        for (J2 t : elements) {
             if (beforeById.get(t.getId()) != null) {
                 JRightPadded<J2> found = beforeById.get(t.getId());
-                // Check if the order of elements is different than the original list.
-                if ((i < before.size() && before.get(i) != found) ||
-                        // Check if the element has been modified.
-                        found.getElement() != t) {
-                    hasChanged = true;
-                }
                 after.add(found.withElement(t));
             } else {
-                hasChanged = true;
                 after.add(new JRightPadded<>(t, Space.EMPTY, Markers.EMPTY));
             }
         }
 
-        if (hasChanged) {
-            return after;
-        }
-        return before;
+        return after;
     }
 
     public static <T> JRightPadded<T> build(T element) {
