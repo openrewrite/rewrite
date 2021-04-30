@@ -49,7 +49,8 @@ interface JavaRecipeTest : RecipeTest {
         @Language("java") after: String,
         cycles: Int
     ) {
-        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, cycles -1) {}
+        assert(cycles > 0) { "cycles must be greater than 0." }
+        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, if (cycles == 1) 1 else cycles - 1) {}
     }
 
     fun assertChanged(
@@ -59,7 +60,8 @@ interface JavaRecipeTest : RecipeTest {
         @Language("java") after: String,
         cycles: Int
     ) {
-        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, cycles -1) {}
+        assert(cycles > 0) { "cycles must be greater than 0." }
+        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, if (cycles == 1) 1 else cycles - 1) {}
     }
 
     fun assertChanged(
@@ -68,9 +70,11 @@ interface JavaRecipeTest : RecipeTest {
         @Language("java") dependsOn: Array<String>,
         @Language("java") after: String,
         cycles: Int,
-        expectedCyclesToComplete: Int
+        expectedCyclesThatMakeChanges: Int
     ) {
-        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, expectedCyclesToComplete) {}
+        assert(cycles > 0) { "cycles must be greater than 0." }
+        assert(expectedCyclesThatMakeChanges > 0) { "expectedCyclesThatMakeChanges must be greater than 0." }
+        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges) {}
     }
 
     fun assertChanged(
@@ -79,7 +83,8 @@ interface JavaRecipeTest : RecipeTest {
         @Language("java") after: String,
         cycles: Int
     ) {
-        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, cycles -1) {}
+        assert(cycles > 0) { "cycles must be greater than 0." }
+        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, if (cycles == 1) 1 else cycles - 1) {}
     }
 
     fun assertChanged(
@@ -88,7 +93,8 @@ interface JavaRecipeTest : RecipeTest {
         @Language("java") after: String,
         cycles: Int,
     ) {
-        super.assertChanged(parser, recipe, before, emptyArray(), after, cycles, cycles - 1) {}
+        assert(cycles > 0) { "cycles must be greater than 0." }
+        super.assertChanged(parser, recipe, before, emptyArray(), after, cycles, if (cycles == 1) 1 else cycles - 1) {}
     }
 
     fun assertChanged(
@@ -96,9 +102,11 @@ interface JavaRecipeTest : RecipeTest {
         @Language("java") before: String,
         @Language("java") after: String,
         cycles: Int,
-        expectedCyclesToComplete: Int
+        expectedCyclesThatMakeChanges: Int
     ) {
-        super.assertChanged(parser, recipe, before, emptyArray(), after, cycles, expectedCyclesToComplete) {}
+        assert(cycles > 0) { "cycles must be greater than 0." }
+        assert(expectedCyclesThatMakeChanges > 0) { "expectedCyclesThatMakeChanges must be greater than 0." }
+        super.assertChanged(parser, recipe, before, emptyArray(), after, cycles, expectedCyclesThatMakeChanges) {}
     }
 
     fun <T : SourceFile> assertChanged(
@@ -108,7 +116,8 @@ interface JavaRecipeTest : RecipeTest {
         @Language("java") after: String,
         cycles: Int,
     ) {
-        super.assertChanged(parser, recipe, before, emptyArray(), after, cycles, cycles - 1) {}
+        assert(cycles > 0) { "cycles must be greater than 0." }
+        super.assertChanged(parser, recipe, before, emptyArray(), after, cycles, if (cycles == 1) 1 else cycles - 1) {}
     }
 
     override fun assertChanged(
@@ -119,7 +128,8 @@ interface JavaRecipeTest : RecipeTest {
         @Language("java") after: String,
         cycles: Int
     ) {
-        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, cycles - 1) {}
+        assert(cycles > 0) { "cycles must be greater than 0." }
+        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, if (cycles == 1) 1 else cycles - 1) {}
     }
 
     override fun <T : SourceFile> assertChanged(
@@ -132,6 +142,8 @@ interface JavaRecipeTest : RecipeTest {
         expectedCyclesThatMakeChanges: Int,
         afterConditions: (T) -> Unit
     ) {
+        assert(cycles > 0) { "cycles must be greater than 0." }
+        assert(expectedCyclesThatMakeChanges > 0) { "expectedCyclesThatMakeChanges must be greater than 0." }
         super.assertChanged(parser, recipe, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
 

@@ -99,8 +99,7 @@ interface AddImportTest : JavaRecipeTest {
             class A {
                 BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);
             }
-        """,
-        expectedCyclesThatMakeChanges = 1
+        """
     )
 
     @Test
