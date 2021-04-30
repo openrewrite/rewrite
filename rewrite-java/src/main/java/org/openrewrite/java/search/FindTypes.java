@@ -66,8 +66,8 @@ public class FindTypes extends Recipe {
             @Override
             public <N extends NameTree> N visitTypeName(N name, ExecutionContext ctx) {
                 N n = super.visitTypeName(name, ctx);
-                JavaType.Class asClass = TypeUtils.asClass(n.getType());
-                if (asClass != null && asClass.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
+                JavaType.FullyQualified asFullyQualified = TypeUtils.asFullyQualified(n.getType());
+                if (asFullyQualified != null && asFullyQualified.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         getCursor().firstEnclosing(J.Import.class) == null) {
                     return n.withMarkers(n.getMarkers().addIfAbsent(new JavaSearchResult(id, FindTypes.this)));
                 }
@@ -77,8 +77,8 @@ public class FindTypes extends Recipe {
             @Override
             public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
                 J.FieldAccess fa = (J.FieldAccess) super.visitFieldAccess(fieldAccess, ctx);
-                JavaType.Class asClass = TypeUtils.asClass(fa.getTarget().getType());
-                if (asClass != null && asClass.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
+                JavaType.FullyQualified asFullyQualified = TypeUtils.asFullyQualified(fa.getTarget().getType());
+                if (asFullyQualified != null && asFullyQualified.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         fa.getName().getSimpleName().equals("class")) {
                     return fa.withMarkers(fa.getMarkers().addIfAbsent(new JavaSearchResult(id, FindTypes.this)));
                 }
@@ -93,8 +93,8 @@ public class FindTypes extends Recipe {
             @Override
             public <N extends NameTree> N visitTypeName(N name, Set<NameTree> ns) {
                 N n = super.visitTypeName(name, ns);
-                JavaType.Class asClass = TypeUtils.asClass(n.getType());
-                if (asClass != null && asClass.getFullyQualifiedName().equals(fullyQualifiedClassName) &&
+                JavaType.FullyQualified asFullyQualified = TypeUtils.asFullyQualified(n.getType());
+                if (asFullyQualified != null && asFullyQualified.getFullyQualifiedName().equals(fullyQualifiedClassName) &&
                         getCursor().firstEnclosing(J.Import.class) == null) {
                     ns.add(name);
                 }
@@ -104,7 +104,7 @@ public class FindTypes extends Recipe {
             @Override
             public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Set<NameTree> ns) {
                 J.FieldAccess fa = super.visitFieldAccess(fieldAccess, ns);
-                JavaType.Class targetClass = TypeUtils.asClass(fa.getTarget().getType());
+                JavaType.FullyQualified targetClass = TypeUtils.asFullyQualified(fa.getTarget().getType());
                 if (targetClass != null && targetClass.getFullyQualifiedName().equals(fullyQualifiedClassName) &&
                         fa.getName().getSimpleName().equals("class")) {
                     ns.add(fieldAccess);

@@ -80,9 +80,9 @@ public class HasTypes extends Recipe {
                     return name;
                 }
                 N n = super.visitTypeName(name, typeExists);
-                JavaType.Class asClass = TypeUtils.asClass(n.getType());
+                JavaType.FullyQualified asFullyQualified = TypeUtils.asFullyQualified(n.getType());
                 for (String fullyQualifiedClassName : fullyQualifiedClassNames) {
-                    if (asClass != null && targetClassMatches(asClass, fullyQualifiedClassName) &&
+                    if (asFullyQualified != null && targetClassMatches(asFullyQualified, fullyQualifiedClassName) &&
                             getCursor().firstEnclosing(J.Import.class) == null) {
                         typeExists.set(true);
                         return n;
@@ -97,7 +97,7 @@ public class HasTypes extends Recipe {
                     return fieldAccess;
                 }
                 J.FieldAccess fa = super.visitFieldAccess(fieldAccess, typeExists);
-                JavaType.Class targetClass = TypeUtils.asClass(fa.getTarget().getType());
+                JavaType.FullyQualified targetClass = TypeUtils.asFullyQualified(fa.getTarget().getType());
                 for (String fullyQualifiedTypeName : fullyQualifiedClassNames) {
                     if (targetClass != null && targetClassMatches(targetClass, fullyQualifiedTypeName) &&
                             fa.getName().getSimpleName().equals("class")) {
@@ -114,7 +114,7 @@ public class HasTypes extends Recipe {
                     return method;
                 }
                 J.MethodInvocation methodInvocation = super.visitMethodInvocation(method, typeExists);
-                JavaType.Class targetClass = methodInvocation.getType() != null ? TypeUtils.asClass(methodInvocation.getType().getDeclaringType()) : null;
+                JavaType.FullyQualified targetClass = methodInvocation.getType() != null ? TypeUtils.asFullyQualified(methodInvocation.getType().getDeclaringType()) : null;
                 for (String fullyQualifiedTypeName : fullyQualifiedClassNames) {
                     if (targetClass != null && targetClassMatches(targetClass, fullyQualifiedTypeName)) {
                         typeExists.set(true);
@@ -124,7 +124,7 @@ public class HasTypes extends Recipe {
                 return methodInvocation;
             }
 
-            private boolean targetClassMatches(JavaType.Class targetClass, String fullyQualifiedTypeName) {
+            private boolean targetClassMatches(JavaType.FullyQualified targetClass, String fullyQualifiedTypeName) {
                 if (fullyQualifiedTypeName.endsWith(".*")) {
                     fullyQualifiedTypeName = fullyQualifiedTypeName.replaceAll("\\.\\*", "");
                 }
