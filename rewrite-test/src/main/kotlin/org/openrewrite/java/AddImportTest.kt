@@ -80,7 +80,7 @@ interface AddImportTest : JavaRecipeTest {
             ): J.ClassDeclaration {
                 val c = super.visitClassDeclaration(classDecl, ctx)
                 var b = c.body
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                if (b.statements.isEmpty()) {
                     b = b.withTemplate(
                         template("BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);")
                             .imports("java.math.BigDecimal", "java.math.RoundingMode").build(),
