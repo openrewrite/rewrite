@@ -23,6 +23,7 @@ import org.openrewrite.marker.Markers;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -74,6 +75,9 @@ public class PlainText implements SourceFile, Tree {
     }
 
     public PlainText withText(String toText) {
+        if (Objects.equals(this.text, toText)) {
+            return this;
+        }
         return new PlainText(id, markers, toText);
     }
 
