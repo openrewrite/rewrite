@@ -80,7 +80,8 @@ interface EmptyBlockTest : JavaRecipeTest {
 
             public class A {
                 {
-                    try(FileInputStream fis = new FileInputStream("")) {
+                    final String fileName = "fileName";
+                    try(FileInputStream fis = new FileInputStream(fileName)) {
                     } catch (IOException e) {
                     }
                 }
@@ -88,9 +89,11 @@ interface EmptyBlockTest : JavaRecipeTest {
         """,
         after = """
             public class A {
+                {
+                    final String fileName = "fileName";
+                }
             }
-        """,
-        expectedCyclesThatMakeChanges = 2
+        """
     )
 
     @Test
