@@ -89,7 +89,8 @@ interface EmptyBlockTest : JavaRecipeTest {
         after = """
             public class A {
             }
-        """
+        """,
+        expectedCyclesThatMakeChanges = 2
     )
 
     @Test
