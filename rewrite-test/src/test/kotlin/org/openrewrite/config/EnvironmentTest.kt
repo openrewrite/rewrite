@@ -174,16 +174,61 @@ class EnvironmentTest : RecipeTest {
     }
 
     @Test
+    fun declarativeRecipeListClassCastException() {
+        val env = Environment.builder()
+            .load(
+                YamlResourceLoader(
+                    """
+                        type: specs.openrewrite.org/v1beta/recipe
+                        name: test.LicenseHeader
+                        displayName: License header.
+                        recipeList:
+                          - org.openrewrite.java.AddLicenseHeader: |-
+                              LicenseHeader
+                    """.trimIndent().byteInputStream(),
+                    URI.create("rewrite.yml"),
+                    Properties()
+                )
+            ).build()
+
+        val recipe = env.activateRecipes("test.LicenseHeader")
+        assertThat(recipe.validateAll()).anyMatch { v -> v.isInvalid }
+    }
+
+    @Test
+    fun declarativeRecipeWrongPackage() {
+        val env = Environment.builder()
+            .load(
+                YamlResourceLoader(
+                    """
+                        type: specs.openrewrite.org/v1beta/recipe
+                        name: test.ResultOfFileMkdirsIgnored
+                        displayName: Test
+                        recipeList:
+                          - org.openrewrite.java.ResultOfMethodCallIgnored:
+                                methodPattern: 'java.io.File mkdir*()'
+                    """.trimIndent().byteInputStream(),
+                    URI.create("rewrite.yml"),
+                    Properties()
+                )
+            ).build()
+
+        val recipe = env.activateRecipes("test.ResultOfFileMkdirsIgnored")
+        val validateAll = recipe.validateAll()
+        assertThat(validateAll).anyMatch { v -> v.isInvalid }
+    }
+
+    @Test
     fun scanClasspath() {
         val env = Environment.builder().scanRuntimeClasspath().build()
 
         assertThat(env.listRecipes()).hasSizeGreaterThanOrEqualTo(2)
-                .extracting("name")
-                .contains("org.openrewrite.text.ChangeTextToJon", "org.openrewrite.HelloJon")
+            .extracting("name")
+            .contains("org.openrewrite.text.ChangeTextToJon", "org.openrewrite.HelloJon")
 
         assertThat(env.listStyles()).hasSizeGreaterThanOrEqualTo(1)
-                .extracting("name")
-                .contains("org.openrewrite.SampleStyle")
+            .extracting("name")
+            .contains("org.openrewrite.SampleStyle")
     }
 
     @Test
@@ -191,7 +236,8 @@ class EnvironmentTest : RecipeTest {
         val env = Environment.builder().scanRuntimeClasspath().build()
         val recipeDescriptors = env.listRecipeDescriptors()
         assertThat(recipeDescriptors).isNotNull.isNotEmpty
-        val changeTextDescriptor = recipeDescriptors.filter { it.name == "org.openrewrite.text.ChangeText" }.firstOrNull()
+        val changeTextDescriptor =
+            recipeDescriptors.filter { it.name == "org.openrewrite.text.ChangeText" }.firstOrNull()
         assertThat(changeTextDescriptor).isNotNull
         assertThat(changeTextDescriptor!!.options).hasSize(1)
         assertThat(changeTextDescriptor.options[0].name).isEqualTo("toText")
@@ -213,12 +259,16 @@ class EnvironmentTest : RecipeTest {
     private val plainTextParser = object : Parser<PlainText> {
         override fun parse(vararg sources: String?): MutableList<PlainText> {
             return sources.asSequence()
-                    .filterNotNull()
-                    .map { PlainText(randomId(), Markers.EMPTY, it)}
-                    .toMutableList()
+                .filterNotNull()
+                .map { PlainText(randomId(), Markers.EMPTY, it) }
+                .toMutableList()
         }
 
-        override fun parseInputs(sources: MutableIterable<Parser.Input>, relativeTo: Path?, ctx: ExecutionContext): MutableList<PlainText> {
+        override fun parseInputs(
+            sources: MutableIterable<Parser.Input>,
+            relativeTo: Path?,
+            ctx: ExecutionContext
+        ): MutableList<PlainText> {
             return mutableListOf()
         }
 
@@ -230,22 +280,22 @@ class EnvironmentTest : RecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/343")
     @Test
     fun environmentActivatedRecipeUsableInTests() = assertChanged(
-            parser = plainTextParser,
-            recipe = Environment.builder()
-                    .scanRuntimeClasspath()
-                    .build()
-                    .activateRecipes("org.openrewrite.text.ChangeTextToJon"),
-            before = "some text that isn't jon",
-            after = "Hello Jon!"
+        parser = plainTextParser,
+        recipe = Environment.builder()
+            .scanRuntimeClasspath()
+            .build()
+            .activateRecipes("org.openrewrite.text.ChangeTextToJon"),
+        before = "some text that isn't jon",
+        after = "Hello Jon!"
     )
 
     @Test
     fun deserializesKotlinRecipe() = assertChanged(
         parser = plainTextParser,
         recipe = Environment.builder()
-                .scanRuntimeClasspath()
-                .build()
-                .activateRecipes("org.openrewrite.text.HelloKotlin"),
+            .scanRuntimeClasspath()
+            .build()
+            .activateRecipes("org.openrewrite.text.HelloKotlin"),
         before = "some text",
         after = "Hello Kotlin"
     )

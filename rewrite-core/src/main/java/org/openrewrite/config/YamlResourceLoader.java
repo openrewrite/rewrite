@@ -19,12 +19,14 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
+import com.fasterxml.jackson.databind.exc.InvalidTypeIdException;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.module.kotlin.KotlinModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
+import org.openrewrite.Validated;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -175,12 +177,28 @@ public class YamlResourceLoader implements ResourceLoader {
                         } else if (next instanceof Map) {
                             Map.Entry<String, Object> nameAndConfig = ((Map<String, Object>) next).entrySet().iterator().next();
                             try {
-                                Map<Object, Object> withJsonType = new HashMap<>((Map<String, Object>) nameAndConfig.getValue());
-                                withJsonType.put("@c", nameAndConfig.getKey());
-                                recipe.doNext(mapper.convertValue(withJsonType, Recipe.class));
+                                if (nameAndConfig.getValue() instanceof Map) {
+                                    Map<Object, Object> withJsonType = new HashMap<>((Map<String, Object>) nameAndConfig.getValue());
+                                    withJsonType.put("@c", nameAndConfig.getKey());
+                                    try {
+                                        recipe.doNext(mapper.convertValue(withJsonType, Recipe.class));
+                                    } catch (IllegalArgumentException e) {
+                                        if (e.getCause() instanceof InvalidTypeIdException) {
+                                            recipe.addValidation(Validated.invalid(nameAndConfig.getKey(),
+                                                    nameAndConfig.getValue(), "Recipe class " +
+                                                            nameAndConfig.getKey() + " cannot be found"));
+                                        }
+                                    }
+                                } else {
+                                    recipe.addValidation(Validated.invalid(nameAndConfig.getKey(),
+                                            nameAndConfig.getValue(),
+                                            "Declarative recipeList entries are expected to be strings or mappings"));
+                                }
                             } catch (Exception e) {
-                                // TODO error handling?
                                 e.printStackTrace();
+                                recipe.addValidation(Validated.invalid(nameAndConfig.getKey(), nameAndConfig.getValue(),
+                                        "Unexpected declarative recipe parsing exception " +
+                                                e.getClass().getName()));
                             }
                         } else {
                             recipe.addValidation(invalid(
