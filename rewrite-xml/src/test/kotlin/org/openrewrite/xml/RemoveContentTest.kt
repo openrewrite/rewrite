@@ -39,14 +39,16 @@ class RemoveContentTest : XmlRecipeTest {
             <dependency>
                 <groupId>group</groupId>
             </dependency>
-        """
+        """,
+        cycles = 1,
+        expectedCyclesToComplete = 1
     )
 
     @Test
     fun removeAncestorsThatBecomeEmpty() = assertChanged(
         recipe = object : XmlVisitor<ExecutionContext>() {
             override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
-                val groupId = ((x.root.content[1] as Xml.Tag).content[0] as Xml.Tag).content[0] as Xml.Tag
+                val groupId = x.root.children[1].children.first().children.first()
                 doAfterVisit(RemoveContentVisitor(groupId, true))
                 return super.visitDocument(x, p)
             }
@@ -65,14 +67,16 @@ class RemoveContentTest : XmlRecipeTest {
             <project>
                 <name>my.company</name>
             </project>
-        """
+        """,
+        cycles = 1,
+        expectedCyclesToComplete = 1
     )
 
     @Test
     fun rootChangedToEmptyTagIfLastRemainingTag() = assertChanged(
         recipe = object : XmlVisitor<ExecutionContext>() {
             override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
-                val groupId = ((x.root.content[0] as Xml.Tag).content[0] as Xml.Tag).content[0] as Xml.Tag
+                val groupId = x.root.children.first().children.first().children.first()
                 doAfterVisit(RemoveContentVisitor(groupId, true))
                 return super.visitDocument(x, p)
             }
@@ -88,6 +92,8 @@ class RemoveContentTest : XmlRecipeTest {
         """,
         after = """
             <project/>
-        """
+        """,
+        cycles = 1,
+        expectedCyclesToComplete = 1
     )
 }
