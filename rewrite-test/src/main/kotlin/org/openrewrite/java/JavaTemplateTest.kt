@@ -36,26 +36,29 @@ interface JavaTemplateTest : JavaRecipeTest {
         jp.classpath("junit-jupiter-api").build(),
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
 
-            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, ctx: ExecutionContext): J.MethodDeclaration {
                 val tagComp = Comparator<J.Annotation> { a1, a2 -> a1.simpleName.compareTo(a2.simpleName) }
                     .reversed()
 
-                val m = super.visitMethodDeclaration(method, p)
+                var m = super.visitMethodDeclaration(method, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    m = m
+                        .withTemplate<J.MethodDeclaration>(
+                            template("@Tag(\"tag1\")")
+                                .doBeforeParseTemplate(logEvent)
+                                .doAfterVariableSubstitution(logEvent)
+                                .build(),
+                            m.coordinates.addAnnotation(tagComp)
+                        )
+                        .withTemplate(
+                            template("@Tag(\"tag2\")")
+                                .doBeforeParseTemplate(logEvent)
+                                .doAfterVariableSubstitution(logEvent)
+                                .build(),
+                            m.coordinates.addAnnotation(tagComp)
+                        )
+                }
                 return m
-                    .withTemplate<J.MethodDeclaration>(
-                        template("@Tag(\"tag1\")")
-                            .doBeforeParseTemplate(logEvent)
-                            .doAfterVariableSubstitution(logEvent)
-                            .build(),
-                        m.coordinates.addAnnotation(tagComp)
-                    )
-                    .withTemplate(
-                        template("@Tag(\"tag2\")")
-                            .doBeforeParseTemplate(logEvent)
-                            .doAfterVariableSubstitution(logEvent)
-                            .build(),
-                        m.coordinates.addAnnotation(tagComp)
-                    )
             }
         }.toRecipe(),
         before = """
@@ -76,8 +79,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 void method() {
                 }
             }
-        """,
-        cycles = 1
+        """
     )
 
     @Test
@@ -89,9 +91,12 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
-                val m = super.visitMethodInvocation(method, p)
-                return m.withTemplate(template, m.coordinates.replaceArguments())
+            override fun visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): J.MethodInvocation {
+                var m = super.visitMethodInvocation(method, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    m = m.withTemplate(template, m.coordinates.replaceArguments())
+                }
+                return m
             }
         }.toRecipe(),
         before = """
@@ -123,13 +128,16 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = object : JavaVisitor<ExecutionContext>() {
             override fun visitClassDeclaration(
                 classDecl: J.ClassDeclaration,
-                p: ExecutionContext
+                ctx: ExecutionContext
             ): J {
-                val c = super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration
-                return c.withTemplate(
-                    template("public String bar = \"hey!\";").build(),
-                    classDecl.body.statements[1].coordinates.before()
-                )
+                var c = super.visitClassDeclaration(classDecl, ctx) as J.ClassDeclaration
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    c = c.withTemplate(
+                        template("public String bar = \"hey!\";").build(),
+                        classDecl.body.statements[1].coordinates.before()
+                    )
+                }
+                return c
             }
         }.toRecipe(),
         before = """
@@ -144,8 +152,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 public String bar = "hey!";
                 public String fuz;
             }
-        """,
-        cycles = 1
+        """
     )
 
     @Test
@@ -157,15 +164,17 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            override fun visitBlock(block: J.Block, p: ExecutionContext): J {
-                var b = super.visitBlock(block, p)
-                val parent = cursor.dropParentUntil { it is J }.getValue<J>()
-                if (parent is J.MethodDeclaration) {
-                    b = b.withTemplate(
-                        template,
-                        block.statements[1].coordinates.before(),
-                        (parent.parameters[0] as J.VariableDeclarations).variables[0]
-                    )
+            override fun visitBlock(block: J.Block, ctx: ExecutionContext): J {
+                var b = super.visitBlock(block, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    val parent = cursor.dropParentUntil { it is J }.getValue<J>()
+                    if (parent is J.MethodDeclaration) {
+                        b = b.withTemplate(
+                            template,
+                            block.statements[1].coordinates.before(),
+                            (parent.parameters[0] as J.VariableDeclarations).variables[0]
+                        )
+                    }
                 }
                 return b
             }
@@ -190,8 +199,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                     n++;
                 }
             }
-        """,
-        cycles = 1
+        """
     )
 
     /**
@@ -207,15 +215,18 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
-                val m = super.visitMethodDeclaration(method, p)
-                val statements = m.body!!.statements
-                statements[1] = statements[1].withTemplate(
-                    template,
-                    statements[1].coordinates.replace(),
-                    (m.parameters[0] as J.VariableDeclarations).variables[0]
-                )
-                return m.withBody(m.body!!.withStatements(statements))
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, ctx: ExecutionContext): J.MethodDeclaration {
+                var m = super.visitMethodDeclaration(method, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    val statements = m.body!!.statements
+                    statements[1] = statements[1].withTemplate(
+                        template,
+                        statements[1].coordinates.replace(),
+                        (m.parameters[0] as J.VariableDeclarations).variables[0]
+                    )
+                    m = m.withBody(m.body!!.withStatements(statements))
+                }
+                return m
             }
         }.toRecipe(),
         before = """
@@ -248,15 +259,17 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            override fun visitBlock(block: J.Block, p: ExecutionContext): J {
-                var b = super.visitBlock(block, p)
-                val parent = cursor.dropParentUntil { it is J }.getValue<J>()
-                if (parent is J.MethodDeclaration) {
-                    b = b.withTemplate(
-                        template,
-                        block.coordinates.lastStatement(),
-                        (parent.parameters[0] as J.VariableDeclarations).variables[0]
-                    )
+            override fun visitBlock(block: J.Block, ctx: ExecutionContext): J {
+                var b = super.visitBlock(block, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    val parent = cursor.dropParentUntil { it is J }.getValue<J>()
+                    if (parent is J.MethodDeclaration) {
+                        b = b.withTemplate(
+                            template,
+                            block.coordinates.lastStatement(),
+                            (parent.parameters[0] as J.VariableDeclarations).variables[0]
+                        )
+                    }
                 }
                 return b
             }
@@ -281,8 +294,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                     others.add(m);
                 }
             }
-        """,
-        cycles = 1
+        """
     )
 
     @Test
@@ -293,15 +305,17 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            override fun visitBlock(block: J.Block, p: ExecutionContext): J {
-                var b = super.visitBlock(block, p)
-                val parent = cursor.dropParentUntil { it is J }.getValue<J>()
-                if (parent is J.MethodDeclaration) {
-                    b = b.withTemplate(
-                        template,
-                        block.coordinates.lastStatement(),
-                        (parent.parameters[0] as J.VariableDeclarations).variables[0]
-                    )
+            override fun visitBlock(block: J.Block, ctx: ExecutionContext): J {
+                var b = super.visitBlock(block, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    val parent = cursor.dropParentUntil { it is J }.getValue<J>()
+                    if (parent is J.MethodDeclaration) {
+                        b = b.withTemplate(
+                            template,
+                            block.coordinates.lastStatement(),
+                            (parent.parameters[0] as J.VariableDeclarations).variables[0]
+                        )
+                    }
                 }
                 return b
             }
@@ -322,8 +336,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                     others.add(m);
                 }
             }
-        """,
-        cycles = 1
+        """
     )
 
     @Test
@@ -341,11 +354,13 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
-                var b = super.visitBlock(block, p)
-                val parent = cursor.dropParentUntil { it is J }.getValue<J>()
-                if (parent is J.ClassDeclaration) {
-                    b = b.withTemplate(template, block.coordinates.lastStatement())
+            override fun visitBlock(block: J.Block, ctx: ExecutionContext): J.Block {
+                var b = super.visitBlock(block, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    val parent = cursor.dropParentUntil { it is J }.getValue<J>()
+                    if (parent is J.ClassDeclaration) {
+                        b = b.withTemplate(template, block.coordinates.lastStatement())
+                    }
                 }
                 return b
             }
@@ -376,8 +391,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                     return 'f';
                 }
             }
-        """,
-        cycles = 1
+        """
     )
 
     @Test
@@ -389,9 +403,12 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doAfterVariableSubstitution(logEvent)
                 .doBeforeParseTemplate(logEvent)
                 .build()
-            override fun visitClassDeclaration(clazz: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
-                val c = super.visitClassDeclaration(clazz, p)
-                return c.withTemplate(template, c.coordinates.replaceExtendsClause())
+            override fun visitClassDeclaration(clazz: J.ClassDeclaration, ctx: ExecutionContext): J.ClassDeclaration {
+                var c = super.visitClassDeclaration(clazz, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    c = c.withTemplate(template, c.coordinates.replaceExtendsClause())
+                }
+                return c
             }
         }.toRecipe(),
         before = """
@@ -413,9 +430,12 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doAfterVariableSubstitution(logEvent)
                 .doBeforeParseTemplate(logEvent)
                 .build()
-            override fun visitClassDeclaration(clazz: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
-                val c = super.visitClassDeclaration(clazz, p)
-                return c.withTemplate(template, c.coordinates.replaceExtendsClause())
+            override fun visitClassDeclaration(clazz: J.ClassDeclaration, ctx: ExecutionContext): J.ClassDeclaration {
+                var c = super.visitClassDeclaration(clazz, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    c = c.withTemplate(template, c.coordinates.replaceExtendsClause())
+                }
+                return c
             }
         }.toRecipe(),
         before = """
@@ -445,11 +465,13 @@ interface JavaTemplateTest : JavaRecipeTest {
                     """
             ).doAfterVariableSubstitution(logEvent).doBeforeParseTemplate(logEvent).build()
 
-            override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
-                var b = super.visitBlock(block, p)
-                val parent = cursor.dropParentUntil { it is J }.getValue<J>()
-                if (parent is J.ClassDeclaration) {
-                    b = b.withTemplate(template, block.coordinates.lastStatement())
+            override fun visitBlock(block: J.Block, ctx: ExecutionContext): J.Block {
+                var b = super.visitBlock(block, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    val parent = cursor.dropParentUntil { it is J }.getValue<J>()
+                    if (parent is J.ClassDeclaration) {
+                        b = b.withTemplate(template, block.coordinates.lastStatement())
+                    }
                 }
                 return b
             }
@@ -480,8 +502,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                     return 'f';
                 }
             }
-        """,
-        cycles = 1
+        """
     )
 
     @Test
@@ -493,8 +514,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J {
-                val m = super.visitMethodInvocation(method, p) as J.MethodInvocation
+            override fun visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): J {
+                val m = super.visitMethodInvocation(method, ctx) as J.MethodInvocation
                 if (m.name.simpleName != "countLetters") {
                     return m
                 }
@@ -620,9 +641,12 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
-                val m = super.visitMethodDeclaration(method, p)
-                return m.withTemplate(template, m.coordinates.replaceAnnotations())
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, ctx: ExecutionContext): J.MethodDeclaration {
+                var m = super.visitMethodDeclaration(method, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    m = m.withTemplate(template, m.coordinates.replaceAnnotations())
+                }
+                return m
             }
         }.toRecipe(),
         before = """
@@ -651,9 +675,12 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            override fun visitAnnotation(annotation: J.Annotation, p: ExecutionContext): J.Annotation {
-                val a = super.visitAnnotation(annotation, p)
-                return a.withTemplate(template, a.coordinates.replace())
+            override fun visitAnnotation(annotation: J.Annotation, ctx: ExecutionContext): J.Annotation {
+                var a = super.visitAnnotation(annotation, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    a = a.withTemplate(template, a.coordinates.replace())
+                }
+                return a
             }
         }.toRecipe(),
         before = """
@@ -688,8 +715,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            override fun visitAnnotation(annotation: J.Annotation, p: ExecutionContext): J.Annotation {
-                val a = super.visitAnnotation(annotation, p)
+            override fun visitAnnotation(annotation: J.Annotation, ctx: ExecutionContext): J.Annotation {
+                val a = super.visitAnnotation(annotation, ctx)
                 if (a.simpleName.equals("Anno1")) {
                     return a.withTemplate(template, a.coordinates.replace())
                 }
@@ -722,9 +749,12 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            override fun visitAnnotation(annotation: J.Annotation, p: ExecutionContext): J.Annotation {
-                val a = super.visitAnnotation(annotation, p)
-                return a.withTemplate(template, a.coordinates.replace())
+            override fun visitAnnotation(annotation: J.Annotation, ctx: ExecutionContext): J.Annotation {
+                var a = super.visitAnnotation(annotation, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    a = a.withTemplate(template, a.coordinates.replace())
+                }
+                return a
             }
         }.toRecipe(),
         before = """
@@ -747,8 +777,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            override fun visitAnnotation(annotation: J.Annotation, p: ExecutionContext): J.Annotation {
-                val a = super.visitAnnotation(annotation, p)
+            override fun visitAnnotation(annotation: J.Annotation, ctx: ExecutionContext): J.Annotation {
+                val a = super.visitAnnotation(annotation, ctx)
                 if (a.simpleName.equals("Deprecated")) {
                     return a.withTemplate(template, a.coordinates.replace())
                 }
@@ -776,9 +806,12 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            override fun visitClassDeclaration(clazz: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
-                val c = super.visitClassDeclaration(clazz, p)
-                return c.withTemplate(template, c.coordinates.replaceAnnotations())
+            override fun visitClassDeclaration(clazz: J.ClassDeclaration, ctx: ExecutionContext): J.ClassDeclaration {
+                var c = super.visitClassDeclaration(clazz, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    c = c.withTemplate(template, c.coordinates.replaceAnnotations())
+                }
+                return c
             }
         }.toRecipe(),
         before = """
@@ -805,9 +838,12 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            override fun visitClassDeclaration(clazz: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
-                val c = super.visitClassDeclaration(clazz, p)
-                return c.withTemplate(template, c.coordinates.replaceAnnotations())
+            override fun visitClassDeclaration(clazz: J.ClassDeclaration, ctx: ExecutionContext): J.ClassDeclaration {
+                var c = super.visitClassDeclaration(clazz, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    c = c.withTemplate(template, c.coordinates.replaceAnnotations())
+                }
+                return c
             }
         }.toRecipe(),
         before = """
@@ -838,15 +874,17 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
-                var b = super.visitBlock(block, p)
+            override fun visitBlock(block: J.Block, ctx: ExecutionContext): J.Block {
+                var b = super.visitBlock(block, ctx)
                 val parent = cursor.dropParentUntil { it is J }.getValue<J>()
-                if (parent is J.MethodDeclaration && parent.name.simpleName == "foo") {
-                    b = b.withTemplate(
-                        template, b.statements[0].coordinates.before(),
-                        b.statements[1] as J,
-                        b.statements[0] as J
-                    )
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    if (parent is J.MethodDeclaration && parent.name.simpleName == "foo") {
+                        b = b.withTemplate(
+                            template, b.statements[0].coordinates.before(),
+                            b.statements[1] as J,
+                            b.statements[0] as J
+                        )
+                    }
                 }
                 return b
             }
@@ -884,8 +922,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                     return 'f';
                 }
             }
-        """,
-        cycles = 1
+        """
     )
 
     @Test
@@ -897,16 +934,18 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
-                var b = super.visitBlock(block, p)
-                val parent = cursor.dropParentUntil { it is J }.getValue<J>()
-                if (parent is J.If) {
-                    b = b.withTemplate(
-                        template,
-                        b.coordinates.lastStatement(),
-                        b.statements[1],
-                        b.statements[0]
-                    )
+            override fun visitBlock(block: J.Block, ctx: ExecutionContext): J.Block {
+                var b = super.visitBlock(block, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    val parent = cursor.dropParentUntil { it is J }.getValue<J>()
+                    if (parent is J.If) {
+                        b = b.withTemplate(
+                            template,
+                            b.coordinates.lastStatement(),
+                            b.statements[1],
+                            b.statements[0]
+                        )
+                    }
                 }
                 return b
             }
@@ -972,8 +1011,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                     private String nope = "nothing here";
                 }
             }
-        """,
-        cycles = 1
+        """
     )
     @Test
     fun templateMethodIntoClass(jp: JavaParser) = assertChanged(
@@ -984,8 +1022,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
-                var cd = super.visitClassDeclaration(classDecl, p)
+            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, ctx: ExecutionContext): J.ClassDeclaration {
+                var cd = super.visitClassDeclaration(classDecl, ctx)
                 val helloMethodExists = cd.body.statements.asSequence()
                     .filterIsInstance(J.MethodDeclaration::class.java)
                     .find { it.name.simpleName == "hello" } != null
@@ -1032,9 +1070,12 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
-                val c = super.visitClassDeclaration(classDecl, p)
-                return c.withTemplate(template, c.coordinates.replaceTypeParameters())
+            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, ctx: ExecutionContext): J.ClassDeclaration {
+                var c = super.visitClassDeclaration(classDecl, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    c =c.withTemplate(template, c.coordinates.replaceTypeParameters())
+                }
+                return c
             }
         }.toRecipe(),
         before = """
@@ -1059,9 +1100,12 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
-                val c = super.visitClassDeclaration(classDecl, p)
-                return c.withTemplate(template, c.coordinates.replaceExtendsClause())
+            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, ctx: ExecutionContext): J.ClassDeclaration {
+                var c = super.visitClassDeclaration(classDecl, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    c = c.withTemplate(template, c.coordinates.replaceExtendsClause())
+                }
+                return c
             }
         }.toRecipe(),
         before = """
@@ -1086,9 +1130,12 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
-                val c = super.visitClassDeclaration(classDecl, p)
-                return c.withTemplate(template, c.coordinates.replaceImplementsClause())
+            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, ctx: ExecutionContext): J.ClassDeclaration {
+                var c = super.visitClassDeclaration(classDecl, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    c = c.withTemplate(template, c.coordinates.replaceImplementsClause())
+                }
+                return c
             }
         }.toRecipe(),
         before = """
@@ -1118,9 +1165,12 @@ interface JavaTemplateTest : JavaRecipeTest {
                     """
             ).doAfterVariableSubstitution(logEvent).doBeforeParseTemplate(logEvent).build()
 
-            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
-                val c = super.visitClassDeclaration(classDecl, p)
-                return c.withTemplate(template, c.coordinates.replaceBody())
+            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, ctx: ExecutionContext): J.ClassDeclaration {
+                var c = super.visitClassDeclaration(classDecl, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    c = c.withTemplate(template, c.coordinates.replaceBody())
+                }
+                return c
             }
         }.toRecipe(),
         before = """
@@ -1146,9 +1196,12 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
-                val m = super.visitMethodDeclaration(method, p)
-                return m.withTemplate(template, m.coordinates.replaceTypeParameters())
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, ctx: ExecutionContext): J.MethodDeclaration {
+                var m = super.visitMethodDeclaration(method, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    m = m.withTemplate(template, m.coordinates.replaceTypeParameters())
+                }
+                return m
             }
         }.toRecipe(),
         before = """
@@ -1174,9 +1227,12 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
-                val m = super.visitMethodDeclaration(method, p)
-                return m.withTemplate(template, m.coordinates.replaceParameters())
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, ctx: ExecutionContext): J.MethodDeclaration {
+                var m = super.visitMethodDeclaration(method, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    m = m.withTemplate(template, m.coordinates.replaceParameters())
+                }
+                return m
             }
         }.toRecipe(),
         before = """
@@ -1203,13 +1259,12 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .imports("java.util.Date")
                 .build()
 
-            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
-                var m = super.visitMethodDeclaration(method, p)
-                if (m.simpleName == "setCustomerInfo") {
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, ctx: ExecutionContext): J.MethodDeclaration {
+                var m = super.visitMethodDeclaration(method, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
                     m = m.withTemplate(template, m.parameters[0].coordinates.before())
                     maybeAddImport("java.util.Date")
                 }
-
                 return m
             }
         }.toRecipe(),
@@ -1224,8 +1279,7 @@ interface JavaTemplateTest : JavaRecipeTest {
             public abstract class Customer {
                 public abstract void setCustomerInfo(Date dateOfBirth, String firstName, String lastName);
             }
-        """,
-        cycles = 1
+        """
     )
 
     @Test
@@ -1237,9 +1291,12 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
-                val m = super.visitMethodDeclaration(method, p)
-                return m.withTemplate(template, m.coordinates.replaceThrows())
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, ctx: ExecutionContext): J.MethodDeclaration {
+                var m = super.visitMethodDeclaration(method, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    m = m.withTemplate(template, m.coordinates.replaceThrows())
+                }
+                return m
             }
         }.toRecipe(),
         before = """
@@ -1265,9 +1322,12 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(logEvent)
                 .build()
 
-            override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
-                val m = super.visitMethodInvocation(method, p)
-                return m.withTemplate(template, m.coordinates.replaceArguments())
+            override fun visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): J.MethodInvocation {
+                var m = super.visitMethodInvocation(method, ctx)
+                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                    m = m.withTemplate(template, m.coordinates.replaceArguments())
+                }
+                return m
             }
         }.toRecipe(),
         before = """
