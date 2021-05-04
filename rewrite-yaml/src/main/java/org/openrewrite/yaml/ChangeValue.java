@@ -55,7 +55,8 @@ public class ChangeValue extends Recipe {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext context) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, context);
-                if (xPathMatcher.matches(getCursor())) {
+
+                if (xPathMatcher.matches(getCursor()) && (!(e.getValue() instanceof Yaml.Scalar) || !((Yaml.Scalar) e.getValue()).getValue().equals(value))) {
                     e = e.withValue(
                             new Yaml.Scalar(randomId(), e.getValue().getPrefix(), Markers.EMPTY,
                                     Yaml.Scalar.Style.PLAIN, value)
@@ -65,4 +66,6 @@ public class ChangeValue extends Recipe {
             }
         };
     }
+
+
 }
