@@ -94,11 +94,15 @@ public class RemoveDependency extends Recipe {
         public Maven visitMaven(Maven maven, ExecutionContext ctx) {
             model = maven.getModel();
             Maven m = super.visitMaven(maven, ctx);
-            List<Pom.Dependency> dependencies = model.getDependencies().stream()
-                    .filter(dep -> !(dep.getArtifactId().equals(artifactId) && dep.getGroupId().equals(groupId)))
-                    .collect(toList());
 
-            return m.withModel(model.withDependencies(dependencies));
+            if (model.getDependencies().stream().anyMatch(dep -> (dep.getArtifactId().equals(artifactId) && dep.getGroupId().equals(groupId)))) {
+                List<Pom.Dependency> dependencies = model.getDependencies().stream()
+                        .filter(dep -> !(dep.getArtifactId().equals(artifactId) && dep.getGroupId().equals(groupId)))
+                        .collect(toList());
+                return m.withModel(model.withDependencies(dependencies));
+            } else {
+                return m;
+            }
         }
     }
 }
