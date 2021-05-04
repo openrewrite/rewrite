@@ -202,6 +202,9 @@ public final class ListUtils {
         if (ls == null) {
             return t;
         }
+        if (t.isEmpty()) {
+            return ls;
+        }
         List<T> newLs = new ArrayList<>(ls);
         newLs.addAll(t);
         return newLs;
@@ -210,6 +213,9 @@ public final class ListUtils {
     public static <T> List<T> insertAll(List<T> ls, int index, List<T> t) {
         if(ls == null) {
             return t;
+        }
+        if (t.isEmpty()) {
+            return ls;
         }
         List<T> newLs = new ArrayList<>(ls);
         newLs.addAll(index, t);
