@@ -25,34 +25,39 @@ class AddToTagTest : XmlRecipeTest {
     fun addElement() = assertChanged(
         recipe = object : XmlVisitor<ExecutionContext>() {
             override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
-                doAfterVisit(AddToTagVisitor(x.root, Xml.Tag.build("""<bean id="myBean2"/>""")))
+                val bean2Tag =  x.root.children.find { it.attributes.find { attr -> attr.key.name == "id" && attr.value.value == "myBean2" } != null }
+                if(bean2Tag == null) {
+                    doAfterVisit(AddToTagVisitor(x.root, Xml.Tag.build("""<bean id="myBean2"/>""")))
+                }
                 return super.visitDocument(x, p)
             }
         }.toRecipe(),
         before = """
-            <beans >
+            <beans>
                 <bean id="myBean"/>
             </beans>
         """,
         after = """
-            <beans >
+            <beans>
                 <bean id="myBean"/>
                 <bean id="myBean2"/>
             </beans>
         """,
-        cycles = 1
+        cycles = 2
     )
 
     @Test
     fun addElementToSlashClosedTag() = assertChanged(
         recipe = object : XmlVisitor<ExecutionContext>() {
             override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
-                doAfterVisit(
-                    AddToTagVisitor(
-                        x.root.content[0] as Xml.Tag,
-                        Xml.Tag.build("""<property name="myprop" ref="collaborator"/>""")
+                if(x.root.children.first().children.size == 0) {
+                    doAfterVisit(
+                            AddToTagVisitor(
+                                    x.root.content[0] as Xml.Tag,
+                                    Xml.Tag.build("""<property name="myprop" ref="collaborator"/>""")
+                            )
                     )
-                )
+                }
                 return super.visitDocument(x, p)
             }
         }.toRecipe(),
@@ -68,14 +73,16 @@ class AddToTagTest : XmlRecipeTest {
                 </bean>
             </beans>
         """,
-        cycles = 1
+        cycles = 2
     )
 
     @Test
     fun addElementToEmptyTagOnSameLine() = assertChanged(
         recipe = object : XmlVisitor<ExecutionContext>() {
             override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
-                doAfterVisit(AddToTagVisitor(x.root, Xml.Tag.build("""<bean id="myBean"/>""")))
+                if(x.root.children.isEmpty()) {
+                    doAfterVisit(AddToTagVisitor(x.root, Xml.Tag.build("""<bean id="myBean"/>""")))
+                }
                 return super.visitDocument(x, p)
             }
         }.toRecipe(),
@@ -87,17 +94,19 @@ class AddToTagTest : XmlRecipeTest {
                 <bean id="myBean"/>
             </beans>
         """,
-        cycles = 1
+        cycles = 2
     )
 
     @Test
     fun addElementInOrder() = assertChanged(
         recipe = object : XmlVisitor<ExecutionContext>() {
             override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
-                doAfterVisit(AddToTagVisitor(
-                    x.root, Xml.Tag.build("""<apple/>"""),
-                    Comparator.comparing(Xml.Tag::getName)
-                ))
+                if(x.root.children.find { it.name == "apple" } == null) {
+                    doAfterVisit(AddToTagVisitor(
+                            x.root, Xml.Tag.build("""<apple/>"""),
+                            Comparator.comparing(Xml.Tag::getName)
+                    ))
+                }
                 return super.visitDocument(x, p)
             }
         }.toRecipe(),
@@ -112,6 +121,6 @@ class AddToTagTest : XmlRecipeTest {
                 <banana/>
             </beans>
         """,
-        cycles = 1
+        cycles = 2
     )
 }
