@@ -154,7 +154,7 @@ public class Space {
                         prefix = new StringBuilder();
                         comment = new StringBuilder();
                         continue;
-                    } else if (last == '*' && inJavadoc) {
+                    } else if (last == '*' && inJavadoc && comment.length() > 0) {
                         inJavadoc = false;
                         comment.setLength(comment.length() - 1); // trim the last '*'
                         comments.add(new Comment(Comment.Style.JAVADOC, comment.toString(), prefix.toString(), Markers.EMPTY));

@@ -125,6 +125,12 @@ class SpaceTest {
     }
 
     @Test
+    fun emptyMultilineComment() {
+        val emptyMultilineComment = Space.format("/**/")
+        assertThat(emptyMultilineComment.comments).isEmpty()
+    }
+
+    @Test
     fun stringify() {
         assertThat(Space.format("\n  \n\t \t").toString())
             .isEqualTo("Space(comments=<0 comments>, whitespace='\\n·₁·₂\\n-₁·₂-₃')")
