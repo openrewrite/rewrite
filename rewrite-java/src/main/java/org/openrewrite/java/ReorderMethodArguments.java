@@ -76,7 +76,7 @@ public class ReorderMethodArguments extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new ReorderMethodArgumentsVisitor(new MethodMatcher(methodPattern));
     }
 
