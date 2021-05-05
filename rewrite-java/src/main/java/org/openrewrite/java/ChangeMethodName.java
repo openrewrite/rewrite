@@ -60,6 +60,11 @@ public class ChangeMethodName extends Recipe {
     }
 
     @Override
+    public boolean causesAnotherCycle() {
+        return true;
+    }
+
+    @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
         return new ChangeMethodNameVisitor(new MethodMatcher(methodPattern));
     }

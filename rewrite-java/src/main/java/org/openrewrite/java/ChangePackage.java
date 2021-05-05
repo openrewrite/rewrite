@@ -18,36 +18,30 @@ package org.openrewrite.java;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
 import org.openrewrite.Option;
+import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
-import java.io.File;
 import java.nio.file.Paths;
-import java.util.regex.Matcher;
 
 @Getter
 @RequiredArgsConstructor
 @AllArgsConstructor(onConstructor_ = @JsonCreator)
 @EqualsAndHashCode(callSuper = true)
 public class ChangePackage extends Recipe {
-    /**
-     * Fully-qualified package name of the old package.
-     */
     @Option(displayName = "Old fully-qualified package name", description = "Fully-qualified package name of the old package.")
     private final String oldFullyQualifiedPackageName;
 
-    /**
-     * Fully-qualified package name of the replacement package.
-     */
     @Option(displayName = "New fully-qualified package name", description = "Fully-qualified package name of the replacement package.")
     private final String newFullyQualifiedPackageName;
 
     @With
     @Option(displayName = "Recursive", description = "Recursively change subpackage names", required = false)
-    private boolean recursive = true;
+    @Nullable
+    private Boolean recursive;
 
     @Override
     public String getDisplayName() {
@@ -87,7 +81,7 @@ public class ChangePackage extends Recipe {
                 if (original.equals(oldFullyQualifiedPackageName)) {
                     getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "changingTo", newFullyQualifiedPackageName);
                     return pkg.withTemplate(newPackageExpr, pkg.getCoordinates().replace(), newFullyQualifiedPackageName);
-                } else if (recursive && original.startsWith(oldFullyQualifiedPackageName) &&
+                } else if ((recursive == null || recursive) && original.startsWith(oldFullyQualifiedPackageName) &&
                         !original.startsWith(newFullyQualifiedPackageName)) {
                     String changingTo = newFullyQualifiedPackageName +
                             original.substring(oldFullyQualifiedPackageName.length());
