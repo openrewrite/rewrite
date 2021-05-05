@@ -25,17 +25,17 @@ interface ChangeMethodTargetToStaticTest : JavaRecipeTest {
         jp,
         dependsOn = arrayOf(
             """
-                    package a;
-                    public class A {
-                       public void nonStatic() {}
-                    }
-                """,
+                package a;
+                public class A {
+                   public void nonStatic() {}
+                }
+            """,
             """
-                    package b;
-                    public class B {
-                       public static void foo() {}
-                    }
-                """
+                package b;
+                public class B {
+                   public static void foo() {}
+                }
+            """
         ),
         recipe = ChangeMethodTargetToStatic("a.A nonStatic()", "b.B")
             .doNext(ChangeMethodName("b.B nonStatic()", "foo")),
