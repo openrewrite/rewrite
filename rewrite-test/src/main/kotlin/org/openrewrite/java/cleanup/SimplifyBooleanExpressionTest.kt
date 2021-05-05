@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
@@ -245,6 +246,20 @@ interface SimplifyBooleanExpressionTest : JavaRecipeTest {
                 }
             }
         """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/502")
+    @Test
+    fun autoFormatIsConditionallyApplied(jp: JavaParser) = assertUnchanged(
+        before = """
+            public class A {
+                {
+                    boolean a=true;
+                    boolean i=(a!=true);
+                }
+            }
+        """,
+
     )
 
 }

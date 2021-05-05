@@ -81,8 +81,9 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
                 j = asBinary.getLeft();
             }
         }
-
-        getCursor().dropParentUntil(J.class::isInstance).putMessage(MAYBE_AUTO_FORMAT_ME, "");
+        if (asBinary != j) {
+            getCursor().dropParentUntil(J.class::isInstance).putMessage(MAYBE_AUTO_FORMAT_ME, "");
+        }
         return j;
     }
 
@@ -113,8 +114,9 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
                 j = ((J.Unary) asUnary.getExpression()).getExpression();
             }
         }
-
-        getCursor().dropParentUntil(J.class::isInstance).putMessage(MAYBE_AUTO_FORMAT_ME, "");
+        if (asUnary != j) {
+            getCursor().dropParentUntil(J.class::isInstance).putMessage(MAYBE_AUTO_FORMAT_ME, "");
+        }
         return j;
     }
 
