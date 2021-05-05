@@ -20,10 +20,7 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
-import org.openrewrite.java.tree.Flag;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.LinkedHashSet;
@@ -75,7 +72,11 @@ public class ChangeMethodTargetToStatic extends Recipe {
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if (methodMatcher.matches(method)) {
+            boolean isStatic = method.getType() != null && method.getType().hasFlags(Flag.Static);
+            boolean isSameReceiverType = method.getSelect() != null &&
+                    TypeUtils.isOfClassType(method.getSelect().getType(), fullyQualifiedTargetTypeName);
+
+            if ((!isStatic || !isSameReceiverType) && methodMatcher.matches(method)) {
                 m = method.withSelect(J.Identifier.build(randomId(),
                         method.getSelect() == null ?
                                 Space.EMPTY :

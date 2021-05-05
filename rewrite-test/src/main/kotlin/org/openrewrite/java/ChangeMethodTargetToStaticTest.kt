@@ -96,6 +96,36 @@ interface ChangeMethodTargetToStaticTest : JavaRecipeTest {
         """
     )
 
+    @Test
+    fun targetToStaticWhenMethodHasSameName(jp: JavaParser) = assertChanged(
+        jp,
+        dependsOn = arrayOf(
+            """
+                package a;
+                public class A {
+                   public void method() {}
+                }
+            """
+        ),
+        recipe = ChangeMethodTargetToStatic("a.A method()", "a.A"),
+        before = """
+            import a.A;
+            class Test {
+               public void test() {
+                   new A().method();
+               }
+            }
+        """,
+        after = """
+            import a.A;
+            class Test {
+               public void test() {
+                   A.method();
+               }
+            }
+        """
+    )
+
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
