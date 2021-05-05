@@ -63,7 +63,7 @@ public class ChangeMethodTargetToVariable extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public JavaVisitor<ExecutionContext> getVisitor() {
         return new ChangeMethodTargetToVariableVisitor(new MethodMatcher(methodPattern), JavaType.Class.build(variableType));
     }
 

@@ -62,7 +62,7 @@ public class ChangeType extends Recipe {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
+    public JavaVisitor<ExecutionContext> getVisitor() {
         return new ChangeTypeVisitor(newFullyQualifiedTypeName);
     }
 
