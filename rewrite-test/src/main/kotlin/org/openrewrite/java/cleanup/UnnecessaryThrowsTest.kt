@@ -57,4 +57,18 @@ interface UnnecessaryThrowsTest: JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    fun necessaryThrows(jp: JavaParser) = assertUnchanged(
+        before = """
+            import java.io.IOException;
+            
+            class Test {
+                
+                void test() throws IOException {
+                    throw new IOException();
+                }
+            }
+        """
+    )
 }

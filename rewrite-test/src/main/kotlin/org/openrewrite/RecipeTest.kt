@@ -258,10 +258,10 @@ interface RecipeTest {
                 if (cyclesThatResultedInChanges > expectedCyclesThatMakeChanges &&
                     before.isNotEmpty() && afterList.isNotEmpty()
                 ) {
-                    assertThat(before[0]!!.printTrimmed())
+                    assertThat(afterList[0]!!.printTrimmed())
                         .`as`("Expected recipe to complete in $expectedCyclesThatMakeChanges cycle${if (expectedCyclesThatMakeChanges == 1) "" else "s"}, " +
                                 "but took at least one more cycle. Between the last two executed cycles there were changes.")
-                        .isEqualTo(afterList[0]!!.printTrimmed())
+                        .isEqualTo(before[0]!!.printTrimmed())
                 }
             }
             return afterList

@@ -68,6 +68,15 @@ public class UnnecessaryThrows extends Recipe {
                         }
 
                         @Override
+                        public J.Throw visitThrow(J.Throw thrown, ExecutionContext executionContext) {
+                            JavaType.FullyQualified type = TypeUtils.asFullyQualified(thrown.getException().getType());
+                            if(type != null) {
+                                unusedThrows.removeIf(t -> TypeUtils.isAssignableTo(t, type));
+                            }
+                            return thrown;
+                        }
+
+                        @Override
                         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                             removeThrownTypes(method.getType());
                             return super.visitMethodInvocation(method, ctx);
