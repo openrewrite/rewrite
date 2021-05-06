@@ -15,8 +15,7 @@
  */
 package org.openrewrite.java;
 
-import org.antlr.v4.runtime.CharStreams;
-import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.*;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureLexer;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureParser;
 import org.openrewrite.java.tree.Expression;
@@ -49,8 +48,10 @@ public class AnnotationMatcher {
     private final AnnotationSignatureParser.AnnotationContext match;
 
     public AnnotationMatcher(String signature) {
-        this.match = new AnnotationSignatureParser(new CommonTokenStream(new AnnotationSignatureLexer(CharStreams.fromString(signature))))
-                .annotation();
+        AnnotationSignatureParser ap = new AnnotationSignatureParser(new CommonTokenStream(new AnnotationSignatureLexer(CharStreams.fromString(signature))));
+        ap.removeErrorListeners();
+        ap.addErrorListener(new ParserSyntaxErrorListener());
+        this.match = ap.annotation();
     }
 
     public boolean matches(J.Annotation annotation) {
@@ -99,7 +100,7 @@ public class AnnotationMatcher {
     private boolean argumentValueMatches(String matchOnArgumentName, Expression arg, String matchText) {
         if (matchOnArgumentName.equals("value")) {
             if (arg instanceof J.Literal) {
-                return ((J.Literal) arg).getValueSource().equals(matchText);
+                return matchText.equals(((J.Literal) arg).getValueSource());
             }
             if (arg instanceof J.FieldAccess && ((J.FieldAccess) arg).getSimpleName().equals("class") &&
                     matchText.endsWith(".class")) {
@@ -132,4 +133,13 @@ public class AnnotationMatcher {
         // we've already matched the argument name, so recursively we just check the value matches match text.
         return argumentValueMatches("value", assignment.getAssignment(), matchText);
     }
+
+    private static class ParserSyntaxErrorListener extends BaseErrorListener {
+        @Override
+        public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
+                                int line, int charPositionInLine, String msg, RecognitionException e) {
+            throw new RuntimeException(msg, e);
+        }
+    }
+
 }

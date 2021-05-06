@@ -17,8 +17,7 @@ package org.openrewrite.java;
 
 import lombok.Getter;
 import lombok.Setter;
-import org.antlr.v4.runtime.CharStreams;
-import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.openrewrite.internal.lang.Nullable;
@@ -69,6 +68,8 @@ public class MethodMatcher {
     public MethodMatcher(String signature) {
         MethodSignatureParser parser = new MethodSignatureParser(new CommonTokenStream(new MethodSignatureLexer(
                 CharStreams.fromString(signature))));
+        parser.removeErrorListeners();
+        parser.addErrorListener(new ParserSyntaxErrorListener());
 
         new MethodSignatureParserBaseVisitor<Void>() {
             @Override
@@ -198,6 +199,14 @@ public class MethodMatcher {
                         .filter(Objects::nonNull)
                         .collect(joining(",")) +
                 ")";
+    }
+
+    private static class ParserSyntaxErrorListener extends BaseErrorListener {
+        @Override
+        public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
+                                int line, int charPositionInLine, String msg, RecognitionException e) {
+            throw new RuntimeException(msg, e);
+        }
     }
 }
 
