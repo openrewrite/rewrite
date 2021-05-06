@@ -35,9 +35,9 @@ public class BigDecimalRoundingConstantsToEnums extends Recipe {
     private static final String BIG_DECIMAL_FQN = BigDecimal.class.getName();
     private static final String ROUNDING_MODE_FQN = RoundingMode.class.getName();
 
-    private static final MethodMatcher BIG_DECIMAL_DIVIDE_METHOD_MATCHER = new MethodMatcher(BIG_DECIMAL_FQN + " divide(java.math.BigDecimal, int");
-    private static final MethodMatcher BIG_DECIMAL_DIVIDE_WITH_SCALE_METHOD_MATCHER = new MethodMatcher(BIG_DECIMAL_FQN + " divide(java.math.BigDecimal, int, int");
-    private static final MethodMatcher BIG_DECIMAL_SET_SCALE_METHOD_MATCHER = new MethodMatcher(BIG_DECIMAL_FQN + " setScale(int, int");
+    private static final MethodMatcher BIG_DECIMAL_DIVIDE_METHOD_MATCHER = new MethodMatcher(BIG_DECIMAL_FQN + " divide(java.math.BigDecimal, int)");
+    private static final MethodMatcher BIG_DECIMAL_DIVIDE_WITH_SCALE_METHOD_MATCHER = new MethodMatcher(BIG_DECIMAL_FQN + " divide(java.math.BigDecimal, int, int)");
+    private static final MethodMatcher BIG_DECIMAL_SET_SCALE_METHOD_MATCHER = new MethodMatcher(BIG_DECIMAL_FQN + " setScale(int, int)");
 
     private static final ThreadLocal<JavaParser> JAVA_PARSER_THREAD_LOCAL = ThreadLocal.withInitial(() -> JavaParser.fromJavaVersion().build());
 
