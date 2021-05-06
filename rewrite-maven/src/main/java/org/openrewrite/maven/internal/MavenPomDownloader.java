@@ -333,16 +333,14 @@ public class MavenPomDownloader {
 
                 Request.Builder request = applyAuthenticationToRequest(repository, new Request.Builder()
                         .url(httpsUri).get());
-                try {
-                    sendRequest.apply(request.build());
+                try (Response ignored = sendRequest.apply(request.build())) {
                     return repository.withUri(URI.create(httpsUri));
                 } catch (Throwable t) {
                     // Fallback to http if https is unavailable and the original URL was an http URL
                     if (httpsUri.equals(originalUrl)) {
                         return null;
                     }
-                    try {
-                        sendRequest.apply(request.url(originalUrl).build());
+                    try (Response ignored = sendRequest.apply(request.url(originalUrl).build())) {
                         return new MavenRepository(
                                 repository.getId(),
                                 URI.create(originalUrl),
