@@ -2,7 +2,7 @@ build/
 .gradle/
 out/
 */src/main/gen/
-*/src/main/antlr/
+*/src/main/antlr/gen
 .idea/
 bin/
 .project
