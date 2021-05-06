@@ -43,7 +43,7 @@ import static org.openrewrite.Tree.randomId;
 @RequiredArgsConstructor
 @AllArgsConstructor(onConstructor_ = @JsonCreator)
 @EqualsAndHashCode(callSuper = true)
-public class RenamePackage extends Recipe {
+public class ChangePackage extends Recipe {
 
     private static final ThreadLocal<JavaParser> JAVA_PARSER_THREAD_LOCAL =
             ThreadLocal.withInitial(() -> JavaParser.fromJavaVersion().build());
@@ -77,10 +77,10 @@ public class RenamePackage extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new RenamePackageVisitor();
+        return new ChangePackageVisitor();
     }
 
-    private class RenamePackageVisitor extends JavaIsoVisitor<ExecutionContext> {
+    private class ChangePackageVisitor extends JavaIsoVisitor<ExecutionContext> {
         private static final String RENAME_TO_KEY = "renameTo";
         private static final String RENAME_FROM_KEY = "renameFrom";
 

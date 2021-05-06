@@ -20,10 +20,10 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 import java.nio.file.Paths
 
-interface RenamePackageTest: JavaRecipeTest {
+interface ChangePackageTest: JavaRecipeTest {
 
     override val recipe: Recipe?
-        get() = RenamePackage("org.openrewrite", "org.openrewrite.test")
+        get() = ChangePackage("org.openrewrite", "org.openrewrite.test")
 
     companion object {
         private val testClass = """
@@ -38,7 +38,7 @@ interface RenamePackageTest: JavaRecipeTest {
     @Test
     fun renamePackageNonRecursive(jp: JavaParser) = assertUnchanged(
         jp,
-        recipe = RenamePackage(
+        recipe = ChangePackage(
             "org.openrewrite",
             "org.openrewrite.test",
             false
@@ -380,20 +380,20 @@ interface RenamePackageTest: JavaRecipeTest {
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = RenamePackage(null, null)
+        var recipe = ChangePackage(null, null)
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("newPackageName")
         assertThat(valid.failures()[1].property).isEqualTo("oldPackageName")
 
-        recipe = RenamePackage(null, "java.lang.String")
+        recipe = ChangePackage(null, "java.lang.String")
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("oldPackageName")
 
-        recipe = RenamePackage("java.lang.String", null)
+        recipe = ChangePackage("java.lang.String", null)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
