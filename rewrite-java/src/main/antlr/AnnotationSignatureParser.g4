@@ -27,7 +27,7 @@ elementValue
 
 primary
     :   literal
-    |   Identifier
+    |   type
     ;
 
 type
@@ -35,7 +35,7 @@ type
     ;
 
 classOrInterfaceType
-    :   Identifier (DOT Identifier )*
+    :   Identifier (DOT Identifier)*
     ;
 
 literal
