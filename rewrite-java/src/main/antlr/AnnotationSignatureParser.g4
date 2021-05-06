@@ -1,10 +1,47 @@
 parser grammar AnnotationSignatureParser;
 
-options { tokenVocab=AspectJLexer; }
-
-import JavaParser;
+options { tokenVocab=AnnotationSignatureLexer; }
 
 annotation
-    :	'@' annotationName ( '(' ( elementValuePairs | elementValue )? ')' )?
+    :	AT annotationName ( LPAREN ( elementValuePairs | elementValue )? RPAREN )?
     ;
 
+annotationName
+    :   qualifiedName ;
+
+qualifiedName
+    :   Identifier (DOT Identifier)*
+    ;
+
+elementValuePairs
+    :   elementValuePair (COMMA elementValuePair)*
+    ;
+
+elementValuePair
+    :   Identifier ASSIGN elementValue
+    ;
+
+elementValue
+    :   primary
+    ;
+
+primary
+    :   literal
+    |   Identifier
+    ;
+
+type
+    :   classOrInterfaceType (LBRACK RBRACK)*
+    ;
+
+classOrInterfaceType
+    :   Identifier (DOT Identifier )*
+    ;
+
+literal
+    :   IntegerLiteral
+    |   FloatingPointLiteral
+    |   CharacterLiteral
+    |   StringLiteral
+    |   BooleanLiteral
+    ;

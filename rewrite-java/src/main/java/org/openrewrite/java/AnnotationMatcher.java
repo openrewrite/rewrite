@@ -17,8 +17,8 @@ package org.openrewrite.java;
 
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.openrewrite.java.internal.grammar.AnnotationSignatureLexer;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureParser;
-import org.openrewrite.java.internal.grammar.AspectJLexer;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -49,7 +49,7 @@ public class AnnotationMatcher {
     private final AnnotationSignatureParser.AnnotationContext match;
 
     public AnnotationMatcher(String signature) {
-        this.match = new AnnotationSignatureParser(new CommonTokenStream(new AspectJLexer(CharStreams.fromString(signature))))
+        this.match = new AnnotationSignatureParser(new CommonTokenStream(new AnnotationSignatureLexer(CharStreams.fromString(signature))))
                 .annotation();
     }
 

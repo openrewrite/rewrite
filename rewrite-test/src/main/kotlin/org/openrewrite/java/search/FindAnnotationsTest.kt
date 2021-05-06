@@ -235,4 +235,3 @@ interface FindAnnotationsTest : JavaRecipeTest {
         assertThat(maybeExample).hasSize(1)
     }
 }
-    

@@ -22,9 +22,9 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.internal.grammar.AspectJLexer;
-import org.openrewrite.java.internal.grammar.RefactorMethodSignatureParser;
-import org.openrewrite.java.internal.grammar.RefactorMethodSignatureParserBaseVisitor;
+import org.openrewrite.java.internal.grammar.MethodSignatureLexer;
+import org.openrewrite.java.internal.grammar.MethodSignatureParser;
+import org.openrewrite.java.internal.grammar.MethodSignatureParserBaseVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -67,12 +67,12 @@ public class MethodMatcher {
     private Pattern argumentPattern;
 
     public MethodMatcher(String signature) {
-        RefactorMethodSignatureParser parser = new RefactorMethodSignatureParser(new CommonTokenStream(new AspectJLexer(
+        MethodSignatureParser parser = new MethodSignatureParser(new CommonTokenStream(new MethodSignatureLexer(
                 CharStreams.fromString(signature))));
 
-        new RefactorMethodSignatureParserBaseVisitor<Void>() {
+        new MethodSignatureParserBaseVisitor<Void>() {
             @Override
-            public Void visitMethodPattern(RefactorMethodSignatureParser.MethodPatternContext ctx) {
+            public Void visitMethodPattern(MethodSignatureParser.MethodPatternContext ctx) {
                 targetTypePattern = Pattern.compile(new TypeVisitor().visitTargetTypePattern(ctx.targetTypePattern()));
                 methodNamePattern = Pattern.compile(ctx.simpleNamePattern().children.stream()
                         .map(c -> AspectjUtils.aspectjNameToPattern(c.toString()))
@@ -201,9 +201,9 @@ public class MethodMatcher {
     }
 }
 
-class TypeVisitor extends RefactorMethodSignatureParserBaseVisitor<String> {
+class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
     @Override
-    public String visitClassNameOrInterface(RefactorMethodSignatureParser.ClassNameOrInterfaceContext ctx) {
+    public String visitClassNameOrInterface(MethodSignatureParser.ClassNameOrInterfaceContext ctx) {
         StringBuilder classNameBuilder = new StringBuilder();
         for (ParseTree c : ctx.children) {
             classNameBuilder.append(AspectjUtils.aspectjNameToPattern(c.getText()));
@@ -221,11 +221,6 @@ class TypeVisitor extends RefactorMethodSignatureParserBaseVisitor<String> {
 
         return className;
     }
-
-    @Override
-    public String visitPrimitiveType(RefactorMethodSignatureParser.PrimitiveTypeContext ctx) {
-        return ctx.getText();
-    }
 }
 
 /**
@@ -237,7 +232,7 @@ class TypeVisitor extends RefactorMethodSignatureParserBaseVisitor<String> {
  * <code>execution(void m(.., int))</code>
  * picks out execution join points for void methods named m whose last parameter is of type int.
  */
-class FormalParameterVisitor extends RefactorMethodSignatureParserBaseVisitor<String> {
+class FormalParameterVisitor extends MethodSignatureParserBaseVisitor<String> {
     private final List<Argument> arguments = new ArrayList<>();
 
     @Override
@@ -249,19 +244,19 @@ class FormalParameterVisitor extends RefactorMethodSignatureParserBaseVisitor<St
     }
 
     @Override
-    public String visitDotDot(RefactorMethodSignatureParser.DotDotContext ctx) {
+    public String visitDotDot(MethodSignatureParser.DotDotContext ctx) {
         arguments.add(Argument.DOT_DOT);
         return super.visitDotDot(ctx);
     }
 
     @Override
-    public String visitFormalTypePattern(RefactorMethodSignatureParser.FormalTypePatternContext ctx) {
+    public String visitFormalTypePattern(MethodSignatureParser.FormalTypePatternContext ctx) {
         arguments.add(new Argument.FormalType(ctx));
         return super.visitFormalTypePattern(ctx);
     }
 
     @Override
-    public String visitFormalParametersPattern(RefactorMethodSignatureParser.FormalParametersPatternContext ctx) {
+    public String visitFormalParametersPattern(MethodSignatureParser.FormalParametersPatternContext ctx) {
         super.visitFormalParametersPattern(ctx);
 
         List<String> argumentPatterns = new ArrayList<>();
@@ -300,12 +295,12 @@ class FormalParameterVisitor extends RefactorMethodSignatureParserBaseVisitor<St
         };
 
         private static class FormalType extends Argument {
-            private final RefactorMethodSignatureParser.FormalTypePatternContext ctx;
+            private final MethodSignatureParser.FormalTypePatternContext ctx;
 
             @Setter
             private boolean variableArgs = false;
 
-            public FormalType(RefactorMethodSignatureParser.FormalTypePatternContext ctx) {
+            public FormalType(MethodSignatureParser.FormalTypePatternContext ctx) {
                 this.ctx = ctx;
             }
 

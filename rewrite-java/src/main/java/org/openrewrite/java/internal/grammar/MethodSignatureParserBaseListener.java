@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/AnnotationSignatureParser.g4 by ANTLR 4.8
+// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/MethodSignatureParser.g4 by ANTLR 4.8
 package org.openrewrite.java.internal.grammar;
 
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -21,131 +21,131 @@ import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
 /**
- * This class provides an empty implementation of {@link AnnotationSignatureParserListener},
+ * This class provides an empty implementation of {@link MethodSignatureParserListener},
  * which can be extended to create a listener which only needs to handle a subset
  * of the available methods.
  */
-public class AnnotationSignatureParserBaseListener implements AnnotationSignatureParserListener {
+public class MethodSignatureParserBaseListener implements MethodSignatureParserListener {
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterAnnotation(AnnotationSignatureParser.AnnotationContext ctx) { }
+	@Override public void enterMethodPattern(MethodSignatureParser.MethodPatternContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitAnnotation(AnnotationSignatureParser.AnnotationContext ctx) { }
+	@Override public void exitMethodPattern(MethodSignatureParser.MethodPatternContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterAnnotationName(AnnotationSignatureParser.AnnotationNameContext ctx) { }
+	@Override public void enterFormalParametersPattern(MethodSignatureParser.FormalParametersPatternContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitAnnotationName(AnnotationSignatureParser.AnnotationNameContext ctx) { }
+	@Override public void exitFormalParametersPattern(MethodSignatureParser.FormalParametersPatternContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterQualifiedName(AnnotationSignatureParser.QualifiedNameContext ctx) { }
+	@Override public void enterFormalsPattern(MethodSignatureParser.FormalsPatternContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitQualifiedName(AnnotationSignatureParser.QualifiedNameContext ctx) { }
+	@Override public void exitFormalsPattern(MethodSignatureParser.FormalsPatternContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterElementValuePairs(AnnotationSignatureParser.ElementValuePairsContext ctx) { }
+	@Override public void enterDotDot(MethodSignatureParser.DotDotContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitElementValuePairs(AnnotationSignatureParser.ElementValuePairsContext ctx) { }
+	@Override public void exitDotDot(MethodSignatureParser.DotDotContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterElementValuePair(AnnotationSignatureParser.ElementValuePairContext ctx) { }
+	@Override public void enterFormalsPatternAfterDotDot(MethodSignatureParser.FormalsPatternAfterDotDotContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitElementValuePair(AnnotationSignatureParser.ElementValuePairContext ctx) { }
+	@Override public void exitFormalsPatternAfterDotDot(MethodSignatureParser.FormalsPatternAfterDotDotContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterElementValue(AnnotationSignatureParser.ElementValueContext ctx) { }
+	@Override public void enterOptionalParensTypePattern(MethodSignatureParser.OptionalParensTypePatternContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitElementValue(AnnotationSignatureParser.ElementValueContext ctx) { }
+	@Override public void exitOptionalParensTypePattern(MethodSignatureParser.OptionalParensTypePatternContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterPrimary(AnnotationSignatureParser.PrimaryContext ctx) { }
+	@Override public void enterTargetTypePattern(MethodSignatureParser.TargetTypePatternContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitPrimary(AnnotationSignatureParser.PrimaryContext ctx) { }
+	@Override public void exitTargetTypePattern(MethodSignatureParser.TargetTypePatternContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterType(AnnotationSignatureParser.TypeContext ctx) { }
+	@Override public void enterFormalTypePattern(MethodSignatureParser.FormalTypePatternContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitType(AnnotationSignatureParser.TypeContext ctx) { }
+	@Override public void exitFormalTypePattern(MethodSignatureParser.FormalTypePatternContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterClassOrInterfaceType(AnnotationSignatureParser.ClassOrInterfaceTypeContext ctx) { }
+	@Override public void enterClassNameOrInterface(MethodSignatureParser.ClassNameOrInterfaceContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitClassOrInterfaceType(AnnotationSignatureParser.ClassOrInterfaceTypeContext ctx) { }
+	@Override public void exitClassNameOrInterface(MethodSignatureParser.ClassNameOrInterfaceContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterLiteral(AnnotationSignatureParser.LiteralContext ctx) { }
+	@Override public void enterSimpleNamePattern(MethodSignatureParser.SimpleNamePatternContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitLiteral(AnnotationSignatureParser.LiteralContext ctx) { }
+	@Override public void exitSimpleNamePattern(MethodSignatureParser.SimpleNamePatternContext ctx) { }
 
 	/**
 	 * {@inheritDoc}

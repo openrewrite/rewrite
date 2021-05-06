@@ -23,6 +23,7 @@ import org.openrewrite.Issue
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 
+@Suppress("ClassInitializerMayBeStatic")
 interface MethodMatcherTest {
     fun typeRegex(signature: String) = MethodMatcher(signature).targetTypePattern.toRegex()
     fun nameRegex(signature: String) = MethodMatcher(signature).methodNamePattern.toRegex()
@@ -204,5 +205,11 @@ interface MethodMatcherTest {
         val classDecl = cu.classes.first()
         val fooMethod = classDecl.body.statements[0] as J.MethodDeclaration
         assertTrue(MethodMatcher("* foo(..)").matches(fooMethod, classDecl))
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/492")
+    @Test
+    fun matchesWildcardedMethodNameStartingWithJavaKeyword(jp: JavaParser) {
+        assertTrue(nameRegex("A assert*()").matches("assertThat"))
     }
 }
