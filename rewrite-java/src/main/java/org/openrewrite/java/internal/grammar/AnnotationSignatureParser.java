@@ -1,18 +1,3 @@
-/*
- * Copyright 2020 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 // Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/AnnotationSignatureParser.g4 by ANTLR 4.8
 package org.openrewrite.java.internal.grammar;
 import org.antlr.v4.runtime.atn.*;
@@ -33,9 +18,9 @@ public class AnnotationSignatureParser extends Parser {
 		new PredictionContextCache();
 	public static final int
 		IntegerLiteral=1, FloatingPointLiteral=2, BooleanLiteral=3, CharacterLiteral=4, 
-		StringLiteral=5, NullLiteral=6, Identifier=7, LPAREN=8, RPAREN=9, LBRACK=10, 
-		RBRACK=11, COMMA=12, DOT=13, ASSIGN=14, COLON=15, ADD=16, SUB=17, AND=18, 
-		OR=19, AT=20, ELLIPSIS=21, DOTDOT=22, SPACE=23;
+		StringLiteral=5, LPAREN=6, RPAREN=7, LBRACK=8, RBRACK=9, COMMA=10, DOT=11, 
+		ASSIGN=12, COLON=13, ADD=14, SUB=15, AND=16, OR=17, AT=18, ELLIPSIS=19, 
+		DOTDOT=20, SPACE=21, Identifier=22;
 	public static final int
 		RULE_annotation = 0, RULE_annotationName = 1, RULE_qualifiedName = 2, 
 		RULE_elementValuePairs = 3, RULE_elementValuePair = 4, RULE_elementValue = 5, 
@@ -51,18 +36,18 @@ public class AnnotationSignatureParser extends Parser {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, null, null, null, null, "'null'", null, "'('", "')'", "'['", 
-			"']'", "','", "'.'", "'='", "':'", "'+'", "'-'", "'&&'", "'||'", "'@'", 
-			"'...'", "'..'", "' '"
+			null, null, null, null, null, null, "'('", "')'", "'['", "']'", "','", 
+			"'.'", "'='", "':'", "'+'", "'-'", "'&&'", "'||'", "'@'", "'...'", "'..'", 
+			"' '"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
 			null, "IntegerLiteral", "FloatingPointLiteral", "BooleanLiteral", "CharacterLiteral", 
-			"StringLiteral", "NullLiteral", "Identifier", "LPAREN", "RPAREN", "LBRACK", 
-			"RBRACK", "COMMA", "DOT", "ASSIGN", "COLON", "ADD", "SUB", "AND", "OR", 
-			"AT", "ELLIPSIS", "DOTDOT", "SPACE"
+			"StringLiteral", "LPAREN", "RPAREN", "LBRACK", "RBRACK", "COMMA", "DOT", 
+			"ASSIGN", "COLON", "ADD", "SUB", "AND", "OR", "AT", "ELLIPSIS", "DOTDOT", 
+			"SPACE", "Identifier"
 		};
 	}
 	private static final String[] _SYMBOLIC_NAMES = makeSymbolicNames();
@@ -476,7 +461,9 @@ public class AnnotationSignatureParser extends Parser {
 		public LiteralContext literal() {
 			return getRuleContext(LiteralContext.class,0);
 		}
-		public TerminalNode Identifier() { return getToken(AnnotationSignatureParser.Identifier, 0); }
+		public TypeContext type() {
+			return getRuleContext(TypeContext.class,0);
+		}
 		public PrimaryContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -508,7 +495,6 @@ public class AnnotationSignatureParser extends Parser {
 			case BooleanLiteral:
 			case CharacterLiteral:
 			case StringLiteral:
-			case NullLiteral:
 				enterOuterAlt(_localctx, 1);
 				{
 				setState(54);
@@ -519,7 +505,7 @@ public class AnnotationSignatureParser extends Parser {
 				enterOuterAlt(_localctx, 2);
 				{
 				setState(55);
-				match(Identifier);
+				type();
 				}
 				break;
 			default:
@@ -678,7 +664,6 @@ public class AnnotationSignatureParser extends Parser {
 		public TerminalNode CharacterLiteral() { return getToken(AnnotationSignatureParser.CharacterLiteral, 0); }
 		public TerminalNode StringLiteral() { return getToken(AnnotationSignatureParser.StringLiteral, 0); }
 		public TerminalNode BooleanLiteral() { return getToken(AnnotationSignatureParser.BooleanLiteral, 0); }
-		public TerminalNode NullLiteral() { return getToken(AnnotationSignatureParser.NullLiteral, 0); }
 		public LiteralContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -707,7 +692,7 @@ public class AnnotationSignatureParser extends Parser {
 			{
 			setState(74);
 			_la = _input.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << IntegerLiteral) | (1L << FloatingPointLiteral) | (1L << BooleanLiteral) | (1L << CharacterLiteral) | (1L << StringLiteral) | (1L << NullLiteral))) != 0)) ) {
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << IntegerLiteral) | (1L << FloatingPointLiteral) | (1L << BooleanLiteral) | (1L << CharacterLiteral) | (1L << StringLiteral))) != 0)) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
@@ -729,24 +714,24 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static final String _serializedATN =
-		"\3\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964\3\31O\4\2\t\2\4\3\t"+
+		"\3\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964\3\30O\4\2\t\2\4\3\t"+
 		"\3\4\4\t\4\4\5\t\5\4\6\t\6\4\7\t\7\4\b\t\b\4\t\t\t\4\n\t\n\4\13\t\13\3"+
 		"\2\3\2\3\2\3\2\3\2\5\2\34\n\2\3\2\5\2\37\n\2\3\3\3\3\3\4\3\4\3\4\7\4&"+
 		"\n\4\f\4\16\4)\13\4\3\5\3\5\3\5\7\5.\n\5\f\5\16\5\61\13\5\3\6\3\6\3\6"+
 		"\3\6\3\7\3\7\3\b\3\b\5\b;\n\b\3\t\3\t\3\t\7\t@\n\t\f\t\16\tC\13\t\3\n"+
 		"\3\n\3\n\7\nH\n\n\f\n\16\nK\13\n\3\13\3\13\3\13\2\2\f\2\4\6\b\n\f\16\20"+
-		"\22\24\2\3\3\2\3\b\2L\2\26\3\2\2\2\4 \3\2\2\2\6\"\3\2\2\2\b*\3\2\2\2\n"+
+		"\22\24\2\3\3\2\3\7\2L\2\26\3\2\2\2\4 \3\2\2\2\6\"\3\2\2\2\b*\3\2\2\2\n"+
 		"\62\3\2\2\2\f\66\3\2\2\2\16:\3\2\2\2\20<\3\2\2\2\22D\3\2\2\2\24L\3\2\2"+
-		"\2\26\27\7\26\2\2\27\36\5\4\3\2\30\33\7\n\2\2\31\34\5\b\5\2\32\34\5\f"+
-		"\7\2\33\31\3\2\2\2\33\32\3\2\2\2\33\34\3\2\2\2\34\35\3\2\2\2\35\37\7\13"+
+		"\2\26\27\7\24\2\2\27\36\5\4\3\2\30\33\7\b\2\2\31\34\5\b\5\2\32\34\5\f"+
+		"\7\2\33\31\3\2\2\2\33\32\3\2\2\2\33\34\3\2\2\2\34\35\3\2\2\2\35\37\7\t"+
 		"\2\2\36\30\3\2\2\2\36\37\3\2\2\2\37\3\3\2\2\2 !\5\6\4\2!\5\3\2\2\2\"\'"+
-		"\7\t\2\2#$\7\17\2\2$&\7\t\2\2%#\3\2\2\2&)\3\2\2\2\'%\3\2\2\2\'(\3\2\2"+
-		"\2(\7\3\2\2\2)\'\3\2\2\2*/\5\n\6\2+,\7\16\2\2,.\5\n\6\2-+\3\2\2\2.\61"+
-		"\3\2\2\2/-\3\2\2\2/\60\3\2\2\2\60\t\3\2\2\2\61/\3\2\2\2\62\63\7\t\2\2"+
-		"\63\64\7\20\2\2\64\65\5\f\7\2\65\13\3\2\2\2\66\67\5\16\b\2\67\r\3\2\2"+
-		"\28;\5\24\13\29;\7\t\2\2:8\3\2\2\2:9\3\2\2\2;\17\3\2\2\2<A\5\22\n\2=>"+
-		"\7\f\2\2>@\7\r\2\2?=\3\2\2\2@C\3\2\2\2A?\3\2\2\2AB\3\2\2\2B\21\3\2\2\2"+
-		"CA\3\2\2\2DI\7\t\2\2EF\7\17\2\2FH\7\t\2\2GE\3\2\2\2HK\3\2\2\2IG\3\2\2"+
+		"\7\30\2\2#$\7\r\2\2$&\7\30\2\2%#\3\2\2\2&)\3\2\2\2\'%\3\2\2\2\'(\3\2\2"+
+		"\2(\7\3\2\2\2)\'\3\2\2\2*/\5\n\6\2+,\7\f\2\2,.\5\n\6\2-+\3\2\2\2.\61\3"+
+		"\2\2\2/-\3\2\2\2/\60\3\2\2\2\60\t\3\2\2\2\61/\3\2\2\2\62\63\7\30\2\2\63"+
+		"\64\7\16\2\2\64\65\5\f\7\2\65\13\3\2\2\2\66\67\5\16\b\2\67\r\3\2\2\28"+
+		";\5\24\13\29;\5\20\t\2:8\3\2\2\2:9\3\2\2\2;\17\3\2\2\2<A\5\22\n\2=>\7"+
+		"\n\2\2>@\7\13\2\2?=\3\2\2\2@C\3\2\2\2A?\3\2\2\2AB\3\2\2\2B\21\3\2\2\2"+
+		"CA\3\2\2\2DI\7\30\2\2EF\7\r\2\2FH\7\30\2\2GE\3\2\2\2HK\3\2\2\2IG\3\2\2"+
 		"\2IJ\3\2\2\2J\23\3\2\2\2KI\3\2\2\2LM\t\2\2\2M\25\3\2\2\2\t\33\36\'/:A"+
 		"I";
 	public static final ATN _ATN =
