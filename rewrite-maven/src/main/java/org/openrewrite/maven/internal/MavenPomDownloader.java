@@ -357,7 +357,8 @@ public class MavenPomDownloader {
             return null;
         }
 
-        return result.getData();
+        MavenRepository repo = result.getData();
+        return repo == null ? null : applyAuthenticationToRepository(repo);
     }
 
     /**
