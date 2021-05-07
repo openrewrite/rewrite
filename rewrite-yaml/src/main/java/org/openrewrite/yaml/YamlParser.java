@@ -23,6 +23,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.MetricsHelper;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
@@ -35,15 +36,12 @@ import org.yaml.snakeyaml.reader.StreamReader;
 import org.yaml.snakeyaml.scanner.Scanner;
 import org.yaml.snakeyaml.scanner.ScannerImpl;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.UncheckedIOException;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Stack;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -51,6 +49,8 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
+    private static final Pattern VARIABLE_PATTERN = Pattern.compile(":\\s*(@[^\n\r@]+@)");
+
     @Override
     public List<Yaml.Documents> parse(@Language("yml") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
@@ -88,7 +88,27 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
     }
 
     private Yaml.Documents parseFromInput(Path sourceFile, InputStream source) {
-        try (FormatPreservingReader reader = new FormatPreservingReader(new InputStreamReader(source))) {
+        String yamlSource = StringUtils.readFully(source);
+        Map<String, String> variableByUuid = new HashMap<>();
+
+        StringBuilder yamlSourceWithVariablePlaceholders = new StringBuilder();
+        Matcher variableMatcher = VARIABLE_PATTERN.matcher(yamlSource);
+        int pos = 0;
+        while (pos < yamlSource.length() && variableMatcher.find(pos)) {
+            yamlSourceWithVariablePlaceholders.append(yamlSource, pos, variableMatcher.start(1));
+            String uuid = UUID.randomUUID().toString();
+            variableByUuid.put(uuid, variableMatcher.group(1));
+            yamlSourceWithVariablePlaceholders.append(uuid);
+            pos = variableMatcher.end(1);
+        }
+
+        if(pos < yamlSource.length() - 1) {
+            yamlSourceWithVariablePlaceholders.append(yamlSource, pos, yamlSource.length());
+        }
+
+        try (FormatPreservingReader reader = new FormatPreservingReader(
+                new InputStreamReader(new ByteArrayInputStream(yamlSourceWithVariablePlaceholders.toString()
+                        .getBytes(StandardCharsets.UTF_8))))) {
             StreamReader streamReader = new StreamReader(reader);
             Scanner scanner = new ScannerImpl(streamReader);
             Parser parser = new ParserImpl(scanner);
@@ -133,6 +153,10 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                     case Scalar:
                         ScalarEvent scalar = (ScalarEvent) event;
                         String scalarValue = scalar.getValue();
+                        if(variableByUuid.containsKey(scalarValue)) {
+                            scalarValue = variableByUuid.get(scalarValue);
+                        }
+
                         Yaml.Scalar.Style style;
                         switch (scalar.getScalarStyle()) {
                             case DOUBLE_QUOTED:

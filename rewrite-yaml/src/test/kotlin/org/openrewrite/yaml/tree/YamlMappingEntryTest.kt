@@ -18,11 +18,22 @@ package org.openrewrite.yaml.tree
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
-import org.openrewrite.Recipe
+import org.openrewrite.Issue
 import org.openrewrite.yaml.YamlParser
-import org.openrewrite.yaml.YamlRecipeTest
 
 class YamlMappingEntryTest {
+
+    @Issue("https://github.com/spring-projects/spring-boot/issues/8438")
+    @Test
+    fun valueStartsWithAt() {
+        val y = """
+          date: @build.timestamp@
+          version: @project.version@
+        """.trimIndent()
+
+        val parsed = YamlParser().parse(InMemoryExecutionContext { t -> t.printStackTrace() }, y)[0]
+        assertThat(parsed.print()).isEqualTo(y)
+    }
 
     @Test
     fun suffixBeforeColon() {
