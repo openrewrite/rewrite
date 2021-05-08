@@ -20,6 +20,7 @@ import org.openrewrite.internal.lang.Nullable;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -27,6 +28,7 @@ public class InMemoryExecutionContext implements ExecutionContext {
     private final Map<String, Object> messages = new ConcurrentHashMap<>();
     private final Consumer<Throwable> onError;
     private final Function<Integer, Duration> runTimeout;
+    private final BiConsumer<Throwable, ExecutionContext> onTimeout;
 
     public InMemoryExecutionContext() {
         this(
@@ -41,8 +43,13 @@ public class InMemoryExecutionContext implements ExecutionContext {
 
     public InMemoryExecutionContext(Consumer<Throwable> onError,
                                     Function<Integer, Duration> runTimeout) {
+        this(onError, runTimeout, (throwable, ctx) -> {});
+    }
+
+    public InMemoryExecutionContext(Consumer<Throwable> onError, Function<Integer, Duration> runTimeout, BiConsumer<Throwable, ExecutionContext> onTimeout) {
         this.onError = onError;
         this.runTimeout = runTimeout;
+        this.onTimeout = onTimeout;
     }
 
     @Override
@@ -66,6 +73,11 @@ public class InMemoryExecutionContext implements ExecutionContext {
 
     public Consumer<Throwable> getOnError() {
         return onError;
+    }
+
+    @Override
+    public BiConsumer<Throwable, ExecutionContext> getOnTimeout() {
+        return onTimeout;
     }
 
     @Override

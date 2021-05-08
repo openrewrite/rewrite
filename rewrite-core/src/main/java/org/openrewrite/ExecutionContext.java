@@ -21,6 +21,7 @@ import java.time.Duration;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -72,6 +73,8 @@ public interface ExecutionContext {
     }
 
     Consumer<Throwable> getOnError();
+
+    BiConsumer<Throwable,ExecutionContext> getOnTimeout();
 
     /**
      * @param inputs The number of inputs to the run. Allows the duration to be scaled to the number of inputs.

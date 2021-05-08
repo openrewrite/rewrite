@@ -17,6 +17,7 @@ package org.openrewrite;
 
 import org.openrewrite.internal.lang.Nullable;
 
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 public class DelegatingExecutionContext implements ExecutionContext {
@@ -44,5 +45,10 @@ public class DelegatingExecutionContext implements ExecutionContext {
     @Override
     public Consumer<Throwable> getOnError() {
         return delegate.getOnError();
+    }
+
+    @Override
+    public BiConsumer<Throwable, ExecutionContext> getOnTimeout() {
+        return delegate.getOnTimeout();
     }
 }
