@@ -80,7 +80,7 @@ public class LoggingMeterRegistry extends MeterRegistry {
                                 double count = counter.count();
                                 if (count == 0) return;
                                 loggingSink.accept(print.id() +
-                                        "\n    throughput=" + print.value(count) +
+                                        "\n    sum=" + print.value(count) +
                                         "\n    rate=" + print.rate(count));
                             },
                             timer -> {
@@ -88,7 +88,7 @@ public class LoggingMeterRegistry extends MeterRegistry {
                                 long count = snapshot.count();
                                 if (count == 0) return;
                                 loggingSink.accept(print.id() +
-                                        "\n    throughput=" + print.value(count) +
+                                        "\n    sum=" + print.value(count) +
                                         "\n    rate=" + print.unitlessRate(count) +
                                         "\n    mean=" + print.time(snapshot.mean(getBaseTimeUnit())) +
                                         "\n    max=" + print.time(snapshot.max(getBaseTimeUnit())));
@@ -98,7 +98,7 @@ public class LoggingMeterRegistry extends MeterRegistry {
                                 long count = snapshot.count();
                                 if (count == 0) return;
                                 loggingSink.accept(print.id() +
-                                        "\n    throughput=" + print.value(count) +
+                                        "\n    sum=" + print.value(count) +
                                         "\n    rate=" + print.unitlessRate(count) +
                                         "\n    mean=" + print.value(snapshot.mean()) +
                                         "\n    max=" + print.value(snapshot.max()));
@@ -119,14 +119,14 @@ public class LoggingMeterRegistry extends MeterRegistry {
                                 double count = counter.count();
                                 if (count == 0) return;
                                 loggingSink.accept(print.id() +
-                                        "\n    throughput=" + print.value(count) +
+                                        "\n    sum=" + print.value(count) +
                                         "\n    rate=" + print.rate(count));
                             },
                             timer -> {
                                 double count = timer.count();
                                 if (count == 0) return;
                                 loggingSink.accept(print.id() +
-                                        "\n    throughput=" + print.value(count) +
+                                        "\n    sum=" + print.value(count) +
                                         "\n    rate=" + print.rate(count) +
                                         "\n    mean=" + print.time(timer.mean(getBaseTimeUnit())));
                             },
@@ -148,7 +148,7 @@ public class LoggingMeterRegistry extends MeterRegistry {
                         case DURATION:
                             return msLine + print.time(ms.getValue());
                         case COUNT:
-                            return "\n    throughput=" + print.value(ms.getValue()) +
+                            return "\n    sum=" + print.value(ms.getValue()) +
                                     "\n    rate=" + print.rate(ms.getValue());
                         default:
                             return msLine + decimalOrNan(ms.getValue());
