@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import org.openrewrite.internal.lang.Nullable;
@@ -50,6 +51,12 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     private List<TreeVisitor<T, P>> afterVisit;
+
+    private int visitCount;
+    private final DistributionSummary visitCountSummary = DistributionSummary.builder("rewrite.visitor.visit.method.count")
+            .description("Visit methods called per source file visited.")
+            .tag("visitor.class", getClass().getName())
+            .register(Metrics.globalRegistry);
 
     protected void setCursor(@Nullable Cursor cursor) {
         this.cursor = cursor;
@@ -131,9 +138,12 @@ public abstract class TreeVisitor<T extends Tree, P> {
         boolean topLevel = false;
         if (afterVisit == null) {
             topLevel = true;
+            visitCount = 0;
             sample = Timer.start();
             afterVisit = new ArrayList<>();
         }
+
+        visitCount++;
 
         setCursor(new Cursor(cursor, tree));
 
@@ -158,11 +168,14 @@ public abstract class TreeVisitor<T extends Tree, P> {
             sample.stop(Timer.builder("rewrite.visitor.visit")
                     .tag("visitor.class", getClass().getName())
                     .register(Metrics.globalRegistry));
+            visitCountSummary.record(visitCount);
+
             if (t != null) {
                 for (TreeVisitor<T, P> v : afterVisit) {
                     t = v.visit(t, p);
                 }
             }
+
             sample.stop(Timer.builder("rewrite.visitor.visit.cumulative")
                     .tag("visitor.class", getClass().getName())
                     .register(Metrics.globalRegistry));
