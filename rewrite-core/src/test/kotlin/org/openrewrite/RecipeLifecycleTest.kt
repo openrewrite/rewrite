@@ -30,6 +30,28 @@ import java.util.concurrent.atomic.AtomicInteger
 class RecipeLifecycleTest {
 
     @Test
+    fun panic() {
+        val visited = AtomicInteger(0)
+        val ctx = InMemoryExecutionContext()
+        ctx.putMessage(Recipe.PANIC, true)
+
+        object : Recipe() {
+            override fun getDisplayName(): String = "Slow"
+
+            override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
+                return object : TreeVisitor<Tree, ExecutionContext>() {
+                    override fun visit(tree: Tree, p: ExecutionContext): Tree {
+                        visited.incrementAndGet()
+                        return tree
+                    }
+                }
+            }
+        }.run(listOf(PlainText(randomId(), Markers.EMPTY, "hello world")), ctx)
+
+        assertThat(visited.get()).isEqualTo(0)
+    }
+
+    @Test
     fun recipeTimeout() {
         val latch = CountDownLatch(1)
         val timeouts = AtomicInteger(0)

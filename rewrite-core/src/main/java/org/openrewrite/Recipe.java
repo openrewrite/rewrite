@@ -60,6 +60,7 @@ import static org.openrewrite.Tree.randomId;
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
 public abstract class Recipe {
+    public static final String PANIC = "__AHHH_PANIC!!!__";
 
     private static final Logger logger = LoggerFactory.getLogger(Recipe.class);
 
@@ -239,6 +240,10 @@ public abstract class Recipe {
                     return s;
                 }
 
+                if (ctx.getMessage(PANIC) != null) {
+                    return s;
+                }
+
                 Timer.Builder timer = Timer.builder("rewrite.recipe.visit").tag("recipe", getDisplayName());
                 Timer.Sample sample = Timer.start();
                 try {
@@ -288,6 +293,9 @@ public abstract class Recipe {
         }
 
         for (Recipe recipe : recipeList) {
+            if (ctx.getMessage(PANIC) != null) {
+                return afterWidened;
+            }
             afterWidened = recipe.visitInternal(afterWidened, ctx, forkJoinPool, recipeThatDeletedSourceFile);
         }
 
