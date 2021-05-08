@@ -38,6 +38,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -238,7 +239,9 @@ public abstract class Recipe {
                 Duration duration = Duration.ofNanos(System.nanoTime() - startTime);
                 if (duration.compareTo(ctx.getRunTimeout(before.size())) > 0) {
                     if (thrownErrorOnTimeout.compareAndSet(false, true)) {
-                        ctx.getOnError().accept(new RecipeTimeoutException(this));
+                        RecipeTimeoutException t = new RecipeTimeoutException(this);
+                        ctx.getOnError().accept(t);
+                        ctx.getOnTimeout().accept(t, ctx);
                     }
                     sample.stop(MetricsHelper.successTags(timer, s, "timeout").register(Metrics.globalRegistry));
                     return s;
@@ -503,6 +506,11 @@ public abstract class Recipe {
         @Override
         public Consumer<Throwable> getOnError() {
             return delegate.getOnError();
+        }
+
+        @Override
+        public BiConsumer<Throwable, ExecutionContext> getOnTimeout() {
+            return delegate.getOnTimeout();
         }
 
         @Override
