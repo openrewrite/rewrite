@@ -122,6 +122,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class JavaTemplateTck : JavaTemplateTest
 
     @Nested
+    inner class MaybeUsesTypeTck : MaybeUsesTypeTest
+
+    @Nested
     inner class MethodNameCasingTck : MethodNameCasingTest
 
     @Nested
