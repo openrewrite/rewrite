@@ -232,11 +232,15 @@ public abstract class Recipe {
         // if this recipe isn't valid we just skip it and proceed to next
         if (validate(ctx).isValid()) {
             after = ListUtils.map(after, forkJoinPool, s -> {
+                Timer.Builder timer = Timer.builder("rewrite.recipe.visit").tag("recipe", getDisplayName());
+                Timer.Sample sample = Timer.start();
+
                 Duration duration = Duration.ofNanos(System.nanoTime() - startTime);
                 if (duration.compareTo(ctx.getRunTimeout(before.size())) > 0) {
                     if (thrownErrorOnTimeout.compareAndSet(false, true)) {
                         ctx.getOnError().accept(new RecipeTimeoutException(this));
                     }
+                    sample.stop(MetricsHelper.successTags(timer, s, "timeout").register(Metrics.globalRegistry));
                     return s;
                 }
 
@@ -244,8 +248,6 @@ public abstract class Recipe {
                     return s;
                 }
 
-                Timer.Builder timer = Timer.builder("rewrite.recipe.visit").tag("recipe", getDisplayName());
-                Timer.Sample sample = Timer.start();
                 try {
                     @SuppressWarnings("unchecked") S afterFile = (S) getVisitor().visit(s, ctx);
                     if (afterFile != null && afterFile != s) {

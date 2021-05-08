@@ -22,7 +22,7 @@ import java.nio.file.Paths
 
 interface ChangePackageTest: JavaRecipeTest {
 
-    override val recipe: Recipe?
+    override val recipe: Recipe
         get() = ChangePackage("org.openrewrite", "org.openrewrite.test")
 
     companion object {
