@@ -22,12 +22,47 @@ import java.nio.file.Path
 
 class UpgradeDependencyVersionTest : MavenRecipeTest {
     @Test
+    fun trustParent() = assertUnchanged(
+        recipe = UpgradeDependencyVersion(
+            "junit",
+            "junit",
+            "4.x",
+            null,
+            true
+        ),
+        before = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <parent>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-parent</artifactId>
+                <version>2.12</version>
+              </parent>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>junit</groupId>
+                  <artifactId>junit</artifactId>
+                </dependency>
+              </dependencies>
+            </project>
+        """
+    )
+
+    @Test
     fun upgradeVersion() = assertChanged(
         recipe = UpgradeDependencyVersion(
             "org.springframework.boot",
             null,
             "~1.5",
-            null),
+            null,
+            null
+        ),
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>
@@ -70,7 +105,9 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
             "com.google.guava",
             null as String?,
             "25-28",
-            "-jre"),
+            "-jre",
+            null
+        ),
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>
@@ -161,7 +198,9 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                 "com.google.guava",
                 null,
                 "25-28",
-                "-jre"),
+                "-jre",
+                null
+            ),
             dependsOn = arrayOf(server.toFile()),
             before = parent.toFile(),
             after = """
@@ -187,7 +226,9 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
             "org.thymeleaf",
             "thymeleaf-spring5",
             "3.0.12.RELEASE",
-            null),
+            null,
+            null
+        ),
         before = """
             <project>
             <modelVersion>4.0.0</modelVersion>
@@ -229,36 +270,35 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = UpgradeDependencyVersion(null, null, null, null)
+        var recipe = UpgradeDependencyVersion(null, null, null, null, null)
         var valid = recipe.validate()
         Assertions.assertThat(valid.isValid).isFalse()
         Assertions.assertThat(valid.failures()).hasSize(2)
         Assertions.assertThat(valid.failures()[0].property).isEqualTo("groupId")
         Assertions.assertThat(valid.failures()[1].property).isEqualTo("newVersion")
 
-        recipe = UpgradeDependencyVersion(null, "rewrite-maven", "latest.release", null)
+        recipe = UpgradeDependencyVersion(null, "rewrite-maven", "latest.release", null, null)
         valid = recipe.validate()
         Assertions.assertThat(valid.isValid).isFalse()
         Assertions.assertThat(valid.failures()).hasSize(1)
         Assertions.assertThat(valid.failures()[0].property).isEqualTo("groupId")
 
-        recipe = UpgradeDependencyVersion("org.openrewrite", null, null, null)
+        recipe = UpgradeDependencyVersion("org.openrewrite", null, null, null, null)
         valid = recipe.validate()
         Assertions.assertThat(valid.isValid).isFalse()
         Assertions.assertThat(valid.failures()).hasSize(1)
         Assertions.assertThat(valid.failures()[0].property).isEqualTo("newVersion")
 
-        recipe = UpgradeDependencyVersion("org.openrewrite", "rewrite-maven", "latest.release", null)
+        recipe = UpgradeDependencyVersion("org.openrewrite", "rewrite-maven", "latest.release", null, null)
         valid = recipe.validate()
         Assertions.assertThat(valid.isValid).isTrue()
 
-        recipe = UpgradeDependencyVersion("org.openrewrite", "rewrite-maven", "latest.release", "123")
+        recipe = UpgradeDependencyVersion("org.openrewrite", "rewrite-maven", "latest.release", "123", null)
         valid = recipe.validate()
         Assertions.assertThat(valid.isValid).isTrue()
 
-        recipe = UpgradeDependencyVersion("org.openrewrite", "rewrite-maven", "1.0.0", null)
+        recipe = UpgradeDependencyVersion("org.openrewrite", "rewrite-maven", "1.0.0", null, null)
         valid = recipe.validate()
         Assertions.assertThat(valid.isValid).isTrue()
-
     }
 }

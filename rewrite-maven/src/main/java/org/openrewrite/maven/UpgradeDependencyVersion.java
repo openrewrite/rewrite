@@ -73,6 +73,13 @@ public class UpgradeDependencyVersion extends Recipe {
     @Nullable
     String versionPattern;
 
+    @Option(displayName = "Trust parent POM",
+            description = "Even if the parent suggests a version that is older than what we are trying to upgrade to, trust it anyway. " +
+                    "Useful when you want to wait for the parent to catch up before upgrading. The parent is not trusted by default.",
+            required = false)
+    @Nullable
+    Boolean trustParent;
+
     @SuppressWarnings("ConstantConditions")
     @Override
     public Validated validate() {
@@ -124,6 +131,12 @@ public class UpgradeDependencyVersion extends Recipe {
         private void maybeChangeDependencyVersion(Pom model, ExecutionContext ctx) {
             for (Pom.Dependency dependency : model.getDependencies()) {
                 if (dependency.getGroupId().equals(groupId) && (artifactId == null || dependency.getArtifactId().equals(artifactId))) {
+                    if (model.getParent() != null) {
+                        String managedVersion = model.getParent().getManagedVersion(groupId, dependency.getArtifactId());
+                        if (managedVersion != null) {
+                            continue;
+                        }
+                    }
                     findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion(), ctx).ifPresent(newer -> {
                         ChangeDependencyVersionVisitor changeDependencyVersion = new ChangeDependencyVersionVisitor(newer, dependency.getArtifactId());
                         doAfterVisit(changeDependencyVersion);
@@ -158,7 +171,6 @@ public class UpgradeDependencyVersion extends Recipe {
         }
     }
 
-
     private class ChangeDependencyVersionVisitor extends MavenVisitor {
         private final String newVersion;
         private final String artifactId;
@@ -183,7 +195,7 @@ public class UpgradeDependencyVersion extends Recipe {
                     }
                 }
                 // In this case a transitive dependency has been removed and the dependency now requires a version
-                else if (!versionTag.isPresent() && !isManagedDependencyTag(groupId, artifactId)) {
+                else if (!isManagedDependencyTag(groupId, artifactId)) {
                     Xml.Tag newVersionTag = Xml.Tag.build("<version>" + newVersion + "</version>");
                     doAfterVisit(new AddToTagVisitor<>(getCursor().getValue(), newVersionTag));
                 }
