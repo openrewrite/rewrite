@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
@@ -68,6 +69,30 @@ interface UnnecessaryThrowsTest: JavaRecipeTest {
                 void test() throws IOException {
                     throw new IOException();
                 }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/519")
+    @Test
+    fun interfaces(jp: JavaParser) = assertUnchanged(
+        before = """
+            import java.io.IOException;
+            
+            interface Test {
+                void test() throws IOException;
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/519")
+    @Test
+    fun abstractMethods(jp: JavaParser) = assertUnchanged(
+        before = """
+            import java.io.IOException;
+            
+            abstract class Test {
+                abstract void test() throws IOException;
             }
         """
     )

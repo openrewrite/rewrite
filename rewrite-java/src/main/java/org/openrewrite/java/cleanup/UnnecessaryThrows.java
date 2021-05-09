@@ -22,6 +22,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -50,7 +51,7 @@ public class UnnecessaryThrows extends Recipe {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                 J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
-                if (m.getThrows() != null) {
+                if (m.getThrows() != null && !m.isAbstract()) {
                     Set<JavaType.FullyQualified> unusedThrows = m.getThrows().stream()
                             .map(t -> TypeUtils.asFullyQualified(t.getType()))
                             .filter(Objects::nonNull)
