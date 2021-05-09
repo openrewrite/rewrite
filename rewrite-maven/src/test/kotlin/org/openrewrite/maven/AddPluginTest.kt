@@ -21,7 +21,46 @@ import org.openrewrite.Recipe
 
 class AddPluginTest : MavenRecipeTest {
     override val recipe: Recipe
-        get() = AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", "100.0")
+        get() = AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", "100.0", null)
+
+    @Test
+    fun addPluginWithConfiguration() = assertChanged(
+        recipe = AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", "100.0", """
+            <configuration>
+              <activeRecipes>
+                <recipe>io.moderne.FindTest</recipe>
+              </activeRecipes>
+            </configuration>
+        """.trimIndent()),
+        before = """
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+            </project>
+        """,
+        after = """
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <build>
+                <plugins>
+                  <plugin>
+                    <groupId>org.openrewrite.maven</groupId>
+                    <artifactId>rewrite-maven-plugin</artifactId>
+                    <version>100.0</version>
+                    <configuration>
+                      <activeRecipes>
+                        <recipe>io.moderne.FindTest</recipe>
+                      </activeRecipes>
+                    </configuration>
+                  </plugin>
+                </plugins>
+              </build>
+            </project>
+        """
+    )
 
     @Test
     fun addPlugin() = assertChanged(
@@ -89,7 +128,7 @@ class AddPluginTest : MavenRecipeTest {
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = AddPlugin(null, null, null)
+        var recipe = AddPlugin(null, null, null, null)
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(3)
@@ -97,21 +136,21 @@ class AddPluginTest : MavenRecipeTest {
         assertThat(valid.failures()[1].property).isEqualTo("groupId")
         assertThat(valid.failures()[2].property).isEqualTo("version")
 
-        recipe = AddPlugin(null, "rewrite-maven", null)
+        recipe = AddPlugin(null, "rewrite-maven", null, null)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("groupId")
         assertThat(valid.failures()[1].property).isEqualTo("version")
 
-        recipe = AddPlugin("org.openrewrite", null, null)
+        recipe = AddPlugin("org.openrewrite", null, null, null)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("artifactId")
         assertThat(valid.failures()[1].property).isEqualTo("version")
 
-        recipe = AddPlugin("org.openrewrite", "rewrite-maven", "1.0.0")
+        recipe = AddPlugin("org.openrewrite", "rewrite-maven", "1.0.0", null)
         valid = recipe.validate()
         assertThat(valid.isValid).isTrue()
     }

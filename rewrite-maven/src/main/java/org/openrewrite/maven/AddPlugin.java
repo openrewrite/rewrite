@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
@@ -50,6 +51,12 @@ public class AddPlugin extends Recipe {
             example = "1.0.0")
     String version;
 
+    @Option(displayName = "Configuration",
+            description = "Optional plugin configuration provided as raw XML",
+            required = false)
+    @Nullable
+    String configuration;
+
     @Override
     public String getDisplayName() {
         return "Add Maven plugin";
@@ -72,6 +79,7 @@ public class AddPlugin extends Recipe {
                         "<groupId>" + groupId + "</groupId>\n" +
                         "<artifactId>" + artifactId + "</artifactId>\n" +
                         "<version>" + version + "</version>\n" +
+                        (configuration != null ? configuration.trim() + "\n" : "") +
                         "</plugin>\n" +
                         "</plugins>\n" +
                         "</build>"),
@@ -111,6 +119,7 @@ public class AddPlugin extends Recipe {
                                 "<groupId>" + groupId + "</groupId>\n" +
                                 "<artifactId>" + artifactId + "</artifactId>\n" +
                                 "<version>" + version + "</version>\n" +
+                                (configuration != null ? configuration.trim() + "\n" : "") +
                                 "</plugin>")));
                     }
                 }
