@@ -286,6 +286,11 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
+    public J.Try.Resource visitTryResource(J.Try.Resource tryResource, P p) {
+        return (J.Try.Resource) super.visitTryResource(tryResource, p);
+    }
+
+    @Override
     public J.TypeCast visitTypeCast(J.TypeCast typeCast, P p) {
         return (J.TypeCast) super.visitTypeCast(typeCast, p);
     }
