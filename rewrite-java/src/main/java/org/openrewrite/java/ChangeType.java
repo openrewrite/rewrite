@@ -61,6 +61,11 @@ public class ChangeType extends Recipe {
     }
 
     @Override
+    public boolean causesAnotherCycle() {
+        return true;
+    }
+
+    @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
         return new ChangeTypeVisitor(newFullyQualifiedTypeName);
     }
