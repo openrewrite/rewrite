@@ -18,8 +18,49 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.java.tree.J
+import java.util.stream.Collectors.toList
 
 interface RenameVariableTest : JavaRecipeTest {
+    @Test
+    fun doNotRenameConstant(jp: JavaParser) = assertUnchanged(
+        jp,
+        recipe = object : JavaVisitor<ExecutionContext>() {
+            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J {
+                val variableDecls = classDecl.body.statements.stream().filter {s -> s is J.VariableDeclarations}
+                    .map {s -> s as J.VariableDeclarations}
+                    .filter {v -> v.hasModifier(J.Modifier.Type.Static) && v.hasModifier(J.Modifier.Type.Final)}
+                    .collect(toList())
+
+                val namedVariables: MutableList<J.VariableDeclarations.NamedVariable> = mutableListOf()
+                variableDecls.forEach { namedVariables.addAll(it.variables) }
+
+                for (namedVariable in namedVariables) {
+                    if (namedVariable.simpleName.equals("n")) {
+                        doAfterVisit(RenameVariable(namedVariable, "N"))
+                    }
+                }
+
+                return super.visitClassDeclaration(classDecl, p)
+            }
+        }.toRecipe(),
+        before = """
+            public class B {
+                static final int n;
+            
+                {
+                    int n;
+                    n = 1;
+                    n /= 2;
+                    if(n + 1 == 2) {}
+                    n++;
+                }
+               
+                public int foo(int n) {
+                    return n + this.n;
+                }
+            }
+        """
+    )
     @Test
     fun renameVariable(jp: JavaParser) = assertChanged(
         jp,
