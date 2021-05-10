@@ -17,10 +17,12 @@ package org.openrewrite.java.tree
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.java.JavaIsoVisitor
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTreeTest
 import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
+import java.util.concurrent.atomic.AtomicInteger
 
 interface TryCatchTest : JavaTreeTest {
 
@@ -30,7 +32,9 @@ interface TryCatchTest : JavaTreeTest {
             class Test {
                 void method() {
                     try {
+                        String foo;
                     } catch( Exception e ) {
+                    //
                     }
                 }
             }
@@ -114,4 +118,36 @@ interface TryCatchTest : JavaTreeTest {
             finally {}
         """
     )
+
+    @Test
+    @Issue("#530 Try-with-resource navigation")
+    fun tryWithResourcesTypeAttributed(jp: JavaParser) {
+        val source = """
+            package com.example;
+            import java.io.*;
+            public class Testing {
+                public void foo() {
+                    File f = new File("file.txt");
+                    try(FileInputStream fis = new FileInputStream(f); FileInputStream fis2 = new FileInputStream(f)) {
+                        String foo;
+                    } catch(RuntimeException | IOException e) {
+                        //
+                    }
+                }
+            }
+        """.trimIndent()
+        val cu: J.CompilationUnit = jp.parse(source).iterator().next()
+
+        //This is testing the navigation into the try-with-resources and ensures the visitor correctly visits the
+        //variable declarations of each resource by counting the number of on new class events.
+        val counter = AtomicInteger()
+        val countingVisitor = object : JavaIsoVisitor<AtomicInteger>() {
+            override fun visitNewClass(newClass: J.NewClass, c: AtomicInteger): J.NewClass {
+                counter.incrementAndGet()
+                return super.visitNewClass(newClass, c)
+            }
+        }
+        countingVisitor.visit(cu, counter)
+        assertThat(counter.get()).isEqualTo(3)
+    }
 }
