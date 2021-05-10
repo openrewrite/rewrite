@@ -61,6 +61,7 @@ interface RenameVariableTest : JavaRecipeTest {
             }
         """
     )
+
     @Test
     fun renameVariable(jp: JavaParser) = assertChanged(
         jp,
