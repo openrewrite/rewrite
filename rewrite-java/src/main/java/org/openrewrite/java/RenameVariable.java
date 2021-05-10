@@ -38,6 +38,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
 
     private class RenameVariableByCursor extends JavaIsoVisitor<P> {
         private final Cursor scope;
+        private boolean isConstant = false;
 
         public RenameVariableByCursor(Cursor scope) {
             this.scope = scope;
@@ -50,12 +51,22 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
 
         @Override
         public J.Identifier visitIdentifier(J.Identifier ident, P p) {
-            if (ident.getSimpleName().equals(variable.getSimpleName()) &&
+            if (!isConstant && ident.getSimpleName().equals(variable.getSimpleName()) &&
                     isInSameNameScope(scope, getCursor()) &&
                     !(getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.FieldAccess)) {
                 return ident.withName(toName);
             }
             return super.visitIdentifier(ident, p);
+        }
+
+        @Override
+        public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
+            if (!isConstant && multiVariable.getVariables().contains(variable)) {
+                if (multiVariable.hasModifier(J.Modifier.Type.Static) && multiVariable.hasModifier(J.Modifier.Type.Final)) {
+                    isConstant = true;
+                }
+            }
+            return super.visitVariableDeclarations(multiVariable, p);
         }
     }
 }
