@@ -4299,6 +4299,11 @@ public interface J extends Serializable, Tree {
             boolean terminatedWithSemicolon;
 
             @Override
+            public <P> J acceptJava(JavaVisitor<P> v, P p) {
+                return v.visitTryResource(this, p);
+            }
+
+            @Override
             public Coordinates.Try.Resource getCoordinates() {
                 return new Coordinates.Try.Resource(this);
             }

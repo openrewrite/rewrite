@@ -793,17 +793,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.TRY_PREFIX, p));
         t = visitAndCast(t, p, this::visitStatement);
         if (t.getPadding().getResources() != null) {
-            t = t.getPadding().withResources(visitContainer(
-                    t.getPadding().getResources().getPadding().withElements(
-                            ListUtils.map(t.getPadding().getResources().getPadding().getElements(),
-                                    res -> res.withElement(
-                                            res.getElement().withPrefix(
-                                                    visitSpace(res.getElement().getPrefix(), Space.Location.TRY_RESOURCE, p)
-                                            )
-                                    )
-                            )
-                    ),
-                    JContainer.Location.TRY_RESOURCES, p));
+            t = t.getPadding().withResources(visitContainer(t.getPadding().getResources(), JContainer.Location.TRY_RESOURCES, p));
         }
         t = t.withBody(visitAndCast(t.getBody(), p));
         t = t.withCatches(ListUtils.map(t.getCatches(), c -> visitAndCast(c, p)));
@@ -812,6 +802,14 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         t = t.withMarkers(visitMarkers(t.getMarkers(), p));
         return t;
+    }
+
+    public J visitTryResource(J.Try.Resource tryResource, P p) {
+        J.Try.Resource r = tryResource;
+        r = tryResource.withPrefix(visitSpace(r.getPrefix(), Space.Location.TRY_RESOURCE, p));
+        r = tryResource.withVariableDeclarations(visitAndCast(r.getVariableDeclarations(), p, this::visitVariableDeclarations));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        return r;
     }
 
     public J visitTypeCast(J.TypeCast typeCast, P p) {

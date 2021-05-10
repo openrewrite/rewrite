@@ -1000,6 +1000,8 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
         visitMarkers(tryable.getMarkers(), p);
         acc.append("try");
         if (tryable.getPadding().getResources() != null) {
+            //Note: we do not call visitContainer here because the last resource may or may not be semicolon terminated.
+            //      Doing this means that visitTryResource is not called, therefore this logic must visit the resources.
             visitSpace(tryable.getPadding().getResources().getBefore(), Space.Location.TRY_RESOURCES, p);
             acc.append('(');
             List<JRightPadded<Try.Resource>> resources = tryable.getPadding().getResources().getPadding().getElements();
@@ -1007,6 +1009,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
                 JRightPadded<Try.Resource> resource = resources.get(i);
 
                 visitSpace(resource.getElement().getPrefix(), Space.Location.TRY_RESOURCE, p);
+                visitMarkers(resource.getElement().getMarkers(), p);
                 visit(resource.getElement().getVariableDeclarations(), p);
 
                 if (i < resources.size() - 1 || resource.getElement().isTerminatedWithSemicolon()) {
