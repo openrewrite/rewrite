@@ -20,9 +20,9 @@ plugins {
     id("io.github.gradle-nexus.publish-plugin") version "1.0.0"
 
     id("com.github.johnrengelman.shadow") version "6.1.0" apply false
-    id("com.github.hierynomus.license") version "0.15.0" apply false
+    id("com.github.hierynomus.license") version "0.16.1" apply false
     id("org.jetbrains.kotlin.jvm") version "1.4.31" apply false
-    id("org.gradle.test-retry") version "1.1.6" apply false
+    id("org.gradle.test-retry") version "1.2.1" apply false
     id("com.github.jk1.dependency-license-report") version "1.16" apply false
 
     id("nebula.maven-publish") version "17.3.2" apply false
@@ -71,15 +71,6 @@ subprojects {
         apply(plugin = "nebula.javadoc-jar")
         apply(plugin = "nebula.source-jar")
         apply(plugin = "nebula.maven-apache-license")
-
-        // applied on a small set of projects for the moment (rewrite-test) for testing, todo
-        if(name.contains("rewrite-test")) {
-            apply(plugin = "org.openrewrite.rewrite")
-            configure<org.openrewrite.gradle.RewriteExtension> {
-                activeRecipe("org.openrewrite.java.format.AutoFormat")
-                sourceSets = listOf(project.sourceSets.getByName("main"))
-            }
-        }
 
         signing {
             setRequired({
@@ -140,15 +131,6 @@ subprojects {
         options.encoding = "UTF-8"
     }
 
-    tasks.named<JavaCompile>("compileJava") {
-        sourceCompatibility = JavaVersion.VERSION_1_8.toString()
-        targetCompatibility = JavaVersion.VERSION_1_8.toString()
-
-        options.isFork = true
-        options.forkOptions.executable = "javac"
-        options.compilerArgs.addAll(listOf("--release", "8"))
-    }
-
     configure<LicenseExtension> {
         ext.set("year", Calendar.getInstance().get(Calendar.YEAR))
         skipExistingHeaders = true
@@ -169,7 +151,16 @@ subprojects {
         resolutionStrategy.cacheDynamicVersionsFor(0, "seconds")
     }
 
-    configure<JavaPluginExtension> {
+    tasks.named<JavaCompile>("compileJava") {
+        sourceCompatibility = JavaVersion.VERSION_1_8.toString()
+        targetCompatibility = JavaVersion.VERSION_1_8.toString()
+
+        options.isFork = true
+        options.forkOptions.executable = "javac"
+        options.compilerArgs.addAll(listOf("--release", "8"))
+    }
+
+    java {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
