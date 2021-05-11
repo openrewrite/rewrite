@@ -23,24 +23,6 @@ dependencies {
     integTestImplementation("io.micrometer:micrometer-registry-prometheus:latest.release")
 }
 
-java {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
-}
-
-val compiler = javaToolchains.compilerFor {
-    languageVersion.set(JavaLanguageVersion.of(11))
-}
-
-val maybeExe = if(getCurrentOperatingSystem().isWindows) {
-    ".exe"
-} else {
-    ""
-}
-val javac = compiler.get().metadata.installationPath.file("bin/javac${maybeExe}")
-tasks.withType<org.jetbrains.kotlin.gradle.dsl.KotlinJvmCompile>().configureEach {
-    kotlinOptions.jdkHome = compiler.get().metadata.installationPath.asFile.absolutePath
-}
 tasks.named<JavaCompile>("compileJava") {
     sourceCompatibility = JavaVersion.VERSION_11.toString()
     targetCompatibility = JavaVersion.VERSION_11.toString()
@@ -54,15 +36,6 @@ tasks.named<JavaCompile>("compileJava") {
             "--add-exports", "jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED",
             "--add-exports", "jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED"
     ))
-}
-tasks.withType<JavaCompile>().configureEach {
-    options.isFork = true
-    options.forkOptions.executable = javac.toString()
-}
-tasks.withType<Test>().configureEach {
-    javaLauncher.set(javaToolchains.launcherFor {
-        languageVersion.set(JavaLanguageVersion.of(11))
-    })
 }
 
 tasks.withType<Javadoc> {

@@ -3,6 +3,9 @@ import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform.getCurr
 val compiler = javaToolchains.compilerFor {
     languageVersion.set(JavaLanguageVersion.of(8))
 }
+val javadoc = javaToolchains.javadocToolFor {
+    languageVersion.set(JavaLanguageVersion.of(8))
+}
 
 val maybeExe = if(getCurrentOperatingSystem().isWindows) {
     ".exe"
@@ -35,10 +38,8 @@ java {
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.dsl.KotlinJvmCompile>().configureEach {
-    kotlinOptions.jdkHome = compiler.get().metadata.installationPath.asFile.absolutePath
-}
-tasks.withType<org.jetbrains.kotlin.gradle.dsl.KotlinJvmCompile>().configureEach {
     kotlinOptions {
+        jdkHome = compiler.get().metadata.installationPath.asFile.absolutePath
         jvmTarget = "1.8"
     }
 }
@@ -57,4 +58,8 @@ tasks.named<Test>("test") {
     javaLauncher.set(javaToolchains.launcherFor {
         languageVersion.set(JavaLanguageVersion.of(8))
     })
+}
+
+tasks.withType<Javadoc>().configureEach {
+    executable = javadoc.get().executablePath.toString()
 }

@@ -5,12 +5,6 @@ import nl.javadude.gradle.plugins.license.LicenseExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.*
 
-buildscript {
-    repositories {
-        gradlePluginPortal()
-    }
-}
-
 plugins {
     `java-library`
     `maven-publish`
@@ -56,6 +50,26 @@ subprojects {
     apply(plugin = "java-library")
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "com.github.jk1.dependency-license-report")
+
+    java {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    val compiler = javaToolchains.compilerFor {
+        languageVersion.set(JavaLanguageVersion.of(11))
+    }
+    val javadoc = javaToolchains.javadocToolFor {
+        languageVersion.set(JavaLanguageVersion.of(11))
+    }
+
+    val maybeExe = if(org.gradle.nativeplatform.platform.internal.DefaultNativePlatform.getCurrentOperatingSystem().isWindows) {
+        ".exe"
+    } else {
+        ""
+    }
+    val javac = compiler.get().metadata.installationPath.file("bin/javac${maybeExe}")
+
 
     if(!name.contains("benchmark")) {
         apply(plugin = "maven-publish")
@@ -114,21 +128,23 @@ subprojects {
     // time spent during Gradle's configuration phase.
     // But if we don't proactively make sure the destination dir exists, sometimes JavaCompile can fail with:
     // '..rewrite-core\build\classes\java\main' specified for property 'compileKotlinOutputClasses' does not exist.
-    tasks.withType(KotlinCompile::class.java) {
+    tasks.withType<KotlinCompile>() {
         kotlinOptions {
+            jdkHome = compiler.get().metadata.installationPath.asFile.absolutePath
             jvmTarget = "1.8"
             useIR = true
         }
         destinationDir.mkdirs()
     }
 
-    tasks.withType(JavaCompile::class.java) {
+    tasks.withType<JavaCompile>().configureEach {
         options.encoding = "UTF-8"
         options.compilerArgs.add("-parameters")
     }
 
-    tasks.withType(Javadoc::class.java) {
+    tasks.withType<Javadoc>().configureEach {
         options.encoding = "UTF-8"
+        executable = javadoc.get().executablePath.toString()
     }
 
     configure<LicenseExtension> {
@@ -145,6 +161,9 @@ subprojects {
             excludeTags("debug")
         }
         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
+        javaLauncher.set(javaToolchains.launcherFor {
+            languageVersion.set(JavaLanguageVersion.of(11))
+        })
     }
 
     configurations.all {
@@ -156,7 +175,7 @@ subprojects {
         targetCompatibility = JavaVersion.VERSION_1_8.toString()
 
         options.isFork = true
-        options.forkOptions.executable = "javac"
+        options.forkOptions.executable = javac.toString()
         options.compilerArgs.addAll(listOf("--release", "8"))
     }
 
