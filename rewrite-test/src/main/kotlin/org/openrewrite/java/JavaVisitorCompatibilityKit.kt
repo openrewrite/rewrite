@@ -44,6 +44,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class BlankLinesTck : BlankLinesTest
 
     @Nested
+    inner class ChangeEnumValueNameTck : ChangeEnumValueNameTest
+
+    @Nested
     inner class ChangeFieldNameTck : ChangeFieldNameTest
 
     @Nested
@@ -66,6 +69,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class ChangeTypeTck : ChangeTypeTest
+
+    @Nested
+    inner class ConstantNamesAreCapitalizedWithUnderscoresTck : ConstantNamesAreCapitalizedWithUnderscoresTest
 
     @Nested
     inner class CovariantEqualsTck : CovariantEqualsTest

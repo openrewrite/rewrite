@@ -44,6 +44,10 @@ class Java11BlankLinesTest : Java11Test, BlankLinesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11ChangeEnumValueNameTest : Java11Test, ChangeEnumValueNameTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11ChangeFieldNameTest : Java11Test, ChangeFieldNameTest
 
 @DebugOnly
@@ -73,6 +77,10 @@ class Java11ChangePackageTest : Java11Test, ChangePackageTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11ChangeTypeTest : Java11Test, ChangeTypeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11ConstantNamesAreCapitalizedWithUnderscoresTest : Java11Test, ConstantNamesAreCapitalizedWithUnderscoresTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
