@@ -2,14 +2,9 @@ import com.github.jk1.license.LicenseReportExtension
 import nebula.plugin.contacts.Contact
 import nebula.plugin.contacts.ContactsExtension
 import nl.javadude.gradle.plugins.license.LicenseExtension
+import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform.getCurrentOperatingSystem
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.*
-
-buildscript {
-    repositories {
-        gradlePluginPortal()
-    }
-}
 
 plugins {
     `java-library`
@@ -20,9 +15,9 @@ plugins {
     id("io.github.gradle-nexus.publish-plugin") version "1.0.0"
 
     id("com.github.johnrengelman.shadow") version "6.1.0" apply false
-    id("com.github.hierynomus.license") version "0.15.0" apply false
-    id("org.jetbrains.kotlin.jvm") version "1.4.31" apply false
-    id("org.gradle.test-retry") version "1.1.6" apply false
+    id("com.github.hierynomus.license") version "0.16.1" apply false
+    id("org.jetbrains.kotlin.jvm") version "1.5.0" apply false
+    id("org.gradle.test-retry") version "1.2.1" apply false
     id("com.github.jk1.dependency-license-report") version "1.16" apply false
 
     id("nebula.maven-publish") version "17.3.2" apply false
@@ -57,6 +52,22 @@ subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "com.github.jk1.dependency-license-report")
 
+    java {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    val compiler = javaToolchains.compilerFor {
+        languageVersion.set(JavaLanguageVersion.of(11))
+    }
+
+    val maybeExe = if(getCurrentOperatingSystem().isWindows) {
+        ".exe"
+    } else {
+        ""
+    }
+    val javac = compiler.get().metadata.installationPath.file("bin/javac${maybeExe}")
+
     if(!name.contains("benchmark")) {
         apply(plugin = "maven-publish")
         apply(plugin = "signing")
@@ -71,15 +82,6 @@ subprojects {
         apply(plugin = "nebula.javadoc-jar")
         apply(plugin = "nebula.source-jar")
         apply(plugin = "nebula.maven-apache-license")
-
-        // applied on a small set of projects for the moment (rewrite-test) for testing, todo
-        if(name.contains("rewrite-test")) {
-            apply(plugin = "org.openrewrite.rewrite")
-            configure<org.openrewrite.gradle.RewriteExtension> {
-                activeRecipe("org.openrewrite.java.format.AutoFormat")
-                sourceSets = listOf(project.sourceSets.getByName("main"))
-            }
-        }
 
         signing {
             setRequired({
@@ -96,7 +98,7 @@ subprojects {
         mavenCentral()
     }
 
-    tasks.withType(GenerateModuleMetadata::class.java) {
+    tasks.withType<GenerateModuleMetadata>().configureEach {
         enabled = false
     }
 
@@ -123,30 +125,25 @@ subprojects {
     // time spent during Gradle's configuration phase.
     // But if we don't proactively make sure the destination dir exists, sometimes JavaCompile can fail with:
     // '..rewrite-core\build\classes\java\main' specified for property 'compileKotlinOutputClasses' does not exist.
-    tasks.withType(KotlinCompile::class.java) {
+    tasks.withType<KotlinCompile>() {
         kotlinOptions {
+            jdkHome = compiler.get().metadata.installationPath.asFile.absolutePath
             jvmTarget = "1.8"
             useIR = true
         }
         destinationDir.mkdirs()
     }
 
-    tasks.withType(JavaCompile::class.java) {
+    tasks.withType<JavaCompile>().configureEach {
         options.encoding = "UTF-8"
         options.compilerArgs.add("-parameters")
     }
 
-    tasks.withType(Javadoc::class.java) {
+    tasks.withType<Javadoc>().configureEach {
         options.encoding = "UTF-8"
-    }
-
-    tasks.named<JavaCompile>("compileJava") {
-        sourceCompatibility = JavaVersion.VERSION_1_8.toString()
-        targetCompatibility = JavaVersion.VERSION_1_8.toString()
-
-        options.isFork = true
-        options.forkOptions.executable = "javac"
-        options.compilerArgs.addAll(listOf("--release", "8"))
+        executable = javaToolchains.javadocToolFor {
+            languageVersion.set(JavaLanguageVersion.of(11))
+        }.get().executablePath.toString()
     }
 
     configure<LicenseExtension> {
@@ -158,18 +155,30 @@ subprojects {
         strictCheck = true
     }
 
-    tasks.named<Test>("test") {
+    tasks.named<Test>("test").configure {
         useJUnitPlatform {
             excludeTags("debug")
         }
         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
+        javaLauncher.set(javaToolchains.launcherFor {
+            languageVersion.set(JavaLanguageVersion.of(11))
+        })
     }
 
     configurations.all {
         resolutionStrategy.cacheDynamicVersionsFor(0, "seconds")
     }
 
-    configure<JavaPluginExtension> {
+    tasks.named<JavaCompile>("compileJava").configure {
+        sourceCompatibility = JavaVersion.VERSION_1_8.toString()
+        targetCompatibility = JavaVersion.VERSION_1_8.toString()
+
+        options.isFork = true
+        options.forkOptions.executable = javac.toString()
+        options.compilerArgs.addAll(listOf("--release", "8"))
+    }
+
+    java {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }

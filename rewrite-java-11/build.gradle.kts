@@ -1,3 +1,5 @@
+import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform.getCurrentOperatingSystem
+
 plugins {
     id("nebula.integtest") version "7.0.9" apply false
 }

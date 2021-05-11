@@ -1,6 +1,7 @@
 include(
     "rewrite-core",
     "rewrite-java",
+    "rewrite-java-8",
     "rewrite-java-11",
     "rewrite-maven",
     "rewrite-properties",
