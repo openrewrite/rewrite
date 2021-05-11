@@ -23,6 +23,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.J;
 
@@ -54,6 +55,12 @@ public class FindAnnotations extends Recipe {
     @Override
     public String getDescription() {
         return "Find all annotations matching the annotation pattern.";
+    }
+
+    @Override
+    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
+        AnnotationMatcher annotationMatcher = new AnnotationMatcher(annotationPattern);
+        return new UsesType<>(annotationMatcher.getAnnotationName());
     }
 
     @Override

@@ -110,9 +110,6 @@ abstract class JavaVisitorCompatibilityKit {
     inner class FindTypesTck : FindTypesTest
 
     @Nested
-    inner class HasTypesTck : HasTypesTest
-
-    @Nested
     inner class HideUtilityClassConstructorTck : HideUtilityClassConstructorTest
 
     @Nested
@@ -122,7 +119,7 @@ abstract class JavaVisitorCompatibilityKit {
     inner class JavaTemplateTck : JavaTemplateTest
 
     @Nested
-    inner class MaybeUsesTypeTck : MaybeUsesTypeTest
+    inner class MaybeUsesImportTck : MaybeUsesImportTest
 
     @Nested
     inner class MethodNameCasingTck : MethodNameCasingTest
@@ -197,7 +194,13 @@ abstract class JavaVisitorCompatibilityKit {
     inner class UseDiamondOperatorTck : UseDiamondOperatorTest
 
     @Nested
+    inner class UsesMethodTck : UsesMethodTest
+
+    @Nested
     inner class UseStaticImportTck : UseStaticImportTest
+
+    @Nested
+    inner class UsesTypeTck : UsesTypeTest
 
     @Nested
     inner class WrappingAndBracesTck : WrappingAndBracesTest

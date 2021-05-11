@@ -20,11 +20,12 @@ import org.openrewrite.ExecutionContext
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 
-interface MaybeUsesTypeTest : JavaRecipeTest {
+interface MaybeUsesImportTest : JavaRecipeTest {
     @Test
     fun usesType(jp: JavaParser) = assertChanged(
         jp,
-        recipe = MaybeUsesType<ExecutionContext>("java.util.Collections").toRecipe(),
+        recipe = MaybeUsesImport<ExecutionContext>("java.util.Collections")
+            .toRecipe(),
         before = """
             import java.io.File;
             import java.util.Collections;
@@ -61,7 +62,7 @@ interface MaybeUsesTypeTest : JavaRecipeTest {
     @Test
     fun usesTypeWildcard(jp: JavaParser) = assertChanged(
         jp,
-        recipe = MaybeUsesType<ExecutionContext>("java.util.*").toRecipe(),
+        recipe = MaybeUsesImport<ExecutionContext>("java.util.*").toRecipe(),
         before = """
             import java.io.File;
             import java.util.Collections;

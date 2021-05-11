@@ -22,6 +22,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -68,6 +69,11 @@ public class ChangeType extends Recipe {
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
         return new ChangeTypeVisitor(newFullyQualifiedTypeName);
+    }
+
+    @Override
+    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
+        return new UsesType<>(oldFullyQualifiedTypeName);
     }
 
     private class ChangeTypeVisitor extends JavaVisitor<ExecutionContext> {

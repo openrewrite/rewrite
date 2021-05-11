@@ -20,6 +20,8 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
+import org.openrewrite.java.search.UsesMethod;
+import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeTree;
@@ -57,6 +59,11 @@ public class ChangeMethodName extends Recipe {
     @Override
     public String getDescription() {
         return "Rename a method.";
+    }
+
+    @Override
+    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
+        return new UsesMethod<>(methodPattern);
     }
 
     @Override

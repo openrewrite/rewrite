@@ -31,12 +31,10 @@ public class ChangeFieldType<P> extends JavaIsoVisitor<P> {
     private final JavaType.FullyQualified newFieldType;
 
     public ChangeFieldType(JavaType.FullyQualified oldFieldType, JavaType.FullyQualified newFieldType) {
-        assert oldFieldType != null;
-        assert newFieldType != null;
-
         this.oldFullyQualifiedTypeName = oldFieldType.getFullyQualifiedName();
         this.newFieldType  = newFieldType;
     }
+
     @Override
     public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
         JavaType.Class typeAsClass = multiVariable.getTypeAsClass();

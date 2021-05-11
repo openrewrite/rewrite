@@ -132,10 +132,6 @@ class Java11FindTypesTest : Java11Test, FindTypesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11HasTypesTest : Java11Test, HasTypesTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
 class Java11HideUtilityClassConstructorTest : Java11Test, HideUtilityClassConstructorTest
 
 @DebugOnly
@@ -148,7 +144,7 @@ class Java11JavaTemplateTest : Java11Test, JavaTemplateTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11MaybeUsesTypeTest : Java11Test, MaybeUsesTypeTest
+class Java11MaybeUsesImportTest : Java11Test, MaybeUsesImportTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
@@ -249,6 +245,14 @@ class Java11UseDiamondOperatorTest : Java11Test, UseDiamondOperatorTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11UseStaticImportTest : Java11Test, UseStaticImportTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11UsesMethodTest : Java11Test, UsesMethodTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11UsesTypeTest : Java11Test, UsesTypeTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

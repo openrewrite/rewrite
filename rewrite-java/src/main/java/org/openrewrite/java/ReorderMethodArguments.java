@@ -23,6 +23,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.Option;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
@@ -73,6 +74,11 @@ public class ReorderMethodArguments extends Recipe {
     @Override
     public String getDescription() {
         return "Reorder method arguments into the specified order.";
+    }
+
+    @Override
+    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
+        return new UsesMethod<>(methodPattern);
     }
 
     @Override

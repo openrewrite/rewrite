@@ -21,14 +21,14 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.search.HasTypes;
+import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Collections;
 
 public class BigDecimalRoundingConstantsToEnums extends Recipe {
 
@@ -52,8 +52,8 @@ public class BigDecimalRoundingConstantsToEnums extends Recipe {
     }
 
     @Override
-    protected @Nullable TreeVisitor<?, ExecutionContext> getApplicableTest() {
-        return new HasTypes(Collections.singletonList(BIG_DECIMAL_FQN)).getVisitor();
+    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
+        return new UsesType<>(BIG_DECIMAL_FQN);
     }
 
     @Override

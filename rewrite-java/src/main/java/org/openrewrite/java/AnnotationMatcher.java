@@ -61,7 +61,11 @@ public class AnnotationMatcher {
 
     private boolean matchesAnnotationName(J.Annotation annotation) {
         JavaType.Class typeAsClass = TypeUtils.asClass(annotation.getType());
-        return match.annotationName().getText().equals(typeAsClass == null ? null : typeAsClass.getFullyQualifiedName());
+        return getAnnotationName().equals(typeAsClass == null ? null : typeAsClass.getFullyQualifiedName());
+    }
+
+    public String getAnnotationName() {
+        return match.annotationName().getText();
     }
 
     private boolean matchesNamedParameters(J.Annotation annotation) {

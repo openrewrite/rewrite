@@ -29,6 +29,7 @@ import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.*;
+import org.openrewrite.java.search.FindAllUsedTypes;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.marker.Markers;
 
@@ -1082,6 +1083,10 @@ public interface J extends Serializable, Tree {
     final class CompilationUnit implements J, SourceFile {
         @Nullable
         @NonFinal
+        transient WeakReference<Set<JavaType>> typesInUse;
+
+        @Nullable
+        @NonFinal
         transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
@@ -1142,6 +1147,21 @@ public interface J extends Serializable, Tree {
 
         public Set<NameTree> findType(String clazz) {
             return FindTypes.find(this, clazz);
+        }
+
+        public Set<JavaType> getTypesInUse() {
+            Set<JavaType> t;
+            if (this.typesInUse == null) {
+                t = FindAllUsedTypes.findAll(this);
+                this.typesInUse = new WeakReference<>(t);
+            } else {
+                t = this.typesInUse.get();
+                if (t == null) {
+                    t = FindAllUsedTypes.findAll(this);
+                    this.typesInUse = new WeakReference<>(t);
+                }
+            }
+            return t;
         }
 
         public Padding getPadding() {

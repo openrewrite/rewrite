@@ -19,7 +19,9 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.search.HasTypes;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.search.UsesType;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.semver.Semver;
 
 import java.util.List;
@@ -128,7 +130,15 @@ public class AddDependency extends Recipe {
     @Override
     protected @Nullable TreeVisitor<?, ExecutionContext> getApplicableTest() {
         if (onlyIfUsing != null) {
-            return new HasTypes(onlyIfUsing).getVisitor();
+            return new JavaIsoVisitor<ExecutionContext>() {
+                @Override
+                public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+                    for (String s : onlyIfUsing) {
+                        doAfterVisit(new UsesType<>(s));
+                    }
+                    return cu;
+                }
+            };
         }
         return null;
     }

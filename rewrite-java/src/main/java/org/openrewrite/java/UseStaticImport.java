@@ -17,11 +17,10 @@ package org.openrewrite.java;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import lombok.experimental.NonFinal;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
@@ -54,21 +53,19 @@ public class UseStaticImport extends Recipe {
     }
 
     @Override
+    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
+        return new UsesMethod<>(methodPattern);
+    }
+
+    @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
         return new UseStaticImportVisitor();
     }
 
-    @NonFinal
-    @Nullable
-    transient MethodMatcher methodMatcher;
-
     private class UseStaticImportVisitor extends JavaIsoVisitor<ExecutionContext> {
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            if(methodMatcher == null) {
-                methodMatcher = new MethodMatcher(methodPattern);
-            }
-
+            MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             if (m.getSelect() != null && methodMatcher.matches(m)) {
                 if (m.getType() != null) {

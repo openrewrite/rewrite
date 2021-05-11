@@ -389,5 +389,4 @@ interface ChangeTypeTest : JavaRecipeTest {
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("newFullyQualifiedTypeName")
     }
-
 }

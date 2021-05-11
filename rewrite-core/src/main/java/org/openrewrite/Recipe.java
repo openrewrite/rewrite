@@ -195,14 +195,32 @@ public abstract class Recipe {
      * A recipe can optionally include an applicability test that can be used to determine whether it should run on a
      * set of source files (or even be listed in a suggested list of recipes for a particular codebase).
      * <p>
-     * To identify a tree as applicable, the visitor should mark or otherwise alter the tree at any level. The mutation
-     * that the applicability test visitor makes to the tree will not included in the results.
+     * To identify a tree as applicable, the visitor should mark or otherwise any tree at any level. Any mutation
+     * that the applicability test visitor makes to a tree will not included in the results.
      *
      * @return A tree visitor that performs an applicability test.
      */
     @Incubating(since = "7.2.0")
     @Nullable
     protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
+        return null;
+    }
+
+    /**
+     * A recipe can optionally include an applicability test that can be used to determine whether it should run on a
+     * a particular source file.
+     * <p>
+     * To identify a {@link SourceFile} as applicable, the visitor should mark it at any level. Any mutation
+     * that the applicability test visitor makes on the tree will not included in the results.
+     * <p>
+     * The applicability test only affects whether this recipes {@link #getVisitor()} will run. Downstream
+     * {@link #doNext(Recipe)} will still run.
+     *
+     * @return A tree visitor that performs an applicability test.
+     */
+    @Incubating(since = "7.4.0")
+    @Nullable
+    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
         return null;
     }
 
@@ -235,6 +253,13 @@ public abstract class Recipe {
             after = ListUtils.map(after, forkJoinPool, s -> {
                 Timer.Builder timer = Timer.builder("rewrite.recipe.visit").tag("recipe", getDisplayName());
                 Timer.Sample sample = Timer.start();
+
+                if(getSingleSourceApplicableTest() != null) {
+                    if(getSingleSourceApplicableTest().visit(s, ctx) == s) {
+                        sample.stop(MetricsHelper.successTags(timer, s, "skipped").register(Metrics.globalRegistry));
+                        return s;
+                    }
+                }
 
                 Duration duration = Duration.ofNanos(System.nanoTime() - startTime);
                 if (duration.compareTo(ctx.getRunTimeout(before.size())) > 0) {

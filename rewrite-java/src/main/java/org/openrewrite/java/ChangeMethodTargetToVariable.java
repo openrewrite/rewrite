@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
+import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -64,6 +65,11 @@ public class ChangeMethodTargetToVariable extends Recipe {
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
         return new ChangeMethodTargetToVariableVisitor(new MethodMatcher(methodPattern), JavaType.Class.build(variableType));
+    }
+
+    @Override
+    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
+        return new UsesMethod<>(methodPattern);
     }
 
     private class ChangeMethodTargetToVariableVisitor extends JavaIsoVisitor<ExecutionContext> {

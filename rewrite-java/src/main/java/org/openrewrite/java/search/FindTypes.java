@@ -55,8 +55,8 @@ public class FindTypes extends Recipe {
     UUID id = Tree.randomId();
 
     @Override
-    public boolean causesAnotherCycle() {
-        return false;
+    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
+        return new UsesType<>(fullyQualifiedTypeName);
     }
 
     @Override

@@ -23,7 +23,7 @@ import java.nio.file.Paths
 interface ChangePackageTest: JavaRecipeTest {
 
     override val recipe: Recipe
-        get() = ChangePackage("org.openrewrite", "org.openrewrite.test")
+        get() = ChangePackage("org.openrewrite", "org.openrewrite.test", null)
 
     companion object {
         private val testClass = """
@@ -358,7 +358,7 @@ interface ChangePackageTest: JavaRecipeTest {
         jp,
         dependsOn = arrayOf(testClass),
         before = """
-            import static org.openrewrite.stat;
+            import static org.openrewrite.Test.stat;
 
             public class B {
                 public void test() {
@@ -367,7 +367,7 @@ interface ChangePackageTest: JavaRecipeTest {
             }
         """,
         after = """
-            import static org.openrewrite.test.stat;
+            import static org.openrewrite.test.Test.stat;
 
             public class B {
                 public void test() {
@@ -380,20 +380,20 @@ interface ChangePackageTest: JavaRecipeTest {
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = ChangePackage(null, null)
+        var recipe = ChangePackage(null, null, null)
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("newPackageName")
         assertThat(valid.failures()[1].property).isEqualTo("oldPackageName")
 
-        recipe = ChangePackage(null, "java.lang.String")
+        recipe = ChangePackage(null, "java.lang.String", null)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("oldPackageName")
 
-        recipe = ChangePackage("java.lang.String", null)
+        recipe = ChangePackage("java.lang.String", null, null)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)

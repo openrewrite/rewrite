@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.Option;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
@@ -61,6 +62,11 @@ public class DeleteMethodArgument extends Recipe {
     @Override
     public String getDescription() {
         return "Delete an argument from method invocations.";
+    }
+
+    @Override
+    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
+        return new UsesMethod<>(methodPattern);
     }
 
     @Override

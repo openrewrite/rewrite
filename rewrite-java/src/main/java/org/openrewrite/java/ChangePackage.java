@@ -15,14 +15,17 @@
  */
 package org.openrewrite.java;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.*;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import lombok.With;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.marker.JavaSearchResult;
+import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -32,38 +35,33 @@ import static org.openrewrite.Tree.randomId;
 
 /**
  * A recipe that will rename a package name in package statements, imports, and fully-qualified types (see: NOTE).
- *
+ * <p>
  * NOTE: Does not currently transform all possible type references, and accomplishing this would be non-trivial.
  * For example, a method invocation select might refer to field `A a` whose type has now changed to `A2`, and so the type
  * on the select should change as well. But how do we identify the set of all method selects which refer to `a`? Suppose
  * it were prefixed like `this.a`, or `MyClass.this.a`, or indirectly via a separate method call like `getA()` where `getA()`
  * is defined on the super class.
  */
-@Getter
-@RequiredArgsConstructor
-@AllArgsConstructor(onConstructor_ = @JsonCreator)
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangePackage extends Recipe {
-
     private static final ThreadLocal<JavaParser> JAVA_PARSER_THREAD_LOCAL =
             ThreadLocal.withInitial(() -> JavaParser.fromJavaVersion().build());
 
-    /**
-     * Old package name to replace.
-     */
-    @Option(displayName = "Old package name", description = "The package name to replace.")
-    private final String oldPackageName;
+    @Option(displayName = "Old package name",
+            description = "The package name to replace.")
+    String oldPackageName;
 
-    /**
-     * New package name to replace the old package name with.
-     */
-    @Option(displayName = "New package name", description = "New package name to replace the old package name with.")
-    private final String newPackageName;
+    @Option(displayName = "New package name",
+            description = "New package name to replace the old package name with.")
+    String newPackageName;
 
     @With
-    @Option(displayName = "Recursive", description = "Recursively change subpackage names", required = false)
+    @Option(displayName = "Recursive",
+            description = "Recursively change subpackage names",
+            required = false)
     @Nullable
-    private Boolean recursive;
+    Boolean recursive;
 
     @Override
     public String getDisplayName() {
@@ -73,6 +71,24 @@ public class ChangePackage extends Recipe {
     @Override
     public String getDescription() {
         return "A recipe that will rename a package name in package statements, imports, and fully-qualified types.";
+    }
+
+    @Override
+    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
+        return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+                if (cu.getPackageDeclaration() != null) {
+                    String original = cu.getPackageDeclaration().getExpression()
+                            .printTrimmed().replaceAll("\\s", "");
+                    if (original.startsWith(oldPackageName)) {
+                        return cu.withMarkers(cu.getMarkers().addIfAbsent(new JavaSearchResult(randomId(), ChangePackage.this)));
+                    }
+                }
+                doAfterVisit(new UsesType<>(oldPackageName + ".*"));
+                return cu;
+            }
+        };
     }
 
     @Override
@@ -103,7 +119,7 @@ public class ChangePackage extends Recipe {
 
         @Override
         public J.ArrayType visitArrayType(J.ArrayType arrayType, ExecutionContext ctx) {
-            final J.ArrayType a = super.visitArrayType(arrayType, ctx);
+            J.ArrayType a = super.visitArrayType(arrayType, ctx);
             return a.withElementType(transformName(a.getElementType()));
         }
 
@@ -111,7 +127,7 @@ public class ChangePackage extends Recipe {
         public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
             J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
 
-            final String changingTo = getCursor().getNearestMessage(RENAME_TO_KEY);
+            String changingTo = getCursor().getNearestMessage(RENAME_TO_KEY);
             if (changingTo != null && classDecl.getType() != null) {
                 if (c.getExtends() != null) {
                     c = c.withExtends(transformName(c.getExtends()));
@@ -128,10 +144,10 @@ public class ChangePackage extends Recipe {
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
             J.CompilationUnit c = super.visitCompilationUnit(cu, ctx);
 
-            final String changingTo = getCursor().getMessage(RENAME_TO_KEY);
+            String changingTo = getCursor().getMessage(RENAME_TO_KEY);
             if (changingTo != null) {
-                final String path = c.getSourcePath().toString().replace('\\', '/');
-                final String changingFrom = getCursor().getMessage(RENAME_FROM_KEY);
+                String path = c.getSourcePath().toString().replace('\\', '/');
+                String changingFrom = getCursor().getMessage(RENAME_FROM_KEY);
                 assert changingFrom != null;
                 c = c.withSourcePath(Paths.get(path.replaceFirst(
                         changingFrom.replace('.', '/'),
@@ -209,25 +225,25 @@ public class ChangePackage extends Recipe {
 
         @Override
         public J.MultiCatch visitMultiCatch(J.MultiCatch multiCatch, ExecutionContext ctx) {
-            final J.MultiCatch m = super.visitMultiCatch(multiCatch, ctx);
+            J.MultiCatch m = super.visitMultiCatch(multiCatch, ctx);
             return m.withAlternatives(ListUtils.map(m.getAlternatives(), this::transformName));
         }
 
         @Override
         public J.NewArray visitNewArray(J.NewArray newArray, ExecutionContext ctx) {
-            final J.NewArray n = super.visitNewArray(newArray, ctx);
+            J.NewArray n = super.visitNewArray(newArray, ctx);
             return n.withTypeExpression(transformName(n.getTypeExpression()));
         }
 
         @Override
         public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
-            final J.NewClass n = super.visitNewClass(newClass, ctx);
+            J.NewClass n = super.visitNewClass(newClass, ctx);
             return n.withClazz(transformName(n.getClazz()));
         }
 
         @Override
         public J.Package visitPackage(J.Package pkg, ExecutionContext context) {
-            final String original = pkg.getExpression().printTrimmed().replaceAll("\\s", "");
+            String original = pkg.getExpression().printTrimmed().replaceAll("\\s", "");
             getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, RENAME_FROM_KEY, original);
 
             if (original.equals(oldPackageName)) {
@@ -235,7 +251,7 @@ public class ChangePackage extends Recipe {
                 pkg = pkg.withTemplate(packageExprTemplate, pkg.getCoordinates().replace(), newPackageName);
             } else if ((recursive == null || recursive)
                     && original.startsWith(oldPackageName) && !original.startsWith(newPackageName)) {
-                final String changingTo = newPackageName + original.substring(oldPackageName.length());
+                String changingTo = newPackageName + original.substring(oldPackageName.length());
                 getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, RENAME_TO_KEY, changingTo);
                 pkg = pkg.withTemplate(packageExprTemplate, pkg.getCoordinates().replace(), changingTo);
             }
@@ -244,7 +260,7 @@ public class ChangePackage extends Recipe {
 
         @Override
         public J.TypeCast visitTypeCast(J.TypeCast typeCast, ExecutionContext ctx) {
-            final J.TypeCast t = super.visitTypeCast(typeCast, ctx);
+            J.TypeCast t = super.visitTypeCast(typeCast, ctx);
             return t.withClazz(t.getClazz().withTree(transformName(t.getClazz().getTree())));
         }
 
@@ -271,7 +287,7 @@ public class ChangePackage extends Recipe {
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
             J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, ctx);
 
-            final JavaType.FullyQualified varType = TypeUtils.asFullyQualified(variable.getType());
+            JavaType.FullyQualified varType = TypeUtils.asFullyQualified(variable.getType());
             if (varType != null && varType.getFullyQualifiedName().equals(oldPackageName)) {
                 v = v.withType(newPackageType)
                         .withName(v.getName().withType(newPackageType));
@@ -290,15 +306,15 @@ public class ChangePackage extends Recipe {
 
         @Override
         public J.Wildcard visitWildcard(J.Wildcard wildcard, ExecutionContext ctx) {
-            final J.Wildcard w = super.visitWildcard(wildcard, ctx);
+            J.Wildcard w = super.visitWildcard(wildcard, ctx);
             return w.withBoundedType(transformName(w.getBoundedType()));
         }
 
         @SuppressWarnings({"unchecked", "ConstantConditions"})
         private <T extends J> T transformName(@Nullable T nameField) {
             if (nameField instanceof NameTree) {
-                final JavaType.FullyQualified nameTree = TypeUtils.asFullyQualified(((NameTree) nameField).getType());
-                final String name = newPackageType.getClassName();
+                JavaType.FullyQualified nameTree = TypeUtils.asFullyQualified(((NameTree) nameField).getType());
+                String name = newPackageType.getClassName();
 
                 if (nameTree != null && nameTree.getFullyQualifiedName().equals(oldPackageName)) {
                     return (T) J.Identifier.build(randomId(),

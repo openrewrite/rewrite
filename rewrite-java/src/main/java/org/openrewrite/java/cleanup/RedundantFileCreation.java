@@ -20,6 +20,8 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -32,6 +34,11 @@ public class RedundantFileCreation extends Recipe {
     @Override
     public String getDescription() {
         return "Remove unnecessary intermediate creations of files";
+    }
+
+    @Override
+    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
+        return new UsesType<>("java.io.FileInputStream");
     }
 
     @Override

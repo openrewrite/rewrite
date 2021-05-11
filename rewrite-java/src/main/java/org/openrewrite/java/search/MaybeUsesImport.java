@@ -30,18 +30,18 @@ import java.util.Scanner;
 import static org.openrewrite.Tree.randomId;
 
 /**
- * Acts as a sort of bloom filter for the presence of a type in a {@link org.openrewrite.java.tree.J.CompilationUnit},
- * i.e. it may falsely report the presence of a type, but would never negatively report when the type is in present.
+ * Acts as a sort of bloom filter for the presence of an import for a particular type in a {@link org.openrewrite.java.tree.J.CompilationUnit},
+ * i.e. it may falsely report the presence of an import, but would never negatively report when the type is in present.
  */
 @Incubating(since = "7.4.0")
-public class MaybeUsesType<P> extends JavaIsoVisitor<P> {
+public class MaybeUsesImport<P> extends JavaIsoVisitor<P> {
     @SuppressWarnings("ConstantConditions")
     private static final Markers FOUND_TYPE = Markers.build(Collections.singletonList(
             new JavaSearchResult(randomId(), null, null)));
 
     private final List<String> fullyQualifiedTypeSegments;
 
-    public MaybeUsesType(String fullyQualifiedType) {
+    public MaybeUsesImport(String fullyQualifiedType) {
         Scanner scanner = new Scanner(fullyQualifiedType);
         scanner.useDelimiter("\\.");
         this.fullyQualifiedTypeSegments = new ArrayList<>();
