@@ -1,5 +1,5 @@
 import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform.getCurrentOperatingSystem
-import org.jetbrains.kotlin.gradle.dsl.KotlinJvmCompile
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 val compiler = javaToolchains.compilerFor {
     languageVersion.set(JavaLanguageVersion.of(8))
@@ -35,7 +35,7 @@ java {
     targetCompatibility = JavaVersion.VERSION_1_8
 }
 
-tasks.withType<KotlinJvmCompile>().configureEach {
+tasks.withType<KotlinCompile>().configureEach {
     kotlinOptions {
         jdkHome = compiler.get().metadata.installationPath.asFile.absolutePath
         jvmTarget = "1.8"
