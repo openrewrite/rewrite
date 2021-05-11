@@ -21,7 +21,10 @@ import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.format.*
 import org.openrewrite.java.search.*
 import org.openrewrite.java.tree.TypeTreeTest
-
+//----------------------------------------------------------------------------------------------
+// If test classes are added here, they should also be added to JavaVisitorCompatibilityKit.kt
+// Tests are in alphabetical order.
+//----------------------------------------------------------------------------------------------
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java8AddImportTest : Java8Test, AddImportTest
@@ -128,10 +131,6 @@ class Java8FindTypesTest : Java8Test, FindTypesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java8HasTypesTest : Java8Test, HasTypesTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
 class Java8HideUtilityClassConstructorTest : Java8Test, HideUtilityClassConstructorTest
 
 @DebugOnly
@@ -141,6 +140,10 @@ class Java8ImplementInterfaceTest : Java8Test, ImplementInterfaceTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java8JavaTemplateTest : Java8Test, JavaTemplateTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8MaybeUsesImportTest : Java8Test, MaybeUsesImportTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
@@ -241,6 +244,14 @@ class Java8UseDiamondOperatorTest : Java8Test, UseDiamondOperatorTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java8UseStaticImportTest : Java8Test, UseStaticImportTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8UsesMethodTest : Java8Test, UsesMethodTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8UsesTypeTest : Java8Test, UsesTypeTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
