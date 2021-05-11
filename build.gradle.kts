@@ -2,6 +2,7 @@ import com.github.jk1.license.LicenseReportExtension
 import nebula.plugin.contacts.Contact
 import nebula.plugin.contacts.ContactsExtension
 import nl.javadude.gradle.plugins.license.LicenseExtension
+import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform.getCurrentOperatingSystem
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.*
 
@@ -63,7 +64,7 @@ subprojects {
         languageVersion.set(JavaLanguageVersion.of(11))
     }
 
-    val maybeExe = if(org.gradle.nativeplatform.platform.internal.DefaultNativePlatform.getCurrentOperatingSystem().isWindows) {
+    val maybeExe = if(getCurrentOperatingSystem().isWindows) {
         ".exe"
     } else {
         ""
@@ -101,7 +102,7 @@ subprojects {
         mavenCentral()
     }
 
-    tasks.withType(GenerateModuleMetadata::class.java) {
+    tasks.withType<GenerateModuleMetadata>().configureEach {
         enabled = false
     }
 
@@ -156,7 +157,7 @@ subprojects {
         strictCheck = true
     }
 
-    tasks.named<Test>("test") {
+    tasks.named<Test>("test").configure {
         useJUnitPlatform {
             excludeTags("debug")
         }
@@ -170,7 +171,7 @@ subprojects {
         resolutionStrategy.cacheDynamicVersionsFor(0, "seconds")
     }
 
-    tasks.named<JavaCompile>("compileJava") {
+    tasks.named<JavaCompile>("compileJava").configure {
         sourceCompatibility = JavaVersion.VERSION_1_8.toString()
         targetCompatibility = JavaVersion.VERSION_1_8.toString()
 

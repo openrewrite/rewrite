@@ -1,4 +1,5 @@
 import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform.getCurrentOperatingSystem
+import org.jetbrains.kotlin.gradle.dsl.KotlinJvmCompile
 
 val compiler = javaToolchains.compilerFor {
     languageVersion.set(JavaLanguageVersion.of(8))
@@ -37,7 +38,7 @@ java {
     targetCompatibility = JavaVersion.VERSION_1_8
 }
 
-tasks.withType<org.jetbrains.kotlin.gradle.dsl.KotlinJvmCompile>().configureEach {
+tasks.withType<KotlinJvmCompile>().configureEach {
     kotlinOptions {
         jdkHome = compiler.get().metadata.installationPath.asFile.absolutePath
         jvmTarget = "1.8"
@@ -52,7 +53,7 @@ tasks.withType<JavaCompile>().configureEach {
     options.compilerArgs.clear() // remove `--release 8` set in root gradle build
 }
 
-tasks.named<Test>("test") {
+tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
     javaLauncher.set(javaToolchains.launcherFor {
