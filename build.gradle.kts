@@ -60,9 +60,6 @@ subprojects {
     val compiler = javaToolchains.compilerFor {
         languageVersion.set(JavaLanguageVersion.of(11))
     }
-    val javadoc = javaToolchains.javadocToolFor {
-        languageVersion.set(JavaLanguageVersion.of(11))
-    }
 
     val maybeExe = if(getCurrentOperatingSystem().isWindows) {
         ".exe"
@@ -70,7 +67,6 @@ subprojects {
         ""
     }
     val javac = compiler.get().metadata.installationPath.file("bin/javac${maybeExe}")
-
 
     if(!name.contains("benchmark")) {
         apply(plugin = "maven-publish")
@@ -145,7 +141,9 @@ subprojects {
 
     tasks.withType<Javadoc>().configureEach {
         options.encoding = "UTF-8"
-        executable = javadoc.get().executablePath.toString()
+        executable = javaToolchains.javadocToolFor {
+            languageVersion.set(JavaLanguageVersion.of(11))
+        }.get().executablePath.toString()
     }
 
     configure<LicenseExtension> {

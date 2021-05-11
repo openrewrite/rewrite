@@ -4,9 +4,6 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinJvmCompile
 val compiler = javaToolchains.compilerFor {
     languageVersion.set(JavaLanguageVersion.of(8))
 }
-val javadoc = javaToolchains.javadocToolFor {
-    languageVersion.set(JavaLanguageVersion.of(8))
-}
 
 val maybeExe = if(getCurrentOperatingSystem().isWindows) {
     ".exe"
@@ -62,5 +59,7 @@ tasks.withType<Test>().configureEach {
 }
 
 tasks.withType<Javadoc>().configureEach {
-    executable = javadoc.get().executablePath.toString()
+    executable = javaToolchains.javadocToolFor {
+        languageVersion.set(JavaLanguageVersion.of(8))
+    }.get().executablePath.toString()
 }
