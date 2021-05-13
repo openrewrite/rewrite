@@ -907,12 +907,11 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             t = visitAndCast((J) right.getElement(), p);
         }
 
-        Space after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
-
         setCursor(getCursor().getParent());
         if (t == null) {
             return null;
         }
+        Space after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
         return (after == right.getAfter() && t == right.getElement()) ? right : new JRightPadded<>(t, after, right.getMarkers());
     }
 
