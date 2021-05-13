@@ -16,8 +16,8 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
-import org.openrewrite.Tree
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
@@ -162,15 +162,13 @@ interface HideUtilityClassConstructorTest : JavaRecipeTest {
     )
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/538")
     fun ignoreClassesWithMainMethod(jp: JavaParser) = assertUnchanged(
         jp,
         before = """
+            package a;
+
             public class A {
-                public static final int SOME_NUMBER = 0;
-
-                public static void utility() {
-                }
-
                 public static void main(String[] args) {
                     // SpringApplication.run(A.class, args);
                 }
@@ -420,7 +418,7 @@ interface HideUtilityClassConstructorTest : JavaRecipeTest {
         jp.styles(
             listOf(
                 NamedStyles(
-                        randomId(), "test", "test", "test", emptySet(), listOf(
+                    randomId(), "test", "test", "test", emptySet(), listOf(
                         HideUtilityClassConstructorStyle(
                             listOf(
                                 "@lombok.experimental.UtilityClass",

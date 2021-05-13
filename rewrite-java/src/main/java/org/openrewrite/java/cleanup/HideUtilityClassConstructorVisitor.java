@@ -174,10 +174,10 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         /**
-         * @return true if this class has a {@code public static void main(String[] args)} method signature in it
+         * @return true if this class has a {@code public static void main(String[] args)} method signature in it.
          */
         static boolean hasMainMethod(J.ClassDeclaration c) {
-            return c.getBody().getStatements().stream()
+            return c.getType() != null && c.getBody().getStatements().stream()
                     .filter(J.MethodDeclaration.class::isInstance)
                     .map(J.MethodDeclaration.class::cast)
                     .filter(md -> !md.isConstructor())
@@ -185,7 +185,8 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
                     .filter(md -> md.hasModifier(J.Modifier.Type.Static))
                     .filter(md -> md.getReturnTypeExpression() != null)
                     .filter(md -> JavaType.Primitive.Void.equals(md.getReturnTypeExpression().getType()))
-                    .anyMatch(md -> new MethodMatcher("* main(String)").matches(md, c));
+                    // note that, as of writing this, the matcher for "main(String)" will match on "main(String[]) as expected.
+                    .anyMatch(md -> new MethodMatcher(c.getType().getFullyQualifiedName() + " main(String)").matches(md, c));
         }
 
         /**
