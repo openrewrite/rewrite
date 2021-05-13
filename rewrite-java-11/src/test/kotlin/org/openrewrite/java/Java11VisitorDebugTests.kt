@@ -168,7 +168,7 @@ class Java11OrderImportsTest : Java11Test, OrderImportsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11PrimitiveWrapperClassConstructorToValueOfTest: Java11Test, PrimitiveWrapperClassConstructorToValueOfTest
+class Java11PrimitiveWrapperClassConstructorToValueOfTest : Java11Test, PrimitiveWrapperClassConstructorToValueOfTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
@@ -176,7 +176,7 @@ class Java11RedundantFileCreationTest : Java11Test, RedundantFileCreationTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11RemoveAnnotationTest: Java11Test, RemoveAnnotationTest
+class Java11RemoveAnnotationTest : Java11Test, RemoveAnnotationTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
@@ -260,4 +260,4 @@ class Java11WrappingAndBracesTest : Java11Test, WrappingAndBracesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11XmlParserXXEVulnerabilityTest: Java11Test, XmlParserXXEVulnerabilityTest
+class Java11XmlParserXXEVulnerabilityTest : Java11Test, XmlParserXXEVulnerabilityTest

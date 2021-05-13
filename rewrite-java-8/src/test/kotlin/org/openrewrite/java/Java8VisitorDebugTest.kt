@@ -21,6 +21,7 @@ import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.format.*
 import org.openrewrite.java.search.*
 import org.openrewrite.java.tree.TypeTreeTest
+
 //----------------------------------------------------------------------------------------------
 // If test classes are added here, they should also be added to JavaVisitorCompatibilityKit.kt
 // Tests are in alphabetical order.
@@ -167,7 +168,7 @@ class Java8OrderImportsTest : Java8Test, OrderImportsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java8PrimitiveWrapperClassConstructorToValueOfTest: Java8Test, PrimitiveWrapperClassConstructorToValueOfTest
+class Java8PrimitiveWrapperClassConstructorToValueOfTest : Java8Test, PrimitiveWrapperClassConstructorToValueOfTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
@@ -175,7 +176,7 @@ class Java8RedundantFileCreationTest : Java8Test, RedundantFileCreationTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java8RemoveAnnotationTest: Java8Test, RemoveAnnotationTest
+class Java8RemoveAnnotationTest : Java8Test, RemoveAnnotationTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
@@ -259,4 +260,4 @@ class Java8WrappingAndBracesTest : Java8Test, WrappingAndBracesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java8XmlParserXXEVulnerabilityTest: Java8Test, XmlParserXXEVulnerabilityTest
+class Java8XmlParserXXEVulnerabilityTest : Java8Test, XmlParserXXEVulnerabilityTest
