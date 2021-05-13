@@ -34,6 +34,7 @@ public class ExplicitInitialization extends Recipe {
         return "Checks if any class or object member is explicitly initialized to default for its type value (`null` for object references, zero for numeric types and `char` and `false` for `boolean`.";
     }
 
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new ExplicitInitializationFromCompilationUnitStyle();
     }
