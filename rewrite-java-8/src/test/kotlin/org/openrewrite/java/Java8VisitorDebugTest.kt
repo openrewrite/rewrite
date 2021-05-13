@@ -144,6 +144,10 @@ class Java8JavaTemplateTest : Java8Test, JavaTemplateTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8JavaVisitorTest : Java8Test, JavaVisitorTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8MaybeUsesImportTest : Java8Test, MaybeUsesImportTest
 
 @DebugOnly
