@@ -910,7 +910,9 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         Space after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
 
         setCursor(getCursor().getParent());
-
+        if (t == null) {
+            return null;
+        }
         return (after == right.getAfter() && t == right.getElement()) ? right : new JRightPadded<>(t, after, right.getMarkers());
     }
 
@@ -926,6 +928,9 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
 
         setCursor(getCursor().getParent());
+        if (t == null) {
+            return null;
+        }
 
         return (before == left.getBefore() && t == left.getElement()) ? left : new JLeftPadded<>(before, t, left.getMarkers());
     }

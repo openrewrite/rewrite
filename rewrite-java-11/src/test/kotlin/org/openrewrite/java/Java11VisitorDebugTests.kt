@@ -144,6 +144,10 @@ class Java11JavaTemplateTest : Java11Test, JavaTemplateTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11JavaVisitorTest : Java11Test, JavaVisitorTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11MaybeUsesImportTest : Java11Test, MaybeUsesImportTest
 
 @DebugOnly
