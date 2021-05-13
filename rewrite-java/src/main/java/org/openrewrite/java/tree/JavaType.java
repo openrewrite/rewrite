@@ -303,7 +303,7 @@ public interface JavaType extends Serializable {
         }
 
         /**
-         * Lazily built so that a {@link org.openrewrite.java.internal.grammar.JavaParser} operating over a set of code
+         * Lazily built so that a {@link org.openrewrite.java.JavaParser} operating over a set of code
          * has an opportunity to build {@link Class} instances for sources found in the repo that can provide richer information
          * for constructor parameter types.
          *

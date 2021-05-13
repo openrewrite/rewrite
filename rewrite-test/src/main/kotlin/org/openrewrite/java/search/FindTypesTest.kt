@@ -17,6 +17,7 @@ package org.openrewrite.java.search
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 
@@ -113,6 +114,25 @@ interface FindTypesTest : JavaRecipeTest {
             }
         """,
         dependsOn = arrayOf(a1)
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite-maven-plugin/issues/165")
+    @Test
+    fun methodWithParameterizedType(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = FindTypes("java.util.List"),
+        before = """
+            import java.util.List;
+            public class B {
+               public List<String> foo() { return null; }
+            }
+        """,
+        after = """
+            import java.util.List;
+            public class B {
+               public /*~~>*/List<String> foo() { return null; }
+            }
+        """
     )
 
     @Test

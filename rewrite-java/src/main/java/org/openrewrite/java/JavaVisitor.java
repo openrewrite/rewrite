@@ -23,11 +23,8 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
@@ -713,7 +710,6 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         pt = pt.withPrefix(visitSpace(pt.getPrefix(), Space.Location.PARAMETERIZED_TYPE_PREFIX, p));
         pt = visitAndCast(pt, p, this::visitExpression);
         pt = pt.withClazz(visitAndCast(pt.getClazz(), p));
-        pt = pt.withClazz(visitTypeName(pt.getClazz(), p));
         if (pt.getPadding().getTypeParameters() != null) {
             pt = pt.getPadding().withTypeParameters(visitContainer(pt.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p));
         }
