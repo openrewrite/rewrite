@@ -38,11 +38,19 @@ class Java8AddLicenseHeaderTest : Java8Test, AddLicenseHeaderTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8AnnotationTemplateGeneratorTest : Java8Test, AnnotationTemplateGeneratorTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8BigDecimalRoundingConstantsToEnumsTestTest : Java8Test, BigDecimalRoundingConstantsToEnumsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java8BlankLinesTest : Java8Test, BlankLinesTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8BlockStatementTemplateGeneratorTest : Java8Test, BlockStatementTemplateGeneratorTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
@@ -151,6 +159,10 @@ class Java8ImplementInterfaceTest : Java8Test, ImplementInterfaceTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java8JavaTemplateTest : Java8Test, JavaTemplateTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8JavaTemplateSubstitutionsTest : Java8Test, JavaTemplateSubstitutionsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

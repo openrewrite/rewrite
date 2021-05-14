@@ -13,10 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.tree;
+package org.openrewrite.java;
 
-/**
- * A tree representing a simple or fully qualified name
- */
-public interface NameTree extends TypedTree {
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.tree.J;
+
+import static org.openrewrite.Tree.randomId;
+
+public class RandomizeIdVisitor<P> extends JavaIsoVisitor<P> {
+    @Nullable
+    @Override
+    public J postVisit(J tree, P p) {
+        return tree.withId(randomId());
+    }
 }

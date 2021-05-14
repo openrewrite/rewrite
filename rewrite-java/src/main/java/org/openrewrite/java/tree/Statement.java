@@ -35,4 +35,6 @@ public interface Statement extends J {
 
         return TypeUtils.isOfClassType(variable.getTypeExpression().getType(), classType.getFullyQualifiedName());
     }
+
+    Coordinates.Statement getCoordinates();
 }

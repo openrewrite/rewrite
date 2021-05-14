@@ -24,7 +24,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class FindAllUsedTypes {
-    public static Set<JavaType> findAll(J.CompilationUnit cu) {
+    public static Set<JavaType> findAll(J j) {
         Set<JavaType> types = new HashSet<>();
         new JavaIsoVisitor<Set<JavaType>>() {
             @Override
@@ -148,7 +148,7 @@ public class FindAllUsedTypes {
                 javaTypes.add(variable.getType());
                 return super.visitVariable(variable, javaTypes);
             }
-        }.visit(cu, types);
+        }.visit(j, types);
         return types;
     }
 }

@@ -1,0 +1,17 @@
+LPAREN=1
+RPAREN=2
+LBRACK=3
+RBRACK=4
+DOT=5
+COMMA=6
+SPACE=7
+FullyQualifiedName=8
+Number=9
+Identifier=10
+'('=1
+')'=2
+'['=3
+']'=4
+'.'=5
+','=6
+' '=7

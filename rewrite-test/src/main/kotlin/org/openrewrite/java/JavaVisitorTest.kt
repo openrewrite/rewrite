@@ -26,7 +26,7 @@ interface JavaVisitorTest : JavaRecipeTest {
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
             override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation? {
                 val mi = super.visitMethodInvocation(method, p)
-                if ("removeMethod".equals(mi.simpleName)) {
+                if ("removeMethod" == mi.simpleName) {
                     return null
                 }
                 return mi
@@ -35,8 +35,8 @@ interface JavaVisitorTest : JavaRecipeTest {
             object : JavaIsoVisitor<ExecutionContext>() {
                 override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
                     var md = super.visitMethodDeclaration(method, p)
-                    if (md.simpleName.equals("allTheThings")) {
-                        md = md.withTemplate(template("throws Exception").build(), md.coordinates.replaceThrows())
+                    if (md.simpleName == "allTheThings") {
+                        md = md.withTemplate(template("Exception").build(), md.coordinates.replaceThrows())
                     }
                     return md
                 }

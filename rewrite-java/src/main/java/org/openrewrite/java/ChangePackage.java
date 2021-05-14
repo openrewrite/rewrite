@@ -45,9 +45,6 @@ import static org.openrewrite.Tree.randomId;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangePackage extends Recipe {
-    private static final ThreadLocal<JavaParser> JAVA_PARSER_THREAD_LOCAL =
-            ThreadLocal.withInitial(() -> JavaParser.fromJavaVersion().build());
-
     @Option(displayName = "Old package name",
             description = "The package name to replace.")
     String oldPackageName;
@@ -99,9 +96,6 @@ public class ChangePackage extends Recipe {
     private class ChangePackageVisitor extends JavaIsoVisitor<ExecutionContext> {
         private static final String RENAME_TO_KEY = "renameTo";
         private static final String RENAME_FROM_KEY = "renameFrom";
-
-        private final JavaTemplate packageExprTemplate =
-                template("package #{}").javaParser(JAVA_PARSER_THREAD_LOCAL.get()).build();
 
         private final JavaType.Class newPackageType = JavaType.Class.build(newPackageName);
         private final JavaType.Class oldPackageType = JavaType.Class.build(oldPackageName);
@@ -248,12 +242,12 @@ public class ChangePackage extends Recipe {
 
             if (original.equals(oldPackageName)) {
                 getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, RENAME_TO_KEY, newPackageName);
-                pkg = pkg.withTemplate(packageExprTemplate, pkg.getCoordinates().replace(), newPackageName);
+                pkg = pkg.withTemplate(template(newPackageName).build(), pkg.getCoordinates().replace());
             } else if ((recursive == null || recursive)
                     && original.startsWith(oldPackageName) && !original.startsWith(newPackageName)) {
                 String changingTo = newPackageName + original.substring(oldPackageName.length());
                 getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, RENAME_TO_KEY, changingTo);
-                pkg = pkg.withTemplate(packageExprTemplate, pkg.getCoordinates().replace(), changingTo);
+                pkg = pkg.withTemplate(template(changingTo).build(), pkg.getCoordinates().replace());
             }
             return pkg;
         }

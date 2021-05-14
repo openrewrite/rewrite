@@ -28,14 +28,13 @@ import java.util.stream.Stream;
 
 @Incubating(since = "7.0.0")
 public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
-
-    private static final MethodMatcher OBJECT_EQUALS_SIGNATURE = new MethodMatcher("* equals(java.lang.Object)");
+    private static final MethodMatcher OBJECT_EQUALS = new MethodMatcher("* equals(java.lang.Object)");
 
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, p);
         Stream<J.MethodDeclaration> mds = cd.getBody().getStatements().stream().filter(J.MethodDeclaration.class::isInstance).map(J.MethodDeclaration.class::cast);
-        if (mds.noneMatch(m -> OBJECT_EQUALS_SIGNATURE.matches(m, classDecl))) {
+        if (mds.noneMatch(m -> OBJECT_EQUALS.matches(m, classDecl))) {
             cd = (J.ClassDeclaration) new ChangeCovariantEqualsMethodVisitor<>(cd).visit(cd, p, getCursor());
             assert cd != null;
         }
@@ -43,8 +42,7 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private static class ChangeCovariantEqualsMethodVisitor<P> extends JavaIsoVisitor<P> {
-
-        private static final AnnotationMatcher OVERRIDE_ANNOTATION_SIGNATURE = new AnnotationMatcher("@java.lang.Override");
+        private static final AnnotationMatcher OVERRIDE_ANNOTATION = new AnnotationMatcher("@java.lang.Override");
         private static final String EQUALS_BODY_PREFIX_TEMPLATE =
                 "if (#{} == this) return true;\n" +
                         "if (#{} == null || getClass() != #{}.getClass()) return false;\n" +
@@ -70,12 +68,12 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
             }
 
             String ecfqn = type.getFullyQualifiedName();
-            if (new MethodMatcher(String.format("%s equals(%s)", ecfqn, ecfqn)).matches(m, enclosingClass) &&
+            if (new MethodMatcher(ecfqn + " equals(" + ecfqn + ")").matches(m, enclosingClass) &&
                     m.hasModifier(J.Modifier.Type.Public) &&
                     m.getReturnTypeExpression() != null &&
                     JavaType.Primitive.Boolean.equals(m.getReturnTypeExpression().getType())) {
 
-                if (m.getAllAnnotations().stream().noneMatch(OVERRIDE_ANNOTATION_SIGNATURE::matches)) {
+                if (m.getAllAnnotations().stream().noneMatch(OVERRIDE_ANNOTATION::matches)) {
                     m = maybeAutoFormat(m,
                             m.withTemplate(
                                     template("@Override").build(),
@@ -92,7 +90,7 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
                 String paramName = "obj".equals(oldParamName.getSimpleName()) ? "other" : "obj";
                 m = maybeAutoFormat(m,
                         m.withTemplate(
-                                template("(Object #{})").build(),
+                                template("Object #{}").build(),
                                 m.getCoordinates().replaceParameters(),
                                 paramName
                         ), p, getCursor().getParentOrThrow());
@@ -103,13 +101,14 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
                  * with the logic doing what it was doing.
                  */
                 JavaTemplate equalsBodySnippet = template(EQUALS_BODY_PREFIX_TEMPLATE).build();
+
                 assert m.getBody() != null;
                 Object[] params = new Object[]{
                         paramName,
                         paramName,
                         paramName,
                         enclosingClass.getSimpleName(),
-                        oldParamName.printTrimmed(),
+                        oldParamName.getSimpleName(),
                         enclosingClass.getSimpleName(),
                         paramName
                 };

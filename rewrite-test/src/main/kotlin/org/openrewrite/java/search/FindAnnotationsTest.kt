@@ -20,7 +20,6 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
-import org.openrewrite.java.tree.JavaType
 
 interface FindAnnotationsTest : JavaRecipeTest {
     companion object {

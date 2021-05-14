@@ -846,38 +846,83 @@ public interface JavaType extends Serializable {
     }
 
     enum Primitive implements JavaType {
-        Boolean("boolean"),
-        Byte("byte"),
-        Char("char"),
-        Double("double"),
-        Float("float"),
-        Int("int"),
-        Long("long"),
-        Short("short"),
-        Void("void"),
-        String("String"),
-        None(""),
-        Wildcard("*"),
-        Null("null");
-
-        private final String keyword;
-
-        Primitive(String keyword) {
-            this.keyword = keyword;
-        }
+        Boolean,
+        Byte,
+        Char,
+        Double,
+        Float,
+        Int,
+        Long,
+        Short,
+        Void,
+        String,
+        None,
+        Wildcard,
+        Null;
 
         @Nullable
         public static Primitive fromKeyword(String keyword) {
-            for (Primitive p : values()) {
-                if (p.keyword.equals(keyword)) {
-                    return p;
-                }
+            switch(keyword) {
+                case "boolean":
+                    return Boolean;
+                case "byte":
+                    return Byte;
+                case "char":
+                    return Char;
+                case "double":
+                    return Double;
+                case "float":
+                    return Float;
+                case "int":
+                    return Int;
+                case "long":
+                    return Long;
+                case "short":
+                    return Short;
+                case "void":
+                    return Void;
+                case "String":
+                    return String;
+                case "*":
+                    return Wildcard;
+                case "null":
+                    return Null;
+                case "":
+                    return None;
             }
             return null;
         }
 
         public String getKeyword() {
-            return this.keyword;
+            switch(this) {
+                case Boolean:
+                    return "boolean";
+                case Byte:
+                    return "byte";
+                case Char:
+                    return "char";
+                case Double:
+                    return "double";
+                case Float:
+                    return "float";
+                case Int:
+                    return "int";
+                case Long:
+                    return "long";
+                case Short:
+                    return "short";
+                case Void:
+                    return "void";
+                case String:
+                    return "String";
+                case Wildcard:
+                    return "*";
+                case Null:
+                    return "null";
+                case None:
+                default:
+                    return "";
+            }
         }
 
         @Override

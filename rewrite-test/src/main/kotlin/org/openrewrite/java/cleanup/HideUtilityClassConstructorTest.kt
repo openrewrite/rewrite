@@ -414,7 +414,7 @@ interface HideUtilityClassConstructorTest : JavaRecipeTest {
     )
 
     @Test
-    fun identifySuppressedUtilityClasses(jp: JavaParser.Builder<*, *>) = assertChanged(
+    fun dontChangeSuppressedUtilityClasses(jp: JavaParser.Builder<*, *>) = assertUnchanged(
         jp.styles(
             listOf(
                 NamedStyles(
@@ -450,7 +450,23 @@ interface HideUtilityClassConstructorTest : JavaRecipeTest {
                 public static void utility() {
                 }
             }
+        """
+    )
 
+    @Test
+    fun suppressedUtilityClassWithDifferentArgument(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(
+            listOf(
+                NamedStyles(
+                    randomId(), "test", "test", "test", emptySet(), listOf(
+                        HideUtilityClassConstructorStyle(
+                            listOf("""@java.lang.SuppressWarnings("checkstyle:HideUtilityClassConstructor")""")
+                        )
+                    )
+                )
+            )
+        ).build(),
+        before = """
             @SuppressWarnings("rewrite:I-can-change")
             class ChangeMeA {
                 public static void utility() {
@@ -458,20 +474,6 @@ interface HideUtilityClassConstructorTest : JavaRecipeTest {
             }
         """,
         after = """
-            import lombok.experimental.UtilityClass;
-            
-            @UtilityClass
-            public class DoNotChangeMeA {
-                public static void utility() {
-                }
-            }
-
-            @SuppressWarnings("checkstyle:HideUtilityClassConstructor")
-            class DoNotChangeMeB {
-                public static void utility() {
-                }
-            }
-
             @SuppressWarnings("rewrite:I-can-change")
             class ChangeMeA {
                 public static void utility() {

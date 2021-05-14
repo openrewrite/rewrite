@@ -18,16 +18,13 @@ package org.openrewrite.java.security;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
 
 public class SecureTempFileCreation extends Recipe {
-
-    private static final ThreadLocal<JavaParser> JAVA_PARSER_THREAD_LOCAL = ThreadLocal.withInitial(() -> JavaParser.fromJavaVersion().build());
-    private static final String CREATE_TEMP_FILE_PATTERN = "java.io.File createTempFile(..)";
-    private static final MethodMatcher matcher = new MethodMatcher(CREATE_TEMP_FILE_PATTERN);
+    private static final MethodMatcher matcher = new MethodMatcher("java.io.File createTempFile(..)");
 
     @Override
     public String getDisplayName() {
@@ -38,36 +35,38 @@ public class SecureTempFileCreation extends Recipe {
     public String getDescription() {
         return "`java.io.File.createTempFile()` has exploitable default file permissions. This recipe migrates to the more secure `java.nio.file.Files.createTempFile()`.";
     }
+
     @Override
     protected JavaIsoVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(CREATE_TEMP_FILE_PATTERN);
+        return new UsesMethod<>(matcher);
     }
 
     @Override
-    protected JavaIsoVisitor<ExecutionContext>  getVisitor() {
+    protected JavaIsoVisitor<ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
+            private final JavaTemplate twoArg = template("Files.createTempFile(#{any(String)}, #{any(String)}).toFile();")
+                    .imports("java.nio.file.Files")
+                    .build();
+
+            private final JavaTemplate threeArg = template("Files.createTempFile(#{any(java.io.File)}.toPath(), #{any(String)}, #{any(String)}).toFile();")
+                    .imports("java.nio.file.Files")
+                    .build();
 
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                 J.MethodInvocation m = method;
-                if(matcher.matches(m)) {
+                if (matcher.matches(m)) {
                     maybeAddImport("java.nio.file.Files");
-                    if(m.getArguments().size() == 2) {
+                    if (m.getArguments().size() == 2) {
                         // File.createTempFile(String prefix, String suffix)
-                        m = m.withTemplate(template("Files.createTempFile(#{}, #{}).toFile();")
-                                        .imports("java.nio.file.Files")
-                                        .javaParser(JAVA_PARSER_THREAD_LOCAL.get())
-                                        .build(),
+                        m = m.withTemplate(twoArg,
                                 m.getCoordinates().replace(),
                                 m.getArguments().get(0),
                                 m.getArguments().get(1)
                         );
-                    } else if(m.getArguments().size() == 3) {
+                    } else if (m.getArguments().size() == 3) {
                         // File.createTempFile(String prefix, String suffix, File dir)
-                        m = m.withTemplate(template("Files.createTempFile(#{}.toPath(), #{}, #{}).toFile();")
-                                        .imports("java.nio.file.Files")
-                                        .javaParser(JAVA_PARSER_THREAD_LOCAL.get())
-                                        .build(),
+                        m = m.withTemplate(threeArg,
                                 m.getCoordinates().replace(),
                                 m.getArguments().get(2),
                                 m.getArguments().get(0),

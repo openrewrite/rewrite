@@ -16,125 +16,309 @@
 package org.openrewrite.java;
 
 import org.openrewrite.Cursor;
-import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.format.AutoFormatVisitor;
-import org.openrewrite.java.internal.template.ExtractTrees;
-import org.openrewrite.java.internal.template.InsertAtCoordinates;
-import org.openrewrite.java.internal.template.JavaTemplatePrinter;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JLeftPadded;
-import org.openrewrite.java.tree.JRightPadded;
-import org.openrewrite.java.tree.JavaCoordinates;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.internal.template.JavaTemplateParser;
+import org.openrewrite.java.internal.template.Substitutions;
+import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Space.Location;
+import org.openrewrite.marker.Markers;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-/**
- * Build ASTs from the text of Java source code without knowing how to build the AST
- * elements that make up that text.
- */
-@Incubating(since = "7.0.0")
+import static java.util.Collections.emptyList;
+import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.java.tree.Space.Location.*;
+
 public class JavaTemplate {
+    private static final J.Block EMPTY_BLOCK = new J.Block(randomId(), Space.EMPTY,
+            Markers.EMPTY, new JRightPadded<>(false, Space.EMPTY, Markers.EMPTY),
+            Collections.emptyList(), Space.format(" "));
+
     private final Supplier<Cursor> parentScopeGetter;
-    private final JavaParser parser;
     private final String code;
     private final int parameterCount;
-    private final Set<String> imports;
-    private final String parameterMarker;
     private final Consumer<String> onAfterVariableSubstitution;
-    private final Consumer<String> onBeforeParseTemplate;
+    private final JavaTemplateParser templateParser;
 
-    private JavaTemplate(Supplier<Cursor> parentScopeGetter, JavaParser parser, String code, Set<String> imports,
-                         String parameterMarker, Consumer<String> onAfterVariableSubstitution,
-                         Consumer<String> onBeforeParseTemplate) {
+    private JavaTemplate(Supplier<Cursor> parentScopeGetter, Supplier<JavaParser> parser, String code, Set<String> imports,
+                         Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
         this.parentScopeGetter = parentScopeGetter;
-        this.parser = parser;
         this.code = code;
-        this.imports = imports;
-        this.parameterMarker = parameterMarker;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
-        this.onBeforeParseTemplate = onBeforeParseTemplate;
-        this.parameterCount = StringUtils.countOccurrences(code, parameterMarker);
+        this.parameterCount = StringUtils.countOccurrences(code, "#{");
+        this.templateParser = new JavaTemplateParser(parser, onAfterVariableSubstitution, onBeforeParseTemplate, imports);
     }
 
-    public static Builder builder(Supplier<Cursor> parentScope, String code) {
-        return new Builder(parentScope, code);
-    }
-
-    /**
-     * @param changing    The tree that will be returned modified where one of its subtrees will have
-     *                    been added or replaced by an AST formed from the template.
-     * @param coordinates The point where the template will either insert or replace code.
-     * @param parameters  Parameters substituted into the template.
-     * @param <J2>        The type of the changing tree.
-     * @return A modified form of the changing tree.
-     */
-    public <J2 extends J> J2 withTemplate(Tree changing, JavaCoordinates coordinates, Object... parameters) {
-        Cursor parentScope = parentScopeGetter.get();
-
+    @SuppressWarnings("unchecked")
+    public <J2 extends J> J2 withTemplate(Tree changing, JavaCoordinates coordinates, Object[] parameters) {
         if (parameters.length != parameterCount) {
             throw new IllegalArgumentException("This template requires " + parameterCount + " parameters.");
         }
 
-        //Substitute parameter markers with the string representation of each parameter.
-        String substitutedTemplate = substituteParameters(parameters);
+        Substitutions substitutions = new Substitutions(code, parameters);
+        String substitutedTemplate = substitutions.substitute();
         onAfterVariableSubstitution.accept(substitutedTemplate);
 
-        J.CompilationUnit cu = parentScope.firstEnclosingOrThrow(J.CompilationUnit.class);
-        //The tree printer uses the cursor path from the compilation unit down to the tree element within the coordinates
-        //to generate the synthetic compilation unit. It is possible that the coordinates exist only in the "changed"
-        //tree. To accommodate this, the cursor path is extended from the parent into the changed/mutated tree until the
-        //coordinates are found.
-        Cursor insertionScope = JavaTemplatePrinter.findCoordinateCursor(parentScope, changing, coordinates);
+        Tree insertionPoint = coordinates.getTree();
+        Location loc = coordinates.getSpaceLocation();
+        JavaCoordinates.Mode mode = coordinates.getMode();
 
-        String generatedSource = new JavaTemplatePrinter(substitutedTemplate, changing, coordinates, imports)
-                .print(cu, insertionScope);
-        onBeforeParseTemplate.accept(generatedSource);
+        AtomicReference<Cursor> parentCursorRef = new AtomicReference<>();
 
-        parser.reset();
-        J.CompilationUnit synthetic = parser.parse(generatedSource).iterator().next();
+        // Find the parent cursor of the CHANGING element, which may not be the same as the cursor of
+        // the method using the template. For example, using a template on a class declaration body
+        // inside visitClassDeclaration. The body is the changing element, but the current cursor
+        // is at the class declaration.
+        //
+        //      J visitClassDeclaration(J.ClassDeclaration c, Integer p) {
+        //            c.getBody().withTemplate(template, c.getBody().coordinates.lastStatement());
+        //      }
+        new JavaIsoVisitor<Integer>() {
+            @Nullable
+            @Override
+            public J visit(@Nullable Tree tree, Integer integer) {
+                if (tree != null && tree.isScope(changing)) {
+                    parentCursorRef.set(getCursor());
+                    return (J) tree;
+                }
+                return super.visit(tree, integer);
+            }
+        }.visit(parentScopeGetter.get().getValue(), 0, parentScopeGetter.get().getParentOrThrow());
 
-        List<J> generatedElements = ExtractTrees.extract(synthetic);
-        for (int i = 0; i < generatedElements.size(); i++) {
-            J snippet = generatedElements.get(i);
-            generatedElements.set(i, new AutoFormatVisitor<Integer>().visit(snippet, 0, parentScope));
-        }
+        Cursor parentCursor = parentCursorRef.get();
 
-        //noinspection unchecked,ConstantConditions
-        return (J2) new InsertAtCoordinates(coordinates).visit(changing, generatedElements, parentScope);
+        //noinspection ConstantConditions
+        return (J2) new JavaVisitor<Integer>() {
+            @Override
+            public J visitAnnotation(J.Annotation annotation, Integer integer) {
+                if (loc.equals(ANNOTATION_PREFIX) && mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
+                    List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
+                    return gen.get(0).withPrefix(annotation.getPrefix());
+                }
+
+                return super.visitAnnotation(annotation, integer);
+            }
+
+            @Override
+            public J visitBlock(J.Block block, Integer p) {
+                switch (loc) {
+                    case BLOCK_END: {
+                        List<Statement> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(
+                                new Cursor(getCursor(), insertionPoint),
+                                substitutedTemplate, loc));
+                        return block.withStatements(
+                                ListUtils.concatAll(
+                                        block.getStatements(),
+                                        ListUtils.map(gen, (i, s) -> autoFormat(i == 0 ? s.withPrefix(Space.format("\n")) : s, p, getCursor()))
+                                )
+                        );
+                    }
+                    case STATEMENT_PREFIX: {
+                        return block.withStatements(ListUtils.flatMap(block.getStatements(), statement -> {
+                            if (statement.isScope(insertionPoint)) {
+                                List<Statement> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(
+                                        new Cursor(getCursor(), insertionPoint),
+                                        substitutedTemplate, loc));
+
+                                Cursor parent = getCursor();
+                                for (int i = 0; i < gen.size(); i++) {
+                                    Statement s = gen.get(i);
+                                    Statement formattedS = autoFormat(i == 0 ? s.withPrefix(statement.getPrefix()) : s, p, parent);
+                                    gen.set(i, formattedS);
+                                }
+
+                                switch (mode) {
+                                    case REPLACEMENT:
+                                        return gen;
+                                    case BEFORE:
+                                        return ListUtils.concat(gen, statement);
+                                    case AFTER:
+                                        return ListUtils.concat(statement, gen);
+                                }
+                            }
+                            return statement;
+                        }));
+                    }
+                }
+                return super.visitBlock(block, p);
+            }
+
+            @Override
+            public J visitClassDeclaration(J.ClassDeclaration classDecl, Integer p) {
+                if (classDecl.isScope(insertionPoint)) {
+                    switch (loc) {
+                        case ANNOTATIONS: {
+                            List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
+                            J.ClassDeclaration c = classDecl;
+                            if (mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
+                                c = c.withLeadingAnnotations(gen);
+                                if (c.getTypeParameters() != null) {
+                                    c = c.withTypeParameters(ListUtils.map(c.getTypeParameters(), tp -> tp.withAnnotations(emptyList())));
+                                }
+                                c = c.withModifiers(ListUtils.map(c.getModifiers(), m -> m.withAnnotations(emptyList())));
+                                c = c.getAnnotations().withKind(c.getAnnotations().getKind().withAnnotations(emptyList()));
+                            } else {
+                                for (J.Annotation a : gen) {
+                                    c = c.withLeadingAnnotations(ListUtils.insertInOrder(c.getLeadingAnnotations(), a,
+                                            coordinates.getComparator()));
+                                }
+                            }
+                            return autoFormat(c, c.getLeadingAnnotations().get(c.getLeadingAnnotations().size() - 1), p,
+                                    getCursor());
+                        }
+                        case EXTENDS: {
+                            TypeTree anExtends = substitutions.unsubstitute(templateParser.parseExtends(substitutedTemplate));
+                            J.ClassDeclaration c = classDecl.withExtends(anExtends);
+
+                            //noinspection ConstantConditions
+                            c = c.getPadding().withExtends(c.getPadding().getExtends().withBefore(Space.format(" ")));
+                            return c;
+                        }
+                        case IMPLEMENTS: {
+                            List<TypeTree> implementings = substitutions.unsubstitute(templateParser.parseImplements(substitutedTemplate));
+                            J.ClassDeclaration c = classDecl.withImplements(implementings);
+
+                            //noinspection ConstantConditions
+                            c = c.getPadding().withImplements(c.getPadding().getImplements().withBefore(Space.format(" ")));
+                            return c;
+                        }
+                        case TYPE_PARAMETERS: {
+                            List<J.TypeParameter> typeParameters = substitutions.unsubstitute(templateParser.parseTypeParameters(substitutedTemplate));
+                            return classDecl.withTypeParameters(typeParameters);
+                        }
+                    }
+                }
+                return super.visitClassDeclaration(classDecl, p);
+            }
+
+            @Override
+            public J visitLambda(J.Lambda lambda, Integer p) {
+                if (loc.equals(LAMBDA_PARAMETERS_PREFIX) && lambda.getParameters().isScope(insertionPoint)) {
+                    return lambda.withParameters(substitutions.unsubstitute(templateParser.parseLambdaParameters(substitutedTemplate)));
+                }
+                return super.visitLambda(lambda, p);
+            }
+
+            @Override
+            public J visitMethodDeclaration(J.MethodDeclaration method, Integer p) {
+                if (method.isScope(insertionPoint)) {
+                    switch (loc) {
+                        case ANNOTATIONS: {
+                            List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
+                            J.MethodDeclaration m = method;
+                            if (mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
+                                m = method.withLeadingAnnotations(gen);
+                                if (m.getTypeParameters() != null) {
+                                    m = m.withTypeParameters(ListUtils.map(m.getTypeParameters(), tp -> tp.withAnnotations(emptyList())));
+                                }
+                                if (m.getReturnTypeExpression() instanceof J.AnnotatedType) {
+                                    m = m.withReturnTypeExpression(((J.AnnotatedType) m.getReturnTypeExpression()).getTypeExpression());
+                                }
+                                m = m.withModifiers(ListUtils.map(m.getModifiers(), m2 -> m2.withAnnotations(emptyList())));
+                                m = m.getAnnotations().withName(m.getAnnotations().getName().withAnnotations(emptyList()));
+                            } else {
+                                for (J.Annotation a : gen) {
+                                    m = m.withLeadingAnnotations(ListUtils.insertInOrder(m.getLeadingAnnotations(), a,
+                                            coordinates.getComparator()));
+                                }
+                            }
+                            return autoFormat(m, m.getLeadingAnnotations().get(m.getLeadingAnnotations().size() - 1), p,
+                                    getCursor().getParentOrThrow());
+                        }
+                        case BLOCK_PREFIX: {
+                            List<Statement> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(getCursor(), substitutedTemplate, loc));
+                            J.Block body = method.getBody();
+                            if (body == null) {
+                                body = EMPTY_BLOCK;
+                            }
+                            body = body.withStatements(gen);
+                            return method.withBody(autoFormat(body, p, getCursor()));
+                        }
+                        case METHOD_DECLARATION_PARAMETERS: {
+                            return method.withParameters(substitutions.unsubstitute(templateParser.parseParameters(substitutedTemplate)));
+                        }
+                        case THROWS: {
+                            J.MethodDeclaration m = method.withThrows(substitutions.unsubstitute(templateParser.parseThrows(substitutedTemplate)));
+
+                            //noinspection ConstantConditions
+                            m = m.getPadding().withThrows(m.getPadding().getThrows().withBefore(Space.format(" ")));
+                            return m;
+                        }
+                        case TYPE_PARAMETERS: {
+                            List<J.TypeParameter> typeParameters = substitutions.unsubstitute(templateParser.parseTypeParameters(substitutedTemplate));
+                            J.MethodDeclaration m = method.withTypeParameters(typeParameters);
+                            return autoFormat(m, typeParameters.get(typeParameters.size() - 1), p,
+                                    getCursor().getParentOrThrow());
+                        }
+                    }
+                }
+                return super.visitMethodDeclaration(method, p);
+            }
+
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, Integer integer) {
+                if (loc.equals(METHOD_INVOCATION_ARGUMENTS) && method.isScope(insertionPoint)) {
+                    List<Expression> args = substitutions.unsubstitute(templateParser.parseMethodArguments(getCursor(), substitutedTemplate, loc));
+                    J.MethodInvocation m = method.withArguments(args);
+                    m = autoFormat(m, 0, getCursor().getParentOrThrow());
+                    return m;
+                }
+                return super.visitMethodInvocation(method, integer);
+            }
+
+            @Override
+            public J visitPackage(J.Package pkg, Integer integer) {
+                if (loc.equals(PACKAGE_PREFIX) && pkg.isScope(insertionPoint)) {
+                    return pkg.withExpression(substitutions.unsubstitute(templateParser.parsePackage(substitutedTemplate)));
+                }
+                return super.visitPackage(pkg, integer);
+            }
+
+            @Override
+            public J visitStatement(Statement statement, Integer p) {
+                if (loc.equals(STATEMENT_PREFIX) && statement.isScope(insertionPoint)) {
+                    if (mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
+                        List<Statement> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(getCursor(), substitutedTemplate, loc));
+                        if (gen.size() != 1) {
+                            throw new IllegalArgumentException("Expected a template that would generate exactly one " +
+                                    "statement to replace one statement, but generated " + gen.size());
+                        }
+                        return autoFormat(gen.get(0).withPrefix(statement.getPrefix()), p, getCursor().getParentOrThrow());
+                    }
+                    throw new IllegalArgumentException("Cannot insert a new statement before an existing statement and return both to a visit method that returns one statement.");
+                }
+                return super.visitStatement(statement, p);
+            }
+
+            @Override
+            public J visitVariableDeclarations(J.VariableDeclarations multiVariable, Integer p) {
+                if (multiVariable.isScope(insertionPoint)) {
+                    if (loc == ANNOTATIONS) {
+                        J.VariableDeclarations v = multiVariable.withLeadingAnnotations(substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate)));
+                        if (v.getTypeExpression() instanceof J.AnnotatedType) {
+                            v = v.withTypeExpression(((J.AnnotatedType) v.getTypeExpression()).getTypeExpression());
+                        }
+                        v = v.withModifiers(ListUtils.map(v.getModifiers(), m -> m.withAnnotations(emptyList())));
+                        return autoFormat(v, v.getLeadingAnnotations().get(v.getLeadingAnnotations().size() - 1), p,
+                                getCursor().getParentOrThrow());
+                    }
+                }
+                return super.visitVariableDeclarations(multiVariable, p);
+            }
+        }.visit(changing, 0, parentCursor);
     }
 
-    /**
-     * Replace the parameter markers in the template with the parameters passed into the generate method.
-     * Parameters that are Java Tree's will be correctly printed into the string. The parameters are not named and
-     * rely purely on ordinal position.
-     *
-     * @param parameters A list of parameters
-     * @return The final snippet to be generated.
-     */
-    private String substituteParameters(Object... parameters) {
-        String codeInstance = code;
-        for (Object parameter : parameters) {
-            codeInstance = StringUtils.replaceFirst(codeInstance, parameterMarker,
-                    substituteParameter(parameter));
-        }
-        return codeInstance;
-    }
-
-    private String substituteParameter(Object parameter) {
-        if (parameter instanceof Tree) {
-            return ((Tree) parameter).printTrimmed();
-        } else if (parameter instanceof JRightPadded) {
-            return substituteParameter(((JRightPadded<?>) parameter).getElement());
-        } else if (parameter instanceof JLeftPadded) {
-            return substituteParameter(((JLeftPadded<?>) parameter).getElement());
-        }
-        return parameter.toString();
+    public static Builder builder(Supplier<Cursor> parentScope, String code) {
+        return new Builder(parentScope, code);
     }
 
     public static class Builder {
@@ -142,9 +326,7 @@ public class JavaTemplate {
         private final String code;
         private final Set<String> imports = new HashSet<>();
 
-        private JavaParser javaParser = JavaParser.fromJavaVersion().build();
-
-        private String parameterMarker = "#{}";
+        private Supplier<JavaParser> javaParser = () -> JavaParser.fromJavaVersion().build();
 
         private Consumer<String> onAfterVariableSubstitution = s -> {
         };
@@ -156,16 +338,6 @@ public class JavaTemplate {
             this.code = code.trim();
         }
 
-        /**
-         * A list of fully-qualified types that will be added when generating/compiling snippets
-         *
-         * <PRE>
-         * Examples:
-         * <p>
-         * java.util.Collections
-         * java.util.Date
-         * </PRE>
-         */
         public Builder imports(String... fullyQualifiedTypeNames) {
             for (String typeName : fullyQualifiedTypeNames) {
                 if (typeName.startsWith("import ") || typeName.startsWith("static ")) {
@@ -178,16 +350,6 @@ public class JavaTemplate {
             return this;
         }
 
-        /**
-         * A list of fully-qualified member type names that will be statically imported when generating/compiling snippets.
-         *
-         * <PRE>
-         * Examples:
-         * <p>
-         * java.util.Collections.emptyList
-         * java.util.Collections.*
-         * </PRE>
-         */
         public Builder staticImports(String... fullyQualifiedMemberTypeNames) {
             for (String typeName : fullyQualifiedMemberTypeNames) {
                 if (typeName.startsWith("import ") || typeName.startsWith("static ")) {
@@ -200,17 +362,8 @@ public class JavaTemplate {
             return this;
         }
 
-        public Builder javaParser(JavaParser javaParser) {
+        public Builder javaParser(Supplier<JavaParser> javaParser) {
             this.javaParser = javaParser;
-            return this;
-        }
-
-        /**
-         * Define an alternate marker to denote where a parameter should be inserted into the template. If not specified, the
-         * default format for parameter marker is "#{}"
-         */
-        public Builder parameterMarker(String parameterMarker) {
-            this.parameterMarker = parameterMarker;
             return this;
         }
 
@@ -225,7 +378,7 @@ public class JavaTemplate {
         }
 
         public JavaTemplate build() {
-            return new JavaTemplate(parentScope, javaParser, code, imports, parameterMarker,
+            return new JavaTemplate(parentScope, javaParser, code, imports,
                     onAfterVariableSubstitution, onBeforeParseTemplate);
         }
     }
