@@ -99,7 +99,7 @@ public class ChangeType extends Recipe {
 
         @Override
         public <N extends NameTree> N visitTypeName(N name, ExecutionContext ctx) {
-            JavaType.Class oldTypeAsClass = TypeUtils.asClass(name.getType());
+            JavaType.FullyQualified oldTypeAsClass = TypeUtils.asFullyQualified(name.getType());
             N n = visitAndCast(name, ctx, super::visitTypeName);
             if (!(name instanceof TypeTree) && oldTypeAsClass != null && oldTypeAsClass.getFullyQualifiedName().equals(oldFullyQualifiedTypeName)) {
                 n = n.withType(targetType);
@@ -187,7 +187,7 @@ public class ChangeType extends Recipe {
             }
 
             if (m.getSelect() != null) {
-                JavaType.Class selectType = TypeUtils.asClass(m.getSelect().getType());
+                JavaType.FullyQualified selectType = TypeUtils.asFullyQualified(m.getSelect().getType());
                 if (selectType != null && selectType.getFullyQualifiedName().equals(oldFullyQualifiedTypeName)) {
                     m = m.withSelect(m.getSelect().withType(targetType));
                 }
@@ -222,7 +222,7 @@ public class ChangeType extends Recipe {
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
             J.VariableDeclarations.NamedVariable v = visitAndCast(variable, ctx, super::visitVariable);
 
-            JavaType.Class varType = TypeUtils.asClass(variable.getType());
+            JavaType.FullyQualified varType = TypeUtils.asFullyQualified(variable.getType());
             if (varType != null && varType.getFullyQualifiedName().equals(oldFullyQualifiedTypeName)) {
                 v = v.withType(targetType).withName(v.getName().withType(targetType));
             }
@@ -264,7 +264,7 @@ public class ChangeType extends Recipe {
         @SuppressWarnings({"unchecked", "ConstantConditions"})
         private <T extends J> T transformName(@Nullable T nameField) {
             if (nameField instanceof NameTree) {
-                JavaType.Class nameTreeClass = TypeUtils.asClass(((NameTree) nameField).getType());
+                JavaType.FullyQualified nameTreeClass = TypeUtils.asFullyQualified(((NameTree) nameField).getType());
                 String name;
                 if (targetType instanceof JavaType.FullyQualified) {
                     name = ((JavaType.FullyQualified) targetType).getClassName();

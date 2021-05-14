@@ -20,7 +20,7 @@ import org.openrewrite.java.tree.TypeUtils
 
 fun JavaType?.hasElementType(clazz: String) = TypeUtils.hasElementType(this, clazz)
 
-fun JavaType?.asClass(): JavaType.Class? = TypeUtils.asClass(this)
+fun JavaType?.asFullyQualified(): JavaType.FullyQualified? = TypeUtils.asFullyQualified(this)
 
 fun JavaType?.asArray(): JavaType.Array? = TypeUtils.asArray(this)
 

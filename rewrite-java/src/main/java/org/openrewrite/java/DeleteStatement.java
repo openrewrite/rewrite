@@ -85,7 +85,7 @@ public class DeleteStatement<P> extends JavaIsoVisitor<P> {
     @Override
     public J preVisit(J tree, P p) {
         if (statement.isScope(tree)) {
-            for (JavaType.Class referenced : FindReferencedTypes.find(tree)) {
+            for (JavaType.FullyQualified referenced : FindReferencedTypes.find(tree)) {
                 maybeRemoveImport(referenced);
             }
         }

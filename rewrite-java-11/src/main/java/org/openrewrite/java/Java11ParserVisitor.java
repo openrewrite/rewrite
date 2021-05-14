@@ -70,7 +70,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     private final String source;
     private final boolean relaxedClassTypeMatching;
     private final Collection<NamedStyles> styles;
-    private final Map<String, JavaType.Class> sharedClassTypes;
+    private final Map<String, JavaType.FullyQualified> sharedClassTypes;
     private final ExecutionContext ctx;
 
     @SuppressWarnings("NotNullFieldNotInitialized")
@@ -84,7 +84,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     public Java11ParserVisitor(Path sourcePath, String source,
                                boolean relaxedClassTypeMatching,
                                Collection<NamedStyles> styles,
-                               Map<String, JavaType.Class> sharedClassTypes,
+                               Map<String, JavaType.FullyQualified> sharedClassTypes,
                                ExecutionContext ctx) {
         this.sourcePath = sourcePath;
         this.source = source;
@@ -440,7 +440,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         J.Block body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
                 members, sourceBefore("}"));
 
-        return new J.ClassDeclaration(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), kind, name, typeParams, extendings, implementings, body, (JavaType.Class) type(node));
+        return new J.ClassDeclaration(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), kind, name, typeParams, extendings, implementings, body, (JavaType.FullyQualified) type(node));
     }
 
     @Override
@@ -1552,10 +1552,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 paramNames.add(s);
             }
 
-            List<JavaType.Class> exceptionTypes = new ArrayList<>();
+            List<JavaType.FullyQualified> exceptionTypes = new ArrayList<>();
             if (selectType instanceof MethodType) {
                 for (com.sun.tools.javac.code.Type exceptionType : ((MethodType) selectType).thrown) {
-                    JavaType.Class javaType = TypeUtils.asClass(type(exceptionType));
+                    JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(exceptionType));
                     if (javaType == null) {
                         //If the type cannot be resolved to a class (it might not be on the classpath or it might have
                         //been mapped to cyclic, build the class.
@@ -1571,7 +1571,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 }
             }
 
-            JavaType.Class declaringType = TypeUtils.asClass(type(methodSymbol.owner));
+            JavaType.FullyQualified declaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner));
             if(declaringType == null) {
                 return null;
             }
@@ -1621,7 +1621,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 return null;
             }
 
+            ClassType classType = (ClassType) type;
             Symbol.ClassSymbol sym = (Symbol.ClassSymbol) type.tsym;
+            ClassType symType = (ClassType) sym.type;
 
             if (stack.contains(sym))
                 return new JavaType.Cyclic(sym.className());
@@ -1629,7 +1631,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 if (shallow) {
                     return new JavaType.ShallowClass(sym.className());
                 } else {
-                    JavaType.Class flyweight = sharedClassTypes.get(sym.className());
+                    //Care must be taken generating this ID such that we do not
+                    //inadvertently call complete on the symbol.
+                    String flyweightId = getFlyweightId(classType);
+                    JavaType.FullyQualified flyweight = sharedClassTypes.get(flyweightId);
                     if (flyweight != null) {
                         return flyweight;
                     }
@@ -1654,9 +1659,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                         }
                     }
 
-                    ClassType classType = (ClassType) type;
-                    ClassType symType = (ClassType) sym.type;
-
                     List<JavaType> typeParameters;
                     if (classType.typarams_field == null) {
                         typeParameters = emptyList();
@@ -1670,13 +1672,13 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                         }
                     }
 
-                    List<JavaType> interfaces;
+                    List<JavaType.FullyQualified> interfaces;
                     if (symType.interfaces_field == null) {
                         interfaces = emptyList();
                     } else {
                         interfaces = new ArrayList<>();
                         for (com.sun.tools.javac.code.Type iParam : symType.interfaces_field) {
-                            JavaType javaType = type(iParam, stackWithSym, false);
+                            JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(iParam, stackWithSym, false));
                             if (javaType != null) {
                                 interfaces.add(javaType);
                             }
@@ -1693,9 +1695,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                         kind = JavaType.Class.Kind.Class;
                     }
 
-                    JavaType.Class owner = null;
+                    JavaType.FullyQualified owner = null;
                     if (sym.owner instanceof Symbol.ClassSymbol) {
-                        owner = TypeUtils.asClass(type(sym.owner.type, stackWithSym));
+                        owner = TypeUtils.asFullyQualified(type(sym.owner.type, stackWithSym));
                     }
                     JavaType.Class clazz = JavaType.Class.build(
                             //Currently only the first 16 bits are meaninful
@@ -1703,23 +1705,29 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                             sym.className(),
                             kind,
                             fields,
-                            typeParameters,
                             interfaces,
                             null,
-                            TypeUtils.asClass(type(classType.supertype_field, stackWithSym)),
+                            TypeUtils.asFullyQualified(type(classType.supertype_field, stackWithSym)),
                             owner,
                             relaxedClassTypeMatching);
 
-                    sharedClassTypes.put(sym.className(), clazz);
-
-                    return clazz;
+                    sharedClassTypes.put(clazz.getFullyQualifiedName(), clazz);
+                    if (!typeParameters.isEmpty()) {
+                        JavaType.Parameterized parameterized = JavaType.Parameterized.build(clazz, typeParameters);
+                        sharedClassTypes.put(flyweightId, parameterized);
+                        return parameterized;
+                    } else {
+                        return clazz;
+                    }
                 }
             }
         } else if (type instanceof TypeVar) {
             return new JavaType.GenericTypeVariable(type.tsym.name.toString(),
-                    TypeUtils.asClass(type(type.getUpperBound(), stack)));
+                    TypeUtils.asFullyQualified(type(type.getUpperBound(), stack)));
         } else if (type instanceof JCPrimitiveType) {
             return primitive(type.getTag());
+        } else if (type instanceof JCVoidType) {
+            return JavaType.Primitive.Void;
         } else if (type instanceof ArrayType) {
             return new JavaType.Array(type(((ArrayType) type).elemtype, stack));
         } else if (com.sun.tools.javac.code.Type.noType.equals(type)) {
@@ -1727,6 +1735,27 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         } else {
             return null;
         }
+    }
+
+    private String getFlyweightId(ClassType classType) {
+        StringBuilder id = new StringBuilder();
+        id.append(((Symbol.ClassSymbol)classType.tsym).className());
+        if (classType.typarams_field != null && !classType.typarams_field.isEmpty()) {
+            id.append("<");
+            boolean delimit = false;
+            for (Type type : classType.typarams_field) {
+                if (delimit) id.append(",");
+                delimit = true;
+
+                if (type.tsym instanceof Symbol.ClassSymbol) {
+                    id.append(((Symbol.ClassSymbol) type.tsym).className());
+                } else if (type.tsym != null) {
+                    id.append(type.tsym.name);
+                }
+            }
+            id.append(">");
+        }
+        return id.toString();
     }
 
     @Nullable

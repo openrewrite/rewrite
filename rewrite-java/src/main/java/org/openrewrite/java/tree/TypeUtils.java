@@ -27,7 +27,7 @@ public class TypeUtils {
     }
 
     public static List<JavaType.Variable> getVisibleSupertypeMembers(@Nullable JavaType type) {
-        JavaType.Class classType = TypeUtils.asClass(type);
+        JavaType.FullyQualified classType = TypeUtils.asFullyQualified(type);
         return classType == null ? emptyList() : classType.getVisibleSupertypeMembers();
     }
 
@@ -39,7 +39,7 @@ public class TypeUtils {
     }
 
     public static boolean isOfClassType(@Nullable JavaType type, String fqn) {
-        JavaType.Class classType = asClass(type);
+        JavaType.FullyQualified classType = asFullyQualified(type);
         return classType != null && classType.getFullyQualifiedName().equals(fqn);
     }
 
@@ -48,25 +48,30 @@ public class TypeUtils {
             return to == JavaType.Class.OBJECT;
         }
 
-        JavaType.Class classTo = asClass(to);
-        JavaType.Class classFrom = asClass(from);
+        JavaType.FullyQualified classTo = asFullyQualified(to);
+        JavaType.FullyQualified classFrom = asFullyQualified(from);
 
         if (classTo == null || classFrom == null) {
             return false;
         }
 
-        if (classTo.getFullyQualifiedName().equals(classFrom.getFullyQualifiedName()) ||
+        return classTo.getFullyQualifiedName().equals(classFrom.getFullyQualifiedName()) ||
                 isAssignableTo(to, classFrom.getSupertype()) ||
-                classFrom.getInterfaces().stream().anyMatch(i -> isAssignableTo(to, i))) {
-            return true;
-        }
+                classFrom.getInterfaces().stream().anyMatch(i -> isAssignableTo(to, i));
+    }
 
-        return false;
+    /**
+     * @deprecated This method is being deprecated, please use asFullyQualified() instead.
+     */
+    @Nullable
+    @Deprecated
+    public static JavaType.Class asClass(@Nullable JavaType type) {
+        return type instanceof JavaType.Class ? (JavaType.Class) type : null;
     }
 
     @Nullable
-    public static JavaType.Class asClass(@Nullable JavaType type) {
-        return type instanceof JavaType.Class ? (JavaType.Class) type : null;
+    public static JavaType.Parameterized asParameterized(@Nullable JavaType type) {
+        return type instanceof JavaType.Parameterized ? (JavaType.Parameterized) type : null;
     }
 
     @Nullable
@@ -107,7 +112,7 @@ public class TypeUtils {
         return false;
     }
 
-    static boolean deepEquals(List<? extends JavaType> ts1, List<? extends JavaType> ts2) {
+    static boolean deepEquals(@Nullable List<? extends JavaType> ts1, @Nullable List<? extends JavaType> ts2) {
 
         if (ts1 == null || ts2 == null) {
             return ts1 == null && ts2 == null;

@@ -69,7 +69,21 @@ public interface JavaType extends Serializable {
     }
 
     abstract class FullyQualified implements JavaType {
+
         public abstract String getFullyQualifiedName();
+        public abstract boolean hasFlags(Flag... test);
+        public abstract Set<Flag> getFlags();
+        public abstract List<FullyQualified> getInterfaces();
+        public abstract Class.Kind getKind();
+        public abstract List<Variable> getMembers();
+
+        @Nullable
+        public abstract FullyQualified getOwningClass();
+
+        @Nullable
+        public abstract FullyQualified getSupertype();
+
+        public abstract List<Variable> getVisibleSupertypeMembers();
 
         public String getClassName() {
             AtomicBoolean dropWhile = new AtomicBoolean(false);
@@ -91,12 +105,12 @@ public interface JavaType extends Serializable {
                     .collect(joining("."));
         }
 
-        public boolean isAssignableFrom(@Nullable JavaType.Class clazz) {
+        public boolean isAssignableFrom(@Nullable JavaType.FullyQualified clazz) {
+            //TODO This does not take into account type parameters.
             return clazz != null && (this == Class.OBJECT ||
-                    getFullyQualifiedName().equals(clazz.fullyQualifiedName) ||
+                    getFullyQualifiedName().equals(clazz.getFullyQualifiedName()) ||
                     isAssignableFrom(clazz.getSupertype()) ||
-                    clazz.getInterfaces().stream().anyMatch(i -> i instanceof Class && isAssignableFrom((Class) i))
-            );
+                    clazz.getInterfaces().stream().anyMatch(this::isAssignableFrom));
         }
     }
 
@@ -111,6 +125,46 @@ public interface JavaType extends Serializable {
 
         public ShallowClass(String fullyQualifiedName) {
             this.fullyQualifiedName = fullyQualifiedName;
+        }
+
+        @Override
+        public Class.Kind getKind() {
+            return Class.Kind.Class;
+        }
+
+        @Override
+        public boolean hasFlags(Flag... test) {
+            return test.length == 1 && test[0] == Flag.Public;
+        }
+
+        @Override
+        public Set<Flag> getFlags() {
+            return Collections.singleton(Flag.Public);
+        }
+
+        @Override
+        public List<FullyQualified> getInterfaces() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public List<Variable> getMembers() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public FullyQualified getOwningClass() {
+            return null;
+        }
+
+        @Override
+        public FullyQualified getSupertype() {
+            return Class.OBJECT;
+        }
+
+        @Override
+        public List<Variable> getVisibleSupertypeMembers() {
+            return Collections.emptyList();
         }
 
         @Override
@@ -139,48 +193,33 @@ public interface JavaType extends Serializable {
         private final Kind kind;
 
         private final List<Variable> members;
-        private final List<JavaType> typeParameters;
-        private final List<JavaType> interfaces;
+        private final List<FullyQualified> interfaces;
 
         @Nullable
         private volatile List<Method> constructors;
 
         @Nullable
-        private final Class supertype;
+        private final FullyQualified supertype;
 
         @Nullable
-        private final Class owningClass;
-
-        private final String flyweightId;
+        private final FullyQualified owningClass;
 
         private Class(int flagsBitMap,
                       String fullyQualifiedName,
                       Kind kind,
                       List<Variable> members,
-                      List<JavaType> typeParameters,
-                      List<JavaType> interfaces,
+                      List<FullyQualified> interfaces,
                       @Nullable List<Method> constructors,
-                      @Nullable Class supertype,
-                      @Nullable Class owningClass) {
+                      @Nullable FullyQualified supertype,
+                      @Nullable FullyQualified owningClass) {
             this.fullyQualifiedName = fullyQualifiedName;
             this.flagsBitMap = flagsBitMap;
             this.kind = kind;
             this.members = members;
-            this.typeParameters = typeParameters;
             this.interfaces = interfaces;
             this.constructors = constructors;
             this.supertype = supertype;
             this.owningClass = owningClass;
-
-
-            //The flyweight ID is used to group class variants by their class names. The one execption to this rule
-            //are classes that include generic types, their IDs need to be a function of the class name plus the generic
-            //parameter types.
-            StringBuilder tag = new StringBuilder(fullyQualifiedName);
-            if (!typeParameters.isEmpty()) {
-                tag.append("<").append(typeParameters.stream().map(JavaType::toString).collect(Collectors.joining(","))).append(">");
-            }
-            this.flyweightId = tag.toString();
         }
 
         public boolean hasFlags(Flag... test) {
@@ -201,7 +240,7 @@ public interface JavaType extends Serializable {
          * @return Any class found in the type cache
          */
         public static Class build(String fullyQualifiedName) {
-            return build(1, fullyQualifiedName, Kind.Class, emptyList(), emptyList(), emptyList(), null, null, null,true);
+            return build(1, fullyQualifiedName, Kind.Class, emptyList(), emptyList(), null, null, null,true);
         }
 
         /**
@@ -215,19 +254,18 @@ public interface JavaType extends Serializable {
          * @return Any class found in the type cache
          */
         public static Class build(String fullyQualifiedName, Kind kind) {
-            return build(1, fullyQualifiedName, kind, emptyList(), emptyList(), emptyList(), null, null, null,true);
+            return build(1, fullyQualifiedName, kind, emptyList(), emptyList(), null, null, null,true);
         }
 
         public static Class build(Set<Flag> flags,
                                   String fullyQualifiedName,
                                   Kind kind,
                                   List<Variable> members,
-                                  List<JavaType> typeParameters,
-                                  List<JavaType> interfaces,
+                                  List<FullyQualified> interfaces,
                                   List<Method> constructors,
-                                  @Nullable Class supertype,
-                                  @Nullable Class owningClass) {
-            return build(Flag.flagsToBitMap(flags), fullyQualifiedName, kind, members, typeParameters, interfaces, constructors, supertype, owningClass, false);
+                                  @Nullable FullyQualified supertype,
+                                  @Nullable FullyQualified owningClass) {
+            return build(Flag.flagsToBitMap(flags), fullyQualifiedName, kind, members, interfaces, constructors, supertype, owningClass, false);
         }
 
         @JsonCreator
@@ -235,23 +273,21 @@ public interface JavaType extends Serializable {
                                      String fullyQualifiedName,
                                      Kind kind,
                                      List<Variable> members,
-                                     List<JavaType> typeParameters,
-                                     List<JavaType> interfaces,
+                                     List<FullyQualified> interfaces,
                                      @Nullable List<Method> constructors,
-                                     @Nullable Class supertype,
-                                     @Nullable Class owningClass) {
-            return build(flagsBitMap, fullyQualifiedName, kind, members, typeParameters, interfaces, constructors, supertype, owningClass, false);
+                                     @Nullable FullyQualified supertype,
+                                     @Nullable FullyQualified owningClass) {
+            return build(flagsBitMap, fullyQualifiedName, kind, members, interfaces, constructors, supertype, owningClass, false);
         }
 
         public static Class build(int flagsBitMap,
                                   String fullyQualifiedName,
                                   Kind kind,
                                   List<Variable> members,
-                                  List<JavaType> typeParameters,
-                                  List<JavaType> interfaces,
+                                  List<FullyQualified> interfaces,
                                   @Nullable List<Method> constructors,
-                                  @Nullable Class supertype,
-                                  @Nullable Class owningClass,
+                                  @Nullable FullyQualified supertype,
+                                  @Nullable FullyQualified owningClass,
                                   boolean relaxedClassTypeMatching) {
 
             List<Variable> sortedMembers;
@@ -265,7 +301,7 @@ public interface JavaType extends Serializable {
             }
             sortedMembers.sort(comparing(Variable::getName));
 
-            JavaType.Class candidate = new Class( flagsBitMap, fullyQualifiedName, kind, sortedMembers, typeParameters, interfaces, constructors, supertype, owningClass);
+            JavaType.Class candidate = new Class( flagsBitMap, fullyQualifiedName, kind, sortedMembers, interfaces, constructors, supertype, owningClass);
 
             // This logic will attempt to match the candidate against a candidate in the flyweights. If a match is found,
             // that instance is used over the new candidate to prevent a large memory footprint. If relaxed class type
@@ -274,7 +310,7 @@ public interface JavaType extends Serializable {
             // hierarchies.
 
             synchronized (flyweights) {
-                Set<JavaType.Class> variants = flyweights.computeIfAbsent(candidate.flyweightId, fqn -> new HashSet<>());
+                Set<JavaType.Class> variants = flyweights.computeIfAbsent(candidate.fullyQualifiedName, fqn -> new HashSet<>());
 
                 if (relaxedClassTypeMatching) {
                     if (variants.isEmpty()) {
@@ -381,8 +417,8 @@ public interface JavaType extends Serializable {
 
         public List<Variable> getVisibleSupertypeMembers() {
             List<Variable> members = new ArrayList<>();
-            if (supertype != null) {
-                for (Variable member : supertype.getMembers()) {
+            if (this.supertype != null) {
+                for (Variable member : this.supertype.getMembers()) {
                     if (!member.hasFlags(Flag.Private)) {
                         members.add(member);
                     }
@@ -403,8 +439,8 @@ public interface JavaType extends Serializable {
                     this == c || (kind == c.kind && flagsBitMap == c.flagsBitMap &&
                             fullyQualifiedName.equals(c.fullyQualifiedName) &&
                                     TypeUtils.deepEquals(members, c.members) &&
-                                    TypeUtils.deepEquals(supertype, c.supertype) &&
-                                    TypeUtils.deepEquals(typeParameters, c.typeParameters));
+                                    TypeUtils.deepEquals(interfaces, c.interfaces) &&
+                                    TypeUtils.deepEquals(supertype, c.supertype));
         }
 
         @Override
@@ -422,11 +458,143 @@ public interface JavaType extends Serializable {
 
     @EqualsAndHashCode(callSuper = false)
     @Data
+    class Parameterized extends FullyQualified {
+
+        private final static Map<String, IdentityHashMap<FullyQualified, Parameterized>> flyweights = new HashMap<>();
+
+        private final FullyQualified type;
+        private final List<JavaType> typeParameters;
+
+
+        @JsonCreator
+        public static Parameterized build(FullyQualified type, List<JavaType> typeParameters) {
+            StringBuilder flyweightId = new StringBuilder(type.getFullyQualifiedName());
+            if (!typeParameters.isEmpty()) {
+                flyweightId.append("<").append(typeParameters.stream().map(JavaType::toString).collect(Collectors.joining(","))).append(">");
+            }
+            synchronized (flyweights) {
+                Map<FullyQualified, Parameterized> variants = flyweights.computeIfAbsent(flyweightId.toString(), fqn -> new IdentityHashMap<>());
+                Parameterized parameterized = variants.get(type);
+                if (parameterized != null) {
+                    return parameterized;
+                }
+                parameterized = new Parameterized(type, typeParameters);
+                variants.put(type, parameterized);
+                return parameterized;
+            }
+        }
+
+
+        private Parameterized(FullyQualified type, List<JavaType> typeParameters) {
+            this.type = type;
+            this.typeParameters = typeParameters;
+        }
+
+        @Override
+        public String getFullyQualifiedName() {
+            return type.getFullyQualifiedName();
+        }
+
+        @Override
+        public boolean hasFlags(Flag... test) {
+            return type.hasFlags();
+        }
+
+        @Override
+        public Set<Flag> getFlags() {
+            return type.getFlags();
+        }
+
+        @Override
+        public List<FullyQualified> getInterfaces() {
+            return type.getInterfaces();
+        }
+
+        @Override
+        public JavaType.Class.Kind getKind() {
+            return type.getKind();
+        }
+
+        @Override
+        public List<Variable> getMembers() {
+            return type.getMembers();
+        }
+
+        @Override
+        public FullyQualified getOwningClass() {
+            return type.getOwningClass();
+        }
+
+        @Override
+        public FullyQualified getSupertype() {
+            return type.getSupertype();
+        }
+
+        @Override
+        public List<Variable> getVisibleSupertypeMembers() {
+            return type.getVisibleSupertypeMembers();
+        }
+
+        @Override
+        public boolean deepEquals(@Nullable JavaType type) {
+            if (!(type instanceof Parameterized)) {
+                return false;
+            }
+
+            Parameterized p = (Parameterized) type;
+            return
+                    this == p || (TypeUtils.deepEquals(this.type, p.type) &&
+                            TypeUtils.deepEquals(this.typeParameters, p.typeParameters));
+        }
+    }
+
+    @EqualsAndHashCode(callSuper = false)
+    @Data
     class Cyclic extends FullyQualified {
         private final String fullyQualifiedName;
 
         public Cyclic(String fullyQualifiedName) {
             this.fullyQualifiedName = fullyQualifiedName;
+        }
+
+        @Override
+        public Class.Kind getKind() {
+            return Class.Kind.Class;
+        }
+
+        @Override
+        public boolean hasFlags(Flag... test) {
+            return test.length == 1 && test[0] == Flag.Public;
+        }
+
+        @Override
+        public Set<Flag> getFlags() {
+            return Collections.singleton(Flag.Public);
+        }
+
+        @Override
+        public List<FullyQualified> getInterfaces() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public List<Variable> getMembers() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public Class getOwningClass() {
+            return null;
+        }
+
+        @Override
+        public Class getSupertype() {
+            return Class.OBJECT;
+        }
+
+        @Override
+        public List<Variable> getVisibleSupertypeMembers() {
+            return Collections.emptyList();
         }
 
         @Override
@@ -589,7 +757,47 @@ public interface JavaType extends Serializable {
         private final String fullyQualifiedName;
 
         @Nullable
-        private final Class bound;
+        private final FullyQualified bound;
+
+        @Override
+        public Class.Kind getKind() {
+            return Class.Kind.Class;
+        }
+
+        @Override
+        public boolean hasFlags(Flag... test) {
+            return bound != null && bound.hasFlags(test);
+        }
+
+        @Override
+        public Set<Flag> getFlags() {
+            return bound == null ? Collections.emptySet() : bound.getFlags();
+        }
+
+        @Override
+        public List<FullyQualified> getInterfaces() {
+            return bound == null ? Collections.emptyList() : bound.getInterfaces();
+        }
+
+        @Override
+        public List<Variable> getMembers() {
+            return bound == null ? Collections.emptyList() : bound.getMembers();
+        }
+
+        @Override
+        public FullyQualified getOwningClass() {
+            return bound == null ? null : bound.getOwningClass();
+        }
+
+        @Override
+        public FullyQualified getSupertype() {
+            return bound == null ? null : bound.getSupertype();
+        }
+
+        @Override
+        public List<Variable> getVisibleSupertypeMembers() {
+            return bound == null ? Collections.emptyList() : bound.getVisibleSupertypeMembers();
+        }
 
         @Override
         public boolean deepEquals(@Nullable JavaType type) {

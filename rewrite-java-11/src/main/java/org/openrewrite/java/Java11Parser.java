@@ -202,7 +202,7 @@ public class Java11Parser implements JavaParser {
             ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
         }
 
-        Map<String, JavaType.Class> sharedClassTypes = new HashMap<>();
+        Map<String, JavaType.FullyQualified> sharedClassTypes = new HashMap<>();
         return cus.entrySet().stream()
                 .map(cuByPath -> {
                     Timer.Sample sample = Timer.start();

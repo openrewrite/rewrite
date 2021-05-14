@@ -104,14 +104,14 @@ public class MethodMatcher {
             return false;
         }
 
-        return matchesTargetType(TypeUtils.asClass(enclosing.getType())) &&
+        return matchesTargetType(enclosing.getType()) &&
                 methodNamePattern.matcher(method.getSimpleName()).matches() &&
                 argumentPattern.matcher(method.getParameters().stream()
                         .map(v -> {
                             if (v instanceof J.VariableDeclarations) {
                                 J.VariableDeclarations vd = (J.VariableDeclarations) v;
-                                if (vd.getTypeAsClass() != null) {
-                                    return vd.getTypeAsClass();
+                                if (vd.getTypeAsFullyQualified() != null) {
+                                    return vd.getTypeAsFullyQualified();
                                 } else {
                                     return vd.getTypeExpression() != null ? vd.getTypeExpression().getType() : null;
                                 }
@@ -158,7 +158,7 @@ public class MethodMatcher {
                     .collect(joining(","));
         }
 
-        JavaType.Class type = TypeUtils.asClass(constructor.getType());
+        JavaType.FullyQualified type = TypeUtils.asFullyQualified(constructor.getType());
         assert type != null;
         return matchesTargetType(type) &&
                 methodNamePattern.matcher(type.getClassName()).matches() &&
@@ -166,10 +166,9 @@ public class MethodMatcher {
     }
 
     boolean matchesTargetType(@Nullable JavaType.FullyQualified type) {
-        JavaType.Class asClass = TypeUtils.asClass(type);
         return type != null && (targetTypePattern.matcher(type.getFullyQualifiedName()).matches() ||
                 type != JavaType.Class.OBJECT &&
-                        (asClass == null || matchesTargetType(asClass.getSupertype() == null ? JavaType.Class.OBJECT : asClass.getSupertype())));
+                        (matchesTargetType(type.getSupertype() == null ? JavaType.Class.OBJECT : type.getSupertype())));
     }
 
     @Nullable

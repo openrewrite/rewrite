@@ -30,18 +30,18 @@ public class FindReferencedTypes {
     private FindReferencedTypes() {
     }
 
-    public static Set<JavaType.Class> find(J j) {
-        Set<JavaType.Class> fields = new HashSet<>();
+    public static Set<JavaType.FullyQualified> find(J j) {
+        Set<JavaType.FullyQualified> fields = new HashSet<>();
         new FindReferencedTypesVisitor().visit(j, fields);
         return fields;
     }
 
-    private static class FindReferencedTypesVisitor extends JavaIsoVisitor<Set<JavaType.Class>> {
+    private static class FindReferencedTypesVisitor extends JavaIsoVisitor<Set<JavaType.FullyQualified>> {
         @Override
-        public <N extends NameTree> N visitTypeName(N name, Set<JavaType.Class> ctx) {
-            JavaType.Class asClass = TypeUtils.asClass(name.getType());
-            if (asClass != null) {
-                ctx.add(asClass);
+        public <N extends NameTree> N visitTypeName(N name, Set<JavaType.FullyQualified> ctx) {
+            JavaType.FullyQualified fullyQualified = TypeUtils.asFullyQualified(name.getType());
+            if (fullyQualified != null) {
+                ctx.add(fullyQualified);
             }
             return super.visitTypeName(name, ctx);
         }

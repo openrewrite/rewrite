@@ -37,7 +37,7 @@ public class ChangeFieldType<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
-        JavaType.Class typeAsClass = multiVariable.getTypeAsClass();
+        JavaType.FullyQualified typeAsClass = multiVariable.getTypeAsFullyQualified();
         J.VariableDeclarations mv = super.visitVariableDeclarations(multiVariable, p);
         if (typeAsClass != null && oldFullyQualifiedTypeName.equals(typeAsClass.getFullyQualifiedName())) {
 
@@ -54,7 +54,7 @@ public class ChangeFieldType<P> extends JavaIsoVisitor<P> {
             );
 
             mv = mv.withVariables(ListUtils.map(mv.getVariables(), var -> {
-                JavaType.Class varType = TypeUtils.asClass(var.getType());
+                JavaType.FullyQualified varType = TypeUtils.asFullyQualified(var.getType());
                 if (varType != null && !varType.equals(newFieldType)) {
                     return var.withType(newFieldType).withName(var.getName().withType(newFieldType));
                 }
