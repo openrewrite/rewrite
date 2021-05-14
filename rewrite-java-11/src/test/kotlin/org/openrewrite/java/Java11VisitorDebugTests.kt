@@ -20,6 +20,8 @@ import org.openrewrite.DebugOnly
 import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.format.*
 import org.openrewrite.java.search.*
+import org.openrewrite.java.security.SecureTempFileCreationTest
+import org.openrewrite.java.security.XmlParserXXEVulnerabilityTest
 import org.openrewrite.java.tree.TypeTreeTest
 
 //----------------------------------------------------------------------------------------------
@@ -201,6 +203,10 @@ class Java11ReorderMethodArgumentsTest : Java11Test, ReorderMethodArgumentsTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11ResultOfMethodCallIgnoredTest : Java11Test, ResultOfMethodCallIgnoredTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11SecureTempFileCreationTest : Java11Test, SecureTempFileCreationTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

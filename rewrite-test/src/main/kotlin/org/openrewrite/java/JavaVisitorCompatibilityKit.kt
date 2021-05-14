@@ -20,6 +20,8 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.format.*
 import org.openrewrite.java.search.*
+import org.openrewrite.java.security.SecureTempFileCreationTest
+import org.openrewrite.java.security.XmlParserXXEVulnerabilityTest
 import org.openrewrite.java.tree.TypeTreeTest
 
 //----------------------------------------------------------------------------------------
@@ -162,6 +164,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class ResultOfMethodCallIgnoredTck : ResultOfMethodCallIgnoredTest
+
+    @Nested
+    inner class SecureTempFileCreationTck : SecureTempFileCreationTest
 
     @Nested
     inner class SemanticallyEqualTck : SemanticallyEqualTest
