@@ -24,14 +24,25 @@ import org.openrewrite.marker.RecipeSearchResult;
 
 import java.util.UUID;
 
+import static org.openrewrite.Tree.randomId;
+
 @Incubating(since = "7.2.0")
 public class XmlSearchResult extends RecipeSearchResult {
     @JsonCreator
     public XmlSearchResult(UUID id, Recipe recipe, @Nullable String description) {
         super(id, recipe, description);
     }
+
     public XmlSearchResult(UUID id, Recipe recipe) {
         super(id, recipe, null);
+    }
+
+    public XmlSearchResult(Recipe recipe) {
+        super(randomId(), recipe, null);
+    }
+
+    public XmlSearchResult(Recipe recipe, @Nullable String description) {
+        super(randomId(), recipe, description);
     }
 
     @Override

@@ -17,7 +17,10 @@ package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.marker.JavaSearchResult;
@@ -28,7 +31,6 @@ import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.UUID;
 
 /**
  * This recipe finds all explicit references to a type.
@@ -52,8 +54,6 @@ public class FindTypes extends Recipe {
         return "Find type references by name.";
     }
 
-    UUID id = Tree.randomId();
-
     @Override
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
         return new UsesType<>(fullyQualifiedTypeName);
@@ -69,7 +69,7 @@ public class FindTypes extends Recipe {
                 JavaType.FullyQualified asFullyQualified = TypeUtils.asFullyQualified(n.getType());
                 if (asFullyQualified != null && asFullyQualified.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         getCursor().firstEnclosing(J.Import.class) == null) {
-                    return n.withMarkers(n.getMarkers().addIfAbsent(new JavaSearchResult(id, FindTypes.this)));
+                    return n.withMarkers(n.getMarkers().addIfAbsent(new JavaSearchResult(FindTypes.this)));
                 }
                 return n;
             }
@@ -80,7 +80,7 @@ public class FindTypes extends Recipe {
                 JavaType.FullyQualified asFullyQualified = TypeUtils.asFullyQualified(fa.getTarget().getType());
                 if (asFullyQualified != null && asFullyQualified.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         fa.getName().getSimpleName().equals("class")) {
-                    return fa.withMarkers(fa.getMarkers().addIfAbsent(new JavaSearchResult(id, FindTypes.this)));
+                    return fa.withMarkers(fa.getMarkers().addIfAbsent(new JavaSearchResult(FindTypes.this)));
                 }
                 return fa;
             }

@@ -28,9 +28,6 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.UUID;
-
-import static org.openrewrite.Tree.randomId;
 
 @EqualsAndHashCode(callSuper = true)
 @Value
@@ -51,8 +48,6 @@ public class FindTags extends Recipe {
         return "Find XML tags by XPath expression.";
     }
 
-    UUID id = randomId();
-
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         XPathMatcher xPathMatcher = new XPathMatcher(xPath);
@@ -62,7 +57,7 @@ public class FindTags extends Recipe {
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
                 if (xPathMatcher.matches(getCursor())) {
-                    t = t.withMarkers(t.getMarkers().addIfAbsent(new XmlSearchResult(id,FindTags.this)));
+                    t = t.withMarkers(t.getMarkers().addIfAbsent(new XmlSearchResult(FindTags.this)));
                 }
                 return t;
             }

@@ -26,12 +26,9 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 
 import java.util.List;
-import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
-
-import static org.openrewrite.Tree.randomId;
 
 @EqualsAndHashCode(callSuper = true)
 @Value
@@ -41,8 +38,6 @@ public class FindText extends Recipe {
             description = "A list of regular expressions to search for.",
             example = "-----BEGIN RSA PRIVATE KEY-----")
     List<String> patterns;
-
-    UUID id = randomId();
 
     @Override
     public String getDisplayName() {
@@ -83,7 +78,7 @@ public class FindText extends Recipe {
             public Space visitSpace(Space space, Space.Location loc, ExecutionContext context) {
                 return space.withComments(ListUtils.map(space.getComments(), comment -> {
                     if(compiledPatterns.stream().anyMatch(p -> p.matcher(comment.getText()).find())) {
-                        return comment.withMarkers(comment.getMarkers().addIfAbsent(new JavaSearchResult(id, FindText.this)));
+                        return comment.withMarkers(comment.getMarkers().addIfAbsent(new JavaSearchResult(FindText.this)));
                     }
                     return comment;
                 }));
@@ -98,7 +93,7 @@ public class FindText extends Recipe {
                 assert literal.getValue() != null;
                 if (compiledPatterns.stream().anyMatch(p -> p
                         .matcher(literal.getValue().toString()).find())) {
-                    return literal.withMarkers(literal.getMarkers().addIfAbsent(new JavaSearchResult(id, FindText.this)));
+                    return literal.withMarkers(literal.getMarkers().addIfAbsent(new JavaSearchResult(FindText.this)));
                 }
 
                 return literal;

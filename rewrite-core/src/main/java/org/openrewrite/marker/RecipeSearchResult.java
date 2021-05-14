@@ -18,7 +18,6 @@ package org.openrewrite.marker;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.Value;
 import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.Nullable;

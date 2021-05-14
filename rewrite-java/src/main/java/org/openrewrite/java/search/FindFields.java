@@ -28,9 +28,6 @@ import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.UUID;
-
-import static org.openrewrite.Tree.randomId;
 
 /**
  * Finds fields that have a matching type.
@@ -43,8 +40,6 @@ public class FindFields extends Recipe {
             description = "A fully-qualified Java type name, that is used to find matching fields.",
             example = "org.slf4j.api.Logger")
     String fullyQualifiedTypeName;
-
-    UUID id = randomId();
 
     @Override
     public String getDisplayName() {
@@ -66,7 +61,7 @@ public class FindFields extends Recipe {
                 }
                 if (multiVariable.getTypeExpression() != null && TypeUtils.hasElementType(multiVariable.getTypeExpression()
                         .getType(), fullyQualifiedTypeName)) {
-                    return multiVariable.withMarkers(multiVariable.getMarkers().addIfAbsent(new JavaSearchResult(id, FindFields.this)));
+                    return multiVariable.withMarkers(multiVariable.getMarkers().addIfAbsent(new JavaSearchResult(FindFields.this)));
                 }
                 return multiVariable;
             }

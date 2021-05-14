@@ -24,6 +24,8 @@ import org.openrewrite.marker.RecipeSearchResult;
 
 import java.util.UUID;
 
+import static org.openrewrite.Tree.randomId;
+
 @Incubating(since = "7.2.0")
 public class JavaSearchResult extends RecipeSearchResult {
     @JsonCreator
@@ -33,6 +35,14 @@ public class JavaSearchResult extends RecipeSearchResult {
 
     public JavaSearchResult(UUID id, Recipe recipe) {
         super(id, recipe, null);
+    }
+
+    public JavaSearchResult(Recipe recipe) {
+        super(randomId(), recipe, null);
+    }
+
+    public JavaSearchResult(Recipe recipe, @Nullable String description) {
+        super(randomId(), recipe, description);
     }
 
     @Override

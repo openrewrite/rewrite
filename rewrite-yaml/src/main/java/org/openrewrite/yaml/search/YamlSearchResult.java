@@ -13,12 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.properties.marker;
+package org.openrewrite.yaml.search;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.RecipeSearchResult;
 
@@ -26,29 +25,22 @@ import java.util.UUID;
 
 import static org.openrewrite.Tree.randomId;
 
-@Incubating(since = "7.2.0")
-public class PropertiesSearchResult extends RecipeSearchResult {
+@Incubating(since = "7.5.0")
+public class YamlSearchResult extends RecipeSearchResult {
     @JsonCreator
-    public PropertiesSearchResult(UUID id, Recipe recipe, @Nullable String description) {
+    public YamlSearchResult(UUID id, Recipe recipe, @Nullable String description) {
         super(id, recipe, description);
     }
-    public PropertiesSearchResult(UUID id, Recipe recipe) {
+
+    public YamlSearchResult(UUID id, Recipe recipe) {
         super(id, recipe, null);
     }
 
-    public PropertiesSearchResult(Recipe recipe) {
+    public YamlSearchResult(Recipe recipe) {
         super(randomId(), recipe, null);
     }
 
-    public PropertiesSearchResult(Recipe recipe, @Nullable String description) {
+    public YamlSearchResult(Recipe recipe, @Nullable String description) {
         super(randomId(), recipe, description);
-    }
-    @Override
-    public <P> String print(TreePrinter<P> printer, P p) {
-        if (getDescription() == null) {
-            return "#~~>\n";
-        } else {
-            return String.format("#~~(%s)~~>\n", getDescription());
-        }
     }
 }

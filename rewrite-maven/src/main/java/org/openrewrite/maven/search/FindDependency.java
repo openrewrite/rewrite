@@ -25,9 +25,6 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.UUID;
-
-import static org.openrewrite.Tree.randomId;
 
 @EqualsAndHashCode(callSuper = true)
 @Value
@@ -42,8 +39,6 @@ public class FindDependency extends Recipe {
             description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
             example = "guava")
     String artifactId;
-
-    UUID id = randomId();
 
     public static Set<Xml.Tag> find(Maven maven, String groupId, String artifactId) {
         Set<Xml.Tag> ds = new HashSet<>();
@@ -75,7 +70,7 @@ public class FindDependency extends Recipe {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
                 if (isDependencyTag(groupId, artifactId)) {
-                    return tag.withMarkers(tag.getMarkers().addIfAbsent(new XmlSearchResult(id, FindDependency.this)));
+                    return tag.withMarkers(tag.getMarkers().addIfAbsent(new XmlSearchResult(FindDependency.this)));
                 }
                 return super.visitTag(tag, context);
             }

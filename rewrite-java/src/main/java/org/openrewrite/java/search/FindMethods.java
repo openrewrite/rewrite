@@ -29,9 +29,6 @@ import org.openrewrite.java.tree.J;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.UUID;
-
-import static org.openrewrite.Tree.randomId;
 
 /**
  * Finds matching method invocations.
@@ -48,8 +45,6 @@ public class FindMethods extends Recipe {
             description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.",
             example = "java.util.List add(..)")
     String methodPattern;
-
-    UUID id = randomId();
 
     @Override
     public String getDisplayName() {
@@ -74,7 +69,7 @@ public class FindMethods extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if (methodMatcher.matches(method)) {
-                    m = m.withMarkers(m.getMarkers().addIfAbsent(new JavaSearchResult(id, FindMethods.this)));
+                    m = m.withMarkers(m.getMarkers().addIfAbsent(new JavaSearchResult(FindMethods.this)));
                 }
                 return m;
             }
@@ -83,7 +78,7 @@ public class FindMethods extends Recipe {
             public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
                 J.MemberReference m = super.visitMemberReference(memberRef, ctx);
                 if (methodMatcher.matches(m.getReferenceType())) {
-                    m = m.withReference(m.getReference().withMarkers(m.getReference().getMarkers().addIfAbsent(new JavaSearchResult(id, FindMethods.this))));
+                    m = m.withReference(m.getReference().withMarkers(m.getReference().getMarkers().addIfAbsent(new JavaSearchResult(FindMethods.this))));
                 }
                 return m;
             }
