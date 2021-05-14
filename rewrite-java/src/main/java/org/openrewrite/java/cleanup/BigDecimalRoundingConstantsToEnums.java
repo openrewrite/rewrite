@@ -20,7 +20,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesType;
@@ -28,19 +28,10 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-
 public class BigDecimalRoundingConstantsToEnums extends Recipe {
-
-    private static final String BIG_DECIMAL_FQN = BigDecimal.class.getName();
-    private static final String ROUNDING_MODE_FQN = RoundingMode.class.getName();
-
-    private static final MethodMatcher BIG_DECIMAL_DIVIDE_METHOD_MATCHER = new MethodMatcher(BIG_DECIMAL_FQN + " divide(java.math.BigDecimal, int)");
-    private static final MethodMatcher BIG_DECIMAL_DIVIDE_WITH_SCALE_METHOD_MATCHER = new MethodMatcher(BIG_DECIMAL_FQN + " divide(java.math.BigDecimal, int, int)");
-    private static final MethodMatcher BIG_DECIMAL_SET_SCALE_METHOD_MATCHER = new MethodMatcher(BIG_DECIMAL_FQN + " setScale(int, int)");
-
-    private static final ThreadLocal<JavaParser> JAVA_PARSER_THREAD_LOCAL = ThreadLocal.withInitial(() -> JavaParser.fromJavaVersion().build());
+    private static final MethodMatcher BIG_DECIMAL_DIVIDE = new MethodMatcher("java.math.BigDecimal divide(java.math.BigDecimal, int)");
+    private static final MethodMatcher BIG_DECIMAL_DIVIDE_WITH_SCALE = new MethodMatcher("java.math.BigDecimal divide(java.math.BigDecimal, int, int)");
+    private static final MethodMatcher BIG_DECIMAL_SET_SCALE = new MethodMatcher("java.math.BigDecimal setScale(int, int)");
 
     @Override
     public String getDisplayName() {
@@ -54,54 +45,55 @@ public class BigDecimalRoundingConstantsToEnums extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>(BIG_DECIMAL_FQN);
+        return new UsesType<>("java.math.BigDecimal");
     }
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
+            private final JavaTemplate twoArg = template("#{any(int)}, #{}")
+                    .imports("java.math.RoundingMode").build();
+
+            private final JavaTemplate threeArg = template("#{any(java.math.BigDecimal)}, #{any(int)}, #{}")
+                    .imports("java.math.RoundingMode").build();
+
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                J.MethodInvocation mi = super.visitMethodInvocation(method, executionContext);
-                if ((BIG_DECIMAL_DIVIDE_METHOD_MATCHER.matches(mi) || BIG_DECIMAL_SET_SCALE_METHOD_MATCHER.matches(mi)) &&
-                    isConvertibleBigDecimalConstant(mi.getArguments().get(1))) {
-                    mi = mi.withTemplate(template("(#{}, #{})")
-                            .imports(ROUNDING_MODE_FQN)
-                            .javaParser(JAVA_PARSER_THREAD_LOCAL.get()).build(), mi.getCoordinates().replaceArguments(), mi.getArguments().get(0), getTemplateValue(mi.getArguments().get(1)));
-                    maybeAddImport(ROUNDING_MODE_FQN);
-                } else if (BIG_DECIMAL_DIVIDE_WITH_SCALE_METHOD_MATCHER.matches(mi) &&
-                        isConvertibleBigDecimalConstant(mi.getArguments().get(2))) {
-                    mi = mi.withTemplate(template("(#{}, #{}, #{})")
-                            .imports(ROUNDING_MODE_FQN)
-                            .javaParser(JAVA_PARSER_THREAD_LOCAL.get()).build(), mi.getCoordinates().replaceArguments(), mi.getArguments().get(0), mi.getArguments().get(1), getTemplateValue(mi.getArguments().get(2)));
-                    maybeAddImport(ROUNDING_MODE_FQN);
+                J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
+                if ((BIG_DECIMAL_DIVIDE.matches(m) || BIG_DECIMAL_SET_SCALE.matches(m)) &&
+                        isConvertibleBigDecimalConstant(m.getArguments().get(1))) {
+                    m = m.withTemplate(twoArg, m.getCoordinates().replaceArguments(),
+                            m.getArguments().get(0), getTemplateValue(m.getArguments().get(1)));
+                    maybeAddImport("java.math.RoundingMode");
+                } else if (BIG_DECIMAL_DIVIDE_WITH_SCALE.matches(m) &&
+                        isConvertibleBigDecimalConstant(m.getArguments().get(2))) {
+                    m = m.withTemplate(threeArg, m.getCoordinates().replaceArguments(),
+                            m.getArguments().get(0), m.getArguments().get(1), getTemplateValue(m.getArguments().get(2)));
+                    maybeAddImport("java.math.RoundingMode");
                 }
-                return mi;
+                return m;
             }
 
             private boolean isConvertibleBigDecimalConstant(J elem) {
-                boolean isBigDecimal = false;
                 if (elem instanceof J.Literal) {
-                    isBigDecimal = true;
-                } else if (elem instanceof J.FieldAccess && ((J.FieldAccess)elem).getTarget().getType() instanceof JavaType.FullyQualified) {
-                    J.FieldAccess fa = (J.FieldAccess)elem;
-                    if (TypeUtils.isOfClassType(fa.getTarget().getType(), BIG_DECIMAL_FQN)) {
-                        isBigDecimal = true;
-                    }
+                    return true;
+                } else if (elem instanceof J.FieldAccess && ((J.FieldAccess) elem).getTarget().getType() instanceof JavaType.FullyQualified) {
+                    J.FieldAccess fa = (J.FieldAccess) elem;
+                    return fa.getTarget().getType() != null && TypeUtils.isOfClassType(fa.getTarget().getType(), "java.math.BigDecimal");
                 }
-                return isBigDecimal;
+                return false;
             }
 
             @Nullable
             private String getTemplateValue(J elem) {
                 String roundingName = null;
-                if (elem instanceof J.FieldAccess && ((J.FieldAccess)elem).getTarget().getType() instanceof JavaType.FullyQualified) {
-                    J.FieldAccess fa = (J.FieldAccess)elem;
-                    if (TypeUtils.isOfClassType(fa.getTarget().getType(),BIG_DECIMAL_FQN)) {
+                if (elem instanceof J.FieldAccess && ((J.FieldAccess) elem).getTarget().getType() instanceof JavaType.FullyQualified) {
+                    J.FieldAccess fa = (J.FieldAccess) elem;
+                    if (fa.getTarget().getType() != null && TypeUtils.isOfClassType(fa.getTarget().getType(), "java.math.BigDecimal")) {
                         roundingName = fa.getSimpleName();
                     }
-                } else if (elem instanceof J.Literal){
-                    roundingName = ((J.Literal)elem).getValueSource();
+                } else if (elem instanceof J.Literal) {
+                    roundingName = ((J.Literal) elem).getValueSource();
                 }
                 if (roundingName != null) {
                     switch (roundingName) {
@@ -129,8 +121,6 @@ public class BigDecimalRoundingConstantsToEnums extends Recipe {
                         case "ROUND_UNNECESSARY":
                         case "7":
                             return "RoundingMode.UNNECESSARY";
-                        default:
-                            break;
                     }
                 }
                 return null;

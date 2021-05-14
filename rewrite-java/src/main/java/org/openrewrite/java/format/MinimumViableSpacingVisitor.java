@@ -36,16 +36,24 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
             first = false;
         }
 
+        if (c.getPadding().getKind().getPrefix().isEmpty()) {
+            if (!first) {
+                c = c.getPadding().withKind(c.getPadding().getKind().withPrefix(
+                        c.getPadding().getKind().getPrefix().withWhitespace(" ")));
+            }
+            first = false;
+        }
+
+        if (!first && c.getName().getPrefix().getWhitespace().isEmpty()) {
+            c = c.withName(c.getName().withPrefix(c.getName().getPrefix().withWhitespace(" ")));
+        }
+
         J.ClassDeclaration.Padding padding = c.getPadding();
         JContainer<J.TypeParameter> typeParameters = padding.getTypeParameters();
         if (typeParameters != null && !typeParameters.getElements().isEmpty()) {
             if (!first && !typeParameters.getBefore().getWhitespace().isEmpty()) {
                 c = padding.withTypeParameters(typeParameters.withBefore(typeParameters.getBefore().withWhitespace(" ")));
             }
-        }
-
-        if(c.getName().getPrefix().getWhitespace().isEmpty()) {
-            c = c.withName(c.getName().withPrefix(c.getName().getPrefix().withWhitespace(" ")));
         }
 
         if (c.getPadding().getExtends() != null) {
@@ -88,6 +96,7 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
             }
             first = false;
         }
+
         J.TypeParameters typeParameters = m.getAnnotations().getTypeParameters();
         if (typeParameters != null && !typeParameters.getTypeParameters().isEmpty()) {
             if (!first && typeParameters.getPrefix().getWhitespace().isEmpty()) {
@@ -96,9 +105,10 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
                                 typeParameters.getPrefix().withWhitespace(" ")
                         )
                 );
-                first = false;
             }
+            first = false;
         }
+
         if (m.getReturnTypeExpression() != null && m.getReturnTypeExpression().getPrefix().getWhitespace().isEmpty()) {
             if (!first) {
                 m = m.withReturnTypeExpression(m.getReturnTypeExpression()
@@ -133,37 +143,38 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
         J.VariableDeclarations v = super.visitVariableDeclarations(multiVariable, p);
 
-        J firstEnclosing = getCursor().getParentOrThrow().firstEnclosing(J.class);
-        if (!(firstEnclosing instanceof J.Lambda)) {
-            if (Space.firstPrefix(v.getVariables()).getWhitespace().isEmpty()) {
-                v = v.withVariables(Space.formatFirstPrefix(v.getVariables(),
-                        v.getVariables().iterator().next().getPrefix().withWhitespace(" ")));
-            }
-        }
+        boolean first = v.getLeadingAnnotations().isEmpty();
 
         /*
          * We need at least one space between multiple modifiers, otherwise we could get a run-on like "publicstaticfinal".
          * Note, this is applicable anywhere that modifiers can exist, such as class declarations, etc.
          */
         if (!v.getModifiers().isEmpty()) {
+            boolean needFirstSpace = !first;
             v = v.withModifiers(
                     ListUtils.map(v.getModifiers(), (index, modifier) -> {
-                        //noinspection StatementWithEmptyBody
-                        if (index == 0) {
-                            // Skip the first modifier in the modifier list (if any). We only
-                            // care about ensuring there is at least one space between multiple modifiers.
-                        } else {
-                            if (modifier.getPrefix().getWhitespace().isEmpty())
+                        if (index != 0 || needFirstSpace) {
+                            if (modifier.getPrefix().getWhitespace().isEmpty()) {
                                 modifier = modifier.withPrefix(modifier.getPrefix().withWhitespace(" "));
+                            }
                         }
                         return modifier;
                     })
             );
+            first = false;
         }
 
-        if (!v.getModifiers().isEmpty()) {
-            if (v.getTypeExpression() != null && v.getTypeExpression().getPrefix().isEmpty()) {
+        if (!first && v.getTypeExpression() != null) {
+            if(v.getTypeExpression().getPrefix().getWhitespace().isEmpty()) {
                 v = v.withTypeExpression(v.getTypeExpression().withPrefix(v.getTypeExpression().getPrefix().withWhitespace(" ")));
+            }
+        }
+
+        J firstEnclosing = getCursor().getParentOrThrow().firstEnclosing(J.class);
+        if (!(firstEnclosing instanceof J.Lambda)) {
+            if (Space.firstPrefix(v.getVariables()).getWhitespace().isEmpty()) {
+                v = v.withVariables(Space.formatFirstPrefix(v.getVariables(),
+                        v.getVariables().iterator().next().getPrefix().withWhitespace(" ")));
             }
         }
 

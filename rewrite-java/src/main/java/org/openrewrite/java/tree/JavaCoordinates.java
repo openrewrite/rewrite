@@ -46,7 +46,8 @@ public class JavaCoordinates {
     }
 
     public enum Mode {
-        INSERTION,
+        AFTER,
+        BEFORE,
         REPLACEMENT
     }
 

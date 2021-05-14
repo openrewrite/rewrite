@@ -81,11 +81,12 @@ interface AddImportTest : JavaRecipeTest {
                 val c = super.visitClassDeclaration(classDecl, ctx)
                 var b = c.body
                 if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    b = b.withTemplate(
-                        template("BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);")
-                            .imports("java.math.BigDecimal", "java.math.RoundingMode").build(),
-                        b.coordinates.lastStatement()
-                    )
+                    val t = template("BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);")
+                        .doBeforeParseTemplate(::println)
+                        .imports("java.math.BigDecimal", "java.math.RoundingMode")
+                        .build()
+
+                    b = b.withTemplate(t, b.coordinates.lastStatement())
                     maybeAddImport("java.math.BigDecimal")
                     maybeAddImport("java.math.RoundingMode")
                 }

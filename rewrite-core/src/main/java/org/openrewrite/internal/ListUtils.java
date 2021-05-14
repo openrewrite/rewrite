@@ -24,6 +24,7 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import static java.util.Collections.singletonList;
@@ -137,6 +138,58 @@ public final class ListUtils {
 
     public static <T> List<T> map(List<T> ls, UnaryOperator<T> map) {
         return map(ls, (i, t) -> map.apply(t));
+    }
+
+    public static <T> List<T> flatMap(List<T> ls, BiFunction<Integer, T, Object> flatMap) {
+        if (ls == null || ls.isEmpty()) {
+            return ls;
+        }
+        List<T> newLs = ls;
+        int j = 0;
+        for (int i = 0; i < ls.size(); i++, j++) {
+            T tree = ls.get(i);
+            Object newTreeOrTrees = flatMap.apply(i, tree);
+            if (newTreeOrTrees != tree) {
+                if (newLs == ls) {
+                    newLs = new ArrayList<>(ls);
+                }
+
+                if (newTreeOrTrees instanceof Iterable) {
+                    int n = 0;
+                    //noinspection unchecked
+                    for (T newTree : (Iterable<T>) newTreeOrTrees) {
+                        if (j >= newLs.size()) {
+                            newLs.add(newTree);
+                        } else if(n == 0) {
+                            newLs.set(j, newTree);
+                        } else {
+                            newLs.add(j, newTree);
+                        }
+                        j++;
+                        n++;
+                    }
+                } else {
+                    if (j >= newLs.size()) {
+                        //noinspection unchecked
+                        newLs.add((T) newTreeOrTrees);
+                    } else {
+                        //noinspection unchecked
+                        newLs.set(j, (T) newTreeOrTrees);
+                    }
+                }
+            }
+        }
+
+        if (newLs != ls) {
+            //noinspection StatementWithEmptyBody
+            while (newLs.remove(null)) ;
+        }
+
+        return newLs;
+    }
+
+    public static <T> List<T> flatMap(List<T> ls, Function<T, Object> flatMap) {
+        return flatMap(ls, (i, t) -> flatMap.apply(t));
     }
 
     public static <T> List<T> map(List<T> ls, ForkJoinPool pool, UnaryOperator<T> map) {

@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.tree;
+package org.openrewrite.java.internal.template;
 
-/**
- * A tree representing a simple or fully qualified name
- */
-public interface NameTree extends TypedTree {
+import java.lang.annotation.Documented;
+
+@Documented
+public @interface SubAnnotation {
+    int value();
 }

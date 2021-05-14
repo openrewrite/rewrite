@@ -14,6 +14,9 @@ dependencies {
     implementation("io.github.classgraph:classgraph:latest.release")
     implementation("org.assertj:assertj-core:latest.release")
 
+    // later versions are compiled with Java 11, so are not usable in rewrite-java-8 tests
+    implementation("com.google.googlejavaformat:google-java-format:1.6")
+
     implementation("org.slf4j:slf4j-api:1.7.+")
     implementation("ch.qos.logback:logback-classic:1.0.13")
 }

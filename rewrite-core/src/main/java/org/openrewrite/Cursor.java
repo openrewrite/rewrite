@@ -82,8 +82,8 @@ public class Cursor {
 
         @Override
         public boolean hasNext() {
-            for(Cursor c = cursor; c != null; c = c.parent) {
-                if(filter.test(c.value)) {
+            for (Cursor c = cursor; c != null; c = c.parent) {
+                if (filter.test(c.value)) {
                     return true;
                 }
             }
@@ -92,9 +92,9 @@ public class Cursor {
 
         @Override
         public Object next() {
-            for(; cursor != null; cursor = cursor.parent) {
+            for (; cursor != null; cursor = cursor.parent) {
                 Object v = cursor.value;
-                if(filter.test(v)) {
+                if (filter.test(v)) {
                     cursor = cursor.parent;
                     return v;
                 }
@@ -137,7 +137,7 @@ public class Cursor {
 
     public Cursor dropParentUntil(Predicate<Object> valuePredicate) {
         Cursor cursor = parent;
-        while(cursor != null && !valuePredicate.test(cursor.value)) {
+        while (cursor != null && !valuePredicate.test(cursor.value)) {
             cursor = cursor.parent;
         }
         if (cursor == null) {
@@ -148,7 +148,7 @@ public class Cursor {
 
     public Cursor dropParentWhile(Predicate<Object> valuePredicate) {
         Cursor cursor = parent;
-        while(cursor != null && valuePredicate.test(cursor.value)) {
+        while (cursor != null && valuePredicate.test(cursor.value)) {
             cursor = cursor.parent;
         }
         if (cursor == null) {
@@ -275,5 +275,15 @@ public class Cursor {
     public <T> T pollMessage(String key) {
         //noinspection unchecked
         return messages == null ? null : (T) messages.remove(key);
+    }
+
+    /**
+     * Creates a cursor at the same position, but with its own messages that can't influence
+     * the messages of the cursor that was forked.
+     *
+     * @return A new cursor with the same position but an initially clear set of messages.
+     */
+    public Cursor fork() {
+        return new Cursor(parent == null ? null : parent.fork(), value);
     }
 }

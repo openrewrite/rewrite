@@ -32,7 +32,8 @@ import java.util.stream.Collectors;
 
 @Incubating(since = "7.0.0")
 public class SimplifyBooleanReturnVisitor<P> extends JavaVisitor<P> {
-    private final JavaTemplate notIfConditionReturn = template("return !(#{});").build();
+    private final JavaTemplate notIfConditionReturn = template("return !(#{any(boolean)});")
+            .build();
 
     @Override
     public J visitIf(J.If iff, P p) {
@@ -157,5 +158,3 @@ public class SimplifyBooleanReturnVisitor<P> extends JavaVisitor<P> {
         return Optional.empty();
     }
 }
-
-

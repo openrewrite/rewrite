@@ -40,27 +40,27 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
     public J visit(@Nullable Tree tree, P p, Cursor cursor) {
         J.CompilationUnit cu = cursor.firstEnclosingOrThrow(J.CompilationUnit.class);
 
-        J t = new NormalizeFormatVisitor<>().visit(tree, p, cursor);
+        J t = new NormalizeFormatVisitor<>().visit(tree, p, cursor.fork());
 
-        t = new MinimumViableSpacingVisitor<>().visit(t, p, cursor);
+        t = new MinimumViableSpacingVisitor<>().visit(t, p, cursor.fork());
 
-        t = new RemoveTrailingWhitespaceVisitor<>().visit(t, p, cursor);
+        t = new RemoveTrailingWhitespaceVisitor<>().visit(t, p, cursor.fork());
 
         t = new BlankLinesVisitor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
                 .orElse(IntelliJ.blankLines()), stopAfter)
-                .visit(t, p, cursor);
+                .visit(t, p, cursor.fork());
 
         t = new SpacesVisitor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
                 .orElse(IntelliJ.spaces()), stopAfter)
-                .visit(t, p, cursor);
+                .visit(t, p, cursor.fork());
 
         t = new WrappingAndBracesVisitor<>(Optional.ofNullable(cu.getStyle(WrappingAndBracesStyle.class))
                 .orElse(IntelliJ.wrappingAndBraces()), stopAfter)
-                .visit(t, p, cursor);
+                .visit(t, p, cursor.fork());
 
         t = new TabsAndIndentsVisitor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
                 .orElse(IntelliJ.tabsAndIndents()), stopAfter)
-                .visit(t, p, cursor);
+                .visit(t, p, cursor.fork());
 
         return t;
     }

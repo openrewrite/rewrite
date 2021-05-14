@@ -40,10 +40,16 @@ abstract class JavaVisitorCompatibilityKit {
     inner class AddLicenseHeaderTck : AddLicenseHeaderTest
 
     @Nested
+    inner class AnnotationTemplateGeneratorTck : AnnotationTemplateGeneratorTest
+
+    @Nested
     inner class BigDecimalRoundingConstantsToEnumsTck : BigDecimalRoundingConstantsToEnumsTest
 
     @Nested
     inner class BlankLinesTck : BlankLinesTest
+
+    @Nested
+    inner class BlockStatementTemplateGeneratorTck : BlockStatementTemplateGeneratorTest
 
     @Nested
     inner class ChangeFieldNameTck : ChangeFieldNameTest
@@ -125,6 +131,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class JavaTemplateTck : JavaTemplateTest
+
+    @Nested
+    inner class JavaTemplateSubstitutionsTck : JavaTemplateSubstitutionsTest
 
     @Nested
     inner class JavaVisitorTestTck : JavaVisitorTest

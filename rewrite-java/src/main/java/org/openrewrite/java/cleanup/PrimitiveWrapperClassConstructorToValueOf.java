@@ -19,15 +19,14 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 
 public class PrimitiveWrapperClassConstructorToValueOf extends Recipe {
-
-    private static final ThreadLocal<JavaParser> JAVA_PARSER_THREAD_LOCAL = ThreadLocal.withInitial(() -> JavaParser.fromJavaVersion().build());
 
     @Override
     public String getDisplayName() {
@@ -64,21 +63,41 @@ public class PrimitiveWrapperClassConstructorToValueOf extends Recipe {
             public J visitNewClass(J.NewClass newClass, ExecutionContext executionContext) {
                 J j = super.visitNewClass(newClass, executionContext);
                 J.NewClass nc = (J.NewClass) j;
-                if (nc.getType() instanceof JavaType.FullyQualified && nc.getArguments() != null && nc.getArguments().size() == 1) {
-                    JavaType.FullyQualified fqn = (JavaType.FullyQualified) nc.getType();
-                    switch (fqn.getFullyQualifiedName()) {
+                JavaType.FullyQualified type = TypeUtils.asFullyQualified(nc.getType());
+                if (type != null && nc.getArguments() != null && nc.getArguments().size() == 1) {
+                    JavaTemplate.Builder valueOf = null;
+                    switch (type.getFullyQualifiedName()) {
                         case "java.lang.Boolean":
+                            valueOf = template("#{}.valueOf(#{any(boolean)});");
+                            break;
                         case "java.lang.Byte":
+                            valueOf = template("#{}.valueOf(#{any(byte)});");
+                            break;
                         case "java.lang.Character":
+                            valueOf = template("#{}.valueOf(#{any(char)});");
+                            break;
                         case "java.lang.Double":
+                            valueOf = template("#{}.valueOf(#{any(double)});");
+                            break;
                         case "java.lang.Float":
+                            valueOf = template("#{}.valueOf(#{any(float)});");
+                            break;
                         case "java.lang.Integer":
+                            valueOf = template("#{}.valueOf(#{any(int)});");
+                            break;
                         case "java.lang.Long":
+                            valueOf = template("#{}.valueOf(#{any(long)});");
+                            break;
                         case "java.lang.Short":
-                            j = nc.withTemplate(template(fqn.getClassName() + ".valueOf(#{});").javaParser(JAVA_PARSER_THREAD_LOCAL.get()).build(), nc.getCoordinates().replace(), nc.getArguments().get(0));
+                            valueOf = template("#{}.valueOf(#{any(short)});");
                             break;
                         default:
                             break;
+                    }
+
+                    if(valueOf != null) {
+                        j = nc.withTemplate(valueOf.build(), nc.getCoordinates().replace(),
+                                type.getClassName(), nc.getArguments().get(0));
                     }
                 }
                 return j;

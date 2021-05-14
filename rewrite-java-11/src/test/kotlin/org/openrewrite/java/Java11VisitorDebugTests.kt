@@ -38,11 +38,19 @@ class Java11AddLicenseHeaderTest : Java11Test, AddLicenseHeaderTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11AnnotationTemplateGeneratorTest : Java11Test, AnnotationTemplateGeneratorTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11BigDecimalRoundingConstantsToEnumsTestTest : Java11Test, BigDecimalRoundingConstantsToEnumsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11BlankLinesTest : Java11Test, BlankLinesTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11BlockStatementTemplateGeneratorTest : Java11Test, BlockStatementTemplateGeneratorTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
@@ -151,6 +159,10 @@ class Java11ImplementInterfaceTest : Java11Test, ImplementInterfaceTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11JavaTemplateTest : Java11Test, JavaTemplateTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11JavaTemplateSubstitutionsTest : Java11Test, JavaTemplateSubstitutionsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

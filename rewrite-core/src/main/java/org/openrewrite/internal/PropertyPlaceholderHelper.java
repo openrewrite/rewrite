@@ -104,8 +104,12 @@ public class PropertyPlaceholderHelper {
                     // previously resolved placeholder value.
                     propVal = parseStringValue(propVal, placeholderResolver, visitedPlaceholders);
                     result.replace(startIndex, endIndex + this.placeholderSuffix.length(), propVal);
-                    startIndex = result.indexOf(this.placeholderPrefix, startIndex + propVal.length());
+
+                    if(propVal.length() < placeholderPrefix.length() + placeholderSuffix.length()) {
+                        endIndex -= (placeholderPrefix.length() + placeholderSuffix.length()) - propVal.length() - 1;
+                    }
                 }
+
                 // Proceed with unprocessed value.
                 startIndex = result.indexOf(this.placeholderPrefix, endIndex + this.placeholderSuffix.length());
                 visitedPlaceholders.remove(originalPlaceholder);

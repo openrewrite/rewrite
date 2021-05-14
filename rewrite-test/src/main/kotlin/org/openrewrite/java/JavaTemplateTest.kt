@@ -15,1047 +15,729 @@
  */
 package org.openrewrite.java
 
+import com.google.common.io.CharSink
+import com.google.common.io.CharSource
+import com.google.googlejavaformat.java.Formatter
+import com.google.googlejavaformat.java.JavaFormatterOptions
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
-import org.openrewrite.Issue
-import org.openrewrite.Parser
 import org.openrewrite.java.tree.J
-import org.slf4j.LoggerFactory
-import java.util.*
+import java.io.ByteArrayOutputStream
+import java.io.OutputStreamWriter
+import java.util.Comparator.comparing
 import java.util.function.Consumer
 
 interface JavaTemplateTest : JavaRecipeTest {
-    companion object {
-        private val logger = LoggerFactory.getLogger(JavaTemplateTest::class.java)
-//        private val logEvent = Consumer<String> { s -> logger.info(s) }
-        private val logEvent = Consumer<String> { _ -> /* do nothing */ }
-    }
 
     @Test
-    fun addMethodAnnotationTest(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.classpath("junit-jupiter-api").build(),
+    fun replacePackage(jp: JavaParser) = assertChanged(
+        jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val t = template("b").build()
 
-            override fun visitMethodDeclaration(method: J.MethodDeclaration, ctx: ExecutionContext): J.MethodDeclaration {
-                val tagComp = Comparator<J.Annotation> { a1, a2 -> a1.simpleName.compareTo(a2.simpleName) }
-                    .reversed()
-
-                var m = super.visitMethodDeclaration(method, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    m = m
-                        .withTemplate<J.MethodDeclaration>(
-                            template("@Tag(\"tag1\")")
-                                .doBeforeParseTemplate(logEvent)
-                                .doAfterVariableSubstitution(logEvent)
-                                .build(),
-                            m.coordinates.addAnnotation(tagComp)
-                        )
-                        .withTemplate(
-                            template("@Tag(\"tag2\")")
-                                .doBeforeParseTemplate(logEvent)
-                                .doAfterVariableSubstitution(logEvent)
-                                .build(),
-                            m.coordinates.addAnnotation(tagComp)
-                        )
+            override fun visitPackage(pkg: J.Package, p: ExecutionContext): J.Package {
+                if(pkg.expression.printTrimmed() == "a") {
+                    return pkg.withTemplate(t, pkg.coordinates.replace())
                 }
-                return m
+                return super.visitPackage(pkg, p)
             }
         }.toRecipe(),
         before = """
-            import org.junit.jupiter.api.*;
-            class A {
-                @Test
-                void method() {
-                }
+            package a;
+            class Test {
             }
         """,
         after = """
-            import org.junit.jupiter.api.*;
-            class A {
-
-                @Test
-                @Tag("tag1")
-                @Tag("tag2")
-                void method() {
-                }
+            package b;
+            class Test {
             }
         """
     )
 
     @Test
-    fun replaceMethodArgumentsTest(jp: JavaParser) = assertChanged(
+    fun replaceMethod(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("""(() -> "test")""")
-                .doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .build()
+            val t = template("void test2() {}").build()
 
-            override fun visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): J.MethodInvocation {
-                var m = super.visitMethodInvocation(method, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    m = m.withTemplate(template, m.coordinates.replaceArguments())
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
+                if (method.simpleName == "test") {
+                    return method.withTemplate(t, method.coordinates.replace())
                 }
-                return m
+                return super.visitMethodDeclaration(method, p)
             }
         }.toRecipe(),
         before = """
-            import java.util.function.Supplier;
-            class A {
+            class Test {
                 void test() {
-                    printStuff("test");
-                }
-                void printStuff(String string) {}
-                void printStuff(Supplier<String> stringSupplier) {}
-            }
-        """,
-        after = """
-            import java.util.function.Supplier;
-            class A {
-                void test() {
-                    printStuff(() -> "test");
-                }
-                void printStuff(String string) {}
-                void printStuff(Supplier<String> stringSupplier) {}
-            }
-        """
-    )
-
-    @Test
-    @Issue("#327")
-    fun addStatementBeforeAnotherStatement(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaVisitor<ExecutionContext>() {
-            override fun visitClassDeclaration(
-                classDecl: J.ClassDeclaration,
-                ctx: ExecutionContext
-            ): J {
-                var c = super.visitClassDeclaration(classDecl, ctx) as J.ClassDeclaration
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    c = c.withTemplate(
-                        template("public String bar = \"hey!\";").build(),
-                        classDecl.body.statements[1].coordinates.before()
-                    )
-                }
-                return c
-            }
-        }.toRecipe(),
-        before = """
-            class A {
-                public String foo;
-                public String fuz;
-            }
-        """,
-        after = """
-            class A {
-                public String foo;
-                public String bar = "hey!";
-                public String fuz;
-            }
-        """
-    )
-
-    @Test
-    fun beforeStatements(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaVisitor<ExecutionContext>() {
-            val template = template("others.add(#{});")
-                .doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .build()
-
-            override fun visitBlock(block: J.Block, ctx: ExecutionContext): J {
-                var b = super.visitBlock(block, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    val parent = cursor.dropParentUntil { it is J }.getValue<J>()
-                    if (parent is J.MethodDeclaration) {
-                        b = b.withTemplate(
-                            template,
-                            block.statements[1].coordinates.before(),
-                            (parent.parameters[0] as J.VariableDeclarations).variables[0]
-                        )
-                    }
-                }
-                return b
-            }
-        }.toRecipe(),
-        before = """
-            import java.util.List;
-            public class A {
-                int n = 0;
-                void foo(String m, List<String> others) {
-                    n++;
-                    n++;
                 }
             }
         """,
         after = """
-            import java.util.List;
-            public class A {
-                int n = 0;
-                void foo(String m, List<String> others) {
-                    n++;
-                    others.add(m);
-                    n++;
-                }
-            }
-        """
-    )
-
-    /**
-     * Test to make sure when the current cursor is a parent but the element having the template applied is a child. This
-     * tests that the logic to find the insertion point starts from the cursor rather than the "Changing element"
-     */
-    @Test
-    fun templateOnNestedChild(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("others.add(#{});")
-                .doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .build()
-
-            override fun visitMethodDeclaration(method: J.MethodDeclaration, ctx: ExecutionContext): J.MethodDeclaration {
-                var m = super.visitMethodDeclaration(method, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    val statements = m.body!!.statements
-                    statements[1] = statements[1].withTemplate(
-                        template,
-                        statements[1].coordinates.replace(),
-                        (m.parameters[0] as J.VariableDeclarations).variables[0]
-                    )
-                    m = m.withBody(m.body!!.withStatements(statements))
-                }
-                return m
-            }
-        }.toRecipe(),
-        before = """
-            import java.util.List;
-            public class A {
-                int n = 0;
-                void foo(String m, List<String> others) {
-                    n++;
-                    n++;
-                }
-            }
-        """,
-        after = """
-            import java.util.List;
-            public class A {
-                int n = 0;
-                void foo(String m, List<String> others) {
-                    n++;
-                    others.add(m);
-                }
-            }
-        """
-    )
-
-    @Test
-    fun lastInMethodBodyStatement(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaVisitor<ExecutionContext>() {
-            val template = template("others.add(#{});").doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .build()
-
-            override fun visitBlock(block: J.Block, ctx: ExecutionContext): J {
-                var b = super.visitBlock(block, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    val parent = cursor.dropParentUntil { it is J }.getValue<J>()
-                    if (parent is J.MethodDeclaration) {
-                        b = b.withTemplate(
-                            template,
-                            block.coordinates.lastStatement(),
-                            (parent.parameters[0] as J.VariableDeclarations).variables[0]
-                        )
-                    }
-                }
-                return b
-            }
-        }.toRecipe(),
-        before = """
-            import java.util.List;
-            public class A {
-                int n = 0;
-                void foo(String m, List<String> others) {
-                    n++;
-                    n++;
-                }
-            }
-        """,
-        after = """
-            import java.util.List;
-            public class A {
-                int n = 0;
-                void foo(String m, List<String> others) {
-                    n++;
-                    n++;
-                    others.add(m);
-                }
-            }
-        """
-    )
-
-    @Test
-    fun addToEmptyMethodBody(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaVisitor<ExecutionContext>() {
-            val template = template("others.add(#{});").doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .build()
-
-            override fun visitBlock(block: J.Block, ctx: ExecutionContext): J {
-                var b = super.visitBlock(block, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    val parent = cursor.dropParentUntil { it is J }.getValue<J>()
-                    if (parent is J.MethodDeclaration) {
-                        b = b.withTemplate(
-                            template,
-                            block.coordinates.lastStatement(),
-                            (parent.parameters[0] as J.VariableDeclarations).variables[0]
-                        )
-                    }
-                }
-                return b
-            }
-        }.toRecipe(),
-        before = """
-            import java.util.List;
-            public class A {
-                int n = 0;
-                void foo(String m, List<String> others) {
-                }
-            }
-        """,
-        after = """
-            import java.util.List;
-            public class A {
-                int n = 0;
-                void foo(String m, List<String> others) {
-                    others.add(m);
-                }
-            }
-        """
-    )
-
-    @Test
-    fun addMethodToClass(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template(
-                """
-                        char incrementCounterByListSize(List<String> list) {
-                            n += list.size();
-                            return 'f';
-                        }
-                    """
-            ).doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .build()
-
-            override fun visitBlock(block: J.Block, ctx: ExecutionContext): J.Block {
-                var b = super.visitBlock(block, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    val parent = cursor.dropParentUntil { it is J }.getValue<J>()
-                    if (parent is J.ClassDeclaration) {
-                        b = b.withTemplate(template, block.coordinates.lastStatement())
-                    }
-                }
-                return b
-            }
-        }.toRecipe(),
-        before = """
-            import java.util.List;
-            import static java.util.Collections.emptyList;
-
-            public class A {
-                int n = 0;
-                void foo(String m, List<String> others) {
-                    others.add(m);
-                }
-            }
-        """,
-        after = """
-            import java.util.List;
-            import static java.util.Collections.emptyList;
-
-            public class A {
-                int n = 0;
-                void foo(String m, List<String> others) {
-                    others.add(m);
-                }
+            class Test {
             
-                char incrementCounterByListSize(List<String> list) {
-                    n += list.size();
-                    return 'f';
+                void test2() {
                 }
             }
         """
     )
 
     @Test
-    fun addImportToTemplate(jp: JavaParser) = assertChanged(
+    fun replaceMethodParameters(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("extends List<String>")
+            val t = template("int m, int n")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
+                if (method.simpleName == "test" && method.parameters.size == 1) {
+                    // insert in outer method
+                    val m: J.MethodDeclaration = method.withTemplate(t, method.coordinates.replaceParameters())
+                    val newRunnable = (method.body!!.statements[0] as J.NewClass)
+
+                    // insert in inner method
+                    val innerMethod = (newRunnable.body!!.statements[0] as J.MethodDeclaration)
+                    return m.withTemplate(t, innerMethod.coordinates.replaceParameters())
+                }
+                return super.visitMethodDeclaration(method, p)
+            }
+        }.toRecipe(),
+        before = """
+            class Test {
+                void test() {
+                    new Runnable() {
+                        void inner() {
+                        }
+                    };
+                }
+            }
+        """,
+        after = """
+            class Test {
+                void test(int m, int n) {
+                    new Runnable() {
+                        void inner(int m, int n) {
+                        }
+                    };
+                }
+            }
+        """
+    )
+
+    @Test
+    fun replaceLambdaParameters(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val t = template("int m, int n")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitLambda(lambda: J.Lambda, p: ExecutionContext): J.Lambda =
+                if (lambda.parameters.parameters.size == 1) {
+                    lambda.withTemplate(t, lambda.parameters.coordinates.replace())
+                } else {
+                    super.visitLambda(lambda, p)
+                }
+        }.toRecipe(),
+        before = """
+            class Test {
+                void test() {
+                    Object o = () -> 1;
+                }
+            }
+        """,
+        after = """
+            class Test {
+                void test() {
+                    Object o = (int m, int n) -> 1;
+                }
+            }
+        """
+    )
+
+    @Test
+    fun replaceSingleStatement(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaVisitor<ExecutionContext>() {
+            val t = template(
+                "if(n != 1) {\n" +
+                        "  n++;\n" +
+                        "}"
+            )
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitAssert(_assert: J.Assert, p: ExecutionContext): J =
+                _assert.withTemplate(t, _assert.coordinates.replace())
+        }.toRecipe(),
+        before = """
+            class Test {
+                int n;
+                void test() {
+                    assert n == 0;
+                }
+            }
+        """,
+        after = """
+            class Test {
+                int n;
+                void test() {
+                    if (n != 1) {
+                        n++;
+                    }
+                }
+            }
+        """
+    )
+
+    @Test
+    fun replaceStatementInBlock(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.logCompilationWarningsAndErrors(true).build(),
+        recipe = object : JavaVisitor<ExecutionContext>() {
+            val t = template("n = 2;\nn = 3;")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
+                val statement = method.body!!.statements[1]
+                if (statement is J.Unary) {
+                    return method.withTemplate(t, statement.coordinates.replace())
+                }
+                return method
+            }
+        }.toRecipe(),
+        before = """
+            class Test {
+                int n;
+                void test() {
+                    n = 1;
+                    n++;
+                }
+            }
+        """,
+        after = """
+            class Test {
+                int n;
+                void test() {
+                    n = 1;
+                    n = 2;
+                    n = 3;
+                }
+            }
+        """
+    )
+
+    @Test
+    fun beforeStatementInBlock(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaVisitor<ExecutionContext>() {
+            val t = template("assert n == 0;")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
+                val statement = method.body!!.statements[0]
+                if (statement is J.Assignment) {
+                    return method.withTemplate(t, statement.coordinates.before())
+                }
+                return method
+            }
+        }.toRecipe(),
+        before = """
+            class Test {
+                int n;
+                void test() {
+                    n = 1;
+                }
+            }
+        """,
+        after = """
+            class Test {
+                int n;
+                void test() {
+                    assert n == 0;
+                    n = 1;
+                }
+            }
+        """
+    )
+
+    @Test
+    fun afterStatementInBlock(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaVisitor<ExecutionContext>() {
+            val t = template("n = 1;")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
+                if (method.body!!.statements.size == 1) {
+                    return method.withTemplate(t, method.body!!.statements[0].coordinates.after())
+                }
+                return method
+            }
+        }.toRecipe(),
+        before = """
+            class Test {
+                int n;
+                void test() {
+                    assert n == 0;
+                }
+            }
+        """,
+        after = """
+            class Test {
+                int n;
+                void test() {
+                    assert n == 0;
+                    n = 1;
+                }
+            }
+        """
+    )
+
+    @Test
+    fun lastStatementInClassBlock(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaVisitor<ExecutionContext>() {
+            val t = template("int n;")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J {
+                if (classDecl.body.statements.isEmpty()) {
+                    return classDecl.withTemplate(t, classDecl.body.coordinates.lastStatement())
+                }
+                return classDecl
+            }
+        }.toRecipe(),
+        before = """
+            class Test {
+            }
+        """,
+        after = """
+            class Test {
+                int n;
+            }
+        """
+    )
+
+    @Test
+    fun lastStatementInMethodBlock(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaVisitor<ExecutionContext>() {
+            val t = template("n = 1;")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
+                if (method.body!!.statements.size == 1) {
+                    return method.withTemplate(t, method.body!!.coordinates.lastStatement())
+                }
+                return method
+            }
+        }.toRecipe(),
+        before = """
+            class Test {
+                int n;
+                void test() {
+                    assert n == 0;
+                }
+            }
+        """,
+        after = """
+            class Test {
+                int n;
+                void test() {
+                    assert n == 0;
+                    n = 1;
+                }
+            }
+        """
+    )
+
+    @Test
+    fun replaceStatementRequiringNewImport(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaVisitor<ExecutionContext>() {
+            val t = template("List<String> s = null;")
                 .imports("java.util.List")
-                .doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .build()
-            override fun visitClassDeclaration(clazz: J.ClassDeclaration, ctx: ExecutionContext): J.ClassDeclaration {
-                var c = super.visitClassDeclaration(clazz, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    c = c.withTemplate(template, c.coordinates.replaceExtendsClause())
-                }
-                return c
-            }
-        }.toRecipe(),
-        before = """
-            public class A {
-            }
-        """,
-        after = """
-            public class A extends List<String> {
-            }
-        """
-    )
-
-    @Test
-    fun addStaticImportToTemplate(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("extends List<String>")
-                .staticImports("java.util.Collections.emptyList")
-                .doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .build()
-            override fun visitClassDeclaration(clazz: J.ClassDeclaration, ctx: ExecutionContext): J.ClassDeclaration {
-                var c = super.visitClassDeclaration(clazz, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    c = c.withTemplate(template, c.coordinates.replaceExtendsClause())
-                }
-                return c
-            }
-        }.toRecipe(),
-        before = """
-            package org.example;
-            import java.util.List;
-            public class A {
-            }
-        """,
-        after = """
-            package org.example;
-            import java.util.List;
-            public class A extends List<String> {
-            }
-        """
-    )
-
-    @Test
-    fun addStaticMethodToClass(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template(
-                """
-                        static char incrementCounterByListSize(List<String> list) {
-                            n += list.size();
-                            return 'f';
-                        }
-                    """
-            ).doAfterVariableSubstitution(logEvent).doBeforeParseTemplate(logEvent).build()
-
-            override fun visitBlock(block: J.Block, ctx: ExecutionContext): J.Block {
-                var b = super.visitBlock(block, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    val parent = cursor.dropParentUntil { it is J }.getValue<J>()
-                    if (parent is J.ClassDeclaration) {
-                        b = b.withTemplate(template, block.coordinates.lastStatement())
-                    }
-                }
-                return b
-            }
-        }.toRecipe(),
-        before = """
-            import java.util.List;
-            import static java.util.Collections.emptyList;
-
-            public class A {
-                static int n = 0;
-                void foo(String m, List<String> others) {
-                    others.add(m);
-                }
-            }
-        """,
-        after = """
-            import java.util.List;
-            import static java.util.Collections.emptyList;
-
-            public class A {
-                static int n = 0;
-                void foo(String m, List<String> others) {
-                    others.add(m);
-                }
-            
-                static char incrementCounterByListSize(List<String> list) {
-                    n += list.size();
-                    return 'f';
-                }
-            }
-        """
-    )
-
-    @Test
-    fun changeMethodInvocations(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaVisitor<ExecutionContext>() {
-            val template: JavaTemplate = template("withString(#{}).length()")
-                .doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
+                .doBeforeParseTemplate(print)
                 .build()
 
-            override fun visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): J {
-                val m = super.visitMethodInvocation(method, ctx) as J.MethodInvocation
-                if (m.name.simpleName != "countLetters") {
-                    return m
-                }
-                return m.withTemplate(template, m.coordinates.replace(), m.arguments[0])
+            override fun visitAssert(_assert: J.Assert, p: ExecutionContext): J {
+                maybeAddImport("java.util.List")
+                return _assert.withTemplate(t, _assert.coordinates.replace())
             }
         }.toRecipe(),
         before = """
-            import java.util.List;
-            import java.util.stream.Collectors;
-            import java.util.Arrays;
-
-            public class A {
-                String name = "Jill";
-                {
-                    countLetters("fred");
-                }
-                int n = countLetters(name);
-                void foo() {
-                    if (countLetters("fred") == 4) {
-                        System.out.println("Letter Count :" + countLetters(name));
-                    }
-                    int letterCount = countLetters(name) == 4 ? countLetters("notfred") : countLetters(name);
-                    int letterCount2 = countLetters(name) != 3 ? 0 : countLetters(name);
-                    System.out.println("Letter Count :" + letterCount);
-                    System.out.println("Letter Count :" + letterCount2);
-                    String sub = "Fred".substring(0, countLetters("fred"));
-                    for (int index = 0; index < countLetters(name); index++) {
-                      letterCount++;
-                    }
-                    int index = 0;
-                    while (index < countLetters(name)) {
-                        index++;
-                    }
-                    switch (countLetters(name)) {
-                        case 4:
-                        case 1:
-                        case 2:
-                        default:
-                            break;
-                    }
-                    List<String> names = Arrays.asList("fred", "joe", "jill");
-                    List<Integer> counts = names.stream().map(this::countLetters).collect(Collectors.toList());
-                }
-                public int countLetters(String sourceString) {
-                    return sourceString.length();
-                }
-                public StringStub withString(String source) {
-                    return new StringStub(source);
-                }
-                public class StringStub {
-                    String source;
-                    private StringStub(String source) {
-                        this.source = source;
-                    }
-                    public int length() {
-                        return source.length();
-                    }
-                }
-           }
-        """,
-        after = """
-            import java.util.List;
-            import java.util.stream.Collectors;
-            import java.util.Arrays;
-
-            public class A {
-                String name = "Jill";
-                {
-                    withString("fred").length();
-                }
-                int n = withString(name).length();
-                void foo() {
-                    if (withString("fred").length() == 4) {
-                        System.out.println("Letter Count :" + withString(name).length());
-                    }
-                    int letterCount = withString(name).length() == 4 ? withString("notfred").length() : withString(name).length();
-                    int letterCount2 = withString(name).length() != 3 ? 0 : withString(name).length();
-                    System.out.println("Letter Count :" + letterCount);
-                    System.out.println("Letter Count :" + letterCount2);
-                    String sub = "Fred".substring(0, withString("fred").length());
-                    for (int index = 0; index < withString(name).length(); index++) {
-                      letterCount++;
-                    }
-                    int index = 0;
-                    while (index < withString(name).length()) {
-                        index++;
-                    }
-                    switch (withString(name).length()) {
-                        case 4:
-                        case 1:
-                        case 2:
-                        default:
-                            break;
-                    }
-                    List<String> names = Arrays.asList("fred", "joe", "jill");
-                    List<Integer> counts = names.stream().map(this::countLetters).collect(Collectors.toList());
-                }
-                public int countLetters(String sourceString) {
-                    return sourceString.length();
-                }
-                public StringStub withString(String source) {
-                    return new StringStub(source);
-                }
-                public class StringStub {
-                    String source;
-                    private StringStub(String source) {
-                        this.source = source;
-                    }
-                    public int length() {
-                        return source.length();
-                    }
-                }
-           }
-        """
-    )
-
-    @Test
-    fun addAnnotationToMethod(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("@Deprecated")
-                .doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .build()
-
-            override fun visitMethodDeclaration(method: J.MethodDeclaration, ctx: ExecutionContext): J.MethodDeclaration {
-                var m = super.visitMethodDeclaration(method, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    m = m.withTemplate(template, m.coordinates.replaceAnnotations())
-                }
-                return m
-            }
-        }.toRecipe(),
-        before = """
-            public class A {
-                void foo() {
-                }
-            }
-        """,
-        after = """
-            public class A {
-
-                @Deprecated
-                void foo() {
-                }
-            }
-        """
-    )
-
-    @Issue("#239")
-    @Test
-    fun replaceAnnotation(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("@Issue")
-                .doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .build()
-
-            override fun visitAnnotation(annotation: J.Annotation, ctx: ExecutionContext): J.Annotation {
-                var a = super.visitAnnotation(annotation, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    a = a.withTemplate(template, a.coordinates.replace())
-                }
-                return a
-            }
-        }.toRecipe(),
-        before = """
-                public class A {
-                    @Deprecated
-                    void foo() {
-                    }
-                }
-            """,
-        after = """
-                public class A {
-                    @Issue
-                    void foo() {
-                    }
-                }
-        """
-    )
-
-    @Test
-    fun replaceOneOfThreeMethodAnnotation() = assertChanged(
-        JavaParser.fromJavaVersion().dependsOn(
-            Collections.singletonList(
-                Parser.Input.fromString(
-            """
-                public @interface Anno1{}
-                public @interface Anno2{}
-                public @interface Anno3{}
-            """))).build(),
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("@Anno3")
-                .doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .build()
-
-            override fun visitAnnotation(annotation: J.Annotation, ctx: ExecutionContext): J.Annotation {
-                val a = super.visitAnnotation(annotation, ctx)
-                if (a.simpleName.equals("Anno1")) {
-                    return a.withTemplate(template, a.coordinates.replace())
-                }
-                return a
-            }
-        }.toRecipe(),
-        before = """
-            public class Cd {
-                @Anno1
-                @Anno2
-                void md() {}
-            }
-        """,
-        after = """
-            public class Cd {
-                @Anno3
-                @Anno2
-                void md() {}
-            }
-        """
-    )
-
-    @Issue("#331")
-    @Test
-    fun replaceAnnotationOnClass(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("@Issue")
-                .doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .build()
-
-            override fun visitAnnotation(annotation: J.Annotation, ctx: ExecutionContext): J.Annotation {
-                var a = super.visitAnnotation(annotation, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    a = a.withTemplate(template, a.coordinates.replace())
-                }
-                return a
-            }
-        }.toRecipe(),
-        before = """
-                @Deprecated
-                public class A {}
-            """,
-        after = """
-                @Issue
-                public class A {}
-        """
-    )
-
-    @Issue("#333")
-    @Test
-    fun replaceAnnotationOnClassWithCommentsAndAnnotations(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("@Issue")
-                .doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .build()
-
-            override fun visitAnnotation(annotation: J.Annotation, ctx: ExecutionContext): J.Annotation {
-                val a = super.visitAnnotation(annotation, ctx)
-                if (a.simpleName.equals("Deprecated")) {
-                    return a.withTemplate(template, a.coordinates.replace())
-                }
-                return a
-            }
-        }.toRecipe(),
-        before = """
-                @Deprecated
-                @SuppressWarnings("yo")
-                public class A {}
-            """,
-        after = """
-                @Issue
-                @SuppressWarnings("yo")
-                public class A {}
-        """
-    )
-
-    @Test
-    fun addAnnotationToClass(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("@Deprecated")
-                .doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .build()
-
-            override fun visitClassDeclaration(clazz: J.ClassDeclaration, ctx: ExecutionContext): J.ClassDeclaration {
-                var c = super.visitClassDeclaration(clazz, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    c = c.withTemplate(template, c.coordinates.replaceAnnotations())
-                }
-                return c
-            }
-        }.toRecipe(),
-        before = """
-            public class A {
-                void foo() {
-                }
-            }
-        """,
-        after = """
-            @Deprecated
-            public class A {
-                void foo() {
-                }
-            }
-        """
-    )
-
-    @Test
-    fun addAnnotationToClassWithImports(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("@Deprecated")
-                .doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .build()
-
-            override fun visitClassDeclaration(clazz: J.ClassDeclaration, ctx: ExecutionContext): J.ClassDeclaration {
-                var c = super.visitClassDeclaration(clazz, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    c = c.withTemplate(template, c.coordinates.replaceAnnotations())
-                }
-                return c
-            }
-        }.toRecipe(),
-        before = """
-            import java.util.List;
-            
-            public class A {
-                void foo() {
+            class Test {
+                int n;
+                void test() {
+                    assert n == 0;
                 }
             }
         """,
         after = """
             import java.util.List;
             
-            @Deprecated
-            public class A {
-                void foo() {
+            class Test {
+                int n;
+                void test() {
+                    List<String> s = null;
                 }
             }
         """
     )
 
     @Test
-    fun templateWithLocalMethodReference(jp: JavaParser) = assertChanged(
+    fun replaceArguments(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("\n#{};\n#{};")
-                .doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
+            val t = template("m, n")
+                .doBeforeParseTemplate(print)
                 .build()
 
-            override fun visitBlock(block: J.Block, ctx: ExecutionContext): J.Block {
-                var b = super.visitBlock(block, ctx)
-                val parent = cursor.dropParentUntil { it is J }.getValue<J>()
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    if (parent is J.MethodDeclaration && parent.name.simpleName == "foo") {
-                        b = b.withTemplate(
-                            template, b.statements[0].coordinates.before(),
-                            b.statements[1] as J,
-                            b.statements[0] as J
-                        )
-                    }
+            override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
+                if (method.arguments.size == 1) {
+                    return method.withTemplate(t, method.coordinates.replaceArguments())
                 }
-                return b
+                return super.visitMethodInvocation(method, p)
             }
         }.toRecipe(),
         before = """
-            import java.util.List;
-            import static java.util.Collections.emptyList;
-
-            public class A {
-                int n = 0;
-                void foo(String m, List<String> others) {
-                    incrementCounterByListSize(others);
-                    others.add(m);
-                }
-                char incrementCounterByListSize(List<String> list) {
-                    n += list.size();
-                    return 'f';
-                }
-            }
-        """,
-        after = """
-            import java.util.List;
-            import static java.util.Collections.emptyList;
-
-            public class A {
-                int n = 0;
-                void foo(String m, List<String> others) {
-                    others.add(m);
-                    incrementCounterByListSize(others);
-                    incrementCounterByListSize(others);
-                    others.add(m);
-                }
-                char incrementCounterByListSize(List<String> list) {
-                    n += list.size();
-                    return 'f';
-                }
-            }
-        """
-    )
-
-    @Test
-    fun templateWithSiblingClassMethodReference(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("#{};\n#{};")
-                .doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .build()
-
-            override fun visitBlock(block: J.Block, ctx: ExecutionContext): J.Block {
-                var b = super.visitBlock(block, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    val parent = cursor.dropParentUntil { it is J }.getValue<J>()
-                    if (parent is J.If) {
-                        b = b.withTemplate(
-                            template,
-                            b.coordinates.lastStatement(),
-                            b.statements[1],
-                            b.statements[0]
-                        )
-                    }
-                }
-                return b
-            }
-        }.toRecipe(),
-        before = """
-            import java.util.List;
-            import java.util.ArrayList;
-            import static java.util.Collections.emptyList;
-
-            public class A {
-                int n = 0;
-                void foo(String m, List<String> others) {
-                    boolean flag = others.contains(m);
-                    List<String> clone;
-                    if (flag) {
-                        clone.add(m);
-                        B.cloneList(others);
-                    }
-                    int fred = 8;
-                }
-
-                public static class B {
-                    public static List<String> cloneList(List<String> list) {
-                        return new ArrayList<>(list);
-                    }
-                }
-
-                public static class C {
-
-                    private int hello = 0;
-                    private String nope = "nothing here";
-                }
-            }
-        """,
-        after = """
-            import java.util.List;
-            import java.util.ArrayList;
-            import static java.util.Collections.emptyList;
-
-            public class A {
-                int n = 0;
-                void foo(String m, List<String> others) {
-                    boolean flag = others.contains(m);
-                    List<String> clone;
-                    if (flag) {
-                        clone.add(m);
-                        B.cloneList(others);
-                        B.cloneList(others);
-                        clone.add(m);
-                    }
-                    int fred = 8;
-                }
-
-                public static class B {
-                    public static List<String> cloneList(List<String> list) {
-                        return new ArrayList<>(list);
-                    }
-                }
-
-                public static class C {
-
-                    private int hello = 0;
-                    private String nope = "nothing here";
-                }
-            }
-        """
-    )
-    @Test
-    fun templateMethodIntoClass(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("""public String hello() { return "Hello!"; }""")
-                .doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .build()
-
-            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, ctx: ExecutionContext): J.ClassDeclaration {
-                var cd = super.visitClassDeclaration(classDecl, ctx)
-                val helloMethodExists = cd.body.statements.asSequence()
-                    .filterIsInstance(J.MethodDeclaration::class.java)
-                    .find { it.name.simpleName == "hello" } != null
-
-                if (helloMethodExists) {
-                    return cd
-                }
-
-                cd = cd.withBody(
-                    cd.body.withTemplate(
-                        template,
-                        cd.body.coordinates.lastStatement())
-                )
-
-                return cd
-            }
-        }.toRecipe(),
-        before = """
-            package com.yourorg;
-
-            class A {
-            void foo() {}
-            }
-        """,
-        after = """
-            package com.yourorg;
-
-            class A {
-            void foo() {}
+            abstract class Test {
+                abstract void test();
             
-                public String hello() {
-                    return "Hello!";
+                void test(int m, int n) {
+                    test();
+                }
+            }
+        """,
+        after = """
+            abstract class Test {
+                abstract void test();
+            
+                void test(int m, int n) {
+                    test(m, n);
+                }
+            }
+        """
+    )
+
+    @Test
+    fun replaceClassAnnotation(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val t = template("@Deprecated")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitAnnotation(annotation: J.Annotation, p: ExecutionContext): J.Annotation {
+                if(annotation.simpleName == "SuppressWarnings") {
+                    return annotation.withTemplate(t, annotation.coordinates.replace())
+                }
+                return super.visitAnnotation(annotation, p)
+            }
+        }.toRecipe(),
+        before = "@SuppressWarnings(\"ALL\") class Test {}",
+        after = "@Deprecated class Test {}"
+    )
+
+    @Test
+    fun replaceMethodAnnotations(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val t = template("@SuppressWarnings(\"other\")")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
+                if (method.leadingAnnotations.size == 0) {
+                    return method.withTemplate(t, method.coordinates.replaceAnnotations())
+                }
+                return super.visitMethodDeclaration(method, p)
+            }
+        }.toRecipe(),
+        before = """
+            class Test {
+                static final String WARNINGS = "ALL";
+            
+                public @SuppressWarnings(WARNINGS) Test() {
+                }
+            
+                public void test1() {
+                }
+            
+                public @SuppressWarnings(WARNINGS) void test2() {
+                }
+            }
+        """,
+        after = """
+            class Test {
+                static final String WARNINGS = "ALL";
+            
+                @SuppressWarnings("other")
+                public Test() {
+                }
+            
+                @SuppressWarnings("other")
+                public void test1() {
+                }
+            
+                @SuppressWarnings("other")
+                public void test2() {
+                }
+            }
+        """
+    )
+
+    @Test
+    fun replaceClassAnnotations(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val t = template("@SuppressWarnings(\"other\")")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
+                if(classDecl.leadingAnnotations.size == 0 && classDecl.simpleName != "Test") {
+                    return classDecl.withTemplate(t, classDecl.coordinates.replaceAnnotations())
+                }
+                return super.visitClassDeclaration(classDecl, p)
+            }
+        }.toRecipe(),
+        before = """
+            class Test {
+                static final String WARNINGS = "ALL";
+                
+                class Inner1 {
+                }
+            }
+        """,
+        after = """
+            class Test {
+                static final String WARNINGS = "ALL";
+            
+                @SuppressWarnings("other")
+                class Inner1 {
+                }
+            }
+        """
+    )
+
+    @Test
+    fun replaceVariableAnnotations(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val t = template("@SuppressWarnings(\"other\")")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitVariableDeclarations(multiVariable: J.VariableDeclarations, p: ExecutionContext): J.VariableDeclarations {
+                if(multiVariable.leadingAnnotations.size == 0) {
+                    return multiVariable.withTemplate(t, multiVariable.coordinates.replaceAnnotations())
+                }
+                return super.visitVariableDeclarations(multiVariable, p)
+            }
+        }.toRecipe(),
+        before = """
+            class Test {
+                void test() {
+                    int m;
+                    final @SuppressWarnings("ALL") int n;
+                }
+            }
+        """,
+        after = """
+            class Test {
+                void test() {
+                    @SuppressWarnings("other") int m;
+                    @SuppressWarnings("other") final int n;
+                }
+            }
+        """
+    )
+
+    @Test
+    fun addMethodAnnotations(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val t = template("@SuppressWarnings(\"other\")")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
+                if (method.leadingAnnotations.size == 0) {
+                    return method.withTemplate(t, method.coordinates.addAnnotation(comparing { it.simpleName }))
+                }
+                return super.visitMethodDeclaration(method, p)
+            }
+        }.toRecipe(),
+        before = """
+            class Test {
+                static final String WARNINGS = "ALL";
+            
+                public void test() {
+                }
+            }
+        """,
+        after = """
+            class Test {
+                static final String WARNINGS = "ALL";
+            
+                @SuppressWarnings("other")
+                public void test() {
+                }
+            }
+        """
+    )
+
+    @Test
+    fun addClassAnnotations(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val t = template("@SuppressWarnings(\"other\")")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
+                if(classDecl.leadingAnnotations.size == 0 && classDecl.simpleName != "Test") {
+                    return classDecl.withTemplate(t, classDecl.coordinates.addAnnotation(comparing { it.simpleName }))
+                }
+                return super.visitClassDeclaration(classDecl, p)
+            }
+        }.toRecipe(),
+        before = """
+            class Test {
+                class Inner1 {
+                }
+            }
+        """,
+        after = """
+            class Test {
+            
+                @SuppressWarnings("other")
+                class Inner1 {
+                }
+            }
+        """
+    )
+
+    @Test
+    fun replaceClassImplements(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val t = template("Serializable, Closeable")
+                .imports("java.io.*")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
+                if(classDecl.implements == null) {
+                    maybeAddImport("java.io.Closeable");
+                    maybeAddImport("java.io.Serializable");
+                    return classDecl.withTemplate(t, classDecl.coordinates.replaceImplementsClause())
+                }
+                return super.visitClassDeclaration(classDecl, p)
+            }
+        }.toRecipe(),
+        before = """
+            class Test {
+            }
+        """,
+        after = """
+            import java.io.Closeable;
+            import java.io.Serializable;
+            
+            class Test implements Serializable, Closeable {
+            }
+        """
+    )
+
+    @Test
+    fun replaceClassExtends(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val t = template("List<String>")
+                .imports("java.util.*")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
+                if(classDecl.extends == null) {
+                    maybeAddImport("java.util.List");
+                    return classDecl.withTemplate(t, classDecl.coordinates.replaceExtendsClause())
+                }
+                return super.visitClassDeclaration(classDecl, p)
+            }
+        }.toRecipe(),
+        before = """
+            class Test {
+            }
+        """,
+        after = """
+            import java.util.List;
+            
+            class Test extends List<String> {
+            }
+        """
+    )
+
+    @Test
+    fun replaceThrows(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val t = template("Exception")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
+                if(method.throws == null) {
+                    return method.withTemplate(t, method.coordinates.replaceThrows())
+                }
+                return super.visitMethodDeclaration(method, p)
+            }
+        }.toRecipe(),
+        before = """
+            class Test {
+                void test() {}
+            }
+        """,
+        after = """
+            class Test {
+                void test() throws Exception {}
+            }
+        """
+    )
+
+    @Test
+    fun replaceMethodTypeParameters(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val t = template("T, U")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
+                if(method.typeParameters == null) {
+                    return method.withTemplate(t, method.coordinates.replaceTypeParameters())
+                }
+                return super.visitMethodDeclaration(method, p)
+            }
+        }.toRecipe(),
+        before = """
+            class Test {
+            
+                void test() {
+                }
+            }
+        """,
+        after = """
+            class Test {
+            
+                <T, U> void test() {
                 }
             }
         """
@@ -1065,290 +747,75 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceClassTypeParameters(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("<T,P>")
-                .doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
+            val t = template("T, U")
+                .doBeforeParseTemplate(print)
                 .build()
 
-            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, ctx: ExecutionContext): J.ClassDeclaration {
-                var c = super.visitClassDeclaration(classDecl, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    c =c.withTemplate(template, c.coordinates.replaceTypeParameters())
+            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
+                if(classDecl.typeParameters == null) {
+                    return classDecl.withTemplate(t, classDecl.coordinates.replaceTypeParameters())
                 }
-                return c
+                return super.visitClassDeclaration(classDecl, p)
             }
         }.toRecipe(),
         before = """
-            public class A<T> {
-                void foo() {
-                }
+            class Test {
             }
         """,
         after = """
-            public class A<T, P> {
-                void foo() {
-                }
+            class Test<T, U> {
             }
         """
     )
 
     @Test
-    fun replaceClassExtends(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("extends ArrayList<String>").doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
+    fun replaceBody(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.logCompilationWarningsAndErrors(true).build(),
+        recipe = object : JavaVisitor<ExecutionContext>() {
+            val t = template("n = 1;")
+                .doBeforeParseTemplate(print)
                 .build()
 
-            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, ctx: ExecutionContext): J.ClassDeclaration {
-                var c = super.visitClassDeclaration(classDecl, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    c = c.withTemplate(template, c.coordinates.replaceExtendsClause())
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
+                val statement = method.body!!.statements[0]
+                if (statement is J.Unary) {
+                    return method.withTemplate(t, method.coordinates.replaceBody())
                 }
-                return c
+                return method
             }
         }.toRecipe(),
         before = """
-            import java.util.ArrayList;
-            public abstract class A {
-                private String name = "Jill";
-            }
-        """,
-        after = """
-            import java.util.ArrayList;
-            public abstract class A extends ArrayList<String> {
-                private String name = "Jill";
-            }
-        """
-    )
-
-    @Test
-    fun replaceClassImplements(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("implements List<String>").doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .build()
-
-            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, ctx: ExecutionContext): J.ClassDeclaration {
-                var c = super.visitClassDeclaration(classDecl, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    c = c.withTemplate(template, c.coordinates.replaceImplementsClause())
-                }
-                return c
-            }
-        }.toRecipe(),
-        before = """
-            import java.util.List;
-            public abstract class A {
-                private String name = "Jill";
-            }
-        """,
-        after = """
-            import java.util.List;
-            public abstract class A implements List<String> {
-                private String name = "Jill";
-            }
-        """
-    )
-
-    @Test
-    fun replaceClassBody(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template(
-                """
-                        {
-                        private String name = "Jill";
-                        private String name2 = "Fred";
-                        }
-                    """
-            ).doAfterVariableSubstitution(logEvent).doBeforeParseTemplate(logEvent).build()
-
-            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, ctx: ExecutionContext): J.ClassDeclaration {
-                var c = super.visitClassDeclaration(classDecl, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    c = c.withTemplate(template, c.coordinates.replaceBody())
-                }
-                return c
-            }
-        }.toRecipe(),
-        before = """
-            import java.util.List;
-            public class A {
-            }
-        """,
-        after = """
-            import java.util.List;
-            public class A {
-                private String name = "Jill";
-                private String name2 = "Fred";
-            }
-        """
-    )
-
-    @Test
-    fun replaceMethodDeclarationTypeParameters(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("<T,P>")
-                .doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .build()
-
-            override fun visitMethodDeclaration(method: J.MethodDeclaration, ctx: ExecutionContext): J.MethodDeclaration {
-                var m = super.visitMethodDeclaration(method, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    m = m.withTemplate(template, m.coordinates.replaceTypeParameters())
-                }
-                return m
-            }
-        }.toRecipe(),
-        before = """
-            public class A {
-                <T> void foo() {
+            class Test {
+                int n;
+                void test() {
+                    n++;
                 }
             }
         """,
         after = """
-            public class A {
-                <T, P> void foo() {
+            class Test {
+                int n;
+                void test() {
+                    n = 1;
                 }
             }
         """
     )
 
-    @Test
-    fun replaceMethodDeclarationParameters(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("(String foo, String bar)")
-                .doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .build()
+    companion object {
+        val print = Consumer<String> { s: String ->
+            try {
+                val bos = ByteArrayOutputStream()
+                Formatter(JavaFormatterOptions.builder().style(JavaFormatterOptions.Style.AOSP).build())
+                    .formatSource(CharSource.wrap(s), object : CharSink() {
+                        override fun openStream() = OutputStreamWriter(bos)
+                    })
 
-            override fun visitMethodDeclaration(method: J.MethodDeclaration, ctx: ExecutionContext): J.MethodDeclaration {
-                var m = super.visitMethodDeclaration(method, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    m = m.withTemplate(template, m.coordinates.replaceParameters())
-                }
-                return m
+                println(bos.toString(Charsets.UTF_8).trim())
+            } catch(_: Throwable) {
+                println("Unable to format:")
+                println(s)
             }
-        }.toRecipe(),
-        before = """
-            public class A {
-                void foo() {
-                }
-            }
-        """,
-        after = """
-            public class A {
-                void foo(String foo, String bar) {
-                }
-            }
-        """
-    )
-
-    @Test
-    fun addMethodDeclarationParameters(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("Date dateOfBirth,String firstName,")
-                .doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .imports("java.util.Date")
-                .build()
-
-            override fun visitMethodDeclaration(method: J.MethodDeclaration, ctx: ExecutionContext): J.MethodDeclaration {
-                var m = super.visitMethodDeclaration(method, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    m = m.withTemplate(template, m.parameters[0].coordinates.before())
-                    maybeAddImport("java.util.Date")
-                }
-                return m
-            }
-        }.toRecipe(),
-        before = """
-            public abstract class Customer {
-                public abstract void setCustomerInfo(String lastName);
-            }
-        """,
-        after = """
-            import java.util.Date;
-
-            public abstract class Customer {
-                public abstract void setCustomerInfo(Date dateOfBirth, String firstName, String lastName);
-            }
-        """
-    )
-
-    @Test
-    fun replaceMethodDeclarationThrows(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("throws RuntimeException")
-                .doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .build()
-
-            override fun visitMethodDeclaration(method: J.MethodDeclaration, ctx: ExecutionContext): J.MethodDeclaration {
-                var m = super.visitMethodDeclaration(method, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    m = m.withTemplate(template, m.coordinates.replaceThrows())
-                }
-                return m
-            }
-        }.toRecipe(),
-        before = """
-            public class A {
-                void foo() {
-                }
-            }
-        """,
-        after = """
-            public class A {
-                void foo() throws RuntimeException {
-                }
-            }
-        """
-    )
-
-    @Test
-    fun replaceMethodInvocationArguments(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val template = template("(\"fred\", \"sally\", \"dude\")")
-                .doAfterVariableSubstitution(logEvent)
-                .doBeforeParseTemplate(logEvent)
-                .build()
-
-            override fun visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): J.MethodInvocation {
-                var m = super.visitMethodInvocation(method, ctx)
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    m = m.withTemplate(template, m.coordinates.replaceArguments())
-                }
-                return m
-            }
-        }.toRecipe(),
-        before = """
-            public class A {
-                void foo() {
-                    logNames("fred");
-                }
-
-                void logNames(String... names) {
-                }
-            }
-        """,
-        after = """
-            public class A {
-                void foo() {
-                    logNames("fred", "sally", "dude");
-                }
-
-                void logNames(String... names) {
-                }
-            }
-        """
-    )
+        }
+    }
 }

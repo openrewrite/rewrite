@@ -24,10 +24,7 @@ import lombok.experimental.NonFinal;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaPrinter;
-import org.openrewrite.java.JavaTemplate;
-import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.*;
 import org.openrewrite.java.internal.*;
 import org.openrewrite.java.search.FindAllUsedTypes;
 import org.openrewrite.java.search.FindTypes;
@@ -74,6 +71,8 @@ public interface J extends Serializable, Tree {
         return print(TreePrinter.identity(), p);
     }
 
+    <J2 extends J> J2 withId(UUID id);
+
     <J2 extends J> J2 withPrefix(Space space);
 
     Space getPrefix();
@@ -85,8 +84,6 @@ public interface J extends Serializable, Tree {
     default <J2 extends J> J2 withComments(List<Comment> comments) {
         return withPrefix(getPrefix().withComments(comments));
     }
-
-    Coordinates getCoordinates();
 
     @Incubating(since = "7.0.0")
     default <J2 extends J> J2 withTemplate(JavaTemplate template, JavaCoordinates coordinates, Object... parameters) {
@@ -102,6 +99,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     final class AnnotatedType implements J, Expression, TypeTree {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -131,11 +129,6 @@ public interface J extends Serializable, Tree {
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitAnnotatedType(this, p);
         }
-
-        @Override
-        public Coordinates.AnnotatedType getCoordinates() {
-            return new Coordinates.AnnotatedType(this);
-        }
     }
 
     @ToString
@@ -148,6 +141,7 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -198,7 +192,6 @@ public interface J extends Serializable, Tree {
             return v.visitAnnotation(this, p);
         }
 
-        @Override
         public Coordinates.Annotation getCoordinates() {
             return new Coordinates.Annotation(this);
         }
@@ -236,7 +229,8 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    final class ArrayAccess implements J, Expression {
+    final class ArrayAccess implements J, Expression, TypedTree {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -260,18 +254,13 @@ public interface J extends Serializable, Tree {
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitArrayAccess(this, p);
         }
-
-        @Override
-        public Coordinates.ArrayAccess getCoordinates() {
-            return new Coordinates.ArrayAccess(this);
-        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     final class ArrayType implements J, TypeTree, Expression {
-
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -302,18 +291,13 @@ public interface J extends Serializable, Tree {
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitArrayType(this, p);
         }
-
-        @Override
-        public Coordinates.ArrayType getCoordinates() {
-            return new Coordinates.ArrayType(this);
-        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     final class Assert implements J, Statement {
-
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -332,8 +316,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Assert getCoordinates() {
-            return new Coordinates.Assert(this);
+        public Coordinates.Statement getCoordinates() {
+            return new Coordinates.Statement(this);
         }
     }
 
@@ -342,11 +326,12 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class Assignment implements J, Statement, Expression {
+    final class Assignment implements J, Statement, Expression, TypedTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -373,6 +358,11 @@ public interface J extends Serializable, Tree {
             return getPadding().withAssignment(this.assignment.withElement(assignment));
         }
 
+        @Override
+        public Coordinates.Statement getCoordinates() {
+            return new Coordinates.Statement(this);
+        }
+
         @With
         @Nullable
         @Getter
@@ -381,11 +371,6 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitAssignment(this, p);
-        }
-
-        @Override
-        public Coordinates.Assignment getCoordinates() {
-            return new Coordinates.Assignment(this);
         }
 
         @Override
@@ -427,11 +412,12 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class AssignmentOperation implements J, Statement, Expression {
+    final class AssignmentOperation implements J, Statement, Expression, TypedTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -473,8 +459,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.AssignmentOperation getCoordinates() {
-            return new Coordinates.AssignmentOperation(this);
+        public Coordinates.Statement getCoordinates() {
+            return new Coordinates.Statement(this);
         }
 
         @Override
@@ -530,11 +516,12 @@ public interface J extends Serializable, Tree {
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     @Data
-    final class Binary implements J, Expression {
+    final class Binary implements J, Expression, TypedTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -567,11 +554,6 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitBinary(this, p);
-        }
-
-        @Override
-        public Coordinates.Binary getCoordinates() {
-            return new Coordinates.Binary(this);
         }
 
         @Override
@@ -643,6 +625,7 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -684,7 +667,6 @@ public interface J extends Serializable, Tree {
             return v.visitBlock(this, p);
         }
 
-        @Override
         public Coordinates.Block getCoordinates() {
             return new Coordinates.Block(this);
         }
@@ -730,6 +712,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     final class Break implements J, Statement {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -749,10 +732,9 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Break getCoordinates() {
-            return new Coordinates.Break(this);
+        public Coordinates.Statement getCoordinates() {
+            return new Coordinates.Statement(this);
         }
-
     }
 
     @ToString
@@ -765,6 +747,7 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -798,8 +781,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Case getCoordinates() {
-            return new Coordinates.Case(this);
+        public Coordinates.Statement getCoordinates() {
+            return new Coordinates.Statement(this);
         }
 
         public Padding getPadding() {
@@ -835,7 +818,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class ClassDeclaration implements J, Statement {
+    final class ClassDeclaration implements J, Statement, TypedTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -844,6 +827,7 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Annotations> annotations;
 
+        @With
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -923,10 +907,23 @@ public interface J extends Serializable, Tree {
         @Getter
         Block body;
 
-        @With
         @Getter
         @Nullable
         JavaType.FullyQualified type;
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public ClassDeclaration withType(@Nullable JavaType type) {
+            if(type == this.type) {
+                return this;
+            }
+
+            if(!(type instanceof JavaType.FullyQualified)) {
+                throw new IllegalArgumentException("A class can only be type attributed with a fully qualified type name");
+            }
+
+            return new ClassDeclaration(id, prefix, markers, leadingAnnotations, modifiers, kind, name, typeParameters, extendings, implementings, body, (JavaType.FullyQualified) type);
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -957,6 +954,7 @@ public interface J extends Serializable, Tree {
         @Data
         public static final class Kind implements J {
 
+            @With
             @Getter
             @EqualsAndHashCode.Include
             UUID id;
@@ -976,11 +974,6 @@ public interface J extends Serializable, Tree {
             @With
             @Getter
             Type type;
-
-            @Override
-            public Coordinates getCoordinates() {
-                return new Coordinates.ClassDeclaration.Kind(this);
-            }
 
             public enum Type {
                 Class,
@@ -1036,6 +1029,14 @@ public interface J extends Serializable, Tree {
                 return t.implementings == implementings ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, t.typeParameters, t.extendings, implementings, t.body, t.type);
             }
 
+            public Kind getKind() {
+                return t.kind;
+            }
+
+            public ClassDeclaration withKind(Kind kind) {
+                return t.kind == kind ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, kind, t.name, t.typeParameters, t.extendings, t.implementings, t.body, t.type);
+            }
+
             @Nullable
             public JContainer<TypeParameter> getTypeParameters() {
                 return t.typeParameters;
@@ -1089,6 +1090,7 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -1138,11 +1140,6 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitCompilationUnit(this, p);
-        }
-
-        @Override
-        public Coordinates.CompilationUnit getCoordinates() {
-            return new Coordinates.CompilationUnit(this);
         }
 
         public Set<NameTree> findType(String clazz) {
@@ -1206,6 +1203,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     final class Continue implements J, Statement {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1225,8 +1223,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Continue getCoordinates() {
-            return new Coordinates.Continue(this);
+        public Coordinates.Statement getCoordinates() {
+            return new Coordinates.Statement(this);
         }
     }
 
@@ -1240,6 +1238,7 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -1278,8 +1277,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.DoWhileLoop getCoordinates() {
-            return new Coordinates.DoWhileLoop(this);
+        public Coordinates.Statement getCoordinates() {
+            return new Coordinates.Statement(this);
         }
 
         public Padding getPadding() {
@@ -1323,6 +1322,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     final class Empty implements J, Statement, Expression, TypeTree {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1349,8 +1349,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Empty getCoordinates() {
-            return new Coordinates.Empty(this);
+        public Coordinates.Statement getCoordinates() {
+            return new Coordinates.Statement(this);
         }
     }
 
@@ -1358,6 +1358,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     final class EnumValue implements J {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1381,11 +1382,6 @@ public interface J extends Serializable, Tree {
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitEnumValue(this, p);
         }
-
-        @Override
-        public Coordinates.EnumValue getCoordinates() {
-            return new Coordinates.EnumValue(this);
-        }
     }
 
     @ToString
@@ -1398,6 +1394,7 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -1430,8 +1427,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.EnumValueSet getCoordinates() {
-            return new Coordinates.EnumValueSet(this);
+        public Coordinates.Statement getCoordinates() {
+            return new Coordinates.Statement(this);
         }
 
         public Padding getPadding() {
@@ -1472,6 +1469,7 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -1506,11 +1504,6 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitFieldAccess(this, p);
-        }
-
-        @Override
-        public Coordinates.FieldAccess getCoordinates() {
-            return new Coordinates.FieldAccess(this);
         }
 
         public String getSimpleName() {
@@ -1620,6 +1613,7 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -1652,8 +1646,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.ForEachLoop getCoordinates() {
-            return new Coordinates.ForEachLoop(this);
+        public Coordinates.Statement getCoordinates() {
+            return new Coordinates.Statement(this);
         }
 
         @ToString
@@ -1666,6 +1660,7 @@ public interface J extends Serializable, Tree {
             @NonFinal
             transient WeakReference<Padding> padding;
 
+            @With
             @EqualsAndHashCode.Include
             @Getter
             UUID id;
@@ -1701,11 +1696,6 @@ public interface J extends Serializable, Tree {
             @Override
             public <P> J acceptJava(JavaVisitor<P> v, P p) {
                 return v.visitForEachControl(this, p);
-            }
-
-            @Override
-            public Coordinates.ForEachLoop.Control getCoordinates() {
-                return new Coordinates.ForEachLoop.Control(this);
             }
 
             public Padding getPadding() {
@@ -1784,6 +1774,7 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -1816,8 +1807,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.ForLoop getCoordinates() {
-            return new Coordinates.ForLoop(this);
+        public Coordinates.Statement getCoordinates() {
+            return new Coordinates.Statement(this);
         }
 
         @ToString
@@ -1830,6 +1821,7 @@ public interface J extends Serializable, Tree {
             @NonFinal
             transient WeakReference<Padding> padding;
 
+            @With
             @EqualsAndHashCode.Include
             @Getter
             UUID id;
@@ -1875,11 +1867,6 @@ public interface J extends Serializable, Tree {
             @Override
             public <P> J acceptJava(JavaVisitor<P> v, P p) {
                 return v.visitForControl(this, p);
-            }
-
-            @Override
-            public Coordinates.ForLoop.Control getCoordinates() {
-                return new Coordinates.ForLoop.Control(this);
             }
 
             public Padding getPadding() {
@@ -1987,6 +1974,15 @@ public interface J extends Serializable, Tree {
 
         @SuppressWarnings("unchecked")
         @Override
+        public Identifier withId(UUID id) {
+            if (id == getId()) {
+                return this;
+            }
+            return build(id, prefix, markers, getSimpleName(), getType());
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
         public Identifier withType(@Nullable JavaType type) {
             if (type == getType()) {
                 return this;
@@ -2001,11 +1997,6 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitIdentifier(this, p);
-        }
-
-        @Override
-        public Coordinates.Identifier getCoordinates() {
-            return new Coordinates.Identifier(this);
         }
 
         public Identifier withName(String name) {
@@ -2076,6 +2067,7 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -2113,8 +2105,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.If getCoordinates() {
-            return new Coordinates.If(this);
+        public Coordinates.Statement getCoordinates() {
+            return new Coordinates.Statement(this);
         }
 
         @ToString
@@ -2127,6 +2119,7 @@ public interface J extends Serializable, Tree {
             @NonFinal
             transient WeakReference<Padding> padding;
 
+            @With
             @EqualsAndHashCode.Include
             @Getter
             UUID id;
@@ -2152,11 +2145,6 @@ public interface J extends Serializable, Tree {
             @Override
             public <P> J acceptJava(JavaVisitor<P> v, P p) {
                 return v.visitElse(this, p);
-            }
-
-            @Override
-            public Coordinates.If.Else getCoordinates() {
-                return new Coordinates.If.Else(this);
             }
 
             public Padding getPadding() {
@@ -2226,6 +2214,7 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -2255,11 +2244,6 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitImport(this, p);
-        }
-
-        @Override
-        public Coordinates.Import getCoordinates() {
-            return new Coordinates.Import(this);
         }
 
         public boolean isFromType(String clazz) {
@@ -2369,11 +2353,12 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class InstanceOf implements J, Expression {
+    final class InstanceOf implements J, Expression, TypedTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -2408,11 +2393,6 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitInstanceOf(this, p);
-        }
-
-        @Override
-        public Coordinates.InstanceOf getCoordinates() {
-            return new Coordinates.InstanceOf(this);
         }
 
         public Padding getPadding() {
@@ -2454,6 +2434,7 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -2489,8 +2470,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Label getCoordinates() {
-            return new Coordinates.Label(this);
+        public Coordinates.Statement getCoordinates() {
+            return new Coordinates.Statement(this);
         }
 
         public Padding getPadding() {
@@ -2525,7 +2506,8 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    final class Lambda implements J, Expression {
+    final class Lambda implements J, Statement, Expression, TypedTree {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2554,8 +2536,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Lambda getCoordinates() {
-            return new Coordinates.Lambda(this);
+        public Coordinates.Statement getCoordinates() {
+            return new Coordinates.Statement(this);
         }
 
         @ToString
@@ -2568,6 +2550,7 @@ public interface J extends Serializable, Tree {
             @NonFinal
             transient WeakReference<Padding> padding;
 
+            @With
             @EqualsAndHashCode.Include
             @Getter
             UUID id;
@@ -2594,7 +2577,6 @@ public interface J extends Serializable, Tree {
                 return getPadding().withParams(JRightPadded.withElements(this.parameters, parameters));
             }
 
-            @Override
             public Coordinates.Lambda.Parameters getCoordinates() {
                 return new Coordinates.Lambda.Parameters(this);
             }
@@ -2632,8 +2614,8 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    final class Literal implements J, Expression {
-
+    final class Literal implements J, Expression, TypedTree {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2678,11 +2660,6 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Literal getCoordinates() {
-            return new Coordinates.Literal(this);
-        }
-
-        @Override
         public String toString() {
             return "Literal(" + LiteralToString.toString(this) + ")";
         }
@@ -2702,11 +2679,12 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class MemberReference implements J, Expression {
+    final class MemberReference implements J, Expression, TypedTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -2767,11 +2745,6 @@ public interface J extends Serializable, Tree {
             return v.visitMemberReference(this, p);
         }
 
-        @Override
-        public Coordinates.MemberReference getCoordinates() {
-            return new Coordinates.MemberReference(this);
-        }
-
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -2814,7 +2787,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class MethodDeclaration implements J, Statement {
+    final class MethodDeclaration implements J, Statement, TypedTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -2823,6 +2796,7 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Annotations> annotations;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -2932,10 +2906,23 @@ public interface J extends Serializable, Tree {
             return getPadding().withDefaultValue(JLeftPadded.withElement(this.defaultValue, defaultValue));
         }
 
-        @With
         @Getter
         @Nullable
         JavaType.Method type;
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public MethodDeclaration withType(@Nullable JavaType type) {
+            if(type == this.type) {
+                return this;
+            }
+
+            if(!(type instanceof JavaType.Method)) {
+                throw new IllegalArgumentException("A method can only be type attributed with a method type");
+            }
+
+            return new MethodDeclaration(id, prefix, markers, leadingAnnotations, modifiers, typeParameters, returnTypeExpression, name, parameters, throwz, body, defaultValue, (JavaType.Method) type);
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -2988,12 +2975,12 @@ public interface J extends Serializable, Tree {
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static final class IdentifierWithAnnotations {
-
             @Getter
             @With
             Identifier identifier;
 
             @Getter
+            @With
             List<Annotation> annotations;
         }
 
@@ -3085,11 +3072,12 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class MethodInvocation implements J, Statement, Expression {
+    final class MethodInvocation implements J, Statement, Expression, TypedTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -3249,6 +3237,7 @@ public interface J extends Serializable, Tree {
             return modifiers.stream().anyMatch(m -> m.getType() == modifier);
         }
 
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -3283,11 +3272,6 @@ public interface J extends Serializable, Tree {
             Native,
             Strictfp,
         }
-
-        @Override
-        public Coordinates.Modifier getCoordinates() {
-            return new Coordinates.Modifier(this);
-        }
     }
 
     @ToString
@@ -3300,6 +3284,7 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -3325,11 +3310,6 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitMultiCatch(this, p);
-        }
-
-        @Override
-        public Coordinates.MultiCatch getCoordinates() {
-            return new Coordinates.MultiCatch(this);
         }
 
         @SuppressWarnings("unchecked")
@@ -3381,11 +3361,12 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class NewArray implements J, Expression {
+    final class NewArray implements J, Expression, TypedTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -3423,11 +3404,6 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitNewArray(this, p);
-        }
-
-        @Override
-        public Coordinates.NewArray getCoordinates() {
-            return new Coordinates.NewArray(this);
         }
 
         public Padding getPadding() {
@@ -3470,6 +3446,7 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -3495,11 +3472,6 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitArrayDimension(this, p);
-        }
-
-        @Override
-        public Coordinates.ArrayDimension getCoordinates() {
-            return new Coordinates.ArrayDimension(this);
         }
 
         public Padding getPadding() {
@@ -3536,11 +3508,12 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class NewClass implements J, Statement, Expression {
+    final class NewClass implements J, Statement, Expression, TypedTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -3620,8 +3593,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.NewClass getCoordinates() {
-            return new Coordinates.NewClass(this);
+        public Coordinates.Statement getCoordinates() {
+            return new Coordinates.Statement(this);
         }
 
         @Override
@@ -3672,6 +3645,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     final class Package implements J {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -3692,7 +3666,6 @@ public interface J extends Serializable, Tree {
             return v.visitPackage(this, p);
         }
 
-        @Override
         public Coordinates.Package getCoordinates() {
             return new Coordinates.Package(this);
         }
@@ -3708,6 +3681,7 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -3755,11 +3729,6 @@ public interface J extends Serializable, Tree {
             return v.visitParameterizedType(this, p);
         }
 
-        @Override
-        public Coordinates.ParameterizedType getCoordinates() {
-            return new Coordinates.ParameterizedType(this);
-        }
-
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -3800,6 +3769,7 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Padding<J2>> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -3825,11 +3795,6 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitParentheses(this, p);
-        }
-
-        @Override
-        public Coordinates.Parentheses getCoordinates() {
-            return new Coordinates.Parentheses(this);
         }
 
         @Override
@@ -3891,6 +3856,7 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Padding<J2>> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -3916,11 +3882,6 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitControlParentheses(this, p);
-        }
-
-        @Override
-        public Coordinates.ControlParentheses getCoordinates() {
-            return new Coordinates.ControlParentheses(this);
         }
 
         @Override
@@ -3976,6 +3937,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
     final class Primitive implements J, TypeTree, Expression {
+        @With
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -4012,17 +3974,13 @@ public interface J extends Serializable, Tree {
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitPrimitive(this, p);
         }
-
-        @Override
-        public Coordinates.Primitive getCoordinates() {
-            return new Coordinates.Primitive(this);
-        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     final class Return implements J, Statement {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -4042,8 +4000,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Return getCoordinates() {
-            return new Coordinates.Return(this);
+        public Coordinates.Statement getCoordinates() {
+            return new Coordinates.Statement(this);
         }
     }
 
@@ -4051,6 +4009,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     final class Switch implements J, Statement {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -4072,8 +4031,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Switch getCoordinates() {
-            return new Coordinates.Switch(this);
+        public Coordinates.Statement getCoordinates() {
+            return new Coordinates.Statement(this);
         }
     }
 
@@ -4081,6 +4040,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     final class Synchronized implements J, Statement {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -4102,8 +4062,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Synchronized getCoordinates() {
-            return new Coordinates.Synchronized(this);
+        public Coordinates.Statement getCoordinates() {
+            return new Coordinates.Statement(this);
         }
     }
 
@@ -4112,11 +4072,12 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class Ternary implements J, Expression {
+    final class Ternary implements J, Expression, TypedTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -4163,11 +4124,6 @@ public interface J extends Serializable, Tree {
             return v.visitTernary(this, p);
         }
 
-        @Override
-        public Coordinates.Ternary getCoordinates() {
-            return new Coordinates.Ternary(this);
-        }
-
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -4209,6 +4165,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     final class Throw implements J, Statement {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -4227,8 +4184,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Throw getCoordinates() {
-            return new Coordinates.Throw(this);
+        public Coordinates.Statement getCoordinates() {
+            return new Coordinates.Statement(this);
         }
     }
 
@@ -4242,6 +4199,7 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -4292,14 +4250,15 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Try getCoordinates() {
-            return new Coordinates.Try(this);
+        public Coordinates.Statement getCoordinates() {
+            return new Coordinates.Statement(this);
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static final class Resource implements J {
+            @With
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -4322,17 +4281,13 @@ public interface J extends Serializable, Tree {
             public <P> J acceptJava(JavaVisitor<P> v, P p) {
                 return v.visitTryResource(this, p);
             }
-
-            @Override
-            public Coordinates.Try.Resource getCoordinates() {
-                return new Coordinates.Try.Resource(this);
-            }
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static final class Catch implements J {
+            @With
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -4351,11 +4306,6 @@ public interface J extends Serializable, Tree {
             @Override
             public <P> J acceptJava(JavaVisitor<P> v, P p) {
                 return v.visitCatch(this, p);
-            }
-
-            @Override
-            public Coordinates.Try.Catch getCoordinates() {
-                return new Coordinates.Try.Catch(this);
             }
         }
 
@@ -4402,6 +4352,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     final class TypeCast implements J, Expression {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -4432,11 +4383,6 @@ public interface J extends Serializable, Tree {
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitTypeCast(this, p);
         }
-
-        @Override
-        public Coordinates.TypeCast getCoordinates() {
-            return new Coordinates.TypeCast(this);
-        }
     }
 
     @ToString
@@ -4449,6 +4395,7 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -4490,11 +4437,6 @@ public interface J extends Serializable, Tree {
             return v.visitTypeParameter(this, p);
         }
 
-        @Override
-        public Coordinates.TypeParameter getCoordinates() {
-            return new Coordinates.TypeParameter(this);
-        }
-
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -4531,11 +4473,11 @@ public interface J extends Serializable, Tree {
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class TypeParameters implements J {
-
         @Nullable
         @NonFinal
         transient WeakReference<TypeParameters.Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -4560,11 +4502,6 @@ public interface J extends Serializable, Tree {
 
         public TypeParameters withTypeParameters(List<TypeParameter> typeParameters) {
             return getPadding().withTypeParameters(JRightPadded.withElements(this.typeParameters, typeParameters));
-        }
-
-        @Override
-        public Coordinates.TypeParameters getCoordinates() {
-            return new Coordinates.TypeParameters(this);
         }
 
         public TypeParameters.Padding getPadding() {
@@ -4601,11 +4538,12 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class Unary implements J, Statement, Expression {
+    final class Unary implements J, Statement, Expression, TypedTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -4643,8 +4581,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Unary getCoordinates() {
-            return new Coordinates.Unary(this);
+        public Coordinates.Statement getCoordinates() {
+            return new Coordinates.Statement(this);
         }
 
         @Override
@@ -4701,6 +4639,7 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -4782,6 +4721,7 @@ public interface J extends Serializable, Tree {
             @NonFinal
             transient WeakReference<Padding> padding;
 
+            @With
             @EqualsAndHashCode.Include
             @Getter
             UUID id;
@@ -4826,11 +4766,6 @@ public interface J extends Serializable, Tree {
             @Override
             public <P> J acceptJava(JavaVisitor<P> v, P p) {
                 return v.visitVariable(this, p);
-            }
-
-            @Override
-            public Coordinates.VariableDeclarations.NamedVar getCoordinates() {
-                return new Coordinates.VariableDeclarations.NamedVar(this);
             }
 
             public boolean isField(Cursor cursor) {
@@ -4921,6 +4856,7 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -4953,8 +4889,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.WhileLoop getCoordinates() {
-            return new Coordinates.WhileLoop(this);
+        public Coordinates.Statement getCoordinates() {
+            return new Coordinates.Statement(this);
         }
 
         public Padding getPadding() {
@@ -4996,6 +4932,7 @@ public interface J extends Serializable, Tree {
         @NonFinal
         transient WeakReference<Padding> padding;
 
+        @With
         @EqualsAndHashCode.Include
         @Getter
         UUID id;
@@ -5039,11 +4976,6 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitWildcard(this, p);
-        }
-
-        @Override
-        public Coordinates.Wildcard getCoordinates() {
-            return new Coordinates.Wildcard(this);
         }
 
         public enum Bound {

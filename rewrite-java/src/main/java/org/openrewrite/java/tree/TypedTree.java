@@ -15,8 +15,18 @@
  */
 package org.openrewrite.java.tree;
 
+import org.openrewrite.Tree;
+import org.openrewrite.internal.lang.Nullable;
+
 /**
- * A tree representing a simple or fully qualified name
+ * A tree with type attribution information. Unlike {@link TypeTree},
+ * this does not necessarily mean the tree is the name of a type. So for
+ * example, a {@link J.MethodInvocation} is a {@link TypedTree} but
+ * not a {@link TypeTree}.
  */
-public interface NameTree extends TypedTree {
+public interface TypedTree extends J {
+    @Nullable
+    JavaType getType();
+
+    <T extends Tree> T withType(@Nullable JavaType type);
 }

@@ -162,7 +162,12 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public <T> JRightPadded<T> visitRightPadded(JRightPadded<T> right, JRightPadded.Location loc, P p) {
+    public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P p) {
+        if(right == null) {
+            //noinspection ConstantConditions
+            return null;
+        }
+
         setCursor(new Cursor(getCursor(), right));
 
         T t = right.getElement();

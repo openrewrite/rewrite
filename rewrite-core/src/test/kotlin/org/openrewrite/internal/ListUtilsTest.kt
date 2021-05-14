@@ -13,10 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.tree;
+package org.openrewrite.internal
 
-/**
- * A tree representing a simple or fully qualified name
- */
-public interface NameTree extends TypedTree {
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Test
+
+class ListUtilsTest {
+
+    @Test
+    fun flatMap() {
+        val l = listOf(1.0, 2.0, 3.0)
+        assertThat(ListUtils.flatMap(l) { l2 ->
+            if(l2.toInt() % 2 == 0) {
+                listOf(2.0, 2.1, 2.2)
+            } else {
+                l2
+            }
+        }).containsExactly(1.0, 2.0, 2.1, 2.2, 3.0)
+    }
 }
