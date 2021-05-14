@@ -23,12 +23,4 @@ tags:
 recipeList:
   - org.openrewrite.java.security.ResultOfFileMkdirsIgnored
   - org.openrewrite.java.security.XmlParserXXEVulnerability
----
-type: specs.openrewrite.org/v1beta/recipe
-name: org.openrewrite.java.security.ResultOfFileMkdirsIgnored
-displayName: Allows attacker to create a directory with elevated permissions.
-tags:
-  - security
-recipeList:
-  - org.openrewrite.java.search.ResultOfMethodCallIgnored:
-      methodPattern: 'java.io.File mkdir*()'
+
