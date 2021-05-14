@@ -312,3 +312,7 @@ class Java8WrappingAndBracesTest : Java8Test, WrappingAndBracesTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java8XmlParserXXEVulnerabilityTest : Java8Test, XmlParserXXEVulnerabilityTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8SameClassNameTest : Java8Test, SameClassNameTest

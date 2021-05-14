@@ -316,3 +316,8 @@ class Java11WrappingAndBracesTest : Java11Test, WrappingAndBracesTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11XmlParserXXEVulnerabilityTest : Java11Test, XmlParserXXEVulnerabilityTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11SameClassNameTest : Java11Test, SameClassNameTest
+
