@@ -926,7 +926,7 @@ public interface J extends Serializable, Tree {
         @With
         @Getter
         @Nullable
-        JavaType.Class type;
+        JavaType.FullyQualified type;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -2287,7 +2287,7 @@ public interface J extends Serializable, Tree {
          */
 
         public String getPackageName() {
-            JavaType.Class importType = TypeUtils.asClass(qualid.getType());
+            JavaType.FullyQualified importType = TypeUtils.asFullyQualified(qualid.getType());
             if (importType != null) {
                 return importType.getPackageName();
             }
@@ -4768,8 +4768,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Nullable
-        public JavaType.Class getTypeAsClass() {
-            return typeExpression == null ? null : TypeUtils.asClass(typeExpression.getType());
+        public JavaType.FullyQualified getTypeAsFullyQualified() {
+            return typeExpression == null ? null : TypeUtils.asFullyQualified(typeExpression.getType());
         }
 
         @ToString

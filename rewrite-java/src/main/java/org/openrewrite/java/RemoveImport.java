@@ -107,10 +107,10 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
 
     @Override
     public <N extends NameTree> N visitTypeName(N name, P p) {
-        JavaType.Class asClass = TypeUtils.asClass(name.getType());
-        if (asClass != null && asClass.getPackageName().equals(classType.getPackageName()) &&
+        JavaType.FullyQualified fullyQualified = TypeUtils.asFullyQualified(name.getType());
+        if (fullyQualified != null && fullyQualified.getPackageName().equals(classType.getPackageName()) &&
                 getCursor().getPathAsStream().noneMatch(J.Import.class::isInstance)) {
-            referencedTypes.add(asClass.getFullyQualifiedName());
+            referencedTypes.add(fullyQualified.getFullyQualifiedName());
         }
         return super.visitTypeName(name, p);
     }
@@ -157,7 +157,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
 
     private J.CompilationUnit staticImportDeletions(J.CompilationUnit cu) {
         if (staticStarImport != null) {
-            JavaType.Class qualidType = TypeUtils.asClass(staticStarImport.getQualid().getTarget().getType());
+            JavaType.FullyQualified qualidType = TypeUtils.asFullyQualified(staticStarImport.getQualid().getTarget().getType());
             if (referencedMethods.isEmpty() && noFieldReferences(qualidType, null)) {
                 cu = delete(cu, staticStarImport);
             }
@@ -165,7 +165,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
 
         for (J.Import staticImport : staticNamedImports) {
             String methodOrField = staticImport.getQualid().getSimpleName();
-            JavaType.Class qualidType = TypeUtils.asClass(staticImport.getQualid().getTarget().getType());
+            JavaType.FullyQualified qualidType = TypeUtils.asFullyQualified(staticImport.getQualid().getTarget().getType());
             if (referencedMethods.stream().noneMatch(m -> m.getSimpleName().equals(methodOrField)) &&
                     noFieldReferences(qualidType, methodOrField)) {
                 cu = delete(cu, staticImport);
@@ -175,7 +175,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         return cu;
     }
 
-    private boolean noFieldReferences(@Nullable JavaType.Class qualidType, @Nullable String fieldName) {
+    private boolean noFieldReferences(@Nullable JavaType.FullyQualified qualidType, @Nullable String fieldName) {
         return qualidType == null || (
                 fieldName != null ? !referencedFields.contains(fieldName) :
                         referencedFields.stream().noneMatch(f -> qualidType.getMembers().stream().anyMatch(v -> f.equals(v.getName())) ||

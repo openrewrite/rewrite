@@ -44,7 +44,8 @@ public class FindInheritedFields {
             this.fullyQualifiedName = fullyQualifiedName;
         }
 
-        private Set<JavaType.Variable> superFields(@Nullable JavaType.Class type) {
+        private Set<JavaType.Variable> superFields(@Nullable JavaType.FullyQualified type) {
+
             if (type == null || type.getSupertype() == null) {
                 return emptySet();
             }
@@ -58,8 +59,7 @@ public class FindInheritedFields {
 
         @Override
         public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Set<JavaType.Variable> ctx) {
-            JavaType.Class asClass = TypeUtils.asClass(classDecl.getType());
-            ctx.addAll(superFields(asClass == null ? null : asClass.getSupertype()));
+            ctx.addAll(superFields(classDecl.getType() == null ? null : classDecl.getType().getSupertype()));
             return super.visitClassDeclaration(classDecl, ctx);
         }
     }

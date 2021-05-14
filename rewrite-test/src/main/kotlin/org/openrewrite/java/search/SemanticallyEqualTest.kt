@@ -411,14 +411,11 @@ interface SemanticallyEqualTest {
             Space.EMPTY,
             Markers.EMPTY,
             "name",
-            object : JavaType.FullyQualified() {
+            object : JavaType.ShallowClass("org.foo.Bar") {
                 override fun deepEquals(type: JavaType?): Boolean {
                     return false
                 }
 
-                override fun getFullyQualifiedName(): String {
-                    return "org.foo.Bar"
-                }
             }
         )
         val nameB = J.Identifier.build(
@@ -430,7 +427,6 @@ interface SemanticallyEqualTest {
                 Collections.singleton(Flag.Public),
                 "org.foo.Bar",
                 JavaType.Class.Kind.Class,
-                listOf(),
                 listOf(),
                 listOf(JavaType.Class.build("org.foo.Baz")),
                 listOf(),

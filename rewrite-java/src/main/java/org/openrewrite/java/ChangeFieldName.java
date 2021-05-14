@@ -71,7 +71,7 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
     }
 
     private boolean matchesClass(@Nullable JavaType test) {
-        JavaType.Class testClassType = TypeUtils.asClass(test);
+        JavaType.FullyQualified testClassType = TypeUtils.asFullyQualified(test);
         return testClassType != null && testClassType.getFullyQualifiedName().equals(classType.getFullyQualifiedName());
     }
 

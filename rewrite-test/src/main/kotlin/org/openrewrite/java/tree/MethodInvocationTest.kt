@@ -17,10 +17,7 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.asClass
-import org.openrewrite.java.asGeneric
-import org.openrewrite.java.hasElementType
+import org.openrewrite.java.*
 
 interface MethodInvocationTest {
     private fun J.CompilationUnit.allInvs() = classes[0].body
@@ -42,12 +39,12 @@ interface MethodInvocationTest {
 
         // check assumptions about the call site
         assertEquals("foo", inv.name.printTrimmed())
-        assertEquals("java.lang.Integer", inv.returnType.asClass()?.fullyQualifiedName)
+        assertEquals("java.lang.Integer", inv.returnType.asFullyQualified()?.fullyQualifiedName)
         assertEquals(listOf(JavaType.Primitive.Int, JavaType.Primitive.Int, JavaType.Primitive.Int),
             inv.arguments.filterIsInstance<J.Literal>().map { it.type })
 
         val effectParams = inv.type!!.resolvedSignature.paramTypes
-        assertEquals("java.lang.Integer", effectParams[0].asClass()?.fullyQualifiedName)
+        assertEquals("java.lang.Integer", effectParams[0].asFullyQualified()?.fullyQualifiedName)
         assertTrue(effectParams[1].hasElementType("java.lang.Integer"))
 
         // for non-generic method signatures, resolvedSignature and genericSignature match
@@ -73,12 +70,12 @@ interface MethodInvocationTest {
 
         listOf(genericInv, explicitGenericInv).forEach { test: J.MethodInvocation ->
             // check assumptions about the call site
-            assertEquals("java.lang.Integer", test.returnType.asClass()?.fullyQualifiedName)
+            assertEquals("java.lang.Integer", test.returnType.asFullyQualified()?.fullyQualifiedName)
             assertEquals(listOf(JavaType.Primitive.Int, JavaType.Primitive.Int, JavaType.Primitive.Int),
                 test.arguments.filterIsInstance<J.Literal>().map { it.type })
 
             val effectiveParams = test.type!!.resolvedSignature.paramTypes
-            assertEquals("java.lang.Integer", effectiveParams[0].asClass()?.fullyQualifiedName)
+            assertEquals("java.lang.Integer", effectiveParams[0].asFullyQualified()?.fullyQualifiedName)
             assertTrue(effectiveParams[1].hasElementType("java.lang.Integer"))
 
             // check assumptions about the target method

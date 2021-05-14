@@ -55,7 +55,7 @@ public class ExplicitInitializationVisitor<P> extends JavaIsoVisitor<P> {
         J.Literal literalInit = variable.getInitializer() instanceof J.Literal ? (J.Literal) variable.getInitializer() : null;
 
         if (literalInit != null && !variableDecls.hasModifier(J.Modifier.Type.Final)) {
-            if (TypeUtils.asClass(variable.getType()) != null && JavaType.Primitive.Null.equals(literalInit.getType())) {
+            if (TypeUtils.asFullyQualified(variable.getType()) != null && JavaType.Primitive.Null.equals(literalInit.getType())) {
                 v = v.withInitializer(null);
             } else if (primitive != null && !Boolean.TRUE.equals(style.getOnlyObjectReferences())) {
                 switch (primitive) {

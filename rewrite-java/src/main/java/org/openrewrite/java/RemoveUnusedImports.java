@@ -60,7 +60,7 @@ public class RemoveUnusedImports extends Recipe {
             Map<String, Set<String>> methodsByTypeName = new HashMap<>();
             new StaticMethodsByType().visit(cu, methodsByTypeName);
 
-            Map<String, Set<JavaType.Class>> typesByPackage = new HashMap<>();
+            Map<String, Set<JavaType.FullyQualified>> typesByPackage = new HashMap<>();
             new TypesByPackage().visit(cu, typesByPackage);
 
             boolean changed = false;
@@ -93,7 +93,7 @@ public class RemoveUnusedImports extends Recipe {
                         importsWithUsage.add(anImport);
                     }
                 } else {
-                    Set<JavaType.Class> types = typesByPackage.get(anImport.getElement().getPackageName());
+                    Set<JavaType.FullyQualified> types = typesByPackage.get(anImport.getElement().getPackageName());
                     if (types == null) {
                         changed = true;
                         continue;
@@ -151,12 +151,12 @@ public class RemoveUnusedImports extends Recipe {
             return cu;
         }
 
-        private static class TypesByPackage extends JavaIsoVisitor<Map<String, Set<JavaType.Class>>> {
+        private static class TypesByPackage extends JavaIsoVisitor<Map<String, Set<JavaType.FullyQualified>>> {
 
             @Override
-            public <N extends NameTree> N visitTypeName(N name, Map<String, Set<JavaType.Class>> ctx) {
+            public <N extends NameTree> N visitTypeName(N name, Map<String, Set<JavaType.FullyQualified>> ctx) {
                 if (getCursor().firstEnclosing(J.Import.class) == null) {
-                    JavaType.Class clazz = TypeUtils.asClass(name.getType());
+                    JavaType.FullyQualified clazz = TypeUtils.asFullyQualified(name.getType());
                     if (clazz != null) {
                         ctx.computeIfAbsent(clazz.getPackageName(), t -> new HashSet<>()).add(clazz);
                     }
@@ -165,8 +165,8 @@ public class RemoveUnusedImports extends Recipe {
             }
 
             @Override
-            public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Map<String, Set<JavaType.Class>> ctx) {
-                JavaType.Class targetClass = TypeUtils.asClass(fieldAccess.getTarget().getType());
+            public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Map<String, Set<JavaType.FullyQualified>> ctx) {
+                JavaType.FullyQualified targetClass = TypeUtils.asFullyQualified(fieldAccess.getTarget().getType());
                 if (targetClass != null && fieldAccess.getName().getSimpleName().equals("class")) {
                     ctx.computeIfAbsent(targetClass.getPackageName(), t -> new HashSet<>()).add(targetClass);
                 }
@@ -174,8 +174,8 @@ public class RemoveUnusedImports extends Recipe {
             }
 
             @Override
-            public J.Annotation visitAnnotation(J.Annotation annotation, Map<String, Set<JavaType.Class>> ctx) {
-                JavaType.Class clazz = TypeUtils.asClass(annotation.getType());
+            public J.Annotation visitAnnotation(J.Annotation annotation, Map<String, Set<JavaType.FullyQualified>> ctx) {
+                JavaType.FullyQualified clazz = TypeUtils.asFullyQualified(annotation.getType());
                 if (clazz != null) {
                     ctx.computeIfAbsent(clazz.getPackageName(), t -> new HashSet<>()).add(clazz);
                 }

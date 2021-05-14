@@ -60,7 +60,7 @@ public class AnnotationMatcher {
     }
 
     private boolean matchesAnnotationName(J.Annotation annotation) {
-        JavaType.Class typeAsClass = TypeUtils.asClass(annotation.getType());
+        JavaType.FullyQualified typeAsClass = TypeUtils.asFullyQualified(annotation.getType());
         return getAnnotationName().equals(typeAsClass == null ? null : typeAsClass.getFullyQualifiedName());
     }
 
@@ -103,7 +103,8 @@ public class AnnotationMatcher {
     private boolean argumentValueMatches(String matchOnArgumentName, Expression arg, String matchText) {
         if (matchOnArgumentName.equals("value")) {
             if (arg instanceof J.Literal) {
-                return ((J.Literal) arg).getValueSource().equals(matchText);
+                String valueSource = ((J.Literal) arg).getValueSource();
+                return valueSource != null && valueSource.equals(matchText);
             }
             if (arg instanceof J.FieldAccess && ((J.FieldAccess) arg).getSimpleName().equals("class") &&
                     matchText.endsWith(".class")) {

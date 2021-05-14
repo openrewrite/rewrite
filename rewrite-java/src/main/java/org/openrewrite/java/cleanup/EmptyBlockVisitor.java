@@ -95,7 +95,7 @@ public class EmptyBlockVisitor<P> extends JavaIsoVisitor<P> {
 
         if (Boolean.TRUE.equals(emptyBlockStyle.getLiteralCatch()) && isEmptyBlock(c.getBody())) {
             String throwName;
-            if (TypeUtils.isOfClassType(c.getParameter().getTree().getTypeAsClass(), "java.io.IOException")) {
+            if (TypeUtils.isOfClassType(c.getParameter().getTree().getTypeAsFullyQualified(), "java.io.IOException")) {
                 throwName = "UncheckedIOException";
                 maybeAddImport("java.io.UncheckedIOException");
             } else {

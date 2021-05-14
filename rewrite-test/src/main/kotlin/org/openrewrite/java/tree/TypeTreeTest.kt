@@ -18,7 +18,8 @@ package org.openrewrite.java.tree
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.asClass
+import org.openrewrite.java.asFullyQualified
+
 
 interface TypeTreeTest {
 
@@ -43,11 +44,11 @@ interface TypeTreeTest {
 
         assertEquals("a.Outer.Inner", name.printTrimmed())
         assertEquals("Inner", name.simpleName)
-        assertEquals("a.Outer.Inner", name.type.asClass()?.fullyQualifiedName)
+        assertEquals("a.Outer.Inner", name.type.asFullyQualified()?.fullyQualifiedName)
 
         val outer = name.target as J.FieldAccess
         assertEquals("Outer", outer.simpleName)
-        assertEquals("a.Outer", outer.type.asClass()?.fullyQualifiedName)
+        assertEquals("a.Outer", outer.type.asFullyQualified()?.fullyQualifiedName)
     }
 
     @Test

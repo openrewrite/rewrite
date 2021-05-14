@@ -93,7 +93,7 @@ interface JavaParserTest {
             )
 
         assertThat(
-            (cu[0].classes[0].body.statements[0] as J.VariableDeclarations).typeAsClass?.fullyQualifiedName
+            (cu[0].classes[0].body.statements[0] as J.VariableDeclarations).typeAsFullyQualified?.fullyQualifiedName
         ).isEqualTo("A")
     }
 }

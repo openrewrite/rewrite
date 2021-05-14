@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 @Value
@@ -65,10 +66,13 @@ public class GenerateGetter extends Recipe {
             Cursor varCursor = getCursor().pollNearestMessage("varCursor");
             if (varCursor != null) {
                 J.VariableDeclarations.NamedVariable var = varCursor.getValue();
-                c = c.withTemplate(getter, c.getBody().getCoordinates().lastStatement(),
-                        TypeUtils.asClass(var.getType()).getClassName(),
-                        StringUtils.capitalize(var.getSimpleName()),
-                        var.getSimpleName());
+                JavaType.FullyQualified fullyQualified = TypeUtils.asFullyQualified(var.getType());
+                if (fullyQualified != null) {
+                    c = c.withTemplate(getter, c.getBody().getCoordinates().lastStatement(),
+                            fullyQualified.getClassName(),
+                            StringUtils.capitalize(var.getSimpleName()),
+                            var.getSimpleName());
+                }
             }
             return c;
         }

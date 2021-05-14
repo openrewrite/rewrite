@@ -164,14 +164,14 @@ interface JavaTypeSerializerTest {
 
     @Test
     fun serializeVariable(jp: JavaParser) {
-        @Suppress("RECEIVER_NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS") val members = jp.parse("""
+        @Suppress("RECEIVER_NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS") val members = (jp.parse("""
             public abstract class A {
                 public String getFoo;
                 private final String getFoo2 = "fred";
                 protected static String getFoo3;
                 Long getFoo4;
             }
-        """)[0].classes[0].type.members
+        """)[0].classes[0].type as JavaType.Class).members
 
         val mapper = objectMapper()
 

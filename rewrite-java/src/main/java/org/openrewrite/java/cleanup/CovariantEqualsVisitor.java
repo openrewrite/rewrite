@@ -64,7 +64,7 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
              * Looking for "public boolean equals(EnclosingClassType)" as the method signature match.
              * We'll replace it with "public boolean equals(Object)"
              */
-            JavaType.Class type = enclosingClass.getType();
+            JavaType.FullyQualified type = enclosingClass.getType();
             if (type == null) {
                 return m;
             }
