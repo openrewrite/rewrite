@@ -28,6 +28,8 @@ import org.openrewrite.maven.internal.RawMavenResolver;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.tree.Xml;
 
+import java.io.FileNotFoundException;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -100,24 +102,34 @@ public class MavenArtifactHelper {
         Pom pom = maven.getModel();
         MavenArtifactDownloader mavenArtifactDownloader = new MavenArtifactDownloader(mavenArtifactCache, null, ctx.getOnError());
         List<Path> artifactPaths = new ArrayList<>();
-        artifactPaths.add(mavenArtifactDownloader.downloadArtifact(new Pom.Dependency(pom.getRepositories().iterator().next(), Scope.Compile, null, null, false, new Pom(
-                randomId(),
-                pom.getGroupId(),
-                pom.getArtifactId(),
-                pom.getVersion(),
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                Collections.emptyList(),
-                new Pom.DependencyManagement(Collections.emptyList()),
-                Collections.emptyList(),
-                repositories,
-                Collections.emptyMap(),
-                Collections.emptyMap()
-        ), null, pom.getSnapshotVersion(), Collections.emptySet())));
+        Path downloadedArtifact = null;
+        for (MavenRepository pomRepository : pom.getRepositories()) {
+            downloadedArtifact = mavenArtifactDownloader.downloadArtifact(new Pom.Dependency(pomRepository, Scope.Compile, null, null, false, new Pom(
+                    randomId(),
+                    pom.getGroupId(),
+                    pom.getArtifactId(),
+                    pom.getVersion(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    Collections.emptyList(),
+                    new Pom.DependencyManagement(Collections.emptyList()),
+                    Collections.emptyList(),
+                    repositories,
+                    Collections.emptyMap(),
+                    Collections.emptyMap()
+            ), null, pom.getSnapshotVersion(), Collections.emptySet()));
+            if (downloadedArtifact != null) {
+                break;
+            }
+        }
+        if (downloadedArtifact == null) {
+            throw new UncheckedIOException(new FileNotFoundException("Could not find " + pom.toString() + " in any repositories."));
+        }
+        artifactPaths.add(downloadedArtifact);
         for (Pom.Dependency dependency : collectDependencies(maven.getModel().getDependencies(),
                 d -> !d.isOptional() && d.getScope() != Scope.Test)) {
             artifactPaths.add(mavenArtifactDownloader.downloadArtifact(dependency));
