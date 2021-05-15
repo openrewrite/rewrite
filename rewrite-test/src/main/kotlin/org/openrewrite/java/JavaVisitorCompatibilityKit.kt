@@ -73,6 +73,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class CovariantEqualsTck : CovariantEqualsTest
 
     @Nested
+    inner class DefaultComesLastTck : DefaultComesLastTest
+
+    @Nested
     inner class DeleteMethodArgumentTck : DeleteMethodArgumentTest
 
     @Nested

@@ -82,6 +82,10 @@ class Java8CovariantEqualsTest : Java8Test, CovariantEqualsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8DefaultComesLastTest : Java8Test, DefaultComesLastTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8DeleteMethodArgumentTest : Java8Test, DeleteMethodArgumentTest
 
 @DebugOnly

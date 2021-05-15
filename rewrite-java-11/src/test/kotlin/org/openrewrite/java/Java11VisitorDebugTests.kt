@@ -82,6 +82,10 @@ class Java11CovariantEqualsTest : Java11Test, CovariantEqualsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11DefaultComesLastTest : Java11Test, DefaultComesLastTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11DeleteMethodArgumentTest : Java11Test, DeleteMethodArgumentTest
 
 @DebugOnly
