@@ -23,7 +23,6 @@ recipeList:
   - org.openrewrite.java.cleanup.EmptyBlock
   - org.openrewrite.java.cleanup.EqualsAvoidsNull
   - org.openrewrite.java.cleanup.ExplicitInitialization
-  - org.openrewrite.java.cleanup.FinalizeLocalVariables
   - org.openrewrite.java.cleanup.HideUtilityClassConstructor
 #  - org.openrewrite.java.cleanup.MethodNameCasing
   - org.openrewrite.java.cleanup.ModifierOrder
