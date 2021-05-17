@@ -148,12 +148,12 @@ public final class ListUtils {
      * a new list will be returned where the modified elements have been replaced with their new version.
      *
      * @param ls   The original list
-     * @param pool A pool to parallelize the mapping operation
+     * @param pool A pool to parallelize the mapping operation or null to execute in the calling thread.
      * @param map  The mapping function. If a null value is returned, the item is dropped from the resultant list
      * @param <T>  The type of the list
      * @return The original list if no element has changed, or a new list.
      */
-    public static <T> List<T> map(List<T> ls, ForkJoinPool pool, BiFunction<Integer, T, T> map) {
+    public static <T> List<T> map(List<T> ls, @Nullable ForkJoinPool pool, BiFunction<Integer, T, T> map) {
         if (ls == null || ls.isEmpty()) {
             return ls;
         }
