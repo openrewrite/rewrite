@@ -45,7 +45,7 @@ public final class ListUtils {
      * @return A new list with the element inserted in an approximately ordered place.
      */
     public static <T> List<T> insertInOrder(List<T> ls, T insert, Comparator<T> naturalOrdering) {
-        if(ls == null || ls.isEmpty()) {
+        if (ls == null || ls.isEmpty()) {
             return singletonList(insert);
         }
 
@@ -148,12 +148,12 @@ public final class ListUtils {
      * a new list will be returned where the modified elements have been replaced with their new version.
      *
      * @param ls   The original list
-     * @param pool A pool to parallelize the mapping operation
+     * @param pool A pool to parallelize the mapping operation or null to execute in the calling thread.
      * @param map  The mapping function. If a null value is returned, the item is dropped from the resultant list
      * @param <T>  The type of the list
      * @return The original list if no element has changed, or a new list.
      */
-    public static <T> List<T> map(List<T> ls, ForkJoinPool pool, BiFunction<Integer, T, T> map) {
+    public static <T> List<T> map(List<T> ls, @Nullable ForkJoinPool pool, BiFunction<Integer, T, T> map) {
         if (ls == null || ls.isEmpty()) {
             return ls;
         }
@@ -162,17 +162,21 @@ public final class ListUtils {
         for (int i = 0; i < ls.size(); i++) {
             int index = i;
 
-            ForkJoinTask<?> task = ForkJoinTask.adapt(() -> {
+            Runnable updateTreeFn = () -> {
                 T tree = ls.get(index);
                 T newTree = map.apply(index, tree);
                 if (newTree != tree) {
                     newLs.updateAndGet(l -> l == ls ? new ArrayList<>(ls) : l)
                             .set(index, newTree);
                 }
-            });
-
-            pool.invoke(task);
-            task.join();
+            };
+            if (pool == null) {
+                updateTreeFn.run();
+            } else {
+                ForkJoinTask<?> task = ForkJoinTask.adapt(updateTreeFn);
+                pool.invoke(task);
+                task.join();
+            }
         }
 
         if (newLs.get() != ls) {
@@ -211,7 +215,7 @@ public final class ListUtils {
     }
 
     public static <T> List<T> insertAll(List<T> ls, int index, List<T> t) {
-        if(ls == null) {
+        if (ls == null) {
             return t;
         }
         if (t.isEmpty()) {
