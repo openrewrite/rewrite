@@ -16,12 +16,38 @@
 package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTreeTest
 import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
 import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
 
 interface MemberReferenceTest : JavaTreeTest {
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/548")
+    @Test
+    fun unknownDeclaringType(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, CompilationUnit, """
+            package com.company.pkg;
+
+            import java.util.concurrent.CompletableFuture;
+            import java.util.stream.Collectors;
+            import java.util.stream.Stream;
+            import com.company.pkg.UnknownClass;
+
+            public class ReproduceParserIssue {
+
+              public static void main(String[] args) {
+                CompletableFuture.supplyAsync(
+                    () -> {
+                      return Stream.empty()
+                          .map(UnknownClass::valueOf) 
+                          .collect(Collectors.toList());
+                    });
+              }
+            }
+        """
+    )
 
     @Test
     fun staticFunctionReference(jp: JavaParser) = assertParsePrintAndProcess(

@@ -1572,7 +1572,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             }
 
             JavaType.Class declaringType = TypeUtils.asClass(type(methodSymbol.owner));
-            assert declaringType != null;
+            if(declaringType == null) {
+                return null;
+            }
 
             return JavaType.Method.build(
                     //Currently only the first 16 bits are meaninful
