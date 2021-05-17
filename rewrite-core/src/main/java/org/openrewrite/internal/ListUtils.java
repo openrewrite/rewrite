@@ -170,7 +170,7 @@ public final class ListUtils {
                             .set(index, newTree);
                 }
             };
-            if (null == pool) {
+            if (pool == null) {
                 updateTreeFn.run();
             } else {
                 ForkJoinTask<?> task = ForkJoinTask.adapt(updateTreeFn);
