@@ -17,6 +17,9 @@ package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.ExecutionContext
+import org.openrewrite.java.tree.J
+import org.openrewrite.java.tree.JavaType
 
 interface UseStaticImportTest : JavaRecipeTest {
     @Test
@@ -60,6 +63,70 @@ interface UseStaticImportTest : JavaRecipeTest {
                 }
             }
         """
+    )
+
+    @Test
+    fun methodInvocationsHavingNullSelect(jp: JavaParser) = assertChanged(
+        jp,
+        dependsOn = arrayOf(
+            """
+                package asserts;
+                
+                public class Assert {
+                    public static void assertTrue(boolean b) {}
+                    public static void assertEquals(int m, int n) {}
+                }
+                
+                public class MyAssert {
+                    public void assertTrue(boolean b) {Assert.assertTrue(b);}
+                    public void assertEquals(int m, int n) {Assert.assertEquals(m, n);}
+                }
+            """
+        ),
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
+                val cd = super.visitClassDeclaration(classDecl, p)
+                return cd.withExtends(null)
+            }
+            override fun visitImport(_import: J.Import, p: ExecutionContext): J.Import? {
+                return null
+            }
+            override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
+                val mi = super.visitMethodInvocation(method, p)
+                return mi.withDeclaringType(JavaType.Class.build("asserts.Assert"))
+            }
+            override fun visitCompilationUnit(cu: J.CompilationUnit, p: ExecutionContext): J.CompilationUnit {
+                doAfterVisit(UseStaticImport("asserts.Assert assert*(..)"))
+                return super.visitCompilationUnit(cu, p)
+            }
+        }.toRecipe(),
+        before = """
+            package test;
+            
+            import asserts.MyAssert;
+            
+            class Test extends MyAssert {
+                void test() {
+                    assertTrue(true);
+                    assertEquals(1, 2);
+                }
+            }
+        """,
+        after = """
+            package test;
+            
+            import static asserts.Assert.assertEquals;
+            import static asserts.Assert.assertTrue;
+            
+            class Test {
+                void test() {
+                    assertTrue(true);
+                    assertEquals(1, 2);
+                }
+            }
+        """,
+        cycles = 2,
+        expectedCyclesThatMakeChanges = 2
     )
 
     @Test

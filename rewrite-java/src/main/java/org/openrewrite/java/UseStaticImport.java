@@ -67,7 +67,7 @@ public class UseStaticImport extends Recipe {
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if (m.getSelect() != null && methodMatcher.matches(m)) {
+            if (methodMatcher.matches(m)) {
                 if (m.getType() != null) {
                     JavaType.FullyQualified receiverType = m.getType().getDeclaringType();
                     maybeRemoveImport(receiverType);
@@ -80,8 +80,9 @@ public class UseStaticImport extends Recipe {
                         doAfterVisit(addStatic);
                     }
                 }
-
-                m = m.withSelect(null).withName(m.getName().withPrefix(m.getSelect().getPrefix()));
+                if (m.getSelect() != null) {
+                    m = m.withSelect(null).withName(m.getName().withPrefix(m.getSelect().getPrefix()));
+                }
             }
             return m;
         }
