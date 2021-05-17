@@ -45,7 +45,7 @@ public final class ListUtils {
      * @return A new list with the element inserted in an approximately ordered place.
      */
     public static <T> List<T> insertInOrder(List<T> ls, T insert, Comparator<T> naturalOrdering) {
-        if(ls == null || ls.isEmpty()) {
+        if (ls == null || ls.isEmpty()) {
             return singletonList(insert);
         }
 
@@ -162,17 +162,21 @@ public final class ListUtils {
         for (int i = 0; i < ls.size(); i++) {
             int index = i;
 
-            ForkJoinTask<?> task = ForkJoinTask.adapt(() -> {
+            Runnable updateTreeFn = () -> {
                 T tree = ls.get(index);
                 T newTree = map.apply(index, tree);
                 if (newTree != tree) {
                     newLs.updateAndGet(l -> l == ls ? new ArrayList<>(ls) : l)
                             .set(index, newTree);
                 }
-            });
-
-            pool.invoke(task);
-            task.join();
+            };
+            if (null == pool) {
+                updateTreeFn.run();
+            } else {
+                ForkJoinTask<?> task = ForkJoinTask.adapt(updateTreeFn);
+                pool.invoke(task);
+                task.join();
+            }
         }
 
         if (newLs.get() != ls) {
@@ -211,7 +215,7 @@ public final class ListUtils {
     }
 
     public static <T> List<T> insertAll(List<T> ls, int index, List<T> t) {
-        if(ls == null) {
+        if (ls == null) {
             return t;
         }
         if (t.isEmpty()) {
