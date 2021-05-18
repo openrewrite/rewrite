@@ -30,6 +30,11 @@ public class SimplifyBooleanExpression extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new SimplifyBooleanExpressionVisitor();
+        return new SimplifyBooleanExpressionVisitor<>();
+    }
+
+    @Override
+    public boolean causesAnotherCycle() {
+        return true;
     }
 }

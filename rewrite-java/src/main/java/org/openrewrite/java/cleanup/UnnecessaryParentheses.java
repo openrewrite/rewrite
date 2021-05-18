@@ -44,4 +44,9 @@ public class UnnecessaryParentheses extends Recipe {
             return cu;
         }
     }
+
+    @Override
+    public boolean causesAnotherCycle() {
+        return true;
+    }
 }
