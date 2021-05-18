@@ -29,6 +29,12 @@ public class CovariantEquals extends Recipe {
     }
 
     @Override
+    public String getDescription() {
+        return "Checks that classes and records which define a covariant `equals()` method also override method `equals(Object)`. " +
+                "Covariant `equals()` means a method that is similar to `equals(Object)`, but with a covariant parameter type (any subtype of `Object`).";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new CovariantEqualsVisitor<>();
     }

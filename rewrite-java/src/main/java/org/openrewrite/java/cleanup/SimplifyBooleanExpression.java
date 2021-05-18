@@ -29,6 +29,11 @@ public class SimplifyBooleanExpression extends Recipe {
     }
 
     @Override
+    public String getDescription() {
+        return "Checks for over-complicated boolean expressions. Finds code like `if (b == true)`, `b || true`, `!false`, etc.";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new SimplifyBooleanExpressionVisitor<>();
     }

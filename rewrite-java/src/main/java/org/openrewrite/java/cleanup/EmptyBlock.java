@@ -30,6 +30,11 @@ public class EmptyBlock extends Recipe {
     }
 
     @Override
+    public String getDescription() {
+        return "Remove empty blocks that effectively do nothing.";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new EmptyBlockFromCompilationUnitStyle();
     }
