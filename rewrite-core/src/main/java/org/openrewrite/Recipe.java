@@ -208,7 +208,7 @@ public abstract class Recipe {
 
     /**
      * A recipe can optionally include an applicability test that can be used to determine whether it should run on a
-     * a particular source file.
+     * particular source file.
      * <p>
      * To identify a {@link SourceFile} as applicable, the visitor should mark it at any level. Any mutation
      * that the applicability test visitor makes on the tree will not included in the results.
