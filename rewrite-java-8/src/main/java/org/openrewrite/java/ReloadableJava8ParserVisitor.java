@@ -1623,9 +1623,9 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 return new JavaType.Cyclic(sym.className());
             else {
                 JavaType.Class clazz = sharedClassTypes.get(sym.className());
+                List<Symbol> stackWithSym = new ArrayList<>(stack);
+                stackWithSym.add(sym);
                 if (clazz == null) {
-                    List<Symbol> stackWithSym = new ArrayList<>(stack);
-                    stackWithSym.add(sym);
 
                     List<JavaType.Variable> fields;
                     if (sym.members_field == null) {
@@ -1691,7 +1691,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 } else {
                     typeParameters = new ArrayList<>(classType.typarams_field.length());
                     for (com.sun.tools.javac.code.Type tParam : classType.typarams_field) {
-                        JavaType javaType = type(tParam, stack);
+                        JavaType javaType = type(tParam, stackWithSym);
                         if (javaType != null) {
                             typeParameters.add(javaType);
                         }
