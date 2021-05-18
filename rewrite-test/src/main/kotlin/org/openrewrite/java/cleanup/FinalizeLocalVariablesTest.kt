@@ -17,6 +17,7 @@ package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
@@ -273,6 +274,25 @@ interface FinalizeLocalVariablesTest : JavaRecipeTest {
                     for (String i : args) {
                         i = i.toUpperCase();
                         System.out.println(i);
+                    }
+                }
+            }
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/549")
+    fun catchBlocksIgnored(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            import java.io.IOException;
+            
+            class Test {
+                {
+                    try {
+                        null;
+                    } catch (RuntimeException | IOException e) {
+                        null;
                     }
                 }
             }
