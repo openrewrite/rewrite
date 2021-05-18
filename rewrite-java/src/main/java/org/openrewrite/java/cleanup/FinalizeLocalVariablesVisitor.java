@@ -70,6 +70,11 @@ public class FinalizeLocalVariablesVisitor<P> extends JavaIsoVisitor<P> {
             return mv;
         }
 
+        // do not add a "final" keyword to a catch block
+        if (isDeclaredInCatch()) {
+            return mv;
+        }
+
         // ignore fields (aka "instance variable" or "class variable")
         if (mv.getVariables().stream().anyMatch(v -> v.isField(getCursor()) || isField(getCursor()))) {
             return mv;
@@ -111,6 +116,13 @@ public class FinalizeLocalVariablesVisitor<P> extends JavaIsoVisitor<P> {
         return getCursor()
                 .dropParentUntil(J.class::isInstance) // maybe J.Lambda
                 .getValue() instanceof J.Lambda;
+    }
+
+    private boolean isDeclaredInCatch() {
+        return getCursor()
+                .dropParentUntil(J.class::isInstance) // maybe J.ControlParentheses
+                .dropParentUntil(J.class::isInstance) // maybe J.Try.Catch
+                .getValue() instanceof J.Try.Catch;
     }
 
     private boolean isField(Cursor cursor) {
