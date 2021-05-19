@@ -106,6 +106,10 @@ class Java8ExplicitInitializationTest : Java8Test, ExplicitInitializationTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8FallThroughTest : Java8Test, FallThroughTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8FinalizeLocalVariablesTest : Java8Test, FinalizeLocalVariablesTest
 
 @DebugOnly
