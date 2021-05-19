@@ -16,8 +16,22 @@
 package org.openrewrite.java;
 
 import org.openrewrite.Cursor;
+import org.openrewrite.Incubating;
+import org.openrewrite.Tree;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Statement;
 
+import java.util.Stack;
+
+/**
+ * Renames a NamedVariable to the target name.
+ *
+ * Notes:
+ *  - The current version will rename variables even if a variable with `toName` is already declared in the same scope.
+ *  - FieldAccess to the new variable need to be covered separately. Refer to ChangeFieldAccess.
+ */
+@Incubating(since = "7.5.0")
 public class RenameVariable<P> extends JavaIsoVisitor<P> {
     private final J.VariableDeclarations.NamedVariable variable;
     private final String toName;
@@ -38,35 +52,116 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
 
     private class RenameVariableByCursor extends JavaIsoVisitor<P> {
         private final Cursor scope;
-        private boolean isConstant = false;
+        private final Stack<Tree> currentNameScope = new Stack<>();
 
         public RenameVariableByCursor(Cursor scope) {
             this.scope = scope;
         }
 
         @Override
-        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
-            return super.visitCompilationUnit(cu, p);
+        public J.Block visitBlock(J.Block block, P p) {
+            // A variable name scope is owned by the ClassDeclaration regardless of what order it is declared.
+            // Variables declared in a child block are owned by the corresponding block until the block is exited.
+            if (getCursor().getParent() != null && getCursor().getParent().getValue() instanceof J.ClassDeclaration) {
+                boolean isClassScope = false;
+                for (Statement statement : block.getStatements()) {
+                    if (statement instanceof J.VariableDeclarations) {
+                        if (((J.VariableDeclarations) statement).getVariables().contains(variable)) {
+                            isClassScope = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (isClassScope) {
+                    currentNameScope.add(block);
+                }
+            }
+            return super.visitBlock(block, p);
         }
 
         @Override
         public J.Identifier visitIdentifier(J.Identifier ident, P p) {
-            if (!isConstant && ident.getSimpleName().equals(variable.getSimpleName()) &&
-                    isInSameNameScope(scope, getCursor()) &&
-                    !(getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.FieldAccess)) {
-                return ident.withName(toName);
+            // The size of the stack will be 1 if the identifier is in the right scope.
+            if (ident.getSimpleName().equals(variable.getSimpleName()) && isInSameNameScope(scope, getCursor()) && currentNameScope.size() == 1) {
+                if (!(getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.FieldAccess)) {
+                    return ident.withName(toName);
+                }
             }
             return super.visitIdentifier(ident, p);
         }
 
         @Override
-        public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
-            if (!isConstant && multiVariable.getVariables().contains(variable)) {
-                if (multiVariable.hasModifier(J.Modifier.Type.Static) && multiVariable.hasModifier(J.Modifier.Type.Final)) {
-                    isConstant = true;
+        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable namedVariable, P p) {
+            if (namedVariable.getSimpleName().equals(variable.getSimpleName())) {
+                Cursor parentScope = getCursorToParentScope(getCursor());
+                // The target variable was found and was not declared in a class declaration block.
+                if (currentNameScope.isEmpty()) {
+                    if (namedVariable.equals(variable)) {
+                        currentNameScope.add(parentScope.getValue());
+                    }
+                } else {
+                    // A variable has been declared and created a new name scope.
+                    if (!parentScope.getValue().equals(currentNameScope.peek()) && getCursor().isScopeInPath(currentNameScope.peek())) {
+                        currentNameScope.add(parentScope.getValue());
+                    }
                 }
             }
-            return super.visitVariableDeclarations(multiVariable, p);
+            return super.visitVariable(namedVariable, p);
+        }
+
+        @Override
+        public J.Try.Catch visitCatch(J.Try.Catch _catch, P p) {
+            // Check if the try added a new scope to the stack,
+            // postVisit doesn't happen until after both the try and catch are processed.
+            maybeChangeNameScope(getCursorToParentScope(getCursor()).getValue());
+            return super.visitCatch(_catch, p);
+        }
+
+        @Override
+        public J.MultiCatch visitMultiCatch(J.MultiCatch multiCatch, P p) {
+            // Check if the try added a new scope to the stack,
+            // postVisit doesn't happen until after both the try and catch are processed.
+            maybeChangeNameScope(getCursorToParentScope(getCursor()).getValue());
+            return super.visitMultiCatch(multiCatch, p);
+        }
+
+        @Nullable
+        @Override
+        public J postVisit(J tree, P p) {
+            maybeChangeNameScope(tree);
+            return super.postVisit(tree, p);
+        }
+
+        /**
+         * Used to check if the name scope has changed.
+         * Pops the stack if the tree element is at the top of the stack.
+         */
+        private void maybeChangeNameScope(Tree tree) {
+            if (currentNameScope.size() > 0 && currentNameScope.peek().equals(tree)) {
+                currentNameScope.pop();
+            }
+        }
+
+        /**
+         * Returns either the current block or a J.Type that may create a reference to a variable.
+         * I.E. for(int target = 0; target < N; target++) creates a new name scope for `target`.
+         * The name scope in the next J.Block `{}` cannot create new variables with the name `target`.
+         * <p>
+         * J.* types that may only reference an existing name and do not create a new name scope are excluded.
+         */
+        private Cursor getCursorToParentScope(Cursor cursor) {
+            return cursor.dropParentUntil(is ->
+                    is instanceof J.Block ||
+                            is instanceof J.MethodDeclaration ||
+                            is instanceof J.ForLoop ||
+                            is instanceof J.ForEachLoop ||
+                            is instanceof J.Case ||
+                            is instanceof J.Try ||
+                            is instanceof J.Try.Catch ||
+                            is instanceof J.MultiCatch ||
+                            is instanceof J.Lambda
+            );
         }
     }
 }
