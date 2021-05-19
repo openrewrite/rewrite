@@ -103,6 +103,8 @@ subprojects {
     }
 
     dependencies {
+        "implementation"(platform("org.jetbrains.kotlin:kotlin-bom"))
+
         "compileOnly"("com.google.code.findbugs:jsr305:latest.release")
 
         "compileOnly"("org.projectlombok:lombok:latest.release")
@@ -129,7 +131,6 @@ subprojects {
         kotlinOptions {
             jdkHome = compiler.get().metadata.installationPath.asFile.absolutePath
             jvmTarget = "1.8"
-            useIR = true
         }
         destinationDir.mkdirs()
     }
