@@ -175,8 +175,8 @@ public class MethodMatcher {
     private static String typePattern(JavaType type) {
         if (type instanceof JavaType.Primitive) {
             return ((JavaType.Primitive) type).getKeyword();
-        } else if (type instanceof JavaType.Class) {
-            return ((JavaType.Class) type).getFullyQualifiedName();
+        } else if (type instanceof JavaType.FullyQualified) {
+            return ((JavaType.FullyQualified) type).getFullyQualifiedName();
         } else if (type instanceof JavaType.Array) {
             JavaType elemType = ((JavaType.Array) type).getElemType();
             if (elemType != null) {
