@@ -100,15 +100,6 @@ interface JavaTypeSerializerTest {
 
         assertThat(TypeUtils.deepEquals(javaClass, copy)).isTrue()
         assertThat(copy.flags).hasSize(0)
-
-        //Inner Class E
-        javaClass = (clazz.body.statements[3] as J.ClassDeclaration).type
-        classTypeOut = mapper.writeValueAsString(javaClass)
-        copy = mapper.readValue(classTypeOut, JavaType.Class::class.java)
-
-        assertThat(TypeUtils.deepEquals(javaClass, copy)).isTrue()
-        assertThat(copy.flags).hasSize(0)
-
     }
 
     @Suppress("rawtypes")
