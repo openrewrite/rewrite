@@ -780,7 +780,7 @@ public interface JavaType extends Serializable {
 
         @Override
         public Class.Kind getKind() {
-            return Class.Kind.Class;
+            return bound == null ? Class.Kind.Class : bound.getKind();
         }
 
         @Override
@@ -827,6 +827,75 @@ public interface JavaType extends Serializable {
             GenericTypeVariable generic = (GenericTypeVariable) type;
             return this == generic || (fullyQualifiedName.equals(generic.fullyQualifiedName) &&
                     TypeUtils.deepEquals(bound, generic.bound));
+        }
+    }
+
+    @EqualsAndHashCode(callSuper = false)
+    @Data
+    class Wildcard extends FullyQualified {
+
+        private final String fullyQualifiedName;
+        private final BoundKind boundKind;
+        @Nullable
+        private final FullyQualified bound;
+
+        @Override
+        public Class.Kind getKind() {
+            return bound == null ? Class.Kind.Class : bound.getKind();
+        }
+
+        @Override
+        public boolean hasFlags(Flag... test) {
+            return bound != null && bound.hasFlags(test);
+        }
+
+        @Override
+        public Set<Flag> getFlags() {
+            return bound == null ? Collections.emptySet() : bound.getFlags();
+        }
+
+        @Override
+        public List<FullyQualified> getInterfaces() {
+            return bound == null ? Collections.emptyList() : bound.getInterfaces();
+        }
+
+        @Override
+        public List<Variable> getMembers() {
+            return bound == null ? Collections.emptyList() : bound.getMembers();
+        }
+
+        @Override
+        public FullyQualified getOwningClass() {
+            return bound == null ? null : bound.getOwningClass();
+        }
+
+        @Override
+        public FullyQualified getSupertype() {
+            return bound == null ? null : bound.getSupertype();
+        }
+
+        @Override
+        public List<Variable> getVisibleSupertypeMembers() {
+            return bound == null ? Collections.emptyList() : bound.getVisibleSupertypeMembers();
+        }
+
+        @Override
+        public boolean deepEquals(@Nullable JavaType type) {
+            if (!(type instanceof Wildcard)) {
+                return false;
+            }
+
+            Wildcard wildcard = (Wildcard) type;
+            return this == wildcard || (
+                    this.boundKind == wildcard.boundKind &&
+                            this.fullyQualifiedName.equals(wildcard.fullyQualifiedName) &&
+                            TypeUtils.deepEquals(this.bound, wildcard.bound));
+        }
+
+        public enum BoundKind {
+            Extends,
+            Super,
+            Unbound,
         }
     }
 

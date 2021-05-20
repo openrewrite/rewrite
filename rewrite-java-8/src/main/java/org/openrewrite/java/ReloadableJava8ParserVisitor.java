@@ -1713,6 +1713,27 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             return JavaType.Primitive.Void;
         } else if (type instanceof ArrayType) {
             return new JavaType.Array(type(((ArrayType) type).elemtype, stack));
+        } else if (type instanceof WildcardType) {
+            WildcardType wildcard = (WildcardType) type;
+            String fullyQualifiedName;
+            if (wildcard.type instanceof ClassType) {
+                fullyQualifiedName = ((Symbol.ClassSymbol) wildcard.type.tsym).className();
+            } else {
+                fullyQualifiedName = wildcard.type.tsym.name.toString();
+            }
+            JavaType.Wildcard.BoundKind kind;
+            switch (wildcard.kind) {
+                case EXTENDS:
+                    kind = JavaType.Wildcard.BoundKind.Extends;
+                    break;
+                case SUPER:
+                    kind = JavaType.Wildcard.BoundKind.Super;
+                    break;
+                default:
+                    kind = JavaType.Wildcard.BoundKind.Unbound;
+                    fullyQualifiedName = "java.lang.Object";
+            }
+            return new JavaType.Wildcard(fullyQualifiedName, kind, TypeUtils.asFullyQualified(type(wildcard.type, stack)));
         } else if (com.sun.tools.javac.code.Type.noType.equals(type)) {
             return null;
         } else {
