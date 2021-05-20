@@ -786,7 +786,7 @@ public interface JavaType extends Serializable {
 
         @Override
         public Class.Kind getKind() {
-            return Class.Kind.Class;
+            return bound == null ? Class.Kind.Class : bound.getKind();
         }
 
         @Override
@@ -841,9 +841,49 @@ public interface JavaType extends Serializable {
     class Wildcard extends FullyQualified {
 
         private final String fullyQualifiedName;
-        private final BoundKind kind;
+        private final BoundKind boundKind;
         @Nullable
         private final FullyQualified type;
+
+        @Override
+        public Class.Kind getKind() {
+            return type == null ? Class.Kind.Class : type.getKind();
+        }
+
+        @Override
+        public boolean hasFlags(Flag... test) {
+            return type != null && type.hasFlags(test);
+        }
+
+        @Override
+        public Set<Flag> getFlags() {
+            return type == null ? Collections.emptySet() : type.getFlags();
+        }
+
+        @Override
+        public List<FullyQualified> getInterfaces() {
+            return type == null ? Collections.emptyList() : type.getInterfaces();
+        }
+
+        @Override
+        public List<Variable> getMembers() {
+            return type == null ? Collections.emptyList() : type.getMembers();
+        }
+
+        @Override
+        public FullyQualified getOwningClass() {
+            return type == null ? null : type.getOwningClass();
+        }
+
+        @Override
+        public FullyQualified getSupertype() {
+            return type == null ? null : type.getSupertype();
+        }
+
+        @Override
+        public List<Variable> getVisibleSupertypeMembers() {
+            return type == null ? Collections.emptyList() : type.getVisibleSupertypeMembers();
+        }
 
         @Override
         public boolean deepEquals(@Nullable JavaType type) {
@@ -853,7 +893,7 @@ public interface JavaType extends Serializable {
 
             Wildcard wildcard = (Wildcard) type;
             return this == wildcard || (
-                    this.kind == wildcard.kind &&
+                    this.boundKind == wildcard.boundKind &&
                     this.fullyQualifiedName.equals(wildcard.fullyQualifiedName) &&
                     TypeUtils.deepEquals(this.type, wildcard.type));
         }

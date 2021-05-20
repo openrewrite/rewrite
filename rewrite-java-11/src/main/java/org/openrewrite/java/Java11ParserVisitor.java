@@ -1587,7 +1587,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 exceptionTypes = exceptions.apply(forAll.qtype);
                 if (forAll.tvars != null) {
                     typeParameters = forAll.tvars.stream()
-                            .map( tp -> type(tp, emptyList(), true))
+                            .map( tp -> type(tp, emptyList()))
                             .filter(Objects::nonNull).collect(toList());
                 }
             } else {

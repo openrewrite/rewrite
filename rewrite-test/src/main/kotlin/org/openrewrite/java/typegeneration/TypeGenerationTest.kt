@@ -45,7 +45,7 @@ interface TypeGenerationTest {
     // checkCompilationUnit can be use used to verify type attribution on the compilation unit after the second parse.
 
     val debugAsm: Boolean
-        get() = false
+        get() = true
 
     val rewriteRoot: Path
         get () {
@@ -376,13 +376,13 @@ interface TypeGenerationTest {
     @Test
     @Disabled
     fun print() {
-        //printClass("com.fasterxml.jackson.annotation.ObjectIdGenerators.Base")
+        printClass("com.fasterxml.jackson.annotation.ObjectIdGenerator")
         //printClass("org.openrewrite.TreeVisitor")
         //printClass("com.fasterxml.jackson.annotation.JsonIdentityInfo")
         //printClass("org.openrewrite.marker.Markers")
         //printClass("java.util.List")
-        printClass("io.github.classgraph.ResourceList")
-        printClass("io.github.classgraph.ResourceList.InputStreamConsumer")
+        //printClass("io.github.classgraph.ResourceList")
+        //printClass("io.github.classgraph.ResourceList.InputStreamConsumer")
         //printClass("org.openrewrite.style.NamedStyles")
         //printClass("com.fasterxml.jackson.annotation.JsonProperty")
         //printClass("org.openrewrite.internal.StringUtils")

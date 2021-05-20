@@ -56,7 +56,7 @@ public class TypeInformation {
         this.debugOut = debugOut;
     }
 
-    public void addDeclaredType(@Nullable JavaType.Class declaredType) {
+    public void addDeclaredType(@Nullable JavaType.FullyQualified declaredType) {
         maybeAddType(declaredType);
         if (declaredType != null) {
             this.sourceClasses.add(declaredType);
@@ -69,23 +69,26 @@ public class TypeInformation {
         } else if (type instanceof JavaType.Wildcard) {
             maybeAddType(((JavaType.Wildcard) type).getType());
         } else if (type instanceof JavaType.FullyQualified) {
-            JavaType.Class classType = (type instanceof JavaType.Class) ?
-                    (JavaType.Class) type : JavaType.Class.build(((JavaType.FullyQualified) type).getFullyQualifiedName());
-            if (!isKnowType(classType) && !typeMap.containsKey(classType.getFullyQualifiedName())) {
-                typeMap.computeIfAbsent(classType.getFullyQualifiedName(), k -> new ClassMeta(classType));
-                if (classType.getTypeParameters() != null) {
-                    classType.getTypeParameters().forEach(this::maybeAddType);
+            JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) type;
+            if (!typeMap.containsKey(fullyQualified.getFullyQualifiedName())) {
+                if (!isKnowType(fullyQualified)) {
+                    typeMap.computeIfAbsent(fullyQualified.getFullyQualifiedName(), k -> new ClassMeta(fullyQualified));
                 }
-                if (classType.getOwningClass() != null) {
-                    maybeAddType(classType.getOwningClass());
-                    ClassMeta ownerMeta = typeMap.get(classType.getOwningClass().getFullyQualifiedName());
+
+                if (fullyQualified.getOwningClass() != null) {
+                    maybeAddType(fullyQualified.getOwningClass());
+                    ClassMeta ownerMeta = typeMap.get(fullyQualified.getOwningClass().getFullyQualifiedName());
                     if (ownerMeta != null) {
-                        ownerMeta.innerClasses.add(classType);
+                        ownerMeta.innerClasses.add(fullyQualified);
                     }
                 }
-                maybeAddType(classType.getSupertype());
-                if (classType.getInterfaces() != null) {
-                    classType.getInterfaces().forEach(this::maybeAddType);
+                maybeAddType(fullyQualified.getSupertype());
+                fullyQualified.getInterfaces().forEach(this::maybeAddType);
+                if (fullyQualified instanceof JavaType.Parameterized) {
+                    JavaType.Parameterized parameterized = (JavaType.Parameterized) fullyQualified;
+                    if (parameterized.getTypeParameters() != null) {
+                        parameterized.getTypeParameters().forEach(this::maybeAddType);
+                    }
                 }
             }
         }
@@ -119,17 +122,6 @@ public class TypeInformation {
         return fullyQualified.getPackageName().startsWith("java.");
     }
 
-    @Nullable private static JavaType.Class resolveClass(JavaType type) {
-        JavaType.Class javaClass = TypeUtils.asClass(type);
-        if (javaClass == null) {
-            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type);
-            if (fq != null) {
-                javaClass = JavaType.Class.build(fq.getFullyQualifiedName());
-            }
-        }
-        return javaClass;
-    }
-
     public List<byte[]> getTypesAsByteCode() {
 
         List<ClassMeta> filteredTypes = typeMap.values().stream().filter(meta -> !sourceClasses.contains(meta.classType)).collect(Collectors.toList());
@@ -143,7 +135,7 @@ public class TypeInformation {
     }
 
     byte[] classToBytes(ClassMeta meta) {
-        JavaType.Class type = meta.classType;
+        JavaType.FullyQualified type = meta.classType;
         String asmTypeName = AsmUtils.getAsmName(type);
         ClassVisitor classVisitor;
         ClassWriter classWriter = new ClassWriter(0);
@@ -165,15 +157,15 @@ public class TypeInformation {
                 .map(AsmUtils::getAsmName).toArray(String[]::new);
 
         String signature = null;
-        if ((type.getTypeParameters() != null && !type.getTypeParameters().isEmpty()) ||
-                (type.getSupertype() != null && type.getSupertype().getTypeParameters() != null && !type.getSupertype().getTypeParameters().isEmpty())) {
+        if (type instanceof JavaType.Parameterized || type.getSupertype() instanceof JavaType.Parameterized) {
             signature = AsmUtils.getClassSignature(type);
         }
-        classVisitor.visit(V1_8, flags, asmTypeName, signature, AsmUtils.getAsmName(type.getSupertype()), interfaceNames);
+        String superName = type.getSupertype() == null ? "java/lang/Object" : AsmUtils.getAsmName(type.getSupertype());
+        classVisitor.visit(V1_8, flags, asmTypeName, signature, superName, interfaceNames);
         classVisitor.visitSource(type.getClassName() + ".java", null);
 
         //Inner Classes
-        for (JavaType.Class innerClass : meta.innerClasses) {
+        for (JavaType.FullyQualified innerClass : meta.innerClasses) {
             String innerClassName = innerClass.getClassName();
             int index = innerClassName.lastIndexOf('.');
             if (index > -1) {
@@ -188,20 +180,18 @@ public class TypeInformation {
             //fields when the type is an enum.
             int enum_mask = type.getKind() == JavaType.Class.Kind.Enum ? 0x4000 : 0;
             if (variable.getType() != null) {
-                JavaType.Class classType = resolveClass(variable.getType());
-                boolean hasTypeParameters = classType != null && classType.getTypeParameters() != null &&
-                        !classType.getTypeParameters().isEmpty();
+                JavaType fullyQualifiedType = TypeUtils.asFullyQualified(variable.getType());
                 classVisitor.visitField(
                         Flag.flagsToBitMap(variable.getFlags()) | enum_mask,
                         variable.getName(),
                         AsmUtils.getAsmDescriptor(variable.getType()),
-                        hasTypeParameters ? AsmUtils.getTypeSignature(variable.getType()) : null,
+                        fullyQualifiedType instanceof JavaType.Parameterized ? AsmUtils.getTypeSignature(variable.getType()) : null,
                         null).visitEnd();
             }
         }
 
         //Methods
-        Stream.concat(type.getConstructors().stream(), meta.methods.stream()).forEach(m -> generateMethod(m, classVisitor));
+        meta.methods.forEach(m -> generateMethod(m, classVisitor));
 
         classVisitor.visitEnd();
         if (debugOut != null) {
@@ -269,10 +259,10 @@ public class TypeInformation {
         }
     }
     private static class ClassMeta {
-        final JavaType.Class classType;
+        final JavaType.FullyQualified classType;
         final Set<JavaType.Method> methods = new HashSet<>();
-        final Set<JavaType.Class> innerClasses = new HashSet<>();
-        private ClassMeta(JavaType.Class classType) {
+        final Set<JavaType.FullyQualified> innerClasses = new HashSet<>();
+        private ClassMeta(JavaType.FullyQualified classType) {
             this.classType = classType;
         }
     }

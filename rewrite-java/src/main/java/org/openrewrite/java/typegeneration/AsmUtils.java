@@ -84,46 +84,53 @@ public class AsmUtils {
      */
     @Nullable
     public static String getClassSignature(@Nullable JavaType.FullyQualified type) {
-        JavaType.Class classType = TypeUtils.asClass(type);
-        if (classType == null) {
+        if (type == null) {
             return null;
         }
         StringBuilder signature = new StringBuilder();
 
         //TypeParams?
-        if (classType.getTypeParameters() != null && !classType.getTypeParameters().isEmpty()) {
+        if (type instanceof JavaType.Parameterized) {
+            JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
             signature.append("<");
-            for (JavaType typeParameter :  classType.getTypeParameters()) {
+            for (JavaType typeParameter :  parameterized.getTypeParameters()) {
                 if (typeParameter instanceof JavaType.GenericTypeVariable) {
                     JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) typeParameter;
                     String boundSignature = getFieldTypeSignature(generic.getBound());
                     if (boundSignature == null) {
                         return null;
                     }
-                    return generic.getFullyQualifiedName() + "::" + ((generic.getBound() == null) ? "Ljava/lang/Object;" : boundSignature);
+                    signature.append(generic.getFullyQualifiedName()).append("::").append(((generic.getBound() == null) ? "Ljava/lang/Object;" : boundSignature));
                 } else {
+                    //TODO: I think we have type mapping issue here, we should not
+                    //      be getting in here when we have Class<java.lang.Integer>
+                    //      this should really be a generic variable (name from base
+                    //      class and bounded by java.lang.Integer
                     return null;
+//                    String typeSignature = getFieldTypeSignature(typeParameter);
+//                    if (typeSignature == null) {
+//                        return null;
+//                    }
+//                    signature.append(typeSignature);
                 }
             }
             signature.append(">");
         }
 
         //Super ClassTypeSignature
-        String superSignature = getClassTypeSignature(classType.getSupertype() != null ? classType.getSupertype() : JavaType.Class.OBJECT);
+        String superSignature = getClassTypeSignature(type.getSupertype() != null ? type.getSupertype() : JavaType.Class.OBJECT);
         if (superSignature == null) {
             return null;
         }
         signature.append(superSignature);
 
         //Interfaces *ClassTypeSignature
-        if (classType.getInterfaces() != null && !classType.getInterfaces().isEmpty()) {
-            for (JavaType interfaceType : classType.getInterfaces()) {
-                String interfaceSig = getClassTypeSignature(TypeUtils.asFullyQualified(interfaceType));
-                if (interfaceSig == null) {
-                    return null;
-                }
-                signature.append(interfaceSig);
+        for (JavaType interfaceType : type.getInterfaces()) {
+            String interfaceSig = getClassTypeSignature(TypeUtils.asFullyQualified(interfaceType));
+            if (interfaceSig == null) {
+                return null;
             }
+            signature.append(interfaceSig);
         }
         return signature.toString();
     }
@@ -293,16 +300,16 @@ public class AsmUtils {
         if (type == null) {
             return null;
         }
-        JavaType.Class classType = JavaType.Class.build(type.getFullyQualifiedName());
         StringBuilder signature = new StringBuilder();
-        signature.append("L").append(getAsmName(classType));
-        if (classType.getTypeParameters() != null && !classType.getTypeParameters().isEmpty()) {
+        signature.append("L").append(getAsmName(type));
+        if (type instanceof JavaType.Parameterized) {
+            JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
             signature.append("<");
-            for (JavaType typeParameter : classType.getTypeParameters()) {
+            for (JavaType typeParameter : parameterized.getTypeParameters()) {
                 if (typeParameter instanceof JavaType.Wildcard) {
                     JavaType.Wildcard wildcardType = (JavaType.Wildcard) typeParameter;
                     String boundSignature;
-                    switch (wildcardType.getKind()) {
+                    switch (wildcardType.getBoundKind()) {
                         case Extends:
                             boundSignature = getFieldTypeSignature(wildcardType.getType());
                             if (boundSignature == null) {
@@ -343,11 +350,10 @@ public class AsmUtils {
         if (type == null) {
             return null;
         }
-        JavaType.Class javaClass = TypeUtils.asClass(type);
-        if (javaClass == null || javaClass.getOwningClass() == null) {
+        if (type.getOwningClass() == null) {
             return type.getFullyQualifiedName().replace(".", "/");
         } else {
-            return type.getPackageName().replace(".", "/") + "/" + javaClass.getClassName().replace(".", "$");
+            return type.getPackageName().replace(".", "/") + "/" + type.getClassName().replace(".", "$");
         }
     }
 
