@@ -151,7 +151,6 @@ interface JavaTypeSerializerTest {
 
     }
 
-
     @Test
     fun serializeMethod(jp: JavaParser) {
         val statements = jp.parse("""
