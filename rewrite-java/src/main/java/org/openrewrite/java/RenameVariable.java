@@ -22,10 +22,11 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 
-import java.util.Stack;
+import java.util.*;
 
 /**
  * Renames a NamedVariable to the target name.
+ * Prevents variables from being renamed to reserved java keywords.
  *
  * Notes:
  *  - The current version will rename variables even if a variable with `toName` is already declared in the same scope.
@@ -43,7 +44,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
-        if (variable.equals(this.variable)) {
+        if (!JavaKeywords.isReserved(toName) && variable.equals(this.variable)) {
             doAfterVisit(new RenameVariableByCursor(getCursor()));
             return variable;
         }
@@ -162,6 +163,69 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                             is instanceof J.MultiCatch ||
                             is instanceof J.Lambda
             );
+        }
+    }
+
+    private static final class JavaKeywords {
+        JavaKeywords() {}
+
+        private static final String[] RESERVED_WORDS = new String[] {
+                "abstract",
+                "assert",
+                "boolean",
+                "break",
+                "byte",
+                "case",
+                "catch",
+                "char",
+                "class",
+                "const",
+                "continue",
+                "default",
+                "do",
+                "double",
+                "else",
+                "enum",
+                "extends",
+                "final",
+                "finally",
+                "float",
+                "for",
+                "goto",
+                "if",
+                "implements",
+                "import",
+                "instanceof",
+                "int",
+                "interface",
+                "long",
+                "native",
+                "new",
+                "package",
+                "private",
+                "protected",
+                "public",
+                "return",
+                "short",
+                "static",
+                "strictfp",
+                "super",
+                "switch",
+                "synchronized",
+                "this",
+                "throw",
+                "throws",
+                "transient",
+                "try",
+                "void",
+                "volatile",
+                "while",
+        };
+
+        private static final Set<String> RESERVED_WORDS_SET = new HashSet<>(Arrays.asList(RESERVED_WORDS));
+
+        public static boolean isReserved(String word) {
+            return RESERVED_WORDS_SET.contains(word);
         }
     }
 }

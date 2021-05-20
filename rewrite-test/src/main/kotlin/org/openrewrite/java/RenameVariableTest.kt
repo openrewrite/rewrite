@@ -44,6 +44,28 @@ interface RenameVariableTest : JavaRecipeTest {
         }.toRecipe()
 
     @Test
+    fun doNotChangeToJavaKeyword(jp: JavaParser) = assertUnchanged(
+        jp,
+        recipe = renameVariableTest("A", "val", "int"),
+        before = """
+            package org.openrewrite;
+
+            public class A {
+                int fooA() {
+                    val++;
+                    // creates new scope owned by for loop.
+                    for (int val = 0; val < 10; ++val) {
+                        int x = val + 1;
+                    }
+                    val++;
+                }
+                // val is scoped to classDeclaration regardless of statement order.
+                public int val = 1;
+            }
+        """
+    )
+
+    @Test
     fun doNotRenameForLoopVariables(jp: JavaParser) = assertChanged(
         jp,
         recipe = renameVariableTest("A", "val", "VALUE"),
