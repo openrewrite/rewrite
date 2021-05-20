@@ -20,10 +20,10 @@ import org.openrewrite.internal.lang.Nullable;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
 import static java.util.Collections.singletonList;
@@ -140,7 +140,8 @@ public final class ListUtils {
     }
 
     public static <T> List<T> map(List<T> ls, ForkJoinPool pool, UnaryOperator<T> map) {
-        return map(ls, pool, (i, t) -> map.apply(t));
+        return map(ls, pool, (i, t) -> map.apply(t), t -> {
+        });
     }
 
     /**
@@ -153,7 +154,7 @@ public final class ListUtils {
      * @param <T>  The type of the list
      * @return The original list if no element has changed, or a new list.
      */
-    public static <T> List<T> map(List<T> ls, @Nullable ForkJoinPool pool, BiFunction<Integer, T, T> map) {
+    public static <T> List<T> map(List<T> ls, @Nullable ForkJoinPool pool, BiFunction<Integer, T, T> map, Consumer<Throwable> onError) {
         if (ls == null || ls.isEmpty()) {
             return ls;
         }
@@ -175,7 +176,15 @@ public final class ListUtils {
             } else {
                 ForkJoinTask<?> task = ForkJoinTask.adapt(updateTreeFn);
                 pool.invoke(task);
-                task.join();
+                try {
+                    task.get(100, TimeUnit.MILLISECONDS);
+                } catch (InterruptedException | ExecutionException | TimeoutException e) {
+                    throw new IllegalStateException(e);
+                } finally {
+                    if (task.isCompletedAbnormally() && onError != null) {
+                        onError.accept(task.getException());
+                    }
+                }
             }
         }
 
