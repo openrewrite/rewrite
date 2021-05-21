@@ -104,7 +104,7 @@ public class MethodMatcher {
             return false;
         }
 
-        return matchesTargetType(enclosing.getType()) &&
+        return (targetTypePattern.toString().equals(AspectjUtils.FULL_WILDCARD_RESULT) || matchesTargetType(enclosing.getType())) &&
                 methodNamePattern.matcher(method.getSimpleName()).matches() &&
                 argumentPattern.matcher(method.getParameters().stream()
                         .map(v -> {
@@ -313,6 +313,8 @@ class FormalParameterVisitor extends MethodSignatureParserBaseVisitor<String> {
 }
 
 class AspectjUtils {
+    public static final String FULL_WILDCARD_RESULT = "[^.]*";
+
     private AspectjUtils() {
     }
 
@@ -331,7 +333,7 @@ class AspectjUtils {
                 .replace("[", "\\[")
                 .replace("]", "\\]")
                 .replaceAll("([^.])*\\.([^.])*", "$1\\.$2")
-                .replace("*", "[^.]*")
+                .replace("*", FULL_WILDCARD_RESULT)
                 .replace("..", "\\.(.+\\.)?");
     }
 }

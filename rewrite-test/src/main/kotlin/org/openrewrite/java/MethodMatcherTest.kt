@@ -175,7 +175,6 @@ interface MethodMatcherTest {
         assertTrue(MethodMatcher("a.A getInteger()").matches(getIntegerMethod, classDecl))
     }
 
-    @Disabled
     @Issue("#383")
     @Test
     fun matchesMethodWithWildcardForClassInPackage(jp: JavaParser) {
