@@ -17,9 +17,9 @@ package org.openrewrite
 
 import org.assertj.core.api.Assertions.*
 import org.junit.jupiter.api.fail
+import org.openrewrite.scheduling.ForkJoinScheduler
 import java.io.File
 import java.util.*
-import java.util.concurrent.ForkJoinPool
 
 interface RecipeTest {
     val recipe: Recipe?
@@ -73,7 +73,7 @@ interface RecipeTest {
             .run(
                 sources,
                 InMemoryExecutionContext { t: Throwable? -> fail<Any>("Recipe threw an exception", t) },
-                ForkJoinPool.commonPool(),
+                ForkJoinScheduler.common(),
                 cycles,
                 expectedCyclesThatMakeChanges + 1
             )
@@ -131,7 +131,7 @@ interface RecipeTest {
             .run(
                 listOf(source),
                 InMemoryExecutionContext { t: Throwable -> fail<Any>("Recipe threw an exception", t) },
-                ForkJoinPool.commonPool(),
+                ForkJoinScheduler.common(),
                 cycles,
                 expectedCyclesToComplete + 1
             )
@@ -167,7 +167,7 @@ interface RecipeTest {
         val source = sources.first()
         val recipeCheckingExpectedCycles = RecipeCheckingExpectedCycles(recipe!!, 0)
         val results = recipeCheckingExpectedCycles
-            .run(listOf(source), InMemoryExecutionContext { t -> t.printStackTrace() }, ForkJoinPool.commonPool(), 2, 2)
+            .run(listOf(source), InMemoryExecutionContext { t -> t.printStackTrace() }, ForkJoinScheduler.common(), 2, 2)
 
         results.forEach { result ->
             if (result.diff(treePrinter ?: TreePrinter.identity<Any>()).isEmpty()) {
@@ -206,7 +206,7 @@ interface RecipeTest {
             .run(
                 listOf(source),
                 InMemoryExecutionContext { t -> fail<Any>("Recipe threw an exception", t) },
-                ForkJoinPool.commonPool(),
+                ForkJoinScheduler.common(),
                 2,
                 2
             )
@@ -248,11 +248,11 @@ interface RecipeTest {
         override fun <S : SourceFile?> visitInternal(
             before: List<S>,
             ctx: ExecutionContext,
-            forkJoinPool: ForkJoinPool,
+            recipeScheduler: RecipeScheduler,
             recipeThatDeletedSourceFile: Map<UUID, Recipe>
         ): List<SourceFile> {
             ctx.putMessage("cyclesThatResultedInChanges", cyclesThatResultedInChanges)
-            val afterList = recipe.visitInternal(before, ctx, forkJoinPool, recipeThatDeletedSourceFile)
+            val afterList = recipe.visitInternal(before, ctx, recipeScheduler, recipeThatDeletedSourceFile)
             if (afterList !== before) {
                 cyclesThatResultedInChanges = cyclesThatResultedInChanges.inc()
                 if (cyclesThatResultedInChanges > expectedCyclesThatMakeChanges &&

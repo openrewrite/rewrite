@@ -15,11 +15,15 @@
  */
 package org.openrewrite.internal;
 
+import org.openrewrite.RecipeScheduler;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.atomic.AtomicReference;
@@ -28,6 +32,7 @@ import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 
 public final class ListUtils {
     private ListUtils() {
@@ -160,7 +165,7 @@ public final class ListUtils {
                     for (T newTree : (Iterable<T>) newTreeOrTrees) {
                         if (j >= newLs.size()) {
                             newLs.add(newTree);
-                        } else if(n == 0) {
+                        } else if (n == 0) {
                             newLs.set(j, newTree);
                         } else {
                             newLs.add(j, newTree);
@@ -190,6 +195,22 @@ public final class ListUtils {
 
     public static <T> List<T> flatMap(List<T> ls, Function<T, Object> flatMap) {
         return flatMap(ls, (i, t) -> flatMap.apply(t));
+    }
+    
+    public static <T> List<T> mapAsync(List<T> input,
+                                       RecipeScheduler recipeScheduler,
+                                       UnaryOperator<T> mapFn) {
+        return input == null || input.isEmpty()
+                ? input
+                : input.stream()
+                .map(before -> {
+                    Callable<T> updateTreeFn = () -> mapFn.apply(before);
+                    return recipeScheduler.schedule(updateTreeFn);
+                })
+                .collect(toList()).stream()
+                .map(CompletableFuture::join)
+                .filter(Objects::nonNull)
+                .collect(toList());
     }
 
     public static <T> List<T> map(List<T> ls, ForkJoinPool pool, UnaryOperator<T> map) {
