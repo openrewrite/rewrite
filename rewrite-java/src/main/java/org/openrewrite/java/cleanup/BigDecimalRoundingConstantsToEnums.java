@@ -26,6 +26,7 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -84,7 +85,7 @@ public class BigDecimalRoundingConstantsToEnums extends Recipe {
                     isBigDecimal = true;
                 } else if (elem instanceof J.FieldAccess && ((J.FieldAccess)elem).getTarget().getType() instanceof JavaType.FullyQualified) {
                     J.FieldAccess fa = (J.FieldAccess)elem;
-                    if (fa.getTarget().getType() != null && BIG_DECIMAL_FQN.equals(((JavaType.FullyQualified) fa.getTarget().getType()).getFullyQualifiedName())) {
+                    if (TypeUtils.isOfClassType(fa.getTarget().getType(), BIG_DECIMAL_FQN)) {
                         isBigDecimal = true;
                     }
                 }
@@ -96,7 +97,7 @@ public class BigDecimalRoundingConstantsToEnums extends Recipe {
                 String roundingName = null;
                 if (elem instanceof J.FieldAccess && ((J.FieldAccess)elem).getTarget().getType() instanceof JavaType.FullyQualified) {
                     J.FieldAccess fa = (J.FieldAccess)elem;
-                    if (fa.getTarget().getType() != null && BIG_DECIMAL_FQN.equals(((JavaType.FullyQualified) fa.getTarget().getType()).getFullyQualifiedName())) {
+                    if (TypeUtils.isOfClassType(fa.getTarget().getType(),BIG_DECIMAL_FQN)) {
                         roundingName = fa.getSimpleName();
                     }
                 } else if (elem instanceof J.Literal){

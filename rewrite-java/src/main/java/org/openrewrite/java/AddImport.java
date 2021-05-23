@@ -118,9 +118,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
     private boolean isTypeReference(NameTree t) {
         boolean isTypRef = true;
         if (t instanceof J.FieldAccess) {
-            J.FieldAccess fa = (J.FieldAccess)t;
-            isTypRef = fa.getTarget().getType() instanceof JavaType.FullyQualified &&
-                    ((JavaType.FullyQualified)fa.getTarget().getType()).getFullyQualifiedName().equals(type);
+            isTypRef = TypeUtils.isOfClassType(((J.FieldAccess)t).getTarget().getType(), type);
         }
         return isTypRef;
     }
