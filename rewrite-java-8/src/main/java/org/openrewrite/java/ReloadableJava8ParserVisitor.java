@@ -17,11 +17,8 @@ package org.openrewrite.java;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
-import com.sun.tools.javac.code.Flags;
-import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.code.Type;
+import com.sun.tools.javac.code.*;
 import com.sun.tools.javac.code.Type.*;
-import com.sun.tools.javac.code.TypeTag;
 import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
@@ -1713,6 +1710,20 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             return JavaType.Primitive.Void;
         } else if (type instanceof ArrayType) {
             return new JavaType.Array(type(((ArrayType) type).elemtype, stack));
+        } else if (type instanceof WildcardType) {
+            // TODO: For now we are just mapping wildcards into their bound types and we are not accounting for the
+            //       "bound kind"
+            // <?>                --> java.lang.Object
+            // <? extends Number> --> Number
+            // <? super Number>   --> Number
+            // <? super T>        --> GenericTypeVariable
+
+            WildcardType wildcard = (WildcardType) type;
+            if (wildcard.kind == BoundKind.UNBOUND) {
+                return JavaType.Class.OBJECT;
+            } else {
+                return type(wildcard.type, stack);
+            }
         } else if (com.sun.tools.javac.code.Type.noType.equals(type)) {
             return null;
         } else {
