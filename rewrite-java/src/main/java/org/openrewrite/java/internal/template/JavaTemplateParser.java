@@ -146,7 +146,7 @@ public class JavaTemplateParser {
     public List<Expression> parseMethodArguments(Cursor cursor, String template, Space.Location location) {
         J.MethodInvocation method = cursor.getValue();
         String methodWithReplacementArgs = method.withArguments(Collections.emptyList()).printTrimmed()
-                .replace(")", template + ");");
+                .replaceAll("\\)$", template + ");");
         @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacementArgs, location);
         onBeforeParseTemplate.accept(stub);
         return cache(stub, () -> {
