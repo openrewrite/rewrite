@@ -73,15 +73,19 @@ public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
             return m;
         }
 
-        if (m.getAnnotations().getTypeParameters() != null && !m.getAnnotations().getTypeParameters().getTypeParameters().isEmpty()) {
-            m = concatenatePrefix(m, m.getAnnotations().getTypeParameters().getPrefix());
-            m = m.getAnnotations().withTypeParameters(m.getAnnotations().getTypeParameters().withPrefix(Space.EMPTY));
+        if (m.getAnnotations().getTypeParameters() != null) {
+            if(!m.getAnnotations().getTypeParameters().getTypeParameters().isEmpty()) {
+                m = concatenatePrefix(m, m.getAnnotations().getTypeParameters().getPrefix());
+                m = m.getAnnotations().withTypeParameters(m.getAnnotations().getTypeParameters().withPrefix(Space.EMPTY));
+            }
             return m;
         }
 
-        if (m.getReturnTypeExpression() != null && !m.getReturnTypeExpression().getPrefix().getWhitespace().isEmpty()) {
-            m = concatenatePrefix(m, m.getReturnTypeExpression().getPrefix());
-            m = m.withReturnTypeExpression(m.getReturnTypeExpression().withPrefix(Space.EMPTY));
+        if (m.getReturnTypeExpression() != null) {
+            if(!m.getReturnTypeExpression().getPrefix().getWhitespace().isEmpty()) {
+                m = concatenatePrefix(m, m.getReturnTypeExpression().getPrefix());
+                m = m.withReturnTypeExpression(m.getReturnTypeExpression().withPrefix(Space.EMPTY));
+            }
             return m;
         }
 
