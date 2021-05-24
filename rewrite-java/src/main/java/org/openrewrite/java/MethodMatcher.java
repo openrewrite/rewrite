@@ -104,7 +104,9 @@ public class MethodMatcher {
             return false;
         }
 
-        return (targetTypePattern.toString().equals(AspectjUtils.FULL_WILDCARD_RESULT) || matchesTargetType(enclosing.getType())) &&
+        // aspectJUtils does not support matching classes separated by packages.
+        // [^.]* is the product of a fully wild cart match for a method. `* foo()`
+        return (targetTypePattern.toString().equals("[^.]*") || matchesTargetType(enclosing.getType())) &&
                 methodNamePattern.matcher(method.getSimpleName()).matches() &&
                 argumentPattern.matcher(method.getParameters().stream()
                         .map(v -> {
@@ -313,8 +315,6 @@ class FormalParameterVisitor extends MethodSignatureParserBaseVisitor<String> {
 }
 
 class AspectjUtils {
-    public static final String FULL_WILDCARD_RESULT = "[^.]*";
-
     private AspectjUtils() {
     }
 
@@ -333,7 +333,7 @@ class AspectjUtils {
                 .replace("[", "\\[")
                 .replace("]", "\\]")
                 .replaceAll("([^.])*\\.([^.])*", "$1\\.$2")
-                .replace("*", FULL_WILDCARD_RESULT)
+                .replace("*", "[^.]*")
                 .replace("..", "\\.(.+\\.)?");
     }
 }
