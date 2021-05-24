@@ -21,8 +21,6 @@ import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.cfg.ConstructorDetector
 import com.fasterxml.jackson.databind.json.JsonMapper
-import com.fasterxml.jackson.module.kotlin.KotlinModule
-import com.fasterxml.jackson.module.kotlin.readValue
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -102,6 +100,60 @@ interface JavaTypeSerializerTest {
 
         assertThat(TypeUtils.deepEquals(javaClass, copy)).isTrue()
         assertThat(copy.flags).hasSize(0)
+    }
+
+    @Suppress("rawtypes")
+    @Test
+    fun serializeWildcard(jp: JavaParser) {
+        val clazz = jp.parse("""
+            import java.util.ArrayList;
+            import java.util.List;
+            class E <T extends Number> {
+                List<? extends Number> numberList1 = new ArrayList<>();
+                List<? super Number> numberList2 = new ArrayList<>();
+                List<?> numberList3 = new ArrayList();
+                List<? extends T> numberList4 = new ArrayList<>();
+            }
+        """)[0].classes[0]
+
+        val mapper = objectMapper()
+
+        //Make sure the whole class serializes properly
+        val classOut = mapper.writeValueAsString(clazz)
+        val classCopy = mapper.readValue(classOut, J.ClassDeclaration::class.java)
+        assertThat(clazz.equals(classCopy)).isTrue()
+
+        //NumberList1
+        var variableType = (clazz.body.statements[0] as J.VariableDeclarations).variables[0].type
+        var variableTypeOut = mapper.writeValueAsString(variableType)
+        var copy = mapper.readValue(variableTypeOut, JavaType.Parameterized::class.java)
+        var typeParameter = (variableType as JavaType.Parameterized).typeParameters[0] as JavaType.Class
+        assertThat(TypeUtils.deepEquals(variableType, copy)).isTrue()
+        assertThat(typeParameter.fullyQualifiedName).isEqualTo("java.lang.Number")
+
+        //NumberList2
+        variableType = (clazz.body.statements[1] as J.VariableDeclarations).variables[0].type
+        variableTypeOut = mapper.writeValueAsString(variableType)
+        copy = mapper.readValue(variableTypeOut, JavaType.Parameterized::class.java)
+        typeParameter = (variableType as JavaType.Parameterized).typeParameters[0] as JavaType.Class
+        assertThat(TypeUtils.deepEquals(variableType, copy)).isTrue()
+        assertThat(typeParameter.fullyQualifiedName).isEqualTo("java.lang.Number")
+
+        //NumberList3
+        variableType = (clazz.body.statements[2] as J.VariableDeclarations).variables[0].type
+        variableTypeOut = mapper.writeValueAsString(variableType)
+        copy = mapper.readValue(variableTypeOut, JavaType.Parameterized::class.java)
+        typeParameter = (variableType as JavaType.Parameterized).typeParameters[0] as JavaType.Class
+        assertThat(TypeUtils.deepEquals(variableType, copy)).isTrue()
+        assertThat(typeParameter.fullyQualifiedName).isEqualTo("java.lang.Object")
+
+        //NumberList4
+        variableType = (clazz.body.statements[3] as J.VariableDeclarations).variables[0].type
+        variableTypeOut = mapper.writeValueAsString(variableType)
+        copy = mapper.readValue(variableTypeOut, JavaType.Parameterized::class.java)
+        val genericTypeParameter = (variableType as JavaType.Parameterized).typeParameters[0] as JavaType.GenericTypeVariable
+        assertThat(TypeUtils.deepEquals(variableType, copy)).isTrue()
+        assertThat(genericTypeParameter.bound?.fullyQualifiedName).isEqualTo("java.lang.Number")
 
     }
 
