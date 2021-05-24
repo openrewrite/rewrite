@@ -213,17 +213,6 @@ public abstract class Recipe {
         return null;
     }
 
-    <S extends SourceFile> List<SourceFile> visitInternal(List<S> before,
-                                                          ExecutionContext ctx,
-                                                          RecipeScheduler recipeScheduler,
-                                                          Map<UUID, Recipe> recipeThatDeletedSourceFile) {
-        //noinspection unchecked
-        return recipeScheduler.scheduleVisit(this,
-                (List<SourceFile>) before,
-                ctx,
-                recipeThatDeletedSourceFile);
-    }
-
     /**
      * Override this to generate new source files or delete source files.
      *
@@ -254,7 +243,7 @@ public abstract class Recipe {
                                   RecipeScheduler recipeScheduler,
                                   int maxCycles,
                                   int minCycles) {
-        return recipeScheduler.schedule(this, before, ctx, maxCycles, minCycles);
+        return recipeScheduler.scheduleRun(this, before, ctx, maxCycles, minCycles);
     }
 
     @SuppressWarnings("unused")

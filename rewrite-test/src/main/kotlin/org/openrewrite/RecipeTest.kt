@@ -20,6 +20,9 @@ import org.junit.jupiter.api.fail
 import org.openrewrite.scheduling.ForkJoinScheduler
 import java.io.File
 import java.util.*
+import java.util.concurrent.Callable
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionStage
 
 interface RecipeTest {
     val recipe: Recipe?
@@ -68,12 +71,13 @@ interface RecipeTest {
             .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
             .isEqualTo(inputs.size)
 
-        val recipeCheckingExpectedCycles = RecipeCheckingExpectedCycles(recipe, expectedCyclesThatMakeChanges)
-        val results = recipeCheckingExpectedCycles
+        val recipeSchedulerCheckingExpectedCycles =
+            RecipeSchedulerCheckingExpectedCycles(ForkJoinScheduler.common(), expectedCyclesThatMakeChanges)
+        val results = recipe
             .run(
                 sources,
                 InMemoryExecutionContext { t: Throwable? -> fail<Any>("Recipe threw an exception", t) },
-                ForkJoinScheduler.common(),
+                recipeSchedulerCheckingExpectedCycles,
                 cycles,
                 expectedCyclesThatMakeChanges + 1
             )
@@ -91,7 +95,7 @@ interface RecipeTest {
             .isEqualTo(after.trimIndent())
         afterConditions(result.after as T)
 
-        recipeCheckingExpectedCycles.verify()
+        recipeSchedulerCheckingExpectedCycles.verify()
     }
 
     fun assertChanged(
@@ -126,12 +130,13 @@ interface RecipeTest {
 
         val source = sources.first()
 
-        val recipeCheckingExpectedCycles = RecipeCheckingExpectedCycles(recipe!!, expectedCyclesToComplete)
-        val results = recipeCheckingExpectedCycles
+        val recipeSchedulerCheckingExpectedCycles =
+            RecipeSchedulerCheckingExpectedCycles(ForkJoinScheduler.common(), expectedCyclesToComplete)
+        val results = recipe!!
             .run(
                 listOf(source),
                 InMemoryExecutionContext { t: Throwable -> fail<Any>("Recipe threw an exception", t) },
-                ForkJoinScheduler.common(),
+                recipeSchedulerCheckingExpectedCycles,
                 cycles,
                 expectedCyclesToComplete + 1
             )
@@ -148,7 +153,7 @@ interface RecipeTest {
             .isEqualTo(after.trimIndent())
         afterConditions(result.after as T)
 
-        recipeCheckingExpectedCycles.verify()
+        recipeSchedulerCheckingExpectedCycles.verify()
     }
 
     fun assertUnchanged(
@@ -165,9 +170,15 @@ interface RecipeTest {
             .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
             .isEqualTo(inputs.size)
         val source = sources.first()
-        val recipeCheckingExpectedCycles = RecipeCheckingExpectedCycles(recipe!!, 0)
-        val results = recipeCheckingExpectedCycles
-            .run(listOf(source), InMemoryExecutionContext { t -> t.printStackTrace() }, ForkJoinScheduler.common(), 2, 2)
+        val recipeSchedulerCheckingExpectedCycles = RecipeSchedulerCheckingExpectedCycles(ForkJoinScheduler.common(), 0)
+        val results = recipe!!
+            .run(
+                listOf(source),
+                InMemoryExecutionContext { t -> t.printStackTrace() },
+                recipeSchedulerCheckingExpectedCycles,
+                2,
+                2
+            )
 
         results.forEach { result ->
             if (result.diff(treePrinter ?: TreePrinter.identity<Any>()).isEmpty()) {
@@ -181,7 +192,7 @@ interface RecipeTest {
                 .isEqualTo(result.before?.print(treePrinter ?: TreePrinter.identity<Any>(), null))
         }
 
-        recipeCheckingExpectedCycles.verify()
+        recipeSchedulerCheckingExpectedCycles.verify()
     }
 
     fun assertUnchanged(
@@ -201,12 +212,12 @@ interface RecipeTest {
             .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
             .isEqualTo(inputs.size)
         val source = sources.first()
-        val recipeCheckingExpectedCycles = RecipeCheckingExpectedCycles(recipe!!, 0)
-        val results = recipeCheckingExpectedCycles
+        val recipeSchedulerCheckingExpectedCycles = RecipeSchedulerCheckingExpectedCycles(ForkJoinScheduler.common(), 0)
+        val results = recipe!!
             .run(
                 listOf(source),
                 InMemoryExecutionContext { t -> fail<Any>("Recipe threw an exception", t) },
-                ForkJoinScheduler.common(),
+                recipeSchedulerCheckingExpectedCycles,
                 2,
                 2
             )
@@ -223,7 +234,7 @@ interface RecipeTest {
                 .isEqualTo(result.before?.print(treePrinter ?: TreePrinter.identity<Any>(), null))
         }
 
-        recipeCheckingExpectedCycles.verify()
+        recipeSchedulerCheckingExpectedCycles.verify()
     }
 
     fun TreeVisitor<*, ExecutionContext>.toRecipe() = AdHocRecipe(this)
@@ -233,34 +244,38 @@ interface RecipeTest {
         override fun getVisitor(): TreeVisitor<*, ExecutionContext> = visitor
     }
 
-    private class RecipeCheckingExpectedCycles(
-        private val recipe: Recipe,
+    private class RecipeSchedulerCheckingExpectedCycles(
+        private val delegate: RecipeScheduler,
         private val expectedCyclesThatMakeChanges: Int
-    ) : Recipe() {
+    ) : RecipeScheduler {
         var cyclesThatResultedInChanges = 0
 
-        override fun getDisplayName(): String = "Check expected cycles"
-
-        init {
-            doNext(recipe)
+        override fun <T : Any?> schedule(fn: Callable<T>): CompletableFuture<T> {
+            return delegate.schedule(fn)
         }
 
-        override fun <S : SourceFile?> visitInternal(
-            before: List<S>,
+        override fun schedule(fn: Runnable): CompletionStage<Void> {
+            return delegate.schedule(fn)
+        }
+
+        override fun <S : SourceFile?> scheduleVisit(
+            recipe: Recipe,
+            before: MutableList<S>,
             ctx: ExecutionContext,
-            recipeScheduler: RecipeScheduler,
-            recipeThatDeletedSourceFile: Map<UUID, Recipe>
-        ): List<SourceFile> {
+            recipeThatDeletedSourceFile: MutableMap<UUID, Recipe>
+        ): MutableList<S> {
             ctx.putMessage("cyclesThatResultedInChanges", cyclesThatResultedInChanges)
-            val afterList = recipe.visitInternal(before, ctx, recipeScheduler, recipeThatDeletedSourceFile)
+            val afterList = delegate.scheduleVisit(recipe, before, ctx, recipeThatDeletedSourceFile)
             if (afterList !== before) {
                 cyclesThatResultedInChanges = cyclesThatResultedInChanges.inc()
                 if (cyclesThatResultedInChanges > expectedCyclesThatMakeChanges &&
                     before.isNotEmpty() && afterList.isNotEmpty()
                 ) {
                     assertThat(afterList[0]!!.printTrimmed())
-                        .`as`("Expected recipe to complete in $expectedCyclesThatMakeChanges cycle${if (expectedCyclesThatMakeChanges == 1) "" else "s"}, " +
-                                "but took at least one more cycle. Between the last two executed cycles there were changes.")
+                        .`as`(
+                            "Expected recipe to complete in $expectedCyclesThatMakeChanges cycle${if (expectedCyclesThatMakeChanges == 1) "" else "s"}, " +
+                                    "but took at least one more cycle. Between the last two executed cycles there were changes."
+                        )
                         .isEqualTo(before[0]!!.printTrimmed())
                 }
             }
@@ -269,8 +284,9 @@ interface RecipeTest {
 
         fun verify() {
             if (cyclesThatResultedInChanges != expectedCyclesThatMakeChanges) {
-                fail("Expected recipe to complete in $expectedCyclesThatMakeChanges cycle${if(expectedCyclesThatMakeChanges > 1) "s" else ""}, but took $cyclesThatResultedInChanges cycle${if(cyclesThatResultedInChanges > 1) "s" else ""}.")
+                fail("Expected recipe to complete in $expectedCyclesThatMakeChanges cycle${if (expectedCyclesThatMakeChanges > 1) "s" else ""}, but took $cyclesThatResultedInChanges cycle${if (cyclesThatResultedInChanges > 1) "s" else ""}.")
             }
         }
     }
+
 }

@@ -20,6 +20,8 @@ import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.scheduling.WatchableExecutionContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.*;
@@ -38,12 +40,13 @@ import static org.openrewrite.Recipe.PANIC;
 import static org.openrewrite.internal.ListUtils.mapAsync;
 
 public interface RecipeScheduler {
+    Logger LOGGER = LoggerFactory.getLogger(RecipeScheduler.class);
 
-    default List<Result> schedule(Recipe recipe,
-                                  List<? extends SourceFile> srcFiles,
-                                  ExecutionContext ctx,
-                                  int maxCycles,
-                                  int minCycles) {
+    default List<Result> scheduleRun(Recipe recipe,
+                                     List<? extends SourceFile> srcFiles,
+                                     ExecutionContext ctx,
+                                     int maxCycles,
+                                     int minCycles) {
         DistributionSummary.builder("rewrite.recipe.run")
                 .tag("recipe", recipe.getDisplayName())
                 .description("The distribution of recipe runs and the size of source file batches given to them to process.")
@@ -56,9 +59,9 @@ public interface RecipeScheduler {
         List<? extends SourceFile> before = srcFiles;
         List<? extends SourceFile> after = before;
         WatchableExecutionContext ctxWithWatch = new WatchableExecutionContext(ctx);
-        for (int cycle = 1; cycle <= maxCycles; cycle++) {
-            after = recipe.visitInternal(before, ctxWithWatch, this, recipeThatDeletedSourceFile);
-            if (cycle >= minCycles && ((after == before && !ctxWithWatch.hasNewMessages()) || !recipe.causesAnotherCycle())) {
+        for (int i = 0; i < maxCycles; i++) {
+            after = scheduleVisit(recipe, before, ctxWithWatch, recipeThatDeletedSourceFile);
+            if (i + 1 >= minCycles && ((after == before && !ctxWithWatch.hasNewMessages()) || !recipe.causesAnotherCycle())) {
                 break;
             }
             before = after;
@@ -77,19 +80,21 @@ public interface RecipeScheduler {
         // added or changed files
         for (SourceFile s : after) {
             SourceFile original = sourceFileIdentities.get(s.getId());
-            if (original != s) {
-                if (original == null) {
-                    results.add(new Result(null, s, singleton(recipeThatDeletedSourceFile.get(s.getId()))));
-                } else {
-                    //printing both the before and after (and including markers in the output) and then comparing the
-                    //output to determine if a change has been made.
-                    if (!original.print(MARKER_ID_PRINTER, ctx).equals(s.print(MARKER_ID_PRINTER, ctx))) {
-                        results.add(new Result(original, s, s.getMarkers()
-                                .findFirst(Recipe.RecipeThatMadeChanges.class)
-                                .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe reported making a change?"))
-                                .getRecipes()));
-                    }
-                }
+            if (original == s) {
+                continue;
+            }
+            if (original == null) {
+                results.add(new Result(null, s, singleton(recipeThatDeletedSourceFile.get(s.getId()))));
+                continue;
+            }
+
+            //printing both the before and after (and including markers in the output) and then comparing the
+            //output to determine if a change has been made.
+            if (!original.print(MARKER_ID_PRINTER, ctx).equals(s.print(MARKER_ID_PRINTER, ctx))) {
+                results.add(new Result(original, s, s.getMarkers()
+                        .findFirst(Recipe.RecipeThatMadeChanges.class)
+                        .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe reported making a change?"))
+                        .getRecipes()));
             }
         }
         Set<UUID> afterIds = after.stream()
@@ -206,7 +211,7 @@ public interface RecipeScheduler {
                 //noinspection unchecked
                 return (List<S>) afterWidened;
             }
-            afterWidened = r.visitInternal(afterWidened, ctx, this, recipeThatDeletedSourceFile);
+            afterWidened = scheduleVisit(r, afterWidened, ctx, recipeThatDeletedSourceFile);
         }
 
         //noinspection unchecked
