@@ -15,22 +15,18 @@
  */
 package org.openrewrite.scheduling;
 
+import lombok.RequiredArgsConstructor;
 import org.openrewrite.RecipeScheduler;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ForkJoinPool;
 
+@RequiredArgsConstructor
 public class ForkJoinScheduler implements RecipeScheduler {
-
     private static final ForkJoinScheduler COMMON_SCHEDULER = new ForkJoinScheduler(ForkJoinPool.commonPool());
 
     private final ForkJoinPool forkJoinPool;
-
-    public ForkJoinScheduler(ForkJoinPool forkJoinPool) {
-        this.forkJoinPool = forkJoinPool;
-    }
 
     public static ForkJoinScheduler common() {
         return COMMON_SCHEDULER;
@@ -48,13 +44,5 @@ public class ForkJoinScheduler implements RecipeScheduler {
             }
         });
         return f;
-    }
-
-    @Override
-    public CompletionStage<Void> schedule(Runnable fn) {
-        return schedule(() -> {
-            fn.run();
-            return null;
-        });
     }
 }

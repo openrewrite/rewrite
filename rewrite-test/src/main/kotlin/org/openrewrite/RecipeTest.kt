@@ -73,15 +73,16 @@ interface RecipeTest {
 
         val recipeSchedulerCheckingExpectedCycles =
             RecipeSchedulerCheckingExpectedCycles(ForkJoinScheduler.common(), expectedCyclesThatMakeChanges)
-        val results = recipe
-            .run(
+
+        var results = recipe.run(
                 sources,
                 InMemoryExecutionContext { t: Throwable? -> fail<Any>("Recipe threw an exception", t) },
                 recipeSchedulerCheckingExpectedCycles,
                 cycles,
                 expectedCyclesThatMakeChanges + 1
             )
-            .filter { it.before == sources.first() }
+
+        results = results.filter { it.before == sources.first() }
 
         if (results.isEmpty()) {
             fail<Any>("The recipe must make changes")
@@ -254,10 +255,6 @@ interface RecipeTest {
             return delegate.schedule(fn)
         }
 
-        override fun schedule(fn: Runnable): CompletionStage<Void> {
-            return delegate.schedule(fn)
-        }
-
         override fun <S : SourceFile?> scheduleVisit(
             recipe: Recipe,
             before: MutableList<S>,
@@ -288,5 +285,4 @@ interface RecipeTest {
             }
         }
     }
-
 }

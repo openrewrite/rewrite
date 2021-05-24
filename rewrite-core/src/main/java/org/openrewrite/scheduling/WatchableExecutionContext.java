@@ -15,6 +15,7 @@
  */
 package org.openrewrite.scheduling;
 
+import lombok.RequiredArgsConstructor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -22,15 +23,12 @@ import java.time.Duration;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
+@RequiredArgsConstructor
 public class WatchableExecutionContext implements ExecutionContext {
 
     private final ExecutionContext delegate;
 
     private boolean hasNewMessages = false;
-
-    public WatchableExecutionContext(ExecutionContext delegate) {
-        this.delegate = delegate;
-    }
 
     public boolean hasNewMessages() {
         return hasNewMessages;
@@ -46,13 +44,15 @@ public class WatchableExecutionContext implements ExecutionContext {
         delegate.putMessage(key, value);
     }
 
+    @Nullable
     @Override
-    public <T> @Nullable T getMessage(String key) {
+    public <T> T getMessage(String key) {
         return delegate.getMessage(key);
     }
 
+    @Nullable
     @Override
-    public <T> @Nullable T pollMessage(String key) {
+    public <T> T pollMessage(String key) {
         return delegate.pollMessage(key);
     }
 
