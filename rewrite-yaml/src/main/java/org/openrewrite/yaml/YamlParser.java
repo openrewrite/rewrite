@@ -124,17 +124,14 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
 
                 switch (event.getEventId()) {
                     case DocumentEnd:
-                        if (((DocumentEndEvent) event).getExplicit()) {
-                            assert document != null;
-                            documents.add(document.withEnd(new Yaml.Document.End(
-                                    randomId(),
-                                    fmt,
-                                    Markers.EMPTY
-                            )));
-                            lastEnd = event.getEndMark().getIndex();
-                        } else {
-                            documents.add(document);
-                        }
+                        assert document != null;
+                        documents.add(document.withEnd(new Yaml.Document.End(
+                                randomId(),
+                                fmt,
+                                Markers.EMPTY,
+                                ((DocumentEndEvent) event).getExplicit()
+                        )));
+                        lastEnd = event.getEndMark().getIndex();
                         break;
                     case DocumentStart:
                         document = new Yaml.Document(
@@ -185,14 +182,32 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                     case SequenceEnd:
                     case MappingEnd:
                         Yaml.Block mappingOrSequence = blockStack.pop().build();
+                        if(mappingOrSequence instanceof Yaml.Sequence) {
+                            Yaml.Sequence seq = (Yaml.Sequence) mappingOrSequence;
+                            if(seq.getOpeningBracketPrefix() != null) {
+                                String s = reader.readStringFromBuffer(lastEnd, event.getStartMark().getIndex());
+                                int closingBracketIndex = commentAwareIndexOf(']', s);
+                                lastEnd = lastEnd + closingBracketIndex + 1;
+                                mappingOrSequence = seq.withClosingBracketPrefix(s.substring(0, closingBracketIndex));
+                            }
+                        }
                         if (blockStack.isEmpty()) {
+                            assert document != null;
                             document = document.withBlock(mappingOrSequence);
                         } else {
                             blockStack.peek().push(mappingOrSequence);
                         }
                         break;
                     case SequenceStart:
-                        blockStack.push(new SequenceBuilder(fmt));
+                        String fullPrefix = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex() - 1);
+                        String startBracketPrefix = null;
+                        int openingBracketIndex = commentAwareIndexOf('[', fullPrefix);
+                        if(openingBracketIndex != -1) {
+                            int startIndex = commentAwareIndexOf(':', fullPrefix) + 1;
+                            startBracketPrefix = fullPrefix.substring(startIndex, openingBracketIndex);
+                            lastEnd = event.getEndMark().getIndex();
+                        }
+                        blockStack.push(new SequenceBuilder(fmt, startBracketPrefix));
                         break;
                     case Alias:
                     case StreamEnd:
@@ -205,6 +220,28 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    /**
+     * Return the index of the target character if it appears in a non-comment portion of the String, or -1 if it does not appear.
+     */
+    private static int commentAwareIndexOf(char target, String s) {
+        boolean inComment = false;
+        for(int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (inComment) {
+                if (c == '\n') {
+                    inComment = false;
+                }
+            } else {
+                if(c == target) {
+                    return i;
+                } else if(c == '#') {
+                    inComment = true;
+                }
+            }
+        }
+        return -1;
     }
 
     @Override
@@ -236,14 +273,21 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                 key = (Yaml.Scalar) block;
             } else {
                 String keySuffix = block.getPrefix();
-                block = block.withPrefix(keySuffix.substring(keySuffix.lastIndexOf(':') + 1));
+                block = block.withPrefix(keySuffix.substring(commentAwareIndexOf(':', keySuffix) + 1));
 
-                String keyPrefix = key.getPrefix();
+                // Begin moving whitespace from the key to the entry that contains the key
+                String originalKeyPrefix = key.getPrefix();
                 key = key.withPrefix("");
 
+                // When a dash, indicating the beginning of a sequence, is present whitespace before it will be handled by the SequenceEntry
+                // Similarly if the prefix includes a ':', it will be owned by the mapping that contains this mapping
+                // So this entry's prefix begins after any such delimiter
+                int entryPrefixStartIndex = Math.max(
+                        commentAwareIndexOf('-', originalKeyPrefix),
+                        commentAwareIndexOf(':', originalKeyPrefix)) + 1;
+                String entryPrefix = originalKeyPrefix.substring(entryPrefixStartIndex);
                 String beforeMappingValueIndicator = keySuffix.substring(0,
-                        Math.max(keySuffix.lastIndexOf(':'), 0));
-                String entryPrefix = keyPrefix.substring(keyPrefix.lastIndexOf(':') + 1);
+                        Math.max(commentAwareIndexOf(':', keySuffix), 0));
                 entries.add(new Yaml.Mapping.Entry(randomId(), entryPrefix, Markers.EMPTY, key, beforeMappingValueIndicator, block));
                 key = null;
             }
@@ -256,36 +300,34 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
 
     private static class SequenceBuilder implements BlockBuilder {
         private final String prefix;
+        @Nullable private final String startBracketPrefix;
 
         private final List<Yaml.Sequence.Entry> entries = new ArrayList<>();
 
-        private SequenceBuilder(String prefix) {
+        private SequenceBuilder(String prefix, @Nullable String startBracketPrefix) {
             this.prefix = prefix;
+            this.startBracketPrefix = startBracketPrefix;
         }
 
         @Override
         public void push(Yaml.Block block) {
-            String entryPrefix = block.getPrefix();
-            if (entryPrefix.indexOf(':') != -1) {
-                block = block.withPrefix(entryPrefix.substring(entryPrefix.lastIndexOf(':') + 1));
-                entryPrefix = entryPrefix.substring(0, entryPrefix.lastIndexOf(':'));
-            }
-            if (entryPrefix.indexOf('-') != -1) {
-                block = block.withPrefix(entryPrefix.substring(entryPrefix.lastIndexOf('-') + 1));
-                entryPrefix = entryPrefix.substring(0, entryPrefix.lastIndexOf('-'));
-            }
-            if (block instanceof Yaml.Mapping) {
-                Yaml.Mapping mapping = (Yaml.Mapping) block;
-                mapping = mapping.withEntries(ListUtils.map(mapping.getEntries(),
-                        e -> e.withPrefix(e.getPrefix().substring(e.getPrefix().lastIndexOf('-') + 1))));
-                entries.add(new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, mapping));
+            String rawPrefix = block.getPrefix();
+            int dashIndex = commentAwareIndexOf('-', rawPrefix);
+            String entryPrefix;
+            String blockPrefix;
+            boolean hasDash = dashIndex != -1;
+            if(hasDash) {
+                entryPrefix = rawPrefix.substring(0, dashIndex);
+                blockPrefix = rawPrefix.substring(dashIndex + 1);
             } else {
-                entries.add(new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, block));
+                entryPrefix = "";
+                blockPrefix = rawPrefix;
             }
+            entries.add(new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, block.withPrefix(blockPrefix), hasDash));
         }
 
         public SequenceWithPrefix build() {
-            return new SequenceWithPrefix(prefix, entries);
+            return new SequenceWithPrefix(prefix, startBracketPrefix, entries, null);
         }
     }
 
@@ -309,8 +351,8 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
     private static class SequenceWithPrefix extends Yaml.Sequence {
         private String prefix;
 
-        public SequenceWithPrefix(String prefix, List<Yaml.Sequence.Entry> entries) {
-            super(randomId(), Markers.EMPTY, entries);
+        public SequenceWithPrefix(String prefix, @Nullable String startBracketPrefix, List<Yaml.Sequence.Entry> entries, @Nullable String endBracketPrefix) {
+            super(randomId(), Markers.EMPTY, startBracketPrefix, entries, endBracketPrefix);
             this.prefix = prefix;
         }
 
@@ -332,7 +374,9 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                             new Yaml.Sequence(
                                     sequenceWithPrefix.getId(),
                                     sequenceWithPrefix.getMarkers(),
-                                    ListUtils.mapFirst(sequenceWithPrefix.getEntries(), e -> e.withPrefix(sequenceWithPrefix.getPrefix()))
+                                    sequenceWithPrefix.getOpeningBracketPrefix(),
+                                    ListUtils.mapFirst(sequenceWithPrefix.getEntries(), e -> e.withPrefix(sequenceWithPrefix.getPrefix())),
+                                    sequenceWithPrefix.getClosingBracketPrefix()
                             ), p);
                 }
                 return super.visitSequence(sequence, p);

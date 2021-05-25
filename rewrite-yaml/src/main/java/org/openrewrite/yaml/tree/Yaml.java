@@ -161,7 +161,6 @@ public interface Yaml extends Serializable, Tree {
         @With
         Block block;
 
-        @Nullable
         @With
         End end;
 
@@ -198,9 +197,18 @@ public interface Yaml extends Serializable, Tree {
             @With
             Markers markers;
 
+            /**
+             * Yaml documents may be explicitly ended with "..."
+             * When this is set to "true" the "..." will be printed out.
+             * When this is set to "false" no "..." will be printed, but a comment at the end of the document still will be
+             * See: https://yaml.org/spec/1.2/spec.html#id2800401
+             */
+            @With
+            boolean explicit;
+
             @Override
             public End copyPaste() {
-                return new End(randomId(), prefix, Markers.EMPTY);
+                return new End(randomId(), prefix, Markers.EMPTY, explicit);
             }
         }
     }
@@ -335,8 +343,22 @@ public interface Yaml extends Serializable, Tree {
         @With
         Markers markers;
 
+        /**
+         * Will contain the whitespace preceding the '[' in an inline sequence like [a, b].
+         * Will be null if the sequence is not an inline sequence, e.g.:
+         *  - foo
+         *  - bar
+         */
+        @Nullable
+        @With
+        String openingBracketPrefix;
+
         @With
         List<Entry> entries;
+
+        @Nullable
+        @With
+        String closingBracketPrefix;
 
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
@@ -345,8 +367,8 @@ public interface Yaml extends Serializable, Tree {
 
         @Override
         public Sequence copyPaste() {
-            return new Sequence(randomId(), Markers.EMPTY,
-                    entries.stream().map(Entry::copyPaste).collect(toList()));
+            return new Sequence(randomId(), Markers.EMPTY, openingBracketPrefix,
+                    entries.stream().map(Entry::copyPaste).collect(toList()), closingBracketPrefix);
         }
 
         @Override
@@ -378,6 +400,8 @@ public interface Yaml extends Serializable, Tree {
             @With
             Block block;
 
+            boolean dash;
+
             @Override
             public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
                 return v.visitSequenceEntry(this, p);
@@ -386,7 +410,7 @@ public interface Yaml extends Serializable, Tree {
             @Override
             public Entry copyPaste() {
                 return new Entry(randomId(), prefix, Markers.EMPTY,
-                        block.copyPaste());
+                        block.copyPaste(), dash);
             }
         }
     }

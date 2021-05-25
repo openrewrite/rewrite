@@ -18,59 +18,54 @@ package org.openrewrite.yaml
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
-class DocumentTest {
-    @Test
-    fun explicitStart() {
-        val yText = """
-            ---
-            type: specs.openrewrite.org/v1beta/visitor
-            ---
-            
-            type: specs.openrewrite.org/v1beta/recipe
-        """.trimIndent()
-
-        val y = YamlParser().parse(yText)[0]
-
-        assertThat(y.documents).hasSize(2)
-        assertThat(y.documents[0].isExplicit).isTrue()
-        assertThat(y.printTrimmed()).isEqualTo(yText)
-    }
+class DocumentTest: YamlParserTest {
 
     @Test
-    fun explicitEnd() {
-        val yText = """
-            type: specs.openrewrite.org/v1beta/visitor
-            ...
-            ---
-            type: specs.openrewrite.org/v1beta/recipe
-            
-            ...
-        """.trimIndent()
-
-        val y = YamlParser().parse(yText)[0]
-
-        assertThat(y.documents).hasSize(2)
-        assertThat(y.documents[0].end).isNotNull()
-        assertThat(y.printTrimmed()).isEqualTo(yText)
-    }
+    fun explicitStart() = assertRoundTrip(
+            source = """
+                ---
+                type: specs.openrewrite.org/v1beta/visitor
+                ---
+                
+                type: specs.openrewrite.org/v1beta/recipe
+            """,
+            afterConditions = { y ->
+                assertThat(y.documents).hasSize(2)
+                assertThat(y.documents[0].isExplicit).isTrue()
+            }
+    )
 
     @Test
-    fun implicitStart() {
-        val yText = "type: specs.openrewrite.org/v1beta/visitor"
-        val y = YamlParser().parse(yText)[0]
-
-        assertThat(y.documents).hasSize(1)
-        assertThat(y.documents[0].isExplicit).isFalse()
-        assertThat(y.printTrimmed()).isEqualTo(yText)
-    }
+    fun explicitEnd() = assertRoundTrip(
+            source = """
+                type: specs.openrewrite.org/v1beta/visitor
+                ...
+                ---
+                type: specs.openrewrite.org/v1beta/recipe
+                
+                ...
+            """,
+            afterConditions = { y ->
+                assertThat(y.documents).hasSize(2)
+                assertThat(y.documents[0].end.isExplicit).isTrue()
+            }
+    )
 
     @Test
-    fun implicitEnd() {
-        val yText = "type: specs.openrewrite.org/v1beta/visitor"
-        val y = YamlParser().parse(yText)[0]
+    fun implicitStart() = assertRoundTrip(
+            source = "type: specs.openrewrite.org/v1beta/visitor",
+            afterConditions = { y ->
+                assertThat(y.documents).hasSize(1)
+                assertThat(y.documents[0].isExplicit).isFalse()
+            }
+    )
 
-        assertThat(y.documents).hasSize(1)
-        assertThat(y.documents[0].end).isNull()
-        assertThat(y.printTrimmed()).isEqualTo(yText)
-    }
+    @Test
+    fun implicitEnd() = assertRoundTrip(
+            source = "type: specs.openrewrite.org/v1beta/visitor",
+            afterConditions = { y ->
+                assertThat(y.documents).hasSize(1)
+                assertThat(y.documents[0].end.isExplicit).isFalse()
+            }
+    )
 }
