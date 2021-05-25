@@ -23,24 +23,27 @@ import org.openrewrite.java.tree.J;
 import java.util.regex.Pattern;
 
 /**
- * Converts local variables and method parameters to comply with SonarQube RSPEC-117 naming convention.
+ * This recipe converts local variables and method parameters to camel case convention.
+ * The recipe will not rename variables declared in for loop controls or catches with a single character.
  *
- * Note:
- * - Does not support renaming class fields.
- * - The recipe will not apply renames if the result already exists in the class or is a java reserved keyword.
+ * The first character is set to lower case and existing capital letters are preserved.
+ * Special characters that are allowed in java field names `$` and `_` are removed.
+ * If a special character is removed the next valid alpha-numeric will be capitalized.
  *
- * RSPEC-117 ref: https://rules.sonarsource.com/java/RSPEC-117?search=local%20variable
+ * Currently, unsupported:
+ *  - The recipe will not rename variables declared in a class.
+ *  - The recipe will not rename variables if the result already exists in a class or the result will be a java reserved keyword.
  */
-public class SonarQubeRSpec117 extends Recipe {
+public class RenameLocalVariablesToCamelCase extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Rspec 117: Convert non-compliant local variables to camel case";
+        return "Rename local variables to camel case.";
     }
 
     @Override
     public String getDescription() {
-        return "Rspec 117: Convert non-compliant local variables to camel case";
+        return "Renames local variables and method parameters to java camel case naming convention.";
     }
 
     @Override
@@ -56,16 +59,16 @@ public class SonarQubeRSpec117 extends Recipe {
 
             // Does not currently support renaming fields in a J.ClassDeclaration.
             if (!(parentScope.getParent() != null && parentScope.getParent().getValue() instanceof J.ClassDeclaration)) {
-                // Rule does not apply to loop counters.
+                // Does not apply to loop counters.
                 if (!(parentScope.getValue() instanceof J.ForLoop.Control)) {
-                    // Rule does not apply to one-character catch variables.
+                    // Does not apply to one-character catch variables.
                     if (!((parentScope.getValue() instanceof J.Try.Catch || parentScope.getValue() instanceof J.MultiCatch) &&
                             variable.getSimpleName().length() == 1)) {
-                        // Rspec regex for non-compliant code.
+                        // Regex to match java naming convention.
                         Pattern pattern = Pattern.compile("^[a-z][a-zA-Z0-9]*$");
                         if (!pattern.matcher(variable.getSimpleName()).matches()) {
                             String toName = convertToCamelCase(variable.getSimpleName());
-                            // An identifier does not exist in the
+                            // An identifier does not exit in the class.
                             if (!toNameFound(toName, getCursor(), ctx)) {
                                 doAfterVisit(new RenameVariable<>(variable, toName));
                                 return variable;
@@ -122,6 +125,13 @@ public class SonarQubeRSpec117 extends Recipe {
         );
     }
 
+    /**
+     * Renames `oldName` to java camel case naming convention.
+     * - The first character will be lower case.
+     * - Preserves other existing capitalized characters.
+     * - Special characters `$` and `_` will be removed.
+     *      - If a special character is removed the following alphanumeric will be capitalized.
+     */
     private static String convertToCamelCase(String oldName) {
         StringBuilder builder = new StringBuilder();
         boolean setCaps = false;

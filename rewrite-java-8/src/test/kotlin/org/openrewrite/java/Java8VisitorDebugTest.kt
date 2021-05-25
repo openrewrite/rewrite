@@ -246,7 +246,7 @@ class Java8SimplifyBooleanReturnTest : Java8Test, SimplifyBooleanReturnTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java8SonarQubeRSpec117Test : Java8Test, SonarQubeRSpec117Test
+class Java8RenameLocalVariablesToCamelCaseTest : Java8Test, RenameLocalVariablesToCamelCaseTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

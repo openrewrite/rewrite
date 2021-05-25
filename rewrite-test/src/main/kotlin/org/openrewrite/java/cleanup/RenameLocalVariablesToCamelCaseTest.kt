@@ -20,9 +20,9 @@ import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 
-interface SonarQubeRSpec117Test : JavaRecipeTest {
+interface RenameLocalVariablesToCamelCaseTest : JavaRecipeTest {
     override val recipe: Recipe?
-        get() = SonarQubeRSpec117()
+        get() = RenameLocalVariablesToCamelCase()
 
     @Test
     fun doNotChangeStaticImports(jp: JavaParser) = assertUnchanged(
