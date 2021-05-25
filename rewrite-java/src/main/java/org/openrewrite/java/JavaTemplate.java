@@ -100,7 +100,8 @@ public class JavaTemplate {
         return (J2) new JavaVisitor<Integer>() {
             @Override
             public J visitAnnotation(J.Annotation annotation, Integer integer) {
-                if (loc.equals(ANNOTATION_PREFIX) && mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
+                if (loc.equals(ANNOTATION_PREFIX) && mode.equals(JavaCoordinates.Mode.REPLACEMENT) &&
+                        annotation.isScope(insertionPoint)) {
                     List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
                     return gen.get(0).withPrefix(annotation.getPrefix());
                 }
@@ -112,15 +113,17 @@ public class JavaTemplate {
             public J visitBlock(J.Block block, Integer p) {
                 switch (loc) {
                     case BLOCK_END: {
-                        List<Statement> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(
-                                new Cursor(getCursor(), insertionPoint),
-                                substitutedTemplate, loc));
-                        return block.withStatements(
-                                ListUtils.concatAll(
-                                        block.getStatements(),
-                                        ListUtils.map(gen, (i, s) -> autoFormat(i == 0 ? s.withPrefix(Space.format("\n")) : s, p, getCursor()))
-                                )
-                        );
+                        if(block.isScope(insertionPoint)) {
+                            List<Statement> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(
+                                    new Cursor(getCursor(), insertionPoint),
+                                    substitutedTemplate, loc));
+                            return block.withStatements(
+                                    ListUtils.concatAll(
+                                            block.getStatements(),
+                                            ListUtils.map(gen, (i, s) -> autoFormat(i == 0 ? s.withPrefix(Space.format("\n")) : s, p, getCursor()))
+                                    )
+                            );
+                        }
                     }
                     case STATEMENT_PREFIX: {
                         return block.withStatements(ListUtils.flatMap(block.getStatements(), statement -> {
