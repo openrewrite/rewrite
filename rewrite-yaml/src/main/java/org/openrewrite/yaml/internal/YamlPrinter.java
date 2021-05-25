@@ -109,6 +109,9 @@ public class YamlPrinter<P> extends YamlVisitor<P> {
             acc.append('-');
         }
         visit(entry.getBlock(), p);
+        if(entry.getTrailingCommaPrefix() != null) {
+            acc.append(entry.getTrailingCommaPrefix()).append(',');
+        }
         return entry;
     }
 

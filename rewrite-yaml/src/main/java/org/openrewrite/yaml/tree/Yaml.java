@@ -400,7 +400,25 @@ public interface Yaml extends Serializable, Tree {
             @With
             Block block;
 
+            /**
+             * Set to true when this entry is part of a sequence like:
+             * - 1
+             * - 2
+             *
+             * And false when this entry is part of a sequence like:
+             * [1, 2]
+             */
             boolean dash;
+
+            /**
+             * Holds the whitespace between this entry and its trailing comma, if any.
+             *   v
+             * [1 , 2]
+             * null if there is no trailing comma.
+             */
+            @Nullable
+            @With
+            String trailingCommaPrefix;
 
             @Override
             public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
@@ -410,7 +428,7 @@ public interface Yaml extends Serializable, Tree {
             @Override
             public Entry copyPaste() {
                 return new Entry(randomId(), prefix, Markers.EMPTY,
-                        block.copyPaste(), dash);
+                        block.copyPaste(), dash, trailingCommaPrefix);
             }
         }
     }

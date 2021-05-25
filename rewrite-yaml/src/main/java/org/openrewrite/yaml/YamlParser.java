@@ -175,9 +175,25 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                                 style = Yaml.Scalar.Style.PLAIN;
                                 break;
                         }
+                        BlockBuilder builder = blockStack.peek();
+                        if(builder instanceof SequenceBuilder) {
+                            // Inline sequences like [1, 2] need to keep track of any whitespace between the element
+                            // and its trailing comma.
+                            SequenceBuilder sequenceBuilder = (SequenceBuilder) builder;
+                            String betweenEvents = reader.readStringFromBuffer(event.getEndMark().getIndex(), parser.peekEvent().getStartMark().getIndex() - 1);
+                            int commaIndex = commentAwareIndexOf(',', betweenEvents);
+                            String commaPrefix = null;
+                            if(commaIndex != -1) {
+                                commaPrefix = betweenEvents.substring(0, commaIndex);
 
-                        blockStack.peek().push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, scalarValue));
-                        lastEnd = event.getEndMark().getIndex();
+                            }
+                            lastEnd = event.getEndMark().getIndex() + commaIndex + 1;
+                            sequenceBuilder.push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, scalarValue), commaPrefix);
+
+                        } else {
+                            builder.push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, scalarValue));
+                            lastEnd = event.getEndMark().getIndex();
+                        }
                         break;
                     case SequenceEnd:
                     case MappingEnd:
@@ -311,6 +327,10 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
 
         @Override
         public void push(Yaml.Block block) {
+            push(block, null);
+        }
+
+        public void push(Yaml.Block block, @Nullable String commaPrefix) {
             String rawPrefix = block.getPrefix();
             int dashIndex = commentAwareIndexOf('-', rawPrefix);
             String entryPrefix;
@@ -323,7 +343,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                 entryPrefix = "";
                 blockPrefix = rawPrefix;
             }
-            entries.add(new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, block.withPrefix(blockPrefix), hasDash));
+            entries.add(new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, block.withPrefix(blockPrefix), hasDash, commaPrefix));
         }
 
         public SequenceWithPrefix build() {

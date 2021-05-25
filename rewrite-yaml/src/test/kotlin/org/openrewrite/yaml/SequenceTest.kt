@@ -81,4 +81,15 @@ class SequenceTest: YamlParserTest {
         - baz: [
             a]
     """)
+
+    @Test
+    fun inlineSequenceWithWhitespaceBeforeCommas() = assertRoundTrip(
+            source = "[1 ,2  ,0]",
+            afterConditions = { y ->
+                val seq = y.documents.first().block as Yaml.Sequence
+                assertThat(seq.entries[0].trailingCommaPrefix).isEqualTo(" ")
+                assertThat(seq.entries[1].trailingCommaPrefix).isEqualTo("  ")
+                assertThat(seq.entries[2].trailingCommaPrefix).isNull()
+            }
+    )
 }
