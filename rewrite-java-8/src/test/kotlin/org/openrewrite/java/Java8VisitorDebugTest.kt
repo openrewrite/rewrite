@@ -22,6 +22,7 @@ import org.openrewrite.java.format.*
 import org.openrewrite.java.search.*
 import org.openrewrite.java.security.SecureTempFileCreationTest
 import org.openrewrite.java.security.XmlParserXXEVulnerabilityTest
+import org.openrewrite.java.style.AutodetectTest
 import org.openrewrite.java.tree.TypeTreeTest
 
 //----------------------------------------------------------------------------------------------
@@ -39,6 +40,10 @@ class Java8AddLicenseHeaderTest : Java8Test, AddLicenseHeaderTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java8AnnotationTemplateGeneratorTest : Java8Test, AnnotationTemplateGeneratorTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8AutodetectTest : Java8Test, AutodetectTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

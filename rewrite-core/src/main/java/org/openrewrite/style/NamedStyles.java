@@ -32,10 +32,12 @@ import java.util.UUID;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class NamedStyles implements Marker {
     private final UUID id;
+
     @EqualsAndHashCode.Include
     private final String name;
 
     private final String displayName;
+
     @Nullable
     private final String description;
     private final Set<String> tags;

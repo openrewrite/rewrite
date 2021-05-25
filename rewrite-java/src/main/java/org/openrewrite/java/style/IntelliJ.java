@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 
+import static java.util.Collections.emptySet;
 import static org.openrewrite.Tree.randomId;
 
 public class IntelliJ extends NamedStyles {
@@ -31,8 +32,10 @@ public class IntelliJ extends NamedStyles {
 
     private IntelliJ() {
         super(randomId(),
-                "intellij-idea", "IntelliJ IDEA", "IntelliJ IDEA defaults for all ",
-                Collections.emptySet(),
+                "org.openrewrite.java.IntelliJ",
+                "IntelliJ IDEA",
+                "IntelliJ IDEA defaults for styles.",
+                emptySet(),
                 Arrays.asList(
                         importLayout(),
                         blankLines(),

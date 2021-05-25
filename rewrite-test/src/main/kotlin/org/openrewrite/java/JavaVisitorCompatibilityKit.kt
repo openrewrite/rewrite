@@ -22,6 +22,7 @@ import org.openrewrite.java.format.*
 import org.openrewrite.java.search.*
 import org.openrewrite.java.security.SecureTempFileCreationTest
 import org.openrewrite.java.security.XmlParserXXEVulnerabilityTest
+import org.openrewrite.java.style.AutodetectTest
 import org.openrewrite.java.tree.TypeTreeTest
 
 //----------------------------------------------------------------------------------------
@@ -41,6 +42,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class AnnotationTemplateGeneratorTck : AnnotationTemplateGeneratorTest
+
+    @Nested
+    inner class AutodetectTck : AutodetectTest
 
     @Nested
     inner class BigDecimalRoundingConstantsToEnumsTck : BigDecimalRoundingConstantsToEnumsTest

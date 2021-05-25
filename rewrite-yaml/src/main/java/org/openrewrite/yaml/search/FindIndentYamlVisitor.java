@@ -23,7 +23,6 @@ import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static java.util.function.Function.identity;
@@ -35,8 +34,6 @@ import static java.util.stream.Collectors.counting;
 public class FindIndentYamlVisitor<P> extends YamlVisitor<P> {
     private final SortedMap<Integer, Long> indentFrequencies = new TreeMap<>();
     private final int enclosingIndent;
-
-    private int linesWithSpaceIndents = 0;
 
     public FindIndentYamlVisitor(int enclosingIndent) {
         this.enclosingIndent = enclosingIndent;
@@ -82,7 +79,6 @@ public class FindIndentYamlVisitor<P> extends YamlVisitor<P> {
                     .collect(Collectors.groupingBy(identity(), counting()));
 
             if (indentTypeCounts.getOrDefault(true, 0L) >= indentTypeCounts.getOrDefault(false, 0L)) {
-                linesWithSpaceIndents++;
             }
         }
 
