@@ -40,7 +40,7 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Rename local variables to camel case.";
+        return "Reformat local variable names to camelCase";
     }
 
     @Override
