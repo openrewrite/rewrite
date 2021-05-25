@@ -52,42 +52,6 @@ class RecipeLifecycleTest {
     }
 
     @Test
-    fun recipeTimeout() {
-        val latch = CountDownLatch(1)
-        val timeouts = AtomicInteger(0)
-
-        object : Recipe() {
-            override fun getDisplayName(): String = "Slow"
-
-            override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
-                return object : TreeVisitor<Tree, ExecutionContext>() {
-                    override fun visit(tree: Tree, p: ExecutionContext): Tree {
-                        Thread.sleep(2)
-                        return tree
-                    }
-                }
-            }
-        }.run(
-            listOf(
-                PlainText(randomId(), Markers.EMPTY, "hello"),
-                PlainText(randomId(), Markers.EMPTY, "world")
-            ),
-            InMemoryExecutionContext(
-                { t ->
-                    assertThat(t).isInstanceOf(RecipeTimeoutException::class.java)
-                    timeouts.incrementAndGet()
-                    latch.countDown()
-                },
-                { Duration.ofMillis(1) }
-            ),
-            1
-        )
-
-        latch.await(2, TimeUnit.SECONDS)
-        assertThat(timeouts.get()).isEqualTo(1)
-    }
-
-    @Test
     fun notApplicableRecipe() {
         val results = object : Recipe() {
             override fun getName() = "test.NotApplicable"

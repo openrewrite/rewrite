@@ -20,9 +20,6 @@ import org.openrewrite.internal.lang.Nullable;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinTask;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
@@ -160,7 +157,7 @@ public final class ListUtils {
                     for (T newTree : (Iterable<T>) newTreeOrTrees) {
                         if (j >= newLs.size()) {
                             newLs.add(newTree);
-                        } else if(n == 0) {
+                        } else if (n == 0) {
                             newLs.set(j, newTree);
                         } else {
                             newLs.add(j, newTree);
@@ -190,54 +187,6 @@ public final class ListUtils {
 
     public static <T> List<T> flatMap(List<T> ls, Function<T, Object> flatMap) {
         return flatMap(ls, (i, t) -> flatMap.apply(t));
-    }
-
-    public static <T> List<T> map(List<T> ls, ForkJoinPool pool, UnaryOperator<T> map) {
-        return map(ls, pool, (i, t) -> map.apply(t));
-    }
-
-    /**
-     * Apply function to each element of the list. If any element has been modified then
-     * a new list will be returned where the modified elements have been replaced with their new version.
-     *
-     * @param ls   The original list
-     * @param pool A pool to parallelize the mapping operation or null to execute in the calling thread.
-     * @param map  The mapping function. If a null value is returned, the item is dropped from the resultant list
-     * @param <T>  The type of the list
-     * @return The original list if no element has changed, or a new list.
-     */
-    public static <T> List<T> map(List<T> ls, @Nullable ForkJoinPool pool, BiFunction<Integer, T, T> map) {
-        if (ls == null || ls.isEmpty()) {
-            return ls;
-        }
-
-        AtomicReference<List<T>> newLs = new AtomicReference<>(ls);
-        for (int i = 0; i < ls.size(); i++) {
-            int index = i;
-
-            Runnable updateTreeFn = () -> {
-                T tree = ls.get(index);
-                T newTree = map.apply(index, tree);
-                if (newTree != tree) {
-                    newLs.updateAndGet(l -> l == ls ? new ArrayList<>(ls) : l)
-                            .set(index, newTree);
-                }
-            };
-            if (pool == null) {
-                updateTreeFn.run();
-            } else {
-                ForkJoinTask<?> task = ForkJoinTask.adapt(updateTreeFn);
-                pool.invoke(task);
-                task.join();
-            }
-        }
-
-        if (newLs.get() != ls) {
-            //noinspection StatementWithEmptyBody
-            while (newLs.get().remove(null)) ;
-        }
-
-        return newLs.get();
     }
 
     public static <T> List<T> concat(@Nullable List<T> ls, T t) {

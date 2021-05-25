@@ -18,33 +18,22 @@ package org.openrewrite;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import io.micrometer.core.instrument.DistributionSummary;
-import io.micrometer.core.instrument.Metrics;
-import io.micrometer.core.instrument.Timer;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.config.RecipeDescriptor;
-import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.NullUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.scheduling.ForkJoinScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
-import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
-import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
-import static java.util.Collections.singleton;
-import static java.util.stream.Collectors.*;
+import static java.util.stream.Collectors.joining;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -75,7 +64,7 @@ public abstract class Recipe {
      * This tree printer is used when comparing before/after source files and reifies any markers as a list of
      * hash codes.
      */
-    private static final TreePrinter<ExecutionContext> MARKER_ID_PRINTER = new TreePrinter<ExecutionContext>() {
+    static final TreePrinter<ExecutionContext> MARKER_ID_PRINTER = new TreePrinter<ExecutionContext>() {
         @Override
         public void doBefore(@Nullable Tree tree, StringBuilder printerAcc, ExecutionContext executionContext) {
             if (tree instanceof Markers) {
@@ -224,114 +213,6 @@ public abstract class Recipe {
         return null;
     }
 
-    @SuppressWarnings("SuspiciousMethodCalls")
-    <S extends SourceFile> List<SourceFile> visitInternal(List<S> before,
-                                                          ExecutionContext ctx,
-                                                          ForkJoinPool forkJoinPool,
-                                                          Map<UUID, Recipe> recipeThatDeletedSourceFile) {
-        long startTime = System.nanoTime();
-        AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean(false);
-
-        if (getApplicableTest() != null) {
-            boolean applicable = false;
-            for (S s : before) {
-                if (getApplicableTest().visit(s, ctx) != s) {
-                    applicable = true;
-                    break;
-                }
-            }
-
-            if (!applicable) {
-                //noinspection unchecked
-                return (List<SourceFile>) before;
-            }
-        }
-
-        List<S> after = before;
-        // if this recipe isn't valid we just skip it and proceed to next
-        if (validate(ctx).isValid()) {
-            after = ListUtils.map(after, forkJoinPool, s -> {
-                Timer.Builder timer = Timer.builder("rewrite.recipe.visit").tag("recipe", getDisplayName());
-                Timer.Sample sample = Timer.start();
-
-                if(getSingleSourceApplicableTest() != null) {
-                    if(getSingleSourceApplicableTest().visit(s, ctx) == s) {
-                        sample.stop(MetricsHelper.successTags(timer, s, "skipped").register(Metrics.globalRegistry));
-                        return s;
-                    }
-                }
-
-                Duration duration = Duration.ofNanos(System.nanoTime() - startTime);
-                if (duration.compareTo(ctx.getRunTimeout(before.size())) > 0) {
-                    if (thrownErrorOnTimeout.compareAndSet(false, true)) {
-                        RecipeTimeoutException t = new RecipeTimeoutException(this);
-                        ctx.getOnError().accept(t);
-                        ctx.getOnTimeout().accept(t, ctx);
-                    }
-                    sample.stop(MetricsHelper.successTags(timer, s, "timeout").register(Metrics.globalRegistry));
-                    return s;
-                }
-
-                if (ctx.getMessage(PANIC) != null) {
-                    return s;
-                }
-
-                try {
-                    @SuppressWarnings("unchecked") S afterFile = (S) getVisitor().visit(s, ctx);
-                    if (afterFile != null && afterFile != s) {
-                        afterFile = afterFile.withMarkers(afterFile.getMarkers().computeByType(
-                                new RecipeThatMadeChanges(this),
-                                (r1, r2) -> {
-                                    r1.recipes.addAll(r2.recipes);
-                                    return r1;
-                                }));
-                        sample.stop(MetricsHelper.successTags(timer, s, "changed").register(Metrics.globalRegistry));
-                    } else if (afterFile == null) {
-                        recipeThatDeletedSourceFile.put(s.getId(), this);
-                        sample.stop(MetricsHelper.successTags(timer, s, "deleted").register(Metrics.globalRegistry));
-                    } else {
-                        sample.stop(MetricsHelper.successTags(timer, s, "unchanged").register(Metrics.globalRegistry));
-                    }
-                    return afterFile;
-                } catch (Throwable t) {
-                    sample.stop(MetricsHelper.errorTags(timer, s, t).register(Metrics.globalRegistry));
-                    ctx.getOnError().accept(t);
-                    return s;
-                }
-            });
-        }
-
-        // The type of the list is widened at this point, since a source file type may be generated that isn't
-        // of a type that is in the original set of source files (e.g. only XML files are given, and the
-        // recipe generates Java code).
-
-        //noinspection unchecked
-        List<SourceFile> afterWidened = visit((List<SourceFile>) after, ctx);
-
-        for (SourceFile maybeGenerated : afterWidened) {
-            if (!after.contains(maybeGenerated)) {
-                // a new source file generated
-                recipeThatDeletedSourceFile.put(maybeGenerated.getId(), this);
-            }
-        }
-
-        for (SourceFile maybeDeleted : after) {
-            if (!afterWidened.contains(maybeDeleted)) {
-                // a source file deleted
-                recipeThatDeletedSourceFile.put(maybeDeleted.getId(), this);
-            }
-        }
-
-        for (Recipe recipe : recipeList) {
-            if (ctx.getMessage(PANIC) != null) {
-                return afterWidened;
-            }
-            afterWidened = recipe.visitInternal(afterWidened, ctx, forkJoinPool, recipeThatDeletedSourceFile);
-        }
-
-        return afterWidened;
-    }
-
     /**
      * Override this to generate new source files or delete source files.
      *
@@ -353,76 +234,16 @@ public abstract class Recipe {
     }
 
     public final List<Result> run(List<? extends SourceFile> before, ExecutionContext ctx, int maxCycles) {
-        return run(before, ctx, ForkJoinPool.commonPool(), maxCycles, 1);
+        return run(before, ctx, ForkJoinScheduler.common(), maxCycles, 1);
     }
 
     @Incubating(since = "7.3.0")
     public final List<Result> run(List<? extends SourceFile> before,
                                   ExecutionContext ctx,
-                                  ForkJoinPool forkJoinPool,
+                                  RecipeScheduler recipeScheduler,
                                   int maxCycles,
                                   int minCycles) {
-        DistributionSummary.builder("rewrite.recipe.run")
-                .tag("recipe", getDisplayName())
-                .description("The distribution of recipe runs and the size of source file batches given to them to process.")
-                .baseUnit("source files")
-                .register(Metrics.globalRegistry)
-                .record(before.size());
-
-        Map<UUID, Recipe> recipeThatDeletedSourceFile = new HashMap<>();
-        List<? extends SourceFile> acc = before;
-        List<? extends SourceFile> after = acc;
-
-        WatchForNewMessageExecutionContext ctxWithWatch = new WatchForNewMessageExecutionContext(ctx);
-        for (int i = 0; i < maxCycles; i++) {
-            after = visitInternal(acc, ctxWithWatch, forkJoinPool, recipeThatDeletedSourceFile);
-            if (i + 1 >= minCycles && ((after == acc && !ctxWithWatch.needAnotherCycle) || !causesAnotherCycle())) {
-                break;
-            }
-            acc = after;
-            ctxWithWatch.needAnotherCycle = false;
-        }
-
-        if (after == before) {
-            return emptyList();
-        }
-
-        Map<UUID, SourceFile> sourceFileIdentities = before.stream()
-                .collect(toMap(SourceFile::getId, Function.identity()));
-
-        List<Result> results = new ArrayList<>();
-
-        // added or changed files
-        for (SourceFile s : after) {
-            SourceFile original = sourceFileIdentities.get(s.getId());
-            if (original != s) {
-                if (original == null) {
-                    results.add(new Result(null, s, singleton(recipeThatDeletedSourceFile.get(s.getId()))));
-                } else {
-                    //printing both the before and after (and including markers in the output) and then comparing the
-                    //output to determine if a change has been made.
-                    if (!original.print(MARKER_ID_PRINTER, ctx).equals(s.print(MARKER_ID_PRINTER, ctx))) {
-                        results.add(new Result(original, s, s.getMarkers()
-                                .findFirst(RecipeThatMadeChanges.class)
-                                .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe reported making a change?"))
-                                .recipes));
-                    }
-                }
-            }
-        }
-
-        Set<UUID> afterIds = after.stream()
-                .map(SourceFile::getId)
-                .collect(toSet());
-
-        // removed files
-        for (SourceFile s : before) {
-            if (!afterIds.contains(s.getId())) {
-                results.add(new Result(s, null, singleton(recipeThatDeletedSourceFile.get(s.getId()))));
-            }
-        }
-
-        return results;
+        return recipeScheduler.scheduleRun(this, before, ctx, maxCycles, minCycles);
     }
 
     @SuppressWarnings("unused")
@@ -473,16 +294,20 @@ public abstract class Recipe {
     }
 
     @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-    private static class RecipeThatMadeChanges implements Marker {
+    static class RecipeThatMadeChanges implements Marker {
         private final Set<Recipe> recipes;
 
         @EqualsAndHashCode.Include
         private final UUID id;
 
-        private RecipeThatMadeChanges(Recipe recipe) {
+        RecipeThatMadeChanges(Recipe recipe) {
             this.recipes = new LinkedHashSet<>();
             this.recipes.add(recipe);
             id = randomId();
+        }
+
+        public Set<Recipe> getRecipes() {
+            return recipes;
         }
 
         @Override
@@ -504,43 +329,4 @@ public abstract class Recipe {
         return Objects.hash(getName());
     }
 
-    private static class WatchForNewMessageExecutionContext implements ExecutionContext {
-        private boolean needAnotherCycle = false;
-        private final ExecutionContext delegate;
-
-        private WatchForNewMessageExecutionContext(ExecutionContext delegate) {
-            this.delegate = delegate;
-        }
-
-        @Override
-        public void putMessage(String key, Object value) {
-            needAnotherCycle = true;
-            delegate.putMessage(key, value);
-        }
-
-        @Override
-        public <T> @Nullable T getMessage(String key) {
-            return delegate.getMessage(key);
-        }
-
-        @Override
-        public <T> @Nullable T pollMessage(String key) {
-            return delegate.pollMessage(key);
-        }
-
-        @Override
-        public Consumer<Throwable> getOnError() {
-            return delegate.getOnError();
-        }
-
-        @Override
-        public BiConsumer<Throwable, ExecutionContext> getOnTimeout() {
-            return delegate.getOnTimeout();
-        }
-
-        @Override
-        public Duration getRunTimeout(int inputs) {
-            return delegate.getRunTimeout(inputs);
-        }
-    }
 }
