@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.RenameVariable;
 import org.openrewrite.java.tree.J;
@@ -54,6 +55,7 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
     }
 
     private static class RenameNonCompliantNames extends JavaIsoVisitor<ExecutionContext> {
+        private final Pattern namingConvention = Pattern.compile("^[a-z][a-zA-Z0-9]*$");
 
         @Override
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
@@ -66,12 +68,10 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
                     // Does not apply to one-character catch variables.
                     if (!((parentScope.getValue() instanceof J.Try.Catch || parentScope.getValue() instanceof J.MultiCatch) &&
                             variable.getSimpleName().length() == 1)) {
-                        // Regex to match java naming convention.
-                        Pattern pattern = Pattern.compile("^[a-z][a-zA-Z0-9]*$");
-                        if (!pattern.matcher(variable.getSimpleName()).matches()) {
+                        if (!namingConvention.matcher(variable.getSimpleName()).matches()) {
                             String toName = convertToCamelCase(variable.getSimpleName());
                             // An identifier does not exit in the class.
-                            if (findName(toName, getCursor()).isEmpty()) {
+                            if (findName(getCursor().firstEnclosing(J.CompilationUnit.class), toName).isEmpty()) {
                                 doAfterVisit(new RenameVariable<>(variable, toName));
                                 return variable;
                             }
@@ -85,7 +85,7 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
         /**
          * Finds identifiers with `toName`.
          */
-        private static Set<J.Identifier> findName(String toName, Cursor cursor) {
+        private static Set<J.Identifier> findName(@Nullable J j, String toName) {
             JavaIsoVisitor<Set<J.Identifier>> findNameVisitor = new JavaIsoVisitor<Set<J.Identifier>>() {
 
                 @Override
@@ -99,7 +99,7 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
             };
 
             Set<J.Identifier> identifiers = new HashSet<>();
-            findNameVisitor.visit(cursor.firstEnclosing(J.CompilationUnit.class), identifiers);
+            findNameVisitor.visit(j, identifiers);
             return identifiers;
         }
 

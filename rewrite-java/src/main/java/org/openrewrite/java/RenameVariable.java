@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
@@ -44,7 +45,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
-        if (!JavaKeywords.isReserved(toName) && variable.equals(this.variable)) {
+        if (!JavaKeywords.isReserved(toName) && !StringUtils.isBlank(toName) && variable.equals(this.variable)) {
             doAfterVisit(new RenameVariableByCursor(getCursor()));
             return variable;
         }
