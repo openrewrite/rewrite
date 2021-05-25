@@ -246,6 +246,10 @@ class Java11SimplifyBooleanReturnTest : Java11Test, SimplifyBooleanReturnTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11SonarQubeRSpec117Test : Java11Test, SonarQubeRSpec117Test
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11SpacesTest : Java11Test, SpacesTest
 
 @DebugOnly

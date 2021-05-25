@@ -20,6 +20,7 @@ dependencies {
     implementation("org.antlr:antlr4:4.8-1")
 
     implementation("commons-lang:commons-lang:latest.release")
+    implementation("org.apache.commons:commons-text:latest.release")
 
     api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
 

@@ -246,6 +246,10 @@ class Java8SimplifyBooleanReturnTest : Java8Test, SimplifyBooleanReturnTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8SonarQubeRSpec117Test : Java8Test, SonarQubeRSpec117Test
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8SpacesTest : Java8Test, SpacesTest
 
 @DebugOnly

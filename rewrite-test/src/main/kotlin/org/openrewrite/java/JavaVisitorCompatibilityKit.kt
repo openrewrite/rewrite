@@ -196,6 +196,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class SimplifyBooleanReturnTck : SimplifyBooleanReturnTest
 
     @Nested
+    inner class SonarQubeRSpec117Tck : SonarQubeRSpec117Test
+
+    @Nested
     inner class SpacesTck : SpacesTest
 
     @Nested
