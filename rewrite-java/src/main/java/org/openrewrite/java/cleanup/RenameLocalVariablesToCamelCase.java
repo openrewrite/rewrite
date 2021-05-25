@@ -45,7 +45,7 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Renames local variables and method parameters to java camel case naming convention.";
+        return "Reformat local variable and method parameter names to camelCase to comply with Java naming convention.";
     }
 
     @Override
