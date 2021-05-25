@@ -24,7 +24,7 @@ import java.util.concurrent.ForkJoinPool;
 
 @RequiredArgsConstructor
 public class ForkJoinScheduler implements RecipeScheduler {
-    private static final ForkJoinScheduler COMMON_SCHEDULER = new ForkJoinScheduler(ForkJoinPool.commonPool());
+    private static final ForkJoinScheduler COMMON_SCHEDULER = new ForkJoinScheduler(new ForkJoinPool((int) (Runtime.getRuntime().availableProcessors() * 1.25)));
 
     private final ForkJoinPool forkJoinPool;
 
@@ -39,8 +39,8 @@ public class ForkJoinScheduler implements RecipeScheduler {
             try {
                 T obj = fn.call();
                 f.complete(obj);
-            } catch (Exception e) {
-                f.completeExceptionally(e);
+            } catch (Throwable t) {
+                f.completeExceptionally(t);
             }
         });
         return f;
