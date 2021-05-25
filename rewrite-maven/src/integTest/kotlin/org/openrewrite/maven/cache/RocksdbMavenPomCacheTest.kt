@@ -182,9 +182,7 @@ class RocksdbMavenPomCacheTest {
                 """
         //This is not much of a test, it just ensures the maven parser works correctly with the rocksdb caching
         //implementation. This does work as a good place to experiment with the various configuration settings.
-        val workspace = File(System.getProperty("user.home") + "/.rewrite/cache/pom")
-
-        val mavenCache = RocksdbMavenPomCache(workspace)
+        val mavenCache = RocksdbMavenPomCache("pom")
         val pomAst = MavenParser.builder()
             .cache(mavenCache)
             .build()

@@ -26,6 +26,7 @@ import com.fasterxml.jackson.dataformat.smile.SmileFactory;
 import com.fasterxml.jackson.dataformat.smile.SmileGenerator;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+import org.apache.commons.io.FileUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenMetadata;
 import org.openrewrite.maven.internal.MavenPomDownloader;
@@ -103,22 +104,23 @@ public class RocksdbMavenPomCache implements MavenPomCache {
     CacheResult<MavenMetadata> UNAVAILABLE_METADATA = new CacheResult<>(CacheResult.State.Unavailable, null);
     CacheResult<MavenRepository> UNAVAILABLE_REPOSITORY = new CacheResult<>(CacheResult.State.Unavailable, null);
 
-    public RocksdbMavenPomCache(@Nullable File workspace) {
+    public RocksdbMavenPomCache(@Nullable String folder) {
 
-        assert workspace != null;
+        assert folder != null;
 
-        if(!workspace.exists() && !workspace.mkdirs()) {
-            throw new IllegalStateException("Unable to find or create maven pom cache at " + workspace);
-        } else if (!workspace.isDirectory()) {
+        File relativePath = new File(System.getProperty("user.home") + "/.rewrite/cache/" + folder);
+        if(!relativePath.exists() && !relativePath.mkdirs()) {
+            throw new IllegalStateException("Unable to find or create maven pom cache at " + folder);
+        } else if (!relativePath.isDirectory()) {
             throw new IllegalStateException("The maven cache workspace must be a directory");
         }
         // In case a stale lock file is left over from a previous run that was interrupted
-        File lock = new File(workspace, "LOCK");
+        File lock = new File(folder, "LOCK");
         if(lock.exists()) {
             //noinspection ResultOfMethodCallIgnored
             lock.delete();
         }
-        cache = getCache(workspace.getAbsolutePath());
+        cache = getCache(relativePath.getAbsolutePath());
         fillUnresolvablePoms();
     }
 
@@ -157,7 +159,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         }
 
         byte[] key = serialize(repo.toString() + ":" + artifactCoordinates);
-        Optional<RawMaven> rawMavenEntry = null;
+        Optional<RawMaven> rawMavenEntry;
         rawMavenEntry = deserializeRawMaven(cache.get(key));
 
         //noinspection OptionalAssignedToNull
@@ -189,7 +191,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
             //a null is a cache miss
             try {
                 MavenRepository mavenRepository = orElseGet.call();
-                //Note: we store an empty optional in the cahce if not resolved
+                //Note: we store an empty optional in the cache if not resolved
                 cache.put(key, serialize(Optional.ofNullable(mavenRepository)));
                 return new CacheResult<>(CacheResult.State.Updated, mavenRepository);
             } catch (Exception e) {
@@ -294,8 +296,26 @@ public class RocksdbMavenPomCache implements MavenPomCache {
                 writeOptions = new WriteOptions();
                 writeOptions.setDisableWAL(true);
                 database = RocksDB.open(options, workspace);
+                verifyCache(workspace);
             } catch (RocksDBException exception) {
                 throw new IllegalStateException("Unable to create cache database." + exception.getMessage(), exception);
+            }
+        }
+
+        private void verifyCache(String workspace) {
+            try {
+                database.verifyChecksum();
+            } catch (RocksDBException ex){
+                if (ex.getMessage().contains("block checksum mismatch")) {
+                    File workDirectory = new File(workspace);
+                    Collection<File> caches = FileUtils.listFiles(workDirectory, null, false);
+                    if (!workDirectory.exists() && !workDirectory.mkdirs()) {
+                        throw new IllegalStateException("Unable to find or create maven pom cache at " + workspace);
+                    } else if (!workDirectory.isDirectory()) {
+                        throw new IllegalStateException("The maven cache workspace must be a directory");
+                    }
+                    caches.forEach(FileUtils::deleteQuietly);
+                }
             }
         }
 

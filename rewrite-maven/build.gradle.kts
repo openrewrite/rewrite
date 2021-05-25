@@ -31,6 +31,7 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:latest.release")
 
     implementation("org.apache.commons:commons-text:latest.release")
+    implementation("commons-io:commons-io:latest.release")
 
     integTestImplementation("org.eclipse.aether:aether-api:latest.release")
     integTestImplementation("org.eclipse.aether:aether-spi:latest.release")
