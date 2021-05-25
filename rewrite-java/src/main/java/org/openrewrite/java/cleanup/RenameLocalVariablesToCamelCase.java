@@ -71,7 +71,7 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
                     hasNameSet.add(value);
                 }
             });
-            return super.visitCompilationUnit(cu, ctx);
+            return cu;
         }
 
         @SuppressWarnings("all")
