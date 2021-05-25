@@ -97,8 +97,7 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
 
             if (!namingConvention.matcher(variable.getSimpleName()).matches()) {
                 String toName = convertToCamelCase(variable.getSimpleName());
-                ((Map<J.VariableDeclarations.NamedVariable, String>) getCursor().dropParentUntil(J.CompilationUnit.class::isInstance)
-                        .getNearestMessage("RENAME_VARIABLES_KEY")).put(variable, toName);
+                ((Map<J.VariableDeclarations.NamedVariable, String>) getCursor().getNearestMessage("RENAME_VARIABLES_KEY")).put(variable, toName);
             }
             return super.visitVariable(variable, ctx);
         }
@@ -106,8 +105,7 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
         @SuppressWarnings("all")
         @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
-            ((Set<String>) getCursor().dropParentUntil(J.CompilationUnit.class::isInstance)
-                    .getNearestMessage("HAS_NAME_KEY")).add(identifier.getSimpleName());
+            ((Set<String>) getCursor().getNearestMessage("HAS_NAME_KEY")).add(identifier.getSimpleName());
 
             return super.visitIdentifier(identifier, ctx);
         }
