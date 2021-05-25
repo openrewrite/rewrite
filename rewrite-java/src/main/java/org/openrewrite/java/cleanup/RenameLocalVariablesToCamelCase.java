@@ -20,6 +20,8 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.RenameVariable;
 import org.openrewrite.java.tree.J;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -69,7 +71,7 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
                         if (!pattern.matcher(variable.getSimpleName()).matches()) {
                             String toName = convertToCamelCase(variable.getSimpleName());
                             // An identifier does not exit in the class.
-                            if (!toNameFound(toName, getCursor(), ctx)) {
+                            if (findName(toName, getCursor()).isEmpty()) {
                                 doAfterVisit(new RenameVariable<>(variable, toName));
                                 return variable;
                             }
@@ -79,86 +81,85 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
             }
             return super.visitVariable(variable, ctx);
         }
-    }
 
-    private static boolean toNameFound(String toName, Cursor cursor, ExecutionContext ctx) {
-        new FindName(toName).visit(cursor.firstEnclosing(J.CompilationUnit.class), ctx);
-        return ctx.getMessage("NAME_FOUND_KEY") != null;
-    }
+        /**
+         * Finds identifiers with `toName`.
+         */
+        private static Set<J.Identifier> findName(String toName, Cursor cursor) {
+            JavaIsoVisitor<Set<J.Identifier>> findNameVisitor = new JavaIsoVisitor<Set<J.Identifier>>() {
 
-    private static class FindName extends JavaIsoVisitor<ExecutionContext> {
-        private final String name;
-
-        public FindName(String name) {
-            this.name = name;
-        }
-
-        @Override
-        public J.Identifier visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
-            String nameFoundKey = "NAME_FOUND_KEY";
-            if (ctx.getMessage(nameFoundKey) == null && ident.getSimpleName().equals(name)) {
-                ctx.putMessage(nameFoundKey, true);
-            }
-            return super.visitIdentifier(ident, ctx);
-        }
-    }
-
-    /**
-     * Returns either the current block or a J.Type that may create a reference to a variable.
-     * I.E. for(int target = 0; target < N; target++) creates a new name scope for `target`.
-     * The name scope in the next J.Block `{}` cannot create new variables with the name `target`.
-     * <p>
-     * J.* types that may only reference an existing name and do not create a new name scope are excluded.
-     */
-    private static Cursor getCursorToParentScope(Cursor cursor) {
-        return cursor.dropParentUntil(is ->
-                is instanceof J.Block ||
-                        is instanceof J.MethodDeclaration ||
-                        is instanceof J.ForLoop ||
-                        is instanceof J.ForEachLoop ||
-                        is instanceof J.ForLoop.Control ||
-                        is instanceof J.Case ||
-                        is instanceof J.Try ||
-                        is instanceof J.Try.Catch ||
-                        is instanceof J.MultiCatch ||
-                        is instanceof J.Lambda
-        );
-    }
-
-    /**
-     * Renames `oldName` to java camel case naming convention.
-     * - The first character will be lower case.
-     * - Preserves other existing capitalized characters.
-     * - Special characters `$` and `_` will be removed.
-     *      - If a special character is removed the following alphanumeric will be capitalized.
-     */
-    private static String convertToCamelCase(String oldName) {
-        StringBuilder builder = new StringBuilder();
-        boolean setCaps = false;
-        for (int i = 0; i < oldName.length(); i++) {
-            char c = oldName.charAt(i);
-            switch (c) {
-                case '$':
-                case '_':
-                    if (builder.length() > 0) {
-                        setCaps = true;
+                @Override
+                public J.Identifier visitIdentifier(J.Identifier ident, Set<J.Identifier> identifiers) {
+                    // The matching condition is short-circuited to prevent all identifiers from being found.
+                    if (identifiers.isEmpty() && ident.getSimpleName().equals(toName)) {
+                        identifiers.add(ident);
                     }
-                    continue;
-                default:
-                    break;
-            }
+                    return super.visitIdentifier(ident, identifiers);
+                }
+            };
 
-            if (builder.length() == 0) {
-                builder.append(String.valueOf(oldName.charAt(i)).toLowerCase());
-            } else {
-                if (setCaps) {
-                    builder.append(String.valueOf(oldName.charAt(i)).toUpperCase());
-                    setCaps = false;
+            Set<J.Identifier> identifiers = new HashSet<>();
+            findNameVisitor.visit(cursor.firstEnclosing(J.CompilationUnit.class), identifiers);
+            return identifiers;
+        }
+
+        /**
+         * Returns either the current block or a J.Type that may create a reference to a variable.
+         * I.E. for(int target = 0; target < N; target++) creates a new name scope for `target`.
+         * The name scope in the next J.Block `{}` cannot create new variables with the name `target`.
+         * <p>
+         * J.* types that may only reference an existing name and do not create a new name scope are excluded.
+         */
+        private static Cursor getCursorToParentScope(Cursor cursor) {
+            return cursor.dropParentUntil(is ->
+                    is instanceof J.Block ||
+                            is instanceof J.MethodDeclaration ||
+                            is instanceof J.ForLoop ||
+                            is instanceof J.ForEachLoop ||
+                            is instanceof J.ForLoop.Control ||
+                            is instanceof J.Case ||
+                            is instanceof J.Try ||
+                            is instanceof J.Try.Catch ||
+                            is instanceof J.MultiCatch ||
+                            is instanceof J.Lambda
+            );
+        }
+
+        /**
+         * Renames `oldName` to java camel case naming convention.
+         * - The first character will be lower case.
+         * - Preserves other existing capitalized characters.
+         * - Special characters `$` and `_` will be removed.
+         *      - If a special character is removed the following alphanumeric will be capitalized.
+         */
+        private static String convertToCamelCase(String oldName) {
+            StringBuilder builder = new StringBuilder();
+            boolean setCaps = false;
+            for (int i = 0; i < oldName.length(); i++) {
+                char c = oldName.charAt(i);
+                switch (c) {
+                    case '$':
+                    case '_':
+                        if (builder.length() > 0) {
+                            setCaps = true;
+                        }
+                        continue;
+                    default:
+                        break;
+                }
+
+                if (builder.length() == 0) {
+                    builder.append(String.valueOf(oldName.charAt(i)).toLowerCase());
                 } else {
-                    builder.append(oldName.charAt(i));
+                    if (setCaps) {
+                        builder.append(String.valueOf(oldName.charAt(i)).toUpperCase());
+                        setCaps = false;
+                    } else {
+                        builder.append(oldName.charAt(i));
+                    }
                 }
             }
+            return builder.toString();
         }
-        return builder.toString();
     }
 }
