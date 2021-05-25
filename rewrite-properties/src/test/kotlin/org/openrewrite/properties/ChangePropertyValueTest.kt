@@ -22,7 +22,8 @@ class ChangePropertyValueTest : PropertiesRecipeTest {
 
     override val recipe = ChangePropertyValue(
         "management.metrics.binders.files.enabled",
-        "false"
+        "false",
+        null
     )
 
     @Test
@@ -32,29 +33,48 @@ class ChangePropertyValueTest : PropertiesRecipeTest {
         after = "management.metrics.binders.files.enabled=false"
     )
 
+    @Test
+    fun conditionallyChangeValue() = assertChanged(
+        parser = PropertiesParser(),
+        recipe = ChangePropertyValue("quarkus.quartz.store-type","jdbc-cmt","db"),
+        before = "quarkus.quartz.store-type=db",
+        after = "quarkus.quartz.store-type=jdbc-cmt"
+    )
+
+    @Test
+    fun conditionallyChangeValueNoChange() = assertUnchanged(
+        parser = PropertiesParser(),
+        recipe = ChangePropertyValue("quarkus.quartz.store-type","jdbc-cmt","cache"),
+        before = "quarkus.quartz.store-type=db"
+    )
+
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = ChangePropertyValue(null, null)
+        var recipe = ChangePropertyValue(null, null, null)
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("newValue")
         assertThat(valid.failures()[1].property).isEqualTo("propertyKey")
 
-        recipe = ChangePropertyValue(null, "false")
+        recipe = ChangePropertyValue(null, "false", null)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("propertyKey")
 
-        recipe = ChangePropertyValue("management.metrics.binders.files.enabled", null)
+        recipe = ChangePropertyValue("management.metrics.binders.files.enabled", null, null)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("newValue")
 
-        recipe = ChangePropertyValue("management.metrics.binders.files.enabled", "false")
+        recipe = ChangePropertyValue("management.metrics.binders.files.enabled", "false", null)
+        valid = recipe.validate()
+        assertThat(valid.isValid).isTrue()
+
+        recipe = ChangePropertyValue("management.metrics.binders.files.enabled", "false", "true")
         valid = recipe.validate()
         assertThat(valid.isValid).isTrue()
     }
