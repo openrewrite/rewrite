@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
 
 @Value
@@ -34,6 +35,13 @@ public class ChangePropertyValue extends Recipe {
     @Option(displayName = "New value",
             example = "false")
     String newValue;
+
+    @Option(displayName = "Old value",
+            example = "true",
+            required = false,
+            description = "Only change the property value if it matches the configured `oldValue`.")
+    @Nullable
+    String oldValue;
 
     @Override
     public String getDisplayName() {
@@ -57,8 +65,11 @@ public class ChangePropertyValue extends Recipe {
 
         @Override
         public Properties visitEntry(Properties.Entry entry, P p) {
-            if (entry.getKey().equals(propertyKey) && !entry.getValue().getText().equals(newValue)) {
-                entry = entry.withValue(entry.getValue().withText(newValue));
+            if (entry.getKey().equals(propertyKey)) {
+                if (oldValue == null && !entry.getValue().getText().equals(newValue)
+                        || (oldValue != null && oldValue.equals(entry.getValue().getText()))) {
+                    entry = entry.withValue(entry.getValue().withText(newValue));
+                }
             }
             return super.visitEntry(entry, p);
         }
