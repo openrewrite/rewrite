@@ -23,6 +23,7 @@ import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
+import java.util.concurrent.ForkJoinPool
 
 interface RecipeTest {
     val recipe: Recipe?
@@ -72,7 +73,7 @@ interface RecipeTest {
             .isEqualTo(inputs.size)
 
         val recipeSchedulerCheckingExpectedCycles =
-            RecipeSchedulerCheckingExpectedCycles(ForkJoinScheduler.common(), expectedCyclesThatMakeChanges)
+            RecipeSchedulerCheckingExpectedCycles(ForkJoinScheduler(ForkJoinPool(1)), expectedCyclesThatMakeChanges)
 
         var results = recipe.run(
                 sources,
