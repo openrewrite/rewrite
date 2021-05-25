@@ -21,8 +21,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.RenameVariable;
 import org.openrewrite.java.tree.J;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Pattern;
 
 /**
@@ -58,49 +57,59 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
         private final Pattern namingConvention = Pattern.compile("^[a-z][a-zA-Z0-9]*$");
 
         @Override
+        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+            Map<J.VariableDeclarations.NamedVariable, String> renameVariablesMap = new LinkedHashMap<>();
+            Set<String> hasNameSet = new HashSet<>();
+
+            getCursor().putMessage("RENAME_VARIABLES_KEY", renameVariablesMap);
+            getCursor().putMessage("HAS_NAME_KEY", hasNameSet);
+            super.visitCompilationUnit(cu, ctx);
+
+            renameVariablesMap.forEach((key, value) -> {
+                if (!hasNameSet.contains(value)) {
+                    doAfterVisit(new RenameVariable<>(key, value));
+                    hasNameSet.add(value);
+                }
+            });
+            return super.visitCompilationUnit(cu, ctx);
+        }
+
+        @SuppressWarnings("all")
+        @Override
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
             Cursor parentScope = getCursorToParentScope(getCursor());
 
             // Does not currently support renaming fields in a J.ClassDeclaration.
-            if (!(parentScope.getParent() != null && parentScope.getParent().getValue() instanceof J.ClassDeclaration)) {
-                // Does not apply to loop counters.
-                if (!(parentScope.getValue() instanceof J.ForLoop.Control)) {
-                    // Does not apply to one-character catch variables.
-                    if (!((parentScope.getValue() instanceof J.Try.Catch || parentScope.getValue() instanceof J.MultiCatch) &&
-                            variable.getSimpleName().length() == 1)) {
-                        if (!namingConvention.matcher(variable.getSimpleName()).matches()) {
-                            String toName = convertToCamelCase(variable.getSimpleName());
-                            // An identifier does not exit in the class.
-                            if (findName(getCursor().firstEnclosing(J.CompilationUnit.class), toName).isEmpty()) {
-                                doAfterVisit(new RenameVariable<>(variable, toName));
-                                return variable;
-                            }
-                        }
-                    }
-                }
+            if (parentScope.getParent() != null && parentScope.getParent().getValue() instanceof J.ClassDeclaration) {
+                return variable;
+            }
+
+            // Does not apply to loop counters.
+            if (parentScope.getValue() instanceof J.ForLoop.Control) {
+                return variable;
+            }
+
+            // Does not apply to one-character catch variables.
+            if ((parentScope.getValue() instanceof J.Try.Catch || parentScope.getValue() instanceof J.MultiCatch) &&
+                    variable.getSimpleName().length() == 1) {
+                return variable;
+            }
+
+            if (!namingConvention.matcher(variable.getSimpleName()).matches()) {
+                String toName = convertToCamelCase(variable.getSimpleName());
+                ((Map<J.VariableDeclarations.NamedVariable, String>) getCursor().dropParentUntil(J.CompilationUnit.class::isInstance)
+                        .getNearestMessage("RENAME_VARIABLES_KEY")).put(variable, toName);
             }
             return super.visitVariable(variable, ctx);
         }
 
-        /**
-         * Finds identifiers with `toName`.
-         */
-        private static Set<J.Identifier> findName(@Nullable J j, String toName) {
-            JavaIsoVisitor<Set<J.Identifier>> findNameVisitor = new JavaIsoVisitor<Set<J.Identifier>>() {
+        @SuppressWarnings("all")
+        @Override
+        public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+            ((Set<String>) getCursor().dropParentUntil(J.CompilationUnit.class::isInstance)
+                    .getNearestMessage("HAS_NAME_KEY")).add(identifier.getSimpleName());
 
-                @Override
-                public J.Identifier visitIdentifier(J.Identifier ident, Set<J.Identifier> identifiers) {
-                    // The matching condition is short-circuited to prevent all identifiers from being found.
-                    if (identifiers.isEmpty() && ident.getSimpleName().equals(toName)) {
-                        identifiers.add(ident);
-                    }
-                    return super.visitIdentifier(ident, identifiers);
-                }
-            };
-
-            Set<J.Identifier> identifiers = new HashSet<>();
-            findNameVisitor.visit(j, identifiers);
-            return identifiers;
+            return super.visitIdentifier(identifier, ctx);
         }
 
         /**
