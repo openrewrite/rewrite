@@ -20,35 +20,76 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.yaml.tree.Yaml
 
-class SequenceTest {
+class SequenceTest: YamlParserTest {
 
     @Test
-    fun blockSequence() {
-        val yText = """
-            - apples
-            - oranges
-        """.trimIndent()
-
-        val y = YamlParser().parse(yText)[0]
-
-        assertThat((y.documents[0].block as Yaml.Sequence).entries.map { it.block }.map { it as Yaml.Scalar }.map { it.value })
-            .containsExactly("apples", "oranges")
-
-        assertThat(y.printTrimmed()).isEqualTo(yText)
-    }
+    fun blockSequence() = assertRoundTrip(
+            source = """
+                - apples
+                - oranges
+            """,
+            afterConditions = { y ->
+                assertThat((y.documents[0].block as Yaml.Sequence).entries.map { it.block }.map { it as Yaml.Scalar }.map { it.value })
+                        .containsExactly("apples", "oranges")
+            }
+    )
 
     @Test
-    fun blockSequenceOfMappings() {
-        val yamlText = """
+    fun blockSequenceOfMappings() = assertRoundTrip("""
             - name: Fred
               age: 45
             - name: Barney
               age: 25
-        """.trimIndent()
-        val y = YamlParser().parse(
-            InMemoryExecutionContext { t -> t.printStackTrace() },
-            yamlText
-        )[0]
-        assertThat(y.printTrimmed()).isEqualTo(yamlText)
-    }
+    """)
+
+    @Test
+    fun multiLineInlineSequenceWithFunnyIndentation() = assertRoundTrip("""
+            [
+                a, 
+            b,
+                    c,
+            ]
+    """)
+
+
+    @Test
+    fun sequenceOfEmptyInlineSequence() = assertRoundTrip("- []")
+
+    @Test
+    fun sequenceOfMapOfEmptyInlineSequence() = assertRoundTrip("- foo: []")
+
+
+    @Test
+    fun sequenceOfInlineSequence() = assertRoundTrip("- [a, b]")
+
+    @Test
+    fun sequenceOfMapOfInlineSequence() = assertRoundTrip("- foo: [a, b]")
+
+    @Test
+    fun sequencesOfSequencesOfSequences() = assertRoundTrip("""
+        [[],
+        [1, 2, 3, []],
+        [ [ ] ],]
+    """)
+
+    @Test
+    fun sequenceOfMixedSequences() = assertRoundTrip("""
+        - []
+        - [ 1 ]
+        - foo: []
+        - bar:
+        - baz: [
+            a]
+    """)
+
+    @Test
+    fun inlineSequenceWithWhitespaceBeforeCommas() = assertRoundTrip(
+            source = "[1 ,2  ,0]",
+            afterConditions = { y ->
+                val seq = y.documents.first().block as Yaml.Sequence
+                assertThat(seq.entries[0].trailingCommaPrefix).isEqualTo(" ")
+                assertThat(seq.entries[1].trailingCommaPrefix).isEqualTo("  ")
+                assertThat(seq.entries[2].trailingCommaPrefix).isNull()
+            }
+    )
 }

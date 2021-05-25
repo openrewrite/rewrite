@@ -87,8 +87,9 @@ public class YamlPrinter<P> extends YamlVisitor<P> {
             acc.append("---");
         }
         visit(document.getBlock(), p);
-        if (document.getEnd() != null) {
-            acc.append(document.getEnd().getPrefix()).append("...");
+        acc.append(document.getEnd().getPrefix());
+        if(document.getEnd().isExplicit()) {
+            acc.append("...");
         }
         return document;
     }
@@ -103,8 +104,14 @@ public class YamlPrinter<P> extends YamlVisitor<P> {
     @Override
     public Yaml visitSequenceEntry(Yaml.Sequence.Entry entry, P p) {
         StringBuilder acc = getPrinter();
-        acc.append(entry.getPrefix()).append('-');
+        acc.append(entry.getPrefix());
+        if(entry.isDash()) {
+            acc.append('-');
+        }
         visit(entry.getBlock(), p);
+        if(entry.getTrailingCommaPrefix() != null) {
+            acc.append(entry.getTrailingCommaPrefix()).append(',');
+        }
         return entry;
     }
 
@@ -112,7 +119,15 @@ public class YamlPrinter<P> extends YamlVisitor<P> {
     public Yaml visitSequence(Yaml.Sequence sequence, P p) {
         getPrinter().append(sequence.getPrefix());
         visitMarkers(sequence.getMarkers(), p);
-        return super.visitSequence(sequence, p);
+        if(sequence.getOpeningBracketPrefix() != null) {
+            getPrinter().append(sequence.getOpeningBracketPrefix()).append('[');
+        }
+        Yaml result = super.visitSequence(sequence, p);
+        if(sequence.getClosingBracketPrefix() != null) {
+            getPrinter().append(sequence.getClosingBracketPrefix()).append(']');
+        }
+
+        return result;
     }
 
     @Override
