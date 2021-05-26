@@ -196,6 +196,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class SimplifyBooleanReturnTck : SimplifyBooleanReturnTest
 
     @Nested
+    inner class RenameLocalVariablesToCamelCaseTck : RenameLocalVariablesToCamelCaseTest
+
+    @Nested
     inner class SpacesTck : SpacesTest
 
     @Nested
