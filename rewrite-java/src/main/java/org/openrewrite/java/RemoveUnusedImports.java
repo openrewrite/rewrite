@@ -167,7 +167,7 @@ public class RemoveUnusedImports extends Recipe {
             @Override
             public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Map<String, Set<JavaType.FullyQualified>> ctx) {
                 JavaType.FullyQualified targetClass = TypeUtils.asFullyQualified(fieldAccess.getTarget().getType());
-                if (targetClass != null && fieldAccess.getName().getSimpleName().equals("class")) {
+                if (targetClass != null) {
                     ctx.computeIfAbsent(targetClass.getPackageName(), t -> new HashSet<>()).add(targetClass);
                 }
                 return super.visitFieldAccess(fieldAccess, ctx);

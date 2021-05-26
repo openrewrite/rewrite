@@ -256,4 +256,17 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
             import foo.Foo;
         """
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/580")
+    @Test
+    fun resultSetType() = assertUnchanged(
+        recipe = RemoveUnusedImports(),
+        before = """
+            import java.sql.ResultSet;
+            public class A {
+                int t = ResultSet.TYPE_FORWARD_ONLY;
+            }
+        """
+    )
+
 }
