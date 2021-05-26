@@ -16,8 +16,10 @@
 package org.openrewrite.maven
 
 import org.assertj.core.api.Assertions
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.openrewrite.Issue
 import java.nio.file.Path
 
 class UpgradeDependencyVersionTest : MavenRecipeTest {
@@ -95,6 +97,65 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                   <version>1.5.22.RELEASE</version>
                 </dependency>
               </dependencies>
+            </project>
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/565")
+    @Disabled
+    fun handlesPropertiesInDependencyGroupIdAndArtifactId() = assertChanged(
+        recipe = UpgradeDependencyVersion(
+            "org.springframework.boot",
+            null,
+            "~1.5",
+            null,
+            null
+        ),
+        before = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <properties>
+                    <dependency.group-id>org.springframework.boot</dependency.group-id>
+                    <dependency.artifact-id>spring-boot</dependency.artifact-id>
+                    <dependency.version>1.5.1.RELEASE</dependency.version>
+                </properties>
+
+                <dependencies>
+                    <dependency>
+                        <groupId>${"$"}{dependency.group-id}</groupId>
+                        <artifactId>${"$"}{dependency.artifact-id}</artifactId>
+                        <version>${"$"}{dependency.version}</version>
+                    </dependency>
+                </dependencies>
+            </project>
+        """,
+        after = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <properties>
+                    <dependency.group-id>org.springframework.boot</dependency.group-id>
+                    <dependency.artifact-id>spring-boot</dependency.artifact-id>
+                    <dependency.version>1.5.22.RELEASE</dependency.version>
+                </properties>
+
+                <dependencies>
+                    <dependency>
+                        <groupId>${"$"}{dependency.group-id}</groupId>
+                        <artifactId>${"$"}{dependency.artifact-id}</artifactId>
+                        <version>${"$"}{dependency.version}</version>
+                    </dependency>
+                </dependencies>
             </project>
         """
     )
