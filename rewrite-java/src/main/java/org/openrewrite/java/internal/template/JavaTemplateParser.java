@@ -32,12 +32,12 @@ import static java.util.Collections.singletonList;
 public class JavaTemplateParser {
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("#{", "}", null);
 
-    private static final LinkedHashMap<String, List<? extends J>> templateCache = new LinkedHashMap<String, List<? extends J>>() {
+    private static final Map<String, List<? extends J>> templateCache = Collections.synchronizedMap(new LinkedHashMap<String, List<? extends J>>() {
         @Override
         protected boolean removeEldestEntry(Map.Entry eldest) {
             return size() > 10_000;
         }
-    };
+    });
 
     public static final String PACKAGE_STUB = "package #{}; class $Template {}";
     public static final String PARAMETER_STUB = "abstract class $Template { abstract void $template(#{}); }";
