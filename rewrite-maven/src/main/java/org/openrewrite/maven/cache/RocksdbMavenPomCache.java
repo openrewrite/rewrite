@@ -109,7 +109,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
 
         assert workspace != null;
 
-        File relativePath = new File( workspace + "/.pom");
+        File pomCacheDir = new File( workspace.toFile(), ".pom");
         if(!relativePath.exists() && !relativePath.mkdirs()) {
             throw new IllegalStateException("Unable to find or create maven pom cache at " + relativePath);
         } else if (!relativePath.isDirectory()) {
