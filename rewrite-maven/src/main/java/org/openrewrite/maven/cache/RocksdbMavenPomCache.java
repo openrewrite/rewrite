@@ -110,18 +110,18 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         assert workspace != null;
 
         File pomCacheDir = new File( workspace.toFile(), ".pom");
-        if(!relativePath.exists() && !relativePath.mkdirs()) {
-            throw new IllegalStateException("Unable to find or create maven pom cache at " + relativePath);
-        } else if (!relativePath.isDirectory()) {
-            throw new IllegalStateException("The maven cache workspace must be a directory");
+        if(!pomCacheDir.exists() && !pomCacheDir.mkdirs()) {
+            throw new IllegalStateException("Unable to find or create maven pom cache at " + pomCacheDir);
+        } else if (!pomCacheDir.isDirectory()) {
+            throw new IllegalStateException("The maven pom cache workspace must be a directory at " + pomCacheDir);
         }
         // In case a stale lock file is left over from a previous run that was interrupted
-        File lock = new File(relativePath, "LOCK");
+        File lock = new File(pomCacheDir, "LOCK");
         if(lock.exists()) {
             //noinspection ResultOfMethodCallIgnored
             lock.delete();
         }
-        cache = getCache(relativePath.getAbsolutePath());
+        cache = getCache(pomCacheDir.getAbsolutePath());
         fillUnresolvablePoms();
     }
 
@@ -302,13 +302,13 @@ public class RocksdbMavenPomCache implements MavenPomCache {
             }
 
             try {
-                verifyCache(workspace);
+                cleanCacheIfCorrupt(workspace);
             } catch (Exception ex) {
-                throw new IllegalStateException("Unable to clear corrupt cache.", ex);
+                throw new IllegalStateException("Unable to clear corrupt maven pom cache.", ex);
             }
         }
 
-        private void verifyCache(String workspace) throws IOException {
+        private void cleanCacheIfCorrupt(String workspace) throws IOException {
             try {
                 database.verifyChecksum();
             } catch (RocksDBException ex){
@@ -318,8 +318,8 @@ public class RocksdbMavenPomCache implements MavenPomCache {
                         paths.forEach(path -> {
                             try {
                                 Files.delete(path);
-                            } catch (IOException x) {
-                                throw new IllegalStateException("Unable to delete file.", x);
+                            } catch (IOException ioException) {
+                                throw new IllegalStateException("Unable to delete maven pom cache at " + path, ioException);
                             }
                         });
                     }
