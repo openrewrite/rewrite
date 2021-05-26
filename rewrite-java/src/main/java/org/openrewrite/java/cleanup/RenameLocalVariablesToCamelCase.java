@@ -99,7 +99,7 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
                 String toName = convertToCamelCase(variable.getSimpleName());
                 ((Map<J.VariableDeclarations.NamedVariable, String>) getCursor().getNearestMessage("RENAME_VARIABLES_KEY")).put(variable, toName);
             }
-            return super.visitVariable(variable, ctx);
+            return variable;
         }
 
         @SuppressWarnings("all")
@@ -107,7 +107,7 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
         public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
             ((Set<String>) getCursor().getNearestMessage("HAS_NAME_KEY")).add(identifier.getSimpleName());
 
-            return super.visitIdentifier(identifier, ctx);
+            return identifier;
         }
 
         /**
