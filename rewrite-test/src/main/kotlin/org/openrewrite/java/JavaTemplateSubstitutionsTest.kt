@@ -119,7 +119,9 @@ interface JavaTemplateSubstitutionsTest : JavaRecipeTest {
     fun annotation(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("#{} void test2() {}").build()
+            val t = template("#{} void test2() {}")
+                .javaParser { JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true).build() }
+                .build()
 
             override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
                 if (method.simpleName == "test") {

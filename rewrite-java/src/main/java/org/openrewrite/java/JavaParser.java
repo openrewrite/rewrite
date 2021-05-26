@@ -137,7 +137,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     @SuppressWarnings("unchecked")
     abstract class Builder<P extends JavaParser, B extends Builder<P, B>> {
         @Nullable
-        protected Collection<Path> classpath = runtimeClasspath;
+        protected Collection<Path> classpath = Collections.emptyList();
 
         protected Collection<byte[]> classBytesClasspath = Collections.emptyList();
 

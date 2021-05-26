@@ -154,7 +154,7 @@ public class Substitutions {
     private String substituteSingle(Object parameter, int index) {
         if (parameter instanceof J) {
             if (parameter instanceof J.Annotation) {
-                return "@org.openrewrite.java.internal.template.SubAnnotation(" + index + ")";
+                return "@SubAnnotation(" + index + ")";
             } else if (parameter instanceof J.Block) {
                 return "/*__p" + index + "__*/{}";
             } else if (parameter instanceof J.Literal) {
@@ -184,7 +184,7 @@ public class Substitutions {
             @SuppressWarnings("ConstantConditions")
             @Override
             public J visitAnnotation(J.Annotation annotation, Integer integer) {
-                if (TypeUtils.isOfClassType(annotation.getType(), "org.openrewrite.java.internal.template.SubAnnotation")) {
+                if (TypeUtils.isOfClassType(annotation.getType(), "SubAnnotation")) {
                     J.Literal index = (J.Literal) annotation.getArguments().get(0);
                     J a2 = (J) parameters[(Integer) index.getValue()];
                     return a2.withPrefix(a2.getPrefix().withWhitespace(annotation.getPrefix().getWhitespace()));

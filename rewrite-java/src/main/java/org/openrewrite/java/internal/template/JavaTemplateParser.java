@@ -47,6 +47,9 @@ public class JavaTemplateParser {
     public static final String THROWS_STUB = "abstract class $Template { abstract void $template() throws #{}; }";
     public static final String TYPE_PARAMS_STUB = "class $Template<#{}> {}";
 
+    @Language("java")
+    public static final String SUBSTITUTED_ANNOTATION = "@java.lang.annotation.Documented public @interface SubAnnotation { int value(); }";
+
     private final Supplier<JavaParser> parser;
     private final Consumer<String> onAfterVariableSubstitution;
     private final Consumer<String> onBeforeParseTemplate;
@@ -68,7 +71,7 @@ public class JavaTemplateParser {
         @Language("java") String stub = addImports(substitute(PARAMETER_STUB, template));
         onBeforeParseTemplate.accept(stub);
         return cache(stub, () -> {
-            J.CompilationUnit cu = parser.get().reset().parse(stub).get(0);
+            J.CompilationUnit cu = compileTemplate(stub);
             J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
             return m.getParameters();
         });
@@ -79,7 +82,7 @@ public class JavaTemplateParser {
         onBeforeParseTemplate.accept(stub);
 
         return (J.Lambda.Parameters) cache(stub, () -> {
-            J.CompilationUnit cu = parser.get().reset().parse(stub).get(0);
+            J.CompilationUnit cu = compileTemplate(stub);
             J.Block b = (J.Block) cu.getClasses().get(0).getBody().getStatements().get(0);
             J.VariableDeclarations v = (J.VariableDeclarations) b.getStatements().get(0);
             J.Lambda l = (J.Lambda) v.getVariables().get(0).getInitializer();
@@ -93,7 +96,7 @@ public class JavaTemplateParser {
         onBeforeParseTemplate.accept(stub);
 
         return (TypeTree) cache(stub, () -> {
-            J.CompilationUnit cu = parser.get().reset().parse(stub).get(0);
+            J.CompilationUnit cu = compileTemplate(stub);
             TypeTree anExtends = cu.getClasses().get(0).getExtends();
             assert anExtends != null;
             return singletonList(anExtends);
@@ -104,7 +107,7 @@ public class JavaTemplateParser {
         @Language("java") String stub = addImports(substitute(IMPLEMENTS_STUB, template));
         onBeforeParseTemplate.accept(stub);
         return cache(stub, () -> {
-            J.CompilationUnit cu = parser.get().reset().parse(stub).get(0);
+            J.CompilationUnit cu = compileTemplate(stub);
             List<TypeTree> anImplements = cu.getClasses().get(0).getImplements();
             assert anImplements != null;
             return anImplements;
@@ -115,7 +118,7 @@ public class JavaTemplateParser {
         @Language("java") String stub = addImports(substitute(THROWS_STUB, template));
         onBeforeParseTemplate.accept(stub);
         return cache(stub, () -> {
-            J.CompilationUnit cu = parser.get().reset().parse(stub).get(0);
+            J.CompilationUnit cu = compileTemplate(stub);
             J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
             List<NameTree> aThrows = m.getThrows();
             assert aThrows != null;
@@ -127,7 +130,7 @@ public class JavaTemplateParser {
         @Language("java") String stub = addImports(substitute(TYPE_PARAMS_STUB, template));
         onBeforeParseTemplate.accept(stub);
         return cache(stub, () -> {
-            J.CompilationUnit cu = parser.get().reset().parse(stub).get(0);
+            J.CompilationUnit cu = compileTemplate(stub);
             List<J.TypeParameter> tps = cu.getClasses().get(0).getTypeParameters();
             assert tps != null;
             return tps;
@@ -138,7 +141,7 @@ public class JavaTemplateParser {
         @Language("java") String stub = statementTemplateGenerator.template(cursor, template, location);
         onBeforeParseTemplate.accept(stub);
         return cache(stub, () -> {
-            J.CompilationUnit cu = parser.get().reset().parse(stub).get(0);
+            J.CompilationUnit cu = compileTemplate(stub);
             return statementTemplateGenerator.listTemplatedStatements(cu);
         });
     }
@@ -150,7 +153,7 @@ public class JavaTemplateParser {
         @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacementArgs, location);
         onBeforeParseTemplate.accept(stub);
         return cache(stub, () -> {
-            J.CompilationUnit cu = parser.get().reset().parse(stub).get(0);
+            J.CompilationUnit cu = compileTemplate(stub);
             J.MethodInvocation replaced = (J.MethodInvocation) statementTemplateGenerator.listTemplatedStatements(cu).get(0);
             return replaced.getArguments();
         });
@@ -160,7 +163,7 @@ public class JavaTemplateParser {
         @Language("java") String stub = annotationTemplateGenerator.template(cursor, template);
         onBeforeParseTemplate.accept(stub);
         return cache(stub, () -> {
-            J.CompilationUnit cu = parser.get().reset().parse(stub).get(0);
+            J.CompilationUnit cu = compileTemplate(stub);
             return annotationTemplateGenerator.listAnnotations(cu);
         });
     }
@@ -170,7 +173,7 @@ public class JavaTemplateParser {
         onBeforeParseTemplate.accept(stub);
 
         return (Expression) cache(stub, () -> {
-            J.CompilationUnit cu = parser.get().reset().parse(stub).get(0);
+            J.CompilationUnit cu = compileTemplate(stub);
             @SuppressWarnings("ConstantConditions") Expression expression = cu.getPackageDeclaration()
                     .getExpression();
             return singletonList(expression);
@@ -193,6 +196,12 @@ public class JavaTemplateParser {
             return withImports.toString();
         }
         return stub;
+    }
+
+    private J.CompilationUnit compileTemplate(@Language("java") String stub) {
+        return stub.contains("@SubAnnotation") ?
+                parser.get().reset().parse(stub, SUBSTITUTED_ANNOTATION).get(0) :
+                parser.get().reset().parse(stub).get(0);
     }
 
     @SuppressWarnings("unchecked")
