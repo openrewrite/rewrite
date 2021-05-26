@@ -26,7 +26,6 @@ import com.fasterxml.jackson.dataformat.smile.SmileFactory;
 import com.fasterxml.jackson.dataformat.smile.SmileGenerator;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
-import org.apache.commons.io.FileUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenMetadata;
 import org.openrewrite.maven.internal.MavenPomDownloader;
@@ -40,9 +39,11 @@ import org.rocksdb.WriteOptions;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.Callable;
 
@@ -104,18 +105,18 @@ public class RocksdbMavenPomCache implements MavenPomCache {
     CacheResult<MavenMetadata> UNAVAILABLE_METADATA = new CacheResult<>(CacheResult.State.Unavailable, null);
     CacheResult<MavenRepository> UNAVAILABLE_REPOSITORY = new CacheResult<>(CacheResult.State.Unavailable, null);
 
-    public RocksdbMavenPomCache(@Nullable String folder) {
+    public RocksdbMavenPomCache(@Nullable Path workspace) {
 
-        assert folder != null;
+        assert workspace != null;
 
-        File relativePath = new File(System.getProperty("user.home") + "/.rewrite/cache/" + folder);
+        File relativePath = new File( workspace + "/.pom");
         if(!relativePath.exists() && !relativePath.mkdirs()) {
-            throw new IllegalStateException("Unable to find or create maven pom cache at " + folder);
+            throw new IllegalStateException("Unable to find or create maven pom cache at " + relativePath);
         } else if (!relativePath.isDirectory()) {
             throw new IllegalStateException("The maven cache workspace must be a directory");
         }
         // In case a stale lock file is left over from a previous run that was interrupted
-        File lock = new File(folder, "LOCK");
+        File lock = new File(relativePath, "LOCK");
         if(lock.exists()) {
             //noinspection ResultOfMethodCallIgnored
             lock.delete();
@@ -296,25 +297,32 @@ public class RocksdbMavenPomCache implements MavenPomCache {
                 writeOptions = new WriteOptions();
                 writeOptions.setDisableWAL(true);
                 database = RocksDB.open(options, workspace);
-                verifyCache(workspace);
             } catch (RocksDBException exception) {
                 throw new IllegalStateException("Unable to create cache database." + exception.getMessage(), exception);
             }
+
+            try {
+                verifyCache(workspace);
+            } catch (Exception ex) {
+                throw new IllegalStateException("Unable to clear corrupt cache.", ex);
+            }
         }
 
-        private void verifyCache(String workspace) {
+        private void verifyCache(String workspace) throws IOException {
             try {
                 database.verifyChecksum();
             } catch (RocksDBException ex){
                 if (ex.getMessage().contains("block checksum mismatch")) {
                     File workDirectory = new File(workspace);
-                    Collection<File> caches = FileUtils.listFiles(workDirectory, null, false);
-                    if (!workDirectory.exists() && !workDirectory.mkdirs()) {
-                        throw new IllegalStateException("Unable to find or create maven pom cache at " + workspace);
-                    } else if (!workDirectory.isDirectory()) {
-                        throw new IllegalStateException("The maven cache workspace must be a directory");
+                    try (DirectoryStream<Path> paths = Files.newDirectoryStream(workDirectory.toPath(), "*")) {
+                        paths.forEach(path -> {
+                            try {
+                                Files.delete(path);
+                            } catch (IOException x) {
+                                throw new IllegalStateException("Unable to delete file.", x);
+                            }
+                        });
                     }
-                    caches.forEach(FileUtils::deleteQuietly);
                 }
             }
         }
