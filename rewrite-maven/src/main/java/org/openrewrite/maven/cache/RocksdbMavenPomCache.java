@@ -94,8 +94,8 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> cacheMap.values().forEach(RocksCache::close)));
     }
 
-    static synchronized RocksCache getCache(String workspace) {
-        return cacheMap.computeIfAbsent(workspace, RocksCache::new);
+    static synchronized RocksCache getCache(String pomCacheDir) {
+        return cacheMap.computeIfAbsent(pomCacheDir, RocksCache::new);
     }
 
     private final RocksCache cache;
@@ -109,7 +109,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
 
         assert workspace != null;
 
-        File pomCacheDir = new File( workspace.toFile(), ".pom");
+        File pomCacheDir = new File(workspace.toFile(), "pom");
         if(!pomCacheDir.exists() && !pomCacheDir.mkdirs()) {
             throw new IllegalStateException("Unable to find or create maven pom cache at " + pomCacheDir);
         } else if (!pomCacheDir.isDirectory()) {
@@ -280,7 +280,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         private final Options options;
         private final WriteOptions writeOptions;
 
-        RocksCache(String workspace) {
+        RocksCache(String pomCacheDir) {
             try {
                 options = new Options();
                 options.setCreateIfMissing(true);
@@ -296,33 +296,30 @@ public class RocksdbMavenPomCache implements MavenPomCache {
                 //rocks can recover in the case of a system failure).
                 writeOptions = new WriteOptions();
                 writeOptions.setDisableWAL(true);
-                database = RocksDB.open(options, workspace);
+                database = RocksDB.open(options, pomCacheDir);
             } catch (RocksDBException exception) {
                 throw new IllegalStateException("Unable to create cache database." + exception.getMessage(), exception);
             }
 
             try {
-                cleanCacheIfCorrupt(workspace);
+                cleanCacheIfCorrupt(pomCacheDir);
             } catch (Exception ex) {
                 throw new IllegalStateException("Unable to clear corrupt maven pom cache.", ex);
             }
         }
 
-        private void cleanCacheIfCorrupt(String workspace) throws IOException {
+        private void cleanCacheIfCorrupt(String pomCacheDir) throws IOException {
             try {
                 database.verifyChecksum();
-            } catch (RocksDBException ex){
-                if (ex.getMessage().contains("block checksum mismatch")) {
-                    File workDirectory = new File(workspace);
-                    try (DirectoryStream<Path> paths = Files.newDirectoryStream(workDirectory.toPath(), "*")) {
-                        paths.forEach(path -> {
-                            try {
-                                Files.delete(path);
-                            } catch (IOException ioException) {
-                                throw new IllegalStateException("Unable to delete maven pom cache at " + path, ioException);
-                            }
-                        });
-                    }
+            } catch (RocksDBException ex) {
+                try (DirectoryStream<Path> paths = Files.newDirectoryStream(Paths.get(pomCacheDir), "*")) {
+                    paths.forEach(path -> {
+                        try {
+                            Files.delete(path);
+                        } catch (IOException ioException) {
+                            throw new IllegalStateException("Unable to delete maven pom cache at " + path, ioException);
+                        }
+                    });
                 }
             }
         }
