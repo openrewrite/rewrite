@@ -134,10 +134,7 @@ public class AddDependency extends Recipe {
                 @Override
                 public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
                     for (String s : onlyIfUsing) {
-                        J.CompilationUnit nucu = new UsesType<>(s).visitCompilationUnit(cu, executionContext);
-                        if(nucu != cu) {
-                            return nucu;
-                        }
+                        doAfterVisit(new UsesType<>(s));
                     }
                     return cu;
                 }
