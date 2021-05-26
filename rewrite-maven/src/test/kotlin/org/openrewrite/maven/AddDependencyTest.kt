@@ -18,8 +18,10 @@ package org.openrewrite.maven
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
+import org.openrewrite.Parser
 import org.openrewrite.SourceFile
 import org.openrewrite.java.JavaParser
+import java.util.*
 
 class AddDependencyTest : MavenRecipeTest {
     override val recipe: AddDependency
@@ -28,6 +30,17 @@ class AddDependencyTest : MavenRecipeTest {
             "spring-boot",
             "1.5.22.RELEASE"
         )
+
+    val jp: JavaParser
+        get() = JavaParser.fromJavaVersion()
+            .dependsOn(Collections.singletonList(Parser.Input.fromString(
+                    """
+                    package com.google.common.math;
+                    public class IntMath {
+                        public static boolean isPrime(int n) {}
+                    }
+                """)))
+            .build()
 
     @Test
     fun onlyIfUsing() {
@@ -43,7 +56,7 @@ class AddDependencyTest : MavenRecipeTest {
             null,
             listOf("com.google.common.math.IntMath")
         )
-        val javaSource = JavaParser.fromJavaVersion().build().parse(
+        val javaSource = jp.parse(
             """
             package org.openrewrite.java.testing;
             import com.google.common.math.IntMath;
@@ -103,7 +116,7 @@ class AddDependencyTest : MavenRecipeTest {
             null,
             listOf("com.google.common.math.*", "org.springframework.boot")
         )
-        val javaSource = JavaParser.fromJavaVersion().build().parse(
+        val javaSource = jp.parse(
             """
             package org.openrewrite.java.testing;
             import com.google.common.math.IntMath;
