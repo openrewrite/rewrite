@@ -80,25 +80,18 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
             Cursor parentScope = getCursorToParentScope(getCursor());
 
             // Does not currently support renaming fields in a J.ClassDeclaration.
-            if (parentScope.getParent() != null && parentScope.getParent().getValue() instanceof J.ClassDeclaration) {
-                return variable;
-            }
+            if (!(parentScope.getParent() != null && parentScope.getParent().getValue() instanceof J.ClassDeclaration) &&
+                    // Does not apply to for loop controls.
+                    !(parentScope.getValue() instanceof J.ForLoop.Control) &&
+                    // Does not apply to catches with 1 character.
+                    !((parentScope.getValue() instanceof J.Try.Catch || parentScope.getValue() instanceof J.MultiCatch) && variable.getSimpleName().length() == 1) &&
+                    // Name does not match regex pattern.
+                    !namingConvention.matcher(variable.getSimpleName()).matches()) {
 
-            // Does not apply to loop counters.
-            if (parentScope.getValue() instanceof J.ForLoop.Control) {
-                return variable;
-            }
-
-            // Does not apply to one-character catch variables.
-            if ((parentScope.getValue() instanceof J.Try.Catch || parentScope.getValue() instanceof J.MultiCatch) &&
-                    variable.getSimpleName().length() == 1) {
-                return variable;
-            }
-
-            if (!namingConvention.matcher(variable.getSimpleName()).matches()) {
                 String toName = convertToCamelCase(variable.getSimpleName());
                 ((Map<J.VariableDeclarations.NamedVariable, String>) getCursor().getNearestMessage("RENAME_VARIABLES_KEY")).put(variable, toName);
             }
+
             return variable;
         }
 
