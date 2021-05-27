@@ -36,6 +36,7 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
     private static final XPathMatcher DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencies/dependency");
     private static final XPathMatcher MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies/dependency");
     private static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
+    private static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("/project/*/plugins/plugin");
     private static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
 
     protected Pom model;
@@ -79,6 +80,14 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
 
     public boolean isManagedDependencyTag(String groupId, @Nullable String artifactId) {
         return isManagedDependencyTag() && hasGroupAndArtifact(groupId, artifactId);
+    }
+
+    public boolean isPluginTag() {
+        return PLUGIN_MATCHER.matches(getCursor());
+    }
+
+    public boolean isPluginTag(String groupId, @Nullable String artifactId) {
+        return isPluginTag() && hasGroupAndArtifact(groupId, artifactId);
     }
 
     public boolean isParentTag() {

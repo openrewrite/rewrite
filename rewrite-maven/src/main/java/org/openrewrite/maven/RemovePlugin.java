@@ -19,15 +19,12 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.xml.RemoveContentVisitor;
-import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
 @Incubating(since = "7.7.0")
 public class RemovePlugin extends Recipe {
-
-    private static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("/project/*/plugins/plugin");
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate 'org.openrewrite.maven:rewrite-maven-plugin:VERSION'.",
@@ -58,13 +55,8 @@ public class RemovePlugin extends Recipe {
 
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            if (PLUGIN_MATCHER.matches(getCursor())) {
-                if (groupId.equals(tag.getChildValue("groupId").orElse(model.getGroupId())) &&
-                        tag.getChildValue("artifactId")
-                                .map(a -> a.equals(artifactId))
-                                .orElse(artifactId == null)) {
-                    doAfterVisit(new RemoveContentVisitor<>(tag, true));
-                }
+            if (isPluginTag(groupId, artifactId)) {
+                doAfterVisit(new RemoveContentVisitor<>(tag, true));
             }
 
             return super.visitTag(tag, ctx);
