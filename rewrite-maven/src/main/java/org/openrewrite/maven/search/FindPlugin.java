@@ -13,19 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.maven;
+package org.openrewrite.maven.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.maven.search.FindPlugin;
+import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.xml.RemoveContentVisitor;
+import org.openrewrite.xml.marker.XmlSearchResult;
+import org.openrewrite.xml.tree.Xml;
 
-@Value
+import java.util.HashSet;
+import java.util.Set;
+
 @EqualsAndHashCode(callSuper = true)
+@Value
 @Incubating(since = "7.7.0")
-public class RemovePlugin extends Recipe {
+public class FindPlugin extends Recipe {
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate 'org.openrewrite.maven:rewrite-maven-plugin:VERSION'.",
@@ -37,28 +41,40 @@ public class RemovePlugin extends Recipe {
             example = "rewrite-maven-plugin")
     String artifactId;
 
+    public static Set<Xml.Tag> find(Maven maven, String groupId, String artifactId) {
+        Set<Xml.Tag> ds = new HashSet<>();
+        new MavenVisitor() {
+            @Override
+            public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
+                if (isPluginTag(groupId, artifactId)) {
+                    ds.add(tag);
+                }
+                return super.visitTag(tag, context);
+            }
+        }.visit(maven, new InMemoryExecutionContext());
+        return ds;
+    }
+
     @Override
     public String getDisplayName() {
-        return "Remove Maven plugin";
+        return "Find Maven plugin";
     }
 
     @Override
     public String getDescription() {
-        return "Remove the specified Maven plugin from the pom.xml.";
+        return "Finds a Maven plugin within a pom.xml.";
     }
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new RemovePluginVisitor();
-    }
-
-    private class RemovePluginVisitor extends MavenVisitor {
-
-        @Override
-        public Maven visitMaven(Maven maven, ExecutionContext ctx) {
-            FindPlugin.find(maven, groupId, artifactId).forEach(plugin -> doAfterVisit(new RemoveContentVisitor<>(plugin, true)));
-            return super.visitMaven(maven, ctx);
-        }
-
+        return new MavenVisitor() {
+            @Override
+            public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
+                if (isPluginTag(groupId, artifactId)) {
+                    return tag.withMarkers(tag.getMarkers().addIfAbsent(new XmlSearchResult(FindPlugin.this)));
+                }
+                return super.visitTag(tag, context);
+            }
+        };
     }
 }
