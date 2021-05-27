@@ -26,7 +26,11 @@ class XPathMatcherTest {
             <?xml version="1.0" encoding="UTF-8"?>
             <dependencies>
                 <dependency>
-                    <artifactId scope="compile">org.openrewrite</artifactId>
+                    <groupId>org.openrewrite</groupId>
+                    <artifactId scope="compile">rewrite-xml</artifactId>
+                </dependency>
+                <dependency>
+                    <artifactId scope="test">assertj-core</artifactId>
                 </dependency>
             </dependency>
         """.trimIndent()
@@ -41,6 +45,7 @@ class XPathMatcherTest {
     @Test
     fun matchAbsolute() {
         assertThat(visit("/dependencies/dependency")).isTrue
+        assertThat(visit("/dependencies/*/artifactId")).isTrue
         assertThat(visit("/dependencies/*")).isTrue
         assertThat(visit("/dependencies/dne")).isFalse
     }
@@ -50,6 +55,7 @@ class XPathMatcherTest {
         assertThat(visit("/dependencies/dependency/artifactId/@scope")).isTrue
         assertThat(visit("/dependencies/dependency/artifactId/@scope")).isTrue
         assertThat(visit("/dependencies/dependency/artifactId/@*")).isTrue
+        assertThat(visit("/dependencies/dependency/groupId/@*")).isFalse
     }
 
     @Test
