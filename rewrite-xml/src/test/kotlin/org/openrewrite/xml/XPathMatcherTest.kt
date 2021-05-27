@@ -43,6 +43,7 @@ class XPathMatcherTest {
     }
 
     @Test
+    // if the path starts with a single slash, it always represents an absolute path to an element
     fun matchAbsolute() {
         assertThat(visit("/dependencies/dependency")).isTrue
         assertThat(visit("/dependencies/*/artifactId")).isTrue
@@ -72,6 +73,29 @@ class XPathMatcherTest {
         assertThat(visit("dependency/artifactId/@scope")).isTrue
         assertThat(visit("dependency/artifactId/@*")).isTrue
         assertThat(visit("//dependency/artifactId/@scope")).isTrue
+    }
+
+    /**
+     * handful of tests which are valid xpath syntax, but not currently implemented in our xpath matcher syntax
+     * xpathDivergences
+     * todo
+     */
+    @Test
+    fun matchAnywhereInBetweenDoubleSlash() {
+        // selects all artifactId elements that are descendant of the dependencies element, no matter where they are under the dependencies element
+        assertThat(visit("/dependencies//artifactId")).isTrue
+    }
+
+    @Test
+    fun matchChildrenWithPredicateAttribute() {
+        // selects the artifactId element value of any artifactId with a "scope" attribute of "compile"
+        assertThat(visit("""/dependencies/dependency/artifactId[@scope="compile"]""")).isTrue
+    }
+
+    @Test
+    fun matchChildrenWithPredicate() {
+        // selects the groupId value of any "dependency" element which has an "artifactId" child element equal to "rewrite-xml"
+        assertThat(visit("""/dependencies/dependency[artifactId="rewrite-xml"]/groupId""")).isTrue
     }
 
     private fun visitor(xPath: String): XmlVisitor<MutableList<Xml>> {
