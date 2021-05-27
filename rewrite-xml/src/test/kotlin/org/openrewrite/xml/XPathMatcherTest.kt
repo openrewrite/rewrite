@@ -32,7 +32,7 @@ class XPathMatcherTest {
                 <dependency>
                     <artifactId scope="test">assertj-core</artifactId>
                 </dependency>
-            </dependency>
+            </dependencies>
         """.trimIndent()
     ).iterator().next()
 
