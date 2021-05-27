@@ -16,11 +16,9 @@
 package org.openrewrite.maven;
 
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
-import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
@@ -95,11 +93,20 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
     }
 
     private boolean hasGroupAndArtifact(String groupId, @Nullable String artifactId) {
+        return hasGroupId(groupId) && hasArtifactId(artifactId);
+    }
+
+    private boolean hasGroupId(String groupId) {
         Xml.Tag tag = getCursor().getValue();
-        return groupId.equals(tag.getChildValue("groupId").orElse(model.getGroupId())) &&
-                tag.getChildValue("artifactId")
-                        .map(a -> a.equals(artifactId))
-                        .orElse(artifactId == null);
+        return groupId.equals(tag.getChildValue("groupId").orElse(model.getGroupId())) ||
+                model.getValue(groupId) != null;
+    }
+
+    private boolean hasArtifactId(@Nullable String artifactId) {
+        Xml.Tag tag = getCursor().getValue();
+        return tag.getChildValue("artifactId")
+                .map(a -> a.equals(artifactId))
+                .orElse(artifactId == null) || (artifactId != null && model.getValue(artifactId) != null);
     }
 
     @Nullable
