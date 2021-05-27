@@ -109,7 +109,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
 
         assert workspace != null;
 
-        File pomCacheDir = new File(workspace.toFile(), "pom");
+        File pomCacheDir = new File(workspace.toFile(), ".rewrite-cache");
         if(!pomCacheDir.exists() && !pomCacheDir.mkdirs()) {
             throw new IllegalStateException("Unable to find or create maven pom cache at " + pomCacheDir);
         } else if (!pomCacheDir.isDirectory()) {
