@@ -86,11 +86,11 @@ interface ChangeMethodTargetToStaticTest : JavaRecipeTest {
             }
         """,
         after = """
-            import b.B;
+            import static b.B.foo;
             
             class C {
                public void test() {
-                   B.foo();
+                   foo();
                }
             }
         """

@@ -83,18 +83,20 @@ public class ChangeMethodTargetToStatic extends Recipe {
                     TypeUtils.isOfClassType(method.getSelect().getType(), fullyQualifiedTargetTypeName);
 
             if ((!isStatic || !isSameReceiverType) && methodMatcher.matches(method)) {
-                m = method.withSelect(J.Identifier.build(randomId(),
-                        method.getSelect() == null ?
-                                Space.EMPTY :
-                                method.getSelect().getPrefix(),
-                        Markers.EMPTY,
-                        classType.getClassName(),
-                        classType
-                        )
-                );
-
-                maybeAddImport(fullyQualifiedTargetTypeName);
-
+                if (m.getSelect() == null) {
+                    maybeAddImport(fullyQualifiedTargetTypeName, m.getSimpleName());
+                } else {
+                    maybeAddImport(fullyQualifiedTargetTypeName);
+                    m = method.withSelect(J.Identifier.build(randomId(),
+                            method.getSelect() == null ?
+                                    Space.EMPTY :
+                                    method.getSelect().getPrefix(),
+                            Markers.EMPTY,
+                            classType.getClassName(),
+                            classType
+                            )
+                    );
+                }
                 JavaType.Method transformedType = null;
                 if (method.getType() != null) {
                     maybeRemoveImport(method.getType().getDeclaringType());
