@@ -24,6 +24,7 @@ import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Collection;
+import java.util.Map;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
@@ -98,15 +99,26 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
 
     private boolean hasGroupId(String groupId) {
         Xml.Tag tag = getCursor().getValue();
-        return groupId.equals(tag.getChildValue("groupId").orElse(model.getGroupId())) ||
-                model.getValue(groupId) != null;
+        boolean isGroupIdFound = groupId.equals(tag.getChildValue("groupId").orElse(model.getGroupId()));
+        if (!isGroupIdFound && model.getProperties() != null) {
+            String value = model.getValue(groupId);
+            isGroupIdFound = value != null && model.getProperties().containsValue(value);
+        }
+        return isGroupIdFound;
     }
 
     private boolean hasArtifactId(@Nullable String artifactId) {
         Xml.Tag tag = getCursor().getValue();
-        return tag.getChildValue("artifactId")
+        boolean isArtifactIdFound = tag.getChildValue("artifactId")
                 .map(a -> a.equals(artifactId))
-                .orElse(artifactId == null) || (artifactId != null && model.getValue(artifactId) != null);
+                .orElse(artifactId == null);
+
+        if (!isArtifactIdFound && artifactId != null && model.getProperties() != null) {
+            String value = model.getValue(artifactId);
+            isArtifactIdFound = value != null && model.getProperties().containsValue(value);
+        }
+
+        return isArtifactIdFound;
     }
 
     @Nullable
