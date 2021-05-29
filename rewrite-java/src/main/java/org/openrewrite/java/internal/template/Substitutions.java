@@ -157,8 +157,8 @@ public class Substitutions {
                 return "@SubAnnotation(" + index + ")";
             } else if (parameter instanceof J.Block) {
                 return "/*__p" + index + "__*/{}";
-            } else if (parameter instanceof J.Literal) {
-                return ((J.Literal) parameter).printTrimmed();
+            } else if (parameter instanceof J.Literal || parameter instanceof J.VariableDeclarations) {
+                return ((J) parameter).printTrimmed();
             } else {
                 throw new IllegalArgumentException("'" + parameter.getClass().getSimpleName() + "' cannot be a parameter to a template.");
             }

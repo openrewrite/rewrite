@@ -19,13 +19,16 @@ import com.google.common.io.CharSink
 import com.google.common.io.CharSource
 import com.google.googlejavaformat.java.Formatter
 import com.google.googlejavaformat.java.JavaFormatterOptions
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.java.tree.J
+import org.openrewrite.java.tree.Space
 import java.io.ByteArrayOutputStream
 import java.io.OutputStreamWriter
+import java.util.*
 import java.util.Comparator.comparing
 import java.util.function.Consumer
 
@@ -125,6 +128,44 @@ interface JavaTemplateTest : JavaRecipeTest {
                 }
             }
         """
+    )
+
+
+    @Test
+    fun replaceAndInterpolateMethodParameters(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+                val t = template("int n, #{}")
+                        .doBeforeParseTemplate(print)
+                        .build()
+
+                override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
+                    if (method.simpleName == "test" && method.parameters.size == 1) {
+                        return method.withTemplate(t,
+                                method.coordinates.replaceParameters(),
+                                method.parameters[0])
+                    }
+                    return method;
+                }
+            }.toRecipe(),
+        before = """
+            class Test {
+                void test(String s) {
+                }
+            }
+        """,
+        after = """
+            class Test {
+                void test(int n, String s) {
+                }
+            }
+        """,
+        afterConditions = { cu ->
+            val testMethod = cu.classes.first().body.statements.first() as J.MethodDeclaration
+            assertThat(testMethod.type!!.paramNames)
+                    .`as`("Changing the method arguments should have updated the type information as well")
+                    .containsExactly("n", "s")
+        }
     )
 
     @Test
@@ -799,6 +840,40 @@ interface JavaTemplateTest : JavaRecipeTest {
                 int n;
                 void test() {
                     n = 1;
+                }
+            }
+        """
+    )
+
+    @Test
+    fun replaceMissingBody(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.logCompilationWarningsAndErrors(true).build(),
+        recipe = object : JavaVisitor<ExecutionContext>() {
+                val t = template("")
+                        .doBeforeParseTemplate(print)
+                        .build()
+
+                override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
+                    var m = method;
+                    if(!m.isAbstract) {
+                        return m;
+                    }
+                    m = m.withReturnTypeExpression(m.returnTypeExpression!!.withPrefix(Space.EMPTY))
+                    m = m.withModifiers(emptyList())
+
+                    m = m.withTemplate(t, m.coordinates.replaceBody())
+
+                    return m;
+                }
+            }.toRecipe(),
+        before = """
+            abstract class Test {
+                abstract void test();
+            }
+        """,
+        after = """
+            abstract class Test {
+                void test() {
                 }
             }
         """
