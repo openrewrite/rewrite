@@ -18,7 +18,6 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
-import org.openrewrite.Tree
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.style.ImportLayoutStyle
 import org.openrewrite.style.NamedStyles
@@ -83,12 +82,6 @@ interface OrderImportsTest : JavaRecipeTest {
     fun sortInnerAndOuterClassesInTheSamePackage(jp: JavaParser) = assertUnchanged(
         jp,
         before = """
-            import com.netflix.appinfo.AmazonInfo;
-            import com.netflix.appinfo.AmazonInfo.MetaDataKey;
-            import com.netflix.appinfo.ApplicationInfoManager;
-            import com.netflix.appinfo.DataCenterInfo.Name;
-            import com.netflix.appinfo.InstanceInfo;
-            
             class Test {}
         """
     )

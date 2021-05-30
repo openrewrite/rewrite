@@ -50,8 +50,7 @@ interface ChangeMethodTargetToVariableTest : JavaRecipeTest {
             }
         """,
         after = """
-            import a.A;
-            
+            import a.*;
             public class C {
                A a;
                public void test() {
@@ -90,8 +89,7 @@ interface ChangeMethodTargetToVariableTest : JavaRecipeTest {
             }
         """,
         after = """
-            import a.A;
-            
+            import a.*;
             public class C {
                A a;
                public void test() {
@@ -133,5 +131,4 @@ interface ChangeMethodTargetToVariableTest : JavaRecipeTest {
         assertThat(valid.failures()[0].property).isEqualTo("variableName")
         assertThat(valid.failures()[1].property).isEqualTo("variableType")
     }
-
 }

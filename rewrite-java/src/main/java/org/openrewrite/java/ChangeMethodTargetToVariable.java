@@ -85,8 +85,11 @@ public class ChangeMethodTargetToVariable extends Recipe {
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             if (methodMatcher.matches(m)) {
+
                 JavaType.Method methodType = null;
                 if (m.getType() != null) {
+                    maybeRemoveImport(m.getType().getDeclaringType());
+
                     Set<Flag> flags = new LinkedHashSet<>(m.getType().getFlags());
                     flags.remove(Flag.Static);
                     methodType = m.getType().withDeclaringType(this.variableType).withFlags(flags);
@@ -100,8 +103,6 @@ public class ChangeMethodTargetToVariable extends Recipe {
                         variableName,
                         this.variableType)
                 ).withType(methodType);
-
-                doAfterVisit(new OrderImports());
             }
             return m;
         }
