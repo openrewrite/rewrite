@@ -167,4 +167,25 @@ interface AutodetectTest {
             .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).isStatic }
             .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == "java\\..+" }
     }
+
+    @Test
+    fun detectStarImport(jp: JavaParser) {
+        val cus = jp.parse(
+            """
+            import java.util.*;
+
+            public class Test {
+                List<Integer> l;
+                Set<Integer> s;
+                Map<Integer, Integer> m;
+                Collection<Integer> c;
+            }
+        """.trimIndent()
+        )
+
+        val styles = Autodetect.detect(cus)
+        val importLayout = NamedStyles.merge(ImportLayoutStyle::class.java, listOf(styles))
+
+        assertThat(importLayout.classCountToUseStarImport).isEqualTo(4)
+    }
 }

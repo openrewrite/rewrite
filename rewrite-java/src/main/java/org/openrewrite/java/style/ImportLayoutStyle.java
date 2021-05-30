@@ -275,6 +275,11 @@ public class ImportLayoutStyle implements JavaStyle {
             public List<JRightPadded<J.Import>> orderedImports(LayoutState layoutState, int classCountToUseStarImport, int nameCountToUseStartImport) {
                 return emptyList();
             }
+
+            @Override
+            public String toString() {
+                return "<blank line>" + (count > 1 ? " (x" + count + ")" : "");
+            }
         }
 
         class ImportPackage implements Block {
@@ -400,6 +405,11 @@ public class ImportLayoutStyle implements JavaStyle {
                     return anImport.getElement().getPackageName();
                 }
             }
+
+            @Override
+            public String toString() {
+                return "import " + (statik ? "static " : "") + packageWildcard;
+            }
         }
 
         class AllOthers extends Block.ImportPackage {
@@ -434,7 +444,26 @@ public class ImportLayoutStyle implements JavaStyle {
                 }
                 return anImport.getElement().isStatic() == statik;
             }
+
+            @Override
+            public String toString() {
+                return "import " + (statik ? "static " : "") + "all other imports";
+            }
         }
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder s = new StringBuilder();
+        s.append("classWildcards=")
+                .append(classCountToUseStarImport)
+                .append(", staticWildcards=")
+                .append(nameCountToUseStarImport)
+                .append('\n');
+        for (Block block : layout) {
+            s.append(block).append("\n");
+        }
+        return s.toString();
     }
 }
 
@@ -448,7 +477,7 @@ class Deserializer extends JsonDeserializer<ImportLayoutStyle> {
                     currentField = p.getCurrentName();
                     break;
                 case VALUE_STRING:
-                    if(!"layout".equals(currentField)) {
+                    if (!"layout".equals(currentField)) {
                         break;
                     }
                     String block = p.getText().trim();
@@ -533,5 +562,4 @@ class Serializer extends JsonSerializer<ImportLayoutStyle> {
         gen.writeArray(blocks, 0, blocks.length);
         gen.writeEndArray();
     }
-
 }

@@ -16,11 +16,14 @@
 package org.openrewrite.java.style;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
@@ -28,7 +31,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
-import static java.util.Collections.*;
+import static java.util.Collections.emptySet;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.counting;
 
@@ -157,9 +160,10 @@ public class Autodetect extends NamedStyles {
 
     private static class ImportLayoutStatistics {
         List<List<Block>> blocksPerSourceFile = new ArrayList<>();
+        int minimumFoldedImports = Integer.MAX_VALUE;
+        int minimumFoldedStaticImports = Integer.MAX_VALUE;
 
         enum BlockType {
-            BlankLine,
             Import,
             ImportStatic
         }
@@ -168,21 +172,33 @@ public class Autodetect extends NamedStyles {
             // the simplest heuristic is just to take the single longest block sequence and
             // assume that represents the most variation in the project
             return blocksPerSourceFile.stream()
-                    .max(Comparator.comparing(List::size))
+                    .max(Comparator
+                            .<List<Block>, Integer>comparing(List::size)
+                            .thenComparing(blocks -> blocks.stream()
+                                    .filter(b -> "all other imports".equals(b.pattern))
+                                    .count()
+                            )
+                    )
                     .map(longestBlocks -> {
                         ImportLayoutStyle.Builder builder = ImportLayoutStyle.builder();
+                        boolean importAllOthers = false;
+                        boolean importStaticAllOthers = false;
+                        int i = 0;
                         for (Block block : longestBlocks) {
+                            if (i++ != 0) {
+                                builder = builder.blankLine();
+                            }
+
                             switch (block.type) {
-                                case BlankLine:
-                                    builder = builder.blankLine();
-                                    break;
                                 case Import:
                                     assert block.pattern != null;
                                     if ("all other imports".equals(block.pattern)) {
+                                        importAllOthers = true;
                                         builder = builder.importAllOthers();
                                     } else {
                                         if (longestBlocks.stream().noneMatch(b -> b.type == BlockType.Import &&
                                                 "all other imports".equals(b.pattern))) {
+                                            importAllOthers = true;
                                             builder = builder.importAllOthers().blankLine();
                                         }
                                         builder = builder.importPackage(block.pattern);
@@ -191,10 +207,12 @@ public class Autodetect extends NamedStyles {
                                 case ImportStatic:
                                     assert block.pattern != null;
                                     if ("all other imports".equals(block.pattern)) {
+                                        importStaticAllOthers = true;
                                         builder = builder.importStaticAllOthers();
                                     } else {
                                         if (longestBlocks.stream().noneMatch(b -> b.type == BlockType.ImportStatic &&
                                                 "all other imports".equals(b.pattern))) {
+                                            importStaticAllOthers = true;
                                             builder = builder.importStaticAllOthers().blankLine();
                                         }
                                         builder = builder.staticImportPackage(block.pattern);
@@ -202,21 +220,31 @@ public class Autodetect extends NamedStyles {
                                     break;
                             }
                         }
+
+                        if (!importAllOthers) {
+                            builder = builder.importAllOthers().blankLine();
+                        }
+
+                        if (!importStaticAllOthers) {
+                            builder = builder.importStaticAllOthers().blankLine();
+                        }
+
+                        // set lower limits in case type attribution is really messed up on the project
+                        // and we can't effectively count star imports
+                        builder.classCountToUseStarImport(Math.max(minimumFoldedImports, 5));
+                        builder.nameCountToUseStarImport(Math.max(minimumFoldedStaticImports, 3));
+
                         return builder.build();
                     })
                     .orElse(IntelliJ.importLayout());
         }
 
+        @EqualsAndHashCode
         static class Block {
             private final BlockType type;
 
             @Nullable
             private final String pattern;
-
-            Block(BlockType type) {
-                this.type = type;
-                this.pattern = null;
-            }
 
             Block(BlockType type, List<J.Import> imports) {
                 this.type = type;
@@ -228,19 +256,23 @@ public class Autodetect extends NamedStyles {
 
                 for (J.Import anImport : imports) {
                     String pkg = anImport.getPackageName();
-                    if (pkg.startsWith("java.")) {
-                        return "java.*";
-                    } else if (pkg.startsWith("javax.")) {
-                        return "javax.*";
-                    } else {
-                        longestCommonPrefix = longestCommonPrefix(pkg, longestCommonPrefix);
-                        if (longestCommonPrefix.isEmpty()) {
-                            return "all other imports";
-                        }
+                    longestCommonPrefix = longestCommonPrefix(pkg, longestCommonPrefix);
+                    if (longestCommonPrefix.isEmpty()) {
+                        return "all other imports";
                     }
                 }
 
-                return longestCommonPrefix == null ? "all other imports" : longestCommonPrefix;
+                if (longestCommonPrefix == null) {
+                    return "all other imports";
+                } else if (longestCommonPrefix.startsWith("java.")) {
+                    return "java.*";
+                } else if (longestCommonPrefix.startsWith("javax.")) {
+                    return "javax.*";
+                } else if (longestCommonPrefix.chars().filter(c -> c == '.').count() > 1) {
+                    return longestCommonPrefix + "*";
+                } else {
+                    return "all other imports";
+                }
             }
 
             static String longestCommonPrefix(String pkg, @Nullable String lcp) {
@@ -264,7 +296,7 @@ public class Autodetect extends NamedStyles {
     private static class FindImportLayout extends JavaIsoVisitor<ImportLayoutStatistics> {
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ImportLayoutStatistics importLayoutStatistics) {
-            List<ImportLayoutStatistics.Block> blocks = new ArrayList<>();
+            Set<ImportLayoutStatistics.Block> blocks = new LinkedHashSet<>();
 
             boolean staticBlock = false;
             int blockStart = 0;
@@ -278,9 +310,45 @@ public class Autodetect extends NamedStyles {
                                         ImportLayoutStatistics.BlockType.Import,
                                 cu.getImports().subList(blockStart, i)));
                     }
-                    blocks.add(new ImportLayoutStatistics.Block(ImportLayoutStatistics.BlockType.BlankLine));
                     blockStart = i;
                 }
+
+                if (anImport.getQualid().getSimpleName().equals("*")) {
+                    if (anImport.isStatic()) {
+                        int count = 0;
+                        for (JavaType type : cu.getTypesInUse()) {
+                            if (type instanceof JavaType.Variable) {
+                                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(((JavaType.Variable) type).getType());
+                                if (fq != null && anImport.getTypeName().equals(fq.getFullyQualifiedName())) {
+                                    count++;
+                                }
+                            }
+                        }
+
+                        importLayoutStatistics.minimumFoldedStaticImports = Math.min(
+                                importLayoutStatistics.minimumFoldedStaticImports,
+                                count
+                        );
+                    } else {
+                        Set<String> fqns = new HashSet<>();
+                        for (JavaType type : cu.getTypesInUse()) {
+                            if (type instanceof JavaType.FullyQualified) {
+                                JavaType.FullyQualified fq = (JavaType.FullyQualified) type;
+                                if (anImport.getPackageName().equals(fq.getPackageName())) {
+                                    // don't count directly, as JavaType.Parameterized can
+                                    // CONTAIN a FullyQualified that matches a raw FullyQualified
+                                    fqns.add(fq.getFullyQualifiedName());
+                                }
+                            }
+                        }
+
+                        importLayoutStatistics.minimumFoldedImports = Math.min(
+                                importLayoutStatistics.minimumFoldedImports,
+                                fqns.size()
+                        );
+                    }
+                }
+
                 staticBlock = anImport.isStatic();
                 i++;
             }
@@ -293,7 +361,7 @@ public class Autodetect extends NamedStyles {
                         cu.getImports().subList(blockStart, i)));
             }
 
-            importLayoutStatistics.blocksPerSourceFile.add(blocks);
+            importLayoutStatistics.blocksPerSourceFile.add(new ArrayList<>(blocks));
 
             return cu;
         }

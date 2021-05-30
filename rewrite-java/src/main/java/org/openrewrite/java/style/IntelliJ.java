@@ -16,13 +16,15 @@
 package org.openrewrite.java.style;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import org.openrewrite.java.cleanup.*;
+import org.openrewrite.java.cleanup.EmptyBlockStyle;
+import org.openrewrite.java.cleanup.EqualsAvoidsNullStyle;
+import org.openrewrite.java.cleanup.ExplicitInitializationStyle;
+import org.openrewrite.java.cleanup.UnnecessaryParenthesesStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 
 import static java.util.Collections.emptySet;
 import static org.openrewrite.Tree.randomId;
