@@ -28,7 +28,7 @@ import org.openrewrite.java.tree.Statement;
 import java.util.Iterator;
 import java.util.List;
 
-class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
+public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     @Nullable
     private final Tree stopAfter;
 
@@ -83,19 +83,21 @@ class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration j = super.visitClassDeclaration(classDecl, p);
-        List<JRightPadded<Statement>> statements = j.getBody().getPadding().getStatements();
-        j = j.withBody(j.getBody().getPadding().withStatements(ListUtils.map(statements, (i, s) -> {
-            if (i == 0) {
-                s = minimumLines(s, style.getMinimum().getAfterClassHeader());
-            } else if (statements.get(i - 1).getElement() instanceof J.Block) {
-                s = minimumLines(s, style.getMinimum().getAroundInitializer());
-            }
+        if(j.getBody() != null) {
+            List<JRightPadded<Statement>> statements = j.getBody().getPadding().getStatements();
+            j = j.withBody(j.getBody().getPadding().withStatements(ListUtils.map(statements, (i, s) -> {
+                if (i == 0) {
+                    s = minimumLines(s, style.getMinimum().getAfterClassHeader());
+                } else if (statements.get(i - 1).getElement() instanceof J.Block) {
+                    s = minimumLines(s, style.getMinimum().getAroundInitializer());
+                }
 
-            return s;
-        })));
+                return s;
+            })));
 
-        j = j.withBody(j.getBody().withEnd(minimumLines(j.getBody().getEnd(),
-                style.getMinimum().getBeforeClassEnd())));
+            j = j.withBody(j.getBody().withEnd(minimumLines(j.getBody().getEnd(),
+                    style.getMinimum().getBeforeClassEnd())));
+        }
 
         J.CompilationUnit cu = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
         boolean hasImports = !cu.getImports().isEmpty();
@@ -261,7 +263,7 @@ class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     @Nullable
     @Override
     public J postVisit(J tree, P p) {
-        if (stopAfter != null && stopAfter == tree) {
+        if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "stop", true);
         }
         return super.postVisit(tree, p);

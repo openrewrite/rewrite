@@ -22,16 +22,13 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.HashSet;
-import java.util.Objects;
 import java.util.Set;
-
-import static java.util.stream.Collectors.toCollection;
 
 public class UnnecessaryThrows extends Recipe {
 
@@ -52,11 +49,12 @@ public class UnnecessaryThrows extends Recipe {
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                 J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
                 if (m.getThrows() != null && !m.isAbstract()) {
-                    Set<JavaType.FullyQualified> unusedThrows = m.getThrows().stream()
-                            .map(t -> TypeUtils.asFullyQualified(t.getType()))
-                            .filter(Objects::nonNull)
-                            .filter(t -> !TypeUtils.isAssignableTo(JavaType.Class.build("java.lang.RuntimeException"), t))
-                            .collect(toCollection(HashSet::new));
+                    Set<JavaType.FullyQualified> unusedThrows = new HashSet<>();
+                    for (NameTree nameTree : m.getThrows()) {
+                        if (!TypeUtils.isAssignableTo(JavaType.Class.build("java.lang.RuntimeException"), nameTree.getType())) {
+                            unusedThrows.add(TypeUtils.asFullyQualified(nameTree.getType()));
+                        }
+                    }
 
                     new JavaIsoVisitor<ExecutionContext>() {
                         @Nullable
@@ -71,7 +69,7 @@ public class UnnecessaryThrows extends Recipe {
                         @Override
                         public J.Throw visitThrow(J.Throw thrown, ExecutionContext executionContext) {
                             JavaType.FullyQualified type = TypeUtils.asFullyQualified(thrown.getException().getType());
-                            if(type != null) {
+                            if (type != null) {
                                 unusedThrows.removeIf(t -> TypeUtils.isAssignableTo(t, type));
                             }
                             return thrown;

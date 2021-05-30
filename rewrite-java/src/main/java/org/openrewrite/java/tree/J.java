@@ -1084,7 +1084,7 @@ public interface J extends Serializable, Tree {
     final class CompilationUnit implements J, SourceFile {
         @Nullable
         @NonFinal
-        transient WeakReference<Set<JavaType>> typesInUse;
+        transient WeakReference<TypeCache> typesInUse;
 
         @Nullable
         @NonFinal
@@ -1147,18 +1147,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Set<JavaType> getTypesInUse() {
-            Set<JavaType> t;
+            TypeCache cache;
             if (this.typesInUse == null) {
-                t = FindAllUsedTypes.findAll(this);
-                this.typesInUse = new WeakReference<>(t);
+                cache = new TypeCache(this, FindAllUsedTypes.findAll(this));
+                this.typesInUse = new WeakReference<>(cache);
             } else {
-                t = this.typesInUse.get();
-                if (t == null) {
-                    t = FindAllUsedTypes.findAll(this);
-                    this.typesInUse = new WeakReference<>(t);
+                cache = this.typesInUse.get();
+                if (cache == null || cache.t != this) {
+                    cache = new TypeCache(this, FindAllUsedTypes.findAll(this));
+                    this.typesInUse = new WeakReference<>(cache);
                 }
             }
-            return t;
+            return cache.typesInUse;
         }
 
         public Padding getPadding() {
@@ -1196,6 +1196,12 @@ public interface J extends Serializable, Tree {
             public CompilationUnit withImports(List<JRightPadded<Import>> imports) {
                 return t.imports == imports ? t : new CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.packageDeclaration, imports, t.classes, t.eof);
             }
+        }
+
+        @RequiredArgsConstructor
+        private static class TypeCache {
+            private final CompilationUnit t;
+            private final Set<JavaType> typesInUse;
         }
     }
 
@@ -1946,7 +1952,15 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     final class Identifier implements J, TypeTree, Expression {
-        private static final Map<String, Map<JavaType, IdentifierFlyweight>> flyweights = new WeakHashMap<>();
+        private static final JavaType NONE = new JavaType() {
+            @Override
+            public boolean deepEquals(@Nullable JavaType type) {
+                return type == NONE;
+            }
+        };
+
+        // keyed by name, type, and then field type
+        private static final Map<String, Map<JavaType, Map<JavaType, IdentifierFlyweight>>> flyweights = new WeakHashMap<>();
 
         @Getter
         @EqualsAndHashCode.Include
@@ -1972,13 +1986,18 @@ public interface J extends Serializable, Tree {
             return identifier.getType();
         }
 
+        @Nullable
+        public JavaType getFieldType() {
+            return identifier.getFieldType();
+        }
+
         @SuppressWarnings("unchecked")
         @Override
         public Identifier withId(UUID id) {
             if (id == getId()) {
                 return this;
             }
-            return build(id, prefix, markers, getSimpleName(), getType());
+            return build(id, prefix, markers, getSimpleName(), getType(), getFieldType());
         }
 
         @SuppressWarnings("unchecked")
@@ -1987,7 +2006,7 @@ public interface J extends Serializable, Tree {
             if (type == getType()) {
                 return this;
             }
-            return build(id, prefix, markers, getSimpleName(), type);
+            return build(id, prefix, markers, getSimpleName(), type, getFieldType());
         }
 
         public String getSimpleName() {
@@ -2003,7 +2022,7 @@ public interface J extends Serializable, Tree {
             if (name.equals(identifier.getSimpleName())) {
                 return this;
             }
-            return build(id, prefix, markers, name, getType());
+            return build(id, prefix, markers, name, getType(), getFieldType());
         }
 
         @SuppressWarnings("unchecked")
@@ -2011,7 +2030,7 @@ public interface J extends Serializable, Tree {
             if (markers == this.markers) {
                 return this;
             }
-            return build(id, prefix, markers, identifier.getSimpleName(), getType());
+            return build(id, prefix, markers, identifier.getSimpleName(), getType(), getFieldType());
         }
 
         @SuppressWarnings("unchecked")
@@ -2019,7 +2038,15 @@ public interface J extends Serializable, Tree {
             if (prefix == this.prefix) {
                 return this;
             }
-            return build(id, prefix, markers, identifier.getSimpleName(), getType());
+            return build(id, prefix, markers, identifier.getSimpleName(), getType(), getFieldType());
+        }
+
+        public static Identifier build(UUID id,
+                                       Space prefix,
+                                       Markers markers,
+                                       String simpleName,
+                                       @Nullable JavaType type) {
+            return build(id, prefix, markers, simpleName, type, null);
         }
 
         @JsonCreator
@@ -2027,13 +2054,15 @@ public interface J extends Serializable, Tree {
                                        Space prefix,
                                        Markers markers,
                                        String simpleName,
-                                       @Nullable JavaType type) {
+                                       @Nullable JavaType type,
+                                       @Nullable JavaType fieldType) {
             synchronized (flyweights) {
                 return new Identifier(
                         id,
                         flyweights
                                 .computeIfAbsent(simpleName, n -> new HashMap<>())
-                                .computeIfAbsent(type, t -> new IdentifierFlyweight(simpleName, t)),
+                                .computeIfAbsent(type, t -> new HashMap<>())
+                                .computeIfAbsent(fieldType, t -> new IdentifierFlyweight(simpleName, type, fieldType)),
                         prefix,
                         markers
                 );
@@ -2047,6 +2076,9 @@ public interface J extends Serializable, Tree {
 
             @Nullable
             JavaType type;
+
+            @Nullable
+            JavaType fieldType;
         }
 
         /**

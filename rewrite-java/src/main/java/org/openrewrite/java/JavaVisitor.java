@@ -125,7 +125,6 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
     }
 
-
     public J visitExpression(Expression expression, P p) {
         return expression;
     }

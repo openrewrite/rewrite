@@ -42,7 +42,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
 
         J t = new NormalizeFormatVisitor<>().visit(tree, p, cursor.fork());
 
-        t = new MinimumViableSpacingVisitor<>().visit(t, p, cursor.fork());
+        t = new MinimumViableSpacingVisitor<>(stopAfter).visit(t, p, cursor.fork());
 
         t = new RemoveTrailingWhitespaceVisitor<>().visit(t, p, cursor.fork());
 

@@ -15,12 +15,13 @@
  */
 package org.openrewrite.java.search;
 
-import org.openrewrite.Incubating;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.JavaSearchResult;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Marker;
 
 import java.util.ArrayList;
@@ -30,7 +31,6 @@ import java.util.Set;
 
 import static org.openrewrite.Tree.randomId;
 
-@Incubating(since = "7.5.0")
 public class UsesType<P> extends JavaIsoVisitor<P> {
     @SuppressWarnings("ConstantConditions")
     private static final Marker FOUND_TYPE = new JavaSearchResult(randomId(), null, null);
@@ -48,28 +48,56 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
-        Set<JavaType> types = cu.getTypesInUse();
-        nextType:
+        J.CompilationUnit c = cu;
+        Set<JavaType> types = c.getTypesInUse();
         for (JavaType type : types) {
             if (type instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified fq = (JavaType.FullyQualified) type;
-                Scanner scanner = new Scanner(fq.getFullyQualifiedName());
-                scanner.useDelimiter("\\.");
-                int i = 0;
-                for (; scanner.hasNext() && i < fullyQualifiedTypeSegments.size(); i++) {
-                    String segment = fullyQualifiedTypeSegments.get(i);
-                    if (segment.equals("*")) {
-                        break;
-                    }
-                    String test = scanner.next();
-                    if (!segment.equals(test)) {
-                        continue nextType;
+                if ((c = maybeMark(c, fq)) != cu) {
+                    return c;
+                }
+            } else if (type instanceof JavaType.Method) {
+                JavaType.Method method = (JavaType.Method) type;
+                if (method.hasFlags(Flag.Static)) {
+                    if ((c = maybeMark(c, method.getDeclaringType())) != cu) {
+                        return c;
                     }
                 }
-
-                return cu.withMarkers(cu.getMarkers().addIfAbsent(FOUND_TYPE));
             }
         }
-        return cu;
+
+        for (J.Import anImport : c.getImports()) {
+            if (anImport.isStatic()) {
+                if ((c = maybeMark(c, TypeUtils.asFullyQualified(anImport.getQualid().getTarget().getType()))) != cu) {
+                    return c;
+                }
+            } else if ((c = maybeMark(c, TypeUtils.asFullyQualified(anImport.getQualid().getType()))) != cu) {
+                return c;
+            }
+        }
+
+        return c;
+    }
+
+    private J.CompilationUnit maybeMark(J.CompilationUnit c, @Nullable JavaType.FullyQualified fq) {
+        if (fq == null) {
+            return c;
+        }
+
+        Scanner scanner = new Scanner(fq.getFullyQualifiedName());
+        scanner.useDelimiter("\\.");
+        int i = 0;
+        for (; scanner.hasNext() && i < fullyQualifiedTypeSegments.size(); i++) {
+            String segment = fullyQualifiedTypeSegments.get(i);
+            if (segment.equals("*")) {
+                break;
+            }
+            String test = scanner.next();
+            if (!segment.equals(test)) {
+                return c;
+            }
+        }
+
+        return c.withMarkers(c.getMarkers().addIfAbsent(FOUND_TYPE));
     }
 }

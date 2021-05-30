@@ -15,13 +15,19 @@
  */
 package org.openrewrite.java.format;
 
+import lombok.RequiredArgsConstructor;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.Space;
 
+@RequiredArgsConstructor
 public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
+    @Nullable
+    private final Tree stopAfter;
 
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
@@ -71,17 +77,6 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         return c;
-    }
-
-    @Override
-    public J.Block visitBlock(J.Block block, P p) {
-        J.Block b = super.visitBlock(block, p);
-        @SuppressWarnings("ConstantConditions") Object parent = getCursor().getParent().getValue();
-        if (!b.isStatic() && (parent instanceof J.MethodDeclaration || parent instanceof J.ClassDeclaration) &&
-                b.getPrefix().getWhitespace().isEmpty()) {
-            b = b.withPrefix(b.getPrefix().withWhitespace(" "));
-        }
-        return b;
     }
 
     @Override
@@ -179,5 +174,23 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         return v;
+    }
+
+    @Nullable
+    @Override
+    public J postVisit(J tree, P p) {
+        if (stopAfter != null && stopAfter.isScope(tree)) {
+            getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "stop", true);
+        }
+        return super.postVisit(tree, p);
+    }
+
+    @Nullable
+    @Override
+    public J visit(@Nullable Tree tree, P p) {
+        if (getCursor().getNearestMessage("stop") != null) {
+            return (J) tree;
+        }
+        return super.visit(tree, p);
     }
 }

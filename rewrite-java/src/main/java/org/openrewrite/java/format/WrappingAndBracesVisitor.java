@@ -161,7 +161,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     @Nullable
     @Override
     public J postVisit(J tree, P p) {
-        if (stopAfter != null && stopAfter == tree) {
+        if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "stop", true);
         }
         return super.postVisit(tree, p);

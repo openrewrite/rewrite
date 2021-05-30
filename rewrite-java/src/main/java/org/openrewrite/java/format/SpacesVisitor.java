@@ -93,29 +93,31 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
-        c = c.withBody(spaceBefore(c.getBody(), style.getBeforeLeftBrace().getClassLeftBrace()));
-        if (c.getBody().getStatements().isEmpty()) {
-            if (c.getKind() != J.ClassDeclaration.Kind.Type.Enum) {
-                boolean withinCodeBraces = style.getWithin().getCodeBraces();
-                if (withinCodeBraces && StringUtils.isNullOrEmpty(c.getBody().getEnd().getWhitespace())) {
-                    c = c.withBody(
-                            c.getBody().withEnd(
-                                    c.getBody().getEnd().withWhitespace(" ")
-                            )
-                    );
-                } else if (!withinCodeBraces && c.getBody().getEnd().getWhitespace().equals(" ")) {
-                    c = c.withBody(
-                            c.getBody().withEnd(
-                                    c.getBody().getEnd().withWhitespace("")
-                            )
-                    );
-                }
-            } else {
-                boolean spaceInsideOneLineEnumBraces = style.getOther().getInsideOneLineEnumBraces();
-                if (spaceInsideOneLineEnumBraces && StringUtils.isNullOrEmpty(c.getBody().getEnd().getWhitespace())) {
-                    c = c.withBody(c.getBody().withEnd(c.getBody().getEnd().withWhitespace(" ")));
-                } else if (!spaceInsideOneLineEnumBraces && c.getBody().getEnd().getWhitespace().equals(" ")) {
-                    c = c.withBody(c.getBody().withEnd(c.getBody().getEnd().withWhitespace("")));
+        if (c.getBody() != null) {
+            c = c.withBody(spaceBefore(c.getBody(), style.getBeforeLeftBrace().getClassLeftBrace()));
+            if (c.getBody().getStatements().isEmpty()) {
+                if (c.getKind() != J.ClassDeclaration.Kind.Type.Enum) {
+                    boolean withinCodeBraces = style.getWithin().getCodeBraces();
+                    if (withinCodeBraces && StringUtils.isNullOrEmpty(c.getBody().getEnd().getWhitespace())) {
+                        c = c.withBody(
+                                c.getBody().withEnd(
+                                        c.getBody().getEnd().withWhitespace(" ")
+                                )
+                        );
+                    } else if (!withinCodeBraces && c.getBody().getEnd().getWhitespace().equals(" ")) {
+                        c = c.withBody(
+                                c.getBody().withEnd(
+                                        c.getBody().getEnd().withWhitespace("")
+                                )
+                        );
+                    }
+                } else {
+                    boolean spaceInsideOneLineEnumBraces = style.getOther().getInsideOneLineEnumBraces();
+                    if (spaceInsideOneLineEnumBraces && StringUtils.isNullOrEmpty(c.getBody().getEnd().getWhitespace())) {
+                        c = c.withBody(c.getBody().withEnd(c.getBody().getEnd().withWhitespace(" ")));
+                    } else if (!spaceInsideOneLineEnumBraces && c.getBody().getEnd().getWhitespace().equals(" ")) {
+                        c = c.withBody(c.getBody().withEnd(c.getBody().getEnd().withWhitespace("")));
+                    }
                 }
             }
         }
@@ -1086,7 +1088,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Nullable
     @Override
     public J postVisit(J tree, P p) {
-        if (stopAfter != null && stopAfter == tree) {
+        if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "stop", true);
         }
         return super.postVisit(tree, p);

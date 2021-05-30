@@ -76,10 +76,12 @@ public class UseStaticImport extends Recipe {
                             receiverType.getFullyQualifiedName(),
                             m.getSimpleName(),
                             false);
+
                     if (!getAfterVisit().contains(addStatic)) {
                         doAfterVisit(addStatic);
                     }
                 }
+
                 if (m.getSelect() != null) {
                     m = m.withSelect(null).withName(m.getName().withPrefix(m.getSelect().getPrefix()));
                 }

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.internal;
 
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
@@ -31,9 +30,9 @@ public class FormatFirstClassPrefix<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
-        J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
+        J.ClassDeclaration c = classDecl;
         J.CompilationUnit cu = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
-        if (c.equals(cu.getClasses().get(0))) {
+        if (c == cu.getClasses().get(0)) {
             J.ClassDeclaration temp = autoFormat(c.withBody(EMPTY_BLOCK), p);
             c = c.withPrefix(temp.getPrefix());
         }

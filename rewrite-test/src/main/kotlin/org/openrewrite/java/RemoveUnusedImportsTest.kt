@@ -78,14 +78,14 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
     )
 
     @Test
-    fun leaveStarImportInPlaceIfTwoOrMoreTypesStillReferredTo(jp: JavaParser) = assertUnchanged(
+    fun leaveStarImportInPlaceIfThreeOrMoreTypesStillReferredTo(jp: JavaParser) = assertUnchanged(
         jp,
         recipe = removeImport("java.util.List"),
         before = """
             import java.util.*;
             class A {
                Collection<Integer> c;
-               Set<Integer> s;
+               Set<Integer> s = new HashSet<>();
             }
         """
     )
@@ -166,21 +166,20 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
         jp,
         dependsOn = arrayOf(
             """
-                    package foo;
-                    public class B {
-                        public static final String STRING = "string";
-                        public static final String STRING2 = "string2";
-                    }
-                """,
+                package foo;
+                public class B {
+                    public static final String STRING = "string";
+                    public static final String STRING2 = "string2";
+                }
+            """,
             """
-                    package foo;
-                    public class C {
-                        public static final String ANOTHER = "string";
-                    }
-                """
+                package foo;
+                public class C {
+                    public static final String ANOTHER = "string";
+                }
+            """
         ),
-        recipe = removeImport("foo.B")
-            .doNext(removeImport("foo.C")),
+        recipe = RemoveUnusedImports(),
         before = """
             import static foo.B.STRING;
             import static foo.B.STRING2;
@@ -257,6 +256,19 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/594")
+    @Test
+    fun dontRemoveStaticReferenceToPrimitiveField(jp: JavaParser) = assertUnchanged(
+        jp,
+        recipe = RemoveUnusedImports(),
+        before = """
+            import static java.sql.ResultSet.TYPE_FORWARD_ONLY;
+            public class A {
+                int t = TYPE_FORWARD_ONLY;
+            }
+        """
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/580")
     @Test
     fun resultSetType() = assertUnchanged(
@@ -268,5 +280,4 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
             }
         """
     )
-
 }

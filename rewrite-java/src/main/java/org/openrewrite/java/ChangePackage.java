@@ -152,6 +152,11 @@ public class ChangePackage extends Recipe {
         }
 
         @Override
+        public J.Import visitImport(J.Import impoort, ExecutionContext executionContext) {
+            return super.visitImport(impoort, executionContext);
+        }
+
+        @Override
         public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
             J.FieldAccess f = super.visitFieldAccess(fieldAccess, ctx);
 

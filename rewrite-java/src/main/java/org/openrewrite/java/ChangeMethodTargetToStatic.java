@@ -93,8 +93,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
                                     method.getSelect().getPrefix(),
                             Markers.EMPTY,
                             classType.getClassName(),
-                            classType
-                            )
+                            classType)
                     );
                 }
                 JavaType.Method transformedType = null;

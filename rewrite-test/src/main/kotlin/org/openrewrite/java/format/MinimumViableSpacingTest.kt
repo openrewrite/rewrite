@@ -33,7 +33,7 @@ interface MinimumViableSpacingTest : JavaRecipeTest {
                 }
                 return space
             }
-        }.toRecipe().doNext(MinimumViableSpacingVisitor<ExecutionContext>().toRecipe())
+        }.toRecipe().doNext(MinimumViableSpacingVisitor<ExecutionContext>(null).toRecipe())
 
     @Test
     fun method(jp: JavaParser) = assertChanged(
@@ -45,7 +45,7 @@ interface MinimumViableSpacingTest : JavaRecipeTest {
             }
         """,
         after = """
-            class A {public <T> void foo() {}}
+            class A{public <T> void foo(){}}
         """
     )
 
@@ -60,7 +60,7 @@ interface MinimumViableSpacingTest : JavaRecipeTest {
             }
         """,
         after = """
-            class A {public String foo() {return "foo";}}
+            class A{public String foo(){return "foo";}}
         """
     )
 
@@ -77,7 +77,7 @@ interface MinimumViableSpacingTest : JavaRecipeTest {
             }
         """,
         after = """
-            class A {int unassigned;int zero=0;final int one=1;public static final int ONE=1;public static final int TWO=1,THREE=3;}
+            class A{int unassigned;int zero=0;final int one=1;public static final int ONE=1;public static final int TWO=1,THREE=3;}
         """
     )
 
@@ -96,7 +96,7 @@ interface MinimumViableSpacingTest : JavaRecipeTest {
             }
         """,
         after = """
-            class A {public void foo(int paramA,final int paramB) {int unassigned;int a=1;int b,c=5;final int d=10;final int e,f=20;}}
+            class A{public void foo(int paramA,final int paramB){int unassigned;int a=1;int b,c=5;final int d=10;final int e,f=20;}}
         """
     )
 
@@ -118,7 +118,7 @@ interface MinimumViableSpacingTest : JavaRecipeTest {
             }
         """,
         after = """
-            class Test {void foo(final int[] arr) {for(int n=0,x=0;n<100;n++,x++){}for(int i:arr){}for(final int i:arr){}}}
+            class Test{void foo(final int[] arr){for(int n=0,x=0;n<100;n++,x++){}for(int i:arr){}for(final int i:arr){}}}
         """
     )
 }

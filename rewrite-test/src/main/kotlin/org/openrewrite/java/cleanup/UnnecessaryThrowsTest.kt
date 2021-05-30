@@ -22,7 +22,7 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 
 interface UnnecessaryThrowsTest: JavaRecipeTest {
-    override val recipe: Recipe?
+    override val recipe: Recipe
         get() = UnnecessaryThrows()
 
     @Test
@@ -37,7 +37,7 @@ interface UnnecessaryThrowsTest: JavaRecipeTest {
             class Test {
                 void test() throws FileNotFoundException, UncheckedIOException {
                 }
-                
+            
                 void test() throws IOException, UncheckedIOException {
                     new FileInputStream("test");
                 }
@@ -51,7 +51,7 @@ interface UnnecessaryThrowsTest: JavaRecipeTest {
             class Test {
                 void test() throws UncheckedIOException {
                 }
-                
+            
                 void test() throws IOException, UncheckedIOException {
                     new FileInputStream("test");
                 }

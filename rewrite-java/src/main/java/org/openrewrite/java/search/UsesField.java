@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,38 +15,34 @@
  */
 package org.openrewrite.java.search;
 
+import lombok.RequiredArgsConstructor;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Marker;
 
 import java.util.Set;
 
 import static org.openrewrite.Tree.randomId;
 
-public class UsesMethod<P> extends JavaIsoVisitor<P> {
-    @SuppressWarnings("ConstantConditions")
+@RequiredArgsConstructor
+@Incubating(since = "7.7.0")
+public class UsesField<P> extends JavaIsoVisitor<P> {
     private static final Marker FOUND_TYPE = new JavaSearchResult(randomId(), null, null);
 
-    private final MethodMatcher methodMatcher;
-
-    public UsesMethod(String methodPattern) {
-        this(new MethodMatcher(methodPattern));
-    }
-
-    public UsesMethod(MethodMatcher methodMatcher) {
-        this.methodMatcher = methodMatcher;
-    }
+    private final String fullyQualifiedType;
+    private final String field;
 
     @Override
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
         Set<JavaType> types = cu.getTypesInUse();
         for (JavaType type : types) {
-            if (type instanceof JavaType.Method) {
-                if(methodMatcher.matches(type)) {
+            if (type instanceof JavaType.Variable) {
+                JavaType.Variable variable = (JavaType.Variable) type;
+                if (variable.getName().equals(field) && TypeUtils.isOfClassType(variable.getType(), fullyQualifiedType)) {
                     return cu.withMarkers(cu.getMarkers().addIfAbsent(FOUND_TYPE));
                 }
             }
