@@ -179,6 +179,8 @@ interface AutodetectTest {
                 Set<Integer> s;
                 Map<Integer, Integer> m;
                 Collection<Integer> c;
+                LinkedHashMap<Integer, Integer> lhm;
+                HashSet<Integer> integer;
             }
         """.trimIndent()
         )
@@ -186,6 +188,6 @@ interface AutodetectTest {
         val styles = Autodetect.detect(cus)
         val importLayout = NamedStyles.merge(ImportLayoutStyle::class.java, listOf(styles))
 
-        assertThat(importLayout.classCountToUseStarImport).isEqualTo(4)
+        assertThat(importLayout.classCountToUseStarImport).isEqualTo(6)
     }
 }

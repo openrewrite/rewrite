@@ -48,15 +48,18 @@ public class Autodetect extends NamedStyles {
     public static Autodetect detect(List<J.CompilationUnit> cus) {
         IndentStatistics indentStatistics = new IndentStatistics();
         ImportLayoutStatistics importLayoutStatistics = new ImportLayoutStatistics();
+        SpacesStatistics spacesStatistics = new SpacesStatistics();
 
         for (J.CompilationUnit cu : cus) {
             new FindIndentJavaVisitor().visit(cu, indentStatistics);
             new FindImportLayout().visit(cu, importLayoutStatistics);
+            new FindSpacesStyle().visit(cu, spacesStatistics);
         }
 
         return new Autodetect(Tree.randomId(), Arrays.asList(
                 indentStatistics.getTabsAndIndentsStyle(),
-                importLayoutStatistics.getImportLayoutStyle()));
+                importLayoutStatistics.getImportLayoutStyle(),
+                spacesStatistics.getSpacesStyle()));
     }
 
     private static class IndentStatistics {
@@ -364,6 +367,111 @@ public class Autodetect extends NamedStyles {
             importLayoutStatistics.blocksPerSourceFile.add(new ArrayList<>(blocks));
 
             return cu;
+        }
+    }
+
+    private static class SpacesStatistics {
+        int beforeIf = 1;
+        int beforeMethodCall = 0;
+        int beforeMethodDeclaration = 0;
+        int beforeFor = 1;
+        int beforeWhile = 1;
+        int beforeSwitch = 1;
+        int beforeTry = 1;
+        int beforeCatch = 1;
+        int beforeSynchronized = 1;
+
+        public SpacesStyle getSpacesStyle() {
+            SpacesStyle spaces = IntelliJ.spaces();
+            return spaces
+                    .withBeforeParentheses(
+                            new SpacesStyle.BeforeParentheses(
+                                    beforeMethodDeclaration > 0,
+                                    beforeMethodCall > 0,
+                                    beforeIf > 0,
+                                    beforeFor > 0 || beforeWhile > 0,
+                                    beforeWhile > 0 || beforeFor > 0,
+                                    beforeSwitch > 0,
+                                    beforeTry > 0 || beforeCatch > 0,
+                                    beforeTry > 0 || beforeCatch > 0,
+                                    beforeSynchronized > 0,
+                                    false
+                            )
+                    );
+        }
+    }
+
+    private static class FindSpacesStyle extends JavaIsoVisitor<SpacesStatistics> {
+        @Override
+        public J.Try.Catch visitCatch(J.Try.Catch _catch, SpacesStatistics stats) {
+            stats.beforeCatch += hasSpace(_catch.getParameter().getPrefix());
+            return super.visitCatch(_catch, stats);
+        }
+
+        @Override
+        public J.DoWhileLoop visitDoWhileLoop(J.DoWhileLoop doWhileLoop, SpacesStatistics stats) {
+            stats.beforeWhile += hasSpace(doWhileLoop.getWhileCondition().getPrefix());
+            return super.visitDoWhileLoop(doWhileLoop, stats);
+        }
+
+        @Override
+        public J.ForEachLoop visitForEachLoop(J.ForEachLoop forLoop, SpacesStatistics stats) {
+            stats.beforeFor += hasSpace(forLoop.getControl().getPrefix());
+            return super.visitForEachLoop(forLoop, stats);
+        }
+
+        @Override
+        public J.ForLoop visitForLoop(J.ForLoop forLoop, SpacesStatistics stats) {
+            stats.beforeFor += hasSpace(forLoop.getControl().getPrefix());
+            return super.visitForLoop(forLoop, stats);
+        }
+
+        @Override
+        public J.If visitIf(J.If iff, SpacesStatistics stats) {
+            stats.beforeIf += hasSpace(iff.getIfCondition().getPrefix());
+            return super.visitIf(iff, stats);
+        }
+
+        @Override
+        public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, SpacesStatistics stats) {
+            stats.beforeMethodDeclaration += hasSpace(method.getPadding().getParameters().getBefore());
+            return super.visitMethodDeclaration(method, stats);
+        }
+
+        @Override
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, SpacesStatistics stats) {
+            stats.beforeMethodCall += hasSpace(method.getPadding().getArguments().getBefore());
+            return super.visitMethodInvocation(method, stats);
+        }
+
+        @Override
+        public J.Switch visitSwitch(J.Switch _switch, SpacesStatistics stats) {
+            stats.beforeSwitch += hasSpace(_switch.getSelector().getPrefix());
+            return super.visitSwitch(_switch, stats);
+        }
+
+        @Override
+        public J.Synchronized visitSynchronized(J.Synchronized _sync, SpacesStatistics stats) {
+            stats.beforeSynchronized += hasSpace(_sync.getLock().getPrefix());
+            return super.visitSynchronized(_sync, stats);
+        }
+
+        @Override
+        public J.Try visitTry(J.Try _try, SpacesStatistics stats) {
+            if(_try.getPadding().getResources() != null) {
+                stats.beforeTry += hasSpace(_try.getPadding().getResources().getBefore());
+            }
+            return super.visitTry(_try, stats);
+        }
+
+        @Override
+        public J.WhileLoop visitWhileLoop(J.WhileLoop whileLoop, SpacesStatistics stats) {
+            stats.beforeWhile += hasSpace(whileLoop.getCondition().getPrefix());
+            return super.visitWhileLoop(whileLoop, stats);
+        }
+
+        private int hasSpace(Space space) {
+            return space.getWhitespace().contains(" ") ? 1 : -1;
         }
     }
 }

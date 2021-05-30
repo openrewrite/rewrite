@@ -16,10 +16,10 @@
 package org.openrewrite.java
 
 import org.openrewrite.InMemoryExecutionContext
-import org.openrewrite.Recipe
-import org.openrewrite.SourceFile
 import org.openrewrite.java.style.Autodetect
 import org.openrewrite.java.style.ImportLayoutStyle
+import org.openrewrite.java.style.SpacesStyle
+import org.openrewrite.java.style.TabsAndIndentsStyle
 import org.openrewrite.java.tree.J
 import org.openrewrite.style.NamedStyles
 import java.nio.file.Files
@@ -54,5 +54,11 @@ object AutodetectStyleForJavaProjectOnDisk {
 
         val importLayout = NamedStyles.merge(ImportLayoutStyle::class.java, listOf(autodetect))
         println(importLayout)
+
+        val spacesStyle = NamedStyles.merge(SpacesStyle::class.java, listOf(autodetect))
+        println(spacesStyle)
+
+        val tabsStyle = NamedStyles.merge(TabsAndIndentsStyle::class.java, listOf(autodetect))
+        println(tabsStyle)
     }
 }
