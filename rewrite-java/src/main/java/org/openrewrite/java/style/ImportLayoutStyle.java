@@ -155,12 +155,12 @@ public class ImportLayoutStyle implements JavaStyle {
         private int nameCountToUseStarImport = 3;
 
         public Builder importAllOthers() {
-            blocks.add(new Block.AllOthers(false, classCountToUseStarImport, nameCountToUseStarImport));
+            blocks.add(new Block.AllOthers(false));
             return this;
         }
 
         public Builder importStaticAllOthers() {
-            blocks.add(new Block.AllOthers(true, classCountToUseStarImport, nameCountToUseStarImport));
+            blocks.add(new Block.AllOthers(true));
             return this;
         }
 
@@ -406,7 +406,7 @@ public class ImportLayoutStyle implements JavaStyle {
             private final boolean statik;
             private Collection<ImportPackage> packageImports = emptyList();
 
-            public AllOthers(boolean statik, int classCountToUseStarImport, int nameCountToUseStarImport) {
+            public AllOthers(boolean statik) {
                 super(statik, "*", true
                 );
                 this.statik = statik;
@@ -448,7 +448,7 @@ class Deserializer extends JsonDeserializer<ImportLayoutStyle> {
                     currentField = p.getCurrentName();
                     break;
                 case VALUE_STRING:
-                    if(!currentField.equals("layout")) {
+                    if(!"layout".equals(currentField)) {
                         break;
                     }
                     String block = p.getText().trim();

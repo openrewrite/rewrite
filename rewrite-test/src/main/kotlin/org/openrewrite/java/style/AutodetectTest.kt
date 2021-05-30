@@ -24,7 +24,8 @@ interface AutodetectTest {
 
     @Test
     fun springCloudTabsAndIndents(jp: JavaParser) {
-        val cus = jp.parse("""
+        val cus = jp.parse(
+            """
             package org.springframework.cloud.netflix.eureka;
             
             import static org.springframework.cloud.netflix.eureka.EurekaConstants.DEFAULT_PREFIX;
@@ -44,7 +45,8 @@ interface AutodetectTest {
             				&& Objects.equals(transport, that.transport);
             	}
             }
-        """.trimIndent())
+        """.trimIndent()
+        )
 
         val styles = Autodetect.detect(cus)
         val tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle::class.java, listOf(styles))
@@ -57,7 +59,8 @@ interface AutodetectTest {
 
     @Test
     fun spinnakerTabsAndIndents(jp: JavaParser) {
-        val cus = jp.parse("""
+        val cus = jp.parse(
+            """
             package com.netflix.kayenta.orca.controllers;
             
             @RestController
@@ -81,7 +84,8 @@ interface AutodetectTest {
                 setInstanceEnabled(enabled);
               }
             }
-        """.trimIndent())
+        """.trimIndent()
+        )
 
         val styles = Autodetect.detect(cus)
         val tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle::class.java, listOf(styles))
@@ -94,7 +98,8 @@ interface AutodetectTest {
 
     @Test
     fun rewriteTabsAndIndents(jp: JavaParser) {
-        val cus = jp.parse("""
+        val cus = jp.parse(
+            """
             public class Autodetect extends NamedStyles {
                 @Override
                 public J.Identifier visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
@@ -110,7 +115,8 @@ interface AutodetectTest {
                 }
 
             }
-        """.trimIndent())
+        """.trimIndent()
+        )
 
         val styles = Autodetect.detect(cus)
         val tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle::class.java, listOf(styles))
@@ -119,5 +125,46 @@ interface AutodetectTest {
         assertThat(tabsAndIndents.tabSize).isEqualTo(1)
         assertThat(tabsAndIndents.indentSize).isEqualTo(4)
         assertThat(tabsAndIndents.continuationIndent).isEqualTo(8)
+    }
+
+    @Test
+    fun rewriteImportLayout(jp: JavaParser) {
+        val cus = jp.parse(
+            """
+            import com.fasterxml.jackson.annotation.JsonCreator;
+            import org.openrewrite.Tree;
+            import org.openrewrite.internal.lang.Nullable;
+            
+            import java.util.*;
+            import java.util.stream.Collectors;
+            
+            import static java.util.Collections.*;
+            import static java.util.function.Function.identity;
+
+            public class Test {
+            }
+        """.trimIndent()
+        )
+
+        val styles = Autodetect.detect(cus)
+        val importLayout = NamedStyles.merge(ImportLayoutStyle::class.java, listOf(styles))
+
+        assertThat(importLayout.layout[0]).isInstanceOf(ImportLayoutStyle.Block.AllOthers::class.java)
+        assertThat(importLayout.layout[1]).isInstanceOf(ImportLayoutStyle.Block.BlankLines::class.java)
+
+        assertThat(importLayout.layout[2])
+            .isInstanceOf(ImportLayoutStyle.Block.ImportPackage::class.java)
+            .matches { b -> !(b as ImportLayoutStyle.Block.ImportPackage).isStatic }
+            .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == "java\\..+" }
+
+        assertThat(importLayout.layout[3]).isInstanceOf(ImportLayoutStyle.Block.BlankLines::class.java)
+
+        assertThat(importLayout.layout[4]).isInstanceOf(ImportLayoutStyle.Block.AllOthers::class.java)
+        assertThat(importLayout.layout[5]).isInstanceOf(ImportLayoutStyle.Block.BlankLines::class.java)
+
+        assertThat(importLayout.layout[6])
+            .isInstanceOf(ImportLayoutStyle.Block.ImportPackage::class.java)
+            .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).isStatic }
+            .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == "java\\..+" }
     }
 }
