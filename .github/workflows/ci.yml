@@ -13,7 +13,7 @@ on:
 
 env:
   GRADLE_OPTS: '-Dorg.gradle.jvmargs="-Xmx2048m -XX:+HeapDumpOnOutOfMemoryError"'
-  GRADLE_SWITCHES: "--console=plain --info --stacktrace --no-daemon"
+  GRADLE_SWITCHES: "--console=plain --info --no-daemon"
 
 jobs:
   build:

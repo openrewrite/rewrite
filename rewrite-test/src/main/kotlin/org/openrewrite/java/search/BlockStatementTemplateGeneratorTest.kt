@@ -22,18 +22,14 @@ import com.google.googlejavaformat.java.JavaFormatterOptions
 import org.assertj.core.api.Assertions.assertThat
 import org.intellij.lang.annotations.Language
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.extension.ExtendWith
-import org.openrewrite.MetricsExtension
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaVisitor
 import org.openrewrite.java.internal.template.BlockStatementTemplateGenerator
 import org.openrewrite.java.tree.J
-import org.openrewrite.java.tree.JavaCoordinates
 import org.openrewrite.java.tree.Space
 import java.io.ByteArrayOutputStream
 import java.io.OutputStreamWriter
 
-@ExtendWith(MetricsExtension::class)
 interface BlockStatementTemplateGeneratorTest {
 
     @Test

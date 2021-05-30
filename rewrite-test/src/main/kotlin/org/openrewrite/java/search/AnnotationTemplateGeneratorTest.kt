@@ -31,7 +31,6 @@ import org.openrewrite.java.tree.J
 import java.io.ByteArrayOutputStream
 import java.io.OutputStreamWriter
 
-@ExtendWith(MetricsExtension::class)
 interface AnnotationTemplateGeneratorTest {
 
     @Test
