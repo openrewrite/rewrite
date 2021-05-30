@@ -627,8 +627,23 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitIdentifier(IdentifierTree node, Space fmt) {
-        cursor += node.getName().toString().length();
-        return J.Identifier.build(randomId(), fmt, Markers.EMPTY, node.getName().toString(), type(node));
+        String name = node.getName().toString();
+        cursor += name.length();
+
+        JCIdent ident = (JCIdent) node;
+        JavaType type = type(node);
+
+        // we don't map all the possible symbol types here, because in many cases they aren't necessary.
+        // for method invocations, the J.MethodInvocation will have type attribution, so having the JavaType.Method on the
+        // method invocation select is not needed. for fields, this symbol is the only way to determine an identifier represents
+        // a field.
+        JavaType fieldType = null;
+        if (ident.sym instanceof Symbol.VarSymbol) {
+            // currently only the first 16 bits are meaninful
+            fieldType = new JavaType.Variable((int) ident.sym.flags_field & 0xFFFF, name, type(ident.sym.owner.type));
+        }
+
+        return J.Identifier.build(randomId(), fmt, Markers.EMPTY, name, type, fieldType);
     }
 
     @Override
@@ -965,10 +980,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         JCNewClass jcNewClass = (JCNewClass) node;
-        JavaType.Method constructorType = null;
-        if (jcNewClass.constructor != null && type((jcNewClass.constructor).owner) != null) {
-            constructorType = methodType(jcNewClass.constructorType, jcNewClass.constructor, "<constructor>");
-        }
+        JavaType.Method constructorType = methodType(jcNewClass.constructorType, jcNewClass.constructor, "<constructor>");
 
         return new J.NewClass(randomId(), fmt, Markers.EMPTY, encl, whitespaceBeforeNew,
                 clazz, args, body, constructorType,
@@ -1569,11 +1581,19 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 }
             }
 
-            JavaType.FullyQualified declaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner));
-            assert declaringType != null;
+            JavaType.FullyQualified declaringType = null;
+            if (methodSymbol.owner instanceof Symbol.ClassSymbol || methodSymbol.owner instanceof Symbol.TypeVariableSymbol) {
+                declaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner.type));
+            } else if (methodSymbol.owner instanceof Symbol.VarSymbol) {
+                declaringType = new JavaType.GenericTypeVariable(methodSymbol.owner.name.toString(), null);
+            }
+
+            if (declaringType == null) {
+                return null;
+            }
 
             return JavaType.Method.build(
-                    //Currently only the first 16 bits are meaninful
+                    // currently only the first 16 bits are meaningful
                     (int) methodSymbol.flags_field & 0xFFFF,
                     declaringType,
                     methodName,
@@ -1588,24 +1608,14 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     @Nullable
-    private JavaType type(@Nullable Symbol symbol) {
-        if (symbol instanceof Symbol.ClassSymbol || symbol instanceof Symbol.TypeVariableSymbol) {
-            return type(symbol.type);
-        } else if (symbol instanceof Symbol.VarSymbol) {
-            return new JavaType.GenericTypeVariable(symbol.name.toString(), null);
-        }
-        return null;
-    }
-
-    @Nullable
     private JavaType type(@Nullable Type type) {
         return type(type, emptyList());
     }
 
     @Nullable
     private JavaType type(@Nullable com.sun.tools.javac.code.Type type, List<Symbol> stack) {
-        //Word of caution, during attribution, we will likely encounter symbols that have been parsed but are not
-        //on the parser's classpath. Calling a method on the symbol that calls complete() will result in an exception
+        // Word of caution, during attribution, we will likely encounter symbols that have been parsed but are not
+        // on the parser's classpath. Calling a method on the symbol that calls complete() will result in an exception
         // being thrown. That is why this method uses the symbol's underlying fields directly vs the accessor methods.
         if (type instanceof ClassType) {
             if (type instanceof com.sun.tools.javac.code.Type.ErrorType) {
@@ -1632,7 +1642,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                         for (Symbol elem : sym.members_field.getElements()) {
                             if (elem instanceof Symbol.VarSymbol) {
                                 fields.add(new JavaType.Variable(
-                                        //Currently only the first 16 bits are meaninful
+                                        // currently only the first 16 bits are meaningful
                                         (int) elem.flags_field & 0xFFFF,
                                         elem.name.toString(),
                                         type(elem.type, stackWithSym)

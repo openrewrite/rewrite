@@ -1600,7 +1600,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             }
 
             return JavaType.Method.build(
-                    // currently only the first 16 bits are meaninful
+                    // currently only the first 16 bits are meaningful
                     (int) methodSymbol.flags_field & 0xFFFF,
                     declaringType,
                     methodName,
@@ -1649,7 +1649,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                         for (Symbol elem : sym.members_field.getSymbols()) {
                             if (elem instanceof Symbol.VarSymbol) {
                                 fields.add(new JavaType.Variable(
-                                        // Currently only the first 16 bits are meaninful
+                                        // currently only the first 16 bits are meaningful
                                         (int) elem.flags_field & 0xFFFF,
                                         elem.name.toString(),
                                         type(elem.type, stackWithSym)
