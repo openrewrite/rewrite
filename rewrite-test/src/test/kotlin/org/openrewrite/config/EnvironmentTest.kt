@@ -237,7 +237,7 @@ class EnvironmentTest : RecipeTest {
         val recipeDescriptors = env.listRecipeDescriptors()
         assertThat(recipeDescriptors).isNotNull.isNotEmpty
         val changeTextDescriptor =
-            recipeDescriptors.filter { it.name == "org.openrewrite.text.ChangeText" }.firstOrNull()
+            recipeDescriptors.firstOrNull { it.name == "org.openrewrite.text.ChangeText" }
         assertThat(changeTextDescriptor).isNotNull
         assertThat(changeTextDescriptor!!.options).hasSize(1)
         assertThat(changeTextDescriptor.options[0].name).isEqualTo("toText")
@@ -249,7 +249,7 @@ class EnvironmentTest : RecipeTest {
         val env = Environment.builder().scanRuntimeClasspath().build()
         val styles = env.listStyles()
         assertThat(styles).isNotNull.isNotEmpty
-        val sampleStyle = styles.filter { it.name == "org.openrewrite.SampleStyle" }.firstOrNull()
+        val sampleStyle = styles.firstOrNull { it.name == "org.openrewrite.SampleStyle" }
         assertThat(sampleStyle).isNotNull
         assertThat(sampleStyle!!.displayName).isEqualTo("Sample style")
         assertThat(sampleStyle.description).isEqualTo("Sample test style")

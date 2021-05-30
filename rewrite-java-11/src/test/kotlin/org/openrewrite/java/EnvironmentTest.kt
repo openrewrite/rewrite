@@ -23,15 +23,14 @@ import java.util.*
 
 class EnvironmentTest {
 
-    @Test
-    fun listRecipeDescriptors() {
-        val env = Environment.builder().scanRuntimeClasspath().build()
-        val recipeDescriptors = env.listRecipeDescriptors()
-        recipeDescriptors.forEach {
-            println()
-            printRecipeDescriptor(it)
-        }
-    }
+//    @Test
+//    fun listRecipeDescriptors() {
+//        val env = Environment.builder().scanRuntimeClasspath().build()
+//        val recipeDescriptors = env.listRecipeDescriptors()
+//        recipeDescriptors.forEach {
+//            printRecipeDescriptor(it)
+//        }
+//    }
 
     private fun printRecipeDescriptor(recipe: RecipeDescriptor, indent: String = "") {
         println("name: ${recipe.name}")

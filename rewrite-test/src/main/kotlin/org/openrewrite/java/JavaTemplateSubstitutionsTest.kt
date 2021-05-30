@@ -233,10 +233,10 @@ interface JavaTemplateSubstitutionsTest : JavaRecipeTest {
                         override fun openStream() = OutputStreamWriter(bos)
                     })
 
-                println(bos.toString(Charsets.UTF_8).trim())
+//                println(bos.toString(Charsets.UTF_8).trim())
             } catch (_: Throwable) {
-                println("Unable to format:")
-                println(s)
+//                println("Unable to format:")
+//                println(s)
             }
         }
     }

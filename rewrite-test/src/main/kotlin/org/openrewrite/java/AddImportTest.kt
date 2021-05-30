@@ -82,7 +82,6 @@ interface AddImportTest : JavaRecipeTest {
                 var b = c.body
                 if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
                     val t = template("BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);")
-                        .doBeforeParseTemplate(::println)
                         .imports("java.math.BigDecimal", "java.math.RoundingMode")
                         .build()
 

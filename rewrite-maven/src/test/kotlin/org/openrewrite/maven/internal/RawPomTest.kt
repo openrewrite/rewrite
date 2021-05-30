@@ -219,8 +219,6 @@ class RawPomTest {
 
         assertThat(model.innerProfiles[0].dependencies!!.dependencies.first().groupId).isEqualTo("javax.xml.bind")
         assertThat(model.innerProfiles[1].dependencies!!.dependencies).isEmpty()
-
-        println(MavenXmlMapper.writeMapper().writerWithDefaultPrettyPrinter().writeValueAsString(model))
     }
 
     private fun assertSerializationRoundTrip(tempDir: Path, pom: RawPom): RawPom =
