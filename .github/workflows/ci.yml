@@ -34,7 +34,7 @@ jobs:
           distribution: "adopt"
           java-version: ${{ matrix.java }}
       - name: setup-cache
-        uses: actions/cache@v2.1.5
+        uses: actions/cache@v2.1.6
         with:
           path: |
             ~/.gradle/caches
@@ -59,7 +59,7 @@ jobs:
           distribution: "adopt"
           java-version: "11"
       - name: setup-cache
-        uses: actions/cache@v2.1.5
+        uses: actions/cache@v2.1.6
         with:
           path: |
             ~/.gradle/caches
