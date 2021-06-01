@@ -551,8 +551,7 @@ class Serializer extends JsonSerializer<ImportLayoutStyle> {
                                 "all other imports";
                     } else if (block instanceof ImportLayoutStyle.Block.ImportPackage) {
                         ImportLayoutStyle.Block.ImportPackage importPackage = (ImportLayoutStyle.Block.ImportPackage) block;
-                        return (importPackage.isStatic() ? "static " : "") +
-                                "import " + importPackage.getPackageWildcard();
+                        return "import " + (importPackage.isStatic() ? "static " : "") + importPackage.getPackageWildcard();
                     }
                     return new UnsupportedOperationException("Unknown block type " + block.getClass().getName());
                 })
