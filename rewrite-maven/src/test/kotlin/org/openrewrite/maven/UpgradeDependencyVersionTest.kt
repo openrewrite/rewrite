@@ -103,7 +103,6 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/565")
-    @Disabled
     fun handlesPropertiesInDependencyGroupIdAndArtifactId() = assertChanged(
         recipe = UpgradeDependencyVersion(
             "org.springframework.boot",
