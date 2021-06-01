@@ -20,11 +20,11 @@ import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ScanResult;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.style.NamedStyles;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
@@ -89,7 +89,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
     }
 
     /**
-     * Construct a ClasspathScanningLoader that scans the specified jar name, which must be on the the compile classpath.
+     * Construct a ClasspathScanningLoader that scans the specified jar name, which must be on the specified compile classpath.
      * The classpath is used to provide symbols, but the scan is limited to just recipes contained within the jar.
      *
      * @param jarName Name of jar on classpath to scan for recipes
@@ -98,29 +98,35 @@ public class ClasspathScanningLoader implements ResourceLoader {
      * @param acceptPackages Limit scan to specified packages
      */
     public ClasspathScanningLoader(String jarName, Iterable<Path> compileClasspath, Properties properties, String[] acceptPackages) {
-        URLClassLoader classpathLoader = new URLClassLoader(
-                stream(compileClasspath.spliterator(), false)
-                        .map(cc -> {
-                            try {
-                                return cc.toUri().toURL();
-                            } catch (MalformedURLException e) {
-                                throw new UncheckedIOException(e);
-                            }
-                        })
-                        .toArray(URL[]::new),
-                getClass().getClassLoader()
-        );
+        this(jarName, compileClasspath, properties, null, acceptPackages);
+    }
+
+    public ClasspathScanningLoader(String jarName, Iterable<Path> compileClasspath, Properties properties, @Nullable ClassLoader classLoader, String[] acceptPackages) {
+        if (classLoader == null) {
+            classLoader = new URLClassLoader(
+                    stream(compileClasspath.spliterator(), false)
+                            .map(cc -> {
+                                try {
+                                    return cc.toUri().toURL();
+                                } catch (MalformedURLException e) {
+                                    throw new UncheckedIOException(e);
+                                }
+                            })
+                            .toArray(URL[]::new),
+                    getClass().getClassLoader()
+            );
+        }
 
         scanYaml(new ClassGraph()
                 .acceptJars(jarName)
                 .ignoreParentClassLoaders()
-                .overrideClassLoaders(classpathLoader)
-                .acceptPaths("META-INF/rewrite"), properties, classpathLoader);
+                .overrideClassLoaders(classLoader)
+                .acceptPaths("META-INF/rewrite"), properties, classLoader);
 
         scanClasses(new ClassGraph()
                 .acceptJars(jarName)
                 .ignoreParentClassLoaders()
-                .overrideClassLoaders(classpathLoader), acceptPackages);
+                .overrideClassLoaders(classLoader), acceptPackages);
     }
 
     private void scanYaml(ClassGraph classGraph, Properties properties, @Nullable ClassLoader classLoader) {
