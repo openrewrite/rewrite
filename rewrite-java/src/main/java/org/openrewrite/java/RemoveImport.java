@@ -37,7 +37,6 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
-        String staticImportClassName = type.substring(0, Math.max(0, type.lastIndexOf('.')));
 
         ImportLayoutStyle importLayoutStyle = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
                 .orElse(IntelliJ.importLayout());
@@ -52,25 +51,23 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             if (javaType instanceof JavaType.Variable) {
                 JavaType.Variable variable = (JavaType.Variable) javaType;
                 JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getType());
-                if (fq != null && fq.getFullyQualifiedName().equals(type)) {
-                    methodsAndFieldsUsed.add(variable.getName());
+                if (fq != null) {
+                    if (fq.getFullyQualifiedName().equals(type) || fq.getFullyQualifiedName().equals(owner)) {
+                        methodsAndFieldsUsed.add(variable.getName());
+                    }
                 }
             } else if (javaType instanceof JavaType.Method) {
                 JavaType.Method method = (JavaType.Method) javaType;
                 if (method.hasFlags(Flag.Static)) {
                     if (method.getDeclaringType().getFullyQualifiedName().equals(type)) {
                         methodsAndFieldsUsed.add(method.getName());
-                    } else {
-                        otherMethodsAndFieldsInTypeUsed.add(method.getName());
                     }
                 }
             } else if (javaType instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) javaType;
                 if (fullyQualified.getFullyQualifiedName().equals(type)) {
                     typeUsed = true;
-                } else if (fullyQualified.getFullyQualifiedName().equals(staticImportClassName)) {
-                    otherTypesInPackageUsed.add(fullyQualified.getClassName());
-                } else if (fullyQualified.getPackageName().equals(owner)) {
+                } else if (fullyQualified.getFullyQualifiedName().equals(owner) || fullyQualified.getPackageName().equals(owner)) {
                     otherTypesInPackageUsed.add(fullyQualified.getClassName());
                 }
             }
@@ -100,7 +97,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 }
             } else if (!keepImport && typeName.equals(type)) {
                 return null;
-            } else if (!keepImport && impoort.getPackageName().equals(staticImportClassName) &&
+            } else if (!keepImport && impoort.getPackageName().equals(owner) &&
                     "*".equals(impoort.getClassName()) &&
                     otherTypesInPackageUsed.size() < importLayoutStyle.getNameCountToUseStarImport()) {
                 if (otherTypesInPackageUsed.isEmpty()) {
