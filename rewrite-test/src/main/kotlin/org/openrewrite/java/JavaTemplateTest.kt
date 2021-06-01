@@ -19,8 +19,10 @@ import com.google.common.io.CharSink
 import com.google.common.io.CharSource
 import com.google.googlejavaformat.java.Formatter
 import com.google.googlejavaformat.java.JavaFormatterOptions
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
+import org.openrewrite.Issue
 import org.openrewrite.java.tree.J
 import java.io.ByteArrayOutputStream
 import java.io.OutputStreamWriter
@@ -78,6 +80,50 @@ interface JavaTemplateTest : JavaRecipeTest {
             
                 void test2() {
                 }
+            }
+        """
+    )
+
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/602")
+    @Test
+    fun replaceMethodInvocationMemberReference(jp: JavaParser) = assertChanged(
+        jp,
+        dependsOn = arrayOf("""
+            package org.openrewrite;
+            public class TestClass {
+                public static Integer getValue() { return null; }
+            }
+        """.trimIndent(),
+        """
+            package org.openrewrite;
+            public interface TestInterface {
+                Integer getValue();
+            }
+        """.trimIndent()),
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val t = template("TestInterface::getValue").build()
+            val METHOD_MATCHER = MethodMatcher("org.openrewrite.TestClass getValue()");
+
+            override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
+                if (METHOD_MATCHER.matches(method)) {
+                    return method.withTemplate(t, method.coordinates.replace())
+                }
+                return super.visitMethodInvocation(method, p)
+            }
+        }.toRecipe(),
+        before = """
+            import org.openrewrite.TestClass;
+
+            class Test {
+                Integer n = TestClass.getValue();
+            }
+        """,
+        after = """
+            import org.openrewrite.TestClass;
+
+            class Test {
+                Integer n = TestInterface::getValue;
             }
         """
     )
