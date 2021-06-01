@@ -57,6 +57,12 @@ public class AddPlugin extends Recipe {
     @Nullable
     String configuration;
 
+    @Option(displayName = "Dependencies",
+            description = "Optional plugin dependencies provided as raw XML.",
+            required = false)
+    @Nullable
+    String dependencies;
+
     @Override
     public String getDisplayName() {
         return "Add Maven plugin";
@@ -80,6 +86,7 @@ public class AddPlugin extends Recipe {
                         "<artifactId>" + artifactId + "</artifactId>\n" +
                         "<version>" + version + "</version>\n" +
                         (configuration != null ? configuration.trim() + "\n" : "") +
+                        (dependencies != null ? dependencies.trim() + "\n" : "") +
                         "</plugin>\n" +
                         "</plugins>\n" +
                         "</build>"),
@@ -120,6 +127,7 @@ public class AddPlugin extends Recipe {
                                 "<artifactId>" + artifactId + "</artifactId>\n" +
                                 "<version>" + version + "</version>\n" +
                                 (configuration != null ? configuration.trim() + "\n" : "") +
+                                (dependencies != null ? dependencies.trim() + "\n" : "") +
                                 "</plugin>")));
                     }
                 }
