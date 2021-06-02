@@ -52,6 +52,10 @@ public interface Parser<S extends SourceFile> {
         );
     }
 
+    default List<S> parse(String... sources) {
+        return parse(new InMemoryExecutionContext(), sources);
+    }
+
     default List<S> parse(ExecutionContext ctx, String... sources) {
         return parseInputs(
                 Arrays.stream(sources).map(source ->
@@ -65,14 +69,6 @@ public interface Parser<S extends SourceFile> {
                 ctx
         );
     }
-
-    /**
-     * Used for testing primarily, when a multi-line source string is written inline.
-     *
-     * @param sources One or more sources.
-     * @return Parsed list of {@link SourceFile}.
-     */
-    List<S> parse(String... sources);
 
     /**
      * @param sources    A collection of inputs. At the conclusion of parsing all sources' {@link Input#source}

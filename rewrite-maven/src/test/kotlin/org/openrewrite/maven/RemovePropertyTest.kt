@@ -34,13 +34,6 @@ class RemovePropertyTest : MavenRecipeTest {
                 <a.version>a</a.version>
                 <bla.version>b</bla.version>
               </properties>
-              
-              <dependencies>
-                <dependency>
-                  <groupId>org.webjars</groupId>
-                  <artifactId>webjars-locator</artifactId>
-                </dependency>
-              </dependencies>
             </project>
         """,
         after = """
@@ -54,15 +47,7 @@ class RemovePropertyTest : MavenRecipeTest {
               <properties>
                 <a.version>a</a.version>
               </properties>
-              
-              <dependencies>
-                <dependency>
-                  <groupId>org.webjars</groupId>
-                  <artifactId>webjars-locator</artifactId>
-                </dependency>
-              </dependencies>
             </project>
         """
     )
-
 }
