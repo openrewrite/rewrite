@@ -167,9 +167,8 @@ public interface J extends Serializable, Tree {
         @Nullable
         JContainer<Expression> arguments;
 
-        @Nullable
         public List<Expression> getArguments() {
-            return arguments == null ? null : arguments.getElements();
+            return arguments == null ? emptyList() : arguments.getElements();
         }
 
         public Annotation withArguments(@Nullable List<Expression> arguments) {
@@ -870,9 +869,8 @@ public interface J extends Serializable, Tree {
         @Nullable
         JContainer<TypeParameter> typeParameters;
 
-        @Nullable
         public List<TypeParameter> getTypeParameters() {
-            return typeParameters == null ? null : typeParameters.getElements();
+            return typeParameters == null ? emptyList() : typeParameters.getElements();
         }
 
         public ClassDeclaration withTypeParameters(@Nullable List<TypeParameter> typeParameters) {
@@ -894,9 +892,8 @@ public interface J extends Serializable, Tree {
         @Nullable
         JContainer<TypeTree> implementings;
 
-        @Nullable
         public List<TypeTree> getImplements() {
-            return implementings == null ? null : implementings.getElements();
+            return implementings == null ? emptyList() : implementings.getElements();
         }
 
         public ClassDeclaration withImplements(@Nullable List<TypeTree> implementings) {
@@ -2736,9 +2733,8 @@ public interface J extends Serializable, Tree {
         @Nullable
         JContainer<Expression> typeParameters;
 
-        @Nullable
         public List<Expression> getTypeParameters() {
-            return typeParameters == null ? null : typeParameters.getElements();
+            return typeParameters == null ?  emptyList() : typeParameters.getElements();
         }
 
         public MemberReference withTypeParameters(@Nullable List<Expression> typeParameters) {
@@ -2853,7 +2849,7 @@ public interface J extends Serializable, Tree {
         TypeParameters typeParameters;
 
         public List<TypeParameter> getTypeParameters() {
-            return typeParameters == null ? Collections.emptyList() : typeParameters.getTypeParameters();
+            return typeParameters == null ? emptyList() : typeParameters.getTypeParameters();
         }
 
         public MethodDeclaration withTypeParameters(@Nullable List<TypeParameter> typeParameters) {
@@ -2906,7 +2902,7 @@ public interface J extends Serializable, Tree {
         JContainer<NameTree> throwz;
 
         public List<NameTree> getThrows() {
-            return throwz == null ? Collections.emptyList() : throwz.getElements();
+            return throwz == null ? emptyList() : throwz.getElements();
         }
 
         public MethodDeclaration withThrows(@Nullable List<NameTree> throwz) {
@@ -3139,9 +3135,8 @@ public interface J extends Serializable, Tree {
         @With
         JContainer<Expression> typeParameters;
 
-        @Nullable
         public List<Expression> getTypeParameters() {
-            return typeParameters == null ? null : typeParameters.getElements();
+            return typeParameters == null ? emptyList() : typeParameters.getElements();
         }
 
         @With
@@ -3421,9 +3416,8 @@ public interface J extends Serializable, Tree {
         @Nullable
         JContainer<Expression> initializer;
 
-        @Nullable
         public List<Expression> getInitializer() {
-            return initializer == null ? null : initializer.getElements();
+            return initializer == null  ? emptyList() : initializer.getElements();
         }
 
         @With
@@ -3593,9 +3587,8 @@ public interface J extends Serializable, Tree {
         @Nullable
         JContainer<Expression> arguments;
 
-        @Nullable
         public List<Expression> getArguments() {
-            return arguments == null ? null : arguments.getElements();
+            return arguments == null ? emptyList() : arguments.getElements();
         }
 
         public NewClass withArguments(@Nullable List<Expression> arguments) {
@@ -3731,9 +3724,8 @@ public interface J extends Serializable, Tree {
         @Nullable
         JContainer<Expression> typeParameters;
 
-        @Nullable
         public List<Expression> getTypeParameters() {
-            return typeParameters == null ? null : typeParameters.getElements();
+            return typeParameters == null ? emptyList() : typeParameters.getElements();
         }
 
         public ParameterizedType withTypeParameters(@Nullable List<Expression> typeParameters) {
@@ -4245,9 +4237,8 @@ public interface J extends Serializable, Tree {
         @Nullable
         JContainer<Resource> resources;
 
-        @Nullable
         public List<Resource> getResources() {
-            return resources == null ? null : resources.getElements();
+            return resources == null ? emptyList() : resources.getElements();
         }
 
         public Try withResources(@Nullable List<Resource> resources) {
@@ -4454,7 +4445,7 @@ public interface J extends Serializable, Tree {
         JContainer<TypeTree> bounds;
 
         public List<TypeTree> getBounds() {
-            return bounds == null ? Collections.emptyList() : bounds.getElements();
+            return bounds == null ? emptyList() : bounds.getElements();
         }
 
         public TypeParameter withBounds(@Nullable List<TypeTree> bounds) {

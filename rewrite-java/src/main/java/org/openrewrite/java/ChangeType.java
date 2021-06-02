@@ -127,9 +127,7 @@ public class ChangeType extends Recipe {
                 c = c.withExtends(transformName(c.getExtends()));
             }
 
-            if (c.getImplements() != null) {
-                c = c.withImplements(ListUtils.map(c.getImplements(), this::transformName));
-            }
+            c = c.withImplements(ListUtils.map(c.getImplements(), this::transformName));
 
             return c;
         }
