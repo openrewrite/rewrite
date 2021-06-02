@@ -646,7 +646,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         JavaType fieldType = null;
         if (ident.sym instanceof Symbol.VarSymbol) {
             // currently only the first 16 bits are meaninful
-            fieldType = new JavaType.Variable((int) ident.sym.flags_field & 0xFFFF, name, type(ident.sym.owner.type));
+            fieldType = JavaType.Variable.build(name, type(ident.sym.owner.type), (int) ident.sym.flags_field & 0xFFFF);
         }
 
         return J.Identifier.build(randomId(), fmt, Markers.EMPTY, name, type, fieldType);
@@ -1648,11 +1648,11 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                         fields = new ArrayList<>();
                         for (Symbol elem : sym.members_field.getSymbols()) {
                             if (elem instanceof Symbol.VarSymbol) {
-                                fields.add(new JavaType.Variable(
-                                        // currently only the first 16 bits are meaningful
-                                        (int) elem.flags_field & 0xFFFF,
+                                fields.add(JavaType.Variable.build(
                                         elem.name.toString(),
-                                        type(elem.type, stackWithSym)
+                                        type(elem.type, stackWithSym),
+                                        // currently only the first 16 bits are meaningful
+                                        (int) elem.flags_field & 0xFFFF
                                 ));
                             }
                         }

@@ -23,17 +23,12 @@ import lombok.*;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.io.Serializable;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Parameter;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
-import static java.util.Collections.singleton;
 import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toList;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @JsonTypeInfo(use = JsonTypeInfo.Id.MINIMAL_CLASS, property = "@c")
@@ -201,7 +196,7 @@ public interface JavaType extends Serializable {
         private final List<FullyQualified> interfaces;
 
         @Nullable
-        private volatile List<Method> constructors;
+        private final List<Method> constructors;
 
         @Nullable
         private final FullyQualified supertype;
@@ -294,36 +289,27 @@ public interface JavaType extends Serializable {
                                   @Nullable FullyQualified supertype,
                                   @Nullable FullyQualified owningClass,
                                   boolean relaxedClassTypeMatching) {
-
-            List<Variable> sortedMembers;
-            if (fullyQualifiedName.equals("java.lang.String")) {
-                //There is a "serialPersistentFields" member within the String class which is used in normal Java
-                //serialization to customize how the String field is serialized. This field is tripping up Jackson
-                //serialization and is intentionally filtered to prevent errors.
-                sortedMembers = members.stream().filter(m -> !m.getName().equals("serialPersistentFields")).collect(Collectors.toList());
-            } else {
-                sortedMembers = new ArrayList<>(members);
+            Set<JavaType.Class> variants = flyweights.get(fullyQualifiedName);
+            if (relaxedClassTypeMatching && variants != null && !variants.isEmpty()) {
+                // no lock access to existing flyweight when relaxed class type matching is off
+                return variants.iterator().next();
             }
-            sortedMembers.sort(comparing(Variable::getName));
-
-            JavaType.Class candidate = new Class(flagsBitMap, fullyQualifiedName, kind, sortedMembers, interfaces, constructors, supertype, owningClass);
-
-            // This logic will attempt to match the candidate against a candidate in the flyweights. If a match is found,
-            // that instance is used over the new candidate to prevent a large memory footprint. If relaxed class type
-            // matching is "true" any variant with the same ID will be used. If the relaxed class type matching is "false",
-            // equality is determined by comparing the immediate structure of the class and also comparing the supertype
-            // hierarchies.
 
             synchronized (flyweights) {
-                Set<JavaType.Class> variants = flyweights.computeIfAbsent(candidate.fullyQualifiedName, fqn -> new HashSet<>());
+                variants = flyweights.computeIfAbsent(fullyQualifiedName, fqn -> new HashSet<>());
 
                 if (relaxedClassTypeMatching) {
                     if (variants.isEmpty()) {
+                        JavaType.Class candidate = buildCandidate(flagsBitMap, fullyQualifiedName,
+                                kind, members, interfaces, constructors, supertype, owningClass);
                         variants.add(candidate);
                         return candidate;
                     }
                     return variants.iterator().next();
                 } else {
+                    JavaType.Class candidate = buildCandidate(flagsBitMap, fullyQualifiedName,
+                            kind, members, interfaces, constructors, supertype, owningClass);
+
                     for (Class v : variants) {
                         if (v.deepEquals(candidate)) {
                             return v;
@@ -331,11 +317,14 @@ public interface JavaType extends Serializable {
                     }
 
                     if (candidate.supertype == null) {
-
-                        return variants.stream().filter(v -> v.supertype != null).findFirst().orElseGet(() -> {
-                            variants.add(candidate);
-                            return candidate;
-                        });
+                        for (Class variant : variants) {
+                            if (variant.supertype != null) {
+                                return variant;
+                            } else {
+                                variants.add(candidate);
+                                return candidate;
+                            }
+                        }
                     }
                     variants.add(candidate);
                     return candidate;
@@ -343,80 +332,35 @@ public interface JavaType extends Serializable {
             }
         }
 
-        /**
-         * Lazily built so that a {@link org.openrewrite.java.JavaParser} operating over a set of code
-         * has an opportunity to build {@link Class} instances for sources found in the repo that can provide richer information
-         * for constructor parameter types.
-         *
-         * @return The set of public constructors for a class.
-         */
-        public List<Method> getConstructors() {
-            List<Method> constructorsTemp = constructors;
-            if (constructorsTemp != null) {
-                return constructorsTemp;
-            }
-
-            synchronized (flyweights) {
-                //Double checked locking.
-                constructorsTemp = constructors;
-                if (constructorsTemp != null) {
-                    return constructorsTemp;
-                }
-                List<Method> reflectedConstructors = new ArrayList<>();
-                try {
-                    java.lang.Class<?> reflectionClass = java.lang.Class.forName(fullyQualifiedName, false, JavaType.class.getClassLoader());
-                    for (Constructor<?> constructor : reflectionClass.getConstructors()) {
-                        ShallowClass selfType = new ShallowClass(fullyQualifiedName);
-
-                        // TODO can we generate a generic signature as well?
-                        Method.Signature resolvedSignature = new Method.Signature(selfType, Arrays.stream(constructor.getParameterTypes())
-                                .map(Class::resolveTypeFromClass)
-                                .collect(toList()));
-
-                        List<String> parameterNames = Arrays.stream(constructor.getParameters()).map(Parameter::getName).collect(toList());
-
-                        // Name each constructor "<reflection_constructor>" to intentionally disambiguate from method signatures parsed
-                        // by JavaParser, which may have richer information but which would only be available for types found in the source
-                        // repository.
-                        reflectedConstructors.add(Method.build(singleton(Flag.Public), selfType, "<reflection_constructor>",
-                                resolvedSignature, resolvedSignature, parameterNames, Collections.emptyList()));
+        private static JavaType.Class buildCandidate(int flagsBitMap,
+                                                     String fullyQualifiedName,
+                                                     Kind kind,
+                                                     List<Variable> members,
+                                                     List<FullyQualified> interfaces,
+                                                     @Nullable List<Method> constructors,
+                                                     @Nullable FullyQualified supertype,
+                                                     @Nullable FullyQualified owningClass) {
+            List<Variable> sortedMembers;
+            if (!members.isEmpty()) {
+                if (fullyQualifiedName.equals("java.lang.String")) {
+                    // there is a "serialPersistentFields" member within the String class which is used in normal Java
+                    // serialization to customize how the String field is serialized. This field is tripping up Jackson
+                    // serialization and is intentionally filtered to prevent errors.
+                    sortedMembers = new ArrayList<>(members.size() - 1);
+                    for (Variable m : members) {
+                        if (!m.getName().equals("serialPersistentFields")) {
+                            sortedMembers.add(m);
+                        }
                     }
-                    constructors = reflectedConstructors;
-                } catch (ClassNotFoundException ignored) {
-                    // oh well, we tried
-                }
-                return reflectedConstructors;
-            }
-        }
-
-        private static JavaType resolveTypeFromClass(java.lang.Class<?> clazz) {
-            if (!clazz.isPrimitive() && !clazz.isArray()) {
-                return Class.build(clazz.getName());
-            } else if (clazz.isPrimitive()) {
-                if (clazz == boolean.class) {
-                    return Primitive.Boolean;
-                } else if (clazz == String.class) {
-                    return Primitive.String;
-                } else if (clazz == int.class) {
-                    return Primitive.Int;
-                } else if (clazz == long.class) {
-                    return Primitive.Long;
-                } else if (clazz == double.class) {
-                    return Primitive.Double;
-                } else if (clazz == char.class) {
-                    return Primitive.Char;
-                } else if (clazz == byte.class) {
-                    return Primitive.Byte;
-                } else if (clazz == float.class) {
-                    return Primitive.Float;
-                } else if (clazz == short.class) {
-                    return Primitive.Short;
                 } else {
-                    throw new IllegalArgumentException("Unknown primitive argument");
+                    sortedMembers = new ArrayList<>(members);
                 }
+                sortedMembers.sort(comparing(Variable::getName));
             } else {
-                return new JavaType.Array(resolveTypeFromClass(clazz.getComponentType()));
+                sortedMembers = members;
             }
+
+            return new Class(flagsBitMap, fullyQualifiedName, kind, sortedMembers, interfaces, constructors, supertype, owningClass);
         }
 
         public List<Variable> getVisibleSupertypeMembers() {
@@ -439,12 +383,11 @@ public interface JavaType extends Serializable {
             }
 
             Class c = (Class) type;
-            return
-                    this == c || (kind == c.kind && flagsBitMap == c.flagsBitMap &&
-                            fullyQualifiedName.equals(c.fullyQualifiedName) &&
-                            TypeUtils.deepEquals(members, c.members) &&
-                            TypeUtils.deepEquals(interfaces, c.interfaces) &&
-                            TypeUtils.deepEquals(supertype, c.supertype));
+            return this == c || (kind == c.kind && flagsBitMap == c.flagsBitMap &&
+                    fullyQualifiedName.equals(c.fullyQualifiedName) &&
+                    TypeUtils.deepEquals(members, c.members) &&
+                    TypeUtils.deepEquals(interfaces, c.interfaces) &&
+                    TypeUtils.deepEquals(supertype, c.supertype));
         }
 
         @Override
@@ -631,6 +574,8 @@ public interface JavaType extends Serializable {
     @ToString
     @EqualsAndHashCode
     class Variable implements JavaType {
+        private static final Map<String, Map<JavaType, Set<Variable>>> flyweights = new WeakHashMap<>();
+
         private final String name;
 
         @Nullable
@@ -639,15 +584,30 @@ public interface JavaType extends Serializable {
         @Getter(AccessLevel.NONE)
         private final int flagsBitMap;
 
-        public Variable(Set<Flag> flags, String name, @Nullable JavaType type) {
-            this(Flag.flagsToBitMap(flags), name, type);
-        }
-
-        @JsonCreator
-        public Variable(int flagsBitMap, String name, @Nullable JavaType type) {
+        private Variable(String name, @Nullable JavaType type, int flagsBitMap) {
             this.name = name;
             this.type = type;
             this.flagsBitMap = flagsBitMap;
+        }
+
+        @JsonCreator
+        public static Variable build(String name, @Nullable JavaType type, int flagsBitMap) {
+            Variable test = new Variable(name, type, flagsBitMap);
+
+            synchronized (flyweights) {
+                Set<Variable> variables = flyweights
+                        .computeIfAbsent(name, n -> new WeakHashMap<>())
+                        .computeIfAbsent(type, fq -> Collections.newSetFromMap(new WeakHashMap<>()));
+
+                for (Variable variable : variables) {
+                    if (variable.deepEquals(test)) {
+                        return variable;
+                    }
+                }
+
+                variables.add(test);
+                return test;
+            }
         }
 
         public boolean hasFlags(Flag... test) {
@@ -665,7 +625,9 @@ public interface JavaType extends Serializable {
             }
 
             Variable v = (Variable) type;
-            return this == v || (name.equals(v.name) && TypeUtils.deepEquals(this.type, v.type) && flagsBitMap == v.flagsBitMap);
+            return this == v || (name.equals(v.name) &&
+                    flagsBitMap == v.flagsBitMap &&
+                    TypeUtils.deepEquals(this.type, v.type));
         }
     }
 
@@ -710,17 +672,17 @@ public interface JavaType extends Serializable {
 
             synchronized (flyweights) {
                 Set<Method> methods = flyweights
-                        .computeIfAbsent(declaringType, dt -> new HashMap<>())
-                        .computeIfAbsent(name, n -> new HashSet<>());
+                        .computeIfAbsent(declaringType, dt -> new WeakHashMap<>())
+                        .computeIfAbsent(name, n -> Collections.newSetFromMap(new WeakHashMap<>()));
 
-                return methods
-                        .stream()
-                        .filter(m -> m.deepEquals(test))
-                        .findAny()
-                        .orElseGet(() -> {
-                            methods.add(test);
-                            return test;
-                        });
+                for (Method method : methods) {
+                    if (method.deepEquals(test)) {
+                        return method;
+                    }
+                }
+
+                methods.add(test);
+                return test;
             }
         }
 
@@ -862,7 +824,7 @@ public interface JavaType extends Serializable {
 
         @Nullable
         public static Primitive fromKeyword(String keyword) {
-            switch(keyword) {
+            switch (keyword) {
                 case "boolean":
                     return Boolean;
                 case "byte":
@@ -894,7 +856,7 @@ public interface JavaType extends Serializable {
         }
 
         public String getKeyword() {
-            switch(this) {
+            switch (this) {
                 case Boolean:
                     return "boolean";
                 case Byte:

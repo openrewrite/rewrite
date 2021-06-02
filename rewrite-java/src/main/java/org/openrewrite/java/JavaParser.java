@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
@@ -86,7 +87,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     }
 
     @Override
-    default List<J.CompilationUnit> parse(@Language("java") String... sources) {
+    default List<J.CompilationUnit> parse(ExecutionContext ctx, String... sources) {
         Pattern packagePattern = Pattern.compile("^package\\s+([^;]+);");
         Pattern classPattern = Pattern.compile("(class|interface|enum)\\s*(<[^>]*>)?\\s+(\\w+)");
 
@@ -114,6 +115,11 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
                 null,
                 new InMemoryExecutionContext()
         );
+    }
+
+    @Override
+    default List<J.CompilationUnit> parse(@Language("java") String... sources) {
+        return parse(new InMemoryExecutionContext(), sources);
     }
 
     @Override

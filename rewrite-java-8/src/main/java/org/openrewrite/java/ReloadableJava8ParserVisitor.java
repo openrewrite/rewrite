@@ -58,9 +58,9 @@ import static org.openrewrite.java.tree.Space.format;
  */
 public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
-    public static final int KIND_BITMASK_INTERFACE    = 1<<9;
-    public static final int KIND_BITMASK_ANNOTATION   = 1<<13;
-    public static final int KIND_BITMASK_ENUM         = 1<<14;
+    public static final int KIND_BITMASK_INTERFACE = 1 << 9;
+    public static final int KIND_BITMASK_ANNOTATION = 1 << 13;
+    public static final int KIND_BITMASK_ENUM = 1 << 14;
 
     private final Path sourcePath;
     private final String source;
@@ -576,7 +576,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         List<J.Annotation> annotations = emptyList();
         Space nameSpace = EMPTY;
 
-        if(!node.getModifiers().getAnnotations().isEmpty()) {
+        if (!node.getModifiers().getAnnotations().isEmpty()) {
             annotations = convertAll(node.getModifiers().getAnnotations());
             nameSpace = sourceBefore(node.getName().toString());
         } else {
@@ -639,8 +639,8 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         // a field.
         JavaType fieldType = null;
         if (ident.sym instanceof Symbol.VarSymbol) {
-            // currently only the first 16 bits are meaninful
-            fieldType = new JavaType.Variable((int) ident.sym.flags_field & 0xFFFF, name, type(ident.sym.owner.type));
+            // currently only the first 16 bits are meaningful
+            fieldType = JavaType.Variable.build(name, type(ident.sym.owner.type), (int) ident.sym.flags_field & 0xFFFF);
         }
 
         return J.Identifier.build(randomId(), fmt, Markers.EMPTY, name, type, fieldType);
@@ -1447,7 +1447,8 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         return converted;
     }
 
-    @Nullable private JContainer<Expression> convertTypeParameters(@Nullable List<? extends Tree> typeArguments) {
+    @Nullable
+    private JContainer<Expression> convertTypeParameters(@Nullable List<? extends Tree> typeArguments) {
         if (typeArguments == null) {
             return null;
         }
@@ -1641,11 +1642,11 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                         fields = new ArrayList<>();
                         for (Symbol elem : sym.members_field.getElements()) {
                             if (elem instanceof Symbol.VarSymbol) {
-                                fields.add(new JavaType.Variable(
-                                        // currently only the first 16 bits are meaningful
-                                        (int) elem.flags_field & 0xFFFF,
+                                fields.add(JavaType.Variable.build(
                                         elem.name.toString(),
-                                        type(elem.type, stackWithSym)
+                                        type(elem.type, stackWithSym),
+                                        // currently only the first 16 bits are meaningful
+                                        (int) elem.flags_field & 0xFFFF
                                 ));
                             }
                         }
@@ -1743,7 +1744,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
     private String getFlyweightId(ClassType classType) {
         StringBuilder id = new StringBuilder();
-        id.append(((Symbol.ClassSymbol)classType.tsym).className());
+        id.append(((Symbol.ClassSymbol) classType.tsym).className());
         if (classType.typarams_field != null && !classType.typarams_field.isEmpty()) {
             id.append("<");
             boolean delimit = false;

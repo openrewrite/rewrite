@@ -67,7 +67,11 @@ interface RecipeTest {
         }
 
         val inputs = arrayOf(before.trimIndent()) + dependsOn
-        val sources = parser!!.parse(*inputs)
+        val sources = parser!!.parse(
+            InMemoryExecutionContext { t: Throwable -> fail<Any>("Parser threw an exception", t) },
+            *inputs
+        )
+
         assertThat(sources.size)
             .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
             .isEqualTo(inputs.size)
