@@ -2905,9 +2905,8 @@ public interface J extends Serializable, Tree {
         @Nullable
         JContainer<NameTree> throwz;
 
-        @Nullable
         public List<NameTree> getThrows() {
-            return throwz == null ? null : throwz.getElements();
+            return throwz == null ? Collections.emptyList() : throwz.getElements();
         }
 
         public MethodDeclaration withThrows(@Nullable List<NameTree> throwz) {

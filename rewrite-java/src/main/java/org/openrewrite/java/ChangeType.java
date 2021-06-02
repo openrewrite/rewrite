@@ -175,7 +175,7 @@ public class ChangeType extends Recipe {
         public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
             J.MethodDeclaration m = visitAndCast(method, ctx, super::visitMethodDeclaration);
             m = m.withReturnTypeExpression(transformName(m.getReturnTypeExpression()));
-            return m.withThrows(m.getThrows() == null ? null : ListUtils.map(m.getThrows(), this::transformName));
+            return m.withThrows(ListUtils.map(m.getThrows(), this::transformName));
         }
 
         @Override
