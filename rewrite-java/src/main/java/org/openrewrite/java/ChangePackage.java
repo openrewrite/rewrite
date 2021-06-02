@@ -194,7 +194,7 @@ public class ChangePackage extends Recipe {
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
             J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
             m = m.withReturnTypeExpression(transformName(m.getReturnTypeExpression()));
-            return m.withThrows(m.getThrows() == null ? null : ListUtils.map(m.getThrows(), this::transformName));
+            return m.withThrows(ListUtils.map(m.getThrows(), this::transformName));
         }
 
         @Override

@@ -648,6 +648,7 @@ public interface JavaType extends Serializable {
         private final Signature resolvedSignature;
         @With
         private final List<String> paramNames;
+        @With
         private final List<FullyQualified> thrownExceptions;
 
         private Method(int flagsBitMap, FullyQualified declaringType, String name,

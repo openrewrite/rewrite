@@ -806,7 +806,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .build()
 
             override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
-                if(method.throws == null) {
+                if(method.throws.isEmpty()) {
                     return method.withTemplate(t, method.coordinates.replaceThrows())
                 }
                 return super.visitMethodDeclaration(method, p)
@@ -821,7 +821,11 @@ interface JavaTemplateTest : JavaRecipeTest {
             class Test {
                 void test() throws Exception {}
             }
-        """
+        """,
+        afterConditions = { cu ->
+            val testMethodDecl = cu.classes.first().body.statements.first() as J.MethodDeclaration
+            assertThat(testMethodDecl.type!!.thrownExceptions).containsExactly()
+        }
     )
 
     @Test
