@@ -251,7 +251,7 @@ public class ChangeType extends Recipe {
         @Override
         public J visitTypeParameter(J.TypeParameter typeParam, ExecutionContext ctx) {
             J.TypeParameter t = visitAndCast(typeParam, ctx, super::visitTypeParameter);
-            t = t.withBounds(t.getBounds() == null ? null : ListUtils.map(t.getBounds(), this::transformName));
+            t = t.withBounds(t.getBounds().isEmpty() ? null : ListUtils.map(t.getBounds(), this::transformName));
             return t.withName(transformName(t.getName()));
         }
 

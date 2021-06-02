@@ -278,7 +278,7 @@ public class ChangePackage extends Recipe {
         @Override
         public J.TypeParameter visitTypeParameter(J.TypeParameter typeParam, ExecutionContext ctx) {
             J.TypeParameter t = super.visitTypeParameter(typeParam, ctx);
-            t = t.withBounds(t.getBounds() == null ? null : ListUtils.map(t.getBounds(), this::transformName));
+            t = t.withBounds(t.getBounds().isEmpty() ? null : ListUtils.map(t.getBounds(), this::transformName));
             return t.withName(transformName(t.getName()));
         }
 

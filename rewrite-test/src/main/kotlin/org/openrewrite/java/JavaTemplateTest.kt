@@ -20,15 +20,14 @@ import com.google.common.io.CharSource
 import com.google.googlejavaformat.java.Formatter
 import com.google.googlejavaformat.java.JavaFormatterOptions
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.java.tree.J
+import org.openrewrite.java.tree.JavaType
 import org.openrewrite.java.tree.Space
 import java.io.ByteArrayOutputStream
 import java.io.OutputStreamWriter
-import java.util.*
 import java.util.Comparator.comparing
 import java.util.function.Consumer
 
@@ -63,7 +62,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceMethod(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("void test2() {}").build()
+            val t = template("int test2(int n) { return n; }").build()
 
             override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
                 if (method.simpleName == "test") {
@@ -81,8 +80,78 @@ interface JavaTemplateTest : JavaRecipeTest {
         after = """
             class Test {
             
-                void test2() {
+                int test2(int n) {
+                    return n;
                 }
+            }
+        """,
+        afterConditions = { cu ->
+            val methodType = (cu.classes.first().body.statements.first() as J.MethodDeclaration).type!!
+            assertThat(methodType.resolvedSignature.returnType).isEqualTo(JavaType.Primitive.Int)
+            assertThat(methodType.resolvedSignature.paramTypes).containsExactly(JavaType.Primitive.Int)
+            assertThat(methodType.genericSignature.returnType).isEqualTo(JavaType.Primitive.Int)
+            assertThat(methodType.genericSignature.paramTypes).containsExactly(JavaType.Primitive.Int)
+        }
+    )
+
+    @Test
+    fun replaceLambdaWithMethodReference(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaVisitor<ExecutionContext>() {
+            val t = template("Object::toString").build()
+
+            override fun visitLambda(lambda: J.Lambda, p: ExecutionContext): J {
+                return lambda.withTemplate(t, lambda.coordinates.replace())
+            }
+        }.toRecipe(),
+        before = """
+            import java.util.function.Function;
+
+            class Test {
+                Function<Object, String> toString = it -> it.toString();
+            }
+        """,
+        after = """
+            import java.util.function.Function;
+
+            class Test {
+                Function<Object, String> toString = Object::toString;
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/602")
+    @Test
+    fun replaceMethodInvocationWithMethodReference(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaVisitor<ExecutionContext>() {
+                val t = template("Object::toString").build()
+
+            override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J {
+                return method.withTemplate(t, method.coordinates.replace());
+            }
+
+            }.toRecipe(),
+        before = """
+            import java.util.function.Function;
+
+            class Test {
+                Function<Object, String> toString = getToString();
+                
+                static Function<Object, String> getToString() {
+                    return Object::toString;
+                } 
+            }
+        """,
+        after = """
+            import java.util.function.Function;
+
+            class Test {
+                Function<Object, String> toString = Object::toString;
+                
+                static Function<Object, String> getToString() {
+                    return Object::toString;
+                } 
             }
         """
     )
@@ -163,7 +232,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         afterConditions = { cu ->
             val testMethod = cu.classes.first().body.statements.first() as J.MethodDeclaration
             assertThat(testMethod.type!!.paramNames)
-                    .`as`("Changing the method arguments should have updated the type information as well")
+                    .`as`("Changing the method's parameters should have also updated its type information")
                     .containsExactly("n", "s")
         }
     )
@@ -759,13 +828,18 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceMethodTypeParameters(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("T, U")
+            val typeParamsTemplate = template("T, U")
                 .doBeforeParseTemplate(print)
                 .build()
 
+            val methodArgsTemplate = template("T t, U u")
+                    .doBeforeParseTemplate(print)
+                    .build()
+
             override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
-                if(method.typeParameters == null) {
-                    return method.withTemplate(t, method.coordinates.replaceTypeParameters())
+                if(method.typeParameters.isEmpty()) {
+                    return method.withTemplate<J.MethodDeclaration>(typeParamsTemplate, method.coordinates.replaceTypeParameters())
+                            .withTemplate(methodArgsTemplate, method.coordinates.replaceParameters())
                 }
                 return super.visitMethodDeclaration(method, p)
             }
@@ -780,10 +854,29 @@ interface JavaTemplateTest : JavaRecipeTest {
         after = """
             class Test {
             
-                <T, U> void test() {
+                <T, U> void test(T t, U u) {
                 }
             }
-        """
+        """,
+        afterConditions = { cu ->
+            val type = (cu.classes.first().body.statements.first() as J.MethodDeclaration).type!!
+            assertThat(type).isNotNull
+            val paramTypes = type.genericSignature.paramTypes
+            assertThat(paramTypes[0])
+                    .`as`("The method declaration's type's genericSignature first argument should have have type 'T' with bound 'java.lang.Object'")
+                    .matches { tType ->
+                        tType is JavaType.GenericTypeVariable &&
+                        tType.fullyQualifiedName == "T" &&
+                        tType.bound!!.fullyQualifiedName == "java.lang.Object"
+            }
+            assertThat(paramTypes[1])
+                    .`as`("The method declaration's type's genericSignature second argument should have type 'U' with bound 'java.lang.Object'")
+                    .matches { uType ->
+                        uType is JavaType.GenericTypeVariable &&
+                                uType.fullyQualifiedName == "U" &&
+                                uType.bound!!.fullyQualifiedName == "java.lang.Object"
+                    }
+        }
     )
 
     @Test
@@ -873,7 +966,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         """,
         after = """
             abstract class Test {
-                void test() {
+                void test(){
                 }
             }
         """

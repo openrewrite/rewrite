@@ -26,10 +26,7 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.Space.Location;
 import org.openrewrite.marker.Markers;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -208,6 +205,9 @@ public class JavaTemplate {
                 if (loc.equals(LAMBDA_PARAMETERS_PREFIX) && lambda.getParameters().isScope(insertionPoint)) {
                     return lambda.withParameters(substitutions.unsubstitute(templateParser.parseLambdaParameters(substitutedTemplate)));
                 }
+                if(loc.equals(STATEMENT_PREFIX) && lambda.isScope(insertionPoint)) {
+                    return substitutions.unsubstitute(templateParser.parseExpression(substitutedTemplate));
+                }
                 return super.visitLambda(lambda, p);
             }
 
@@ -220,7 +220,7 @@ public class JavaTemplate {
                             J.MethodDeclaration m = method;
                             if (mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
                                 m = method.withLeadingAnnotations(gen);
-                                if (m.getTypeParameters() != null) {
+                                if (!m.getTypeParameters().isEmpty()) {
                                     m = m.withTypeParameters(ListUtils.map(m.getTypeParameters(), tp -> tp.withAnnotations(emptyList())));
                                 }
                                 if (m.getReturnTypeExpression() instanceof J.AnnotatedType) {
@@ -247,7 +247,67 @@ public class JavaTemplate {
                             return method.withBody(autoFormat(body, p, getCursor()));
                         }
                         case METHOD_DECLARATION_PARAMETERS: {
-                            return method.withParameters(substitutions.unsubstitute(templateParser.parseParameters(substitutedTemplate)));
+                            List<Statement> parameters = substitutions.unsubstitute(templateParser.parseParameters(substitutedTemplate));
+
+                            // Update the J.MethodDeclaration's type information to reflect its new parameter list
+                            JavaType.Method newType = method.getType();
+                            if(newType != null) {
+                                List<String> paramNames = new ArrayList<>();
+                                List<JavaType> paramTypes = new ArrayList<>();
+                                for(Statement parameter : parameters) {
+                                    if(!(parameter instanceof J.VariableDeclarations)) {
+                                        throw new IllegalArgumentException(
+                                                "Only variable declarations may be part of a method declaration's parameter " +
+                                                        "list:" + parameter.print());
+                                    }
+                                    J.VariableDeclarations decl = (J.VariableDeclarations) parameter;
+                                    if(decl.getVariables().size() != 1) {
+                                        throw new IllegalArgumentException(
+                                                "Multi-variable declarations may not be used in a method declaration's " +
+                                                        "parameter list: " + parameter.print());
+                                    }
+                                    if(!(decl.getTypeExpression() instanceof J.Identifier || decl.getTypeExpression() instanceof J.Primitive)) {
+                                        throw new IllegalArgumentException(
+                                                "Only an Identifier or a Primitive can be supplied as the type expression of a parameter " +
+                                                        "appearing in a method declaration's parameter list: " + parameter.print());
+                                    }
+                                    J.VariableDeclarations.NamedVariable namedVariable = decl.getVariables().get(0);
+                                    paramNames.add(namedVariable.getSimpleName());
+                                    if(namedVariable.getType() == null) {
+                                        // null if the type of the argument is a generic type parameter
+                                        // Try to find an appropriate type from the method itself
+                                        assert decl.getTypeExpression() instanceof J.Identifier;
+                                        J.Identifier declTypeIdent = (J.Identifier) decl.getTypeExpression();
+                                        String typeParameterName = declTypeIdent.getSimpleName();
+                                        for(J.TypeParameter typeParameter : method.getTypeParameters()) {
+                                            J.Identifier typeParamIdent = (J.Identifier) typeParameter.getName();
+                                            if(typeParamIdent.getSimpleName().equals(typeParameterName)) {
+                                                List<TypeTree> bounds = typeParameter.getBounds();
+                                                JavaType.FullyQualified bound;
+                                                if(bounds.size() == 0) {
+                                                    bound = JavaType.Class.OBJECT;
+                                                } else {
+                                                    bound = (JavaType.FullyQualified) bounds.get(0);
+                                                }
+                                                JavaType.GenericTypeVariable genericType = new JavaType.GenericTypeVariable(
+                                                        typeParamIdent.getSimpleName(),
+                                                        bound);
+
+                                                paramTypes.add(genericType);
+                                            }
+                                        }
+                                    } else {
+                                        paramTypes.add(namedVariable.getType());
+                                    }
+                                }
+
+                                newType = newType.withParamNames(paramNames)
+                                        .withGenericSignature(newType.getGenericSignature().withParamTypes(paramTypes))
+                                        .withResolvedSignature(newType.getResolvedSignature().withParamTypes(paramTypes));
+                            }
+
+                            return method.withParameters(parameters)
+                                    .withType(newType);
                         }
                         case THROWS: {
                             J.MethodDeclaration m = method.withThrows(substitutions.unsubstitute(templateParser.parseThrows(substitutedTemplate)));
@@ -274,6 +334,9 @@ public class JavaTemplate {
                     J.MethodInvocation m = method.withArguments(args);
                     m = autoFormat(m, 0, getCursor().getParentOrThrow());
                     return m;
+                }
+                if(loc.equals(STATEMENT_PREFIX) && method.isScope(insertionPoint)) {
+                    return substitutions.unsubstitute(templateParser.parseExpression(substitutedTemplate));
                 }
                 return super.visitMethodInvocation(method, integer);
             }

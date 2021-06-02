@@ -2852,9 +2852,8 @@ public interface J extends Serializable, Tree {
         @Nullable
         TypeParameters typeParameters;
 
-        @Nullable
         public List<TypeParameter> getTypeParameters() {
-            return typeParameters == null ? null : typeParameters.getTypeParameters();
+            return typeParameters == null ? Collections.emptyList() : typeParameters.getTypeParameters();
         }
 
         public MethodDeclaration withTypeParameters(@Nullable List<TypeParameter> typeParameters) {
@@ -4455,9 +4454,8 @@ public interface J extends Serializable, Tree {
         @Nullable
         JContainer<TypeTree> bounds;
 
-        @Nullable
         public List<TypeTree> getBounds() {
-            return bounds == null ? null : bounds.getElements();
+            return bounds == null ? Collections.emptyList() : bounds.getElements();
         }
 
         public TypeParameter withBounds(@Nullable List<TypeTree> bounds) {
