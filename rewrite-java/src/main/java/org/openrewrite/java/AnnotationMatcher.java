@@ -74,7 +74,7 @@ public class AnnotationMatcher {
             return true;
         }
 
-        if (annotation.getArguments() == null) {
+        if (annotation.getArguments().isEmpty()) {
             return false;
         }
 
@@ -94,7 +94,7 @@ public class AnnotationMatcher {
             return true;
         }
 
-        return annotation.getArguments() == null || annotation.getArguments().stream()
+        return annotation.getArguments().isEmpty() || annotation.getArguments().stream()
                 .findAny()
                 .map(arg -> argumentValueMatches("value", arg, match.elementValue().getText()))
                 .orElse(true);
@@ -118,7 +118,7 @@ public class AnnotationMatcher {
             }
             if (arg instanceof J.NewArray) {
                 J.NewArray na = (J.NewArray) arg;
-                if (na.getInitializer() == null || na.getInitializer().size() != 1) {
+                if (na.getInitializer().size() != 1) {
                     return false;
                 }
                 return argumentValueMatches("value", na.getInitializer().get(0), matchText);

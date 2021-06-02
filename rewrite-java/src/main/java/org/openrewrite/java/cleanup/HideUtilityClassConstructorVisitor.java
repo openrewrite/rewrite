@@ -227,7 +227,7 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         static boolean isUtilityClass(J.ClassDeclaration c) {
-            if (c.getImplements() != null || c.getExtends() != null) {
+            if (!c.getImplements().isEmpty() || c.getExtends() != null) {
                 return false;
             }
 

@@ -51,12 +51,12 @@ public class ClassDeclarationToString {
                     break;
             }
             acc.append(classDecl.getName().printTrimmed());
-            if (classDecl.getTypeParameters() != null) {
+            if (!classDecl.getTypeParameters().isEmpty()) {
                 visitContainer("<", classDecl.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", unused);
                 acc.append(' ');
             }
             visitLeftPadded("extends", classDecl.getPadding().getExtends(), JLeftPadded.Location.EXTENDS, unused);
-            if (classDecl.getImplements() != null) {
+            if (!classDecl.getImplements().isEmpty()) {
                 if (J.ClassDeclaration.Kind.Type.Interface.equals(classDecl.getKind())) {
                     acc.append("extends");
                 } else {

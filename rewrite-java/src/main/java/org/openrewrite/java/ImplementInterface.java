@@ -16,7 +16,6 @@
 package org.openrewrite.java;
 
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -39,7 +38,7 @@ public class ImplementInterface<P> extends JavaIsoVisitor<P> {
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
-        if (c.isScope(scope) && (c.getImplements() == null || c.getImplements().stream()
+        if (c.isScope(scope) && (c.getImplements().isEmpty() || c.getImplements().stream()
                 .noneMatch(f -> interfaceType.equals(f.getType())))) {
             maybeAddImport(interfaceType);
 

@@ -747,7 +747,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .build()
 
             override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
-                if(classDecl.implements == null) {
+                if(classDecl.implements.isEmpty()) {
                     maybeAddImport("java.io.Closeable");
                     maybeAddImport("java.io.Serializable");
                     return classDecl.withTemplate(t, classDecl.coordinates.replaceImplementsClause())
@@ -892,7 +892,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .build()
 
             override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
-                if(classDecl.typeParameters == null) {
+                if(classDecl.typeParameters.isEmpty()) {
                     return classDecl.withTemplate(t, classDecl.coordinates.replaceTypeParameters())
                 }
                 return super.visitClassDeclaration(classDecl, p)

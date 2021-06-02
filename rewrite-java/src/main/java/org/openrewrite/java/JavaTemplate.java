@@ -161,9 +161,7 @@ public class JavaTemplate {
                             J.ClassDeclaration c = classDecl;
                             if (mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
                                 c = c.withLeadingAnnotations(gen);
-                                if (c.getTypeParameters() != null) {
-                                    c = c.withTypeParameters(ListUtils.map(c.getTypeParameters(), tp -> tp.withAnnotations(emptyList())));
-                                }
+                                c = c.withTypeParameters(ListUtils.map(c.getTypeParameters(), tp -> tp.withAnnotations(emptyList())));
                                 c = c.withModifiers(ListUtils.map(c.getModifiers(), m -> m.withAnnotations(emptyList())));
                                 c = c.getAnnotations().withKind(c.getAnnotations().getKind().withAnnotations(emptyList()));
                             } else {
