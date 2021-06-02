@@ -22,7 +22,6 @@ import java.io.File
 import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.CompletionStage
 import java.util.concurrent.ForkJoinPool
 
 interface RecipeTest {
