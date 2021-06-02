@@ -131,9 +131,7 @@ public class JavaTemplateParser {
         return cache(stub, () -> {
             J.CompilationUnit cu = compileTemplate(stub);
             J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
-            List<NameTree> aThrows = m.getThrows();
-            assert aThrows != null;
-            return aThrows;
+            return m.getThrows();
         });
     }
 
