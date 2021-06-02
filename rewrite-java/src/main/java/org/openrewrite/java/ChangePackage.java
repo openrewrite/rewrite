@@ -127,7 +127,9 @@ public class ChangePackage extends Recipe {
                     c = c.withExtends(transformName(c.getExtends()));
                 }
 
-                c = c.withImplements(ListUtils.map(c.getImplements(), this::transformName));
+                if (c.getImplements() != null) {
+                    c = c.withImplements(ListUtils.map(c.getImplements(), this::transformName));
+                }
             }
             return c;
         }
@@ -192,7 +194,7 @@ public class ChangePackage extends Recipe {
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
             J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
             m = m.withReturnTypeExpression(transformName(m.getReturnTypeExpression()));
-            return m.withThrows(ListUtils.map(m.getThrows(), this::transformName));
+            return m.withThrows(m.getThrows() == null ? null : ListUtils.map(m.getThrows(), this::transformName));
         }
 
         @Override
@@ -276,7 +278,7 @@ public class ChangePackage extends Recipe {
         @Override
         public J.TypeParameter visitTypeParameter(J.TypeParameter typeParam, ExecutionContext ctx) {
             J.TypeParameter t = super.visitTypeParameter(typeParam, ctx);
-            t = t.withBounds(ListUtils.map(t.getBounds(), this::transformName));
+            t = t.withBounds(t.getBounds() == null ? null : ListUtils.map(t.getBounds(), this::transformName));
             return t.withName(transformName(t.getName()));
         }
 
