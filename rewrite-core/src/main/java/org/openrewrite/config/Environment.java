@@ -142,6 +142,10 @@ public class Environment {
             return load(new ClasspathScanningLoader(jarName, compileClasspath, properties, acceptPackages));
         }
 
+        public Builder scanJarWithLoader(String jarName, Iterable<Path> compileClasspath, ClassLoader classLoader, String... acceptPackages) {
+            return load(new ClasspathScanningLoader(jarName, compileClasspath, properties, classLoader, acceptPackages));
+        }
+
         public Builder scanUserHome() {
             File userHomeRewriteConfig = new File(System.getProperty("user.home") + "/.rewrite/rewrite.yml");
             if (userHomeRewriteConfig.exists()) {
