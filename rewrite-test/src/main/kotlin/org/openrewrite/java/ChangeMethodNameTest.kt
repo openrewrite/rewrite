@@ -17,6 +17,9 @@ package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
+import org.openrewrite.java.tree.J
+import org.openrewrite.java.tree.JavaType
 
 interface ChangeMethodNameTest : JavaRecipeTest {
     companion object {
@@ -32,8 +35,9 @@ interface ChangeMethodNameTest : JavaRecipeTest {
         """
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/605")
     @Test
-    fun changeMethodNameForOverridenMethod(jp: JavaParser) = assertChanged(
+    fun changeMethodNameForOverriddenMethod(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(b, """
             package com.abc;
@@ -60,7 +64,17 @@ interface ChangeMethodNameTest : JavaRecipeTest {
                     new java.util.ArrayList<String>().forEach(new C()::bar);
                 }
             }
-        """
+        """,
+        afterConditions = { cu ->
+            val testMethodDecl = cu.classes.first().body.statements.first() as J.MethodDeclaration
+            val statements = testMethodDecl.body!!.statements
+            val barInvocation = statements[0] as J.MethodInvocation
+            assertThat(barInvocation.name.simpleName).isEqualTo("bar")
+            assertThat(barInvocation.type!!.name).isEqualTo("bar")
+            val barReference = (statements[1] as J.MethodInvocation).arguments[0] as J.MemberReference
+            val barRefType = barReference.referenceType as JavaType.Method
+            assertThat(barRefType.name).isEqualTo("bar")
+        }
     )
 
     @Test
