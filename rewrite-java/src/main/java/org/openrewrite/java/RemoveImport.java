@@ -51,10 +51,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             if (javaType instanceof JavaType.Variable) {
                 JavaType.Variable variable = (JavaType.Variable) javaType;
                 JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getType());
-                if (fq != null) {
-                    if (fq.getFullyQualifiedName().equals(type) || fq.getFullyQualifiedName().equals(owner)) {
-                        methodsAndFieldsUsed.add(variable.getName());
-                    }
+                if (fq != null && (fq.getFullyQualifiedName().equals(type) || fq.getFullyQualifiedName().equals(owner))) {
+                    methodsAndFieldsUsed.add(variable.getName());
                 }
             } else if (javaType instanceof JavaType.Method) {
                 JavaType.Method method = (JavaType.Method) javaType;
