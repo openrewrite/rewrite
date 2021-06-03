@@ -32,12 +32,14 @@ import static java.util.Collections.singletonList;
 public class JavaTemplateParser {
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("#{", "}", null);
 
-    private static final Map<String, List<? extends J>> templateCache = Collections.synchronizedMap(new LinkedHashMap<String, List<? extends J>>() {
+    private final Object templateCacheLock = new Object();
+
+    private static final Map<String, List<? extends J>> templateCache = new LinkedHashMap<String, List<? extends J>>() {
         @Override
         protected boolean removeEldestEntry(Map.Entry eldest) {
             return size() > 10_000;
         }
-    });
+    };
 
     public static final String PACKAGE_STUB = "package #{}; class $Template {}";
     public static final String PARAMETER_STUB = "abstract class $Template { abstract void $template(#{}); }";
@@ -219,7 +221,10 @@ public class JavaTemplateParser {
 
     @SuppressWarnings("unchecked")
     private <J2 extends J> List<J2> cache(String stub, Supplier<List<? extends J>> ifAbsent) {
-        List<J2> js = (List<J2>) templateCache.computeIfAbsent(stub, s -> ifAbsent.get());
+        List<J2> js;
+        synchronized (templateCacheLock) {
+            js = (List<J2>) templateCache.computeIfAbsent(stub, s -> ifAbsent.get());
+        }
         return ListUtils.map(js, j -> (J2) new RandomizeIdVisitor<Integer>().visit(j, 0));
     }
 }
