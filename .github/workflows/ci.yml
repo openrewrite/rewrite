@@ -44,7 +44,11 @@ jobs:
             ${{ runner.os }}-gradle-
       - name: build
         run: ./gradlew ${GRADLE_SWITCHES} build test
-
+      - name: publish-tests
+        uses: EnricoMi/publish-unit-test-result-action@v1
+        if: always()
+        with:
+          files: "**/build/test-results/test/TEST-*.xml"
   publish-snapshots:
     needs: [build]
     runs-on: ubuntu-latest
