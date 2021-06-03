@@ -217,6 +217,61 @@ interface JavaTemplateTest : JavaRecipeTest {
     )
 
     @Test
+    fun replaceMethodParametersVariadicArray(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val t = template("Object[]... values")
+                    .doBeforeParseTemplate(print)
+                    .build()
+
+            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
+                if (method.simpleName == "test" && method.parameters.firstOrNull() is J.Empty) {
+                    // insert in outer method
+                    val m: J.MethodDeclaration = method.withTemplate(t, method.coordinates.replaceParameters())
+                    val newRunnable = (method.body!!.statements[0] as J.NewClass)
+
+                    // insert in inner method
+                    val innerMethod = (newRunnable.body!!.statements[0] as J.MethodDeclaration)
+                    return m.withTemplate(t, innerMethod.coordinates.replaceParameters())
+                }
+                return super.visitMethodDeclaration(method, p)
+            }
+        }.toRecipe(),
+        before = """
+            class Test {
+                void test() {
+                    new Runnable() {
+                        void inner() {
+                        }
+                    };
+                }
+            }
+        """,
+        after = """
+            class Test {
+                void test(Object[]... values) {
+                    new Runnable() {
+                        void inner(Object[]... values) {
+                        }
+                    };
+                }
+            }
+        """,
+        afterConditions = { cu ->
+            val type = (cu.classes.first().body.statements.first() as J.MethodDeclaration).type!!
+
+            assertThat(type.paramNames)
+                    .`as`("Changing the method's parameters should have also updated its type's parameter names")
+                    .containsExactly("values")
+            assertThat(type.resolvedSignature.paramTypes[0])
+                    .`as`("Changing the method's parameters should have resulted in the first parameter's type being 'Object[]'")
+                    .matches {
+                        it is JavaType.Array && it.elemType.hasElementType("java.lang.Object")
+                    }
+        }
+    )
+
+    @Test
     fun replaceAndInterpolateMethodParameters(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
