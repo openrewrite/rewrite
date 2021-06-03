@@ -17,16 +17,20 @@ package org.openrewrite.semver
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertAll
 
 class LatestReleaseTest {
     private val latestRelease = LatestRelease(null)
 
     @Test
     fun onlyNumericPartsValid() {
-        assertThat(latestRelease.isValid("1.1.1")).isTrue()
-        assertThat(latestRelease.isValid("1.1")).isTrue()
-        assertThat(latestRelease.isValid("1")).isTrue()
-        assertThat(latestRelease.isValid("1.1.a")).isFalse()
+        assertAll(
+            { assertThat(latestRelease.isValid("1.1.1")).isTrue },
+            { assertThat(latestRelease.isValid("1.1")).isTrue },
+            { assertThat(latestRelease.isValid("1")).isTrue },
+            { assertThat(latestRelease.isValid("1.1.a")).isFalse },
+            { assertThat(latestRelease.isValid("1.1.0-SNAPSHOT")).isFalse }
+        )
     }
 
     @Test

@@ -22,10 +22,14 @@ import org.openrewrite.maven.cache.LocalMavenArtifactCache;
 import org.openrewrite.maven.cache.MavenArtifactCache;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.cache.ReadOnlyLocalMavenArtifactCache;
+import org.openrewrite.maven.internal.MavenMetadata;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.RawMaven;
 import org.openrewrite.maven.internal.RawMavenResolver;
 import org.openrewrite.maven.tree.*;
+import org.openrewrite.semver.LatestRelease;
+import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
 import java.io.FileNotFoundException;
@@ -35,10 +39,16 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static org.openrewrite.Tree.randomId;
 
 public class MavenArtifactHelper {
+
+    private static final String LATEST_INTEGRATION = "latest.integration";
+    private static final String LATEST_RELEASE = "latest.release";
 
     private static final MavenRepository SUPER_POM_REPOSITORY = new MavenRepository("central",
             URI.create("https://repo.maven.apache.org/maven2"), true, false, null, null);
@@ -87,7 +97,8 @@ public class MavenArtifactHelper {
     private static List<Path> downloadArtifactAndDependenciesInternal(String groupId, String artifactId, String version, ExecutionContext ctx, MavenPomCache mavenPomCache, List<MavenRepository> repositories, MavenArtifactCache mavenArtifactCache) {
         MavenPomDownloader mavenPomDownloader = new MavenPomDownloader(mavenPomCache,
                 Collections.emptyMap(), ctx);
-        RawMaven rawMaven = mavenPomDownloader.download(groupId, artifactId, version, null, null,
+        String exactVersion = getExactVersion(groupId, artifactId, version, ctx, repositories);
+        RawMaven rawMaven = mavenPomDownloader.download(groupId, artifactId, exactVersion, null, null,
                 repositories, ctx);
         if (rawMaven == null) {
             return Collections.emptyList();
@@ -135,6 +146,39 @@ public class MavenArtifactHelper {
             artifactPaths.add(mavenArtifactDownloader.downloadArtifact(dependency));
         }
         return artifactPaths;
+    }
+
+    public static String getExactVersion(String groupId, String artifactId, String version, ExecutionContext ctx, List<MavenRepository> repositories) {
+        if (LATEST_INTEGRATION.equals(version)) {
+            return getLatestIntegrationVersion(groupId, artifactId, version, ctx, repositories);
+        } else if (LATEST_RELEASE.equals(version)) {
+            return getLatestReleaseVersion(groupId, artifactId, version, ctx, repositories);
+        }
+        return version;
+    }
+
+    private static String getLatestReleaseVersion(String groupId, String artifactId, String version, ExecutionContext ctx, List<MavenRepository> repositories) {
+        MavenMetadata mavenMetadata = new MavenPomDownloader(MavenPomCache.NOOP,
+                emptyMap(), ctx).downloadMetadata(groupId, artifactId, repositories);
+        VersionComparator versionComparator = new LatestRelease(null);
+        final Optional<String> maybeLatest = mavenMetadata.getVersioning().getVersions().stream()
+                .filter(versionComparator::isValid)
+                .max(String::compareTo);
+        if (!maybeLatest.isPresent()) {
+            throw new IllegalStateException("No latest release version of " + groupId + ":" + artifactId);
+        }
+        return maybeLatest.get();
+    }
+
+    private static String getLatestIntegrationVersion(String groupId, String artifactId, String version, ExecutionContext ctx, List<MavenRepository> repositories) {
+        MavenMetadata mavenMetadata = new MavenPomDownloader(MavenPomCache.NOOP,
+                emptyMap(), ctx).downloadMetadata(groupId, artifactId, repositories);
+        final Optional<String> maybeLatest = mavenMetadata.getVersioning().getVersions().stream()
+                .max(String::compareTo);
+        if (!maybeLatest.isPresent()) {
+            throw new IllegalStateException("No latest integration version of " + groupId + ":" + artifactId);
+        }
+        return maybeLatest.get();
     }
 
     /**
