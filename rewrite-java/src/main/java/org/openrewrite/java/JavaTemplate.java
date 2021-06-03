@@ -38,7 +38,7 @@ import static org.openrewrite.java.tree.Space.Location.*;
 public class JavaTemplate {
     private static final J.Block EMPTY_BLOCK = new J.Block(randomId(), Space.EMPTY,
             Markers.EMPTY, new JRightPadded<>(false, Space.EMPTY, Markers.EMPTY),
-            Collections.emptyList(), Space.format(" "));
+            emptyList(), Space.format(" "));
 
     private final Supplier<Cursor> parentScopeGetter;
     private final String code;
@@ -161,7 +161,9 @@ public class JavaTemplate {
                             J.ClassDeclaration c = classDecl;
                             if (mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
                                 c = c.withLeadingAnnotations(gen);
-                                c = c.withTypeParameters(ListUtils.map(c.getTypeParameters(), tp -> tp.withAnnotations(emptyList())));
+                                if (c.getTypeParameters() != null) {
+                                    c = c.withTypeParameters(ListUtils.map(c.getTypeParameters(), tp -> tp.withAnnotations(emptyList())));
+                                }
                                 c = c.withModifiers(ListUtils.map(c.getModifiers(), m -> m.withAnnotations(emptyList())));
                                 c = c.getAnnotations().withKind(c.getAnnotations().getKind().withAnnotations(emptyList()));
                             } else {
@@ -219,7 +221,7 @@ public class JavaTemplate {
                             J.MethodDeclaration m = method;
                             if (mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
                                 m = method.withLeadingAnnotations(gen);
-                                if (!m.getTypeParameters().isEmpty()) {
+                                if (m.getTypeParameters() != null) {
                                     m = m.withTypeParameters(ListUtils.map(m.getTypeParameters(), tp -> tp.withAnnotations(emptyList())));
                                 }
                                 if (m.getReturnTypeExpression() instanceof J.AnnotatedType) {
@@ -273,12 +275,13 @@ public class JavaTemplate {
                                         // Try to find an appropriate type from the method itself
                                         J.Identifier declTypeIdent = (J.Identifier) decl.getTypeExpression();
                                         String typeParameterName = declTypeIdent.getSimpleName();
-                                        for(J.TypeParameter typeParameter : method.getTypeParameters()) {
+                                        List<J.TypeParameter> typeParameters = (method.getTypeParameters() == null) ? emptyList() : method.getTypeParameters();
+                                        for(J.TypeParameter typeParameter : typeParameters) {
                                             J.Identifier typeParamIdent = (J.Identifier) typeParameter.getName();
                                             if(typeParamIdent.getSimpleName().equals(typeParameterName)) {
                                                 List<TypeTree> bounds = typeParameter.getBounds();
                                                 JavaType.FullyQualified bound;
-                                                if(bounds.size() == 0) {
+                                                if(bounds == null || bounds.isEmpty()) {
                                                     bound = JavaType.Class.OBJECT;
                                                 } else {
                                                     bound = (JavaType.FullyQualified) bounds.get(0);
@@ -310,7 +313,8 @@ public class JavaTemplate {
                             JavaType.Method type = m.getType();
                             if(type != null) {
                                 List<JavaType.FullyQualified> newThrows = new ArrayList<>();
-                                for(NameTree t : m.getThrows()) {
+                                List<NameTree> throwz = (m.getThrows() == null) ? emptyList() : m.getThrows();
+                                for(NameTree t : throwz) {
                                     J.Identifier exceptionIdent = (J.Identifier) t;
                                     newThrows.add((JavaType.FullyQualified) exceptionIdent.getType());
                                 }

@@ -210,7 +210,7 @@ interface SemanticallyEqualTest {
             "class SlowTest {}"
         )
 
-        val firstFieldAccess = cu[0].classes[0].leadingAnnotations[0].arguments.first()
+        val firstFieldAccess = cu[0].classes[0].leadingAnnotations[0].arguments!!.first()
         val secondFieldAccess = J.FieldAccess(
             randomId(),
             Space.EMPTY,
@@ -235,7 +235,7 @@ interface SemanticallyEqualTest {
             ),
             JavaType.Class.build("java.lang.Class")
         )
-        val thirdFieldAccess = cu[0].classes[0].leadingAnnotations[1].arguments.first()
+        val thirdFieldAccess = cu[0].classes[0].leadingAnnotations[1].arguments!!.first()
 
         assertThat(
             SemanticallyEqual
@@ -264,7 +264,7 @@ interface SemanticallyEqualTest {
             "@interface MyAnnotation { boolean value(); }"
         )
 
-        val firstAssign = cu[0].classes[0].leadingAnnotations[0].arguments.first()
+        val firstAssign = cu[0].classes[0].leadingAnnotations[0].arguments!!.first()
         val secondAssign = J.Assignment(
             randomId(),
             Space.EMPTY,

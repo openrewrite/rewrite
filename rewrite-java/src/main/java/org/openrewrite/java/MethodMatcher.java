@@ -150,12 +150,15 @@ public class MethodMatcher {
             return false;
         }
         List<Expression> args = constructor.getArguments();
-        String signaturePattern = args.stream()
-                .map(Expression::getType)
-                .filter(Objects::nonNull)
-                .map(MethodMatcher::typePattern)
-                .filter(Objects::nonNull)
-                .collect(joining(","));
+        String signaturePattern = "";
+        if (args != null) {
+            signaturePattern = args.stream()
+                    .map(Expression::getType)
+                    .filter(Objects::nonNull)
+                    .map(MethodMatcher::typePattern)
+                    .filter(Objects::nonNull)
+                    .collect(joining(","));
+        }
 
         JavaType.FullyQualified type = TypeUtils.asFullyQualified(constructor.getType());
         assert type != null;

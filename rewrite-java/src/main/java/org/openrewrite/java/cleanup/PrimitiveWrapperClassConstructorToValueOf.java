@@ -64,7 +64,7 @@ public class PrimitiveWrapperClassConstructorToValueOf extends Recipe {
                 J j = super.visitNewClass(newClass, executionContext);
                 J.NewClass nc = (J.NewClass) j;
                 JavaType.FullyQualified type = TypeUtils.asFullyQualified(nc.getType());
-                if (type != null && nc.getArguments().size() == 1) {
+                if (type != null && nc.getArguments() != null && nc.getArguments().size() == 1) {
                     JavaTemplate.Builder valueOf = null;
                     switch (type.getFullyQualifiedName()) {
                         case "java.lang.Boolean":

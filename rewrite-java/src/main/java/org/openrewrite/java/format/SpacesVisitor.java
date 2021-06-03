@@ -465,7 +465,9 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             t = t.getPadding().withFinally(f);
         }
         boolean spaceWithinTryParentheses = style.getWithin().getTryParentheses();
-        t = t.withResources(ListUtils.mapFirst(t.getResources(), res -> spaceBefore(res, spaceWithinTryParentheses)));
+        if (t.getResources() != null) {
+            t = t.withResources(ListUtils.mapFirst(t.getResources(), res -> spaceBefore(res, spaceWithinTryParentheses)));
+        }
         if (t.getPadding().getResources() != null) {
             t = t.getPadding().withResources(
                     t.getPadding().getResources().getPadding().withElements(

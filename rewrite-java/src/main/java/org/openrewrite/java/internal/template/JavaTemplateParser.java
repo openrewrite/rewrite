@@ -121,7 +121,9 @@ public class JavaTemplateParser {
         onBeforeParseTemplate.accept(stub);
         return cache(stub, () -> {
             J.CompilationUnit cu = compileTemplate(stub);
-            return cu.getClasses().get(0).getImplements();
+            List<TypeTree> anImplements = cu.getClasses().get(0).getImplements();
+            assert anImplements != null;
+            return anImplements;
         });
     }
 
@@ -131,7 +133,9 @@ public class JavaTemplateParser {
         return cache(stub, () -> {
             J.CompilationUnit cu = compileTemplate(stub);
             J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
-            return m.getThrows();
+            List<NameTree> aThrows = m.getThrows();
+            assert aThrows != null;
+            return aThrows;
         });
     }
 
@@ -140,7 +144,9 @@ public class JavaTemplateParser {
         onBeforeParseTemplate.accept(stub);
         return cache(stub, () -> {
             J.CompilationUnit cu = compileTemplate(stub);
-            return cu.getClasses().get(0).getTypeParameters();
+            List<J.TypeParameter> tps = cu.getClasses().get(0).getTypeParameters();
+            assert tps != null;
+            return tps;
         });
     }
 

@@ -127,7 +127,9 @@ public class ChangeType extends Recipe {
                 c = c.withExtends(transformName(c.getExtends()));
             }
 
-            c = c.withImplements(ListUtils.map(c.getImplements(), this::transformName));
+            if (c.getImplements() != null) {
+                c = c.withImplements(ListUtils.map(c.getImplements(), this::transformName));
+            }
 
             return c;
         }
@@ -173,7 +175,7 @@ public class ChangeType extends Recipe {
         public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
             J.MethodDeclaration m = visitAndCast(method, ctx, super::visitMethodDeclaration);
             m = m.withReturnTypeExpression(transformName(m.getReturnTypeExpression()));
-            return m.withThrows(ListUtils.map(m.getThrows(), this::transformName));
+            return m.withThrows(m.getThrows() == null ? null : ListUtils.map(m.getThrows(), this::transformName));
         }
 
         @Override

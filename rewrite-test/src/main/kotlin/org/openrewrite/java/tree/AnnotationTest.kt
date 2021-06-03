@@ -24,16 +24,6 @@ import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
 interface AnnotationTest : JavaTreeTest {
 
     @Test
-    fun annotationsOnTypeAttribution(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, CompilationUnit, """
-            import java.util.function.Supplier;
-            class Test {
-                Supplier<Integer> s;
-            }
-        """.trimIndent()
-    )
-
-    @Test
     fun annotationWithDefaultArgument(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
            @SuppressWarnings("ALL")

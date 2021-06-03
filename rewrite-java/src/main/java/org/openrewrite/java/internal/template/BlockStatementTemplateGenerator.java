@@ -204,7 +204,7 @@ public class BlockStatementTemplateGenerator {
             before.insert(0, f.printTrimmed().trim());
         } else if (j instanceof J.Try) {
             J.Try t = (J.Try) j;
-            if (!t.getResources().isEmpty()) {
+            if (t.getResources() != null) {
                 before.insert(0, ")");
                 for (J.Try.Resource resource : t.getResources()) {
                     before.insert(0, resource.withPrefix(Space.EMPTY).printTrimmed().trim() + ';');

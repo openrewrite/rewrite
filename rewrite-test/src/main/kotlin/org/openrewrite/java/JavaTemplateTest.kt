@@ -770,7 +770,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .build()
 
             override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
-                if(classDecl.implements.isEmpty()) {
+                if(classDecl.implements == null) {
                     maybeAddImport("java.io.Closeable");
                     maybeAddImport("java.io.Serializable");
                     return classDecl.withTemplate(t, classDecl.coordinates.replaceImplementsClause())
@@ -829,7 +829,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .build()
 
             override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
-                if(method.throws.isEmpty()) {
+                if(method.throws == null) {
                     return method.withTemplate(t, method.coordinates.replaceThrows())
                 }
                 return super.visitMethodDeclaration(method, p)
@@ -866,7 +866,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                     .build()
 
             override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
-                if(method.typeParameters.isEmpty()) {
+                if(method.typeParameters == null) {
                     return method.withTemplate<J.MethodDeclaration>(typeParamsTemplate, method.coordinates.replaceTypeParameters())
                             .withTemplate(methodArgsTemplate, method.coordinates.replaceParameters())
                 }
@@ -921,7 +921,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .build()
 
             override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
-                if(classDecl.typeParameters.isEmpty()) {
+                if(classDecl.typeParameters == null) {
                     return classDecl.withTemplate(t, classDecl.coordinates.replaceTypeParameters())
                 }
                 return super.visitClassDeclaration(classDecl, p)
