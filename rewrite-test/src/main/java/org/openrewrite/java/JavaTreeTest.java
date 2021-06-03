@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.TreeSerializer;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.tree.J;
@@ -41,7 +42,7 @@ public interface JavaTreeTest {
                 break;
         }
 
-        J.CompilationUnit cu = parser.parse(source).iterator().next();
+        J.CompilationUnit cu = parser.parse(new InMemoryExecutionContext(t -> {throw new RuntimeException(t.getMessage(), t);}), source).iterator().next();
 
         J processed = new JavaVisitor<>().visit(cu, new Object());
         assertThat(processed).as("Processing is idempotent").isSameAs(cu);

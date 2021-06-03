@@ -2729,9 +2729,16 @@ public interface J extends Serializable, Tree {
         @Getter
         Markers markers;
 
-        @With
-        @Getter
-        Expression containing;
+        JRightPadded<Expression> containing;
+
+        public Expression getContaining() {
+            return containing.getElement();
+        }
+
+        public MemberReference withContaining(Expression containing) {
+            //noinspection ConstantConditions
+            return getPadding().withContaining(JRightPadded.withElement(this.containing, containing));
+        }
 
         @Nullable
         JContainer<Expression> typeParameters;
@@ -2795,6 +2802,14 @@ public interface J extends Serializable, Tree {
         @RequiredArgsConstructor
         public static class Padding {
             private final MemberReference t;
+
+            public JRightPadded<Expression> getContaining() {
+                return t.containing;
+            }
+
+            public MemberReference withContaining(JRightPadded<Expression> containing) {
+                return t.containing == containing ? t : new MemberReference(t.id, t.prefix, t.markers, containing, t.typeParameters, t.reference, t.type, t.referenceType);
+            }
 
             @Nullable
             public JContainer<Expression> getTypeParameters() {

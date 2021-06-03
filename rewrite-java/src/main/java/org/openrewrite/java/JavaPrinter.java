@@ -757,9 +757,10 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
     public J visitMemberReference(MemberReference memberRef, P p) {
         visitSpace(memberRef.getPrefix(), Space.Location.MEMBER_REFERENCE_PREFIX, p);
         visitMarkers(memberRef.getMarkers(), p);
-        visit(memberRef.getContaining(), p);
+        visitRightPadded(memberRef.getPadding().getContaining(), JRightPadded.Location.MEMBER_REFERENCE_CONTAINING, p);
+        getPrinter().append("::");
         visitContainer("<", memberRef.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
-        visitLeftPadded("::", memberRef.getPadding().getReference(), JLeftPadded.Location.MEMBER_REFERENCE_NAME, p);
+        visitLeftPadded("", memberRef.getPadding().getReference(), JLeftPadded.Location.MEMBER_REFERENCE_NAME, p);
         return memberRef;
     }
 
