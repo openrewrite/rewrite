@@ -31,6 +31,12 @@ styleConfigs:
         - import org.springframework.*
         - <blank line>
         - import static all other imports
+  - org.openrewrite.java.style.TabsAndIndentsStyle:
+      useTabCharacter: true
+      tabSize: 4
+      indentSize: 1
+      continuationIndent: 2
+      indentsRelativeToExpressionStart: false
 #  - org.openrewrite.java.style.DeclarationOrderStyle:
 #      layout:
 #        - public static fields

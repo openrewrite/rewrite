@@ -1,0 +1,14 @@
+type: specs.openrewrite.org/v1beta/style
+name: com.netflix.eureka.Style
+displayName: Eureka style
+styleConfigs:
+  - org.openrewrite.java.style.ImportLayoutStyle:
+      classCountToUseStarImport: 999
+      nameCountToUseStarImport: 999
+      layout:
+        - import all other imports
+        - <blank line>
+        - import javax.*
+        - import java.*
+        - <blank line>
+        - import static all other imports
