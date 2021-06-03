@@ -50,6 +50,55 @@ interface MemberReferenceTest : JavaTreeTest {
     )
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/608")
+    fun memberReferenceWithTypeParameter(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, CompilationUnit, """
+            import java.util.List;
+            import java.util.Map;
+            import java.util.Set;
+            import java.util.function.Function;
+            import java.util.stream.Collector;
+            import java.util.stream.Collectors;
+            
+            public class Sample {
+            
+                private void foo(List<Criteria> request) {
+                    Set<Id<Criteria>> allCriteria = request.stream()
+                            .map(Id::<Criteria>of)
+                            .collect(Collectors.toSet());
+                    allCriteria = request.stream()
+                            .map(Id/**yo**/::/**hola**/<Criteria>/**hello**/of)
+                            .collect(Collectors.toSet());
+                            
+                    List<String> result = allCriteria.stream()
+                            .map(Sample::idToString)
+                            .collect(Collectors.toList());
+                }
+            
+                public static <T, K, V> Collector<T, ?, Map<K, V>> toImmutableMap(
+                        Function<? super T, ? extends K> keyFunction,
+                        Function<? super T, ? extends V> valueFunction) {
+                    return null;
+                }
+                private static String idToString(Id id) {
+                    return id.toString();
+                }
+                private class Id<T> {
+                    static <Y> Id<Y> of(Y thing) {
+                        return null;
+                    }
+                }
+            
+                private class Criteria {
+                    Long getId() {
+                        return null;
+                    }
+                }
+            }
+        """
+    )
+
+    @Test
     fun staticFunctionReference(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             import java.util.stream.Stream;
