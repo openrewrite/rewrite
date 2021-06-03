@@ -249,8 +249,8 @@ public class JavaTemplate {
                             List<Statement> parameters = substitutions.unsubstitute(templateParser.parseParameters(substitutedTemplate));
 
                             // Update the J.MethodDeclaration's type information to reflect its new parameter list
-                            JavaType.Method newType = method.getType();
-                            if(newType != null) {
+                            JavaType.Method type = method.getType();
+                            if(type != null) {
                                 List<String> paramNames = new ArrayList<>();
                                 List<JavaType> paramTypes = new ArrayList<>();
                                 for(Statement parameter : parameters) {
@@ -265,17 +265,12 @@ public class JavaTemplate {
                                                 "Multi-variable declarations may not be used in a method declaration's " +
                                                         "parameter list: " + parameter.print());
                                     }
-                                    if(!(decl.getTypeExpression() instanceof J.Identifier || decl.getTypeExpression() instanceof J.Primitive)) {
-                                        throw new IllegalArgumentException(
-                                                "Only an Identifier or a Primitive can be supplied as the type expression of a parameter " +
-                                                        "appearing in a method declaration's parameter list: " + parameter.print());
-                                    }
                                     J.VariableDeclarations.NamedVariable namedVariable = decl.getVariables().get(0);
                                     paramNames.add(namedVariable.getSimpleName());
-                                    if(namedVariable.getType() == null) {
+                                    // Make a best-effort attempt to update the type information
+                                    if(namedVariable.getType() == null && decl.getTypeExpression() instanceof J.Identifier) {
                                         // null if the type of the argument is a generic type parameter
                                         // Try to find an appropriate type from the method itself
-                                        assert decl.getTypeExpression() instanceof J.Identifier;
                                         J.Identifier declTypeIdent = (J.Identifier) decl.getTypeExpression();
                                         String typeParameterName = declTypeIdent.getSimpleName();
                                         for(J.TypeParameter typeParameter : method.getTypeParameters()) {
@@ -299,14 +294,14 @@ public class JavaTemplate {
                                         paramTypes.add(namedVariable.getType());
                                     }
                                 }
-
-                                newType = newType.withParamNames(paramNames)
-                                        .withGenericSignature(newType.getGenericSignature().withParamTypes(paramTypes))
-                                        .withResolvedSignature(newType.getResolvedSignature().withParamTypes(paramTypes));
+                                type = JavaType.Method.build(type.getFlags(), type.getDeclaringType(), type.getName(),
+                                        type.getGenericSignature().withParamTypes(paramTypes),
+                                        type.getResolvedSignature().withParamTypes(paramTypes),
+                                        paramNames, type.getThrownExceptions());
                             }
 
                             return method.withParameters(parameters)
-                                    .withType(newType);
+                                    .withType(type);
                         }
                         case THROWS: {
                             J.MethodDeclaration m = method.withThrows(substitutions.unsubstitute(templateParser.parseThrows(substitutedTemplate)));
@@ -319,7 +314,8 @@ public class JavaTemplate {
                                     J.Identifier exceptionIdent = (J.Identifier) t;
                                     newThrows.add((JavaType.FullyQualified) exceptionIdent.getType());
                                 }
-                                type.withThrownExceptions(newThrows);
+                                type = JavaType.Method.build(type.getFlags(), type.getDeclaringType(), type.getName(),
+                                        type.getGenericSignature(), type.getResolvedSignature(), type.getParamNames(), newThrows);
                             }
 
                             //noinspection ConstantConditions

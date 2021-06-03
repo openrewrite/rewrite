@@ -160,7 +160,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceMethodParameters(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("int m, int n")
+            val t = template("int m, java.util.List<String> n")
                 .doBeforeParseTemplate(print)
                 .build()
 
@@ -189,16 +189,32 @@ interface JavaTemplateTest : JavaRecipeTest {
         """,
         after = """
             class Test {
-                void test(int m, int n) {
+                void test(int m, java.util.List<String> n) {
                     new Runnable() {
-                        void inner(int m, int n) {
+                        void inner(int m, java.util.List<String> n) {
                         }
                     };
                 }
             }
-        """
-    )
+        """,
+        afterConditions = { cu ->
+            val type = (cu.classes.first().body.statements.first() as J.MethodDeclaration).type!!
 
+            assertThat(type.paramNames)
+                    .`as`("Changing the method's parameters should have also updated its type's parameter names")
+                    .containsExactly("m", "n")
+            assertThat(type.resolvedSignature.paramTypes[0])
+                    .`as`("Changing the method's parameters should have resulted in the first parameter's type being 'int'")
+                    .isEqualTo(JavaType.Primitive.Int)
+            assertThat(type.resolvedSignature.paramTypes[1])
+                    .`as`("Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'")
+                    .matches { it is JavaType.Parameterized
+                            && it.type.fullyQualifiedName == "java.util.List"
+                            && it.typeParameters.size == 1
+                            && it.typeParameters.first().asFullyQualified()!!.fullyQualifiedName == "java.lang.String"
+                    }
+        }
+    )
 
     @Test
     fun replaceAndInterpolateMethodParameters(jp: JavaParser) = assertChanged(
@@ -230,10 +246,17 @@ interface JavaTemplateTest : JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            val testMethod = cu.classes.first().body.statements.first() as J.MethodDeclaration
-            assertThat(testMethod.type!!.paramNames)
-                    .`as`("Changing the method's parameters should have also updated its type information")
+            val type = (cu.classes.first().body.statements.first() as J.MethodDeclaration).type!!
+
+            assertThat(type.paramNames)
+                    .`as`("Changing the method's parameters should have also updated its type's parameter names")
                     .containsExactly("n", "s")
+            assertThat(type.resolvedSignature.paramTypes[0])
+                    .`as`("Changing the method's parameters should have resulted in the first parameter's type being 'int'")
+                    .isEqualTo(JavaType.Primitive.Int)
+            assertThat(type.resolvedSignature.paramTypes[1])
+                    .`as`("Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'")
+                    .matches { it is JavaType.FullyQualified && it.fullyQualifiedName == "java.lang.String" }
         }
     )
 
@@ -824,7 +847,8 @@ interface JavaTemplateTest : JavaRecipeTest {
         """,
         afterConditions = { cu ->
             val testMethodDecl = cu.classes.first().body.statements.first() as J.MethodDeclaration
-            assertThat(testMethodDecl.type!!.thrownExceptions).containsExactly()
+            assertThat(testMethodDecl.type!!.thrownExceptions.map { it.fullyQualifiedName })
+                    .containsExactly("java.lang.Exception")
         }
     )
 
@@ -836,7 +860,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .doBeforeParseTemplate(print)
                 .build()
 
-            val methodArgsTemplate = template("T t, U u")
+            val methodArgsTemplate = template("List<T> t, U u")
+                    .imports("java.util.List")
                     .doBeforeParseTemplate(print)
                     .build()
 
@@ -849,6 +874,8 @@ interface JavaTemplateTest : JavaRecipeTest {
             }
         }.toRecipe(),
         before = """
+            import java.util.List;
+            
             class Test {
             
                 void test() {
@@ -856,9 +883,11 @@ interface JavaTemplateTest : JavaRecipeTest {
             }
         """,
         after = """
+            import java.util.List;
+            
             class Test {
             
-                <T, U> void test(T t, U u) {
+                <T, U> void test(List<T> t, U u) {
                 }
             }
         """,
@@ -866,13 +895,13 @@ interface JavaTemplateTest : JavaRecipeTest {
             val type = (cu.classes.first().body.statements.first() as J.MethodDeclaration).type!!
             assertThat(type).isNotNull
             val paramTypes = type.genericSignature.paramTypes
+
             assertThat(paramTypes[0])
-                    .`as`("The method declaration's type's genericSignature first argument should have have type 'T' with bound 'java.lang.Object'")
+                    .`as`("The method declaration's type's genericSignature first argument should have have type 'java.util.List'")
                     .matches { tType ->
-                        tType is JavaType.GenericTypeVariable &&
-                        tType.fullyQualifiedName == "T" &&
-                        tType.bound!!.fullyQualifiedName == "java.lang.Object"
-            }
+                        tType is JavaType.FullyQualified && tType.fullyQualifiedName == "java.util.List"
+                    }
+
             assertThat(paramTypes[1])
                     .`as`("The method declaration's type's genericSignature second argument should have type 'U' with bound 'java.lang.Object'")
                     .matches { uType ->
