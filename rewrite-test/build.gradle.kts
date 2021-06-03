@@ -23,15 +23,6 @@ dependencies {
     implementation("ch.qos.logback:logback-classic:1.0.13")
 }
 
-tasks.named<JavaCompile>("compileJava") {
-    sourceCompatibility = JavaVersion.VERSION_1_8.toString()
-    targetCompatibility = JavaVersion.VERSION_1_8.toString()
-
-    options.isFork = true
-    options.forkOptions.executable = "javac"
-    options.compilerArgs.addAll(listOf("--release", "8"))
-}
-
 tasks.withType<Javadoc> {
     isFailOnError = false
     exclude("org/openrewrite/java/**")
