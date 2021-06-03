@@ -39,7 +39,9 @@ public class UseStaticImport extends Recipe {
      * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
-    @Option(displayName = "Method pattern", description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.")
+    @Option(displayName = "Method pattern",
+            description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.",
+            example = "java.util.Collections emptyList()")
     String methodPattern;
 
     @Override
@@ -49,7 +51,7 @@ public class UseStaticImport extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Replace method calls with calls to the same method via static import.";
+        return "Removes unnecessary receiver types from static method invocations. For example, `Collections.emptyList()` becomes `emptyList()`.";
     }
 
     @Override
