@@ -695,7 +695,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         J.MemberReference m = memberRef;
         m = m.withPrefix(visitSpace(m.getPrefix(), Space.Location.MEMBER_REFERENCE_PREFIX, p));
         m = m.withMarkers(visitMarkers(m.getMarkers(), p));
-        m = m.withContaining(visitAndCast(m.getContaining(), p));
+        m = m.getPadding().withContaining(visitRightPadded(m.getPadding().getContaining(), JRightPadded.Location.MEMBER_REFERENCE_CONTAINING, p));
         if (m.getPadding().getTypeParameters() != null) {
             m = m.getPadding().withTypeParameters(visitContainer(m.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p));
         }
