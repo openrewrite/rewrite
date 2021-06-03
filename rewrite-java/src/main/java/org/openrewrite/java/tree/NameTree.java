@@ -19,4 +19,5 @@ package org.openrewrite.java.tree;
  * A tree representing a simple or fully qualified name
  */
 public interface NameTree extends TypedTree {
+//    JavaType getType();
 }

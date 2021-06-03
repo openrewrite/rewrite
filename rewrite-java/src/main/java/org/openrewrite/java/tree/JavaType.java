@@ -640,7 +640,6 @@ public interface JavaType extends Serializable {
 
         private final FullyQualified declaringType;
 
-        @With
         private final String name;
         private final Signature genericSignature;
         private final Signature resolvedSignature;
@@ -691,8 +690,10 @@ public interface JavaType extends Serializable {
         @Data
         public static class Signature implements Serializable {
             @Nullable
+            @With
             private final JavaType returnType;
 
+            @With
             private final List<JavaType> paramTypes;
         }
 
@@ -710,12 +711,26 @@ public interface JavaType extends Serializable {
             return Flag.bitMapToFlags(flagsBitMap);
         }
 
+        public Method withName(String name) {
+            if(this.name.equals(name)) {
+                return this;
+            }
+            return Method.build(flagsBitMap, declaringType, name, genericSignature, resolvedSignature, paramNames, thrownExceptions);
+        }
+
         public Method withFlags(Set<Flag> flags) {
-            return new Method(Flag.flagsToBitMap(flags), this.declaringType, this.name, this.genericSignature, this.resolvedSignature, this.paramNames, this.thrownExceptions);
+            int flagsBitMap = Flag.flagsToBitMap(flags);
+            if(this.flagsBitMap == flagsBitMap) {
+                return this;
+            }
+            return Method.build(flagsBitMap, declaringType, name, genericSignature, resolvedSignature, paramNames, thrownExceptions);
         }
 
         public Method withDeclaringType(FullyQualified declaringType) {
-            return new Method(this.flagsBitMap, declaringType, this.name, this.genericSignature, this.resolvedSignature, this.paramNames, this.thrownExceptions);
+            if(this.declaringType.equals(declaringType)) {
+                return this;
+            }
+            return Method.build(flagsBitMap, declaringType, name, genericSignature, resolvedSignature, paramNames, thrownExceptions);
         }
 
         @Override

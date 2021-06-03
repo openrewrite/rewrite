@@ -26,10 +26,7 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.Space.Location;
 import org.openrewrite.marker.Markers;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -41,7 +38,7 @@ import static org.openrewrite.java.tree.Space.Location.*;
 public class JavaTemplate {
     private static final J.Block EMPTY_BLOCK = new J.Block(randomId(), Space.EMPTY,
             Markers.EMPTY, new JRightPadded<>(false, Space.EMPTY, Markers.EMPTY),
-            Collections.emptyList(), Space.format(" "));
+            emptyList(), Space.format(" "));
 
     private final Supplier<Cursor> parentScopeGetter;
     private final String code;
@@ -208,6 +205,10 @@ public class JavaTemplate {
                 if (loc.equals(LAMBDA_PARAMETERS_PREFIX) && lambda.getParameters().isScope(insertionPoint)) {
                     return lambda.withParameters(substitutions.unsubstitute(templateParser.parseLambdaParameters(substitutedTemplate)));
                 }
+                if(loc.equals(STATEMENT_PREFIX) && lambda.isScope(insertionPoint) && mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
+                    J gen = substitutions.unsubstitute(templateParser.parseExpression(substitutedTemplate));
+                    return autoFormat(gen.withPrefix(lambda.getPrefix()), p, getCursor().getParentOrThrow());
+                }
                 return super.visitLambda(lambda, p);
             }
 
@@ -247,13 +248,83 @@ public class JavaTemplate {
                             return method.withBody(autoFormat(body, p, getCursor()));
                         }
                         case METHOD_DECLARATION_PARAMETERS: {
-                            return method.withParameters(substitutions.unsubstitute(templateParser.parseParameters(substitutedTemplate)));
+                            List<Statement> parameters = substitutions.unsubstitute(templateParser.parseParameters(substitutedTemplate));
+
+                            // Update the J.MethodDeclaration's type information to reflect its new parameter list
+                            JavaType.Method type = method.getType();
+                            if(type != null) {
+                                List<String> paramNames = new ArrayList<>();
+                                List<JavaType> paramTypes = new ArrayList<>();
+                                for(Statement parameter : parameters) {
+                                    if(!(parameter instanceof J.VariableDeclarations)) {
+                                        throw new IllegalArgumentException(
+                                                "Only variable declarations may be part of a method declaration's parameter " +
+                                                        "list:" + parameter.print());
+                                    }
+                                    J.VariableDeclarations decl = (J.VariableDeclarations) parameter;
+                                    if(decl.getVariables().size() != 1) {
+                                        throw new IllegalArgumentException(
+                                                "Multi-variable declarations may not be used in a method declaration's " +
+                                                        "parameter list: " + parameter.print());
+                                    }
+                                    J.VariableDeclarations.NamedVariable namedVariable = decl.getVariables().get(0);
+                                    paramNames.add(namedVariable.getSimpleName());
+                                    // Make a best-effort attempt to update the type information
+                                    if(namedVariable.getType() == null && decl.getTypeExpression() instanceof J.Identifier) {
+                                        // null if the type of the argument is a generic type parameter
+                                        // Try to find an appropriate type from the method itself
+                                        J.Identifier declTypeIdent = (J.Identifier) decl.getTypeExpression();
+                                        String typeParameterName = declTypeIdent.getSimpleName();
+                                        List<J.TypeParameter> typeParameters = (method.getTypeParameters() == null) ? emptyList() : method.getTypeParameters();
+                                        for(J.TypeParameter typeParameter : typeParameters) {
+                                            J.Identifier typeParamIdent = (J.Identifier) typeParameter.getName();
+                                            if(typeParamIdent.getSimpleName().equals(typeParameterName)) {
+                                                List<TypeTree> bounds = typeParameter.getBounds();
+                                                JavaType.FullyQualified bound;
+                                                if(bounds == null || bounds.isEmpty()) {
+                                                    bound = JavaType.Class.OBJECT;
+                                                } else {
+                                                    bound = (JavaType.FullyQualified) bounds.get(0);
+                                                }
+                                                JavaType.GenericTypeVariable genericType = new JavaType.GenericTypeVariable(
+                                                        typeParamIdent.getSimpleName(),
+                                                        bound);
+
+                                                paramTypes.add(genericType);
+                                            }
+                                        }
+                                    } else {
+                                        paramTypes.add(namedVariable.getType());
+                                    }
+                                }
+                                type = JavaType.Method.build(type.getFlags(), type.getDeclaringType(), type.getName(),
+                                        type.getGenericSignature().withParamTypes(paramTypes),
+                                        type.getResolvedSignature().withParamTypes(paramTypes),
+                                        paramNames, type.getThrownExceptions());
+                            }
+
+                            return method.withParameters(parameters)
+                                    .withType(type);
                         }
                         case THROWS: {
                             J.MethodDeclaration m = method.withThrows(substitutions.unsubstitute(templateParser.parseThrows(substitutedTemplate)));
 
+                            // Update method type information to reflect the new checked exceptions
+                            JavaType.Method type = m.getType();
+                            if(type != null) {
+                                List<JavaType.FullyQualified> newThrows = new ArrayList<>();
+                                List<NameTree> throwz = (m.getThrows() == null) ? emptyList() : m.getThrows();
+                                for(NameTree t : throwz) {
+                                    J.Identifier exceptionIdent = (J.Identifier) t;
+                                    newThrows.add((JavaType.FullyQualified) exceptionIdent.getType());
+                                }
+                                type = JavaType.Method.build(type.getFlags(), type.getDeclaringType(), type.getName(),
+                                        type.getGenericSignature(), type.getResolvedSignature(), type.getParamNames(), newThrows);
+                            }
+
                             //noinspection ConstantConditions
-                            m = m.getPadding().withThrows(m.getPadding().getThrows().withBefore(Space.format(" ")));
+                            m = m.getPadding().withThrows(m.getPadding().getThrows().withBefore(Space.format(" ")))
+                                    .withType(type);
                             return m;
                         }
                         case TYPE_PARAMETERS: {
@@ -274,6 +345,10 @@ public class JavaTemplate {
                     J.MethodInvocation m = method.withArguments(args);
                     m = autoFormat(m, 0, getCursor().getParentOrThrow());
                     return m;
+                }
+                if(loc.equals(STATEMENT_PREFIX) && method.isScope(insertionPoint) && mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
+                    J gen = substitutions.unsubstitute(templateParser.parseExpression(substitutedTemplate));
+                    return autoFormat(gen.withPrefix(method.getPrefix()), integer, getCursor().getParentOrThrow());
                 }
                 return super.visitMethodInvocation(method, integer);
             }
