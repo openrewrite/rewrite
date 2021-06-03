@@ -20,6 +20,7 @@ import com.google.common.io.CharSource
 import com.google.googlejavaformat.java.Formatter
 import com.google.googlejavaformat.java.JavaFormatterOptions
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
@@ -1056,6 +1057,39 @@ interface JavaTemplateTest : JavaRecipeTest {
             abstract class Test {
                 void test(){
                 }
+            }
+        """
+    )
+
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/611")
+    @Test
+    fun substitutionIsNamedVariable(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val t = template("BigDecimal t2 = #{}.multiply(BigDecimal.valueOf(4));").build()
+
+            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
+                var c = super.visitClassDeclaration(classDecl, p)
+                val varDecls: J.VariableDeclarations = c.body.statements.get(0) as J.VariableDeclarations
+                val xVal: J.VariableDeclarations.NamedVariable = varDecls.variables.get(0);
+                c = c.withBody(c.body.withTemplate(t, c.body.coordinates.lastStatement(), xVal));
+                return c;
+            }
+        }.toRecipe(),
+        before = """
+            package a;
+
+            import java.math.BigDecimal;class Test {
+                BigDecimal t1 = BigDecimal.valueOf(2);
+            }
+        """,
+        after = """
+            package a;
+
+            import java.math.BigDecimal;class Test {
+                BigDecimal t1 = BigDecimal.valueOf(2);
+                BigDecimal t2 = t1.multiply(BigDecimal.valueOf(4));
             }
         """
     )
