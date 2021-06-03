@@ -784,14 +784,16 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.MemberReference visitMemberReference(J.MemberReference memberRef, P p) {
         J.MemberReference m = super.visitMemberReference(memberRef, p);
-        m = m.getPadding().withReference(
-                spaceBefore(m.getPadding().getReference(), style.getAroundOperators().getMethodReferenceDoubleColon())
+        m = m.getPadding().withContaining(
+                spaceAfter(m.getPadding().getContaining(), style.getAroundOperators().getMethodReferenceDoubleColon())
         );
-        m = m.getPadding().withReference(
-                m.getPadding().getReference().withElement(
-                        spaceBefore(m.getPadding().getReference().getElement(), style.getAroundOperators().getMethodReferenceDoubleColon())
-                )
-        );
+        if (m.getPadding().getTypeParameters() != null) {
+            m.getPadding().withTypeParameters(spaceBefore(m.getPadding().getTypeParameters(), style.getAroundOperators().getMethodReferenceDoubleColon()));
+        } else {
+            m = m.getPadding().withReference(
+                    spaceBefore(m.getPadding().getReference(), style.getAroundOperators().getMethodReferenceDoubleColon())
+            );
+        }
         return m;
     }
 
