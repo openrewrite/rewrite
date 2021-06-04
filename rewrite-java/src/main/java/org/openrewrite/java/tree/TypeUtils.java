@@ -32,14 +32,18 @@ public class TypeUtils {
 
     public static boolean isString(@Nullable JavaType type) {
         return type == JavaType.Primitive.String ||
-                ( type instanceof JavaType.Class &&
-                        "java.lang.String".equals(((JavaType.Class) type).getFullyQualifiedName())
+                ( type instanceof JavaType.FullyQualified &&
+                        "java.lang.String".equals(((JavaType.FullyQualified) type).getFullyQualifiedName())
                 );
     }
 
     public static boolean isOfType(@Nullable JavaType type1, @Nullable JavaType type2) {
         if(type1 == null || type2 == null) {
             return false;
+        }
+        // Strings, uniquely amongst all other types, can be either primitives or classes depending on the context
+        if(TypeUtils.isString(type1) && TypeUtils.isString(type2)) {
+            return true;
         }
         if(type1 instanceof JavaType.Primitive && type2 instanceof JavaType.Primitive) {
             return ((JavaType.Primitive) type1).getKeyword().equals(((JavaType.Primitive)type2).getKeyword());

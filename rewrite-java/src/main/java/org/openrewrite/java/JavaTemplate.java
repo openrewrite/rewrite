@@ -347,6 +347,7 @@ public class JavaTemplate {
                 if (loc.equals(METHOD_INVOCATION_ARGUMENTS) && method.isScope(insertionPoint)) {
                     List<Expression> args = substitutions.unsubstitute(templateParser.parseMethodArguments(getCursor(), substitutedTemplate, loc));
                     J.MethodInvocation m = method.withArguments(args);
+                    // Make a best-effort attempt to find type information for the newly modified method signature
                     if(method.getType() != null && method.getType().getGenericSignature().getReturnType() != null) {
                         JavaType.Method mtype = JavaType.Method.lookupExistingType(method.getType().getDeclaringType(),
                                 method.getSimpleName(),
