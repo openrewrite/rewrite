@@ -17,6 +17,7 @@ package org.openrewrite.properties
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 
 class ChangePropertyValueTest : PropertiesRecipeTest {
 
@@ -26,9 +27,22 @@ class ChangePropertyValueTest : PropertiesRecipeTest {
         null
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/575")
+    @Test
+    fun preserveComment() = assertChanged(
+        parser = PropertiesParser(),
+        before = """
+            management.metrics.binders.files.enabled=true
+            # comment
+        """,
+        after = """
+            management.metrics.binders.files.enabled=false
+            # comment
+        """
+    )
+
     @Test
     fun changeValue() = assertChanged(
-        parser = PropertiesParser(),
         before = "management.metrics.binders.files.enabled=true",
         after = "management.metrics.binders.files.enabled=false"
     )

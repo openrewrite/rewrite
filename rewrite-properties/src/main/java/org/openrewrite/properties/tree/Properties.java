@@ -165,5 +165,10 @@ public interface Properties extends Serializable, Tree {
 
         @With
         String message;
+
+        @Override
+        public <P> Properties acceptProperties(PropertiesVisitor<P> v, P p) {
+            return v.visitComment(this, p);
+        }
     }
 }

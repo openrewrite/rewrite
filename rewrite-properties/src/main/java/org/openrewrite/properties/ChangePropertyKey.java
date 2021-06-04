@@ -58,7 +58,7 @@ public class ChangePropertyKey extends Recipe {
         @Override
         public Properties visitEntry(Properties.Entry entry, P p) {
             if (entry.getKey().equals(oldPropertyKey)) {
-                entry = entry.withKey(newPropertyKey);
+                entry = entry.withKey(newPropertyKey).withPrefix(entry.getPrefix());
             }
             return super.visitEntry(entry, p);
         }
