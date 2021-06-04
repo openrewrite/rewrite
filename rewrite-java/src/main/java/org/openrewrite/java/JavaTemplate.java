@@ -26,12 +26,16 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.Space.Location;
 import org.openrewrite.marker.Markers;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.tree.Space.Location.*;
 
@@ -343,6 +347,16 @@ public class JavaTemplate {
                 if (loc.equals(METHOD_INVOCATION_ARGUMENTS) && method.isScope(insertionPoint)) {
                     List<Expression> args = substitutions.unsubstitute(templateParser.parseMethodArguments(getCursor(), substitutedTemplate, loc));
                     J.MethodInvocation m = method.withArguments(args);
+                    if(method.getType() != null && method.getType().getGenericSignature().getReturnType() != null) {
+                        JavaType.Method mtype = JavaType.Method.lookupExistingType(method.getType().getDeclaringType(),
+                                method.getSimpleName(),
+                                method.getType().getGenericSignature().getReturnType(),
+                                args.stream().map(Expression::getType).collect(toList())
+                        );
+                        if (mtype != null) {
+                            m = m.withType(mtype);
+                        }
+                    }
                     m = autoFormat(m, 0, getCursor().getParentOrThrow());
                     return m;
                 }

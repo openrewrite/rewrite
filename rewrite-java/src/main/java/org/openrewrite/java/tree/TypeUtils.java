@@ -17,7 +17,6 @@ package org.openrewrite.java.tree;
 
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.Arrays;
 import java.util.List;
 
 import static java.util.Collections.emptyList;
@@ -36,6 +35,23 @@ public class TypeUtils {
                 ( type instanceof JavaType.Class &&
                         "java.lang.String".equals(((JavaType.Class) type).getFullyQualifiedName())
                 );
+    }
+
+    public static boolean isOfType(@Nullable JavaType type1, @Nullable JavaType type2) {
+        if(type1 == null || type2 == null) {
+            return false;
+        }
+        if(type1 instanceof JavaType.Primitive && type2 instanceof JavaType.Primitive) {
+            return ((JavaType.Primitive) type1).getKeyword().equals(((JavaType.Primitive)type2).getKeyword());
+        }
+        if(type1 instanceof JavaType.FullyQualified && type2 instanceof JavaType.FullyQualified) {
+            return ((JavaType.FullyQualified) type1).getFullyQualifiedName().equals(((JavaType.FullyQualified) type2).getFullyQualifiedName());
+        }
+        if(type1 instanceof JavaType.Array && type2 instanceof JavaType.Array) {
+            return isOfType(((JavaType.Array)type1).getElemType(), ((JavaType.Array)type2).getElemType());
+        }
+
+        return type1.deepEquals(type2);
     }
 
     public static boolean isOfClassType(@Nullable JavaType type, String fqn) {
