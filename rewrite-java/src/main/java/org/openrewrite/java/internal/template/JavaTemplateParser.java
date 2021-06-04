@@ -223,7 +223,11 @@ public class JavaTemplateParser {
     private <J2 extends J> List<J2> cache(String stub, Supplier<List<? extends J>> ifAbsent) {
         List<J2> js;
         synchronized (templateCacheLock) {
-            js = (List<J2>) templateCache.computeIfAbsent(stub, s -> ifAbsent.get());
+            js = (List<J2>) templateCache.get(stub);
+            if(js == null) {
+                js = (List<J2>) ifAbsent.get();
+                templateCache.put(stub, js);
+            }
         }
         return ListUtils.map(js, j -> (J2) new RandomizeIdVisitor<Integer>().visit(j, 0));
     }
