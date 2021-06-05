@@ -18,7 +18,11 @@ package org.openrewrite.internal;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
-import org.openrewrite.config.*;
+import org.openrewrite.config.DeclarativeRecipe;
+import org.openrewrite.config.OptionDescriptor;
+import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.config.RecipeIntrospectionException;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -73,6 +77,17 @@ public class RecipeIntrospectionUtils {
         }
     }
 
+    @Nullable
+    public static Constructor<?> getZeroArgsConstructor(Class<?> recipeClass) {
+        Constructor<?>[] constructors = recipeClass.getConstructors();
+        for(Constructor<?> constructor : constructors) {
+            if(constructor.getParameterCount() == 0) {
+                return constructor;
+            }
+        }
+        return null;
+    }
+
     public static RecipeDescriptor recipeDescriptorFromRecipe(Recipe recipe) {
         List<OptionDescriptor> options = getOptionsDescriptors(recipe);
         List<RecipeDescriptor> recipeList = new ArrayList<>();
@@ -84,7 +99,10 @@ public class RecipeIntrospectionUtils {
     }
 
     private static Recipe constructRecipe(Class<?> recipeClass) {
-        Constructor<?> primaryConstructor = getPrimaryConstructor(recipeClass);
+        Constructor<?> primaryConstructor = getZeroArgsConstructor(recipeClass);
+        if(primaryConstructor == null) {
+            primaryConstructor = getPrimaryConstructor(recipeClass);
+        }
         Object[] constructorArgs = new Object[primaryConstructor.getParameterCount()];
         for (int i = 0; i < primaryConstructor.getParameters().length; i++) {
             java.lang.reflect.Parameter param = primaryConstructor.getParameters()[i];

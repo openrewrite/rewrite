@@ -15,13 +15,22 @@
  */
 package org.openrewrite.java
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.config.Environment
 import org.openrewrite.config.RecipeDescriptor
 import org.openrewrite.style.NamedStyles
-import java.util.*
 
 class EnvironmentTest {
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/616")
+    @Test
+    fun canLoadRecipeWithZeroArgsConstructorAndPrimaryConstructor() {
+        val env = Environment.builder().scanRuntimeClasspath().build()
+        val recipe = env.activateRecipes(OrderImports::class.java.canonicalName)
+        assertThat(recipe).isNotNull
+    }
 
 //    @Test
 //    fun listRecipeDescriptors() {

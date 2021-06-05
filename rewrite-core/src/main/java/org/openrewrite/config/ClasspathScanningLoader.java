@@ -153,11 +153,11 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 }
                 try {
                     recipeDescriptors.add(RecipeIntrospectionUtils.recipeDescriptorFromRecipeClass(recipeClass));
-                    Constructor<?> primaryConstructor = RecipeIntrospectionUtils.getPrimaryConstructor(recipeClass);
+                    Constructor<?> constructor = RecipeIntrospectionUtils.getZeroArgsConstructor(recipeClass);
 
-                    if (primaryConstructor.getParameterCount() == 0) {
-                        primaryConstructor.setAccessible(true);
-                        recipes.add((Recipe) primaryConstructor.newInstance());
+                    if (constructor != null) {
+                        constructor.setAccessible(true);
+                        recipes.add((Recipe) constructor.newInstance());
                     }
                 } catch (Exception e) {
                     logger.warn("Unable to configure {}", recipeClass.getName(), e);
@@ -166,12 +166,10 @@ public class ClasspathScanningLoader implements ResourceLoader {
             for (ClassInfo classInfo : result.getSubclasses(NamedStyles.class.getName())) {
                 Class<?> styleClass = classInfo.loadClass();
                 try {
-                    for (Constructor<?> constructor : styleClass.getConstructors()) {
-                        if (constructor.getParameterCount() == 0) {
-                            constructor.setAccessible(true);
-                            styles.add((NamedStyles) constructor.newInstance());
-                            break;
-                        }
+                    Constructor<?> constructor = RecipeIntrospectionUtils.getZeroArgsConstructor(styleClass);
+                    if(constructor != null) {
+                        constructor.setAccessible(true);
+                        styles.add((NamedStyles) constructor.newInstance());
                     }
                 } catch (Exception e) {
                     logger.warn("Unable to configure {}", styleClass.getName(), e);
