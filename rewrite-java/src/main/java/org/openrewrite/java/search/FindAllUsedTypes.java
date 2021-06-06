@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.search;
 
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 
@@ -25,8 +26,11 @@ public class FindAllUsedTypes {
     public static Set<JavaType> findAll(J j) {
         Set<JavaType> types = new HashSet<JavaType>() {
             @Override
-            public boolean add(JavaType javaType) {
-                return super.add(javaType);
+            public boolean add(@Nullable JavaType javaType) {
+                if(javaType != null) {
+                    return super.add(javaType);
+                }
+                return false;
             }
         };
 

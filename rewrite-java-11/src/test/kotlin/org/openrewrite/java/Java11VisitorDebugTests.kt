@@ -131,6 +131,10 @@ class Java11StaticMethodNotFinalTest : Java11Test, StaticMethodNotFinalTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11FindAllUsedTypesTest : Java11Test, FindAllUsedTypesTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11FindAnnotationsTest : Java11Test, FindAnnotationsTest
 
 @DebugOnly

@@ -46,6 +46,31 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/617")
+    @Test
+    fun leaveImportForStaticImportEnumInAnnotation(jp: JavaParser) = assertUnchanged(
+        jp,
+        recipe = RemoveUnusedImports(),
+        dependsOn = arrayOf("""
+            package org.openrewrite.test;
+            
+            public @interface YesOrNo {
+                Status status();
+                enum Status {
+                    YES, NO
+                }
+            }
+        """),
+        before = """
+            package org.openrewrite.test;
+            
+            import static org.openrewrite.test.YesOrNo.Status.YES;
+            
+            @YesOrNo(status = YES)
+            public class Foo {}
+        """
+    )
+
     @Test
     fun removeStarImportIfNoTypesReferredTo(jp: JavaParser) = assertChanged(
         jp,

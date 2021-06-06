@@ -645,7 +645,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         // a field.
         JavaType fieldType = null;
         if (ident.sym instanceof Symbol.VarSymbol) {
-            // currently only the first 16 bits are meaninful
+            // currently only the first 16 bits are meaningful
             fieldType = JavaType.Variable.build(name, type(ident.sym.owner.type), (int) ident.sym.flags_field & 0xFFFF);
         }
 

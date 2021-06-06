@@ -131,6 +131,10 @@ class Java8StaticMethodNotFinalTest : Java8Test, StaticMethodNotFinalTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8FindAllUsedTypesTest : Java8Test, FindAllUsedTypesTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8FindAnnotationsTest : Java8Test, FindAnnotationsTest
 
 @DebugOnly

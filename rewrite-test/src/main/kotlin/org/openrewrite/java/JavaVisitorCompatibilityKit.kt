@@ -110,6 +110,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class StaticMethodNotFinalTck : StaticMethodNotFinalTest
 
     @Nested
+    inner class FindAllUsedTypesTck : FindAllUsedTypesTest
+
+    @Nested
     inner class FindAnnotationsTck : FindAnnotationsTest
 
     @Nested
