@@ -62,6 +62,9 @@ public class AddDependencyVisitor extends MavenVisitor {
     private final String version;
 
     @Nullable
+    private String resolvedVersion;
+
+    @Nullable
     private final String metadataPattern;
 
     private final boolean releasesOnly;
@@ -113,6 +116,8 @@ public class AddDependencyVisitor extends MavenVisitor {
 
         Collection<Pom.Dependency> dependencies = new ArrayList<>(model.getDependencies());
         String packaging = (type == null) ? "jar" : type;
+
+        String dependencyVersion = findVersionToUse(groupId, artifactId, ctx);
         dependencies.add(
                 new Pom.Dependency(
                         null,
@@ -120,9 +125,9 @@ public class AddDependencyVisitor extends MavenVisitor {
                         classifier,
                         type,
                         false,
-                        new Pom(randomId(), groupId, artifactId, version, null, null, null, packaging, classifier, null,
+                        new Pom(randomId(), groupId, artifactId, dependencyVersion, null, null, null, packaging, classifier, null,
                                 emptyList(), new Pom.DependencyManagement(emptyList()), emptyList(), emptyList(), emptyMap(), emptyMap()),
-                        version,
+                        dependencyVersion,
                         null,
                         emptySet()
                 )
@@ -175,18 +180,22 @@ public class AddDependencyVisitor extends MavenVisitor {
     }
 
     private String findVersionToUse(String groupId, String artifactId, ExecutionContext ctx) {
-        if (versionComparator == null) {
-            return version;
+        if (resolvedVersion == null) {
+
+            if (versionComparator == null) {
+                resolvedVersion = version;
+            }
+
+            MavenMetadata mavenMetadata = new MavenPomDownloader(MavenPomCache.NOOP,
+                    emptyMap(), ctx).downloadMetadata(groupId, artifactId, emptyList());
+
+            LatestRelease latest = new LatestRelease(metadataPattern);
+            resolvedVersion = mavenMetadata.getVersioning().getVersions().stream()
+                    .filter(versionComparator::isValid)
+                    .filter(v -> !releasesOnly || latest.isValid(v))
+                    .max(versionComparator)
+                    .orElse(version);
         }
-
-        MavenMetadata mavenMetadata = new MavenPomDownloader(MavenPomCache.NOOP,
-                emptyMap(), ctx).downloadMetadata(groupId, artifactId, emptyList());
-
-        LatestRelease latest = new LatestRelease(metadataPattern);
-        return mavenMetadata.getVersioning().getVersions().stream()
-                .filter(versionComparator::isValid)
-                .filter(v -> !releasesOnly || latest.isValid(v))
-                .max(versionComparator)
-                .orElse(version);
+        return resolvedVersion;
     }
 }
