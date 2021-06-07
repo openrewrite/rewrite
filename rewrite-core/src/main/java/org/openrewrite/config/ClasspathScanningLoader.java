@@ -45,6 +45,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
     private final List<NamedStyles> styles = new ArrayList<>();
 
     private final List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();
+    private final List<CategoryDescriptor> categoryDescriptors = new ArrayList<>();
 
     /**
      * Construct a ClasspathScanningLoader scans the runtime classpath of the current java process for recipes
@@ -135,11 +136,11 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 YamlResourceLoader resourceLoader = new YamlResourceLoader(input, res.getURI(), properties, classLoader);
                 recipes.addAll(resourceLoader.listRecipes());
                 recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors());
+                categoryDescriptors.addAll(resourceLoader.listCategoryDescriptors());
                 styles.addAll(resourceLoader.listStyles());
             });
         }
     }
-
 
     private void scanClasses(ClassGraph classGraph, String[] acceptPackages) {
         try (ScanResult result = classGraph
@@ -186,6 +187,11 @@ public class ClasspathScanningLoader implements ResourceLoader {
     @Override
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
         return recipeDescriptors;
+    }
+
+    @Override
+    public Collection<CategoryDescriptor> listCategoryDescriptors() {
+        return categoryDescriptors;
     }
 
     @Override

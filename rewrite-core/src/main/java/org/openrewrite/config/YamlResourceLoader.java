@@ -60,7 +60,8 @@ public class YamlResourceLoader implements ResourceLoader {
 
     private enum ResourceType {
         Recipe("specs.openrewrite.org/v1beta/recipe"),
-        Style("specs.openrewrite.org/v1beta/style");
+        Style("specs.openrewrite.org/v1beta/style"),
+        Category("specs.openrewrite.org/v1beta/category");
 
         private final String spec;
 
@@ -280,6 +281,24 @@ public class YamlResourceLoader implements ResourceLoader {
                         }
                     }
                     return namedStyles;
+                })
+                .collect(toList());
+    }
+
+    @Override
+    public Collection<CategoryDescriptor> listCategoryDescriptors() {
+        return loadResources(ResourceType.Recipe).stream()
+                .filter(r -> r.containsKey("name") && r.containsKey("packageName"))
+                .map(c -> {
+                    String name = (String) c.get("name");
+                    String packageName = (String) c.get("packageName");
+                    String description = (String) c.get("description");
+                    Set<String> tags = Collections.emptySet();
+                    List<String> rawTags = (List<String>) c.get("tags");
+                    if (rawTags != null) {
+                        tags = new HashSet<>(rawTags);
+                    }
+                    return new CategoryDescriptor(name, packageName, description, tags);
                 })
                 .collect(toList());
     }

@@ -44,6 +44,12 @@ public class Environment {
         return recipes;
     }
 
+    public Collection<CategoryDescriptor> listCategoryDescriptors() {
+        return resourceLoaders.stream()
+                .flatMap(r -> r.listCategoryDescriptors().stream())
+                .collect(toList());
+    }
+
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
         return resourceLoaders.stream()
                 .flatMap(r -> r.listRecipeDescriptors().stream())
