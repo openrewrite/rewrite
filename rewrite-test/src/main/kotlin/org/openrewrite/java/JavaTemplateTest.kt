@@ -614,7 +614,14 @@ interface JavaTemplateTest : JavaRecipeTest {
                     test(m, n);
                 }
             }
-        """
+        """,
+        afterConditions = { cu ->
+            val m = (cu.classes[0].body.statements[1] as J.MethodDeclaration).body!!.statements[0] as J.MethodInvocation
+            val type = m.type!!
+            assertThat(type.paramNames).containsExactly("m", "n")
+            assertThat(type.resolvedSignature.paramTypes)
+                    .containsExactly(JavaType.Primitive.Int, JavaType.Primitive.Int)
+        }
     )
 
     @Test
