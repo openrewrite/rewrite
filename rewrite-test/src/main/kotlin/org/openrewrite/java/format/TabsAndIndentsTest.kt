@@ -38,6 +38,20 @@ interface TabsAndIndentsTest : JavaRecipeTest {
     )
 
     @Test
+    fun annotationArguments(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.styles(tabsAndIndents()).build(),
+        before = """
+            class Test {
+                @SuppressWarnings({
+                        "unchecked",
+                        "ALL"
+                })
+                String id;
+            }
+        """.trimIndent()
+    )
+
+    @Test
     fun methodChain(jp: JavaParser.Builder<*, *>) = assertUnchanged(
         jp.styles(tabsAndIndents { withContinuationIndent(2) }).build(),
         before = """
