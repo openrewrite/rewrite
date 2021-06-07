@@ -20,7 +20,6 @@ import com.google.common.io.CharSource
 import com.google.googlejavaformat.java.Formatter
 import com.google.googlejavaformat.java.JavaFormatterOptions
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
@@ -121,7 +120,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         """
     )
 
-    @Disabled
     @Test
     fun replaceMethodInvocationWithArray(jp: JavaParser) = assertChanged(
         jp,
@@ -133,12 +131,12 @@ interface JavaTemplateTest : JavaRecipeTest {
             }
         """.trimIndent()),
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("#{any(int[])}").build()
+            val t = template("#{anyArray(int)}").build()
 
             override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
                 var m: J.MethodInvocation = super.visitMethodInvocation(method, p)
                 if (m.simpleName.equals("method") && m.arguments.size == 2) {
-                    m = m.withTemplate(t, m.coordinates.replace(), m.arguments[0])
+                    m = m.withTemplate(t, m.coordinates.replaceArguments(), m.arguments[0])
                 }
                 return m
             }
