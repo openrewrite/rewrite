@@ -17,6 +17,7 @@ package org.openrewrite.java.format
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
@@ -26,7 +27,7 @@ import org.openrewrite.java.style.IntelliJ
 import org.openrewrite.style.NamedStyles
 
 interface BlankLinesTest : JavaRecipeTest {
-    override val recipe: Recipe?
+    override val recipe: Recipe
         get() = BlankLines()
 
     fun blankLines(with: BlankLinesStyle.() -> BlankLinesStyle = { this }) = listOf(
@@ -34,6 +35,19 @@ interface BlankLinesTest : JavaRecipeTest {
                 randomId(), "test", "test", "test", emptySet(), listOf(
                 IntelliJ.blankLines().run { with(this) })
         )
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/620")
+    @Test
+    fun noBlankLineForFirstEnum(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        recipe = AutoFormat(),
+        parser = jp.styles(blankLines()).build(),
+        before = """
+            public enum TheEnum {
+                FIRST,
+                SECOND
+            }
+        """
     )
 
     @Test

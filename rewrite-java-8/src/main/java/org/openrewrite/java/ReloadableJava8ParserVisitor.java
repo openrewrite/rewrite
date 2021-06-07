@@ -23,6 +23,7 @@ import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -409,7 +410,16 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 return semicolonPresent.get() ? sourceBefore(";", '}') : EMPTY;
             });
 
-            enumSet = padRight(new J.EnumValueSet(randomId(), EMPTY, Markers.EMPTY, enumValues, semicolonPresent.get()), EMPTY);
+            enumSet = padRight(
+                    new J.EnumValueSet(
+                            randomId(),
+                            enumValues.get(0).getElement().getPrefix(),
+                            Markers.EMPTY,
+                            ListUtils.map(enumValues, (i, ev) -> i == 0 ? ev.withElement(ev.getElement().withPrefix(EMPTY)) : ev),
+                            semicolonPresent.get()
+                    ),
+                    EMPTY
+            );
         }
 
         List<Tree> membersMultiVariablesSeparated = new ArrayList<>();

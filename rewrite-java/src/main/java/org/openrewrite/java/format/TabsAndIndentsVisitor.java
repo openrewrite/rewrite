@@ -155,7 +155,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         Space s = indentTo(space, indent);
-        if (!(getCursor().getValue() instanceof JLeftPadded)) {
+        if (!(getCursor().getValue() instanceof JLeftPadded) && !(getCursor().getValue() instanceof J.EnumValueSet)) {
             getCursor().putMessage("lastIndent", indent);
         }
         return s;

@@ -67,9 +67,11 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
-        J.CompilationUnit t = (J.CompilationUnit) new BlankLinesVisitor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
+        J.CompilationUnit t = (J.CompilationUnit) new RemoveTrailingWhitespaceVisitor<>().visit(cu, p);
+
+        t = (J.CompilationUnit) new BlankLinesVisitor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
                 .orElse(IntelliJ.blankLines()), stopAfter)
-                .visit(cu, p);
+                .visit(t, p);
 
         t = (J.CompilationUnit) new SpacesVisitor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
                 .orElse(IntelliJ.spaces()), stopAfter)
