@@ -121,6 +121,50 @@ interface JavaTemplateTest : JavaRecipeTest {
         """
     )
 
+    @Disabled
+    @Test
+    fun replaceMethodInvocationWithArray(jp: JavaParser) = assertChanged(
+        jp,
+        dependsOn = arrayOf("""
+            package org.openrewrite;
+            public class Test {
+                public void method(int[] val) {}
+                public void method(int[] val1, String val2) {}
+            }
+        """.trimIndent()),
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val t = template("#{any(int[])}").build()
+
+            override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
+                var m: J.MethodInvocation = super.visitMethodInvocation(method, p)
+                if (m.simpleName.equals("method") && m.arguments.size == 2) {
+                    m = m.withTemplate(t, m.coordinates.replace(), m.arguments[0])
+                }
+                return m
+            }
+        }.toRecipe(),
+        before = """
+            import org.openrewrite.Test;
+            class A {
+                public void method() {
+                    Test test = new Test();
+                    int[] arr = new int[]{};
+                    test.method(arr, null);
+                }
+            }
+        """,
+        after = """
+            import org.openrewrite.Test;
+            class A {
+                public void method() {
+                    Test test = new Test();
+                    int[] arr = new int[]{};
+                    test.method(arr);
+                }
+            }
+        """
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/602")
     @Test
     fun replaceMethodInvocationWithMethodReference(jp: JavaParser) = assertChanged(
