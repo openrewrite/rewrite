@@ -17,6 +17,7 @@ package org.openrewrite.java.format
 
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.Tree
 import org.openrewrite.Tree.randomId
@@ -32,9 +33,33 @@ interface TabsAndIndentsTest : JavaRecipeTest {
 
     fun tabsAndIndents(with: TabsAndIndentsStyle.() -> TabsAndIndentsStyle = { this }) = listOf(
         NamedStyles(
-                randomId(), "test", "test", "test", emptySet(), listOf(
+            randomId(), "test", "test", "test", emptySet(), listOf(
                 IntelliJ.tabsAndIndents().run { with(this) })
         )
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/623")
+    @Test
+    fun ifElseWithComments(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.styles(tabsAndIndents()).build(),
+        before = """
+            public class B {
+                void foo(int input) {
+                    // First case
+                    if (input == 0) {
+                        // do things
+                    }
+                    // Second case
+                    else if (input == 1) {
+                        // do things
+                    }
+                    // Otherwise
+                    else {
+                        // do other things
+                    }
+                }
+            }
+        """.trimIndent()
     )
 
     @Test

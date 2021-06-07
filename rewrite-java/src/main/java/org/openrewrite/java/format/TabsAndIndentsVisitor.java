@@ -137,7 +137,9 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 <IndentType>getNearestMessage("indentType")).orElse(IndentType.ALIGN);
 
         // block spaces are always aligned to their parent
-        boolean alignBlockToParent = loc.equals(Space.Location.BLOCK_END) || loc.equals(Space.Location.NEW_ARRAY_INITIALIZER_SUFFIX);
+        boolean alignBlockToParent = loc.equals(Space.Location.BLOCK_END) ||
+                loc.equals(Space.Location.NEW_ARRAY_INITIALIZER_SUFFIX) ||
+                loc.equals(Space.Location.ELSE_PREFIX);
 
         if (alignBlockToParent || alignToAnnotation) {
             indentType = IndentType.ALIGN;
