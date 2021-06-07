@@ -37,6 +37,22 @@ interface BlankLinesTest : JavaRecipeTest {
         )
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/621")
+    @Test
+    fun leaveTrailingComments(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        recipe = AutoFormat(),
+        parser = jp.styles(blankLines()).build(),
+        before = """
+            public class A {
+                private Long id; // this comment will move to wrong place
+
+                public Long id() {
+                    return id;
+                }
+            }
+        """.trimIndent()
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/620")
     @Test
     fun noBlankLineForFirstEnum(jp: JavaParser.Builder<*, *>) = assertUnchanged(

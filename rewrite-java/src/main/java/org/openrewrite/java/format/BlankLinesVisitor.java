@@ -20,10 +20,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.BlankLinesStyle;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JRightPadded;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 
 import java.util.Iterator;
 import java.util.List;
@@ -245,7 +242,13 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private Space minimumLines(Space prefix, int min) {
-        return prefix.withWhitespace(minimumLines(prefix.getWhitespace(), min));
+        if(prefix.getComments().isEmpty() || prefix.getWhitespace().contains("\n")) {
+            return prefix.withWhitespace(minimumLines(prefix.getWhitespace(), min));
+        }
+
+        // the first comment is a trailing comment on the previous line
+        return prefix.withComments(ListUtils.map(prefix.getComments(), (i, c) -> i == 0 ?
+                c.withSuffix(minimumLines(c.getSuffix(), min)) : c));
     }
 
     private String minimumLines(String whitespace, int min) {
