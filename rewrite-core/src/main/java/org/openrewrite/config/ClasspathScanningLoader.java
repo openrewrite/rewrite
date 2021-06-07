@@ -132,13 +132,21 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
     private void scanYaml(ClassGraph classGraph, Properties properties, @Nullable ClassLoader classLoader) {
         try (ScanResult scanResult = classGraph.enableMemoryMapping().scan()) {
+            List<YamlResourceLoader> yamlResourceLoaders = new ArrayList<>();
+
             scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) -> {
-                YamlResourceLoader resourceLoader = new YamlResourceLoader(input, res.getURI(), properties, classLoader);
+                yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties, classLoader));
+            });
+            // Extract in two passes so that the full list of recipes from all sources are known when computing recipe descriptors
+            // Otherwise recipes which include recipes from other sources in their recipeList will have incomplete descriptors
+            for(YamlResourceLoader resourceLoader : yamlResourceLoaders) {
                 recipes.addAll(resourceLoader.listRecipes());
-                recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors());
                 categoryDescriptors.addAll(resourceLoader.listCategoryDescriptors());
                 styles.addAll(resourceLoader.listStyles());
-            });
+            }
+            for(YamlResourceLoader resourceLoader : yamlResourceLoaders) {
+                recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors(recipes));
+            }
         }
     }
 

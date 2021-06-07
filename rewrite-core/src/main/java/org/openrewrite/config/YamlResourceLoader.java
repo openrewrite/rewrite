@@ -41,7 +41,9 @@ import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.stream.Stream;
 
+import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.invalid;
@@ -216,11 +218,21 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @Override
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
-        Collection<Recipe> recipes = listRecipes();
+
+        return listRecipeDescriptors(emptyList());
+    }
+
+    public Collection<RecipeDescriptor> listRecipeDescriptors(Collection<Recipe> externalRecipes) {
+        Collection<Recipe> internalRecipes = listRecipes();
+        Collection<Recipe> allRecipes = Stream.concat(
+                externalRecipes.stream(),
+                internalRecipes.stream()
+        ).collect(toList());
+
         List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();
-        for (Recipe recipe : recipes) {
+        for (Recipe recipe : internalRecipes) {
             DeclarativeRecipe declarativeRecipe = (DeclarativeRecipe) recipe;
-            declarativeRecipe.initialize(recipes);
+            declarativeRecipe.initialize(allRecipes);
             recipeDescriptors.add(RecipeIntrospectionUtils.recipeDescriptorFromDeclarativeRecipe(declarativeRecipe));
         }
         return recipeDescriptors;

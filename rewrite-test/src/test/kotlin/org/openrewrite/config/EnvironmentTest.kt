@@ -296,4 +296,17 @@ class EnvironmentTest : RecipeTest {
         before = "some text",
         after = "Hello Kotlin"
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/543")
+    @Test
+    fun recipeDescriptorsFromCrossResources() {
+        val env = Environment.builder().scanRuntimeClasspath().build()
+        val recipeDescriptors = env.listRecipeDescriptors()
+        assertThat(recipeDescriptors).isNotNull.isNotEmpty
+        val helloJon2 =
+                recipeDescriptors.firstOrNull { it.name == "org.openrewrite.HelloJon2" }
+        assertThat(helloJon2!!.recipeList)
+                .hasSize(1)
+        assertThat(helloJon2.recipeList.first().name).isEqualTo("org.openrewrite.HelloJon")
+    }
 }
