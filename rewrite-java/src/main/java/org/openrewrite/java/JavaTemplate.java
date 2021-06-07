@@ -347,16 +347,31 @@ public class JavaTemplate {
                 if (loc.equals(METHOD_INVOCATION_ARGUMENTS) && method.isScope(insertionPoint)) {
                     List<Expression> args = substitutions.unsubstitute(templateParser.parseMethodArguments(getCursor(), substitutedTemplate, loc));
                     J.MethodInvocation m = method.withArguments(args);
+                    JavaType.Method mt = method.getType();
                     // Make a best-effort attempt to find type information for the newly modified method signature
-                    if(method.getType() != null && method.getType().getGenericSignature().getReturnType() != null) {
-                        JavaType.Method mtype = JavaType.Method.lookupExistingType(method.getType().getDeclaringType(),
+                    if(mt != null && mt.getGenericSignature().getReturnType() != null) {
+                        List<JavaType> argTypes = args.stream()
+                                .map(Expression::getType)
+                                .map(it -> {
+                                    // If an argument to the method invocation is itself an invocation, use its return type
+                                    if(it instanceof JavaType.Method) {
+                                        return ((JavaType.Method)it).getGenericSignature().getReturnType();
+                                    }
+                                    return it;
+                                })
+                                .collect(toList());
+                        JavaType.Method newType = JavaType.Method.lookupExistingType(mt.getDeclaringType(),
                                 method.getSimpleName(),
-                                method.getType().getGenericSignature().getReturnType(),
-                                args.stream().map(Expression::getType).collect(toList())
+                                mt.getGenericSignature().getReturnType(),
+                                argTypes
                         );
-                        if (mtype != null) {
-                            m = m.withType(mtype);
+                        if (newType == null) {
+                            // Couldn't find an existing method type, construct something reasonable
+                            // There's no way to know what the names of the parameters should be, but we can fill in types
+                            newType = mt.withResolvedSignature(mt.getResolvedSignature().withParamTypes(argTypes))
+                                    .withGenericSignature(mt.getGenericSignature().withParamTypes(argTypes));
                         }
+                        m = m.withType(newType);
                     }
                     m = autoFormat(m, 0, getCursor().getParentOrThrow());
                     return m;

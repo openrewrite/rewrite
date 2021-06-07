@@ -769,6 +769,20 @@ public interface JavaType extends Serializable {
             return Method.build(flagsBitMap, declaringType, name, genericSignature, resolvedSignature, paramNames, thrownExceptions);
         }
 
+        public Method withGenericSignature(Signature genericSignature) {
+            if(genericSignature.equals(this.genericSignature)) {
+                return this;
+            }
+            return Method.build(flagsBitMap, declaringType, name, genericSignature, resolvedSignature, paramNames, thrownExceptions);
+        }
+
+        public Method withResolvedSignature(Signature resolvedSignature) {
+            if(resolvedSignature.equals(this.resolvedSignature)) {
+                return this;
+            }
+            return Method.build(flagsBitMap, declaringType, name, genericSignature, resolvedSignature, paramNames, thrownExceptions);
+        }
+
         @Override
         public boolean deepEquals(@Nullable JavaType type) {
             if (!(type instanceof Method)) {

@@ -630,7 +630,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceArguments(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("m, n")
+            val t = template("m, Integer.valueOf(n)")
                 .doBeforeParseTemplate(print)
                 .build()
 
@@ -638,7 +638,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 if (method.arguments.size == 1) {
                     return method.withTemplate(t, method.coordinates.replaceArguments())
                 }
-                return super.visitMethodInvocation(method, p)
+                return method
             }
         }.toRecipe(),
         before = """
@@ -655,16 +655,17 @@ interface JavaTemplateTest : JavaRecipeTest {
                 abstract void test();
             
                 void test(int m, int n) {
-                    test(m, n);
+                    test(m, Integer.valueOf(n));
                 }
             }
         """,
         afterConditions = { cu ->
             val m = (cu.classes[0].body.statements[1] as J.MethodDeclaration).body!!.statements[0] as J.MethodInvocation
             val type = m.type!!
-            assertThat(type.paramNames).containsExactly("m", "n")
-            assertThat(type.resolvedSignature.paramTypes)
-                    .containsExactly(JavaType.Primitive.Int, JavaType.Primitive.Int)
+            assertThat(type.genericSignature.paramTypes[0])
+                    .isEqualTo(JavaType.Primitive.Int)
+            assertThat(type.genericSignature.paramTypes[1])
+                    .matches { (it as JavaType.FullyQualified).fullyQualifiedName.equals("java.lang.Integer") }
         }
     )
 
