@@ -19,8 +19,6 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.config.Environment
-import org.openrewrite.config.RecipeDescriptor
-import org.openrewrite.style.NamedStyles
 
 class EnvironmentTest {
 
@@ -32,53 +30,17 @@ class EnvironmentTest {
         assertThat(recipe).isNotNull
     }
 
-//    @Test
-//    fun listRecipeDescriptors() {
-//        val env = Environment.builder().scanRuntimeClasspath().build()
-//        val recipeDescriptors = env.listRecipeDescriptors()
-//        recipeDescriptors.forEach {
-//            printRecipeDescriptor(it)
-//        }
-//    }
-
-    private fun printRecipeDescriptor(recipe: RecipeDescriptor, indent: String = "") {
-        println("name: ${recipe.name}")
-        println("displayName: ${recipe.displayName}")
-        println("description: ${recipe.description}")
-        println("tags: ${recipe.tags}")
-        if (recipe.options.isNotEmpty()) {
-            println("options: ")
-            recipe.options.forEach {
-                println()
-                println("\tname: ${it.name}")
-                println("\tdisplayName: ${it.displayName}")
-                println("\ttype: ${it.type}")
-                println("\tdescription: ${it.description}")
-                println("\trequired: ${it.isRequired}")
-                println("\tvalue: ${it.value}")
-            }
-        }
-        if (recipe.recipeList.isNotEmpty()) {
-            println("recipeList:")
-            recipe.recipeList.forEach { printRecipeDescriptor(it, "$indent    ") }
-        }
+    @Test
+    fun listCategoryDescriptors() {
+        val env = Environment.builder().scanRuntimeClasspath().build()
+        val categoryDescriptors = env.listCategoryDescriptors()
+        assertThat(categoryDescriptors).isNotEmpty
     }
 
     @Test
     fun listStyles() {
         val env = Environment.builder().scanRuntimeClasspath().build()
         val styles = env.listStyles()
-        styles.forEach {
-            println()
-            printStyle(it)
-        }
-    }
-
-    private fun printStyle(style: NamedStyles) {
-        println()
-        println("name: ${style.name}")
-        println("displayName: ${style.displayName}")
-        println("description: ${style.description}")
-        println("tags: ${style.tags}")
+        assertThat(styles).isNotEmpty
     }
 }

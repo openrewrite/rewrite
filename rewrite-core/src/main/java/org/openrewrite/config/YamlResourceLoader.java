@@ -287,7 +287,7 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @Override
     public Collection<CategoryDescriptor> listCategoryDescriptors() {
-        return loadResources(ResourceType.Recipe).stream()
+        return loadResources(ResourceType.Category).stream()
                 .filter(r -> r.containsKey("name") && r.containsKey("packageName"))
                 .map(c -> {
                     String name = (String) c.get("name");
