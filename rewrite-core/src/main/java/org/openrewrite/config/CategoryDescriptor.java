@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,17 +15,16 @@
  */
 package org.openrewrite.config;
 
-import org.openrewrite.Recipe;
-import org.openrewrite.style.NamedStyles;
+import lombok.Value;
+import org.openrewrite.Incubating;
 
-import java.util.Collection;
+import java.util.Set;
 
-public interface ResourceLoader {
-    Collection<Recipe> listRecipes();
-
-    Collection<RecipeDescriptor> listRecipeDescriptors();
-
-    Collection<NamedStyles> listStyles();
-
-    Collection<CategoryDescriptor> listCategoryDescriptors();
+@Incubating(since = "7.7.0")
+@Value
+public class CategoryDescriptor {
+    String displayName;
+    String packageName;
+    String description;
+    Set<String> tags;
 }
