@@ -21,6 +21,8 @@ import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Parser
 import org.openrewrite.SourceFile
 import org.openrewrite.java.JavaParser
+import org.openrewrite.maven.tree.Maven
+
 import java.util.*
 
 class AddDependencyTest : MavenRecipeTest {
@@ -289,7 +291,10 @@ class AddDependencyTest : MavenRecipeTest {
                 </dependency>
               </dependencies>
             </project>
-        """
+        """,
+        afterConditions = { m : Maven ->
+            assertThat(m.model.dependencies.first().version).isEqualTo("1.4.7.RELEASE")
+        }
     )
 
     @Test
