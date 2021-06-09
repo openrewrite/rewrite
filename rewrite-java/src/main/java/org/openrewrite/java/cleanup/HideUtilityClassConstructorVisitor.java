@@ -24,6 +24,7 @@ import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.format.MinimumViableSpacingVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
@@ -84,8 +85,8 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
              * But, first and foremost, the main rationale is because it's hopefully conceptually easier to distinguish the steps
              * required for HideUtilityClassConstructorVisitor to work.
              */
-            c = maybeAutoFormat(c, (J.ClassDeclaration) new UtilityClassWithImplicitDefaultConstructorVisitor<>().visit(c, p, getCursor()), p);
-            c = maybeAutoFormat(c, (J.ClassDeclaration) new UtilityClassWithExposedConstructorInspectionVisitor<>().visit(c, p, getCursor()), p);
+            c = (J.ClassDeclaration) new UtilityClassWithImplicitDefaultConstructorVisitor<>().visit(c, p, getCursor());
+            c = (J.ClassDeclaration) new UtilityClassWithExposedConstructorInspectionVisitor<>().visit(c, p, getCursor());
         }
         return c;
     }
@@ -132,6 +133,8 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
                     md = md.withModifiers(
                             ListUtils.concat(md.getModifiers(), mod)
                     );
+                    md = (J.MethodDeclaration) new MinimumViableSpacingVisitor<Integer>(
+                            md.getName()).visit(md, 0, getCursor());
                 }
             }
             return md;
