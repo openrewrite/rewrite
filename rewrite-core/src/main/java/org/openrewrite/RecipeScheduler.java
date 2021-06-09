@@ -127,10 +127,11 @@ public interface RecipeScheduler {
         long startTime = System.nanoTime();
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean(false);
 
-        if (recipe.getApplicableTest() != null) {
+        TreeVisitor<?, ExecutionContext> applicableTest = recipe.getApplicableTest();
+        if (applicableTest != null) {
             boolean applicable = false;
             for (S s : before) {
-                if (recipe.getApplicableTest().visit(s, ctx) != s) {
+                if (applicableTest.visit(s, ctx) != s) {
                     applicable = true;
                     break;
                 }
@@ -141,14 +142,14 @@ public interface RecipeScheduler {
             }
         }
 
+        final TreeVisitor<?, ExecutionContext> singleSourceApplicableTest = recipe.getSingleSourceApplicableTest();
         List<S> after = !recipe.validate(ctx).isValid() ?
                 before :
                 mapAsync(before, s -> {
                     Timer.Builder timer = Timer.builder("rewrite.recipe.visit").tag("recipe", recipe.getDisplayName());
                     Timer.Sample sample = Timer.start();
-
-                    if (recipe.getSingleSourceApplicableTest() != null) {
-                        if (recipe.getSingleSourceApplicableTest().visit(s, ctx) == s) {
+                    if (singleSourceApplicableTest != null) {
+                        if (singleSourceApplicableTest.visit(s, ctx) == s) {
                             sample.stop(MetricsHelper.successTags(timer, s, "skipped").register(Metrics.globalRegistry));
                             return s;
                         }
