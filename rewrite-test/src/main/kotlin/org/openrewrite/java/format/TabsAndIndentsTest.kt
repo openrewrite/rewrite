@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
-import org.openrewrite.Tree
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
@@ -86,6 +85,33 @@ interface TabsAndIndentsTest : JavaRecipeTest {
                       .method(
                         t
                       );
+                }
+            }
+        """
+    )
+
+    @Test
+    @Disabled("https://github.com/openrewrite/rewrite/issues/636")
+    fun nestedMethodChain(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.styles(tabsAndIndents { withContinuationIndent(8) }).build(),
+        before = """
+            class Test {
+                Test withData() {
+                    return this;
+                }
+                Test withData(Object arg0) {
+                    return this;
+                }
+                Test withData(Object arg0, Object arg1) {
+                    return this;
+                }
+                void method(Test t) {
+                    Object data;
+                    data = t.withData(withData()
+                                    .withData(new Object())
+                                    .withData(new Object()),
+                            new Object()
+                    );
                 }
             }
         """
