@@ -18,6 +18,7 @@ package org.openrewrite.config;
 import lombok.Value;
 import lombok.With;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Set;
 
@@ -38,4 +39,6 @@ public class RecipeDescriptor {
 
     @With
     List<RecipeDescriptor> recipeList;
+
+    URI source;
 }

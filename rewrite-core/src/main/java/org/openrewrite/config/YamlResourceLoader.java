@@ -218,7 +218,6 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @Override
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
-
         return listRecipeDescriptors(emptyList());
     }
 
@@ -233,7 +232,7 @@ public class YamlResourceLoader implements ResourceLoader {
         for (Recipe recipe : internalRecipes) {
             DeclarativeRecipe declarativeRecipe = (DeclarativeRecipe) recipe;
             declarativeRecipe.initialize(allRecipes);
-            recipeDescriptors.add(RecipeIntrospectionUtils.recipeDescriptorFromDeclarativeRecipe(declarativeRecipe));
+            recipeDescriptors.add(RecipeIntrospectionUtils.recipeDescriptorFromDeclarativeRecipe(declarativeRecipe, source));
         }
         return recipeDescriptors;
     }
