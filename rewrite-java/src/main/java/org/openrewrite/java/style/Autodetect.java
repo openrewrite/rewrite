@@ -97,7 +97,7 @@ public class Autodetect extends NamedStyles {
             return new TabsAndIndentsStyle(
                     useTabs,
                     useTabs ? indent : 1,
-                    useTabs ? 4 : indent,
+                    useTabs ? 1 : indent,
                     continuationIndent,
                     false
             );

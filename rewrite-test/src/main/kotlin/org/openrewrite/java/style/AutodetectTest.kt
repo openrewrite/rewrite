@@ -53,7 +53,7 @@ interface AutodetectTest {
 
         assertThat(tabsAndIndents.useTabCharacter).isTrue
         assertThat(tabsAndIndents.tabSize).isEqualTo(1)
-        assertThat(tabsAndIndents.indentSize).isEqualTo(4)
+        assertThat(tabsAndIndents.indentSize).isEqualTo(1)
         assertThat(tabsAndIndents.continuationIndent).isEqualTo(2)
     }
 
@@ -125,6 +125,29 @@ interface AutodetectTest {
         assertThat(tabsAndIndents.tabSize).isEqualTo(1)
         assertThat(tabsAndIndents.indentSize).isEqualTo(4)
         assertThat(tabsAndIndents.continuationIndent).isEqualTo(8)
+    }
+
+    @Test
+    fun defaultTabIndentSizeToOne(jp: JavaParser) {
+        val cus = jp.parse(
+            """
+            /**
+             * 
+             */
+            public class Test {
+            	private final ApplicationEventPublisher publisher;
+            	public void method() {
+            		int value = 0;
+            	}
+            }
+        """.trimIndent()
+        )
+
+        val styles = Autodetect.detect(cus)
+        val tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle::class.java, listOf(styles))
+        assertThat(tabsAndIndents.useTabCharacter).isTrue
+        assertThat(tabsAndIndents.tabSize).isEqualTo(1)
+        assertThat(tabsAndIndents.indentSize).isEqualTo(1)
     }
 
     @Test
