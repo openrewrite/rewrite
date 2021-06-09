@@ -15,25 +15,26 @@
  */
 package org.openrewrite.java
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
+import org.openrewrite.Issue
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 
 interface ChangeFieldNameTest : JavaRecipeTest {
-    fun changeFieldName(from: String, to: String) = object : JavaIsoVisitor<ExecutionContext>() {
-        override fun visitVariableDeclarations(v: J.VariableDeclarations, p: ExecutionContext): J.VariableDeclarations {
-            if (cursor.dropParentUntil { it is J }.dropParentUntil { it is J }.getValue<J>() is J.ClassDeclaration) {
-                doAfterVisit(ChangeFieldName(JavaType.Class.build("Test"), from, to))
+    fun changeFieldName(enclosingClassFqn: String, from: String, to: String) =
+        object : JavaIsoVisitor<ExecutionContext>() {
+            override fun visitCompilationUnit(cu: J.CompilationUnit, p: ExecutionContext): J.CompilationUnit {
+                doAfterVisit(ChangeFieldName(JavaType.Class.build(enclosingClassFqn), from, to))
+                return super.visitCompilationUnit(cu, p)
             }
-            return super.visitVariableDeclarations(v, p)
-        }
-    }.toRecipe()
+        }.toRecipe()
 
     @Test
     fun changeFieldName(jp: JavaParser) = assertChanged(
         jp,
-        recipe = changeFieldName("collection", "list"),
+        recipe = changeFieldName("Test", "collection", "list"),
         before = """
             import java.util.List;
             class Test {
@@ -51,7 +52,7 @@ interface ChangeFieldNameTest : JavaRecipeTest {
     @Test
     fun changeFieldNameReferences(jp: JavaParser) = assertChanged(
         jp,
-        recipe = changeFieldName("n", "n1"),
+        recipe = changeFieldName("Test", "n", "n1"),
         before = """
             class Test {
                int n;
@@ -89,7 +90,7 @@ interface ChangeFieldNameTest : JavaRecipeTest {
     @Test
     fun changeFieldNameReferencesInOtherClass(jp: JavaParser) = assertChanged(
         jp,
-        recipe = changeFieldName("n", "n1"),
+        recipe = changeFieldName("Test", "n", "n1"),
         before = """
             class Caller {
                 Test t = new Test();
@@ -116,9 +117,45 @@ interface ChangeFieldNameTest : JavaRecipeTest {
     )
 
     @Test
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/632")
+    fun changeFieldNameReferencesInOtherClassUsingStaticImport(jp: JavaParser) = assertChanged(
+        jp,
+        dependsOn = arrayOf(
+            """
+                package org.openrewrite.example;
+
+                public class Test {
+                    public static final int IMPORT_ME_STATICALLY = 0;
+                }
+            """
+        ),
+        recipe = changeFieldName("org.openrewrite.example.Test", "IMPORT_ME_STATICALLY", "IMPORT_ME_STATICALLY_1"),
+        before = """
+            package org.openrewrite.example;
+
+            import static org.openrewrite.example.Test.IMPORT_ME_STATICALLY;
+
+            public class Caller {
+                int e = IMPORT_ME_STATICALLY;
+            }
+        """,
+        after = """
+            package org.openrewrite.example;
+
+            import static org.openrewrite.example.Test.IMPORT_ME_STATICALLY_1;
+
+            public class Caller {
+                int e = IMPORT_ME_STATICALLY_1;
+            }
+        """
+    )
+
+    @Test
     fun dontChangeNestedFieldsWithSameName(jp: JavaParser) = assertChanged(
         jp,
-        recipe = changeFieldName("collection", "list"),
+        dependsOn = arrayOf("class A { Object collection; }"),
+        recipe = changeFieldName("Test", "collection", "list"),
         before = """
             import java.util.List;
             class Test {
@@ -138,7 +175,7 @@ interface ChangeFieldNameTest : JavaRecipeTest {
                     Object collection2 = A.this.collection;
                 }
             }
-        """,
-        dependsOn = arrayOf("class A { Object collection; }")
+        """
     )
+
 }
