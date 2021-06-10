@@ -156,7 +156,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 break;
         }
 
-        Space s = indentTo(space, indent);
+        Space s = indentTo(space, indent, loc);
         if (!(getCursor().getValue() instanceof JLeftPadded) && !(getCursor().getValue() instanceof J.EnumValueSet)) {
             getCursor().putMessage("lastIndent", indent);
         }
@@ -190,7 +190,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                             getCursor().getParentOrThrow().putMessage("lastIndent", initIndent - style.getContinuationIndent());
                             elem = visitAndCast(elem, p);
                             getCursor().getParentOrThrow().putMessage("lastIndent", indent);
-                            after = indentTo(right.getAfter(), initIndent);
+                            after = indentTo(right.getAfter(), initIndent, loc.getAfterLocation());
                         } else {
                             elem = visitAndCast(elem, p);
                             after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
@@ -205,27 +205,27 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         } else if (firstArg.getPrefix().getLastWhitespace().contains("\n")) {
                             // if the first argument is on its own line, align all arguments to be continuation indented
                             elem = visitAndCast(elem, p);
-                            after = indentTo(right.getAfter(), indent);
+                            after = indentTo(right.getAfter(), indent, loc.getAfterLocation());
                         } else {
                             // align to first argument when the first argument isn't on its own line
                             int firstArgIndent = findIndent(firstArg.getPrefix());
                             getCursor().getParentOrThrow().putMessage("lastIndent", firstArgIndent);
                             elem = visitAndCast(elem, p);
                             getCursor().getParentOrThrow().putMessage("lastIndent", indent);
-                            after = indentTo(right.getAfter(), firstArgIndent);
+                            after = indentTo(right.getAfter(), firstArgIndent, loc.getAfterLocation());
                         }
                         break;
                     }
                     case METHOD_INVOCATION_ARGUMENT:
                         elem = visitAndCast(elem, p);
-                        after = indentTo(right.getAfter(), indent);
+                        after = indentTo(right.getAfter(), indent, loc.getAfterLocation());
                         break;
                     case NEW_CLASS_ARGUMENTS:
                     case ARRAY_INDEX:
                     case PARENTHESES:
                     case TYPE_PARAMETER: {
                         elem = visitAndCast(elem, p);
-                        after = indentTo(right.getAfter(), indent);
+                        after = indentTo(right.getAfter(), indent, loc.getAfterLocation());
                         break;
                     }
                     case METHOD_SELECT: {
@@ -285,7 +285,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                             }
                             if (!anyOtherArgOnOwnLine) {
                                 elem = visitAndCast(elem, p);
-                                after = indentTo(right.getAfter(), indent);
+                                after = indentTo(right.getAfter(), indent, loc.getAfterLocation());
                                 break;
                             }
                         }
@@ -335,7 +335,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 case IMPLEMENTS:
                 case THROWS:
                 case NEW_CLASS_ARGUMENTS:
-                    before = indentTo(container.getBefore(), indent + style.getContinuationIndent());
+                    before = indentTo(container.getBefore(), indent + style.getContinuationIndent(), loc.getBeforeLocation());
                     getCursor().putMessage("indentType", IndentType.ALIGN);
                     getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
                     js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
@@ -367,7 +367,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 JContainer.build(before, js, container.getMarkers());
     }
 
-    private Space indentTo(Space space, int column) {
+    private Space indentTo(Space space, int column, Space.Location loc) {
         if (!space.getLastWhitespace().contains("\n")) {
             return space;
         }
@@ -376,16 +376,38 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         } else {
             space = space.withWhitespace(space.getWhitespace().replaceAll("\t", ""));
         }
-        int indent = findIndent(space);
-        if (!space.getComments().isEmpty()) {
-            indent = findIndent(Space.format(space.getComments().get(space.getComments().size() - 1).getSuffix()));
-        }
 
-        if (indent != column) {
-            int shift = column - indent;
-            space = space.withComments(ListUtils.map(space.getComments(), c ->
-                    indentComment(c, shift)));
-            space = space.withWhitespace(indent(space.getWhitespace(), shift));
+        if (space.getComments().isEmpty()) {
+            int indent = getLengthOfWhitespace(space.getWhitespace());
+            if (indent != column) {
+                int shift = column - indent;
+                space = space.withWhitespace(indent(space.getWhitespace(), shift));
+            }
+        } else {
+            // Note: Formatting multiple block comments on a single line is still not handled.
+            // In the case of multiple block comments on a single line, the shift will be applied between each block.
+            Comment lastElement = space.getComments().get(space.getComments().size() - 1);
+            space = space.withComments(ListUtils.map(space.getComments(), c -> {
+                int indent = getLengthOfWhitespace(Space.format(c.getSuffix()).getWhitespace());
+                indent -= loc.equals(Space.Location.BLOCK_END) && !c.equals(lastElement) ? style.getIndentSize() : 0;
+
+                if (column != indent) {
+                    int shift = column - indent;
+                    c = indentComment(c, shift);
+                }
+                return c;
+            }));
+
+            // Do not format trailing comments.
+            // The whitespace won't have a `\n` character if the 1st element is a trailing comment.
+            if (space.getWhitespace().contains("\n") || loc.equals(Space.Location.COMPILATION_UNIT_PREFIX)) {
+                int indent = getLengthOfWhitespace(space.getWhitespace());
+                indent -= loc.equals(Space.Location.BLOCK_END) ? style.getIndentSize() : 0;
+                if (column != indent) {
+                    int shift = column - indent;
+                    space = space.withWhitespace(indent(space.getWhitespace(), shift));
+                }
+            }
         }
 
         return space;
@@ -401,6 +423,9 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             for (char c : comment.getText().toCharArray()) {
                 newTextBuilder.append(c);
                 if (c == '\n') {
+                    // Note: this needs to be adjusted to only pass in whitespace.
+                    // The call was safe when only shiftRight was supported, but shift left removes items from the String.
+                    // The entire comment is passed in here, so characters are removed if the shift is less than 0.
                     shift(newTextBuilder, shift);
                 }
             }
@@ -440,7 +465,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             } else {
                 len = text.length() + shift;
             }
-            if (len > 0) {
+            if (len >= 0) {
                 text.delete(len, text.length());
             }
         }
@@ -448,8 +473,16 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
     private int findIndent(Space space) {
         String indent = space.getIndent();
+        return getLengthOfWhitespace(indent);
+    }
+
+    private int getLengthOfWhitespace(@Nullable String whitespace) {
+        if (whitespace == null) {
+            return 0;
+        }
+
         int size = 0;
-        for (char c : indent.toCharArray()) {
+        for (char c : whitespace.toCharArray()) {
             size += c == '\t' ? style.getTabSize() : 1;
             if (c == '\n' || c == '\r') {
                 size = 0;

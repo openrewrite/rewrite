@@ -523,7 +523,7 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         """.trimIndent(),
         after = """
             public class A {
-            // length = 1 from new line.
+                // length = 1 from new line.
                 int valA = 10; // text.length = 1 + shift -2 == -1.
             }
         """.trimIndent()
@@ -1493,5 +1493,89 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         	}
         }
         """.trimIndent()
+    )
+
+    @Test
+    fun formatComments(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(tabsAndIndents()).build(),
+        before = """
+                    // shift left.
+            package org.openrewrite; // trailing comment.
+            
+                    // shift left.
+                    public class A { // trailing comment at class.
+            // shift right.
+                    // shift left.
+                            public int method(int value) { // trailing comment at method.
+                // shift right.
+                        // shift left.
+                if (value == 1) { // trailing comment at if.
+            // suffix contains new lines with whitespace.
+                    
+                    
+                    // shift right.
+                                 // shift left.
+                            value += 10; // trailing comment.
+                    // shift right at end of block.
+                            // shift left at end of block.
+                                    } else {
+                        value += 30;
+                    // shift right at end of block.
+                            // shift left at end of block.
+               }
+            
+                            if (value == 11)
+                    // shift right.
+                            // shift left.
+                        value += 1;
+            
+                return value;
+                // shift right at end of block.
+                        // shift left at end of block.
+                        }
+            // shift right at end of block.
+                    // shift left at end of block.
+                        }
+        """.trimIndent(),
+        after = """
+            // shift left.
+            package org.openrewrite; // trailing comment.
+            
+            // shift left.
+            public class A { // trailing comment at class.
+                // shift right.
+                // shift left.
+                public int method(int value) { // trailing comment at method.
+                    // shift right.
+                    // shift left.
+                    if (value == 1) { // trailing comment at if.
+                        // suffix contains new lines with whitespace.
+                    
+                    
+                        // shift right.
+                        // shift left.
+                        value += 10; // trailing comment.
+                        // shift right at end of block.
+                        // shift left at end of block.
+                    } else {
+                        value += 30;
+                        // shift right at end of block.
+                        // shift left at end of block.
+                    }
+            
+                    if (value == 11)
+                        // shift right.
+                        // shift left.
+                        value += 1;
+            
+                    return value;
+                    // shift right at end of block.
+                    // shift left at end of block.
+                }
+                // shift right at end of block.
+                // shift left at end of block.
+            }
+        """.trimIndent(),
+        expectedCyclesThatMakeChanges = 2
     )
 }
