@@ -460,6 +460,47 @@ interface TabsAndIndentsTest : JavaRecipeTest {
     )
 
     @Test
+    fun noIndexOutOfBoundsUsingSpaces(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(tabsAndIndents()).build(),
+        before = """
+            public class A {
+            // length = 1 from new line.
+                  int valA = 10; // text.length = 1 + shift -2 == -1.
+            }
+        """.trimIndent(),
+        after = """
+            public class A {
+            // length = 1 from new line.
+                int valA = 10; // text.length = 1 + shift -2 == -1.
+            }
+        """.trimIndent()
+    )
+
+    @Test
+    fun noIndexOutOfBoundsUsingTabs(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(tabsAndIndents {
+            withUseTabCharacter(true)
+                .withTabSize(1)
+                .withIndentSize(1)
+        }).build(),
+        before = """
+            class Test {
+            	void test() {
+            		System.out.println(); // comment
+            	}
+            }
+        """.trimIndent(),
+        after = """
+            class Test {
+            	void test() {
+            		System.out.println();// comment
+            	}
+            }
+        """.trimIndent(),
+        expectedCyclesThatMakeChanges = 2
+    )
+
+    @Test
     fun blockComment(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(tabsAndIndents()).build(),
         before = """
