@@ -35,9 +35,18 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
         @Language("java") after: String,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,
+        skipEnhancedTypeValidation: Boolean = false,
         afterConditions: (J.CompilationUnit) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        val typeValidatingAfterConditions: (J.CompilationUnit) -> Unit = if(skipEnhancedTypeValidation) {
+            afterConditions
+        } else {
+            {
+                TypeValidator.assertTypesValid(it)
+                afterConditions(it)
+            }
+        }
+        super.assertChangedBase(parser, recipe, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, typeValidatingAfterConditions)
     }
 
     fun assertChanged(
@@ -48,9 +57,18 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
         @Language("java") after: String,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,
+        skipEnhancedTypeValidation: Boolean = false,
         afterConditions: (J.CompilationUnit) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        val typeValidatingAfterConditions: (J.CompilationUnit) -> Unit = if(skipEnhancedTypeValidation) {
+            afterConditions
+        } else {
+            {
+                TypeValidator.assertTypesValid(it)
+                afterConditions(it)
+            }
+        }
+        super.assertChangedBase(parser, recipe, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, typeValidatingAfterConditions)
     }
 
     fun assertUnchanged(

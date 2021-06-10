@@ -195,7 +195,11 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         before = """
             public class Test {
             public int[] X = new int[]{1, 3, 5, 7, 9, 11};
-
+            public void doSomething(int i) {}
+            public void doCase0() {}
+            public void doDefault() {}
+            public void processException(Object a, Object b, Object c, Object d) {}
+            public void processFinally() {}
             public void test(boolean a, int x, int y, int z) {
             label1:
             do {
@@ -244,7 +248,11 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         after = """
             public class Test {
                 public int[] X = new int[]{1, 3, 5, 7, 9, 11};
-
+                public void doSomething(int i) {}
+                public void doCase0() {}
+                public void doDefault() {}
+                public void processException(Object a, Object b, Object c, Object d) {}
+                public void processFinally() {}
                 public void test(boolean a, int x, int y, int z) {
                     label1:
                     do {

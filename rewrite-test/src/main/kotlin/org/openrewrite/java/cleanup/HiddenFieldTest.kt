@@ -251,6 +251,9 @@ interface HiddenFieldTest : JavaRecipeTest {
         jp,
         before = """
             package org.openrewrite;
+            
+            import java.util.List;
+            import java.util.Arrays;
 
             public class A {
                 List<Integer> numbers = Arrays.asList(1, 2, 3);
@@ -262,6 +265,9 @@ interface HiddenFieldTest : JavaRecipeTest {
         """,
         after = """
             package org.openrewrite;
+
+            import java.util.List;
+            import java.util.Arrays;
 
             public class A {
                 List<Integer> numbers = Arrays.asList(1, 2, 3);

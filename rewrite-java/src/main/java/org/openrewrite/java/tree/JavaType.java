@@ -641,7 +641,7 @@ public interface JavaType extends Serializable {
         private final FullyQualified declaringType;
 
         private final String name;
-        private final Signature genericSignature;
+        @Nullable private final Signature genericSignature;
         private final Signature resolvedSignature;
         private final List<String> paramNames;
         private final List<FullyQualified> thrownExceptions;

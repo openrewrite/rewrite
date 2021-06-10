@@ -43,7 +43,7 @@ interface PrimitiveWrapperClassConstructorToValueOfTest : JavaRecipeTest {
                 Byte b = new Byte("1");
                 Character c = new Character('c');
                 Double d = new Double(1.0);
-                Float f = new Float(1.1);
+                Float f = new Float(1.1f);
                 Long l = new Long(1);
                 Short sh = new Short("12");
                 short s3 = 3;
@@ -57,7 +57,7 @@ interface PrimitiveWrapperClassConstructorToValueOfTest : JavaRecipeTest {
                 Byte b = Byte.valueOf("1");
                 Character c = Character.valueOf('c');
                 Double d = Double.valueOf(1.0);
-                Float f = Float.valueOf(1.1);
+                Float f = Float.valueOf(1.1f);
                 Long l = Long.valueOf(1);
                 Short sh = Short.valueOf("12");
                 short s3 = 3;
