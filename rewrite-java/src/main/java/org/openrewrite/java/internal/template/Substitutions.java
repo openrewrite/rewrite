@@ -106,14 +106,20 @@ public class Substitutions {
                             case Boolean:
                                 s += "true";
                                 break;
-                            case Byte:
-                            case Char:
                             case Double:
                             case Float:
                             case Int:
                             case Long:
-                            case Short:
                                 s += "0";
+                                break;
+                            case Short:
+                                s += "(short)0";
+                                break;
+                            case Byte:
+                                s += "(byte)0";
+                                break;
+                            case Char:
+                                s += "'\0'";
                                 break;
                             case String:
                                 s += "\"\"";
