@@ -183,6 +183,10 @@ class Java11JavaVisitorTest : Java11Test, JavaVisitorTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11LineCounterTest : Java11Test, LineCounterTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11MaybeUsesImportTest : Java11Test, MaybeUsesImportTest
 
 @DebugOnly
