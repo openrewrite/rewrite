@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -39,13 +40,20 @@ public class ChangeMethodTargetToStatic extends Recipe {
     @Option(displayName = "Method pattern",
             description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations. " +
                     "The original method call may or may not be a static method invocation.",
-            example = "org.assertj.core.api.AssertionsForClassTypes assertThat(..)")
+            example = "com.google.common.collect.ImmutableSet of(..)")
     String methodPattern;
 
     @Option(displayName = "Fully-qualified target type name",
             description = "A fully-qualified class name of the type upon which the static method is defined.",
-            example = "org.assertj.core.api.Assertions")
+            example = "java.util.Set")
     String fullyQualifiedTargetTypeName;
+
+    @Option(displayName = "Return type after change",
+            description = "Sometimes changing the target type also changes the return type. In the Guava example, changing from `ImmutableSet#of(..)` to `Set#of(..)` widens the return type from Guava's `ImmutableSet` to just `java.util.Set`.",
+            example = "java.util.Set",
+            required = false)
+    @Nullable
+    String returnType;
 
     @Override
     public String getDisplayName() {
@@ -104,6 +112,13 @@ public class ChangeMethodTargetToStatic extends Recipe {
                         Set<Flag> flags = new LinkedHashSet<>(method.getType().getFlags());
                         flags.add(Flag.Static);
                         transformedType = transformedType.withFlags(flags);
+                    }
+                    if (returnType != null) {
+                        JavaType returnTypeType = JavaType.Class.build(returnType);
+                        transformedType = transformedType.withResolvedSignature(transformedType.getResolvedSignature()
+                                .withReturnType(returnTypeType));
+                        transformedType = transformedType.withGenericSignature(transformedType.getGenericSignature()
+                                .withReturnType(returnTypeType));
                     }
                 }
                 m = m.withType(transformedType);

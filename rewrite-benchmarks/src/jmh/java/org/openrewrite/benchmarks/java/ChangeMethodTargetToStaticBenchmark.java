@@ -43,8 +43,7 @@ public class ChangeMethodTargetToStaticBenchmark {
 
     @Benchmark
     public void changeMethodTargetToStatic(JavaCompilationUnitState state) {
-        new ChangeMethodTargetToStatic("org.junit.Assert assertThat(..)", "org.hamcrest.MatcherAssert")
+        new ChangeMethodTargetToStatic("org.junit.Assert assertThat(..)", "org.hamcrest.MatcherAssert", null)
                 .run(state.getSourceFiles());
     }
-
 }
