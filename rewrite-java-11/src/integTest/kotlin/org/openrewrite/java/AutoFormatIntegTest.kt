@@ -25,7 +25,7 @@ import java.nio.file.attribute.BasicFileAttributes
 import java.util.function.BiPredicate
 import kotlin.streams.toList
 
-class AutoFormatIntegTest : RecipeTest {
+class AutoFormatIntegTest : JavaRecipeTest {
     companion object {
         private val predicate = BiPredicate<Path, BasicFileAttributes> { p, bfa ->
             bfa.isRegularFile && p.fileName.toString().endsWith(".java") &&

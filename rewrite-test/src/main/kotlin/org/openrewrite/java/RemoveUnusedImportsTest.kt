@@ -226,6 +226,7 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/429")
     @Test
     fun removePackageInfoImports(jp: JavaParser) = assertChanged(
+        jp,
         recipe = RemoveUnusedImports(),
         dependsOn = arrayOf(
             """
@@ -255,6 +256,7 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
     )
     @Test
     fun removePackageInfoStarImports(jp: JavaParser) = assertChanged(
+        jp,
         recipe = RemoveUnusedImports(),
         dependsOn = arrayOf(
             """

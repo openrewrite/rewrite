@@ -25,7 +25,7 @@ import java.net.URI
 import java.nio.file.Path
 import java.util.*
 
-class EnvironmentTest : RecipeTest {
+class EnvironmentTest : RecipeTest<PlainText> {
     @Test
     fun listRecipes() {
         val env = Environment.builder()
@@ -266,7 +266,10 @@ class EnvironmentTest : RecipeTest {
             relativeTo: Path?,
             ctx: ExecutionContext
         ): MutableList<PlainText> {
-            return mutableListOf()
+            return sources.asSequence()
+                    .map { it.source.toString() }
+                    .map { PlainText(randomId(), Markers.EMPTY, it)}
+                    .toMutableList()
         }
 
         override fun accept(path: Path): Boolean {
@@ -276,7 +279,7 @@ class EnvironmentTest : RecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/343")
     @Test
-    fun environmentActivatedRecipeUsableInTests() = assertChanged(
+    fun environmentActivatedRecipeUsableInTests() = assertChangedBase(
         parser = plainTextParser,
         recipe = Environment.builder()
             .scanRuntimeClasspath()
@@ -287,7 +290,7 @@ class EnvironmentTest : RecipeTest {
     )
 
     @Test
-    fun deserializesKotlinRecipe() = assertChanged(
+    fun deserializesKotlinRecipe() = assertChangedBase(
         parser = plainTextParser,
         recipe = Environment.builder()
             .scanRuntimeClasspath()

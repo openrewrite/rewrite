@@ -255,11 +255,11 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
 
         assertChanged(
             recipe = UpgradeDependencyVersion(
-                "com.google.guava",
-                null,
-                "25-28",
-                "-jre",
-                null
+                    "com.google.guava",
+                    null,
+                    "25-28",
+                    "-jre",
+                    null
             ),
             dependsOn = arrayOf(server.toFile()),
             before = parent.toFile(),

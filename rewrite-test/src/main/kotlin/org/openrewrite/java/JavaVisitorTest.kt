@@ -62,6 +62,6 @@ interface JavaVisitorTest : JavaRecipeTest {
             }
         """,
         cycles = 2,
-        expectedCyclesToComplete = 2
+        expectedCyclesThatMakeChanges = 2
     )
 }

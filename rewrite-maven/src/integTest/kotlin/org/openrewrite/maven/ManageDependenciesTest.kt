@@ -22,12 +22,12 @@ import org.openrewrite.RecipeTest
 import org.openrewrite.maven.cache.InMemoryMavenPomCache
 import org.openrewrite.maven.tree.Maven
 
-class ManageDependenciesTest : RecipeTest {
+class ManageDependenciesTest : MavenRecipeTest {
     companion object {
         val mavenCache = InMemoryMavenPomCache()
     }
 
-    override val parser: Parser<Maven> = MavenParser.builder()
+    override val parser: MavenParser = MavenParser.builder()
         .cache(mavenCache)
         .build()
 
