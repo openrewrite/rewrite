@@ -16,167 +16,62 @@
 package org.openrewrite.yaml
 
 import org.intellij.lang.annotations.Language
-import org.openrewrite.*
+import org.openrewrite.Recipe
+import org.openrewrite.RecipeTest
+import org.openrewrite.TreePrinter
 import org.openrewrite.marker.SearchResult
+import org.openrewrite.yaml.tree.Yaml
+import java.io.File
 
-interface YamlRecipeTest : RecipeTest {
+@Suppress("unused")
+interface YamlRecipeTest : RecipeTest<Yaml.Documents> {
     override val parser: YamlParser
         get() = YamlParser()
 
     override val treePrinter: TreePrinter<*>?
         get() = SearchResult.printer("~~>", "~~(%s)~~>")
 
-    override fun assertChanged(
-        parser: Parser<*>?,
-        recipe: Recipe?,
-        @Language("yml") before: String,
-        @Language("yml") dependsOn: Array<String>,
-        @Language("yml") after: String,
-        cycles: Int
+    fun assertChanged(
+            parser: YamlParser = this.parser,
+            recipe: Recipe = this.recipe!!,
+            @Language("yaml") before: String,
+            @Language("yaml") dependsOn: Array<String> = emptyArray(),
+            @Language("yaml") after: String,
+            cycles: Int = 2,
+            expectedCyclesThatMakeChanges: Int = cycles - 1,
+            afterConditions: (Yaml.Documents) -> Unit = { }
     ) {
-        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, cycles -1) {}
+        super.assertChangedBase(parser, recipe, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
 
     fun assertChanged(
-        @Language("yml") before: String,
-        @Language("yml") dependsOn: Array<String>,
-        @Language("yml") after: String,
+            parser: YamlParser = this.parser,
+            recipe: Recipe = this.recipe!!,
+            @Language("yaml") before: File,
+            @Language("yaml") dependsOn: Array<File> = emptyArray(),
+            @Language("yaml") after: String,
+            cycles: Int = 2,
+            expectedCyclesThatMakeChanges: Int = cycles - 1,
+            afterConditions: (Yaml.Documents) -> Unit = { }
     ) {
-        super.assertChanged(parser, recipe, before, dependsOn, after, 2, 1) {}
-    }
-
-    fun assertChanged(
-        @Language("yml") before: String,
-        @Language("yml") after: String,
-    ) {
-        super.assertChanged(parser, recipe, before, emptyArray(), after, 2, 1) {}
-    }
-
-    fun assertChanged(
-        parser: Parser<*>?,
-        @Language("yml") before: String,
-        @Language("yml") dependsOn: Array<String>,
-        @Language("yml") after: String,
-        cycles: Int
-    ) {
-        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, cycles -1) {}
-    }
-
-    fun assertChanged(
-        recipe: Recipe?,
-        @Language("yml") before: String,
-        @Language("yml") dependsOn: Array<String>,
-        @Language("yml") after: String,
-        cycles: Int
-    ) {
-        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, cycles -1) {}
-    }
-
-    fun assertChanged(
-        recipe: Recipe?,
-        @Language("yml") before: String,
-        @Language("yml") dependsOn: Array<String>,
-        @Language("yml") after: String,
-        cycles: Int,
-        expectedCyclesToComplete: Int
-    ) {
-        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, expectedCyclesToComplete) {}
-    }
-
-    fun assertChanged(
-        @Language("yml") before: String,
-        @Language("yml") dependsOn: Array<String>,
-        @Language("yml") after: String,
-        cycles: Int
-    ) {
-        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, cycles -1) {}
-    }
-
-    fun assertChanged(
-        recipe: Recipe?,
-        @Language("yml") before: String,
-        @Language("yml") after: String,
-        cycles: Int,
-    ) {
-        super.assertChanged(parser, recipe, before, emptyArray(), after, cycles, cycles -1) {}
-    }
-
-    fun assertChanged(
-        recipe: Recipe?,
-        @Language("yml") before: String,
-        @Language("yml") after: String,
-        cycles: Int,
-        expectedCyclesToComplete: Int
-    ) {
-        super.assertChanged(parser, recipe, before, emptyArray(), after, cycles, expectedCyclesToComplete) {}
-    }
-
-    fun <T : SourceFile> assertChanged(
-        parser: Parser<T>?,
-        recipe: Recipe?,
-        @Language("yml") before: String,
-        @Language("yml") after: String,
-        cycles: Int,
-    ) {
-        super.assertChanged(parser, recipe, before, emptyArray(), after, cycles, cycles -1) {}
-    }
-
-    override fun <T : SourceFile> assertChanged(
-        parser: Parser<T>?,
-        recipe: Recipe?,
-        @Language("yml") before: String,
-        @Language("yml") dependsOn: Array<String>,
-        @Language("yml") after: String,
-        cycles: Int,
-        expectedCyclesThatMakeChanges: Int,
-        afterConditions: (T) -> Unit
-    ) {
-        super.assertChanged(parser, recipe, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        super.assertChangedBase(parser, recipe, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
 
     fun assertUnchanged(
-        parser: Parser<*>?,
-        recipe: Recipe?,
-        @Language("yml") before: String,
+            parser: YamlParser = this.parser,
+            recipe: Recipe = this.recipe!!,
+            @Language("yaml") before: String,
+            @Language("yaml") dependsOn: Array<String> = emptyArray()
     ) {
-        super.assertUnchanged(parser, recipe, before, emptyArray())
+        super.assertUnchangedBase(parser, recipe, before, dependsOn)
     }
 
     fun assertUnchanged(
-        recipe: Recipe?,
-        @Language("yml") before: String,
+        parser: YamlParser = this.parser,
+        recipe: Recipe = this.recipe!!,
+        @Language("yaml") before: File,
+        @Language("yaml") dependsOn: Array<File> = emptyArray()
     ) {
-        super.assertUnchanged(parser, recipe, before, emptyArray())
-    }
-
-    fun assertUnchanged(
-        @Language("yml") before: String
-    ) {
-        super.assertUnchanged(parser, recipe, before, emptyArray())
-    }
-
-    fun assertUnchanged(
-        recipe: Recipe?,
-        @Language("yml") before: String,
-        @Language("yml") dependsOn: Array<String>
-    ) {
-        super.assertUnchanged(parser, recipe, before, dependsOn)
-    }
-
-    fun assertUnchanged(
-        parser: Parser<*>?,
-        @Language("yml") before: String,
-        @Language("yml") dependsOn: Array<String>
-    ) {
-        super.assertUnchanged(parser, recipe, before, dependsOn)
-    }
-
-    override fun assertUnchanged(
-        parser: Parser<*>?,
-        recipe: Recipe?,
-        @Language("yml") before: String,
-        @Language("yml") dependsOn: Array<String>
-    ) {
-        super.assertUnchanged(parser, recipe, before, dependsOn)
+        super.assertUnchangedBase(parser, recipe, before, dependsOn)
     }
 }

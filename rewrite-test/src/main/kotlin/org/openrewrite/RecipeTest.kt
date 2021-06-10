@@ -19,36 +19,27 @@ import org.assertj.core.api.Assertions.*
 import org.junit.jupiter.api.fail
 import org.openrewrite.scheduling.ForkJoinScheduler
 import java.io.File
+import java.nio.file.Path
 import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ForkJoinPool
+import kotlin.io.path.readText
 
-interface RecipeTest {
+interface RecipeTest <T: SourceFile> {
     val recipe: Recipe?
         get() = null
 
     val treePrinter: TreePrinter<*>?
         get() = null
 
-    val parser: Parser<*>?
+    val parser: Parser<T>?
         get() = null
 
-    fun assertChanged(
-        parser: Parser<*>? = this.parser,
-        recipe: Recipe? = this.recipe,
-        before: String,
-        dependsOn: Array<String> = emptyArray(),
-        after: String,
-        cycles: Int = 2
-    ) {
-        assertChanged(parser, recipe, before, dependsOn, after, cycles) {}
-    }
-
     @Suppress("UNCHECKED_CAST")
-    fun <T : SourceFile> assertChanged(
-        parser: Parser<T>? = this.parser as Parser<T>?,
-        recipe: Recipe? = this.recipe,
+    fun assertChangedBase(
+        parser: Parser<T> = this.parser!!,
+        recipe: Recipe = this.recipe!!,
         before: String,
         dependsOn: Array<String> = emptyArray(),
         after: String,
@@ -56,20 +47,18 @@ interface RecipeTest {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (T) -> Unit = { }
     ) {
+
         assertThat(recipe).`as`("A recipe must be specified").isNotNull
 
         if (recipe !is AdHocRecipe) {
             val recipeSerializer = RecipeSerializer()
-            assertThat(recipeSerializer.read(recipeSerializer.write(recipe!!)))
+            assertThat(recipeSerializer.read(recipeSerializer.write(recipe)))
                 .`as`("Recipe must be serializable/deserializable")
                 .isEqualTo(recipe)
         }
 
-        val inputs = arrayOf(before.trimIndent()) + dependsOn
-        val sources = parser!!.parse(
-            InMemoryExecutionContext { t: Throwable -> fail<Any>("Parser threw an exception", t) },
-            *inputs
-        )
+        val inputs = arrayOf(before.trimIndent()) + dependsOn.map(String::trimIndent)
+        val sources = parser.parse(InMemoryExecutionContext { t: Throwable -> fail<Any>("Parser threw an exception", t) }, *inputs )
 
         assertThat(sources.size)
             .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
@@ -103,82 +92,42 @@ interface RecipeTest {
         recipeSchedulerCheckingExpectedCycles.verify()
     }
 
-    fun assertChanged(
-        parser: Parser<*>? = this.parser,
-        recipe: Recipe? = this.recipe,
-        before: File,
-        dependsOn: Array<File> = emptyArray(),
-        after: String,
-        cycles: Int = 2
-    ) {
-        assertChanged(parser, recipe, before, dependsOn, after, cycles) {}
-    }
-
     @Suppress("UNCHECKED_CAST")
-    fun <T : SourceFile> assertChanged(
-        parser: Parser<T>? = this.parser as Parser<T>?,
-        recipe: Recipe? = this.recipe,
+    fun assertChangedBase(
+        parser: Parser<T> = this.parser!!,
+        recipe: Recipe = this.recipe!!,
         before: File,
         dependsOn: Array<File> = emptyArray(),
         after: String,
         cycles: Int = 2,
-        expectedCyclesToComplete: Int = cycles - 1,
+        expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (T) -> Unit = { }
     ) {
-        assertThat(recipe).`as`("A recipe must be specified").isNotNull
-
-        val inputs = (arrayOf(before) + dependsOn).map { it.toPath() }.toList()
-        val sources = parser!!.parse(inputs, null, InMemoryExecutionContext())
-        assertThat(sources.size)
-            .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
-            .isEqualTo(inputs.size)
-
-        val source = sources.first()
-
-        val recipeSchedulerCheckingExpectedCycles =
-            RecipeSchedulerCheckingExpectedCycles(ForkJoinScheduler.common(), expectedCyclesToComplete)
-        val results = recipe!!
-            .run(
-                listOf(source),
-                InMemoryExecutionContext { t: Throwable -> fail<Any>("Recipe threw an exception", t) },
-                recipeSchedulerCheckingExpectedCycles,
-                cycles,
-                expectedCyclesToComplete + 1
-            )
-
-        if (results.isEmpty()) {
-            fail<Any>("The recipe must make changes")
-        }
-
-        val result = results.find { s -> source === s.before }
-
-        assertThat(result).`as`("The recipe must make changes").isNotNull
-        assertThat(result!!.after).isNotNull
-        assertThat(result.after!!.printTrimmed(treePrinter ?: TreePrinter.identity<Any>()))
-            .isEqualTo(after.trimIndent())
-        afterConditions(result.after as T)
-
-        recipeSchedulerCheckingExpectedCycles.verify()
+        val beforeInput = before.readText()
+        val dependsOnInputs = dependsOn.map{ it.toPath() }.map(Path::readText).toTypedArray()
+        assertChangedBase(parser, recipe, beforeInput, dependsOnInputs, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
 
-    fun assertUnchanged(
-        parser: Parser<*>? = this.parser,
-        recipe: Recipe? = this.recipe,
+    fun assertUnchangedBase(
+        parser: Parser<T> = this.parser!!,
+        recipe: Recipe = this.recipe!!,
         before: String,
         dependsOn: Array<String> = emptyArray()
     ) {
+
         assertThat(recipe).`as`("A recipe must be specified").isNotNull
 
-        val inputs = (arrayOf(before.trimIndent()) + dependsOn)
-        val sources = parser!!.parse(*inputs)
+        val inputs = arrayOf(before.trimIndent()) + dependsOn.map(String::trimIndent)
+        val sources = parser.parse(
+                InMemoryExecutionContext { t: Throwable -> fail<Any>("Parser threw an exception", t) },
+                *inputs)
         assertThat(sources.size)
             .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
             .isEqualTo(inputs.size)
         val source = sources.first()
         val recipeSchedulerCheckingExpectedCycles = RecipeSchedulerCheckingExpectedCycles(ForkJoinScheduler.common(), 0)
-        val results = recipe!!
-            .run(
-                listOf(source),
+        val results = recipe
+            .run(listOf(source),
                 InMemoryExecutionContext { t -> t.printStackTrace() },
                 recipeSchedulerCheckingExpectedCycles,
                 2,
@@ -200,46 +149,15 @@ interface RecipeTest {
         recipeSchedulerCheckingExpectedCycles.verify()
     }
 
-    fun assertUnchanged(
-        parser: Parser<*>? = this.parser,
-        recipe: Recipe? = this.recipe,
+    fun assertUnchangedBase(
+        parser: Parser<T> = this.parser!!,
+        recipe: Recipe = this.recipe!!,
         before: File,
         dependsOn: Array<File> = emptyArray()
     ) {
-        assertThat(recipe).`as`("A recipe must be specified").isNotNull
-        val inputs = (listOf(before) + dependsOn).map { it.toPath() }
-        val sources = parser!!.parse(
-            inputs,
-            null,
-            InMemoryExecutionContext()
-        )
-        assertThat(sources.size)
-            .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
-            .isEqualTo(inputs.size)
-        val source = sources.first()
-        val recipeSchedulerCheckingExpectedCycles = RecipeSchedulerCheckingExpectedCycles(ForkJoinScheduler.common(), 0)
-        val results = recipe!!
-            .run(
-                listOf(source),
-                InMemoryExecutionContext { t -> fail<Any>("Recipe threw an exception", t) },
-                recipeSchedulerCheckingExpectedCycles,
-                2,
-                2
-            )
-
-        results.forEach { result ->
-            if (result.diff(treePrinter ?: TreePrinter.identity<Any>()).isEmpty()) {
-                fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.")
-            }
-        }
-
-        for (result in results) {
-            assertThat(result.after?.print(treePrinter ?: TreePrinter.identity<Any>(), null))
-                .`as`("The recipe must not make changes")
-                .isEqualTo(result.before?.print(treePrinter ?: TreePrinter.identity<Any>(), null))
-        }
-
-        recipeSchedulerCheckingExpectedCycles.verify()
+        val beforeInput = before.readText()
+        val dependsOnInputs = dependsOn.map(File::readText).toTypedArray()
+        assertUnchangedBase(parser, recipe, beforeInput, dependsOnInputs)
     }
 
     fun TreeVisitor<*, ExecutionContext>.toRecipe() = AdHocRecipe(this)
