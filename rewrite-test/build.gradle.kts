@@ -1,6 +1,10 @@
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
+    api(project(":rewrite-maven"))
+    api(project(":rewrite-xml"))
+    api(project(":rewrite-yaml"))
+    api(project(":rewrite-properties"))
 
     api("org.eclipse.jgit:org.eclipse.jgit:latest.release")
 
