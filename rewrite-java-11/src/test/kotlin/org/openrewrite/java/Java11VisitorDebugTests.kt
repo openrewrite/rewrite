@@ -71,6 +71,10 @@ class Java11ChangeLiteralTest : Java11Test, ChangeLiteralTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11ChangeMethodAccessLevelTest : Java11Test, ChangeMethodAccessLevelTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11ChangeMethodNameTest : Java11Test, ChangeMethodNameTest
 
 @DebugOnly

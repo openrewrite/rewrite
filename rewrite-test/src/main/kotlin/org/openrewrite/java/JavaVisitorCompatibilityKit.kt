@@ -65,6 +65,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class ChangeLiteralTck : ChangeLiteralTest
 
     @Nested
+    inner class ChangeMethodAccessLevelTck : ChangeMethodAccessLevelTest
+
+    @Nested
     inner class ChangeMethodNameTck : ChangeMethodNameTest
 
     @Nested
