@@ -165,7 +165,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P p) {
-        if(right == null) {
+        if (right == null) {
             //noinspection ConstantConditions
             return null;
         }
@@ -297,7 +297,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                             } else {
                                 J.MethodInvocation methodInvocation = (J.MethodInvocation) elem;
                                 Expression select = methodInvocation.getSelect();
-                                if (select instanceof J.FieldAccess || select instanceof J.Identifier) {
+                                if (select instanceof J.FieldAccess || select instanceof J.Identifier || select instanceof J.MethodInvocation) {
                                     getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
                                 }
                             }

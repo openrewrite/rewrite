@@ -91,26 +91,95 @@ interface TabsAndIndentsTest : JavaRecipeTest {
     )
 
     @Test
-    @Disabled("https://github.com/openrewrite/rewrite/issues/636")
-    fun nestedMethodChain(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+    @Issue("https://github.com/openrewrite/rewrite/issues/636")
+    fun methodInvocationArgumentOnOpeningLineWithMethodSelect(jp: JavaParser.Builder<*, *>) = assertUnchanged(
         jp.styles(tabsAndIndents { withContinuationIndent(8) }).build(),
         before = """
             class Test {
-                Test withData() {
+                Test withData(Object... arg0) {
                     return this;
                 }
-                Test withData(Object arg0) {
-                    return this;
-                }
-                Test withData(Object arg0, Object arg1) {
-                    return this;
-                }
+
                 void method(Test t) {
-                    Object data;
-                    data = t.withData(withData()
-                                    .withData(new Object())
-                                    .withData(new Object()),
-                            new Object()
+                    t = t.withData(withData()
+                                    .withData()
+                                    .withData(),
+                            withData()
+                                    .withData()
+                                    .withData()
+                    );
+                }
+            }
+        """
+    )
+
+    @Test
+    @Disabled("https://github.com/openrewrite/rewrite/issues/636")
+    fun methodInvocationArgumentOnNewLineWithMethodSelect(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.styles(tabsAndIndents { withContinuationIndent(8) }).build(),
+        before = """
+            class Test {
+                Test withData(Object... arg0) {
+                    return this;
+                }
+
+                void method(Test t) {
+                    t = t.withData(
+                            withData(), withData()
+                                    .withData()
+                                    .withData()
+                    );
+                }
+            }
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/636")
+    fun methodInvocationArgumentsWithMethodSelectsOnEachNewLine(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.styles(tabsAndIndents { withContinuationIndent(8) }).build(),
+        before = """
+            class Test {
+                Test withData(Object... arg0) {
+                    return this;
+                }
+
+                void method(Test t) {
+                    t = t.withData(withData()
+                            .withData(t
+                                    .
+                                            withData()
+                            )
+                            .withData(
+                                    t
+                                            .
+                                                    withData()
+                            )
+                    );
+                }
+            }
+        """
+    )
+
+    @Test
+    @Disabled("https://github.com/openrewrite/rewrite/issues/636")
+    fun methodInvocationArgumentsContinuationIndentsAssorted(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.styles(tabsAndIndents { withContinuationIndent(8) }).build(),
+        before = """
+            class Test {
+                Test withData(Object... arg0) {
+                    return this;
+                }
+
+                void method(Test t) {
+                    t = t.withData(withData()
+                                    .withData(
+                                            t.withData()
+                                    ).withData(
+                                    t.withData()
+                                    )
+                                    .withData(),
+                            withData()
                     );
                 }
             }
