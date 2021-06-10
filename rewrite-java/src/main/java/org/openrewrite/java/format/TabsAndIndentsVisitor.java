@@ -434,10 +434,14 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 text.append(' ');
             }
         } else {
+            int len;
             if (style.getUseTabCharacter()) {
-                text.delete(text.length() + (shift / tabIndent), text.length());
+                len = text.length() + (shift / tabIndent);
             } else {
-                text.delete(text.length() + shift, text.length());
+                len = text.length() + shift;
+            }
+            if (len > 0) {
+                text.delete(len, text.length());
             }
         }
     }
