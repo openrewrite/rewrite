@@ -18,7 +18,9 @@ package org.openrewrite.maven.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenVisitor;
+import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.marker.XmlSearchResult;
@@ -119,5 +121,21 @@ public class DependencyInsight extends Recipe {
                         artifactIdMatcher.matcher(d.getArtifactId()).matches();
             }
         };
+    }
+
+    /**
+     * This method will search the Maven tree for a dependency (including any transitive references) and return
+     * true if the dependency is found.
+     *
+     * @param maven The maven tree to search.
+     * @param groupIdPattern The artifact's group ID
+     * @param artifactIdPattern The artifact's ID
+     * @param scope An optional scope.
+     *
+     * @return true if the dependency is found.
+     */
+    public static boolean isDependencyPresent(Maven maven, String groupIdPattern, String artifactIdPattern, @Nullable String scope) {
+        DependencyInsight insight = new DependencyInsight(groupIdPattern, artifactIdPattern, scope);
+        return insight.getVisitor().visit(maven, new InMemoryExecutionContext()) != maven;
     }
 }

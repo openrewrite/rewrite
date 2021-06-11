@@ -25,6 +25,7 @@ import org.openrewrite.maven.internal.InsertDependencyComparator;
 import org.openrewrite.maven.internal.MavenMetadata;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.Version;
+import org.openrewrite.maven.search.DependencyInsight;
 import org.openrewrite.maven.search.FindDependency;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
@@ -93,7 +94,8 @@ public class AddDependencyVisitor extends MavenVisitor {
             versionComparator = versionValidation.getValue();
         }
 
-        if (!FindDependency.find(maven, groupId, artifactId).isEmpty()) {
+        if (DependencyInsight.isDependencyPresent(maven, groupId, artifactId, scope)) {
+            //If the dependency is already present (either as a first-order or transitive dependency, do not add it.
             return maven;
         }
 
