@@ -357,20 +357,18 @@ public class JavaTemplate {
                                     if(it instanceof JavaType.Method) {
                                         return ((JavaType.Method)it).getGenericSignature().getReturnType();
                                     }
+                                    // Invoking a method with a string literal still means the invocation has the class type
+                                    if(it == JavaType.Primitive.String) {
+                                        return JavaType.Class.build("java.lang.String");
+                                    }
                                     return it;
                                 })
                                 .collect(toList());
-                        JavaType.Method newType = JavaType.Method.lookupExistingType(mt.getDeclaringType(),
-                                method.getSimpleName(),
-                                mt.getGenericSignature().getReturnType(),
-                                argTypes
-                        );
-                        if (newType == null) {
-                            // Couldn't find an existing method type, construct something reasonable
-                            // There's no way to know what the names of the parameters should be, but we can fill in types
-                            newType = mt.withResolvedSignature(mt.getResolvedSignature().withParamTypes(argTypes))
-                                    .withGenericSignature(mt.getGenericSignature().withParamTypes(argTypes));
-                        }
+
+                        // There's no way to know what the names of the parameters should be, but we can fill in types
+                        JavaType.Method newType = mt.withResolvedSignature(mt.getResolvedSignature().withParamTypes(argTypes))
+                                .withGenericSignature(mt.getGenericSignature().withParamTypes(argTypes));
+
                         m = m.withType(newType);
                     }
                     m = autoFormat(m, 0, getCursor().getParentOrThrow());

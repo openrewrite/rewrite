@@ -687,42 +687,6 @@ public interface JavaType extends Serializable {
             }
         }
 
-        @Nullable
-        public static JavaType.Method lookupExistingType(
-                JavaType.FullyQualified declaringClassType,
-                String methodName,
-                JavaType returnType,
-                List<JavaType> paramTypes
-        ) {
-            synchronized (flyweights) {
-                Map<String, Set<Method>> methodsByClass = flyweights.get(declaringClassType);
-                if(methodsByClass == null) {
-                    return null;
-                }
-                Set<Method> methods = methodsByClass.get(methodName);
-                if(methods == null) {
-                    return null;
-                }
-                nextMethod:
-                for(Method method : methods) {
-                    Signature genericSignature = method.getGenericSignature();
-                    if(!TypeUtils.isOfType(returnType, genericSignature.getReturnType())) {
-                        continue;
-                    }
-                    if(paramTypes.size() != genericSignature.paramTypes.size()) {
-                        continue;
-                    }
-                    for(int i = 0; i < paramTypes.size(); i++) {
-                        if(!TypeUtils.isOfType(paramTypes.get(i), genericSignature.paramTypes.get(i))) {
-                            continue nextMethod;
-                        }
-                    }
-                    return method;
-                }
-                return null;
-            }
-        }
-
         @Data
         public static class Signature implements Serializable {
             @Nullable
