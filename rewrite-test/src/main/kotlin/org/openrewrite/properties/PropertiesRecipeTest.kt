@@ -19,12 +19,25 @@ import org.intellij.lang.annotations.Language
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.properties.tree.Properties
+import org.openrewrite.xml.tree.Xml
 import java.io.File
 
 @Suppress("unused")
 interface PropertiesRecipeTest : RecipeTest<Properties.File> {
     override val parser: PropertiesParser
         get() = PropertiesParser()
+
+    fun assertChanged(
+        recipe: Recipe = this.recipe!!,
+        moderneAstLink: String,
+        moderneApiBearerToken: String,
+        @Language("properties") after: String,
+        cycles: Int = 2,
+        expectedCyclesThatMakeChanges: Int = cycles - 1,
+        afterConditions: (Properties.File) -> Unit = { }
+    ) {
+        super.assertChangedBase(recipe, moderneAstLink, moderneApiBearerToken, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+    }
 
     fun assertChanged(
         parser: PropertiesParser = this.parser,

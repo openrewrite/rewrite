@@ -20,6 +20,7 @@ import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.maven.cache.InMemoryMavenPomCache
 import org.openrewrite.maven.tree.Maven
+import org.openrewrite.xml.tree.Xml
 import java.io.File
 
 @Suppress("unused")
@@ -32,6 +33,18 @@ interface MavenRecipeTest : RecipeTest<Maven> {
         get() = MavenParser.builder()
             .cache(mavenCache)
             .build()
+
+    fun assertChanged(
+        recipe: Recipe = this.recipe!!,
+        moderneAstLink: String,
+        moderneApiBearerToken: String,
+        @Language("xml") after: String,
+        cycles: Int = 2,
+        expectedCyclesThatMakeChanges: Int = cycles - 1,
+        afterConditions: (Maven) -> Unit = { }
+    ) {
+        super.assertChangedBase(recipe, moderneAstLink, moderneApiBearerToken, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+    }
 
     fun assertChanged(
         parser: MavenParser = this.parser,

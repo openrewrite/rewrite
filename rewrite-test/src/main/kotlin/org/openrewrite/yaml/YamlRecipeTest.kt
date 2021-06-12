@@ -20,6 +20,7 @@ import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.TreePrinter
 import org.openrewrite.marker.SearchResult
+import org.openrewrite.xml.tree.Xml
 import org.openrewrite.yaml.tree.Yaml
 import java.io.File
 
@@ -30,6 +31,18 @@ interface YamlRecipeTest : RecipeTest<Yaml.Documents> {
 
     override val treePrinter: TreePrinter<*>?
         get() = SearchResult.printer("~~>", "~~(%s)~~>")
+
+    fun assertChanged(
+        recipe: Recipe = this.recipe!!,
+        moderneAstLink: String,
+        moderneApiBearerToken: String,
+        @Language("yaml") after: String,
+        cycles: Int = 2,
+        expectedCyclesThatMakeChanges: Int = cycles - 1,
+        afterConditions: (Yaml.Documents) -> Unit = { }
+    ) {
+        super.assertChangedBase(recipe, moderneAstLink, moderneApiBearerToken, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+    }
 
     fun assertChanged(
         parser: YamlParser = this.parser,

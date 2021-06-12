@@ -18,6 +18,7 @@ package org.openrewrite.xml
 import org.intellij.lang.annotations.Language
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
+import org.openrewrite.java.tree.J
 import org.openrewrite.xml.tree.Xml
 import java.io.File
 
@@ -25,6 +26,18 @@ import java.io.File
 interface XmlRecipeTest : RecipeTest<Xml.Document> {
     override val parser: XmlParser
         get() = XmlParser()
+
+    fun assertChanged(
+        recipe: Recipe = this.recipe!!,
+        moderneAstLink: String,
+        moderneApiBearerToken: String,
+        @Language("xml") after: String,
+        cycles: Int = 2,
+        expectedCyclesThatMakeChanges: Int = cycles - 1,
+        afterConditions: (Xml.Document) -> Unit = { }
+    ) {
+        super.assertChangedBase(recipe, moderneAstLink, moderneApiBearerToken, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+    }
 
     fun assertChanged(
         parser: XmlParser = this.parser,

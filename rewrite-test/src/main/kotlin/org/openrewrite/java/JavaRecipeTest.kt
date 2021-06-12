@@ -28,6 +28,18 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
             .build()
 
     fun assertChanged(
+        recipe: Recipe = this.recipe!!,
+        moderneAstLink: String,
+        moderneApiBearerToken: String,
+        @Language("java") after: String,
+        cycles: Int = 2,
+        expectedCyclesThatMakeChanges: Int = cycles - 1,
+        afterConditions: (J.CompilationUnit) -> Unit = { }
+    ) {
+        super.assertChangedBase(recipe, moderneAstLink, moderneApiBearerToken, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+    }
+
+    fun assertChanged(
         parser: JavaParser = this.parser,
         recipe: Recipe = this.recipe!!,
         @Language("java") before: String,
