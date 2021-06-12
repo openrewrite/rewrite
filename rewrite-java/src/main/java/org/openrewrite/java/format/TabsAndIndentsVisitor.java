@@ -18,6 +18,7 @@ package org.openrewrite.java.format;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
@@ -367,7 +368,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 JContainer.build(before, js, container.getMarkers());
     }
 
-    private Space indentTo(Space space, int column, Space.Location loc) {
+    private Space indentTo(Space space, int column, Space.Location spaceLocation) {
         if (!space.getLastWhitespace().contains("\n")) {
             return space;
         }
@@ -384,27 +385,25 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 space = space.withWhitespace(indent(space.getWhitespace(), shift));
             }
         } else {
-            // Note: Formatting multiple block comments on a single line is still not handled.
-            // In the case of multiple block comments on a single line, the shift will be applied between each block.
             Comment lastElement = space.getComments().get(space.getComments().size() - 1);
             space = space.withComments(ListUtils.map(space.getComments(), c -> {
-                int indent = getLengthOfWhitespace(Space.format(c.getSuffix()).getWhitespace());
-                indent -= loc.equals(Space.Location.BLOCK_END) && !c.equals(lastElement) ? style.getIndentSize() : 0;
-
-                if (column != indent) {
-                    int shift = column - indent;
-                    c = indentComment(c, shift);
+                // The suffix of the last element in the comment list sets the whitespace for the end of the block.
+                // The column for comments that come before the last element are incremented.
+                int incrementBy = spaceLocation.equals(Space.Location.BLOCK_END) && !c.equals(lastElement) ? style.getIndentSize() : 0;
+                if (Comment.Style.LINE.equals(c.getStyle())) {
+                    return indentSingleLineComment(c, column + incrementBy);
+                } else {
+                    return indentMultilineComment(c, column + incrementBy);
                 }
-                return c;
             }));
 
-            // Do not format trailing comments.
-            // The whitespace won't have a `\n` character if the 1st element is a trailing comment.
-            if (space.getWhitespace().contains("\n") || loc.equals(Space.Location.COMPILATION_UNIT_PREFIX)) {
+            // Prevent formatting trailing comments, the whitespace in a trailing comment won't have a new line character.
+            // Compilation unit prefixes are an exception, since they do not exist in a block.
+            if ((space.getWhitespace().contains("\n") || space.getWhitespace().contains("\r")) || spaceLocation.equals(Space.Location.COMPILATION_UNIT_PREFIX)) {
                 int indent = getLengthOfWhitespace(space.getWhitespace());
-                indent -= loc.equals(Space.Location.BLOCK_END) ? style.getIndentSize() : 0;
-                if (column != indent) {
-                    int shift = column - indent;
+                int incrementBy = spaceLocation.equals(Space.Location.BLOCK_END) ? style.getIndentSize() : 0;
+                if (indent != (column + incrementBy)) {
+                    int shift = column + incrementBy - indent;
                     space = space.withWhitespace(indent(space.getWhitespace(), shift));
                 }
             }
@@ -413,25 +412,107 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         return space;
     }
 
-    private Comment indentComment(Comment comment, int shift) {
-        StringBuilder newSuffix = new StringBuilder(comment.getSuffix());
-        shift(newSuffix, shift);
-
-        String newText = comment.getText();
-        if (comment.getStyle() != Comment.Style.LINE) {
-            StringBuilder newTextBuilder = new StringBuilder();
-            for (char c : comment.getText().toCharArray()) {
-                newTextBuilder.append(c);
-                if (c == '\n') {
-                    // Note: this needs to be adjusted to only pass in whitespace.
-                    // The call was safe when only shiftRight was supported, but shift left removes items from the String.
-                    // The entire comment is passed in here, so characters are removed if the shift is less than 0.
-                    shift(newTextBuilder, shift);
-                }
-            }
-            newText = newTextBuilder.toString();
+    private Comment indentSingleLineComment(Comment comment, int column) {
+        int indent = getLengthOfWhitespace(Space.format(comment.getSuffix()).getWhitespace());
+        if (column == indent) {
+            return comment;
         }
 
+        StringBuilder newSuffix = new StringBuilder(comment.getSuffix());
+        int shift = column - indent;
+        shift(newSuffix, shift);
+        return comment.withSuffix(newSuffix.toString());
+    }
+
+    /**
+     * Aligns JavaDoc and Block comments to the column.
+     *
+     * The text for a JavaDoc/Block comment is a string delimited by `\n` or `\r'.
+     * The whitespace and text are built separately to apply the appropriate shifts.
+     *
+     * isFirstLine is used to maintain the formatting for text that is in line with `/**` or `/*`.
+     */
+    private Comment indentMultilineComment(Comment comment, int column) {
+        StringBuilder newTextBuilder = new StringBuilder();
+        StringBuilder currentText = new StringBuilder();
+        StringBuilder whiteSpace = new StringBuilder();
+        boolean hasChanged = false;
+        boolean isWhitespace = true;
+        boolean isFirstLine = true;
+        for (char c : comment.getText().toCharArray()) {
+            switch (c) {
+                case ' ':
+                    if (!isFirstLine && isWhitespace) {
+                        whiteSpace.append(c);
+                    } else {
+                        currentText.append(c);
+                    }
+                    break;
+
+                case '\r':
+                case '\n':
+                    if (isFirstLine) {
+                        isFirstLine = false;
+                    } else {
+                        int indent = getLengthOfWhitespace(whiteSpace.toString());
+                        if (indent != column) {
+                            int shift = column - indent;
+                            shift(whiteSpace, shift);
+                            hasChanged = true;
+                        }
+                    }
+
+                    newTextBuilder.append(whiteSpace.append(currentText));
+                    whiteSpace.setLength(0);
+                    currentText.setLength(0);
+
+                    whiteSpace.append(c);
+                    isWhitespace = true;
+                    break;
+
+                case '*':
+                    if (!isFirstLine && isWhitespace) {
+                        // Moves a space character to the current text, so that the '*' are in line with each other.
+                        int whitespaceLength = Math.max(whiteSpace.length() - 1, 0);
+                        whiteSpace.setLength(whitespaceLength);
+                        currentText.append(' ');
+                    }
+
+                default:
+                    if (!isFirstLine && isWhitespace) {
+                        isWhitespace = false;
+                    }
+                    currentText.append(c);
+                    break;
+            }
+        }
+
+        int indent = getLengthOfWhitespace(whiteSpace.toString());
+        if (!isFirstLine) {
+            if (indent != column) {
+                int shift = column - indent;
+                // Adjust the shift so that the */ will line up under /*.
+                if (currentText.length() == 0) {
+                    shift += 1;
+                }
+                shift(whiteSpace, shift);
+                hasChanged = true;
+            }
+        }
+
+        StringBuilder newSuffix = new StringBuilder(comment.getSuffix());
+        indent = getLengthOfWhitespace(newSuffix.toString());
+        if (indent != column && ((newSuffix.toString().contains("\n") || newSuffix.toString().contains("\r")))) {
+            int shift = column - indent;
+            shift(newSuffix, shift);
+            hasChanged = true;
+        }
+
+        if (!hasChanged) {
+            return comment;
+        }
+
+        String newText = newTextBuilder.append(whiteSpace.append(currentText)).toString();
         return comment.withText(newText).withSuffix(newSuffix.toString());
     }
 
