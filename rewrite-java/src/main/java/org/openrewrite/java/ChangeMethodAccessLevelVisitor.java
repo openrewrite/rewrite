@@ -15,73 +15,100 @@
  */
 package org.openrewrite.java;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.RequiredArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.format.MinimumViableSpacingVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
 
 import static java.util.Collections.emptyList;
 
+@Value
+@EqualsAndHashCode(callSuper = true)
 public class ChangeMethodAccessLevelVisitor extends JavaIsoVisitor<ExecutionContext> {
-    private static final Set<J.Modifier.Type> EXPLICIT_ACCESS_LEVELS
-            = new HashSet<>(Arrays.asList(J.Modifier.Type.Public, J.Modifier.Type.Private, J.Modifier.Type.Protected));
-    private final MethodMatcher methodMatcher;
-    private final MethodAccessLevel newAccessLevel;
+    private static final Collection<J.Modifier.Type> EXPLICIT_ACCESS_LEVELS = Arrays.asList(J.Modifier.Type.Public,
+            J.Modifier.Type.Private, J.Modifier.Type.Protected);
 
-    public ChangeMethodAccessLevelVisitor(MethodMatcher methodMatcher, MethodAccessLevel newAccessLevel) {
-        this.methodMatcher = methodMatcher;
-        this.newAccessLevel = newAccessLevel;
-    }
+    MethodMatcher methodMatcher;
+
+    @Nullable
+    J.Modifier.Type newAccessLevel;
 
     @Override
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, executionContext);
         J.ClassDeclaration classDecl = getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class);
         if (methodMatcher.matches(method, classDecl)) {
-            MethodAccessLevel currentMethodAccessLevel = m.getModifiers().stream()
+            J.Modifier.Type currentMethodAccessLevel = m.getModifiers().stream()
                     .map(J.Modifier::getType)
                     .filter(EXPLICIT_ACCESS_LEVELS::contains)
-                    .map(MethodAccessLevel::fromModifierType)
                     .findAny()
-                    .orElse(MethodAccessLevel.Package_private);
+                    .orElse(null);
+
             if (currentMethodAccessLevel == newAccessLevel) {
                 // No changes required
                 return m;
             }
 
             // Replace former modifier by new modifier if package-private is not involved
-            if (EXPLICIT_ACCESS_LEVELS.contains(currentMethodAccessLevel.modifierType)
-                    && EXPLICIT_ACCESS_LEVELS.contains(newAccessLevel.modifierType)) {
+            if (EXPLICIT_ACCESS_LEVELS.contains(currentMethodAccessLevel) && EXPLICIT_ACCESS_LEVELS.contains(newAccessLevel)) {
                 m = m.withModifiers(
-                    ListUtils.map(m.getModifiers(), mod -> mod.getType() == currentMethodAccessLevel.modifierType ? mod.withType(newAccessLevel.modifierType) : mod)
+                        ListUtils.map(m.getModifiers(), mod -> mod.getType() == currentMethodAccessLevel ?
+                                mod.withType(newAccessLevel) : mod)
                 );
             }
+
             // If current access level is package-private (no modifier), add the new modifier
-            else if (currentMethodAccessLevel == MethodAccessLevel.Package_private) {
-                J.Modifier mod = new J.Modifier(Tree.randomId(), Space.build(" ", emptyList()), Markers.EMPTY, newAccessLevel.modifierType, Collections.emptyList());
+            else if (currentMethodAccessLevel == null) {
+                J.Modifier mod = new J.Modifier(Tree.randomId(), Space.build(" ", emptyList()), Markers.EMPTY, newAccessLevel, Collections.emptyList());
                 m = m.withModifiers(ListUtils.concat(mod, m.getModifiers()));
-                m = (J.MethodDeclaration) new MinimumViableSpacingVisitor<Integer>(
-                        m.getName()).visit(m, 0, getCursor());
-                m = maybeAutoFormat(m, m, executionContext, getCursor().dropParentUntil(J.class::isInstance));
+
+                if(method.getModifiers().isEmpty()) {
+                    J.TypeParameters typeParams = m.getPadding().getTypeParameters();
+                    if(typeParams == null) {
+                        TypeTree returnExpr = m.getReturnTypeExpression();
+                        if(returnExpr == null) {
+                            m = m.withModifiers(Space.formatFirstPrefix(m.getModifiers(), m.getName().getPrefix()));
+                            m = m.withName(m.getName().withPrefix(Space.format(" ")));
+                        } else {
+                            m = m.withModifiers(Space.formatFirstPrefix(m.getModifiers(), returnExpr.getPrefix()));
+                            m = m.withReturnTypeExpression(returnExpr.withPrefix(Space.format(" ")));
+                        }
+                    } else {
+                        m = m.withModifiers(Space.formatFirstPrefix(m.getModifiers(), typeParams.getPrefix()));
+                        m = m.getPadding().withTypeParameters(typeParams.withPrefix(Space.format(" ")));
+                    }
+                }
+                else {
+                    m = m.withModifiers(ListUtils.map(m.getModifiers(), (i, mod2) -> {
+                        if (i == 0) {
+                            return mod2.withPrefix(method.getModifiers().get(0).getPrefix());
+                        } else if (i == 1) {
+                            return mod2.withPrefix(Space.format(" "));
+                        }
+                        return mod2;
+                    }));
+                }
             }
+
             // If target access level is package-private (no modifier), remove the current access level modifier
             // and copy any associated comments
-            else if (newAccessLevel == MethodAccessLevel.Package_private) {
+            else if (newAccessLevel == null) {
                 final List<Comment> modifierComments = new ArrayList<>();
                 List<J.Modifier> modifiers = ListUtils.map(m.getModifiers(), mod -> {
-                    if (mod.getType() == currentMethodAccessLevel.modifierType) {
+                    if (mod.getType() == currentMethodAccessLevel) {
                         modifierComments.addAll(mod.getComments());
                         return null;
                     }
+
                     // copy access level modifier comment to next modifier if it exists
                     if (!modifierComments.isEmpty()) {
                         J.Modifier nextModifier = mod.withComments(ListUtils.concatAll(new ArrayList<>(modifierComments), mod.getComments()));
@@ -90,6 +117,7 @@ public class ChangeMethodAccessLevelVisitor extends JavaIsoVisitor<ExecutionCont
                     }
                     return mod;
                 });
+
                 // if no following modifier exists, add comments to method itself
                 if (!modifierComments.isEmpty()) {
                     m = m.withComments(ListUtils.concatAll(m.getComments(), modifierComments));
@@ -98,35 +126,5 @@ public class ChangeMethodAccessLevelVisitor extends JavaIsoVisitor<ExecutionCont
             }
         }
         return m;
-    }
-
-
-    @RequiredArgsConstructor
-    public enum MethodAccessLevel {
-        Public("public", J.Modifier.Type.Public),
-        Protected("protected", J.Modifier.Type.Protected),
-        Private("private", J.Modifier.Type.Private),
-        Package_private("package-private", null);
-
-        private final String keyword;
-        private final J.Modifier.Type modifierType;
-
-        public static MethodAccessLevel fromKeyword(String keyword) {
-            for (MethodAccessLevel accessLevel : values()) {
-                if (accessLevel.keyword.equals(keyword)) {
-                    return accessLevel;
-                }
-            }
-            throw new IllegalArgumentException("Invalid keyword for method access level: " + keyword);
-        }
-
-        private static MethodAccessLevel fromModifierType(J.Modifier.Type modifierType) {
-            for (MethodAccessLevel accessLevel : values()) {
-                if (Objects.equals(accessLevel.modifierType, modifierType)) {
-                    return accessLevel;
-                }
-            }
-            throw new IllegalArgumentException("Invalid J.Modifier.Type for method access level: " + modifierType);
-        }
     }
 }

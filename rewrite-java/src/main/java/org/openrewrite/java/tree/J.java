@@ -3085,6 +3085,15 @@ public interface J extends Serializable, Tree {
             public MethodDeclaration withDefaultValue(@Nullable JLeftPadded<Expression> defaultValue) {
                 return t.defaultValue == defaultValue ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, defaultValue, t.type);
             }
+
+            @Nullable
+            public TypeParameters getTypeParameters() {
+                return t.typeParameters;
+            }
+
+            public MethodDeclaration withTypeParameters(@Nullable TypeParameters typeParameters) {
+                return t.typeParameters == typeParameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, t.defaultValue, t.type);
+            }
         }
 
         public Annotations getAnnotations() {

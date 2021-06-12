@@ -15,19 +15,15 @@
  */
 package org.openrewrite.java
 
-import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.ChangeMethodAccessLevelVisitor.MethodAccessLevel.*
-import org.openrewrite.java.tree.J
-import org.openrewrite.java.tree.JavaType
 
 interface ChangeMethodAccessLevelTest : JavaRecipeTest {
 
     @Test
     fun changeMethodAccessLevelFromPublicToPrivate(jp: JavaParser) = assertChanged(
-            jp,
-            recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "private"),
-            before = """
+        jp,
+        recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "private"),
+        before = """
             package com.abc;
             class A {
 
@@ -48,7 +44,7 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
                 }
             }
         """,
-            after = """
+        after = """
             package com.abc;
             class A {
 
@@ -72,10 +68,10 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
     )
 
     @Test
-    fun changeMethodAccessLevelFromPackagePrivateToPublic(jp: JavaParser) = assertChanged(
-            jp,
-            recipe = ChangeMethodAccessLevel("com.abc.A aMethod(String)", "protected"),
-            before = """
+    fun changeMethodAccessLevelFromPackagePrivateToProtected(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected"),
+        before = """
             package com.abc;
             class A {
 
@@ -96,7 +92,7 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
                 }
             }
         """,
-            after = """
+        after = """
             package com.abc;
             class A {
 
@@ -121,9 +117,9 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
 
     @Test
     fun changeMethodAccessLevelFromPublicToPackagePrivate(jp: JavaParser) = assertChanged(
-            jp,
-            recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "package-private"),
-            before = """
+        jp,
+        recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "package"),
+        before = """
             package com.abc;
             class A {
 
@@ -136,7 +132,7 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
                 public void aMethod() {
                 }
 
-                // comment <-- FIXME: remove additional space in front of comment?
+                // comment
                 public void aMethod(Integer i) {
                 }
 
@@ -144,7 +140,7 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
                 }
             }
         """,
-            after = """
+        after = """
             package com.abc;
             class A {
 
@@ -158,7 +154,7 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
                 void aMethod() {
                 }
 
-                 // comment <-- FIXME: remove additional space in front of comment?
+                // comment
                 void aMethod(Integer i) {
                 }
 
@@ -170,9 +166,9 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
 
     @Test
     fun changeMethodAccessLevelOnMethodWithAlreadyCorrectAccessLevel(jp: JavaParser) = assertUnchanged(
-            jp,
-            recipe = ChangeMethodAccessLevel("com.abc.A aMethod(String)", "public"),
-            before = """
+        jp,
+        recipe = ChangeMethodAccessLevel("com.abc.A aMethod(String)", "public"),
+        before = """
             package com.abc;
             class A {
                 // comment

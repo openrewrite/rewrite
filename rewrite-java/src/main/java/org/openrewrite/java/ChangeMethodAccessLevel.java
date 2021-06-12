@@ -20,23 +20,23 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
+import org.openrewrite.Validated;
 import org.openrewrite.java.search.UsesMethod;
+import org.openrewrite.java.tree.J;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeMethodAccessLevel extends Recipe {
 
-    /**
-     * A method pattern, expressed as a pointcut expression, that is used to find matching method declarations/invocations.
-     * See {@link  MethodMatcher} for details on the expression's syntax.
-     */
     @Option(displayName = "Method pattern",
             description = "A method pattern, expressed as a pointcut expression, that is used to find matching method declarations/invocations.",
             example = "org.mockito.Matchers anyVararg()")
     String methodPattern;
 
     @Option(displayName = "New access level",
-            description = "New method access level to apply to the method.")
+            description = "New method access level to apply to the method.",
+            example = "public",
+            valid = {"private", "protected", "package", "public"})
     String newAccessLevel;
 
     @Override
@@ -46,7 +46,13 @@ public class ChangeMethodAccessLevel extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Change the access level (public, protected, private, package-private) of a method.";
+        return "Change the access level (public, protected, private, package private) of a method.";
+    }
+
+    @Override
+    public Validated validate() {
+        return super.validate().and(Validated.test("newAccessLevel", "Must be one of 'private', 'protected', 'package', 'public'",
+                newAccessLevel, level -> level.equals("private") || level.equals("protected") || level.equals("package") || level.equals("public")));
     }
 
     @Override
@@ -56,10 +62,21 @@ public class ChangeMethodAccessLevel extends Recipe {
 
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
-        return new ChangeMethodAccessLevelVisitor(
-                new MethodMatcher(methodPattern),
-                ChangeMethodAccessLevelVisitor.MethodAccessLevel.fromKeyword(newAccessLevel)
-        );
-    }
+        J.Modifier.Type type;
+        switch(newAccessLevel) {
+            case "public":
+                type = J.Modifier.Type.Public;
+                break;
+            case "protected":
+                type = J.Modifier.Type.Protected;
+                break;
+            case "private":
+                type = J.Modifier.Type.Private;
+                break;
+            default:
+                type = null;
+        }
 
+        return new ChangeMethodAccessLevelVisitor(new MethodMatcher(methodPattern), type);
+    }
 }
