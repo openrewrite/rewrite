@@ -18,23 +18,18 @@ package org.openrewrite.java.cleanup;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.Incubating;
-import org.openrewrite.Tree;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.AnnotationMatcher;
+import org.openrewrite.java.ChangeMethodAccessLevelVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.format.MinimumViableSpacingVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
-import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 
 /**
  * HideUtilityClassConstructorVisitor will perform the following operations on a Utility Class:
@@ -122,21 +117,15 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
         @Override
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
             J.MethodDeclaration md = super.visitMethodDeclaration(method, p);
-            if (md.isConstructor() && !(md.hasModifier(J.Modifier.Type.Private) || md.hasModifier(J.Modifier.Type.Protected))) {
-                // If visibility is Public, replace it with Private
-                md = md.withModifiers(
-                        ListUtils.map(md.getModifiers(), mod -> mod.getType() == J.Modifier.Type.Public ? mod.withType(J.Modifier.Type.Private) : mod)
-                );
-                // If visibility is Package-Private (no access modifier keyword), replace it with Private
-                if (!md.hasModifier(J.Modifier.Type.Private)) {
-                    J.Modifier mod = new J.Modifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, J.Modifier.Type.Private, Collections.emptyList());
-                    md = md.withModifiers(
-                            ListUtils.concat(md.getModifiers(), mod)
-                    );
-                    md = (J.MethodDeclaration) new MinimumViableSpacingVisitor<Integer>(
-                            md.getName()).visit(md, 0, getCursor());
-                }
+            if (!md.isConstructor() || (md.hasModifier(J.Modifier.Type.Private) || md.hasModifier(J.Modifier.Type.Protected))) {
+                return md;
             }
+
+            ChangeMethodAccessLevelVisitor<P> changeMethodAccessLevelVisitor = new ChangeMethodAccessLevelVisitor<>(
+                    new MethodMatcher(method),
+                    ChangeMethodAccessLevelVisitor.MethodAccessLevel.Private
+            );
+            md = (J.MethodDeclaration) changeMethodAccessLevelVisitor.visit(md, p, getCursor());
             return md;
         }
     }

@@ -84,6 +84,10 @@ public class MethodMatcher {
         }.visit(parser.methodPattern());
     }
 
+    public MethodMatcher(J.MethodDeclaration method) {
+        this(methodPattern(method));
+    }
+
     public boolean matches(@Nullable JavaType type) {
         if (!(type instanceof JavaType.Method)) {
             return false;
