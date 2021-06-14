@@ -17,4 +17,4 @@
 type: specs.openrewrite.org/v1beta/category
 name: XML
 packageName: org.openrewrite.xml
-description: Basic building blocks for transforming YAML.
+description: Basic building blocks for transforming XML.
