@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
@@ -166,9 +167,11 @@ interface CovariantEqualsTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/653")
     @Test
     fun replaceWithNonCovariantEqualsWhenNested(jp: JavaParser) = assertChanged(
         jp,
+        skipEnhancedTypeValidation = true,
         before = """
             class A {
                 class B {
