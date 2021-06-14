@@ -29,10 +29,12 @@ import org.openrewrite.properties.tree.Properties;
 public class ChangePropertyValue extends Recipe {
 
     @Option(displayName = "Property key",
+            description = "The name of the property key whose value is to be changed.",
             example = "management.metrics.binders.files.enabled")
     String propertyKey;
 
     @Option(displayName = "New value",
+            description = "The new value to be used for key specified by `propertyKey`.",
             example = "false")
     String newValue;
 

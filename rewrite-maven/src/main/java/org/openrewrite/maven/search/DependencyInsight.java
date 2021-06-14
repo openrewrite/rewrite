@@ -55,7 +55,8 @@ public class DependencyInsight extends Recipe {
 
     @Option(displayName = "Scope",
             description = "Match dependencies with the specified scope",
-            valid = {"compile", "test", "runtime", "provided"})
+            valid = {"compile", "test", "runtime", "provided"},
+            example = "compile")
     String scope;
 
     UUID searchId = randomId();

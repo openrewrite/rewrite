@@ -75,6 +75,7 @@ public class UpgradeDependencyVersion extends Recipe {
     @Option(displayName = "Trust parent POM",
             description = "Even if the parent suggests a version that is older than what we are trying to upgrade to, trust it anyway. " +
                     "Useful when you want to wait for the parent to catch up before upgrading. The parent is not trusted by default.",
+            example = "false",
             required = false)
     @Nullable
     Boolean trustParent;

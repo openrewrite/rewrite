@@ -37,7 +37,8 @@ public class AddLicenseHeader extends Recipe {
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
     @Option(displayName = "License text",
-            description = "The license header text without the block comment. May contain ${CURRENT_YEAR} property.")
+            description = "The license header text without the block comment. May contain ${CURRENT_YEAR} property.",
+            example = "Copyright ${CURRENT_YEAR} the original author or authors...")
     String licenseText;
 
     @Override

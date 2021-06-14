@@ -29,11 +29,13 @@ import org.openrewrite.xml.tree.Xml;
 public class ChangePropertyValue extends Recipe {
 
     @Option(displayName = "Key",
-            description = "Property key to change.")
+            description = "The name of the property key whose value is to be changed.",
+            example = "junit.version")
     String key;
 
     @Option(displayName = "Value",
-            description = "Value to apply to the matching property.")
+            description = "Value to apply to the matching property.",
+            example = "4.13")
     String newValue;
 
     @Override

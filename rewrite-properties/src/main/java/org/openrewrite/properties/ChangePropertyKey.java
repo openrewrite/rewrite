@@ -28,10 +28,12 @@ import org.openrewrite.properties.tree.Properties;
 public class ChangePropertyKey extends Recipe {
 
     @Option(displayName = "Old property key",
+            description = "The property key to rename.",
             example = "management.metrics.binders.files.enabled")
     String oldPropertyKey;
 
     @Option(displayName = "New property key",
+            description = "The new name for the key identified by `oldPropertyKey`.",
             example = "management.metrics.enable.process.files")
     String newPropertyKey;
 

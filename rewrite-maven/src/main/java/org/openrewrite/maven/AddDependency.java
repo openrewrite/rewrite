@@ -81,6 +81,7 @@ public class AddDependency extends Recipe {
     private String classifier;
 
     @Option(displayName = "Scope",
+            description = "The maven dependency scope to add the dependency to.",
             valid = {"compile", "test", "runtime", "provided"},
             example = "compile",
             required = false)
@@ -89,6 +90,7 @@ public class AddDependency extends Recipe {
     private String scope;
 
     @Option(displayName = "Type",
+            description = "The type of dependency to add. If omitted Maven defaults to assuming the type is \"jar\".",
             valid = {"jar", "pom"},
             example = "jar",
             required = false)

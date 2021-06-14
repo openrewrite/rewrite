@@ -32,6 +32,7 @@ public class ChangeKey extends Recipe {
     String oldKeyPath;
 
     @Option(displayName = "New key",
+            description = "The new name for the key selected by oldKeyPath.",
             example = "kind")
     String newKey;
 

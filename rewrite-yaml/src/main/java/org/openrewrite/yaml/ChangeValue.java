@@ -35,6 +35,7 @@ public class ChangeValue extends Recipe {
     String oldKeyPath;
 
     @Option(displayName = "New value",
+            description = "The new value to set for the key identified by oldKeyPath.",
             example = "Deployment")
     String value;
 
