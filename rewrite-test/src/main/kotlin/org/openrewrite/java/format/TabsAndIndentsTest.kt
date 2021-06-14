@@ -566,7 +566,7 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         after = """
             public class A {
                 /* this is a comment
-                   that extends onto another line */
+                that extends onto another line */
                 public void method() {}
             }
         """
@@ -645,7 +645,8 @@ interface TabsAndIndentsTest : JavaRecipeTest {
                  */
                 public void method() {}
             }
-        """
+        """,
+        expectedCyclesThatMakeChanges = 2
     )
 
     @Test
@@ -1496,7 +1497,7 @@ interface TabsAndIndentsTest : JavaRecipeTest {
     )
 
     @Test
-    fun formatComments(jp: JavaParser.Builder<*, *>) = assertChanged(
+    fun alignLineComments(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(tabsAndIndents()).build(),
         before = """
                     // shift left.
@@ -1574,6 +1575,109 @@ interface TabsAndIndentsTest : JavaRecipeTest {
                 }
                 // shift right at end of block.
                 // shift left at end of block.
+            }
+        """.trimIndent(),
+        expectedCyclesThatMakeChanges = 2
+    )
+
+    @Test
+    fun alignMultilineStyleCommentLeft(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(tabsAndIndents()).build(),
+        before = """
+                    /**
+                     * JavaDoc starts on 2nd line
+                     */
+            public class A {
+                    /** JavaDoc starts on first line.
+                     * @param value test value.
+                     * @return value + 1 */
+                    public int methodOne(int value) {
+                        return value + 1;
+                    }
+            
+                            /** Edge case odd formatting.
+              * @param value test value.
+                            * @return value + 1
+                                        */
+                    public int methodTwo(int value) {
+                        return value + 1;
+                    }
+            }
+        """.trimIndent(),
+        after = """
+            /**
+             * JavaDoc starts on 2nd line
+             */
+            public class A {
+                /** JavaDoc starts on first line.
+                 * @param value test value.
+                 * @return value + 1 */
+                public int methodOne(int value) {
+                    return value + 1;
+                }
+            
+                /** Edge case odd formatting.
+                 * @param value test value.
+                 * @return value + 1
+                 */
+                public int methodTwo(int value) {
+                    return value + 1;
+                }
+            }
+        """.trimIndent(),
+        expectedCyclesThatMakeChanges = 2
+    )
+
+    @Test
+    fun alignMultipleBlockCommentsOnOneLine(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(tabsAndIndents()).build(),
+        before = """
+            public class A {
+                public void method() {
+                            /* comment 1 */ /* comment 2 */ /* comment 3 */
+                }
+            }
+        """.trimIndent(),
+        after = """
+            public class A {
+                public void method() {
+                    /* comment 1 */ /* comment 2 */ /* comment 3 */
+                }
+            }
+        """.trimIndent()
+    )
+
+    @Test
+    fun alignMultipleBlockComments(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(tabsAndIndents()).build(),
+        before = """
+            public class A {
+            /* this comment should be left alone
+             since a line doesn't start with a * */
+            
+                /* this comment maintains the whitespace from the next `blank` line.
+                 
+               * should be formatted, since extra lines start with * 
+                    */
+            
+                    /* this comment
+                        * should be formatted, since extra lines start with * */
+            public void method() {}
+            }
+        """.trimIndent(),
+        after = """
+            public class A {
+                /* this comment should be left alone
+                since a line doesn't start with a * */
+            
+                /* this comment maintains the whitespace from the next `blank` line.
+                
+                 * should be formatted, since extra lines start with * 
+                 */
+            
+                /* this comment
+                 * should be formatted, since extra lines start with * */
+                public void method() {}
             }
         """.trimIndent(),
         expectedCyclesThatMakeChanges = 2
