@@ -219,6 +219,12 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         break;
                     }
                     case METHOD_INVOCATION_ARGUMENT:
+                        if (elem instanceof J.Lambda) {
+                            J.Lambda lambda = ((J.Lambda) elem);
+                            if (lambda.getBody() instanceof J.Block) {
+                                getCursor().getParentOrThrow().putMessage("lastIndent", indent + style.getContinuationIndent());
+                            }
+                        }
                         elem = visitAndCast(elem, p);
                         after = indentTo(right.getAfter(), indent, loc.getAfterLocation());
                         break;

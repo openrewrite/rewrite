@@ -188,7 +188,7 @@ interface TabsAndIndentsTest : JavaRecipeTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/660")
-    fun methodInvocationArgumentLambdaWithClosingBracketOnSameLineHasContinuationIndent(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+    fun methodInvocationLambdaBlockWithClosingBracketOnSameLineIndent(jp: JavaParser.Builder<*, *>) = assertUnchanged(
         jp.styles(tabsAndIndents { withContinuationIndent(8) }).build(),
         before = """
             class Test {
@@ -209,8 +209,8 @@ interface TabsAndIndentsTest : JavaRecipeTest {
     )
 
     @Test
-    @Disabled("https://github.com/openrewrite/rewrite/issues/660")
-    fun methodInvocationArgumentLambdaWithClosingBracketOnNewLineHasContinuationIndent(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+    @Issue("https://github.com/openrewrite/rewrite/issues/660")
+    fun methodInvocationLambdaBlockWithClosingBracketOnNewLineIndent(jp: JavaParser.Builder<*, *>) = assertUnchanged(
         jp.styles(tabsAndIndents { withContinuationIndent(8) }).build(),
         before = """
             class Test {
