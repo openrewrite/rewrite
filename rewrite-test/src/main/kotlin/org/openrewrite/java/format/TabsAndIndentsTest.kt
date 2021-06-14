@@ -186,6 +186,51 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         """
     )
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/660")
+    fun methodInvocationArgumentLambdaWithClosingBracketOnSameLineHasContinuationIndent(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.styles(tabsAndIndents { withContinuationIndent(8) }).build(),
+        before = """
+            class Test {
+                Test withData(Object... arg0) {
+                    return this;
+                }
+
+                void method(Test t, Collection<String> c) {
+                    t = t.withData(c.stream().map(a -> {
+                        if (!a.isEmpty()) {
+                            return a.toLowerCase();
+                        }
+                        return a;
+                    }));
+                }
+            }
+        """
+    )
+
+    @Test
+    @Disabled("https://github.com/openrewrite/rewrite/issues/660")
+    fun methodInvocationArgumentLambdaWithClosingBracketOnNewLineHasContinuationIndent(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.styles(tabsAndIndents { withContinuationIndent(8) }).build(),
+        before = """
+            class Test {
+                Test withData(Object... arg0) {
+                    return this;
+                }
+
+                void method(Test t, Collection<String> c) {
+                    t = t.withData(c.stream().map(a -> {
+                                if (!a.isEmpty()) {
+                                    return a.toLowerCase();
+                                }
+                                return a;
+                            }
+                    ));
+                }
+            }
+        """
+    )
+
     /**
      * Slight renaming but structurally the same as IntelliJ's code style view.
      */
