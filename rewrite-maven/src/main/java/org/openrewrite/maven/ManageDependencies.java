@@ -71,6 +71,7 @@ public class ManageDependencies extends Recipe {
     @Option(displayName = "Version",
             description = "Version to use for the dependency in dependency management. " +
                     "Defaults to the existing version found on the matching dependency.",
+            example = "1.0.0",
             required = false)
     @Nullable
     String version;

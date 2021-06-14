@@ -27,7 +27,9 @@ import org.openrewrite.xml.tree.Xml;
 @EqualsAndHashCode(callSuper = true)
 public class RemoveProperty extends Recipe {
 
-    @Option(displayName = "Property name", description = "Name of property to remove.")
+    @Option(displayName = "Property name",
+            description = "Name of property to remove.",
+            example = "junit.version")
     String propertyName;
 
     @Override

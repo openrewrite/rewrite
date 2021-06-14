@@ -53,12 +53,14 @@ public class AddPlugin extends Recipe {
 
     @Option(displayName = "Configuration",
             description = "Optional plugin configuration provided as raw XML",
+            example = "<configuration><foo>foo</foo></configuration>",
             required = false)
     @Nullable
     String configuration;
 
     @Option(displayName = "Dependencies",
             description = "Optional plugin dependencies provided as raw XML.",
+            example = "<dependencies><dependency><groupId>com.yourorg</groupId><artifactId>core-lib</artifactId><version>1.0.0</version></dependency></dependencies>",
             required = false)
     @Nullable
     String dependencies;

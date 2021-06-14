@@ -67,6 +67,7 @@ public class AddDependency extends Recipe {
 
     @Option(displayName = "Releases only",
             description = "Whether to exclude snapshots from consideration.",
+            example = "true",
             required = false)
     @With
     private boolean releasesOnly = true;
@@ -81,6 +82,7 @@ public class AddDependency extends Recipe {
 
     @Option(displayName = "Scope",
             valid = {"compile", "test", "runtime", "provided"},
+            example = "compile",
             required = false)
     @Nullable
     @With
@@ -88,6 +90,7 @@ public class AddDependency extends Recipe {
 
     @Option(displayName = "Type",
             valid = {"jar", "pom"},
+            example = "jar",
             required = false)
     @Nullable
     @With

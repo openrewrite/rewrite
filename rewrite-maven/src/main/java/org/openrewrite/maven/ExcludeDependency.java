@@ -45,6 +45,7 @@ public class ExcludeDependency extends Recipe {
             description = "Match dependencies with the specified scope. If you specify `compile`, this will NOT match dependencies in `runtime`. " +
                 "The purpose of this is to be able to exclude dependencies that should be in a higher scope, e.g. a compile dependency that should be a test dependency.",
             valid = {"compile", "test", "runtime", "provided"},
+            example = "compile",
             required = false)
     @Nullable
     String scope;

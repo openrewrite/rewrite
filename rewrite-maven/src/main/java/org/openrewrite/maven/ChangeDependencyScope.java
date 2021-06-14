@@ -50,6 +50,7 @@ public class ChangeDependencyScope extends Recipe {
             description = "Scope to apply to specified Maven dependency. " +
                     "May be omitted, which indicates that no scope should be added and any existing scope be removed from the dependency.",
             valid = {"compile", "test", "runtime", "provided"},
+            example = "compile",
             required = false)
     @Nullable
     String newScope;
