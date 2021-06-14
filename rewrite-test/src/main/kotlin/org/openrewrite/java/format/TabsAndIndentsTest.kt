@@ -1682,4 +1682,34 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         """.trimIndent(),
         expectedCyclesThatMakeChanges = 2
     )
+
+    @Test
+    fun alignTryCatchFinally(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.styles(tabsAndIndents()).build(),
+        before = """
+            public class Test {
+                public void method() {
+                    // inline try, catch, finally.
+                    try {
+            
+                    } catch (Exception ex) {
+            
+                    } finally {
+            
+                    }
+            
+                    // new line try, catch, finally.
+                    try {
+            
+                    }
+                    catch (Exception ex) {
+            
+                    }
+                    finally {
+            
+                    }
+                }
+            }
+        """.trimIndent()
+    )
 }

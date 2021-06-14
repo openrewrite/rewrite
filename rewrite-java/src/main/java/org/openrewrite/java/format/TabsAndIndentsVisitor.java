@@ -18,7 +18,6 @@ package org.openrewrite.java.format;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
@@ -140,6 +139,8 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         // block spaces are always aligned to their parent
         boolean alignBlockToParent = loc.equals(Space.Location.BLOCK_END) ||
                 loc.equals(Space.Location.NEW_ARRAY_INITIALIZER_SUFFIX) ||
+                loc.equals(Space.Location.CATCH_PREFIX) ||
+                loc.equals(Space.Location.TRY_FINALLY) ||
                 loc.equals(Space.Location.ELSE_PREFIX);
 
         if (alignBlockToParent || alignToAnnotation) {
