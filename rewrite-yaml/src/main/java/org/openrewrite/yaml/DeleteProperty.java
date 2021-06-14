@@ -41,7 +41,8 @@ public class DeleteProperty extends Recipe {
     String propertyKey;
 
     @Option(displayName = "Coalesce",
-            description = "Simplify nested map hierarchies into their simplest dot separated property form.")
+            description = "Simplify nested map hierarchies into their simplest dot separated property form.",
+            example = "true")
     Boolean coalesce;
 
     @Override

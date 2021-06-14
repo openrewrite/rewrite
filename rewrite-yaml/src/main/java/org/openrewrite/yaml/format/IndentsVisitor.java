@@ -22,7 +22,6 @@ import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.style.IndentsStyle;
 import org.openrewrite.yaml.tree.Yaml;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 

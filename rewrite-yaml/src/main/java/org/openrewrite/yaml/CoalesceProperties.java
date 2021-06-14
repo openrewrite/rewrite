@@ -18,11 +18,6 @@ package org.openrewrite.yaml;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.yaml.search.FindIndentYamlVisitor;
-import org.openrewrite.yaml.tree.Yaml;
-
-import java.util.ArrayList;
-import java.util.List;
 
 public class CoalesceProperties extends Recipe {
 
