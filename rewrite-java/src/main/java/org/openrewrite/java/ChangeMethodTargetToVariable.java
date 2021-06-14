@@ -45,11 +45,14 @@ public class ChangeMethodTargetToVariable extends Recipe {
             example = "org.mycorp.A method(..)")
     String methodPattern;
 
-    @Option(displayName = "Variable name", description = "Name of variable to use as target for the modified method invocation.")
+    @Option(displayName = "Variable name",
+            description = "Name of variable to use as target for the modified method invocation.",
+            example = "foo")
     String variableName;
 
     @Option(displayName = "Variable type",
-            description = "Type attribution to use for the return type of the modified method invocation.")
+            description = "Type attribution to use for the return type of the modified method invocation.",
+            example = "java.lang.String")
     String variableType;
 
     @Override

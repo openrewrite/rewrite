@@ -27,7 +27,9 @@ import org.openrewrite.java.tree.TypeUtils;
 @EqualsAndHashCode(callSuper = true)
 public class GenerateGetter extends Recipe {
 
-    @Option(displayName = "Field name", description = "Name of field to generate getter for.")
+    @Option(displayName = "Field name",
+            description = "Name of field to generate getter for.",
+            example = "foo")
     String fieldName;
 
     @Override

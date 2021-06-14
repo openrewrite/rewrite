@@ -42,13 +42,17 @@ public class ChangeType extends Recipe {
     /**
      * Fully-qualified class name of the original type.
      */
-    @Option(displayName = "Old fully-qualified type name", description = "Fully-qualified class name of the original type.")
+    @Option(displayName = "Old fully-qualified type name",
+            description = "Fully-qualified class name of the original type.",
+            example = "org.junit.Assume")
     String oldFullyQualifiedTypeName;
 
     /**
      * Fully-qualified class name of the replacement type, the replacement type can also defined as a primitive.
      */
-    @Option(displayName = "New fully-qualified type name", description = "Fully-qualified class name of the replacement type, the replacement type can also defined as a primitive.")
+    @Option(displayName = "New fully-qualified type name",
+            description = "Fully-qualified class name of the replacement type, or the name of a primitive such as \"int\".",
+            example = "org.junit.jupiter.api.Assumptions")
     String newFullyQualifiedTypeName;
 
     @Override

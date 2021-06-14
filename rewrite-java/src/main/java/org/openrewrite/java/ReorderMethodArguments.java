@@ -19,9 +19,8 @@ import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
 import org.openrewrite.Option;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
@@ -45,20 +44,27 @@ public class ReorderMethodArguments extends Recipe {
      * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
-    @Option(displayName = "Method pattern", description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.")
+    @Option(displayName = "Method pattern",
+            description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.",
+            example = "com.yourorg.A foo(String, Integer, Integer)")
     String methodPattern;
 
     /**
      * An array of parameter names that indicates the new order in which those arguments should be arranged.
      */
-    @Option(displayName = "New parameter names", description = "An array of parameter names that indicates the new order in which those arguments should be arranged.")
+    @Option(displayName = "New parameter names",
+            description = "An array of parameter names that indicates the new order in which those arguments should be arranged.",
+            example = "[foo, bar, baz]")
     String[] newParameterNames;
 
     /**
      * If the original method signature is not type-attributed, this is an optional list that indicates the original order
      * in which the arguments were arranged.
      */
-    @Option(displayName = "Old parameter names", description = "If the original method signature is not type-attributed, this is an optional list that indicates the original order in which the arguments were arranged.", required = false)
+    @Option(displayName = "Old parameter names",
+            description = "If the original method signature is not type-attributed, this is an optional list that indicates the original order in which the arguments were arranged.",
+            required = false,
+            example = "[baz, bar, foo]")
     @Nullable
     String[] oldParameterNames;
 

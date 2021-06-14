@@ -46,17 +46,20 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(callSuper = true)
 public class ChangePackage extends Recipe {
     @Option(displayName = "Old package name",
-            description = "The package name to replace.")
+            description = "The package name to replace.",
+            example = "com.yourorg.foo")
     String oldPackageName;
 
     @Option(displayName = "New package name",
-            description = "New package name to replace the old package name with.")
+            description = "New package name to replace the old package name with.",
+            example = "com.yourorg.bar")
     String newPackageName;
 
     @With
     @Option(displayName = "Recursive",
             description = "Recursively change subpackage names",
-            required = false)
+            required = false,
+            example = "true")
     @Nullable
     Boolean recursive;
 
