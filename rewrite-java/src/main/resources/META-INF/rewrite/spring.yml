@@ -15,7 +15,7 @@
 #
 
 type: specs.openrewrite.org/v1beta/style
-name: org.openrewrite.java.SpringFormatV2
+name: org.openrewrite.java.SpringFormat
 displayName: Spring format
 styleConfigs:
   - org.openrewrite.java.style.ImportLayoutStyle:
@@ -33,7 +33,28 @@ styleConfigs:
         - import static all other imports
   - org.openrewrite.java.style.TabsAndIndentsStyle:
       useTabCharacter: true
-      tabSize: 1
+      tabSize: 4
       indentSize: 1
       continuationIndent: 2
       indentsRelativeToExpressionStart: false
+#  - org.openrewrite.java.style.DeclarationOrderStyle:
+#      layout:
+#        - public static fields
+#        - <blank line>
+#        - private static fields
+#        - <blank line>
+#        - final fields
+#        - <blank line>
+#        - all other fields
+#        - <blank line>
+#        - all other constructors
+#        - <blank line>
+#        - all other methods
+#        - all accessors
+#  #        - all getters
+#  #        - all setters
+#  #        - all with
+#        - equals
+#        - hashCode
+#        - toString
+#        - all other classes
