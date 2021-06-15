@@ -26,6 +26,11 @@ public class RemoveTrailingWhitespace extends Recipe {
     }
 
     @Override
+    public String getDescription() {
+        return "Remove any extra trailing whitespace from the end of each line.";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new RemoveTrailingWhitespaceVisitor<>();
     }
