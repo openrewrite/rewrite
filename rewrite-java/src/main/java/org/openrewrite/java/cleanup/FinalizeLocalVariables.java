@@ -29,6 +29,11 @@ public class FinalizeLocalVariables extends Recipe {
     }
 
     @Override
+    public String getDescription() {
+        return "Adds the `final` modifier keyword to local variables which are not reassigned.";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new FinalizeLocalVariablesVisitor<>();
     }
