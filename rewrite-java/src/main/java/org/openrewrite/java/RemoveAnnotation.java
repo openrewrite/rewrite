@@ -53,7 +53,7 @@ public class RemoveAnnotation extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Remove matching annotations wherever they occur";
+        return "Remove matching annotations wherever they occur.";
     }
 
     @Override
