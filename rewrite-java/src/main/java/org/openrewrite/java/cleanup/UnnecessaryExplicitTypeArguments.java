@@ -33,7 +33,7 @@ public class UnnecessaryExplicitTypeArguments extends Recipe {
 
     @Override
     public String getDescription() {
-        return "When explicit type arguments on are inferable by the compiler, they may be removed.";
+        return "When explicit type arguments are inferrable by the compiler, they may be removed.";
     }
 
     @Override
