@@ -48,7 +48,7 @@ public class AddLicenseHeader extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Adds license headers to Java source files when missing. Does not override existing license headers";
+        return "Adds license headers to Java source files when missing. Does not override existing license headers.";
     }
 
     @Override
