@@ -25,13 +25,14 @@ class MavenArtifactHelperIntegTest {
 
     @Test
     fun downloadArtifactAndDependencies() {
-        val artifactPaths = MavenArtifactHelper.downloadArtifactAndDependencies(
+        val dependencyData = MavenArtifactHelper.downloadArtifactAndDependencies(
                 "org.openrewrite.recipe",
                 "rewrite-spring",
                 "4.0.0",
                 InMemoryExecutionContext { t -> t.printStackTrace() },
                 InMemoryMavenPomCache()
         )
+        val artifactPaths = dependencyData.artifactClasspath
         assertThat(artifactPaths).hasSizeGreaterThan(0)
         val firstArtifact = artifactPaths[0]
         assertThat(firstArtifact.fileName.toString()).contains("rewrite-spring")
