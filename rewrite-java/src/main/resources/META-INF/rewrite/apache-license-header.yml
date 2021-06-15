@@ -16,7 +16,8 @@
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.java.AddApache2LicenseHeader
-displayName: Add ASLv2 license header.
+displayName: Add ASLv2 license header
+description: Adds the Apache Software License Version 2.0 to Java source files which are missing a license header.
 tags:
   - oss
 recipeList:
