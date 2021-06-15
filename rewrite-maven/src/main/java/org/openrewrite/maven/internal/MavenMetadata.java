@@ -40,7 +40,7 @@ public class MavenMetadata {
         }
     };
 
-    public static final MavenMetadata EMPTY = new MavenMetadata(new MavenMetadata.Versioning(emptyList(), null));
+    public static final MavenMetadata EMPTY = new MavenMetadata(new MavenMetadata.Versioning(emptyList(), emptyList(), null));
 
     Versioning versioning;
 
@@ -51,15 +51,21 @@ public class MavenMetadata {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Getter
     public static class Versioning {
+
         List<String> versions;
+
+        @Nullable
+        List<SnapshotVersion> snapshotVersions;
 
         @Nullable
         Snapshot snapshot;
 
         public Versioning(
                 @JacksonXmlElementWrapper(localName = "versions") List<String> versions,
+                @Nullable List<SnapshotVersion> snapshotVersions,
                 @Nullable Snapshot snapshot) {
             this.versions = versions;
+            this.snapshotVersions = snapshotVersions;
             this.snapshot = snapshot;
         }
     }
@@ -77,5 +83,13 @@ public class MavenMetadata {
     public static class Snapshot {
         String timestamp;
         String buildNumber;
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Data
+    public static class SnapshotVersion {
+        String extension;
+        String value;
+        String updated;
     }
 }

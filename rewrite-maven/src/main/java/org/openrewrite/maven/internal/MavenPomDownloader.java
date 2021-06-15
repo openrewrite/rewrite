@@ -118,6 +118,8 @@ public class MavenPomDownloader {
                         return new MavenMetadata(new MavenMetadata.Versioning(
                                 Stream.concat(m1.getVersioning().getVersions().stream(),
                                         m2.getVersioning().getVersions().stream()).collect(toList()),
+                                Stream.concat(m1.getVersioning().getSnapshotVersions() == null ? Stream.empty() : m1.getVersioning().getSnapshotVersions().stream(),
+                                        m2.getVersioning().getSnapshotVersions() == null ? Stream.empty() : m2.getVersioning().getSnapshotVersions().stream()).collect(toList()),
                                 null
                         ));
                     }
@@ -172,7 +174,7 @@ public class MavenPomDownloader {
                              ExecutionContext ctx) {
         Map<MavenRepository, Exception> errors = new HashMap<>();
 
-        String versionMaybeDatedSnapshot = findDatedSnapshotVersionIfNecessary(groupId, artifactId, version, repositories);
+        String versionMaybeDatedSnapshot = datedSnapshotVersion(groupId, artifactId, version, repositories);
         if (versionMaybeDatedSnapshot == null) {
             return null;
         }
@@ -283,7 +285,7 @@ public class MavenPomDownloader {
     }
 
     @Nullable
-    private String findDatedSnapshotVersionIfNecessary(String groupId, String artifactId, String version, Collection<MavenRepository> repositories) {
+    public String datedSnapshotVersion(String groupId, String artifactId, String version, Collection<MavenRepository> repositories) {
         if (version.endsWith("-SNAPSHOT")) {
             MavenMetadata mavenMetadata = repositories.stream()
                     .map(this::normalizeRepository)
