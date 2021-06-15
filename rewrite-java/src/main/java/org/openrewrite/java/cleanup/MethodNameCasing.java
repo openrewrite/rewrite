@@ -33,7 +33,7 @@ public class MethodNameCasing extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Method names should comply with a naming convention";
+        return "Method names should comply with a naming convention.";
     }
 
     @Override
