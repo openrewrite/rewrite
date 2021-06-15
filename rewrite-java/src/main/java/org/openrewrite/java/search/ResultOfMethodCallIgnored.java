@@ -44,6 +44,11 @@ public class ResultOfMethodCallIgnored extends Recipe {
     }
 
     @Override
+    public String getDescription() {
+        return "Find locations where the result of the method call is being ignored.";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
         return new JavaIsoVisitor<ExecutionContext>() {
