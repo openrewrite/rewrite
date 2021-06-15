@@ -1496,6 +1496,7 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         """.trimIndent()
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/642")
     @Test
     fun alignLineComments(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(tabsAndIndents()).build(),
@@ -1580,6 +1581,7 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         expectedCyclesThatMakeChanges = 2
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/659")
     @Test
     fun alignMultilineStyleCommentLeft(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(tabsAndIndents()).build(),
@@ -1628,6 +1630,7 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         expectedCyclesThatMakeChanges = 2
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/659")
     @Test
     fun alignMultipleBlockCommentsOnOneLine(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(tabsAndIndents()).build(),
@@ -1647,6 +1650,7 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         """.trimIndent()
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/659")
     @Test
     fun alignMultipleBlockComments(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(tabsAndIndents()).build(),
@@ -1683,6 +1687,7 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         expectedCyclesThatMakeChanges = 2
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/641")
     @Test
     fun alignTryCatchFinally(jp: JavaParser.Builder<*, *>) = assertUnchanged(
         jp.styles(tabsAndIndents()).build(),
@@ -1707,6 +1712,71 @@ interface TabsAndIndentsTest : JavaRecipeTest {
                     }
                     finally {
             
+                    }
+                }
+            }
+        """.trimIndent()
+    )
+
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/663")
+    @Test
+    fun preVisitAlignmentConditions(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        recipe = AutoFormat(),
+        before = """
+            public class Test {
+                // Practice A.
+                public void methodA()
+                {
+                    for (int i = 0; i < 10; ++i)
+                    {
+                        if (i % 2 == 0)
+                        {
+                            try
+                            {
+                                Integer value = Integer.valueOf("100");
+                            } catch (Exception ex)
+                            {
+                                throw new RuntimeException();
+                            } finally
+                            {
+                                System.out.println("out");
+                            }
+                        }
+                    }
+                }
+            
+                // Practice B.
+                public void methodB() {
+                    for (int i = 0; i < 10; ++i) {
+                        if (i % 2 == 0) {
+                            try {
+                                Integer value = Integer.valueOf("100");
+                            } catch (Exception ex) {
+                                throw new RuntimeException();
+                            } finally {
+                                System.out.println("out");
+                            }
+                        }
+                    }
+                }
+            
+                // How IntelliJ formats arguments on new lines.
+                public void methodB
+                        () { // We do this now, but it'll break after the changes.
+                    for
+                    (int i = 0; i < 10; ++i) {
+                        if
+                        (i % 2 == 0) {
+                            try {
+                                Integer value = Integer.valueOf("123");
+                            } catch
+                            (Exception ex) {
+                                throw new RuntimeException();
+                            } finally {
+                                System.out.println("out");
+                            }
+                        }
                     }
                 }
             }
