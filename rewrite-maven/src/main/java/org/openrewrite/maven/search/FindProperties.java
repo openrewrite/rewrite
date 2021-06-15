@@ -49,6 +49,11 @@ public class FindProperties extends Recipe {
     }
 
     @Override
+    public String getDescription() {
+        return "Finds the specified Maven project properties within a pom.xml.";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         Pattern propertyMatcher = Pattern.compile(propertyPattern.replace(".", "\\.")
                 .replace("*", ".*"));

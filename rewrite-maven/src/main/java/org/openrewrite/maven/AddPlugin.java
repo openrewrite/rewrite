@@ -71,6 +71,11 @@ public class AddPlugin extends Recipe {
     }
 
     @Override
+    public String getDescription() {
+        return "Add the specified Maven plugin to the pom.xml.";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new AddPluginVisitor();
     }

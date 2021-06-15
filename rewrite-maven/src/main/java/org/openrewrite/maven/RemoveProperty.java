@@ -28,13 +28,18 @@ import org.openrewrite.xml.tree.Xml;
 public class RemoveProperty extends Recipe {
 
     @Option(displayName = "Property name",
-            description = "Name of property to remove.",
+            description = "Key name of the property to remove.",
             example = "junit.version")
     String propertyName;
 
     @Override
     public String getDisplayName() {
-        return "Remove a Maven project property";
+        return "Remove Maven project property";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Removes the specified Maven project property from the pom.xml.";
     }
 
     @Override

@@ -133,6 +133,11 @@ public class AddDependency extends Recipe {
     }
 
     @Override
+    public String getDescription() {
+        return "Add the specified Maven dependency to the pom.xml.";
+    }
+
+    @Override
     protected @Nullable TreeVisitor<?, ExecutionContext> getApplicableTest() {
         if (onlyIfUsing != null) {
             return new JavaIsoVisitor<ExecutionContext>() {

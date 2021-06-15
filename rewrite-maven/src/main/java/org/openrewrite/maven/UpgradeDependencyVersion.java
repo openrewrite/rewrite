@@ -40,7 +40,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 
 /**
- * Upgrade the version a group or group and artifact using Node Semver
+ * Upgrade the version of a dependency by specifying a group or group and artifact using Node Semver
  * <a href="https://github.com/npm/node-semver#advanced-range-syntax">advanced range selectors</a>, allowing
  * more precise control over version updates to patch or minor releases.
  */
@@ -97,8 +97,8 @@ public class UpgradeDependencyVersion extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Upgrade the version a group or group and artifact using Node Semver advanced range selectors, " +
-                "allowing more precise control over version updates to patch or minor releases.";
+        return "Upgrade the version of a dependency by specifying a group or group and artifact using Node Semver " +
+                "advanced range selectors, allowing more precise control over version updates to patch or minor releases.";
     }
 
     @Override

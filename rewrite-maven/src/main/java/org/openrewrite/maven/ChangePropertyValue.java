@@ -40,7 +40,12 @@ public class ChangePropertyValue extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Change a Maven project property value";
+        return "Change Maven project property value";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Changes the specified Maven project property value leaving the key intact.";
     }
 
     @Override
