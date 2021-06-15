@@ -1358,10 +1358,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>();
 
         for (int i = 0; i < nodes.size(); i++) {
-            VariableTree n = nodes.get(i);
+            JCVariableDecl n = (JCVariableDecl) nodes.get(i);
 
+            boolean implicitlyTyped = skipIfPresent("var");
             Space namedVarPrefix = sourceBefore(n.getName().toString());
-            JCVariableDecl vd = (JCVariableDecl) n;
 
             J.Identifier name = J.Identifier.build(randomId(), EMPTY, Markers.EMPTY, n.getName().toString(), type(node));
             List<JLeftPadded<Space>> dimensionsAfterName = dimensions.get();
@@ -1371,8 +1371,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                             new J.VariableDeclarations.NamedVariable(randomId(), namedVarPrefix, Markers.EMPTY,
                                     name,
                                     dimensionsAfterName,
-                                    vd.init != null ? padLeft(sourceBefore("="), convertOrNull(vd.init)) : null,
-                                    type(n)
+                                    n.init != null ? padLeft(sourceBefore("="), convertOrNull(n.init)) : null,
+                                    type(n),
+                                    implicitlyTyped
                             ),
                             i == nodes.size() - 1 ? EMPTY : sourceBefore(",")
                     )
@@ -1951,6 +1952,20 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         if (source.startsWith(token, cursor))
             cursor += token.length();
         return token;
+    }
+
+    /**
+     * Advances the cursor if the current cursor position starts with the given token.
+     *
+     * @param token Token to skip
+     * @return true if the token is found, otherwise false.
+     */
+    private boolean skipIfPresent(String token) {
+        if (source.startsWith(token, cursor)) {
+            cursor += token.length();
+            return true;
+        }
+        return false;
     }
 
     // Only exists as a function to make it easier to debug unexpected cursor shifts

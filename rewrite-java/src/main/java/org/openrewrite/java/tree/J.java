@@ -4829,6 +4829,9 @@ public interface J extends Serializable, Tree {
             @Getter
             JavaType type;
 
+            @Getter
+            boolean implicitlyTyped;
+
             public String getSimpleName() {
                 return name.getSimpleName();
             }
@@ -4873,7 +4876,7 @@ public interface J extends Serializable, Tree {
                 }
 
                 public NamedVariable withInitializer(@Nullable JLeftPadded<Expression> initializer) {
-                    return t.initializer == initializer ? t : new NamedVariable(t.id, t.prefix, t.markers, t.name, t.dimensionsAfterName, initializer, t.type);
+                    return t.initializer == initializer ? t : new NamedVariable(t.id, t.prefix, t.markers, t.name, t.dimensionsAfterName, initializer, t.type, t.implicitlyTyped);
                 }
             }
         }
