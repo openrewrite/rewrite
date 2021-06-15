@@ -217,6 +217,15 @@ public class JavaTemplate {
             }
 
             @Override
+            public J visitIdentifier(J.Identifier ident, Integer p) {
+                if (loc.equals(IDENTIFIER_PREFIX) && ident.isScope(insertionPoint)) {
+                    J gen = substitutions.unsubstitute(templateParser.parseExpression(substitutedTemplate));
+                    return autoFormat(gen.withPrefix(ident.getPrefix()), p, getCursor().getParentOrThrow());
+                }
+                return super.visitIdentifier(ident, p);
+            }
+
+            @Override
             public J visitMethodDeclaration(J.MethodDeclaration method, Integer p) {
                 if (method.isScope(insertionPoint)) {
                     switch (loc) {

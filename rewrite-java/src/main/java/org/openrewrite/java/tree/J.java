@@ -2041,6 +2041,10 @@ public interface J extends Serializable, Tree {
             return build(id, prefix, markers, identifier.getSimpleName(), getType(), getFieldType());
         }
 
+        public Coordinates.Identifier getCoordinates() {
+            return new Coordinates.Identifier(this);
+        }
+
         public static Identifier build(UUID id,
                                        Space prefix,
                                        Markers markers,

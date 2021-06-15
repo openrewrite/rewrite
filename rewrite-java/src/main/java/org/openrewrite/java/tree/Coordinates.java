@@ -120,6 +120,16 @@ public abstract class Coordinates {
         }
     }
 
+    public static class Identifier extends Coordinates {
+        Identifier(J.Identifier tree) {
+            super(tree);
+        }
+
+        public JavaCoordinates replace() {
+            return replace(Space.Location.IDENTIFIER_PREFIX);
+        }
+    }
+
     public static class MethodDeclaration extends Statement {
         MethodDeclaration(J.MethodDeclaration tree) {
             super(tree);

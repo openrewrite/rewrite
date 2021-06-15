@@ -390,6 +390,48 @@ interface JavaTemplateTest : JavaRecipeTest {
     )
 
     @Test
+    fun replaceIdentifier(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaVisitor<ExecutionContext>() {
+            val t = template("exampleField1")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitIdentifier(ident: J.Identifier, p: ExecutionContext): J {
+                if (ident.simpleName == "exampleField0") {
+                    return ident.withTemplate(t, ident.coordinates.replace())
+                }
+                return super.visitIdentifier(ident, p)
+            }
+        }.toRecipe(),
+        dependsOn = arrayOf("""
+            package org.openrewrite.example;
+
+            public class Example {
+                public static int exampleField0 = 0;
+            }
+        """.trimIndent()),
+        before = """
+            package org.openrewrite.example;
+
+            public class Test {
+                public static void method() {
+                    int example = Example.exampleField0;
+                }
+            }
+        """,
+        after = """
+            package org.openrewrite.example;
+
+            public class Test {
+                public static void method() {
+                    int example = Example.exampleField1;
+                }
+            }
+        """
+    )
+
+    @Test
     fun replaceSingleStatement(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaVisitor<ExecutionContext>() {
