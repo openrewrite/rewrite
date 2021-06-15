@@ -33,18 +33,27 @@ interface VariableDeclarationsTest : JavaTreeTest {
     )
 
     @Test
-    fun implicitlyDeclaredLocalVariable(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, Block, """
-            var a = "";
-            var/* comment */b = "";
-            /*comment*/var c = "";
-            var     d = "";
-            long /* yep */ i /* comments */, /*everywhere*/ j; 
-        """
-    )
+    fun implicitlyDeclaredLocalVariable(jp: JavaParser) {
+        if (jp.majorJavaVersion < 10) {
+            return
+        }
+
+        assertParsePrintAndProcess(
+            jp, Block, """
+                var a = "";
+                var/* comment */b = "";
+                /*comment*/var c = "";
+                var     d = "";
+                long /* yep */ i /* comments */, /*everywhere*/ j; 
+            """
+        )
+    }
 
     @Test
     fun implicitlyDeclaredLocalAstValidation(jp: JavaParser) {
+        if (jp.majorJavaVersion < 10) {
+            return
+        }
         val statements = (jp.parse("""
             import java.util.Date;
             public class Sample {

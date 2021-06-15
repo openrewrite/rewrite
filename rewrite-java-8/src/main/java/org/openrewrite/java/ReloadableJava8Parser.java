@@ -135,6 +135,11 @@ class ReloadableJava8Parser implements JavaParser {
     }
 
     @Override
+    public int getMajorJavaVersion() {
+        return 8;
+    }
+
+    @Override
     public List<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         if (classpath != null) { // override classpath
             if (context.get(JavaFileManager.class) != pfm) {

@@ -140,6 +140,11 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
      */
     void setClasspath(Collection<Path> classpath);
 
+    /**
+     * @return The major version of the Java language that the parser supports.
+     */
+    int getMajorJavaVersion();
+
     @SuppressWarnings("unchecked")
     abstract class Builder<P extends JavaParser, B extends Builder<P, B>> {
         @Nullable
