@@ -16,7 +16,9 @@
 package org.openrewrite.maven.utilities;
 
 import lombok.Value;
+import org.jetbrains.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.LocalMavenArtifactCache;
 import org.openrewrite.maven.cache.MavenArtifactCache;
@@ -28,7 +30,6 @@ import org.openrewrite.maven.internal.RawMaven;
 import org.openrewrite.maven.internal.RawMavenResolver;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.LatestRelease;
-import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
@@ -39,7 +40,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
@@ -87,11 +87,47 @@ public class MavenArtifactHelper {
      * @param ctx Execution context
      * @param mavenPomCache Pom download cache
      * @param repositories Maven repositories to download from
-     * @param path Path of local Maven cache
+     * @param localArtifactCachePath Path of local Maven cache
      * @return List of paths to downloaded artifacts
      */
-    public static List<Path> downloadArtifactAndDependencies(String groupId, String artifactId, String version, ExecutionContext ctx, MavenPomCache mavenPomCache, List<MavenRepository> repositories, Path path) {
-        return downloadArtifactAndDependenciesInternal(groupId, artifactId, version, ctx, mavenPomCache, repositories, new LocalMavenArtifactCache(path));
+    public static List<Path> downloadArtifactAndDependencies(String groupId, String artifactId, String version, ExecutionContext ctx, MavenPomCache mavenPomCache, List<MavenRepository> repositories, Path localArtifactCachePath) {
+        return downloadArtifactAndDependenciesInternal(groupId, artifactId, version, ctx, mavenPomCache, repositories, new LocalMavenArtifactCache(localArtifactCachePath));
+    }
+
+    /**
+     * Download the specific artifact, but not its dependencies
+     * @param groupId Group ID
+     * @param artifactId Artifact ID
+     * @param version Version
+     * @param mavenPomCache Pom download cache
+     * @param mavenRepositories Maven repositories to download from
+     * @param localArtifactCachePath Path to local artifact cache
+     * @return Path to downloaded artifact, null if it couldn't be downloaded
+     */
+    @Nullable
+    public static Path downloadArtifact(String groupId, String artifactId, String version, MavenPomCache mavenPomCache, List<MavenRepository> mavenRepositories, Path localArtifactCachePath) {
+        LocalMavenArtifactCache cache = new LocalMavenArtifactCache(localArtifactCachePath);
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        MavenArtifactDownloader mavenArtifactDownloader = new MavenArtifactDownloader(cache, null, ctx.getOnError());
+        MavenPomDownloader pomDownloader = new MavenPomDownloader(mavenPomCache, emptyMap(), ctx);
+        String exactVersion = getExactVersion(groupId, artifactId, version, ctx, mavenRepositories);
+        Path pomPath = null;
+        for (int i = 0; i < mavenRepositories.size() && pomPath == null; i++) {
+            MavenRepository mavenRepository = mavenRepositories.get(i);
+            RawMaven rawMaven = pomDownloader.download(groupId, artifactId, exactVersion, null, null, mavenRepositories, ctx);
+            if (rawMaven == null) {
+                continue;
+            }
+            Xml.Document xml = new RawMavenResolver(pomDownloader, emptyList(), false, ctx, null).resolve(rawMaven, new HashMap<>());
+            if (xml == null) {
+                continue;
+            }
+            final Maven maven = new Maven(xml);
+            final Pom pom = maven.getModel();
+            pomPath = downloadPom(pom, mavenArtifactDownloader, mavenRepositories, mavenRepository);
+        }
+
+        return pomPath;
     }
 
     private static List<Path> downloadArtifactAndDependenciesInternal(String groupId, String artifactId, String version, ExecutionContext ctx, MavenPomCache mavenPomCache, List<MavenRepository> repositories, MavenArtifactCache mavenArtifactCache) {
@@ -115,24 +151,7 @@ public class MavenArtifactHelper {
         List<Path> artifactPaths = new ArrayList<>();
         Path downloadedArtifact = null;
         for (MavenRepository pomRepository : pom.getRepositories()) {
-            downloadedArtifact = mavenArtifactDownloader.downloadArtifact(new Pom.Dependency(pomRepository, Scope.Compile, null, null, false, new Pom(
-                    randomId(),
-                    pom.getGroupId(),
-                    pom.getArtifactId(),
-                    pom.getVersion(),
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    Collections.emptyList(),
-                    new Pom.DependencyManagement(Collections.emptyList()),
-                    Collections.emptyList(),
-                    repositories,
-                    Collections.emptyMap(),
-                    Collections.emptyMap()
-            ), null, pom.getSnapshotVersion(), Collections.emptySet()));
+            downloadedArtifact = downloadPom(pom, mavenArtifactDownloader, repositories, pomRepository);
             if (downloadedArtifact != null) {
                 break;
             }
@@ -146,6 +165,28 @@ public class MavenArtifactHelper {
             artifactPaths.add(mavenArtifactDownloader.downloadArtifact(dependency));
         }
         return artifactPaths;
+    }
+
+    @Nullable
+    private static Path downloadPom(Pom pom, MavenArtifactDownloader mavenArtifactDownloader, List<MavenRepository> repositories, MavenRepository pomRepository) {
+        return mavenArtifactDownloader.downloadArtifact(new Pom.Dependency(pomRepository, Scope.Compile, null, null, false, new Pom(
+                randomId(),
+                pom.getGroupId(),
+                pom.getArtifactId(),
+                pom.getVersion(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                Collections.emptyList(),
+                new Pom.DependencyManagement(Collections.emptyList()),
+                Collections.emptyList(),
+                repositories,
+                Collections.emptyMap(),
+                Collections.emptyMap()
+        ), null, pom.getSnapshotVersion(), Collections.emptySet()));
     }
 
     public static String getExactVersion(String groupId, String artifactId, String version, ExecutionContext ctx, List<MavenRepository> repositories) {
