@@ -17,7 +17,6 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -33,7 +32,7 @@ import static java.util.Collections.emptyList;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
-public class ChangeMethodAccessLevelVisitor extends JavaIsoVisitor<ExecutionContext> {
+public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
     private static final Collection<J.Modifier.Type> EXPLICIT_ACCESS_LEVELS = Arrays.asList(J.Modifier.Type.Public,
             J.Modifier.Type.Private, J.Modifier.Type.Protected);
 
@@ -43,8 +42,8 @@ public class ChangeMethodAccessLevelVisitor extends JavaIsoVisitor<ExecutionCont
     J.Modifier.Type newAccessLevel;
 
     @Override
-    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
-        J.MethodDeclaration m = super.visitMethodDeclaration(method, executionContext);
+    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
+        J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
         J.ClassDeclaration classDecl = getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class);
         if (methodMatcher.matches(method, classDecl)) {
             J.Modifier.Type currentMethodAccessLevel = m.getModifiers().stream()
@@ -122,7 +121,7 @@ public class ChangeMethodAccessLevelVisitor extends JavaIsoVisitor<ExecutionCont
                 if (!modifierComments.isEmpty()) {
                     m = m.withComments(ListUtils.concatAll(m.getComments(), modifierComments));
                 }
-                m = maybeAutoFormat(m, m.withModifiers(modifiers), executionContext, getCursor().dropParentUntil(J.class::isInstance));
+                m = maybeAutoFormat(m, m.withModifiers(modifiers), p, getCursor().dropParentUntil(J.class::isInstance));
             }
         }
         return m;

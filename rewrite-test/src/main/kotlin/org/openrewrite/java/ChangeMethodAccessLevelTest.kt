@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 
 interface ChangeMethodAccessLevelTest : JavaRecipeTest {
@@ -173,6 +174,97 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
             class A {
                 // comment
                 public void aMethod(String s) {
+                }
+            }
+        """
+    )
+
+    @Test
+    fun fromPackagePrivateToProtectedWithOtherModifier(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected"),
+        before = """
+            package com.abc;
+            class A {
+                // comment
+                @Deprecated
+                static void aMethod(Double d) {
+                }
+            }
+        """,
+        after = """
+            package com.abc;
+            class A {
+                // comment
+                @Deprecated
+                protected static void aMethod(Double d) {
+                }
+            }
+        """
+    )
+
+    @Test
+    fun fromPackagePrivateToProtectedWithConstructor(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = ChangeMethodAccessLevel("com.abc.A A(..)", "protected"),
+        before = """
+            package com.abc;
+            class A {
+                A(Integer i) {
+                }
+                // comment
+                A() {
+                }
+            }
+        """,
+        after = """
+            package com.abc;
+            class A {
+                protected A(Integer i) {
+                }
+                // comment
+                protected A() {
+                }
+            }
+        """
+    )
+
+    @Disabled
+    @Test
+    fun fromPublicToPackagePrivate(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = ChangeMethodAccessLevel("com.abc.A *(..)", "package"),
+        before = """
+            package com.abc;
+            class A {
+                // comment
+                public A(Integer i) {
+                }
+                @Deprecated // comment
+                public A(Float f) {
+                }
+                @Deprecated // comment
+                public void aMethod(String s) {
+                }
+                // comment
+                public void aMethod(Integer i) {
+                }
+            }
+        """,
+        after = """
+            package com.abc;
+            class A {
+                // comment
+                A(Integer i) {
+                }
+                @Deprecated // comment
+                A(Float f) {
+                }
+                @Deprecated // comment
+                void aMethod(String s) {
+                }
+                // comment
+                void aMethod(Integer i) {
                 }
             }
         """

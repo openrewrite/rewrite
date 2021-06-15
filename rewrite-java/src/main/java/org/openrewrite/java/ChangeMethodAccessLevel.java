@@ -77,6 +77,6 @@ public class ChangeMethodAccessLevel extends Recipe {
                 type = null;
         }
 
-        return new ChangeMethodAccessLevelVisitor(new MethodMatcher(methodPattern), type);
+        return new ChangeMethodAccessLevelVisitor<>(new MethodMatcher(methodPattern), type);
     }
 }
