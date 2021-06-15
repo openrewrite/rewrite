@@ -33,7 +33,7 @@ public class RedundantFileCreation extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Remove unnecessary intermediate creations of files";
+        return "Remove unnecessary intermediate creations of files.";
     }
 
     @Override
