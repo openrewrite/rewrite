@@ -29,6 +29,11 @@ public class UnnecessaryParentheses extends Recipe {
     }
 
     @Override
+    public String getDescription() {
+        return "Removes unnecessary parentheses from code where extra parentheses pairs are redundant.";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new UnnecessaryParenthesesFromCompilationUnitStyle();
     }
