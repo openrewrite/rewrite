@@ -120,6 +120,17 @@ public abstract class Coordinates {
         }
     }
 
+    public static class FieldAccess extends Coordinates { // todo
+        FieldAccess(J.FieldAccess tree) {
+            super(tree);
+        }
+
+        public JavaCoordinates replace() {
+            return replace(Space.Location.FIELD_ACCESS_PREFIX);
+        }
+        public JavaCoordinates replaceName() { return replace(Space.Location.FIELD_ACCESS_NAME); }
+    }
+
     public static class MethodDeclaration extends Statement {
         MethodDeclaration(J.MethodDeclaration tree) {
             super(tree);

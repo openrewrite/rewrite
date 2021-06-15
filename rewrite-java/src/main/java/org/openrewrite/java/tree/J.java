@@ -1547,6 +1547,10 @@ public interface J extends Serializable, Tree {
             return null;
         }
 
+        public Coordinates.FieldAccess getCoordinates() {
+            return new Coordinates.FieldAccess(this);
+        }
+
         public boolean isFullyQualifiedClassReference(String className) {
             return isFullyQualifiedClassReference(this, className);
         }

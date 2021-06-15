@@ -390,6 +390,157 @@ interface JavaTemplateTest : JavaRecipeTest {
     )
 
     @Test
+    fun replaceFieldAccess(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaVisitor<ExecutionContext>() {
+            val t = template("Example.exampleField1")
+                .imports("org.openrewrite.example.Example")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitFieldAccess(fieldAccess: J.FieldAccess, p: ExecutionContext): J {
+                if (fieldAccess.name.simpleName == "exampleField0") {
+                    return fieldAccess.withTemplate(t, fieldAccess.coordinates.replace())
+                }
+                return super.visitFieldAccess(fieldAccess, p)
+            }
+        }.toRecipe(),
+        dependsOn = arrayOf("""
+            package org.openrewrite.example;
+
+            public class Example {
+                public static int exampleField0 = 0;
+            }
+        """.trimIndent()),
+        before = """
+            package org.openrewrite.example;
+
+            public class Test {
+                public static void method() {
+                    int example = Example.exampleField0;
+                }
+            }
+        """,
+        after = """
+            package org.openrewrite.example;
+
+            public class Test {
+                public static void method() {
+                    int example = Example.exampleField1;
+                }
+            }
+        """,
+        afterConditions = { cu ->
+            val m = (((cu.classes[0].body.statements[0] as J.MethodDeclaration).body!!.statements[0] as J.VariableDeclarations).variables[0].initializer as J.FieldAccess).name
+            val type = m.type!!
+            assertThat(type)
+                .matches { (it as JavaType.FullyQualified).fullyQualifiedName.equals("java.lang.String") }
+        }
+    )
+
+    @Test // todo
+    fun replaceFieldAccessNameIdentifier(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaVisitor<ExecutionContext>() {
+            val t = template("exampleField1")
+                .imports("org.openrewrite.example.Example")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitFieldAccess(fieldAccess: J.FieldAccess, p: ExecutionContext): J {
+                if (fieldAccess.name.simpleName == "exampleField0") {
+                    return fieldAccess.withTemplate(t, fieldAccess.coordinates.replaceName())
+                }
+                return super.visitFieldAccess(fieldAccess, p)
+            }
+        }.toRecipe(),
+        dependsOn = arrayOf("""
+            package org.openrewrite.example;
+
+            public class Example {
+                public static int exampleField0 = 0;
+                public static String exampleField1 = "example";
+            }
+        """.trimIndent()),
+        before = """
+            package org.openrewrite.example;
+
+            public class Test {
+                public static void method() {
+                    Object example = Example.exampleField0;
+                }
+            }
+        """,
+        after = """
+            package org.openrewrite.example;
+
+            public class Test {
+                public static void method() {
+                    Object example = Example.exampleField1;
+                }
+            }
+        """,
+        afterConditions = { cu ->
+            val m = (((cu.classes[0].body.statements[0] as J.MethodDeclaration).body!!.statements[0] as J.VariableDeclarations).variables[0].initializer as J.FieldAccess).name
+            val type = m.type!!
+            assertThat(type)
+                .matches { (it as JavaType.FullyQualified).fullyQualifiedName.equals("java.lang.String") }
+        }
+    )
+
+    @Test
+    fun replaceFieldAccessWithMethodInvocation(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaVisitor<ExecutionContext>() {
+            val t = template("Example.method()")
+                .imports("org.openrewrite.example.Example")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitFieldAccess(fieldAccess: J.FieldAccess, p: ExecutionContext): J {
+                if (fieldAccess.name.simpleName == "exampleField0") {
+                    return fieldAccess.withTemplate(t, fieldAccess.coordinates.replace())
+                }
+                return super.visitFieldAccess(fieldAccess, p)
+            }
+        }.toRecipe(),
+        dependsOn = arrayOf("""
+            package org.openrewrite.example;
+
+            public class Example {
+                public static String exampleField0 = "example";
+                public static String method() {
+                    return "exampleString";
+                }
+            }
+        """.trimIndent()),
+        before = """
+            package org.openrewrite.example;
+
+            public class Test {
+                public static void method() {
+                    Object example = Example.exampleField0;
+                }
+            }
+        """,
+        after = """
+            package org.openrewrite.example;
+
+            public class Test {
+                public static void method() {
+                    Object example = Example.method();
+                }
+            }
+        """,
+        afterConditions = { cu ->
+            val m = ((cu.classes[0].body.statements[0] as J.MethodDeclaration).body!!.statements[0] as J.VariableDeclarations).variables[0].initializer as J.MethodInvocation
+            val type = m.type!!
+            assertThat(type.genericSignature.paramTypes[0])
+                .matches { (it as JavaType.FullyQualified).fullyQualifiedName.equals("java.lang.String") }
+        }
+    )
+
+    @Test
     fun replaceSingleStatement(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaVisitor<ExecutionContext>() {

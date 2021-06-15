@@ -216,6 +216,26 @@ public class JavaTemplate {
                 return super.visitLambda(lambda, p);
             }
 
+            @Override // prefix the whole thing, and name is just the actual name // todo
+            public J visitFieldAccess(J.FieldAccess fieldAccess, Integer p) {
+                if (fieldAccess.isScope(insertionPoint)) {
+                    if (loc.equals(FIELD_ACCESS_PREFIX)) {
+                        J gen = substitutions.unsubstitute(templateParser.parseExpression(substitutedTemplate));
+                        return autoFormat(gen.withPrefix(fieldAccess.getPrefix()), p, getCursor().getParentOrThrow());
+                    }
+                    if (loc.equals(FIELD_ACCESS_NAME)) {
+                        J gen = substitutions.unsubstitute(templateParser.parseExpression(substitutedTemplate));
+                        if (!(gen instanceof J.Identifier)) {
+                            throw new IllegalArgumentException(
+                                    "Only identifiers may be used to replace field access names " +
+                                            "provided expression:" + gen.print());
+                        }
+                        return fieldAccess.withName(gen.withPrefix(Space.EMPTY));
+                    }
+                }
+                return super.visitFieldAccess(fieldAccess, p);
+            }
+
             @Override
             public J visitMethodDeclaration(J.MethodDeclaration method, Integer p) {
                 if (method.isScope(insertionPoint)) {
