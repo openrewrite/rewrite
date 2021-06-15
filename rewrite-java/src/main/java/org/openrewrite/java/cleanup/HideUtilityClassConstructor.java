@@ -31,6 +31,11 @@ public class HideUtilityClassConstructor extends Recipe {
     }
 
     @Override
+    public String getDescription() {
+        return "Ensures utility classes (classes containing only static methods or fields in their API) do not have a public constructor.";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new HideUtilityClassConstructorFromCompilationUnitStyle();
     }
