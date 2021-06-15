@@ -44,7 +44,7 @@ public class ChangePropertyKey extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Change a property key, leaving the value intact.";
+        return "Change a property key leaving the value intact.";
     }
 
     @Override

@@ -41,7 +41,7 @@ public class InsertYaml extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Insert a YAML snippet at a given key";
+        return "Insert a YAML snippet at a given key.";
     }
 
     @Override

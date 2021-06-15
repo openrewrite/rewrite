@@ -62,7 +62,7 @@ public class ChangeDependencyScope extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Add or alter the scope of the specified dependency";
+        return "Add or alter the scope of the specified dependency.";
     }
 
     @Override
