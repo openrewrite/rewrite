@@ -3195,10 +3195,6 @@ public interface J extends Serializable, Tree {
             if(this.arguments.getElements() == arguments) {
                 return this;
             }
-            JavaType.Method newType = null;
-            if(this.type != null) {
-
-            }
             return getPadding().withArguments(JContainer.withElements(this.arguments, arguments));
         }
 
