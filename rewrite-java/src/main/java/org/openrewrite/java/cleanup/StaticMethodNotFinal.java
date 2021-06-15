@@ -30,7 +30,7 @@ public class StaticMethodNotFinal extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Static methods do not need to be declared final because they cannot be overridden";
+        return "Static methods do not need to be declared final because they cannot be overridden.";
     }
 
     @Override
