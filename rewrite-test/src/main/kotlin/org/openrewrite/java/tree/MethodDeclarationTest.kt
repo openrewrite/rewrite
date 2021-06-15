@@ -17,7 +17,6 @@ package org.openrewrite.java.tree
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTreeTest
@@ -99,19 +98,6 @@ interface MethodDeclarationTest : JavaTreeTest {
         assertTrue(inv.hasModifier(J.Modifier.Type.Private))
         assertTrue(inv.hasModifier(J.Modifier.Type.Static))
     }
-
-    @Test()
-    fun modifiedUtf8SurrogateCharacterLiterals(jp: JavaParser) = assertParsePrintAndProcess(jp, CompilationUnit,
-            """
-                public class A {
-                    private boolean isSockJsSpecialChar(char ch) {
-                        return (ch <= '\u001F') || (ch >= '\u200C' && ch <= '\u200F') ||
-                            (ch >= '\u2028' && ch <= '\u202F') || (ch >= '\u2060' && ch <= '\u206F') ||
-                            (ch >= '\uFFF0') || (ch >= '\uD800' && ch <= '\uDFFF');
-                    }
-                }
-            """
-    )
 
     @Test
     fun hasThrownExceptionInType(jp: JavaParser) {

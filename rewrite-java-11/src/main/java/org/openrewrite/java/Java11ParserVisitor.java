@@ -62,7 +62,8 @@ import static org.openrewrite.java.tree.Space.format;
  * for each compilation unit visited.
  */
 public class Java11ParserVisitor extends TreePathScanner<J, Space> {
-
+    private final static int SURR_FIRST = 0xD800;
+    private final static int SURR_LAST = 0xDFFF;
 
     public static final int KIND_BITMASK_INTERFACE = 1 << 9;
     public static final int KIND_BITMASK_ANNOTATION = 1 << 13;
@@ -726,26 +727,52 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         return new J.Lambda(randomId(), fmt, Markers.EMPTY, params, arrow, body, type(node));
     }
 
-    public final static int SURR_FIRST = 0xD800;
-    public final static int SURR_LAST = 0xDFFF;
-
     @Override
     public J visitLiteral(LiteralTree node, Space fmt) {
         cursor(endPos(node));
         Object value = node.getValue();
+        String valueSource = source.substring(((JCLiteral) node).getStartPosition(), endPos(node));
         JavaType.Primitive type = primitive(((JCTree.JCLiteral) node).typetag);
+
         if (value instanceof Character) {
             char c = (Character) value;
             if (c >= SURR_FIRST && c <= SURR_LAST) {
-                String valueSource = source.substring(((JCLiteral) node).getStartPosition(), endPos(node));
-                int escapeIndex = valueSource.indexOf("\\u");
-                return new J.Literal(randomId(), fmt, Markers.EMPTY, null, null,
-                        new J.Literal.ModifiedUtf8Surrogate(valueSource.substring(0, escapeIndex),
-                                valueSource.substring(escapeIndex)), type);
+                return new J.Literal(randomId(), fmt, Markers.EMPTY, null, "''",
+                        singletonList(new J.Literal.UnicodeEscape(1,
+                                valueSource.substring(3, valueSource.length() - 1))), type);
             }
+        } else if (JavaType.Primitive.String.equals(type)) {
+            StringBuilder valueSourceWithoutSurrogates = new StringBuilder();
+            List<J.Literal.UnicodeEscape> unicodeEscapes = null;
+
+            int i = 0;
+            char[] valueSourceArr = valueSource.toCharArray();
+            for (int j = 0; j < valueSourceArr.length; j++) {
+                char c = valueSourceArr[j];
+                if (c == '\\' && j < valueSourceArr.length - 1) {
+                    if (valueSourceArr[j + 1] == 'u' && j < valueSource.length() - 5) {
+                        String codePoint = valueSource.substring(j + 2, j + 6);
+                        int codePointNumeric = Integer.parseInt(codePoint, 16);
+                        if (codePointNumeric >= SURR_FIRST && codePointNumeric <= SURR_LAST) {
+                            if (unicodeEscapes == null) {
+                                unicodeEscapes = new ArrayList<>();
+                            }
+                            unicodeEscapes.add(new J.Literal.UnicodeEscape(i, codePoint));
+                            j += 5;
+                            continue;
+                        }
+                    }
+                }
+                valueSourceWithoutSurrogates.append(c);
+                i++;
+            }
+
+            return new J.Literal(randomId(), fmt, Markers.EMPTY,
+                    unicodeEscapes == null ? value : valueSourceWithoutSurrogates.toString(),
+                    valueSourceWithoutSurrogates.toString(), unicodeEscapes, type);
         }
-        return new J.Literal(randomId(), fmt, Markers.EMPTY, value,
-                source.substring(((JCLiteral) node).getStartPosition(), endPos(node)), null, type);
+
+        return new J.Literal(randomId(), fmt, Markers.EMPTY, value, valueSource, null, type);
     }
 
     @Override
@@ -1924,15 +1951,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         if (source.startsWith(token, cursor))
             cursor += token.length();
         return token;
-    }
-
-    // return index of next non-whitespace position after index
-    private int nextTokenIndexAfter(int index) {
-        int c = index;
-        while (Character.isWhitespace(source.charAt(c))) {
-            c++;
-        }
-        return c;
     }
 
     // Only exists as a function to make it easier to debug unexpected cursor shifts

@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
+import java.util.Iterator;
 import java.util.List;
 
 import static org.openrewrite.java.tree.J.Modifier.*;
@@ -744,11 +745,31 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
         visitSpace(literal.getPrefix(), Space.Location.LITERAL_PREFIX, p);
         visitMarkers(literal.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        Literal.ModifiedUtf8Surrogate modifiedUtf8Surrogate = literal.getModifiedUtf8Surrogate();
-        if (modifiedUtf8Surrogate != null) {
-            acc.append(modifiedUtf8Surrogate.getEscapeSequence()).append(modifiedUtf8Surrogate.getCodePoint());
-        } else {
+        List<Literal.UnicodeEscape> unicodeEscapes = literal.getUnicodeEscapes();
+        if (unicodeEscapes == null) {
             acc.append(literal.getValueSource());
+        } else if (literal.getValueSource() != null) {
+            Iterator<Literal.UnicodeEscape> surrogateIter = unicodeEscapes.iterator();
+            Literal.UnicodeEscape surrogate = surrogateIter.hasNext() ?
+                    surrogateIter.next() : null;
+            int i = 0;
+            if (surrogate != null && surrogate.getValueSourceIndex() == 0) {
+                acc.append("\\u").append(surrogate.getCodePoint());
+                if (surrogateIter.hasNext()) {
+                    surrogate = surrogateIter.next();
+                }
+            }
+
+            char[] valueSourceArr = literal.getValueSource().toCharArray();
+            for (char c : valueSourceArr) {
+                acc.append(c);
+                if (surrogate != null && surrogate.getValueSourceIndex() == ++i) {
+                    acc.append("\\u").append(surrogate.getCodePoint());
+                    if (surrogateIter.hasNext()) {
+                        surrogate = surrogateIter.next();
+                    }
+                }
+            }
         }
         return literal;
     }

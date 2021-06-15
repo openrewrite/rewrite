@@ -2667,7 +2667,7 @@ public interface J extends Serializable, Tree {
 
         @With
         @Nullable
-        ModifiedUtf8Surrogate modifiedUtf8Surrogate;
+        List<UnicodeEscape> unicodeEscapes;
 
         /**
          * Including String literals
@@ -2681,7 +2681,7 @@ public interface J extends Serializable, Tree {
                 return this;
             }
             if (type instanceof JavaType.Primitive) {
-                return new Literal(id, prefix, markers, value, valueSource, modifiedUtf8Surrogate, (JavaType.Primitive) type);
+                return new Literal(id, prefix, markers, value, valueSource, unicodeEscapes, (JavaType.Primitive) type);
             }
             return this;
         }
@@ -2696,10 +2696,20 @@ public interface J extends Serializable, Tree {
             return "Literal(" + LiteralToString.toString(this) + ")";
         }
 
+        /**
+         * See <a href="https://docs.oracle.com/javase/specs/jls/se7/html/jls-3.html#jls-3.3">jls-3.3</a>.
+         *
+         * Unmatched UTF-16 surrogate pairs (composed of two escape and code point pairs) are unserializable
+         * by technologies like Jackson. So we separate and store the code point off and reconstruct
+         * the escape sequence when printing later.
+         *
+         * We only escape unicode characters that are part of UTF-16 surrogate pairs. Others are generally
+         * treated well by tools like Jackson.
+         */
         @Value
-        public static class ModifiedUtf8Surrogate {
+        public static class UnicodeEscape {
             @With
-            String escapeSequence;
+            int valueSourceIndex;
 
             @With
             String codePoint;

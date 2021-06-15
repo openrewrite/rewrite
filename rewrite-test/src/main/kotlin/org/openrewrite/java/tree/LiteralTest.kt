@@ -16,6 +16,7 @@
 package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTreeTest
 import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
@@ -78,6 +79,24 @@ interface LiteralTest : JavaTreeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/405")
+    @Test
+    fun unmatchedSurrogatePair(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, Block, """
+            char c1 = '\uD800';
+            char c2 = '\uDfFf';
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/405")
+    @Test
+    fun unmatchedSurrogatePairInString(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, Block, """
+            String s1 = "\uD800";
+            String s2 = "\uDfFf";
+        """
+    )
+
     @Test
     fun transformString(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
@@ -110,7 +129,7 @@ interface LiteralTest : JavaTreeTest {
     @Test
     fun escapedString(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
-            String s = "\"";
+            String s = "\"\t	\n";
         """
     )
 
@@ -118,6 +137,7 @@ interface LiteralTest : JavaTreeTest {
     fun escapedCharacter(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             char c = '\'';
+            char tab = '	';
         """
     )
 }
