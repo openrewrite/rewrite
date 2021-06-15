@@ -39,7 +39,7 @@ public class UnnecessaryThrows extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Remove unnecessary throws";
+        return "Remove unnecessary `throws` declarations.";
     }
 
     @Override
