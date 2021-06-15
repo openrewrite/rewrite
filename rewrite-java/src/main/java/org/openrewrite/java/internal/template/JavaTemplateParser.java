@@ -161,17 +161,18 @@ public class JavaTemplateParser {
         });
     }
 
-    public List<Expression> parseMethodArguments(Cursor cursor, String template, Space.Location location) {
+    public J.MethodInvocation parseMethodArguments(Cursor cursor, String template, Space.Location location) {
         J.MethodInvocation method = cursor.getValue();
         String methodWithReplacementArgs = method.withArguments(Collections.emptyList()).printTrimmed()
                 .replaceAll("\\)$", template + ");");
         @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacementArgs, location);
         onBeforeParseTemplate.accept(stub);
-        return cache(stub, () -> {
+        List<J> invocations = cache(stub, () -> {
             J.CompilationUnit cu = compileTemplate(stub);
             J.MethodInvocation replaced = (J.MethodInvocation) statementTemplateGenerator.listTemplatedStatements(cu).get(0);
-            return replaced.getArguments();
+            return Collections.singletonList(replaced);
         });
+        return (J.MethodInvocation) invocations.get(0);
     }
 
     public List<J.Annotation> parseAnnotations(Cursor cursor, String template) {

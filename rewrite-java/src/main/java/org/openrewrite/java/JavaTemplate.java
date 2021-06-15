@@ -345,17 +345,23 @@ public class JavaTemplate {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, Integer integer) {
                 if (loc.equals(METHOD_INVOCATION_ARGUMENTS) && method.isScope(insertionPoint)) {
-                    List<Expression> args = substitutions.unsubstitute(templateParser.parseMethodArguments(getCursor(), substitutedTemplate, loc));
-                    J.MethodInvocation m = method.withArguments(args);
+                    J.MethodInvocation m = substitutions.unsubstitute(templateParser.parseMethodArguments(getCursor(), substitutedTemplate, loc));
+                    // This will only happen if the template encountered non-fatal errors during parsing
+                    // Make a best-effort attempt to recover by patching together a new Method type from the old one
+                    // There are many ways this type could be not quite right, but leaving the type alone is likely to cause MethodMatcher false-positives
                     JavaType.Method mt = method.getType();
-                    // Make a best-effort attempt to find type information for the newly modified method signature
-                    if(mt != null && mt.getGenericSignature().getReturnType() != null) {
-                        List<JavaType> argTypes = args.stream()
+                    if(m.getType() == null && mt != null && mt.getGenericSignature() != null) {
+                        List<JavaType> argTypes = m.getArguments().stream()
                                 .map(Expression::getType)
                                 .map(it -> {
                                     // If an argument to the method invocation is itself an invocation, use its return type
                                     if(it instanceof JavaType.Method) {
-                                        return ((JavaType.Method)it).getGenericSignature().getReturnType();
+                                        JavaType.Method argType = (JavaType.Method) it;
+                                        if(argType.getGenericSignature() != null) {
+                                            return argType.getGenericSignature().getReturnType();
+                                        } else {
+                                            return argType.getResolvedSignature().getReturnType();
+                                        }
                                     }
                                     // Invoking a method with a string literal still means the invocation has the class type
                                     if(it == JavaType.Primitive.String) {
@@ -364,12 +370,9 @@ public class JavaTemplate {
                                     return it;
                                 })
                                 .collect(toList());
-
-                        // There's no way to know what the names of the parameters should be, but we can fill in types
-                        JavaType.Method newType = mt.withResolvedSignature(mt.getResolvedSignature().withParamTypes(argTypes))
+                        mt = mt.withResolvedSignature(mt.getResolvedSignature().withParamTypes(argTypes))
                                 .withGenericSignature(mt.getGenericSignature().withParamTypes(argTypes));
-
-                        m = m.withType(newType);
+                        m = m.withType(mt);
                     }
                     m = autoFormat(m, 0, getCursor().getParentOrThrow());
                     return m;

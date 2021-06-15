@@ -663,7 +663,7 @@ interface JavaTemplateTest : JavaRecipeTest {
             assertThat(type.genericSignature.paramTypes[0])
                     .isEqualTo(JavaType.Primitive.Int)
             assertThat(type.genericSignature.paramTypes[1])
-                    .matches { (it as JavaType.FullyQualified).fullyQualifiedName.equals("java.lang.Integer") }
+                    .isEqualTo(JavaType.Primitive.Int)
             assertThat(type.genericSignature.paramTypes[2])
                     .matches { (it as JavaType.FullyQualified).fullyQualifiedName.equals("java.lang.String") }
         }

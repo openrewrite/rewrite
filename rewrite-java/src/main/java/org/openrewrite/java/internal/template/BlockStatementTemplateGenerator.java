@@ -264,17 +264,23 @@ public class BlockStatementTemplateGenerator {
 
     private String variable(J.VariableDeclarations variable, boolean initializer) {
         StringBuilder varBuilder = new StringBuilder();
-        if (variable.getTypeExpression() != null) {
-            for (J.Modifier modifier : variable.getModifiers()) {
-                varBuilder.append(modifier.getType().toString().toLowerCase()).append(' ');
-            }
-            varBuilder.append(variable.getTypeExpression().withPrefix(Space.EMPTY).printTrimmed())
-                    .append(' ');
+        for (J.Modifier modifier : variable.getModifiers()) {
+            varBuilder.append(modifier.getType().toString().toLowerCase()).append(' ');
         }
 
         List<J.VariableDeclarations.NamedVariable> variables = variable.getVariables();
         for (int i = 0, variablesSize = variables.size(); i < variablesSize; i++) {
             J.VariableDeclarations.NamedVariable nv = variables.get(i);
+            if(i == 0) {
+                if(variable.getTypeExpression() != null) {
+                    varBuilder.append(variable.getTypeExpression().withPrefix(Space.EMPTY).printTrimmed());
+                }
+                if(nv.getType() instanceof JavaType.Array) {
+                    varBuilder.append("[]");
+                }
+                varBuilder.append(" ");
+            }
+
             varBuilder.append(nv.getSimpleName());
 
             JavaType type = nv.getType();

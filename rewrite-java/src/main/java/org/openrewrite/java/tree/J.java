@@ -3171,9 +3171,19 @@ public interface J extends Serializable, Tree {
             return typeParameters == null ? null : typeParameters.getElements();
         }
 
-        @With
         @Getter
         Identifier name;
+
+        public MethodInvocation withName(J.Identifier name) {
+            if(this.name == name) {
+                return this;
+            }
+            JavaType.Method newType = null;
+            if(this.type != null) {
+                newType = this.type.withName(name.getSimpleName());
+            }
+            return new MethodInvocation(id, prefix, markers, select, typeParameters, name, arguments, newType);
+        }
 
         JContainer<Expression> arguments;
 
@@ -3182,6 +3192,13 @@ public interface J extends Serializable, Tree {
         }
 
         public MethodInvocation withArguments(List<Expression> arguments) {
+            if(this.arguments.getElements() == arguments) {
+                return this;
+            }
+            JavaType.Method newType = null;
+            if(this.type != null) {
+
+            }
             return getPadding().withArguments(JContainer.withElements(this.arguments, arguments));
         }
 

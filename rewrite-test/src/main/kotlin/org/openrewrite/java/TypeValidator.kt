@@ -70,6 +70,9 @@ class TypeValidator : JavaIsoVisitor<MutableList<InvalidTypeResult>>() {
         if(mt.genericSignature == null) {
             p.add(invalidTypeResult("J.MethodInvocation is missing a genericSignature"))
         }
+        if(!m.simpleName.equals(mt.name)) {
+            p.add(invalidTypeResult("J.MethodInvocation name \"${m.simpleName}\" does not match the name in its type information \"${mt.name}\""))
+        }
 
         return m
     }
