@@ -46,7 +46,7 @@ public class FindText extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Find occurrences of regular expression based patterns in comments and literals";
+        return "Find occurrences of regular expression based patterns in comments and literals.";
     }
 
     @Override
