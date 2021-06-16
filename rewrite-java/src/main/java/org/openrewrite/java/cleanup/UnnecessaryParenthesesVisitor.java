@@ -116,7 +116,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         if (l.getParameters().getParameters().size() == 1 &&
                 l.getParameters().isParenthesized() &&
                 l.getParameters().getParameters().get(0) instanceof J.VariableDeclarations &&
-                ((J.VariableDeclarations) l.getParameters().getParameters().get(0)).getTypeExpression() == null) {
+                ((J.VariableDeclarations) l.getParameters().getParameters().get(0)).getTypeExpression() instanceof J.InferredType) {
             l = l.withParameters(l.getParameters().withParenthesized(false));
         }
         return l;
