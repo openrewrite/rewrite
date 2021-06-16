@@ -20,7 +20,6 @@ import com.google.common.io.CharSource
 import com.google.googlejavaformat.java.Formatter
 import com.google.googlejavaformat.java.JavaFormatterOptions
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
@@ -117,37 +116,6 @@ interface JavaTemplateTest : JavaRecipeTest {
 
             class Test {
                 Function<Object, String> toString = Object::toString;
-            }
-        """
-    )
-
-    @Test
-    @Disabled("https://github.com/openrewrite/rewrite/issues/673")
-    fun replaceMethodInvocationWhenInvocationIsAssignmentResult(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("20").build()
-
-            override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
-                var m: J.MethodInvocation = super.visitMethodInvocation(method, p)
-                if (m.simpleName.equals("valueOf")) {
-                    m = m.withTemplate(t, m.coordinates.replaceArguments())
-                }
-                return m
-            }
-        }.toRecipe(),
-        before = """
-            class Test {
-                public void method() {
-                    String str = String.valueOf(10);
-                }
-            }
-        """,
-        after = """
-            class Test {
-                public void method() {
-                    String str = String.valueOf(20);
-                }
             }
         """
     )

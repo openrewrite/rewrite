@@ -374,7 +374,7 @@ public class JavaTemplate {
                                 .withGenericSignature(mt.getGenericSignature().withParamTypes(argTypes));
                         m = m.withType(mt);
                     }
-                    m = autoFormat(m, 0, getCursor().getParentOrThrow());
+                    m = autoFormat(m.withPrefix(method.getPrefix()), 0, getCursor().getParentOrThrow());
                     return m;
                 }
                 if(loc.equals(STATEMENT_PREFIX) && method.isScope(insertionPoint) && mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {

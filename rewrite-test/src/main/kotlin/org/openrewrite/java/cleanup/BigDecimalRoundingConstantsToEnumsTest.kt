@@ -46,7 +46,7 @@ interface BigDecimalRoundingConstantsToEnumsTest : JavaRecipeTest {
                 void divide() {
                     BigDecimal bd = BigDecimal.valueOf(10);
                     BigDecimal bd2 = BigDecimal.valueOf(2);
-                    bd.divide(bd2, BigDecimal.ROUND_DOWN);
+                    BigDecimal bd3 = bd.divide(bd2, BigDecimal.ROUND_DOWN);
                     bd.divide(bd2, 1);
                     bd.divide(bd2, 1, BigDecimal.ROUND_CEILING);
                     bd.divide(bd2, 1, 1);
@@ -62,7 +62,7 @@ interface BigDecimalRoundingConstantsToEnumsTest : JavaRecipeTest {
                 void divide() {
                     BigDecimal bd = BigDecimal.valueOf(10);
                     BigDecimal bd2 = BigDecimal.valueOf(2);
-                    bd.divide(bd2, RoundingMode.DOWN);
+                    BigDecimal bd3 = bd.divide(bd2, RoundingMode.DOWN);
                     bd.divide(bd2, RoundingMode.DOWN);
                     bd.divide(bd2, 1, RoundingMode.CEILING);
                     bd.divide(bd2, 1, RoundingMode.DOWN);
