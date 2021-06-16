@@ -28,6 +28,8 @@ import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.properties.PropertiesParser;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.yaml.YamlParser;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.FileReader;
 import java.io.IOException;
@@ -48,6 +50,7 @@ import static org.openrewrite.Tree.randomId;
 public class MavenProjectParser {
 
     private static final Pattern mavenWrapperVersionPattern = Pattern.compile(".*apache-maven/(.*?)/.*");
+    private static final Logger logger = LoggerFactory.getLogger(MavenProjectParser.class);
 
     private final MavenParser mavenParser;
     private final MavenArtifactDownloader artifactDownloader;
@@ -157,14 +160,21 @@ public class MavenProjectParser {
                 publication
         );
 
+        logger.info("The order in which projects are being parsed is:");
         for (Maven maven : mavens) {
-            javaParser.setClasspath(downloadArtifacts(maven.getModel().getDependencies(Scope.Compile)));
+            logger.info("  {}:{}", maven.getModel().getGroupId(), maven.getModel().getArtifactId());
+        }
+
+        for (Maven maven : mavens) {
+            List<Path> dependencies = downloadArtifacts(maven.getModel().getDependencies(Scope.Compile));
+            javaParser.setClasspath(dependencies);
             sourceFiles.addAll(
                     ListUtils.map(javaParser.parse(maven.getJavaSources(projectDirectory, ctx), projectDirectory, ctx),
                             s -> s.withMarkers(s.getMarkers().addIfAbsent(mainProvenance))
                     ));
 
-            javaParser.setClasspath(downloadArtifacts(maven.getModel().getDependencies(Scope.Test)));
+            List<Path> testDependencies = downloadArtifacts(maven.getModel().getDependencies(Scope.Test));
+            javaParser.setClasspath(testDependencies);
             sourceFiles.addAll(
                     ListUtils.map(javaParser.parse(maven.getTestJavaSources(projectDirectory, ctx), projectDirectory, ctx),
                             s -> s.withMarkers(s.getMarkers().addIfAbsent(testProvenance))
@@ -210,12 +220,12 @@ public class MavenProjectParser {
                 ));
     }
 
-
     private List<Path> downloadArtifacts(Set<Pom.Dependency> dependencies) {
         return dependencies.stream()
                 .filter(d -> d.getRepository() != null)
                 .map(artifactDownloader::downloadArtifact)
                 .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(p -> p.toFile().getName().toLowerCase()))
                 .collect(Collectors.toList());
     }
 }
