@@ -4703,7 +4703,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    final class InferredType implements J, Expression, TypeTree {
+    final class VarType implements J, Expression, TypeTree {
         @With
         @EqualsAndHashCode.Include
         UUID id;
@@ -4715,20 +4715,13 @@ public interface J extends Serializable, Tree {
         Markers markers;
 
         @With
-        Kind kind;
-
-        @With
         JavaType type;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
-            return v.visitInferredType(this, p);
+            return v.visitVarType(this, p);
         }
 
-        public enum Kind {
-            LocalVariable,
-            LamdaParameter
-        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

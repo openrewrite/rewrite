@@ -1318,10 +1318,11 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         if (vartype == null || vartype instanceof JCErroneous) {
             typeExpr = null;
         } else if (endPos(vartype) < 0) {
-            //This is either a lambda parameter with an inferred type expression or an inferred local variable (var = ...)
-            J.InferredType.Kind kind = skipIfPresent("var") ? J.InferredType.Kind.LocalVariable : J.InferredType.Kind.LamdaParameter;
-            typeExpr = new J.InferredType(randomId(), Space.EMPTY, Markers.EMPTY, kind, type(vartype));
-
+            if (skipIfPresent("var")) {
+                typeExpr = new J.VarType(randomId(), Space.EMPTY, Markers.EMPTY, type(vartype));
+            } else {
+                typeExpr = null; // this is a lambda parameter with an inferred type expression
+            }
         } else if (vartype instanceof JCArrayTypeTree) {
             // we'll capture the array dimensions in a bit, just convert the element type
             JCExpression elementType = ((JCArrayTypeTree) vartype).elemtype;
@@ -1350,7 +1351,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         List<JLeftPadded<Space>> beforeDimensions = dimensions.get();
 
         Space varargs = null;
-        if (!(typeExpr instanceof J.InferredType)) {
+        if (!(typeExpr instanceof J.VarType)) {
             String vartypeString = typeExpr == null ? "" : source.substring(vartype.getStartPosition(), endPos(vartype));
             Matcher varargMatcher = Pattern.compile("(\\s*)\\.{3}").matcher(vartypeString);
             if (varargMatcher.find()) {

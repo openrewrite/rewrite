@@ -1087,17 +1087,11 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return u;
     }
 
-    //Inferred type are either local variables declared with "var" or lambda parameters.
-    public J visitInferredType(J.InferredType inferredType, P p) {
-        J.InferredType i = inferredType;
-        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
-        Expression temp = (Expression) visitExpression(i, p);
-        if (!(temp instanceof J.InferredType)) {
-            return temp;
-        } else {
-            i = (J.InferredType) temp;
-        }
-        return i;
+    //VarType represents the "var" expression in local variable type inference.
+    public J visitVarType(J.VarType varType, P p) {
+        J.VarType v = varType;
+        v = v.withMarkers(visitMarkers(v.getMarkers(), p));
+        return visitExpression(v, p);
     }
 
     public J visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {

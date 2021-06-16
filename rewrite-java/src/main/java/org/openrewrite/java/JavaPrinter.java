@@ -832,12 +832,10 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
     }
 
     @Override
-    public J visitInferredType(InferredType inferredType, P p) {
-        visitMarkers(inferredType.getMarkers(), p);
-        if (inferredType.getKind() == InferredType.Kind.LocalVariable) {
-            getPrinter().append("var");
-        }
-        return inferredType;
+    public J visitVarType(VarType varType, P p) {
+        visitMarkers(varType.getMarkers(), p);
+        getPrinter().append("var");
+        return varType;
     }
 
     @Override
