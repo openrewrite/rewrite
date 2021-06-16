@@ -30,7 +30,7 @@ interface XmlRecipeTest : RecipeTest<Xml.Document> {
     fun assertChanged(
         recipe: Recipe = this.recipe!!,
         moderneAstLink: String,
-        moderneApiBearerToken: String,
+        moderneApiBearerToken: String = apiTokenFromUserHome(),
         @Language("xml") after: String,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,

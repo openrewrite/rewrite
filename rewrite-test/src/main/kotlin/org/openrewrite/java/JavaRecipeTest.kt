@@ -30,7 +30,7 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
     fun assertChanged(
         recipe: Recipe = this.recipe!!,
         moderneAstLink: String,
-        moderneApiBearerToken: String,
+        moderneApiBearerToken: String = apiTokenFromUserHome(),
         @Language("java") after: String,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,

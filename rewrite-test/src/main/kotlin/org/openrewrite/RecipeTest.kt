@@ -271,12 +271,12 @@ interface RecipeTest <T: SourceFile> {
         }
     }
 
-    private fun apiTokenFromUserHome(): String {
+    fun apiTokenFromUserHome(): String {
         val tokenFile = File(System.getProperty("user.home") + "/.moderne/token.txt")
         if(!tokenFile.exists()) {
             throw IllegalStateException("No token file was not found at ~/.moderne/token.txt")
         }
-        val token = tokenFile.readText()
+        val token = tokenFile.readText().trim()
         return if(token.startsWith("Bearer ")) token else "Bearer $token"
     }
 
