@@ -73,22 +73,29 @@ public class MavenProjectParser {
         List<SourceFile> sourceFiles = new ArrayList<>(mavens);
         Path rootPomPath = Paths.get("pom.xml");
         Maven rootMaven = sourceFiles.stream().filter(f -> f.getSourcePath().equals(rootPomPath))
-                    .map(Maven.class::cast).findAny()
-                    .orElseThrow(() -> new RuntimeException("Unable to locate root pom source file"));
+                .map(Maven.class::cast).findAny()
+                .orElseThrow(() -> new RuntimeException("Unable to locate root pom source file"));
         Pom rootMavenModel = rootMaven.getModel();
 
         // sort maven projects so that multi-module build dependencies parse before the dependent projects
         mavens.sort((m1, m2) -> {
             Pom m1Model = m1.getModel();
-            List<Pom.Dependency> m1Dependencies = m1Model.getDependencies().stream().filter(d -> d.getRepository() == null).collect(Collectors.toList());
+            Collection<Pom.Dependency> m1Dependencies = m1Model.getDependencies();
             Pom m2Model = m2.getModel();
-            List<Pom.Dependency> m2Dependencies = m2Model.getDependencies().stream().filter(d -> d.getRepository() == null).collect(Collectors.toList());
-            if (m1Dependencies.stream().anyMatch(m1Dependency -> m1Dependency.getGroupId().equals(m2Model.getGroupId()) && m1Dependency.getArtifactId().equals(m2Model.getArtifactId()))) {
+            Collection<Pom.Dependency> m2Dependencies = m2Model.getDependencies();
+            if (m1Dependencies.stream().anyMatch(m1Dependency ->
+                    m1Dependency.getGroupId().equals(m2Model.getGroupId()) &&
+                            m1Dependency.getArtifactId().equals(m2Model.getArtifactId()))) {
                 return 1;
-            } else if (m2Dependencies.stream().anyMatch(m2Dependency -> m2Dependency.getGroupId().equals(m1Model.getGroupId()) && m2Dependency.getArtifactId().equals(m1Model.getArtifactId()))) {
+            } else if (m2Dependencies.stream().anyMatch(m2Dependency ->
+                    m2Dependency.getGroupId().equals(m1Model.getGroupId()) &&
+                            m2Dependency.getArtifactId().equals(m1Model.getArtifactId()))) {
                 return -1;
             } else {
-                return 0;
+                if (m1.getModel().getGroupId().equals(m2.getModel().getGroupId())) {
+                    return m1.getModel().getArtifactId().compareTo(m2.getModel().getArtifactId());
+                }
+                return m1.getModel().getGroupId().compareTo(m2.getModel().getGroupId());
             }
         });
 
@@ -225,7 +232,6 @@ public class MavenProjectParser {
                 .filter(d -> d.getRepository() != null)
                 .map(artifactDownloader::downloadArtifact)
                 .filter(Objects::nonNull)
-                .sorted(Comparator.comparing(p -> p.toFile().getName().toLowerCase()))
                 .collect(Collectors.toList());
     }
 }
