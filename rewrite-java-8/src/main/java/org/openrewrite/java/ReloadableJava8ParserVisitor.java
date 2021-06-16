@@ -1310,7 +1310,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         List<J.Annotation> typeExprAnnotations = collectAnnotations(annotationPosTable);
 
         TypeTree typeExpr;
-        if (vartype == null || endPos(vartype) < 0  ||vartype instanceof JCErroneous) {
+        if (vartype == null || endPos(vartype) < 0  || vartype instanceof JCErroneous) {
             typeExpr = null; // this is a lambda parameter with an inferred type expression
         } else if (vartype instanceof JCArrayTypeTree) {
             // we'll capture the array dimensions in a bit, just convert the element type
