@@ -25,6 +25,7 @@ import org.openrewrite.internal.lang.Nullable;
 import java.io.Serializable;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Comparator.comparing;
@@ -760,6 +761,14 @@ public interface JavaType extends Serializable {
                     signatureDeepEquals(genericSignature, m.genericSignature) &&
                     signatureDeepEquals(resolvedSignature, m.resolvedSignature) &&
                     TypeUtils.deepEquals(thrownExceptions, m.thrownExceptions));
+        }
+
+        @Override
+        public String toString() {
+            return "Method{" +
+                    declaringType.getFullyQualifiedName() + " " +
+                    name + "(" +
+                    String.join(", ", paramNames) + ")}";
         }
     }
 
