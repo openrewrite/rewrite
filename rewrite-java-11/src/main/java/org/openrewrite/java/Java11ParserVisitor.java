@@ -1315,8 +1315,12 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         List<J.Annotation> typeExprAnnotations = collectAnnotations(annotationPosTable);
 
         TypeTree typeExpr;
-        if (vartype == null || endPos(vartype) < 0 || vartype instanceof JCErroneous) {
-            typeExpr = null; // this is a lambda parameter with an inferred type expression
+        if (vartype == null || vartype instanceof JCErroneous) {
+            typeExpr = null;
+        } else if (endPos(vartype) < 0) {
+            J.InferredType.Kind kind = skipIfPresent("var") ? J.InferredType.Kind.LocalVariable : J.InferredType.Kind.LamdaParameter;
+            typeExpr = new J.InferredType(randomId(), Space.EMPTY, Markers.EMPTY, kind, type(vartype));
+
         } else if (vartype instanceof JCArrayTypeTree) {
             // we'll capture the array dimensions in a bit, just convert the element type
             JCExpression elementType = ((JCArrayTypeTree) vartype).elemtype;
@@ -1344,15 +1348,17 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
         List<JLeftPadded<Space>> beforeDimensions = dimensions.get();
 
-        String vartypeString = typeExpr == null ? "" : source.substring(vartype.getStartPosition(), endPos(vartype));
-        Matcher varargMatcher = Pattern.compile("(\\s*)\\.{3}").matcher(vartypeString);
         Space varargs = null;
-        if (varargMatcher.find()) {
-            Matcher matcher = Pattern.compile("\\G(\\s*)\\.{3}").matcher(source);
-            if (matcher.find(cursor)) {
-                cursor(matcher.end());
+        if (!(typeExpr instanceof J.InferredType)) {
+            String vartypeString = typeExpr == null ? "" : source.substring(vartype.getStartPosition(), endPos(vartype));
+            Matcher varargMatcher = Pattern.compile("(\\s*)\\.{3}").matcher(vartypeString);
+            if (varargMatcher.find()) {
+                Matcher matcher = Pattern.compile("\\G(\\s*)\\.{3}").matcher(source);
+                if (matcher.find(cursor)) {
+                    cursor(matcher.end());
+                }
+                varargs = format(varargMatcher.group(1));
             }
-            varargs = format(varargMatcher.group(1));
         }
 
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>();
@@ -1360,7 +1366,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         for (int i = 0; i < nodes.size(); i++) {
             JCVariableDecl n = (JCVariableDecl) nodes.get(i);
 
-            boolean implicitlyTyped = skipIfPresent("var");
             Space namedVarPrefix = sourceBefore(n.getName().toString());
 
             J.Identifier name = J.Identifier.build(randomId(), EMPTY, Markers.EMPTY, n.getName().toString(), type(node));
@@ -1372,8 +1377,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                                     name,
                                     dimensionsAfterName,
                                     n.init != null ? padLeft(sourceBefore("="), convertOrNull(n.init)) : null,
-                                    type(n),
-                                    implicitlyTyped
+                                    type(n)
                             ),
                             i == nodes.size() - 1 ? EMPTY : sourceBefore(",")
                     )

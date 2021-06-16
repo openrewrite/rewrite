@@ -145,11 +145,6 @@ public class Java11Parser implements JavaParser {
         compileDependencies();
     }
 
-    @Override
-    public int getMajorJavaVersion() {
-        return 11;
-    }
-
     public static Builder builder() {
         return new Builder();
     }

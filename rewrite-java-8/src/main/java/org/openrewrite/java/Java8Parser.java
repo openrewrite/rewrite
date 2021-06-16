@@ -38,11 +38,6 @@ public class Java8Parser implements JavaParser {
     }
 
     @Override
-    public int getMajorJavaVersion() {
-        return 8;
-    }
-
-    @Override
     public List<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         return delegate.parseInputs(sourceFiles, relativeTo, ctx);
     }

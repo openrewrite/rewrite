@@ -1367,7 +1367,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                                     name,
                                     dimensionsAfterName,
                                     vd.init != null ? padLeft(sourceBefore("="), convertOrNull(vd.init)) : null,
-                                    type(n), false
+                                    type(n)
                             ),
                             i == nodes.size() - 1 ? EMPTY : sourceBefore(",")
                     )

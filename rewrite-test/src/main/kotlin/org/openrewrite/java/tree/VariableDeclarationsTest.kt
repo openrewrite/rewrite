@@ -33,60 +33,6 @@ interface VariableDeclarationsTest : JavaTreeTest {
     )
 
     @Test
-    fun implicitlyDeclaredLocalVariable(jp: JavaParser) {
-        if (jp.majorJavaVersion < 10) {
-            return
-        }
-
-        assertParsePrintAndProcess(
-            jp, Block, """
-                var a = "";
-                var/* comment */b = "";
-                /*comment*/var c = "";
-                var     d = "";
-                long /* yep */ i /* comments */, /*everywhere*/ j; 
-            """
-        )
-    }
-
-    @Test
-    fun implicitlyDeclaredLocalAstValidation(jp: JavaParser) {
-        if (jp.majorJavaVersion < 10) {
-            return
-        }
-        val statements = (jp.parse("""
-            import java.util.Date;
-            public class Sample {
-                static {
-                    var a = "";
-                    var /* comment */ b = 'a';
-                    /*comment*/var c = new Date();
-                    var     d = 1f;
-                    long e, /* hello */   f = 1L;
-                }
-            }
-        """.trimIndent())[0].classes[0].body.statements[0] as J.Block).statements
-        assertThat(namedVariable(statements[0]).isImplicitlyTyped).isTrue()
-        assertThat((namedVariable(statements[0]).type as JavaType.FullyQualified).fullyQualifiedName).isEqualTo("java.lang.String")
-        assertThat(namedVariable(statements[1]).isImplicitlyTyped).isTrue()
-        assertThat((namedVariable(statements[1]).type as JavaType.Primitive)).isEqualTo(JavaType.Primitive.Char)
-        assertThat(namedVariable(statements[2]).isImplicitlyTyped).isTrue()
-        assertThat((namedVariable(statements[2]).type as JavaType.FullyQualified).fullyQualifiedName).isEqualTo("java.util.Date")
-        assertThat(namedVariable(statements[3]).isImplicitlyTyped).isTrue()
-        assertThat((namedVariable(statements[3]).type as JavaType.Primitive)).isEqualTo(JavaType.Primitive.Float)
-        assertThat(namedVariable(statements[4]).isImplicitlyTyped).isFalse()
-        assertThat((namedVariable(statements[4]).type as JavaType.Primitive)).isEqualTo(JavaType.Primitive.Long)
-        val secondVariable = (statements[4] as J.VariableDeclarations).variables[1]
-        assertThat(secondVariable.isImplicitlyTyped).isFalse()
-        assertThat(secondVariable.type as JavaType.Primitive).isEqualTo(JavaType.Primitive.Long)
-        assertThat(secondVariable.prefix.comments[0].text).isEqualTo(" hello ")
-        assertThat(secondVariable.prefix.comments[0].suffix).isEqualTo("   ")
-    }
-
-    fun namedVariable(statement : Statement) : J.VariableDeclarations.NamedVariable {
-        return (statement as J.VariableDeclarations).variables[0]
-    }
-    @Test
     fun localVariableDefinition(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             String a = "";

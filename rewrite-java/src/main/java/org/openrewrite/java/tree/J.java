@@ -4702,6 +4702,37 @@ public interface J extends Serializable, Tree {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    final class InferredType implements J, Expression, TypeTree {
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        Kind kind;
+
+        @With
+        JavaType type;
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitInferredType(this, p);
+        }
+
+        public enum Kind {
+            LocalVariable,
+            LamdaParameter
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class VariableDeclarations implements J, Statement {
@@ -4829,9 +4860,6 @@ public interface J extends Serializable, Tree {
             @Getter
             JavaType type;
 
-            @Getter
-            boolean implicitlyTyped;
-
             public String getSimpleName() {
                 return name.getSimpleName();
             }
@@ -4876,7 +4904,7 @@ public interface J extends Serializable, Tree {
                 }
 
                 public NamedVariable withInitializer(@Nullable JLeftPadded<Expression> initializer) {
-                    return t.initializer == initializer ? t : new NamedVariable(t.id, t.prefix, t.markers, t.name, t.dimensionsAfterName, initializer, t.type, t.implicitlyTyped);
+                    return t.initializer == initializer ? t : new NamedVariable(t.id, t.prefix, t.markers, t.name, t.dimensionsAfterName, initializer, t.type);
                 }
             }
         }
