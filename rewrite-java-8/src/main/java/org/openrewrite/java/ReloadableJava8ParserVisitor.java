@@ -1310,8 +1310,11 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         List<J.Annotation> typeExprAnnotations = collectAnnotations(annotationPosTable);
 
         TypeTree typeExpr;
-        if (vartype == null || endPos(vartype) < 0 || vartype instanceof JCErroneous) {
-            typeExpr = null; // this is a lambda parameter with an inferred type expression
+        if (vartype == null || vartype instanceof JCErroneous) {
+            typeExpr = null;
+        } else if (endPos(vartype) < 0 ) {
+            //In Java 8, the only inferred type is a Lambda parameter.
+            typeExpr = new J.InferredType(randomId(), Space.EMPTY, Markers.EMPTY, J.InferredType.Kind.LamdaParameter, type(vartype));
         } else if (vartype instanceof JCArrayTypeTree) {
             // we'll capture the array dimensions in a bit, just convert the element type
             JCExpression elementType = ((JCArrayTypeTree) vartype).elemtype;
@@ -1339,17 +1342,18 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
         List<JLeftPadded<Space>> beforeDimensions = dimensions.get();
 
-        String vartypeString = typeExpr == null ? "" : source.substring(vartype.getStartPosition(), endPos(vartype));
-        Matcher varargMatcher = Pattern.compile("(\\s*)\\.{3}").matcher(vartypeString);
         Space varargs = null;
-        if (varargMatcher.find()) {
-            Matcher matcher = Pattern.compile("\\G(\\s*)\\.{3}").matcher(source);
-            if (matcher.find(cursor)) {
-                cursor(matcher.end());
+        if (!(typeExpr instanceof J.InferredType)) {
+            String vartypeString = typeExpr == null ? "" : source.substring(vartype.getStartPosition(), endPos(vartype));
+            Matcher varargMatcher = Pattern.compile("(\\s*)\\.{3}").matcher(vartypeString);
+            if (varargMatcher.find()) {
+                Matcher matcher = Pattern.compile("\\G(\\s*)\\.{3}").matcher(source);
+                if (matcher.find(cursor)) {
+                    cursor(matcher.end());
+                }
+                varargs = format(varargMatcher.group(1));
             }
-            varargs = format(varargMatcher.group(1));
         }
-
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>();
 
         for (int i = 0; i < nodes.size(); i++) {
