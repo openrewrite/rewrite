@@ -832,6 +832,13 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
     }
 
     @Override
+    public J visitVarType(VarType varType, P p) {
+        visitMarkers(varType.getMarkers(), p);
+        getPrinter().append("var");
+        return varType;
+    }
+
+    @Override
     public J visitVariableDeclarations(VariableDeclarations multiVariable, P p) {
         StringBuilder acc = getPrinter();
         visitSpace(multiVariable.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);

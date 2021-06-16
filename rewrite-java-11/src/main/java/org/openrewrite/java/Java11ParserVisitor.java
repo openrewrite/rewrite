@@ -1315,8 +1315,14 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         List<J.Annotation> typeExprAnnotations = collectAnnotations(annotationPosTable);
 
         TypeTree typeExpr;
-        if (vartype == null || endPos(vartype) < 0 || vartype instanceof JCErroneous) {
-            typeExpr = null; // this is a lambda parameter with an inferred type expression
+        if (vartype == null || vartype instanceof JCErroneous) {
+            typeExpr = null;
+        } else if (endPos(vartype) < 0) {
+            if (skipIfPresent("var")) {
+                typeExpr = new J.VarType(randomId(), Space.EMPTY, Markers.EMPTY, type(vartype));
+            } else {
+                typeExpr = null; // this is a lambda parameter with an inferred type expression
+            }
         } else if (vartype instanceof JCArrayTypeTree) {
             // we'll capture the array dimensions in a bit, just convert the element type
             JCExpression elementType = ((JCArrayTypeTree) vartype).elemtype;
@@ -1344,24 +1350,25 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
         List<JLeftPadded<Space>> beforeDimensions = dimensions.get();
 
-        String vartypeString = typeExpr == null ? "" : source.substring(vartype.getStartPosition(), endPos(vartype));
-        Matcher varargMatcher = Pattern.compile("(\\s*)\\.{3}").matcher(vartypeString);
         Space varargs = null;
-        if (varargMatcher.find()) {
-            Matcher matcher = Pattern.compile("\\G(\\s*)\\.{3}").matcher(source);
-            if (matcher.find(cursor)) {
-                cursor(matcher.end());
+        if (!(typeExpr instanceof J.VarType)) {
+            String vartypeString = typeExpr == null ? "" : source.substring(vartype.getStartPosition(), endPos(vartype));
+            Matcher varargMatcher = Pattern.compile("(\\s*)\\.{3}").matcher(vartypeString);
+            if (varargMatcher.find()) {
+                Matcher matcher = Pattern.compile("\\G(\\s*)\\.{3}").matcher(source);
+                if (matcher.find(cursor)) {
+                    cursor(matcher.end());
+                }
+                varargs = format(varargMatcher.group(1));
             }
-            varargs = format(varargMatcher.group(1));
         }
 
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>();
 
         for (int i = 0; i < nodes.size(); i++) {
-            VariableTree n = nodes.get(i);
+            JCVariableDecl n = (JCVariableDecl) nodes.get(i);
 
             Space namedVarPrefix = sourceBefore(n.getName().toString());
-            JCVariableDecl vd = (JCVariableDecl) n;
 
             J.Identifier name = J.Identifier.build(randomId(), EMPTY, Markers.EMPTY, n.getName().toString(), type(node));
             List<JLeftPadded<Space>> dimensionsAfterName = dimensions.get();
@@ -1371,7 +1378,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                             new J.VariableDeclarations.NamedVariable(randomId(), namedVarPrefix, Markers.EMPTY,
                                     name,
                                     dimensionsAfterName,
-                                    vd.init != null ? padLeft(sourceBefore("="), convertOrNull(vd.init)) : null,
+                                    n.init != null ? padLeft(sourceBefore("="), convertOrNull(n.init)) : null,
                                     type(n)
                             ),
                             i == nodes.size() - 1 ? EMPTY : sourceBefore(",")
@@ -1951,6 +1958,20 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         if (source.startsWith(token, cursor))
             cursor += token.length();
         return token;
+    }
+
+    /**
+     * Advances the cursor if the current cursor position starts with the given token.
+     *
+     * @param token Token to skip
+     * @return true if the token is found, otherwise false.
+     */
+    private boolean skipIfPresent(String token) {
+        if (source.startsWith(token, cursor)) {
+            cursor += token.length();
+            return true;
+        }
+        return false;
     }
 
     // Only exists as a function to make it easier to debug unexpected cursor shifts

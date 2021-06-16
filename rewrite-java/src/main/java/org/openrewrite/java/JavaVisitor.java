@@ -1087,6 +1087,13 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return u;
     }
 
+    //VarType represents the "var" expression in local variable type inference.
+    public J visitVarType(J.VarType varType, P p) {
+        J.VarType v = varType;
+        v = v.withMarkers(visitMarkers(v.getMarkers(), p));
+        return visitExpression(v, p);
+    }
+
     public J visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
         J.VariableDeclarations.NamedVariable v = variable;
         v = v.withPrefix(visitSpace(v.getPrefix(), Space.Location.VARIABLE_PREFIX, p));

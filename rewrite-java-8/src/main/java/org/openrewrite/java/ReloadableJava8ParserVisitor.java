@@ -1349,7 +1349,6 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             }
             varargs = format(varargMatcher.group(1));
         }
-
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>();
 
         for (int i = 0; i < nodes.size(); i++) {
