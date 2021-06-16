@@ -22,24 +22,23 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.java.*
 import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
 import org.openrewrite.java.JavaTreeTest.NestingLevel.Class
+import org.openrewrite.java.marker.JavaSearchResult
+import org.openrewrite.java.search.FindTypes
 
 @ExtendWith(JavaParserResolver::class)
 class VariableDeclarations11Test : JavaTreeTest {
     fun javaParser(): Java11Parser.Builder = Java11Parser.builder()
 
     @Test
-    fun implicitlyDeclaredLocalVariable(jp: JavaParser) {
-
-        assertParsePrintAndProcess(
-            jp, Block, """
-                var a = "";
-                var/* comment */b = "";
-                /*comment*/var c = "";
-                var     d = "";
-                long /* yep */ i /* comments */, /*everywhere*/ j; 
-            """
-        )
-    }
+    fun implicitlyDeclaredLocalVariable(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, Block, """
+            var a = "";
+            var/* comment */b = "";
+            /*comment*/var c = "";
+            var     d = "";
+            long /* yep */ i /* comments */, /*everywhere*/ j; 
+        """
+    )
 
     @Test
     fun implicitlyDeclaredLocalAstValidation(jp: JavaParser) {
@@ -57,17 +56,17 @@ class VariableDeclarations11Test : JavaTreeTest {
             }
         """.trimIndent())[0].classes[0].body.statements[0] as J.Block).statements
         var inferred = typeTree(statements[0])
-        assertThat((inferred.type as JavaType.FullyQualified).fullyQualifiedName).isEqualTo("java.lang.String")
+        assertThat(TypeUtils.isOfClassType(inferred.type, "java.lang.String")).isTrue()
         inferred = typeTree(statements[1])
-        assertThat(inferred.type as JavaType.Primitive).isEqualTo(JavaType.Primitive.Char)
+        assertThat(TypeUtils.asPrimitive(inferred.type)).isEqualTo(JavaType.Primitive.Char)
         inferred = typeTree(statements[2])
-        assertThat((inferred.type as JavaType.FullyQualified).fullyQualifiedName).isEqualTo("java.util.Date")
+        assertThat(TypeUtils.isOfClassType(inferred.type, "java.util.Date")).isTrue()
         inferred = typeTree(statements[3])
-        assertThat(inferred.type as JavaType.Primitive).isEqualTo(JavaType.Primitive.Float)
+        assertThat(TypeUtils.asPrimitive(inferred.type)).isEqualTo(JavaType.Primitive.Float)
         val variableDeclarations = statements[4] as J.VariableDeclarations
-        assertThat(variableDeclarations.typeExpression!!.type as JavaType.Primitive).isEqualTo(JavaType.Primitive.Long)
+        assertThat(TypeUtils.asPrimitive(variableDeclarations.typeExpression!!.type)).isEqualTo(JavaType.Primitive.Long)
         val secondVariable = variableDeclarations.variables[1]
-        assertThat(secondVariable.type as JavaType.Primitive).isEqualTo(JavaType.Primitive.Long)
+        assertThat(TypeUtils.asPrimitive(secondVariable.type)).isEqualTo(JavaType.Primitive.Long)
         assertThat(secondVariable.prefix.comments[0].text).isEqualTo(" hello ")
         assertThat(secondVariable.prefix.comments[0].suffix).isEqualTo("   ")
     }
@@ -75,4 +74,5 @@ class VariableDeclarations11Test : JavaTreeTest {
     fun typeTree(statement : Statement) : J.VarType {
         return (statement as J.VariableDeclarations).typeExpression as J.VarType
     }
+
 }
