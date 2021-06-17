@@ -231,6 +231,38 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         """
     )
 
+    @Test
+    @Disabled("https://github.com/openrewrite/rewrite/issues/679")
+    fun methodInvocationLambdaBlockIndent(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.styles(tabsAndIndents { withContinuationIndent(8) }).build(),
+        before = """
+            class Test {
+                void method(Test t, Collection<String> c) {
+                    c.stream()
+                            .collect(Collectors.groupingBy(v -> {
+                                String[] versionParts = v.split("\\.");
+                                return versionParts[0] + "." + versionParts[1];
+                            }))
+                            .values()
+                            .stream()
+                            .map(patches -> patches.stream().max((r1, r2) -> {
+                                        String[] r1Parts = r1.split("\\.");
+                                        String[] r2Parts = r2.split("\\.");
+
+                                        int majorVersionComp = r1Parts[0].compareTo(r2Parts[0]);
+                                        if (majorVersionComp != 0) {
+                                            return majorVersionComp;
+                                        }
+                                        return r1.compareTo(r2);
+                                    }).orElseThrow(() -> new IllegalStateException("Patch list should not be empty"))
+                            )
+                            .sorted()
+                            .collect(Collectors.toCollection(HashSet::new));
+                }
+            }
+        """
+    )
+
     /**
      * Slight renaming but structurally the same as IntelliJ's code style view.
      */
