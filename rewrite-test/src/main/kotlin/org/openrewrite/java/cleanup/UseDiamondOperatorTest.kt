@@ -66,4 +66,41 @@ interface UseDiamondOperatorTest: JavaRecipeTest {
             }
         """.trimIndent()
     )
+
+    @Test
+    fun notAsAChainedMethodInvocation(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            class Test {
+                public static ResponseBuilder<String> bResponse(String entity) {
+                    return new ResponseBuilder<String>().entity(entity);
+                }
+                public static ResponseBuilder<String> bResponse(String entity) {
+                    return new ResponseBuilder<String>();
+                }
+
+                public static class ResponseBuilder<T> {
+                    public ResponseBuilder<T> entity(T entity) {
+                        return this;
+                    }
+                }
+            }
+        """,
+        after = """
+            class Test {
+                public static ResponseBuilder<String> bResponse(String entity) {
+                    return new ResponseBuilder<String>().entity(entity);
+                }
+                public static ResponseBuilder<String> bResponse(String entity) {
+                    return new ResponseBuilder<>();
+                }
+
+                public static class ResponseBuilder<T> {
+                    public ResponseBuilder<T> entity(T entity) {
+                        return this;
+                    }
+                }
+            }
+        """
+    )
 }
