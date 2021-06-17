@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.MavenRepositoryCredentials;
 import org.openrewrite.maven.tree.MavenRepositoryMirror;
@@ -30,6 +31,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     private static final String MAVEN_MIRRORS = "org.openrewrite.maven.mirrors";
     private static final String MAVEN_CREDENTIALS = "org.openrewrite.maven.auth";
     private static final String MAVEN_REPOSITORIES = "org.openrewrite.maven.repos";
+    private static final String MAVEN_PINNED_SNAPSHOT_VERSIONS = "org.openrewrite.maven.pinnedSnapshotVersions";
 
     public MavenExecutionContextView(ExecutionContext delegate) {
         super(delegate);
@@ -57,5 +59,19 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
 
     public List<MavenRepository> getRepositories() {
         return getMessage(MAVEN_REPOSITORIES, emptyList());
+    }
+
+    /**
+     * Require dependency resolution that encounters a matching group:artifact:version coordinate to resolve to a
+     * particular dated snapshot version, effectively making snapshot resolution deterministic.
+     *
+     * @param pinnedSnapshotVersions A set of group:artiact:version and the dated snapshot version to pin them to.
+     */
+    public void setPinnedSnapshotVersions(Collection<GroupArtifactVersion> pinnedSnapshotVersions) {
+        putMessage(MAVEN_PINNED_SNAPSHOT_VERSIONS, pinnedSnapshotVersions);
+    }
+
+    public Collection<GroupArtifactVersion> getPinnedSnapshotVersions() {
+        return getMessage(MAVEN_PINNED_SNAPSHOT_VERSIONS, emptyList());
     }
 }

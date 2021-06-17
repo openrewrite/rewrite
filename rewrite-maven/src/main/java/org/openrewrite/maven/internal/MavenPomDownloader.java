@@ -29,12 +29,12 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.CacheResult;
 import org.openrewrite.maven.cache.MavenPomCache;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.MavenRepositoryCredentials;
 import org.openrewrite.maven.tree.MavenRepositoryMirror;
 
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.nio.file.Path;
@@ -44,6 +44,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
 public class MavenPomDownloader {
@@ -94,7 +96,7 @@ public class MavenPomDownloader {
 
                     try {
                         CacheResult<MavenMetadata> result = mavenPomCache.computeMavenMetadata(repo.getUri(), groupId, artifactId,
-                                () -> forceDownloadMetadata(groupId, artifactId, null, repo));
+                                () -> downloadMetadata(groupId, artifactId, null, singletonList(repo)));
 
                         sample.stop(addTagsByResult(timer, result).register(Metrics.globalRegistry));
                         return result.getData();
@@ -118,6 +120,34 @@ public class MavenPomDownloader {
                         return new MavenMetadata(new MavenMetadata.Versioning(
                                 Stream.concat(m1.getVersioning().getVersions().stream(),
                                         m2.getVersioning().getVersions().stream()).collect(toList()),
+                                emptyList(), // there will never be snapshot versions in metadata at the group:artifact level
+                                null
+                        ));
+                    }
+                });
+    }
+
+    @Nullable
+    public MavenMetadata downloadMetadata(String groupId, String artifactId, @Nullable String version,
+                                          Collection<MavenRepository> repositories) {
+        return repositories.stream()
+                .map(this::normalizeRepository)
+                .distinct()
+                .filter(Objects::nonNull)
+                .map(repo -> forceDownloadMetadata(groupId, artifactId, version, repo))
+                .filter(Objects::nonNull)
+                .reduce(MavenMetadata.EMPTY, (m1, m2) -> {
+                    if (m1 == MavenMetadata.EMPTY) {
+                        if (m2 == MavenMetadata.EMPTY) {
+                            return m1;
+                        } else {
+                            return m2;
+                        }
+                    } else if (m2 == MavenMetadata.EMPTY) {
+                        return m1;
+                    } else {
+                        return new MavenMetadata(new MavenMetadata.Versioning(
+                                emptyList(),
                                 Stream.concat(m1.getVersioning().getSnapshotVersions() == null ? Stream.empty() : m1.getVersioning().getSnapshotVersions().stream(),
                                         m2.getVersioning().getSnapshotVersions() == null ? Stream.empty() : m2.getVersioning().getSnapshotVersions().stream()).collect(toList()),
                                 null
@@ -127,7 +157,7 @@ public class MavenPomDownloader {
     }
 
     @Nullable
-    private MavenMetadata forceDownloadMetadata(String groupId, String artifactId, @Nullable String version, MavenRepository repo) throws IOException {
+    private MavenMetadata forceDownloadMetadata(String groupId, String artifactId, @Nullable String version, MavenRepository repo) {
         String uri = repo.getUri().toString() + "/" +
                 groupId.replace('.', '/') + '/' +
                 artifactId + '/' +
@@ -174,7 +204,7 @@ public class MavenPomDownloader {
                              ExecutionContext ctx) {
         Map<MavenRepository, Exception> errors = new HashMap<>();
 
-        String versionMaybeDatedSnapshot = datedSnapshotVersion(groupId, artifactId, version, repositories);
+        String versionMaybeDatedSnapshot = datedSnapshotVersion(groupId, artifactId, version, repositories, ctx);
         if (versionMaybeDatedSnapshot == null) {
             return null;
         }
@@ -189,13 +219,13 @@ public class MavenPomDownloader {
                     artifactId.equals(projectPom.getPom().getArtifactId())) {
                 // In a real project you'd never expect there to be more than one project pom with the same group/artifact but different version numbers
                 // But in unit tests that supply all of the poms as "project" poms like these, there might be more than one entry
-                if(version.equals(projectPom.getPom().getVersion())) {
+                if (version.equals(projectPom.getPom().getVersion())) {
                     return projectPom;
                 }
                 goodEnoughMatch = projectPom;
             }
         }
-        if(goodEnoughMatch != null) {
+        if (goodEnoughMatch != null) {
             return goodEnoughMatch;
         }
 
@@ -217,13 +247,13 @@ public class MavenPomDownloader {
             }
         }
 
-        List<MavenRepository> repos =  Stream.concat(repositories.stream(), Stream.of(SUPER_POM_REPOSITORY))
+        List<MavenRepository> repos = Stream.concat(repositories.stream(), Stream.of(SUPER_POM_REPOSITORY))
                 .map(this::normalizeRepository)
                 .filter(Objects::nonNull)
                 .distinct()
                 .filter(repo -> repo.acceptsVersion(version))
                 .collect(toList());
-        for(MavenRepository repo : repos) {
+        for (MavenRepository repo : repos) {
             Timer.Builder timer = Timer.builder("rewrite.maven.download")
                     .tag("repo.id", repo.getUri().toString())
                     .tag("group.id", groupId)
@@ -263,7 +293,7 @@ public class MavenPomDownloader {
                         });
 
                 sample.stop(addTagsByResult(timer, result).register(Metrics.globalRegistry));
-                if(result.getState() != CacheResult.State.Unavailable) {
+                if (result.getState() != CacheResult.State.Unavailable) {
                     return result.getData();
                 }
             } catch (Exception e) {
@@ -273,7 +303,7 @@ public class MavenPomDownloader {
             }
         }
 
-        if(!errors.isEmpty()) {
+        if (!errors.isEmpty()) {
             String errorText = "Unable to download dependency " + groupId + ":" + artifactId + ":" + version + " from any of these repositories: \n" +
                     errors.entrySet().stream()
                             .map(entry -> "    Id: " + entry.getKey().getId() + ", URL: " + entry.getKey().getUri().toString() + ", cause: " + entry.getValue())
@@ -285,21 +315,23 @@ public class MavenPomDownloader {
     }
 
     @Nullable
-    public String datedSnapshotVersion(String groupId, String artifactId, String version, Collection<MavenRepository> repositories) {
+    private String datedSnapshotVersion(String groupId, String artifactId, String version, Collection<MavenRepository> repositories, ExecutionContext ctx) {
         if (version.endsWith("-SNAPSHOT")) {
+            for (GroupArtifactVersion pinnedSnapshotVersion : new MavenExecutionContextView(ctx).getPinnedSnapshotVersions()) {
+                if (pinnedSnapshotVersion.getDatedSnapshotVersion() != null &&
+                        pinnedSnapshotVersion.getGroupId().equals(groupId) &&
+                        pinnedSnapshotVersion.getArtifactId().equals(artifactId) &&
+                        pinnedSnapshotVersion.getVersion().equals(version)) {
+                    return version.replaceFirst("SNAPSHOT$", pinnedSnapshotVersion.getDatedSnapshotVersion());
+                }
+            }
+
             MavenMetadata mavenMetadata = repositories.stream()
                     .map(this::normalizeRepository)
                     .filter(Objects::nonNull)
                     .distinct()
                     .filter(repo -> repo.acceptsVersion(version))
-                    .map(repo -> {
-                        try {
-                            return forceDownloadMetadata(groupId, artifactId, version, repo);
-                        } catch (IOException e) {
-                            ctx.getOnError().accept(e);
-                            return null;
-                        }
-                    })
+                    .map(repo -> downloadMetadata(groupId, artifactId, version, singletonList(repo)))
                     .filter(Objects::nonNull)
                     .findFirst()
                     .orElse(null);

@@ -22,7 +22,9 @@ import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.maven.utilities.MavenArtifactDownloader;
 
+import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -55,7 +57,7 @@ public class Pom implements Marker {
      * The timestamp and build numbered version number (the latest snapshot at time dependencies were resolved).
      */
     @Nullable
-    String snapshotVersion;
+    String datedSnapshotVersion;
 
     @Nullable
     String packaging;
@@ -91,7 +93,7 @@ public class Pom implements Marker {
                @Nullable String version,
                @Nullable String name,
                @Nullable String description,
-               @Nullable String snapshotVersion,
+               @Nullable String datedSnapshotVersion,
                @Nullable String packaging,
                @Nullable String classifier,
                @Nullable Pom parent,
@@ -107,7 +109,7 @@ public class Pom implements Marker {
         this.version = version;
         this.name = name;
         this.description = description;
-        this.snapshotVersion = snapshotVersion;
+        this.datedSnapshotVersion = datedSnapshotVersion;
         this.packaging = packaging;
         this.classifier = classifier;
         this.parent = parent;

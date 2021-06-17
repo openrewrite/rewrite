@@ -238,7 +238,7 @@ class MavenDependencyResolutionIntegTest {
             .first()
 
         assertThat(maven.model.dependencies.first().version).isEqualTo("6.1.0-SNAPSHOT")
-        assertThat(maven.model.dependencies.first().model.snapshotVersion).startsWith("6.1.0")
+        assertThat(maven.model.dependencies.first().model.datedSnapshotVersion).startsWith("6.1.0")
     }
 
     @Issue("#166")

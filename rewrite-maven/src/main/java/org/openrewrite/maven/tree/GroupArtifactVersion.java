@@ -17,9 +17,18 @@
 package org.openrewrite.maven.tree;
 
 import lombok.Value;
+import org.openrewrite.internal.lang.Nullable;
 
 @Value
-public class GroupArtifact {
+public class GroupArtifactVersion {
     String groupId;
     String artifactId;
+    String version;
+
+    /**
+     * In the form "${timestamp}-${buildNumber}", e.g. for the artifact rewrite-testing-frameworks-1.7.0-20210614.172805-1.jar,
+     * the dated snapshot version is "20210614.172805-1".
+     */
+    @Nullable
+    String datedSnapshotVersion;
 }
