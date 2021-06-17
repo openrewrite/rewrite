@@ -219,10 +219,14 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         break;
                     }
                     case METHOD_INVOCATION_ARGUMENT:
-                        if (elem instanceof J.Lambda) {
-                            J.Lambda lambda = ((J.Lambda) elem);
-                            if (lambda.getBody() instanceof J.Block) {
-                                getCursor().getParentOrThrow().putMessage("lastIndent", indent + style.getContinuationIndent());
+                        if (!elem.getPrefix().getLastWhitespace().contains("\n")) {
+                            if (elem instanceof J.Lambda) {
+                                J body = ((J.Lambda) elem).getBody();
+                                if (!(body instanceof J.Binary)) {
+                                    if (!body.getPrefix().getLastWhitespace().contains("\n")) {
+                                        getCursor().getParentOrThrow().putMessage("lastIndent", indent + style.getContinuationIndent());
+                                    }
+                                }
                             }
                         }
                         elem = visitAndCast(elem, p);

@@ -232,18 +232,53 @@ interface TabsAndIndentsTest : JavaRecipeTest {
     )
 
     @Test
-    @Disabled("https://github.com/openrewrite/rewrite/issues/679")
-    fun methodInvocationStatementLambdaBlockIndent(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+    @Issue("https://github.com/openrewrite/rewrite/issues/679")
+    fun lambdaBodyWithNestedMethodInvocationLambdaStatementBodyIndent(jp: JavaParser.Builder<*, *>) = assertUnchanged(
         jp.styles(tabsAndIndents()).build(),
         before = """
             class Test {
                 void method(Collection<List<String>> c) {
-                    c.stream()
-                            .map(x -> x.stream().max((r1, r2) -> {
-                                        return 0;
-                                    })
-                            )
+                    c.stream().map(x -> x.stream().max((r1, r2) -> {
+                                return 0;
+                            })
+                    )
                             .collect(Collectors.toList());
+                }
+            }
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/679")
+    fun lambdaBodyWithNestedMethodInvocationLambdaExpressionBodyIndent(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.styles(tabsAndIndents()).build(),
+        before = """
+            class Test {
+                void method(Collection<List<String>> c) {
+                    c.stream().map(x -> x.stream().max((r1, r2) ->
+                                    0
+                            )
+                    )
+                            .collect(Collectors.toList());
+                }
+            }
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/679")
+    fun methodInvocationLambdaArgumentIndent(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.styles(tabsAndIndents()).build(),
+        before = """
+            import java.util.function.Function;
+
+            abstract class Test {
+                abstract Test a(Function<String, String> f);
+
+                void method(String s) {
+                    a(
+                            f -> s.toLowerCase()
+                    );
                 }
             }
         """
