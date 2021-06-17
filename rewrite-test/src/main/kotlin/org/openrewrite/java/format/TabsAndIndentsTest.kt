@@ -1705,6 +1705,111 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         expectedCyclesThatMakeChanges = 2
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/677")
+    @Test
+    fun mixedWhitespaceToTabs(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(tabsAndIndents {
+            withUseTabCharacter(true)
+                .withTabSize(1)
+                .withIndentSize(1)
+                .withContinuationIndent(2)
+                .withIndentsRelativeToExpressionStart(false)
+        }).build(),
+
+        before = """
+                    /**
+                     * JavaDoc starts on 2nd line
+                     */
+                public class A {
+            	/** JavaDoc starts on first line.
+                 * @param value test value.
+                 * @return value + 1 */
+            	public int methodOne(int value) {
+            		return value + 1;
+            	}
+            
+                            /** Edge case odd formatting.
+              * @param value test value.
+                            * @return value + 1
+                	      	   	   */
+                    public int methodTwo(int value) {
+            	    			   return value + 1;
+                    }
+            }
+        """.trimIndent(),
+        after = """
+            /**
+             * JavaDoc starts on 2nd line
+             */
+            public class A {
+            	/** JavaDoc starts on first line.
+            	 * @param value test value.
+            	 * @return value + 1 */
+            	public int methodOne(int value) {
+            		return value + 1;
+            	}
+            
+            	/** Edge case odd formatting.
+            	 * @param value test value.
+            	 * @return value + 1
+            	 */
+            	public int methodTwo(int value) {
+            		return value + 1;
+            	}
+            }
+        """.trimIndent(),
+        expectedCyclesThatMakeChanges = 2
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/677")
+    @Test
+    fun mixedWhitespaceToSpaces(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(tabsAndIndents()).build(),
+        before = """
+                    /**
+                     * JavaDoc starts on 2nd line
+                     */
+                public class A {
+            	/** JavaDoc starts on first line.
+                 * @param value test value.
+                 * @return value + 1 */
+            	public int methodOne(int value) {
+            		return value + 1;
+            	}
+            
+                            /** Edge case odd formatting.
+              * @param value test value.
+                            * @return value + 1
+                	      	   	   */
+                    public int methodTwo(int value) {
+            	    			   return value + 1;
+                    }
+            }
+        """.trimIndent(),
+        after = """
+            /**
+             * JavaDoc starts on 2nd line
+             */
+            public class A {
+                /** JavaDoc starts on first line.
+                 * @param value test value.
+                 * @return value + 1 */
+                public int methodOne(int value) {
+                    return value + 1;
+                }
+            
+                /** Edge case odd formatting.
+                 * @param value test value.
+                 * @return value + 1
+                 */
+                public int methodTwo(int value) {
+                    return value + 1;
+                }
+            }
+        """.trimIndent(),
+        expectedCyclesThatMakeChanges = 2
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/641")
     @Test
     fun alignTryCatchFinally(jp: JavaParser.Builder<*, *>) = assertUnchanged(

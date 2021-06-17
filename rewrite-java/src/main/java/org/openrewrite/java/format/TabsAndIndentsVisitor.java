@@ -443,14 +443,36 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         StringBuilder newTextBuilder = new StringBuilder();
         StringBuilder currentText = new StringBuilder();
         StringBuilder whiteSpace = new StringBuilder();
-        boolean hasChanged = false;
-        boolean isWhitespace = true;
-        boolean isFirstLine = true;
+
+        boolean hasChanged = false;  // The comment original is returned if no changes are applied.
+        boolean isWhitespace = true; // Tracks the whitespace that follows a new line until a char is not a tab or space.
+        boolean isFirstLine = true;  // Preserves whitespace that immediately follows a /* or /**. Set to false after a new line char.
+        int indent = 0; // Track the indent of the current line in the block comment.
+
         for (char c : comment.getText().toCharArray()) {
             switch (c) {
+                case '@':
+                    // A placeholder to add checks for annotations.
+                    currentText.append(c);
+                    break;
+
+                case '\t':
                 case ' ':
                     if (!isFirstLine && isWhitespace) {
-                        whiteSpace.append(c);
+                        indent += c == '\t' ? style.getTabSize() : 1;
+                        // Normalizes the whitespace char to match the `style`.
+                        // The character count is updated appropriately in `shift()` after a new line char is found.
+                        Character replace = null;
+                        if (style.getUseTabCharacter()) {
+                            if (c != '\t') {
+                                replace = '\t';
+                            }
+                        } else {
+                            if (c != ' ') {
+                                replace = ' ';
+                            }
+                        }
+                        whiteSpace.append(replace == null ? c : replace);
                     } else {
                         currentText.append(c);
                     }
@@ -461,7 +483,6 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     if (isFirstLine) {
                         isFirstLine = false;
                     } else {
-                        int indent = getLengthOfWhitespace(whiteSpace.toString());
                         if (indent != column) {
                             int shift = column - indent;
                             shift(whiteSpace, shift);
@@ -471,6 +492,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
                     newTextBuilder.append(whiteSpace.append(currentText));
                     whiteSpace.setLength(0);
+                    indent = 0;
                     currentText.setLength(0);
 
                     whiteSpace.append(c);
@@ -479,9 +501,11 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
                 case '*':
                     if (!isFirstLine && isWhitespace) {
-                        // Moves a space character to the current text, so that the '*' are in line with each other.
-                        int whitespaceLength = Math.max(whiteSpace.length() - 1, 0);
-                        whiteSpace.setLength(whitespaceLength);
+                        // Moves a space character from whitespace to the current text,
+                        // so that the '*' in blocks comments are in line with each other.
+                        int newLength = Math.max(whiteSpace.length() - 1, 0);
+                        whiteSpace.setLength(newLength);
+                        indent--;
                         currentText.append(' ');
                     }
 
@@ -494,20 +518,40 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             }
         }
 
-        int indent = getLengthOfWhitespace(whiteSpace.toString());
         if (!isFirstLine) {
+            // Process the last whitespace in the block.
             if (indent != column) {
                 int shift = column - indent;
                 // Adjust the shift so that the */ will line up under /*.
-                if (currentText.length() == 0) {
+                if (currentText.length() == 0 && !style.getUseTabCharacter()) {
                     shift += 1;
                 }
                 shift(whiteSpace, shift);
+                if (currentText.length() == 0 && style.getUseTabCharacter()) {
+                    whiteSpace.append(' ');
+                }
                 hasChanged = true;
             }
         }
 
-        StringBuilder newSuffix = new StringBuilder(comment.getSuffix());
+        // Normalizes the whitespace in the suffix to match the `style`.
+        // The suffix of the comment is the whitespace that precedes the AST element.
+        String suffix = null;
+        if (style.getUseTabCharacter()) {
+            if (comment.getSuffix().contains(" ")) {
+                suffix = comment.getSuffix().replace(" ", "\t");
+                hasChanged = true;
+            }
+        } else {
+            if (comment.getSuffix().contains("\t")) {
+                suffix = comment.getSuffix().replace("\t", " ");
+                hasChanged = true;
+            }
+        }
+
+        suffix = suffix == null ? comment.getSuffix() : suffix;
+
+        StringBuilder newSuffix = new StringBuilder(suffix);
         indent = getLengthOfWhitespace(newSuffix.toString());
         if (indent != column && ((newSuffix.toString().contains("\n") || newSuffix.toString().contains("\r")))) {
             int shift = column - indent;
