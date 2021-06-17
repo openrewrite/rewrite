@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -40,20 +41,43 @@ public class UseDiamondOperator extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
+
         return new JavaIsoVisitor<ExecutionContext>() {
+
             @Override
             public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext executionContext) {
                 J.NewClass n = super.visitNewClass(newClass, executionContext);
                 if (n.getClazz() instanceof J.ParameterizedType && n.getBody() == null) {
+
                     J.ParameterizedType parameterizedType = (J.ParameterizedType) n.getClazz();
-                    if (parameterizedType.getTypeParameters() != null && !parameterizedType.getTypeParameters().isEmpty()) {
-                        if (parameterizedType.getTypeParameters().size() == 1 && !(parameterizedType.getTypeParameters().get(0) instanceof J.Empty)) {
-                            n = n.withClazz(parameterizedType.withTypeParameters(singletonList(new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY))));
-                        }
+                    if (useDiamondOperator((J.ParameterizedType) n.getClazz())) {
+                        n = n.withClazz(parameterizedType.withTypeParameters(singletonList(new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY))));
                     }
                 }
                 return n;
             }
+
+            private boolean useDiamondOperator(J.ParameterizedType parameterizedType) {
+                if (parameterizedType.getTypeParameters() == null || parameterizedType.getTypeParameters().isEmpty()
+                        || parameterizedType.getTypeParameters().get(0) instanceof J.Empty) {
+                    return false;
+                }
+
+                Cursor c = getCursor().dropParentUntil(J.class::isInstance);
+
+                //If the immediate parent is a block, this new operation is a statement and there is no left side to
+                //infer the type parameters.
+                if (c.getValue() instanceof J.VariableDeclarations.NamedVariable) {
+                    //If the immediate parent is named variable, check the variable declaration to make sure it's
+                    //not using local variable type inference.
+                    J.VariableDeclarations variableDeclaration = c.firstEnclosing(J.VariableDeclarations.class);
+                    return variableDeclaration != null && !(variableDeclaration.getTypeExpression() instanceof J.VarType);
+                } else {
+                    return !(c.getValue() instanceof J.Block);
+                }
+            }
         };
+
     }
+
 }

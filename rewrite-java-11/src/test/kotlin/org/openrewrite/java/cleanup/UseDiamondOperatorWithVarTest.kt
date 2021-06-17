@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,54 +16,42 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.Recipe
+import org.openrewrite.java.Java11Parser
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaParserResolver
 import org.openrewrite.java.JavaRecipeTest
 
 @Suppress("Convert2Diamond")
-interface UseDiamondOperatorTest: JavaRecipeTest {
-    override val recipe: Recipe?
+@ExtendWith(JavaParserResolver::class)
+class UseDiamondOperatorWithVarTest : JavaRecipeTest {
+
+    override val recipe: Recipe
         get() = UseDiamondOperator()
 
+    fun javaParser(): Java11Parser.Builder = Java11Parser.builder()
+
     @Test
-    fun useDiamondOperator(jp: JavaParser) = assertChanged(
+    fun doNotConvertVar(jp: JavaParser) = assertChanged(
         jp,
         before = """
             import java.util.*;
-
-            class Test<X, Y> {
+            class Test {
                 void test() {
-                    List<String> ls = new ArrayList<String>();
-                    Map<X,Y> map = new HashMap<X,Y>();
-                    List<String> ls2 = new ArrayList<String>() {
-                    };
+                    var ls1 = new ArrayList<String>();
+                    List<String> ls2 = new ArrayList<String>();
                 }
             }
         """,
         after = """
             import java.util.*;
-
-            class Test<X, Y> {
+            class Test {
                 void test() {
-                    List<String> ls = new ArrayList<>();
-                    Map<X,Y> map = new HashMap<>();
-                    List<String> ls2 = new ArrayList<String>() {
-                    };
+                    var ls1 = new ArrayList<String>();
+                    List<String> ls2 = new ArrayList<>();
                 }
             }
         """
-    )
-
-    @Test
-    fun noLeftSide(jp: JavaParser) = assertUnchanged(
-        parser = jp,
-        before = """
-            import java.util.HashMap;
-            class Test {
-                static {
-                    new HashMap<String, String>();
-                }
-            }
-        """.trimIndent()
     )
 }
