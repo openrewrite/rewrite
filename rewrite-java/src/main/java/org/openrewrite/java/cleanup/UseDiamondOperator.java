@@ -64,17 +64,18 @@ public class UseDiamondOperator extends Recipe {
 
                 Cursor c = getCursor().dropParentUntil(J.class::isInstance);
 
-                //If the immediate parent is a block, this new operation is a statement and there is no left side to
-                //infer the type parameters.
                 if (c.getValue() instanceof J.VariableDeclarations.NamedVariable) {
                     //If the immediate parent is named variable, check the variable declaration to make sure it's
                     //not using local variable type inference.
                     J.VariableDeclarations variableDeclaration = c.firstEnclosing(J.VariableDeclarations.class);
                     return variableDeclaration != null && !(variableDeclaration.getTypeExpression() instanceof J.VarType);
                 } else if (c.getValue() instanceof J.MethodInvocation) {
+                    //Do not remove the type parameters if the newClass is the receiver of a method invocation.
                     J.MethodInvocation invocation = c.getValue();
                     return invocation.getSelect() != newClass;
                 } else {
+                    //If the immediate parent is a block, this new operation is a statement and there is no left side to
+                    //infer the type parameters.
                     return !(c.getValue() instanceof J.Block);
                 }
             }
