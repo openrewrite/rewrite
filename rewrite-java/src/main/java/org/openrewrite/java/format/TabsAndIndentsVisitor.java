@@ -478,8 +478,12 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     }
                     break;
 
-                case '\r':
                 case '\n':
+                    if (whiteSpace.length() == 1 && whiteSpace.charAt(0) == '\r' && currentText.length() == 0) {
+                        whiteSpace.append(c);
+                        continue;
+                    }
+                case '\r':
                     if (isFirstLine) {
                         isFirstLine = false;
                     } else {
