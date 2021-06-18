@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
@@ -126,8 +127,10 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
         after = "class A {}"
     )
 
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/687")
     @Test
-    fun leaveStarStaticImportIfReferenceStillExists(jp: JavaParser) = assertUnchanged(
+    fun leaveStarStaticImportIfReferenceStillExists(jp: JavaParser) = assertChanged(
         jp,
         recipe = removeImport("java.util.Collections"),
         before = """
@@ -135,7 +138,13 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
             class A {
                Object o = emptyList();
             }
-        """
+        """,
+        after = """
+            import static java.util.Collections.emptyList;
+            class A {
+               Object o = emptyList();
+            }
+        """.trimIndent()
     )
 
     @Test
