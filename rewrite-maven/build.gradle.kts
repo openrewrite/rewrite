@@ -20,9 +20,11 @@ dependencies {
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:latest.release")
 
+    // needed by AddDependency
+    implementation(project(":rewrite-java"))
+
     compileOnly("org.rocksdb:rocksdbjni:latest.release")
     compileOnly("org.mapdb:mapdb:latest.release")
-    compileOnly(project(":rewrite-java"))
     compileOnly(project(":rewrite-yaml"))
     compileOnly(project(":rewrite-properties"))
 
