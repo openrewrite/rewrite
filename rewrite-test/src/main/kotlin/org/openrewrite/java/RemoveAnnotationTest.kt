@@ -24,6 +24,8 @@ interface RemoveAnnotationTest : JavaRecipeTest {
         jp,
         recipe = RemoveAnnotation("@java.lang.Deprecated"),
         before = """
+            import java.util.List;
+
             @Deprecated
             public class Test {
                 @Deprecated
@@ -32,8 +34,9 @@ interface RemoveAnnotationTest : JavaRecipeTest {
             }
         """,
         after = """
+            import java.util.List;
+
             public class Test {
-            
                 void test() {
                 }
             }

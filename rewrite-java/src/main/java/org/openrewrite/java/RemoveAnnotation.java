@@ -22,25 +22,13 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
-import org.openrewrite.marker.Markers;
 
-import java.util.Collections;
-
-import static org.openrewrite.Tree.randomId;
+import java.util.List;
 
 @EqualsAndHashCode(callSuper = true)
 @Value
 public class RemoveAnnotation extends Recipe {
-    private static final J.Block EMPTY_BLOCK = new J.Block(randomId(), Space.EMPTY,
-            Markers.EMPTY, new JRightPadded<>(false, Space.EMPTY, Markers.EMPTY),
-            Collections.emptyList(), Space.EMPTY);
-
-    /**
-     * An annotation pattern, expressed as a pointcut expression.
-     * See {@link AnnotationMatcher} for syntax.
-     */
     @Option(displayName = "Annotation pattern",
             description = "An annotation pattern, expressed as a pointcut expression.",
             example = "@java.lang.SuppressWarnings(\"deprecation\")")
@@ -63,9 +51,21 @@ public class RemoveAnnotation extends Recipe {
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                 J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
-                Boolean annotationRemoved = getCursor().<Boolean>pollMessage("annotationRemoved");
-                if (annotationRemoved != null && annotationRemoved) {
-                    c = autoFormat(c.withBody(EMPTY_BLOCK), ctx, getCursor().getParentOrThrow()).withBody(c.getBody());
+                J.Annotation annotationRemoved = getCursor().pollMessage("annotationRemoved");
+
+                List<J.Annotation> leadingAnnotations = classDecl.getLeadingAnnotations();
+                if (annotationRemoved != null) {
+                    if (leadingAnnotations.get(0) == annotationRemoved || leadingAnnotations.size() == 1) {
+                        if (!c.getModifiers().isEmpty()) {
+                            c = c.withModifiers(Space.formatFirstPrefix(c.getModifiers(), Space.firstPrefix(c.getModifiers()).withWhitespace("")));
+                        } else if (c.getPadding().getTypeParameters() != null) {
+                            c = c.getPadding().withTypeParameters(c.getPadding().getTypeParameters().withBefore(c.getPadding().getTypeParameters().getBefore().withWhitespace("")));
+                        } else {
+                            c = c.withName(c.getName().withPrefix(c.getName().getPrefix().withWhitespace("")));
+                        }
+                    } else {
+                        c = autoFormat(c, c.getName(), ctx, getCursor().getParentOrThrow());
+                    }
                 }
                 return c;
             }
@@ -73,9 +73,23 @@ public class RemoveAnnotation extends Recipe {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                 J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
-                Boolean annotationRemoved = getCursor().<Boolean>pollMessage("annotationRemoved");
-                if (annotationRemoved != null && annotationRemoved) {
-                    m = autoFormat(m.withBody(null), ctx, getCursor().getParentOrThrow()).withBody(m.getBody());
+                J.Annotation annotationRemoved = getCursor().pollMessage("annotationRemoved");
+
+                List<J.Annotation> leadingAnnotations = method.getLeadingAnnotations();
+                if (annotationRemoved != null && !leadingAnnotations.isEmpty()) {
+                    if (leadingAnnotations.get(0) == annotationRemoved || leadingAnnotations.size() == 1) {
+                        if (!m.getModifiers().isEmpty()) {
+                            m = m.withModifiers(Space.formatFirstPrefix(m.getModifiers(), Space.firstPrefix(m.getModifiers()).withWhitespace("")));
+                        } else if (m.getPadding().getTypeParameters() != null) {
+                            m = m.getPadding().withTypeParameters(m.getPadding().getTypeParameters().withPrefix(m.getPadding().getTypeParameters().getPrefix().withWhitespace("")));
+                        } else if (m.getReturnTypeExpression() != null) {
+                            m = m.withReturnTypeExpression(m.getReturnTypeExpression().withPrefix(m.getReturnTypeExpression().getPrefix().withWhitespace("")));
+                        } else {
+                            m = m.withName(m.getName().withPrefix(m.getName().getPrefix().withWhitespace("")));
+                        }
+                    } else {
+                        m = autoFormat(m, m.getName(), ctx, getCursor().getParentOrThrow());
+                    }
                 }
                 return m;
             }
@@ -83,7 +97,7 @@ public class RemoveAnnotation extends Recipe {
             @Override
             public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
                 if (annotationMatcher.matches(annotation)) {
-                    getCursor().getParentOrThrow().putMessage("annotationRemoved", true);
+                    getCursor().getParentOrThrow().putMessage("annotationRemoved", annotation);
 
                     //noinspection ConstantConditions
                     return null;
