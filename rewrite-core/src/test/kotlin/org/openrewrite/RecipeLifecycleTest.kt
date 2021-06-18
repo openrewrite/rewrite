@@ -21,10 +21,8 @@ import org.openrewrite.Tree.randomId
 import org.openrewrite.marker.Markers
 import org.openrewrite.text.PlainText
 import org.openrewrite.text.PlainTextVisitor
-import java.time.Duration
+import java.nio.file.Paths
 import java.util.*
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 class RecipeLifecycleTest {
@@ -46,7 +44,7 @@ class RecipeLifecycleTest {
                     }
                 }
             }
-        }.run(listOf(PlainText(randomId(), Markers.EMPTY, "hello world")), ctx)
+        }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, "hello world")), ctx)
 
         assertThat(visited.get()).isEqualTo(0)
     }
@@ -64,7 +62,7 @@ class RecipeLifecycleTest {
             }
 
             override fun visit(before: List<SourceFile>, ctx: ExecutionContext) =
-                before + PlainText(randomId(), Markers.EMPTY, "test")
+                before + PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, "test")
         }.run(emptyList())
 
         assertThat(results).isEmpty()
@@ -79,7 +77,7 @@ class RecipeLifecycleTest {
             }
 
             override fun visit(before: List<SourceFile>, ctx: ExecutionContext) =
-                before + PlainText(randomId(), Markers.EMPTY, "test")
+                before + PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, "test")
         }.run(emptyList())
 
         assertThat(results.map { it.recipesThatMadeChanges.map { r -> r.name }.first() }
@@ -97,7 +95,7 @@ class RecipeLifecycleTest {
 
             override fun visit(before: List<SourceFile>, ctx: ExecutionContext) =
                 emptyList<SourceFile>()
-        }.run(listOf(PlainText(randomId(), Markers.EMPTY, "test")))
+        }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, "test")))
 
         assertThat(results.map {
             it.recipesThatMadeChanges.map { r -> r.name }.first()
@@ -120,7 +118,7 @@ class RecipeLifecycleTest {
 
             }
 
-        }.run(listOf(PlainText(randomId(), Markers.EMPTY, "test")))
+        }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, "test")))
 
         assertThat(results.map {
             it.recipesThatMadeChanges.map { r -> r.name }.first()
@@ -158,7 +156,7 @@ class RecipeLifecycleTest {
     // https://github.com/openrewrite/rewrite/issues/389
     @Test
     fun sourceFilesAcceptOnlyApplicableVisitors() {
-        val sources = listOf(FooSource(), PlainText(randomId(), Markers.build(listOf()), "Hello"))
+        val sources = listOf(FooSource(), PlainText(randomId(), Paths.get("test.txt"), Markers.build(listOf()), "Hello"))
         val fooVisitor = FooVisitor<ExecutionContext>()
         val textVisitor = PlainTextVisitor<ExecutionContext>()
         val ctx = InMemoryExecutionContext {
@@ -172,7 +170,7 @@ class RecipeLifecycleTest {
 
     @Test
     fun accurateReportingOfRecipesMakingChanges() {
-        val sources = listOf(PlainText(randomId(), Markers.build(listOf()), "Hello"))
+        val sources = listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.build(listOf()), "Hello"))
         // Set up a composite recipe which prepends "Change1" and appends "Change2" to the input text
         val recipe = object : Recipe() {
             override fun getDisplayName() = "root"

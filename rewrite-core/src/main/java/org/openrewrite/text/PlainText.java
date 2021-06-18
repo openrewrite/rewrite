@@ -15,70 +15,49 @@
  */
 package org.openrewrite.text;
 
+import lombok.Value;
+import lombok.With;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Objects;
 import java.util.UUID;
 
 /**
  * The simplest of all ASTs representing nothing more than just unstructured text.
  */
+@Value
 public class PlainText implements SourceFile, Tree {
-    private final UUID id;
-    private Markers markers;
-    private final String text;
+    UUID id;
 
-    public PlainText(UUID id,
-                     Markers markers,
-                     String text) {
-        this.id = id;
-        this.markers = markers;
-        this.text = text;
-    }
+    @With
+    Path sourcePath;
+
+    @With
+    Markers markers;
+
+    @With
+    String text;
 
     @Override
     public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
         return v instanceof PlainTextVisitor;
     }
 
-    @Override
-    public Path getSourcePath() {
-        return Paths.get("text.txt");
-    }
-
-    @Override
-    public Markers getMarkers() {
-        return markers;
-    }
-
     @SuppressWarnings("unchecked")
     @Override
-    public PlainText withMarkers(Markers markers) {
-        this.markers = markers;
-        return this;
-    }
-
-    @Override
-    public UUID getId() {
-        return id;
+    public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+        return (R) ((PlainTextVisitor<P>) v).visitText(this, p);
     }
 
     @Override
     public <P> String print(TreePrinter<P> printer, P p) {
         return print(p);
-    }
-
-    public PlainText withText(String toText) {
-        if (Objects.equals(this.text, toText)) {
-            return this;
-        }
-        return new PlainText(id, markers, toText);
     }
 
     @Override

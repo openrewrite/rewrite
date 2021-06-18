@@ -25,12 +25,10 @@ import org.openrewrite.scheduling.ForkJoinScheduler
 import java.io.File
 import java.io.IOException
 import java.io.UncheckedIOException
-import java.nio.file.Path
 import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ForkJoinPool
-import kotlin.io.path.readText
 
 interface RecipeTest <T: SourceFile> {
     val recipe: Recipe?
@@ -53,7 +51,45 @@ interface RecipeTest <T: SourceFile> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (T) -> Unit = { }
     ) {
+        val inputs = arrayOf(before.trimIndent()) + dependsOn.map(String::trimIndent)
+        val sources = parser.parse(InMemoryExecutionContext { t: Throwable -> fail<Any>("Parser threw an exception", t) }, *inputs )
 
+        assertThat(sources.size)
+            .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
+            .isEqualTo(inputs.size)
+
+        assertChangedBase(recipe, sources, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    fun assertChangedBase(
+        parser: Parser<T> = this.parser!!,
+        recipe: Recipe = this.recipe!!,
+        before: File,
+        dependsOn: Array<File> = emptyArray(),
+        after: String,
+        cycles: Int = 2,
+        expectedCyclesThatMakeChanges: Int = cycles - 1,
+        afterConditions: (T) -> Unit = { }
+    ) {
+        val sources = parser.parse(
+            listOf(before).plus(dependsOn).map { it.toPath() },
+            null,
+            InMemoryExecutionContext { t: Throwable -> fail<Any>("Parser threw an exception", t) }
+        )
+
+        assertChangedBase(recipe, sources, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun assertChangedBase(
+        recipe: Recipe = this.recipe!!,
+        sources: List<SourceFile>,
+        after: String,
+        cycles: Int = 2,
+        expectedCyclesThatMakeChanges: Int = cycles - 1,
+        afterConditions: (T) -> Unit = { }
+    ) {
         assertThat(recipe).`as`("A recipe must be specified").isNotNull
 
         if (recipe !is AdHocRecipe) {
@@ -63,23 +99,16 @@ interface RecipeTest <T: SourceFile> {
                 .isEqualTo(recipe)
         }
 
-        val inputs = arrayOf(before.trimIndent()) + dependsOn.map(String::trimIndent)
-        val sources = parser.parse(InMemoryExecutionContext { t: Throwable -> fail<Any>("Parser threw an exception", t) }, *inputs )
-
-        assertThat(sources.size)
-            .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
-            .isEqualTo(inputs.size)
-
         val recipeSchedulerCheckingExpectedCycles =
             RecipeSchedulerCheckingExpectedCycles(ForkJoinScheduler(ForkJoinPool(1)), expectedCyclesThatMakeChanges)
 
         var results = recipe.run(
-                sources,
-                InMemoryExecutionContext { t: Throwable? -> fail<Any>("Recipe threw an exception", t) },
-                recipeSchedulerCheckingExpectedCycles,
-                cycles,
-                expectedCyclesThatMakeChanges + 1
-            )
+            sources,
+            InMemoryExecutionContext { t: Throwable? -> fail<Any>("Recipe threw an exception", t) },
+            recipeSchedulerCheckingExpectedCycles,
+            cycles,
+            expectedCyclesThatMakeChanges + 1
+        )
 
         results = results.filter { it.before == sources.first() }
 
@@ -98,37 +127,45 @@ interface RecipeTest <T: SourceFile> {
         recipeSchedulerCheckingExpectedCycles.verify()
     }
 
-    @Suppress("UNCHECKED_CAST")
-    fun assertChangedBase(
-        parser: Parser<T> = this.parser!!,
-        recipe: Recipe = this.recipe!!,
-        before: File,
-        dependsOn: Array<File> = emptyArray(),
-        after: String,
-        cycles: Int = 2,
-        expectedCyclesThatMakeChanges: Int = cycles - 1,
-        afterConditions: (T) -> Unit = { }
-    ) {
-        val beforeInput = before.readText()
-        val dependsOnInputs = dependsOn.map{ it.toPath() }.map(Path::readText).toTypedArray()
-        assertChangedBase(parser, recipe, beforeInput, dependsOnInputs, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
-    }
-
     fun assertUnchangedBase(
         parser: Parser<T> = this.parser!!,
         recipe: Recipe = this.recipe!!,
         before: String,
         dependsOn: Array<String> = emptyArray()
     ) {
-        assertThat(recipe).`as`("A recipe must be specified").isNotNull
-
         val inputs = arrayOf(before.trimIndent()) + dependsOn.map(String::trimIndent)
         val sources = parser.parse(
                 InMemoryExecutionContext { t: Throwable -> fail<Any>("Parser threw an exception", t) },
                 *inputs)
+
         assertThat(sources.size)
             .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
             .isEqualTo(inputs.size)
+
+        assertUnchangedBase(recipe, sources)
+    }
+
+    fun assertUnchangedBase(
+        parser: Parser<T> = this.parser!!,
+        recipe: Recipe = this.recipe!!,
+        before: File,
+        dependsOn: Array<File> = emptyArray()
+    ) {
+        val sources = parser.parse(
+                listOf(before).plus(dependsOn).map { it.toPath() },
+            null,
+            InMemoryExecutionContext { t: Throwable -> fail<Any>("Parser threw an exception", t) }
+        )
+
+        assertUnchangedBase(recipe, sources)
+    }
+
+    private fun assertUnchangedBase(
+        recipe: Recipe = this.recipe!!,
+        sources: List<SourceFile>,
+    ) {
+        assertThat(recipe).`as`("A recipe must be specified").isNotNull
+
         val source = sources.first()
         val recipeSchedulerCheckingExpectedCycles = RecipeSchedulerCheckingExpectedCycles(ForkJoinScheduler.common(), 0)
         val results = recipe
@@ -152,17 +189,6 @@ interface RecipeTest <T: SourceFile> {
         }
 
         recipeSchedulerCheckingExpectedCycles.verify()
-    }
-
-    fun assertUnchangedBase(
-        parser: Parser<T> = this.parser!!,
-        recipe: Recipe = this.recipe!!,
-        before: File,
-        dependsOn: Array<File> = emptyArray()
-    ) {
-        val beforeInput = before.readText()
-        val dependsOnInputs = dependsOn.map(File::readText).toTypedArray()
-        assertUnchangedBase(parser, recipe, beforeInput, dependsOnInputs)
     }
 
     fun TreeVisitor<*, ExecutionContext>.toRecipe() = AdHocRecipe(this)

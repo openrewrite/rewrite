@@ -22,6 +22,7 @@ import org.openrewrite.marker.Markers
 import org.openrewrite.style.NamedStyles
 import org.openrewrite.text.PlainText
 import org.openrewrite.text.TextStyle
+import java.nio.file.Paths
 
 class TreeSerializerTest {
     @Test
@@ -32,8 +33,8 @@ class TreeSerializerTest {
             charset = "UTF-8"
         }))
 
-        val plainText1 = PlainText(randomId(), Markers.build(listOf(styles)), "hi Jon")
-        val plainText2 = PlainText(randomId(), Markers.build(listOf(styles)), "hi Jonathan")
+        val plainText1 = PlainText(randomId(), Paths.get("test.txt"), Markers.build(listOf(styles)), "hi Jon")
+        val plainText2 = PlainText(randomId(), Paths.get("test.txt"), Markers.build(listOf(styles)), "hi Jonathan")
 
         val serialized = serializer.write(listOf(plainText1, plainText2))
 

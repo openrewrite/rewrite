@@ -21,6 +21,7 @@ import org.openrewrite.Tree.randomId
 import org.openrewrite.marker.Markers
 import org.openrewrite.text.PlainText
 import org.openrewrite.text.PlainTextVisitor
+import java.nio.file.Paths
 
 class ExecutionContextTest {
     @Test
@@ -47,7 +48,7 @@ class ExecutionContextTest {
                     }
                 }
             }
-        }.run(listOf(PlainText(randomId(), Markers.EMPTY, "hello world")))
+        }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, "hello world")))
 
         assertThat(cycles).isEqualTo(2)
     }

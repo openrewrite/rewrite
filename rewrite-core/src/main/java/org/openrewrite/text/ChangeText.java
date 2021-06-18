@@ -24,7 +24,9 @@ import static org.openrewrite.Validated.required;
 
 public class ChangeText extends Recipe {
 
-    @Option(displayName = "To Text", description = "The text to be filled in.", example = "Some text.")
+    @Option(displayName = "Text after change",
+            description = "The text file will have only this text after the change.",
+            example = "Some text.")
     private final String toText;
 
     public ChangeText(String toText) {
@@ -38,12 +40,12 @@ public class ChangeText extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Change Text";
+        return "Change text";
     }
 
     @Override
     public String getDescription() {
-        return "Changes Text, test recipe.";
+        return "Completely replaces the contents of the text file with other text.";
     }
 
     @Override

@@ -18,5 +18,7 @@ package org.openrewrite.text;
 import org.openrewrite.TreeVisitor;
 
 public class PlainTextVisitor<P> extends TreeVisitor<PlainText, P> {
-
+    public PlainText visitText(PlainText text, P p) {
+        return text;
+    }
 }
