@@ -29,6 +29,8 @@ public interface SourceFile extends Tree {
      */
     Path getSourcePath();
 
+    SourceFile withSourcePath(Path path);
+
     @SuppressWarnings("unused")
     @JsonProperty("@c")
     default String getJacksonPolymorphicTypeTag() {

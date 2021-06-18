@@ -96,7 +96,8 @@ public interface RecipeScheduler {
                 } else {
                     //printing both the before and after (and including markers in the output) and then comparing the
                     //output to determine if a change has been made.
-                    if (!original.print(MARKER_ID_PRINTER, ctx).equals(s.print(MARKER_ID_PRINTER, ctx))) {
+                    if (!original.getSourcePath().equals(s.getSourcePath()) ||
+                            !original.print(MARKER_ID_PRINTER, ctx).equals(s.print(MARKER_ID_PRINTER, ctx))) {
                         results.add(new Result(original, s, s.getMarkers()
                                 .findFirst(Recipe.RecipeThatMadeChanges.class)
                                 .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe reported making a change?"))

@@ -89,11 +89,20 @@ public class Result {
             sourcePath = (relativeTo == null ? Paths.get(".") : relativeTo).resolve("partial-" + System.nanoTime());
         }
 
+        Path originalSourcePath = sourcePath;
+        if(before != null && after != null && !before.getSourcePath().equals(after.getSourcePath())) {
+            originalSourcePath = before.getSourcePath();
+        }
+
         //noinspection ConstantConditions
-        return new InMemoryDiffEntry(sourcePath, relativeTo,
+        return new InMemoryDiffEntry(
+                originalSourcePath,
+                sourcePath,
+                relativeTo,
                 before == null ? "" : before.print(),
                 after == null ? "" : after.print(treePrinter, null),
-                recipesThatMadeChanges).getDiff();
+                recipesThatMadeChanges
+        ).getDiff();
     }
 
     @Override
@@ -105,13 +114,13 @@ public class Result {
         private final InMemoryRepository repo;
         private final Set<Recipe> recipesThatMadeChanges;
 
-        InMemoryDiffEntry(Path filePath, @Nullable Path relativeTo, String oldSource, String newSource, Set<Recipe> recipesThatMadeChanges) {
-            this.changeType = ChangeType.MODIFY;
+        InMemoryDiffEntry(Path originalFilePath, Path filePath, @Nullable Path relativeTo, String oldSource,
+                          String newSource, Set<Recipe> recipesThatMadeChanges) {
+            this.changeType = originalFilePath.equals(filePath) ? ChangeType.MODIFY : ChangeType.RENAME;
             this.recipesThatMadeChanges = recipesThatMadeChanges;
 
-            Path relativePath = relativeTo == null ? filePath : relativeTo.relativize(filePath);
-            this.oldPath = relativePath.toString();
-            this.newPath = relativePath.toString();
+            this.oldPath = (relativeTo == null ? originalFilePath : relativeTo.relativize(originalFilePath)).toString();
+            this.newPath = (relativeTo == null ? filePath : relativeTo.relativize(filePath)).toString();
 
             try {
                 this.repo = new InMemoryRepository.Builder()
@@ -132,7 +141,7 @@ public class Result {
         }
 
         String getDiff() {
-            if (oldId.equals(newId)) {
+            if (oldId.equals(newId) && oldPath.equals(newPath)) {
                 return "";
             }
 
