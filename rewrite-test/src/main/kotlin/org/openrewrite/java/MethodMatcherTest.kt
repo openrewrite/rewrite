@@ -211,4 +211,11 @@ interface MethodMatcherTest {
     fun matchesWildcardedMethodNameStartingWithJavaKeyword(jp: JavaParser) {
         assertTrue(nameRegex("A assert*()").matches("assertThat"))
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/629")
+    @Test
+    fun wildcardType(jp: JavaParser) {
+        assertTrue(MethodMatcher("*..* build()").matchesTargetType(JavaType.Class.build("javax.ws.rs.core.Response")))
+        assertTrue(MethodMatcher("javax..* build()").matchesTargetType(JavaType.Class.build("javax.ws.rs.core.Response")))
+    }
 }
