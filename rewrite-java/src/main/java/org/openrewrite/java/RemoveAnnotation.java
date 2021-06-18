@@ -96,6 +96,23 @@ public class RemoveAnnotation extends Recipe {
             }
 
             @Override
+            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                J.VariableDeclarations v = super.visitVariableDeclarations(multiVariable, ctx);
+                J.Annotation annotationRemoved = getCursor().pollMessage("annotationRemoved");
+
+                List<J.Annotation> leadingAnnotations = multiVariable.getLeadingAnnotations();
+                if (annotationRemoved != null && !leadingAnnotations.isEmpty()) {
+                    if (leadingAnnotations.get(0) == annotationRemoved || leadingAnnotations.size() == 1) {
+                        if(v.getTypeExpression() != null) {
+                            v = v.withTypeExpression(v.getTypeExpression().withPrefix(v.getTypeExpression().getPrefix().withWhitespace("")));
+                        }
+                    }
+                }
+
+                return v;
+            }
+
+            @Override
             public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
                 if (annotationMatcher.matches(annotation)) {
                     getCursor().getParentOrThrow().putMessage("annotationRemoved", annotation);

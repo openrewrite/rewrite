@@ -30,6 +30,7 @@ interface RemoveAnnotationTest : JavaRecipeTest {
             public class Test {
                 @Deprecated
                 void test() {
+                    @Deprecated int n;
                 }
             }
         """,
@@ -38,6 +39,7 @@ interface RemoveAnnotationTest : JavaRecipeTest {
 
             public class Test {
                 void test() {
+                    int n;
                 }
             }
         """
