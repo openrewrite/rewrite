@@ -23,6 +23,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.List;
 
@@ -98,7 +99,7 @@ public class RemoveAnnotation extends Recipe {
             public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
                 if (annotationMatcher.matches(annotation)) {
                     getCursor().getParentOrThrow().putMessage("annotationRemoved", annotation);
-
+                    maybeRemoveImport(TypeUtils.asFullyQualified(annotation.getType()));
                     //noinspection ConstantConditions
                     return null;
                 }
