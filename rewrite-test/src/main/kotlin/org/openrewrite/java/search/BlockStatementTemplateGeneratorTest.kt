@@ -22,6 +22,7 @@ import com.google.googlejavaformat.java.JavaFormatterOptions
 import org.assertj.core.api.Assertions.assertThat
 import org.intellij.lang.annotations.Language
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaVisitor
 import org.openrewrite.java.internal.template.BlockStatementTemplateGenerator
@@ -31,6 +32,34 @@ import java.io.ByteArrayOutputStream
 import java.io.OutputStreamWriter
 
 interface BlockStatementTemplateGeneratorTest {
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/653")
+    @Test
+    fun innerClass(jp: JavaParser) {
+        val cu = jp.parse(
+            """
+            class Outer {
+                class Inner {
+                    void test() {
+                        assert n == 0;
+                    }
+                }
+            }
+        """)[0]
+
+        @Language("java")
+        val expected = """
+            class Outer {
+                class Inner {
+                    void test() {
+                        /*__TEMPLATE__*/ assert n == 1;
+                    }
+                }
+            }
+        """.trimIndent()
+
+        assertThat(beforeAssert(cu)).isEqualTo(expected)
+    }
 
     @Test
     fun generateTemplate(jp: JavaParser) {

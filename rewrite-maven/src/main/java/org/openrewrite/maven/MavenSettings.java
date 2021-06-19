@@ -59,7 +59,6 @@ public class MavenSettings {
     Servers servers;
 
     @Nullable
-    @SuppressWarnings("ConstantConditions")
     public static MavenSettings parse(Parser.Input source, ExecutionContext ctx, String... activeProfiles) {
         try {
             MavenSettings settings = MavenXmlMapper.readMapper().readValue(source.getSource(), MavenSettings.class);

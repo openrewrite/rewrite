@@ -29,7 +29,9 @@ class ResultTest {
     @Test
     fun idempotent() {
         val diff = Result.InMemoryDiffEntry(
-            Paths.get("com/netflix/MyJavaClass.java"), null,
+            Paths.get("com/netflix/MyJavaClass.java"),
+            Paths.get("com/netflix/MyJavaClass.java"),
+            null,
             "public class A {}",
             "public class A {}",
             emptySet()
@@ -41,7 +43,7 @@ class ResultTest {
     @Test
     fun singleLineChange() {
         val diff = Result.InMemoryDiffEntry(
-            filePath, null,
+            filePath, filePath, null,
             """
                 |public void test() {
                 |   logger.infof("some %s", 1);
@@ -81,7 +83,7 @@ class ResultTest {
     @Test
     fun multipleChangesMoreThanThreeLinesApart() {
         val diff = Result.InMemoryDiffEntry(
-            filePath, null,
+            filePath, filePath, null,
             """
                 |public void test() {
                 |   logger.infof("some %s", 1);

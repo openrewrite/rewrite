@@ -21,6 +21,7 @@ import org.openrewrite.Tree.randomId
 import org.openrewrite.marker.Markers
 import org.openrewrite.text.PlainText
 import org.openrewrite.text.PlainTextVisitor
+import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
@@ -151,6 +152,7 @@ class RecipeLifecycleTest {
         override fun getId(): UUID = throw NotImplementedError()
         override fun <P : Any?> print(printer: TreePrinter<P>, p: P) = throw NotImplementedError()
         override fun getSourcePath() = throw NotImplementedError()
+        override fun withSourcePath(path: Path): SourceFile = throw NotImplementedError()
     }
 
     // https://github.com/openrewrite/rewrite/issues/389

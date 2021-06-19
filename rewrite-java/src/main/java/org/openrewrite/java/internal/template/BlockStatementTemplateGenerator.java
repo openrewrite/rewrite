@@ -24,11 +24,10 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.newSetFromMap;
 
 /**
  * Generates a stub containing enough variable, method, and class scope
@@ -56,7 +55,7 @@ public class BlockStatementTemplateGenerator {
                         after.append('}');
                     }
 
-                    template(next(cursor), cursor.getValue(), before, after);
+                    template(next(cursor), cursor.getValue(), before, after, newSetFromMap(new IdentityHashMap<>()));
 
                     return before.toString().trim() + "\n/*" + TEMPLATE_COMMENT + "*/" + template + "\n" + after;
                 });
@@ -114,7 +113,9 @@ public class BlockStatementTemplateGenerator {
         return statements;
     }
 
-    private void template(Cursor cursor, J prior, StringBuilder before, StringBuilder after) {
+    @SuppressWarnings("ConstantConditions")
+    private void template(Cursor cursor, J prior, StringBuilder before, StringBuilder after, Set<J> templated) {
+        templated.add(cursor.getValue());
         J j = cursor.getValue();
         if (j instanceof J.CompilationUnit) {
             J.CompilationUnit cu = (J.CompilationUnit) j;
@@ -132,7 +133,7 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.Block) {
             J parent = next(cursor).getValue();
             if (parent instanceof J.ClassDeclaration) {
-                classDeclaration(prior, before, (J.ClassDeclaration) parent);
+                classDeclaration(prior, before, (J.ClassDeclaration) parent, templated);
             } else if (parent instanceof J.MethodDeclaration) {
                 J.MethodDeclaration m = (J.MethodDeclaration) parent;
 
@@ -222,12 +223,16 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.VariableDeclarations) {
             before.insert(0, variable((J.VariableDeclarations) j, false) + '=');
         }
-        template(next(cursor), j, before, after);
+        template(next(cursor), j, before, after, templated);
     }
 
-    private void classDeclaration(@Nullable J prior, StringBuilder before, J.ClassDeclaration parent) {
+    private void classDeclaration(@Nullable J prior, StringBuilder before, J.ClassDeclaration parent, Set<J> templated) {
         J.ClassDeclaration c = parent;
         for (Statement statement : c.getBody().getStatements()) {
+            if(templated.contains(statement)) {
+                continue;
+            }
+
             if (statement instanceof J.VariableDeclarations) {
                 before.insert(0, variable((J.VariableDeclarations) statement, false) + ";\n");
             } else if (statement instanceof J.MethodDeclaration) {
@@ -238,7 +243,7 @@ public class BlockStatementTemplateGenerator {
                 // this is a sibling class. we need declarations for all variables and methods.
                 // setting prior to null will cause them all to be written.
                 before.insert(0, '}');
-                classDeclaration(null, before, (J.ClassDeclaration) statement);
+                classDeclaration(null, before, (J.ClassDeclaration) statement, templated);
             }
         }
         c = c.withBody(null).withLeadingAnnotations(null).withPrefix(Space.EMPTY);
@@ -271,11 +276,11 @@ public class BlockStatementTemplateGenerator {
         List<J.VariableDeclarations.NamedVariable> variables = variable.getVariables();
         for (int i = 0, variablesSize = variables.size(); i < variablesSize; i++) {
             J.VariableDeclarations.NamedVariable nv = variables.get(i);
-            if(i == 0) {
-                if(variable.getTypeExpression() != null) {
+            if (i == 0) {
+                if (variable.getTypeExpression() != null) {
                     varBuilder.append(variable.getTypeExpression().withPrefix(Space.EMPTY).printTrimmed());
                 }
-                if(nv.getType() instanceof JavaType.Array) {
+                if (nv.getType() instanceof JavaType.Array) {
                     varBuilder.append("[]");
                 }
                 varBuilder.append(" ");
