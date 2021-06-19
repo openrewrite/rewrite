@@ -171,7 +171,6 @@ interface CovariantEqualsTest : JavaRecipeTest {
     @Test
     fun replaceWithNonCovariantEqualsWhenNested(jp: JavaParser) = assertChanged(
         jp,
-        skipEnhancedTypeValidation = true,
         before = """
             class A {
                 class B {
