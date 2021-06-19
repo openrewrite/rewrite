@@ -22,7 +22,7 @@ import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 
-interface UnnecessaryThrowsTest: JavaRecipeTest {
+interface UnnecessaryThrowsTest : JavaRecipeTest {
     override val recipe: Recipe
         get() = UnnecessaryThrows()
 
@@ -61,23 +61,20 @@ interface UnnecessaryThrowsTest: JavaRecipeTest {
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/631")
-    @Disabled
     @Test
     fun necessaryThrowsFromCloseable(jp: JavaParser) = assertUnchanged(
         before = """
-        import java.io.IOException;
-        import java.net.URL;
-        import java.net.URLClassLoader;
-        
-        class Test {
-            public void testLookupWithExtendedClasspath() throws IOException{
-                URL url = getClass().getResource("foo.jar");
-                assertNotNull(url);
-                // URLClassLoader implements Closeable and throws IOException from its close() method
-                try (URLClassLoader cl = new URLClassLoader(new URL[] {url})) {
+            import java.io.IOException;
+            import java.net.URL;
+            import java.net.URLClassLoader;
+            
+            class Test {
+                public void closeable() throws IOException {
+                    // URLClassLoader implements Closeable and throws IOException from its close() method
+                    try (URLClassLoader cl = new URLClassLoader(new URL[0])) {
+                    }
                 }
             }
-        }
         """
     )
 

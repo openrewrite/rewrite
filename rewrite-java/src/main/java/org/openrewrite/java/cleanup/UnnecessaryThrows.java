@@ -67,6 +67,17 @@ public class UnnecessaryThrows extends Recipe {
                         }
 
                         @Override
+                        public J.Try.Resource visitTryResource(J.Try.Resource tryResource, ExecutionContext executionContext) {
+                            JavaType.FullyQualified resourceType = tryResource.getVariableDeclarations().getTypeAsFullyQualified();
+                            if (TypeUtils.isAssignableTo(JavaType.Class.build("java.io.Closeable"), resourceType)) {
+                                unusedThrows.remove(JavaType.Class.build("java.io.IOException"));
+                            } else if (TypeUtils.isAssignableTo(JavaType.Class.build("java.lang.AutoCloseable"), resourceType)) {
+                                unusedThrows.remove(JavaType.Class.build("java.lang.Exception"));
+                            }
+                            return super.visitTryResource(tryResource, executionContext);
+                        }
+
+                        @Override
                         public J.Throw visitThrow(J.Throw thrown, ExecutionContext executionContext) {
                             JavaType.FullyQualified type = TypeUtils.asFullyQualified(thrown.getException().getType());
                             if (type != null) {
