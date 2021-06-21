@@ -29,7 +29,7 @@ class MavenSettingsTest {
     @Test
     fun parse() {
         val ctx = MavenExecutionContextView(InMemoryExecutionContext())
-        MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
             """
             <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -53,7 +53,7 @@ class MavenSettingsTest {
                 </profiles>
             </settings>
             """.trimIndent().byteInputStream()
-        }, ctx)
+        }, ctx))
 
         assertThat(ctx.repositories).hasSize(1)
     }
@@ -63,7 +63,7 @@ class MavenSettingsTest {
     @Test
     fun defaultActiveWhenNoOthersAreActive() {
         val ctx = MavenExecutionContextView(InMemoryExecutionContext())
-        MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
             """
             <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -95,7 +95,7 @@ class MavenSettingsTest {
                 </profiles>
             </settings>
             """.trimIndent().byteInputStream()
-        }, ctx)
+        }, ctx))
 
         assertThat(ctx.repositories.map { it.uri.toString() }).containsExactly("https://activebydefault.com")
     }
@@ -105,7 +105,7 @@ class MavenSettingsTest {
     @Test
     fun defaultOnlyActiveIfNoOthersAreActive() {
         val ctx = MavenExecutionContextView(InMemoryExecutionContext())
-        MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
             """
             <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -142,7 +142,7 @@ class MavenSettingsTest {
                 </profiles>
             </settings>
             """.trimIndent().byteInputStream()
-        }, ctx)
+        }, ctx))
 
         assertThat(ctx.repositories.map { it.uri.toString() }).containsExactly("https://activebyactivationlist.com")
     }
@@ -151,7 +151,7 @@ class MavenSettingsTest {
     @Test
     fun mirrorReplacesRepository() {
         val ctx = MavenExecutionContextView(InMemoryExecutionContext())
-        MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
             """
             <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -182,7 +182,7 @@ class MavenSettingsTest {
                 </mirrors>
             </settings>
             """.trimIndent().byteInputStream()
-        }, ctx)
+        }, ctx))
 
         assertThat(ctx.repositories
             .map { MavenRepositoryMirror.apply(ctx.mirrors, it) }
@@ -192,7 +192,7 @@ class MavenSettingsTest {
     @Test
     fun starredMirrorWithExclusion() {
         val ctx = MavenExecutionContextView(InMemoryExecutionContext())
-        MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
             """
             <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -227,7 +227,7 @@ class MavenSettingsTest {
                 </mirrors>
             </settings>
             """.trimIndent().byteInputStream()
-        }, ctx)
+        }, ctx))
 
         assertThat(ctx.repositories.map { MavenRepositoryMirror.apply(ctx.mirrors, it) })
             .hasSize(2)
