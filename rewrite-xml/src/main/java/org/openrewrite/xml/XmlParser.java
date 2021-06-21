@@ -60,7 +60,7 @@ public class XmlParser implements Parser<Xml.Document> {
                         return document;
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
-                        ctx.getOnError().accept(t);
+                        ctx.getOnError().accept(new IllegalStateException(sourceFile.getPath() + " " + t.getMessage(), t));
                         return null;
                     }
                 })
@@ -91,7 +91,7 @@ public class XmlParser implements Parser<Xml.Document> {
         public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
                                 int line, int charPositionInLine, String msg, RecognitionException e) {
             ctx.getOnError().accept(new XmlParsingException(sourcePath,
-                    String.format("Syntax error at line %d:%d %s.", line, charPositionInLine, msg), e));
+                    String.format("Syntax error in %s at line %d:%d %s.", sourcePath.toString(), line, charPositionInLine, msg), e));
         }
     }
 }
