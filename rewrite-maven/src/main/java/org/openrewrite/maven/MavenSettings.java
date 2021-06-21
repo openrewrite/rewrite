@@ -25,16 +25,11 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenXmlMapper;
 import org.openrewrite.maven.internal.ProfileActivation;
 import org.openrewrite.maven.internal.RawRepositories;
-import org.openrewrite.maven.tree.MavenRepository;
-import org.openrewrite.maven.tree.MavenRepositoryCredentials;
-import org.openrewrite.maven.tree.MavenRepositoryMirror;
 
 import java.io.IOException;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 
@@ -59,35 +54,9 @@ public class MavenSettings {
     Servers servers;
 
     @Nullable
-    public static MavenSettings parse(Parser.Input source, ExecutionContext ctx, String... activeProfiles) {
+    public static MavenSettings parse(Parser.Input source, ExecutionContext ctx) {
         try {
-            MavenSettings settings = MavenXmlMapper.readMapper().readValue(source.getSource(), MavenSettings.class);
-            MavenExecutionContextView view = new MavenExecutionContextView(ctx);
-
-            if (settings.servers != null) {
-                view.setCredentials(settings.servers.getServers().stream()
-                        .map(server -> new MavenRepositoryCredentials(server.getId(), server.getUsername(), server.getPassword()))
-                        .collect(Collectors.toList()));
-            }
-
-            if (settings.mirrors != null) {
-                view.setMirrors(settings.mirrors.getMirrors().stream()
-                        .map(mirror -> new MavenRepositoryMirror(mirror.getId(), mirror.getUrl(), mirror.getMirrorOf()))
-                        .collect(Collectors.toList()));
-            }
-
-            view.setRepositories(settings.getActiveRepositories(activeProfiles).stream()
-                    .map(repo -> new MavenRepository(
-                            repo.getId(),
-                            URI.create(repo.getUrl()),
-                            repo.getReleases() == null || repo.getReleases().isEnabled(),
-                            repo.getSnapshots() != null && repo.getSnapshots().isEnabled(),
-                            null,
-                            null
-                    ))
-                    .collect(Collectors.toList()));
-
-            return settings;
+            return MavenXmlMapper.readMapper().readValue(source.getSource(), MavenSettings.class);
         } catch (IOException e) {
             ctx.getOnError().accept(new IOException("Failed to parse " + source.getPath(), e));
             return null;

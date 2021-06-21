@@ -17,13 +17,16 @@ package org.openrewrite.maven;
 
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.MavenRepositoryCredentials;
 import org.openrewrite.maven.tree.MavenRepositoryMirror;
 
+import java.net.URI;
 import java.util.Collection;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 
@@ -73,5 +76,34 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
 
     public Collection<GroupArtifactVersion> getPinnedSnapshotVersions() {
         return getMessage(MAVEN_PINNED_SNAPSHOT_VERSIONS, emptyList());
+    }
+
+    public void setMavenSettings(@Nullable MavenSettings settings, String... activeProfiles) {
+        if (settings == null) {
+            return;
+        }
+
+        if (settings.getServers() != null) {
+            setCredentials(settings.getServers().getServers().stream()
+                    .map(server -> new MavenRepositoryCredentials(server.getId(), server.getUsername(), server.getPassword()))
+                    .collect(Collectors.toList()));
+        }
+
+        if (settings.getMirrors() != null) {
+            setMirrors(settings.getMirrors().getMirrors().stream()
+                    .map(mirror -> new MavenRepositoryMirror(mirror.getId(), mirror.getUrl(), mirror.getMirrorOf()))
+                    .collect(Collectors.toList()));
+        }
+
+        setRepositories(settings.getActiveRepositories(activeProfiles).stream()
+                .map(repo -> new MavenRepository(
+                        repo.getId(),
+                        URI.create(repo.getUrl()),
+                        repo.getReleases() == null || repo.getReleases().isEnabled(),
+                        repo.getSnapshots() != null && repo.getSnapshots().isEnabled(),
+                        null,
+                        null
+                ))
+                .collect(Collectors.toList()));
     }
 }
