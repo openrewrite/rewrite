@@ -53,7 +53,7 @@ class MavenSettingsTest {
                 </profiles>
             </settings>
             """.trimIndent().byteInputStream()
-        }, ctx)
+        })?.sendToExecutionContext(ctx)
 
         assertThat(ctx.repositories).hasSize(1)
     }
@@ -95,7 +95,7 @@ class MavenSettingsTest {
                 </profiles>
             </settings>
             """.trimIndent().byteInputStream()
-        }, ctx)
+        })?.sendToExecutionContext(ctx)
 
         assertThat(ctx.repositories.map { it.uri.toString() }).containsExactly("https://activebydefault.com")
     }
@@ -142,7 +142,7 @@ class MavenSettingsTest {
                 </profiles>
             </settings>
             """.trimIndent().byteInputStream()
-        }, ctx)
+        })?.sendToExecutionContext(ctx)
 
         assertThat(ctx.repositories.map { it.uri.toString() }).containsExactly("https://activebyactivationlist.com")
     }
@@ -182,7 +182,7 @@ class MavenSettingsTest {
                 </mirrors>
             </settings>
             """.trimIndent().byteInputStream()
-        }, ctx)
+        })?.sendToExecutionContext(ctx)
 
         assertThat(ctx.repositories
             .map { MavenRepositoryMirror.apply(ctx.mirrors, it) }
@@ -227,7 +227,7 @@ class MavenSettingsTest {
                 </mirrors>
             </settings>
             """.trimIndent().byteInputStream()
-        }, ctx)
+        })?.sendToExecutionContext(ctx)
 
         assertThat(ctx.repositories.map { MavenRepositoryMirror.apply(ctx.mirrors, it) })
             .hasSize(2)
@@ -262,7 +262,9 @@ class MavenSettingsTest {
                   </servers>
             </settings>
             """.trimIndent().byteInputStream()
-        }, ctx)
+        })
+
+        settings?.sendToExecutionContext(ctx)
 
         assertThat(settings!!.servers).isNotNull()
         assertThat(settings.servers!!.servers).hasSize(1)

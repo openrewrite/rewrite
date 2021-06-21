@@ -59,39 +59,39 @@ public class MavenSettings {
     Servers servers;
 
     @Nullable
-    public static MavenSettings parse(Parser.Input source, ExecutionContext ctx, String... activeProfiles) {
+    public static MavenSettings parse(Parser.Input source) {
         try {
-            MavenSettings settings = MavenXmlMapper.readMapper().readValue(source.getSource(), MavenSettings.class);
-            MavenExecutionContextView view = new MavenExecutionContextView(ctx);
-
-            if (settings.servers != null) {
-                view.setCredentials(settings.servers.getServers().stream()
-                        .map(server -> new MavenRepositoryCredentials(server.getId(), server.getUsername(), server.getPassword()))
-                        .collect(Collectors.toList()));
-            }
-
-            if (settings.mirrors != null) {
-                view.setMirrors(settings.mirrors.getMirrors().stream()
-                        .map(mirror -> new MavenRepositoryMirror(mirror.getId(), mirror.getUrl(), mirror.getMirrorOf()))
-                        .collect(Collectors.toList()));
-            }
-
-            view.setRepositories(settings.getActiveRepositories(activeProfiles).stream()
-                    .map(repo -> new MavenRepository(
-                            repo.getId(),
-                            URI.create(repo.getUrl()),
-                            repo.getReleases() == null || repo.getReleases().isEnabled(),
-                            repo.getSnapshots() != null && repo.getSnapshots().isEnabled(),
-                            null,
-                            null
-                    ))
-                    .collect(Collectors.toList()));
-
-            return settings;
+            return MavenXmlMapper.readMapper().readValue(source.getSource(), MavenSettings.class);
         } catch (IOException e) {
-            ctx.getOnError().accept(new IOException("Failed to parse " + source.getPath(), e));
             return null;
         }
+    }
+
+    public void sendToExecutionContext(ExecutionContext ctx, String... activeProfiles) {
+        MavenExecutionContextView view = new MavenExecutionContextView(ctx);
+
+        if (servers != null) {
+            view.setCredentials(servers.getServers().stream()
+                    .map(server -> new MavenRepositoryCredentials(server.getId(), server.getUsername(), server.getPassword()))
+                    .collect(Collectors.toList()));
+        }
+
+        if (mirrors != null) {
+            view.setMirrors(mirrors.getMirrors().stream()
+                    .map(mirror -> new MavenRepositoryMirror(mirror.getId(), mirror.getUrl(), mirror.getMirrorOf()))
+                    .collect(Collectors.toList()));
+        }
+
+        view.setRepositories(getActiveRepositories(activeProfiles).stream()
+                .map(repo -> new MavenRepository(
+                        repo.getId(),
+                        URI.create(repo.getUrl()),
+                        repo.getReleases() == null || repo.getReleases().isEnabled(),
+                        repo.getSnapshots() != null && repo.getSnapshots().isEnabled(),
+                        null,
+                        null
+                ))
+                .collect(Collectors.toList()));
     }
 
     public List<RawRepositories.Repository> getActiveRepositories(String... activeProfiles) {

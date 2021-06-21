@@ -23,7 +23,6 @@ import okhttp3.Credentials
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.intellij.lang.annotations.Language
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
@@ -503,7 +502,7 @@ class MavenParserTest {
                         </servers>
                     </settings>
                 """.trimIndent().byteInputStream()
-            }, ctx)
+            })?.sendToExecutionContext(ctx)
 
             val maven: Maven = MavenParser.builder().build().parse(
                 ctx,
