@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite;
+package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.nio.file.Path;

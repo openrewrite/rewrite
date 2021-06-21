@@ -18,6 +18,7 @@ package org.openrewrite
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.openrewrite.java.RenameFile
 import org.openrewrite.text.PlainText
 import org.openrewrite.text.PlainTextParser
 import java.nio.file.Path
