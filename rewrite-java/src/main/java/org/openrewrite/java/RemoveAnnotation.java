@@ -103,7 +103,9 @@ public class RemoveAnnotation extends Recipe {
                 List<J.Annotation> leadingAnnotations = multiVariable.getLeadingAnnotations();
                 if (annotationRemoved != null && !leadingAnnotations.isEmpty()) {
                     if (leadingAnnotations.get(0) == annotationRemoved || leadingAnnotations.size() == 1) {
-                        if(v.getTypeExpression() != null) {
+                        if (!v.getModifiers().isEmpty()) {
+                            v = v.withModifiers(Space.formatFirstPrefix(v.getModifiers(), Space.firstPrefix(v.getModifiers()).withWhitespace("")));
+                        } else if (v.getTypeExpression() != null) {
                             v = v.withTypeExpression(v.getTypeExpression().withPrefix(v.getTypeExpression().getPrefix().withWhitespace("")));
                         }
                     }

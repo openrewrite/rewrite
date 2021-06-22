@@ -16,6 +16,7 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 
 interface RemoveAnnotationTest : JavaRecipeTest {
 
@@ -41,6 +42,29 @@ interface RemoveAnnotationTest : JavaRecipeTest {
                 void test() {
                     int n;
                 }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/697")
+    @Test
+    fun preserveWhitespaceOnModifiers(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = RemoveAnnotation("@java.lang.Deprecated"),
+        before = """
+            import java.util.List;
+
+            @Deprecated
+            public class Test {
+                @Deprecated
+                private final Integer value = 0;
+            }
+        """,
+        after = """
+            import java.util.List;
+
+            public class Test {
+                private final Integer value = 0;
             }
         """
     )
