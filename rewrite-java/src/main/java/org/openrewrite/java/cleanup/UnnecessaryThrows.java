@@ -27,8 +27,10 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeUtils;
 
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.TreeSet;
 
 public class UnnecessaryThrows extends Recipe {
 
@@ -49,7 +51,7 @@ public class UnnecessaryThrows extends Recipe {
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                 J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
                 if (m.getThrows() != null && !m.isAbstract()) {
-                    Set<JavaType.FullyQualified> unusedThrows = new HashSet<>();
+                    Set<JavaType.FullyQualified> unusedThrows = new TreeSet<>(Comparator.comparing(JavaType.FullyQualified::getFullyQualifiedName));
                     for (NameTree nameTree : m.getThrows()) {
                         if (!TypeUtils.isAssignableTo(JavaType.Class.build("java.lang.RuntimeException"), nameTree.getType())) {
                             unusedThrows.add(TypeUtils.asFullyQualified(nameTree.getType()));
