@@ -1743,7 +1743,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                             fields,
                             interfaces,
                             null,
-                            TypeUtils.asFullyQualified(type(classType.supertype_field, stackWithSym)),
+                            TypeUtils.asFullyQualified(type(classType.supertype_field != null ? classType.supertype_field : symType.supertype_field, stackWithSym)),
                             owner,
                             relaxedClassTypeMatching);
                     sharedClassTypes.put(clazz.getFullyQualifiedName(), clazz);

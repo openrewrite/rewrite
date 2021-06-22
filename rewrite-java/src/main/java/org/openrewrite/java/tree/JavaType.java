@@ -583,10 +583,10 @@ public interface JavaType extends Serializable {
 
         @Override
         public boolean deepEquals(@Nullable JavaType type) {
-            if (!(type instanceof Cyclic)) {
-                return type != null && fullyQualifiedName.equals(((FullyQualified) type).getFullyQualifiedName());
+            if (type instanceof FullyQualified) {
+                return fullyQualifiedName.equals(((FullyQualified) type).getFullyQualifiedName());
             } else {
-                return this.equals(type);
+                return false;
             }
         }
 
