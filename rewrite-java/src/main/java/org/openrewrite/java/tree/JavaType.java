@@ -365,7 +365,16 @@ public interface JavaType extends Serializable {
             } else {
                 sortedMembers = members;
             }
-            return new Class(flagsBitMap, fullyQualifiedName, kind, sortedMembers, interfaces, constructors, (supertype == null && kind == Kind.Class) ? OBJECT : supertype, owningClass);
+
+            JavaType.FullyQualified computedSuper;
+            if (kind == Kind.Class || kind == Kind.Enum) {
+                computedSuper = supertype == null ? OBJECT : supertype;
+            } else {
+                //All interfaces will have a null supertype.
+                computedSuper = null;
+            }
+
+            return new Class(flagsBitMap, fullyQualifiedName, kind, sortedMembers, interfaces, constructors, computedSuper, owningClass);
         }
 
         public List<Variable> getVisibleSupertypeMembers() {
