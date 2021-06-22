@@ -602,8 +602,7 @@ interface TabsAndIndentsTest : JavaRecipeTest {
             		System.out.println();// comment
             	}
             }
-        """.trimIndent(),
-        expectedCyclesThatMakeChanges = 2
+        """.trimIndent()
     )
 
     @Test
@@ -612,14 +611,14 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         before = """
             public class A {
             /* this is a comment
-               that extends onto another line */
+                    that extends onto another line */
             public void method() {}
             }
         """,
         after = """
             public class A {
                 /* this is a comment
-                that extends onto another line */
+                    that extends onto another line */
                 public void method() {}
             }
         """
@@ -698,8 +697,7 @@ interface TabsAndIndentsTest : JavaRecipeTest {
                  */
                 public void method() {}
             }
-        """,
-        expectedCyclesThatMakeChanges = 2
+        """
     )
 
     @Test
@@ -1630,29 +1628,28 @@ interface TabsAndIndentsTest : JavaRecipeTest {
                 // shift right at end of block.
                 // shift left at end of block.
             }
-        """.trimIndent(),
-        expectedCyclesThatMakeChanges = 2
+        """.trimIndent()
     )
 
     @Issue("https://github.com/openrewrite/rewrite/pull/659")
     @Test
-    fun alignMultilineStyleCommentLeft(jp: JavaParser.Builder<*, *>) = assertChanged(
+    fun alignJavaDocs(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(tabsAndIndents()).build(),
         before = """
                     /**
-                     * JavaDoc starts on 2nd line
+                     * Align JavaDoc left that starts on 2nd line.
                      */
             public class A {
-                    /** JavaDoc starts on first line.
-                     * @param value test value.
-                     * @return value + 1 */
+            /** Align JavaDoc right that starts on 1st line.
+              * @param value test value.
+              * @return value + 1 */
                     public int methodOne(int value) {
                         return value + 1;
                     }
             
-                            /** Edge case odd formatting.
-              * @param value test value.
-                            * @return value + 1
+                            /** Edge case formatting test. And add missing `*`s
+               @param value test value.
+                             @return value + 1
                                         */
                     public int methodTwo(int value) {
                         return value + 1;
@@ -1661,17 +1658,17 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         """.trimIndent(),
         after = """
             /**
-             * JavaDoc starts on 2nd line
+             * Align JavaDoc left that starts on 2nd line.
              */
             public class A {
-                /** JavaDoc starts on first line.
+                /** Align JavaDoc right that starts on 1st line.
                  * @param value test value.
                  * @return value + 1 */
                 public int methodOne(int value) {
                     return value + 1;
                 }
             
-                /** Edge case odd formatting.
+                /** Edge case formatting test. And add missing `*`s
                  * @param value test value.
                  * @return value + 1
                  */
@@ -1679,8 +1676,7 @@ interface TabsAndIndentsTest : JavaRecipeTest {
                     return value + 1;
                 }
             }
-        """.trimIndent(),
-        expectedCyclesThatMakeChanges = 2
+        """.trimIndent()
     )
 
     @Issue("https://github.com/openrewrite/rewrite/pull/659")
@@ -1709,40 +1705,39 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         jp.styles(tabsAndIndents()).build(),
         before = """
             public class A {
-            /* this comment should be left alone
-             since a line doesn't start with a * */
+            /* Preserve whitespace alignment, since the comment has a line
+               that doesn't start with `*` */
             
-                /* this comment maintains the whitespace from the next `blank` line.
+                    /* Preserve whitespace from the next blank line.
                  
-               * should be formatted, since extra lines start with * 
-                    */
+                     * This line should be realigned to the column, since each line with characters starts with *.
+                     */
             
-                    /* this comment
-                        * should be formatted, since extra lines start with * */
+            /* This comment.
+             * should be realigned */
             public void method() {}
             }
         """.trimIndent(),
         after = """
             public class A {
-                /* this comment should be left alone
-                since a line doesn't start with a * */
+                /* Preserve whitespace alignment, since the comment has a line
+               that doesn't start with `*` */
             
-                /* this comment maintains the whitespace from the next `blank` line.
+                /* Preserve whitespace from the next blank line.
                 
-                 * should be formatted, since extra lines start with * 
+                 * This line should be realigned to the column, since each line with characters starts with *.
                  */
             
-                /* this comment
-                 * should be formatted, since extra lines start with * */
+                /* This comment.
+                 * should be realigned */
                 public void method() {}
             }
-        """.trimIndent(),
-        expectedCyclesThatMakeChanges = 2
+        """.trimIndent()
     )
 
     @Issue("https://github.com/openrewrite/rewrite/pull/677")
     @Test
-    fun mixedWhitespaceToTabs(jp: JavaParser.Builder<*, *>) = assertChanged(
+    fun normalizeJavaDocWhitespaceToTabs(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(tabsAndIndents {
             withUseTabCharacter(true)
                 .withTabSize(1)
@@ -1752,13 +1747,13 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         }).build(),
 
         before = """
-                    /**
-                     * JavaDoc starts on 2nd line
-                     */
-                public class A {
+              	    	  /**
+              	    	   * JavaDoc starts on 2nd line
+                	     */
+              	  public class A {
             	/** JavaDoc starts on first line.
-                 * @param value test value.
-                 * @return value + 1 */
+              	   * @param value test value.
+              	   	* @return value + 1 */
             	public int methodOne(int value) {
             		return value + 1;
             	}
@@ -1792,13 +1787,12 @@ interface TabsAndIndentsTest : JavaRecipeTest {
             		return value + 1;
             	}
             }
-        """.trimIndent(),
-        expectedCyclesThatMakeChanges = 2
+        """.trimIndent()
     )
 
     @Issue("https://github.com/openrewrite/rewrite/pull/677")
     @Test
-    fun mixedWhitespaceToSpaces(jp: JavaParser.Builder<*, *>) = assertChanged(
+    fun normalizeJavaDocWhitespaceToSpaces(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(tabsAndIndents()).build(),
         before = """
                     /**
@@ -1841,8 +1835,126 @@ interface TabsAndIndentsTest : JavaRecipeTest {
                     return value + 1;
                 }
             }
+        """.trimIndent()
+    )
+
+    @Test
+    fun normalizeBlockCommentToTabs(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(tabsAndIndents {
+            withUseTabCharacter(true)
+                .withTabSize(1)
+                .withIndentSize(1)
+                .withContinuationIndent(2)
+                .withIndentsRelativeToExpressionStart(false)
+        }).build(),
+
+        before = """
+            public class A {
+            	    /* Normalize to Tabs, and preserve whitespace length.
+                	     public int methodOne(int value) {
+              	  	   	     return value + 1;
+               	         }
+            
+                	     public int methodTwo(int value) {
+                 	   	     return value + 1;
+              	         }
+                 */
+            	public int methodOne(int value) {
+            		return value + 1;
+            	}
+            }
         """.trimIndent(),
-        expectedCyclesThatMakeChanges = 2
+        after = """
+            public class A {
+            	/* Normalize to Tabs, and preserve whitespace length.
+            			public int methodOne(int value) {
+            				return value + 1;
+            			}
+            
+            			public int methodTwo(int value) {
+            				return value + 1;
+            			}
+            	 */
+            	public int methodOne(int value) {
+            		return value + 1;
+            	}
+            }
+        """.trimIndent()
+    )
+
+    @Test
+    fun normalizeBlockCommentToSpaces(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(tabsAndIndents()).build(),
+        before = """
+            public class A {
+            	/* Normalize to spaces and preserve whitespace length.
+                    Example code?
+                	public int methodOne(int value) {
+              	  	   	return value + 1;
+               	    }
+            
+                	public int methodTwo(int value) {
+                 	   	return value + 1;
+              	    }
+                */
+            	public int methodOne(int value) {
+            		return value + 1;
+            	}
+            }
+        """.trimIndent(),
+        after = """
+            public class A {
+                /* Normalize to spaces and preserve whitespace length.
+                    Example code?
+                    public int methodOne(int value) {
+                        return value + 1;
+                    }
+            
+                    public int methodTwo(int value) {
+                        return value + 1;
+                    }
+                 */
+                public int methodOne(int value) {
+                    return value + 1;
+                }
+            }
+        """.trimIndent()
+    )
+
+    @Test
+    fun alignBlockComment(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(tabsAndIndents {
+            withUseTabCharacter(true)
+                .withTabSize(1)
+                .withIndentSize(1)
+                .withContinuationIndent(2)
+                .withIndentsRelativeToExpressionStart(false)
+        }).build(),
+
+        before = """
+            public class A {
+            	    /* Align the Block comment, since each line starts with `*`.
+                	     * public int methodOne(int value) {
+              	  	   	 *     return value + 1;
+               	         * }
+                */
+            	public int methodOne(int value) {
+            		return value + 1;
+            	}
+            }
+        """.trimIndent(),
+        after = """
+            public class A {
+            	/* Align the Block comment, since each line starts with `*`.
+            	 * public int methodOne(int value) {
+            	 *     return value + 1;
+            	 * }
+            	 */
+            	public int methodOne(int value) {
+            		return value + 1;
+            	}
+            }
+        """.trimIndent()
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/641")
