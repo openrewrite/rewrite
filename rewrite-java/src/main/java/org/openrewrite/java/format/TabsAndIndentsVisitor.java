@@ -396,7 +396,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         if (space.getComments().isEmpty()) {
-            int indent = getLengthOfWhitespace(space.getWhitespace());
+            int indent = findIndent(space);
             if (indent != column) {
                 int shift = column - indent;
                 space = space.withWhitespace(indent(space.getWhitespace(), shift));
