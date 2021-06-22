@@ -482,8 +482,8 @@ class MavenParserTest {
                 }
             }
         }.use { mockRepo ->
-            val ctx = InMemoryExecutionContext { err -> throw err }
-            MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
+            val ctx = MavenExecutionContextView(InMemoryExecutionContext { err -> throw err })
+            val settings = MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
                 """
                     <settings>
                         <mirrors>
@@ -503,7 +503,9 @@ class MavenParserTest {
                         </servers>
                     </settings>
                 """.trimIndent().byteInputStream()
-            }, ctx)
+            }, ctx)!!
+
+            ctx.setMavenSettings(settings)
 
             val maven: Maven = MavenParser.builder().build().parse(
                 ctx,
