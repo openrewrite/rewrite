@@ -17,10 +17,8 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.fail
 import org.openrewrite.Cursor
-import org.openrewrite.TreeVisitor
 import org.openrewrite.java.TypeValidator.InvalidTypeResult
 import org.openrewrite.java.tree.J
-import org.openrewrite.java.tree.JavaType
 
 /**
  * Produces a report about missing type attributions within a CompilationUnit.
