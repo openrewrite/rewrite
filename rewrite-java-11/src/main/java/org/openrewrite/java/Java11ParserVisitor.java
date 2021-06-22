@@ -1665,9 +1665,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
     @Nullable
     private JavaType type(@Nullable com.sun.tools.javac.code.Type type, List<Symbol> stack) {
-        // Word of caution, during attribution, we will likely encounter symbols that have been parsed but are not
-        // on the parser's classpath. Calling a method on the symbol that calls complete() will result in an exception
-        // being thrown. That is why this method uses the symbol's underlying fields directly vs the accessor methods.
         if (type instanceof ClassType) {
             if (type instanceof com.sun.tools.javac.code.Type.ErrorType) {
                 return null;
@@ -1676,6 +1673,15 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             ClassType classType = (ClassType) type;
             Symbol.ClassSymbol sym = (Symbol.ClassSymbol) type.tsym;
             ClassType symType = (ClassType) sym.type;
+            if (!sym.isCompleted()) {
+                try {
+                    sym.complete();
+                } catch (Symbol.CompletionFailure e) {
+                    //During attribution, we will likely encounter symbols that have been parsed but are not
+                    // on the parser's classpath. Calling complete on the symbol will result in an exception
+                    // being thrown. We eat the exception
+                }
+            }
 
             if (stack.contains(sym))
                 return new JavaType.Cyclic(sym.className());
@@ -1739,7 +1745,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                             null,
                             TypeUtils.asFullyQualified(type(classType.supertype_field, stackWithSym)),
                             owner,
-                            !sym.isCompleted() || relaxedClassTypeMatching);
+                            relaxedClassTypeMatching);
                     sharedClassTypes.put(clazz.getFullyQualifiedName(), clazz);
                 }
 
