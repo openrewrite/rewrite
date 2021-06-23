@@ -15,5 +15,5 @@
 #
 ---
 type: specs.openrewrite.org/v1beta/category
-name: Core
+name: OpenRewrite
 packageName: org.openrewrite
