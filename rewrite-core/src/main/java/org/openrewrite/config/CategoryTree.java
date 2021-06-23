@@ -195,6 +195,12 @@ public class CategoryTree<G> {
         }
     }
 
+    public Map<G, Collection<RecipeDescriptor>> getRecipesByGroup() {
+        synchronized (lock) {
+            return Collections.unmodifiableMap(new HashMap<>(recipesByGroup));
+        }
+    }
+
     public Collection<CategoryTree<G>> getSubtrees() {
         synchronized (lock) {
             if (!subtrees.isEmpty() && !recipesByGroup.isEmpty()) {
