@@ -25,7 +25,6 @@ import org.openrewrite.internal.lang.Nullable;
 import java.io.Serializable;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Comparator.comparing;
@@ -778,6 +777,7 @@ public interface JavaType extends Serializable {
         private final String fullyQualifiedName;
 
         @Nullable
+        @With
         private final FullyQualified bound;
 
         @Override

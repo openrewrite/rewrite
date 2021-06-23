@@ -17,11 +17,13 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class RemoveImport<P> extends JavaIsoVisitor<P> {
@@ -74,16 +76,24 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         J.CompilationUnit c = cu;
 
         boolean keepImport = typeUsed;
+        AtomicReference<Space> spaceForNextImport = new AtomicReference<>();
         c = c.withImports(ListUtils.flatMap(c.getImports(), impoort -> {
+            if(spaceForNextImport.get() != null) {
+                impoort = impoort.withPrefix(spaceForNextImport.get());
+                spaceForNextImport.set(null);
+            }
+
             String typeName = impoort.getTypeName();
             if (impoort.isStatic()) {
                 String imported = impoort.getQualid().getSimpleName();
                 if ((typeName + "." + imported).equals(type) && !methodsAndFieldsUsed.contains(imported)) {
                     // e.g. remove java.util.Collections.emptySet when type is java.util.Collections.emptySet
+                    spaceForNextImport.set(impoort.getPrefix());
                     return null;
                 } else if (typeName.equals(type) && "*".equals(imported)) {
                     if (methodsAndFieldsUsed.isEmpty() && otherMethodsAndFieldsInTypeUsed.size() < importLayoutStyle.getClassCountToUseStarImport()) {
                         if (otherMethodsAndFieldsInTypeUsed.isEmpty()) {
+                            spaceForNextImport.set(impoort.getPrefix());
                             return null;
                         } else {
                             return unfoldStarImport(impoort, otherMethodsAndFieldsInTypeUsed);
@@ -91,14 +101,17 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                     }
                 } else if (typeName.equals(type) && !methodsAndFieldsUsed.contains(imported)) {
                     // e.g. remove java.util.Collections.emptySet when type is java.util.Collections
+                    spaceForNextImport.set(impoort.getPrefix());
                     return null;
                 }
             } else if (!keepImport && typeName.equals(type)) {
+                spaceForNextImport.set(impoort.getPrefix());
                 return null;
             } else if (!keepImport && impoort.getPackageName().equals(owner) &&
                     "*".equals(impoort.getClassName()) &&
                     otherTypesInPackageUsed.size() < importLayoutStyle.getNameCountToUseStarImport()) {
                 if (otherTypesInPackageUsed.isEmpty()) {
+                    spaceForNextImport.set(impoort.getPrefix());
                     return null;
                 } else {
                     return unfoldStarImport(impoort, otherTypesInPackageUsed);
@@ -108,11 +121,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         }));
 
         if (c != cu) {
-            if (!c.getImports().isEmpty()) {
-                c = autoFormat(c, c.getImports().get(c.getImports().size() - 1), p, getCursor());
-            } else if (!c.getClasses().isEmpty()) {
-                c = autoFormat(c, c.getClasses().get(0).getName(), p, getCursor());
-            }
+            doAfterVisit(new FormatFirstClassPrefix<>());
         }
 
         return c;
