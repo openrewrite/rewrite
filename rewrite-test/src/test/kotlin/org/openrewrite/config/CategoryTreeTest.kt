@@ -35,13 +35,18 @@ class CategoryTreeTest {
 
     @Test
     fun getCategory() {
-        assertThat(categoryTree.getOrThrow("org", "openrewrite")).isNotNull
+        assertThat(categoryTree.getCategoryOrThrow("org", "openrewrite")).isNotNull
     }
 
     @Test
     fun getRecipeCount() {
-        assertThat(categoryTree.getOrThrow("org", "openrewrite").recipeCount)
+        assertThat(categoryTree.getCategoryOrThrow("org", "openrewrite").recipeCount)
             .isGreaterThan(10)
+    }
+
+    @Test
+    fun getRecipe() {
+        assertThat(categoryTree.getRecipe("org.openrewrite.java.ChangeMethodName")).isNotNull
     }
 
     private fun printTree(categoryTree: CategoryTree<*>, level: Int) {

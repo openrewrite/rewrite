@@ -52,7 +52,7 @@ public class CategoryTree<G> {
     }
 
     @Nullable
-    public CategoryTree<G> get(String subcategory) {
+    public CategoryTree<G> getCategory(String subcategory) {
         String packageName = descriptor.getPackageName();
         synchronized (lock) {
             for (CategoryTree<G> t : subtrees) {
@@ -70,8 +70,20 @@ public class CategoryTree<G> {
         return null;
     }
 
-    public CategoryTree<G> getOrThrow(String subcategory) {
-        CategoryTree<G> subtree = get(subcategory);
+    @Nullable
+    public CategoryTree<G> getCategory(String... subcategories) {
+        CategoryTree<G> acc = this;
+        for (String subcategory : subcategories) {
+            if (acc == null) {
+                return null;
+            }
+            acc = acc.getCategory(subcategory);
+        }
+        return acc;
+    }
+
+    public CategoryTree<G> getCategoryOrThrow(String subcategory) {
+        CategoryTree<G> subtree = getCategory(subcategory);
         if (subtree == null) {
             throw new IllegalArgumentException("No subcategory of " +
                     descriptor.getPackageName() + " named '" + subcategory + "'");
@@ -79,12 +91,27 @@ public class CategoryTree<G> {
         return subtree;
     }
 
-    public CategoryTree<G> getOrThrow(String... subcategories) {
+    public CategoryTree<G> getCategoryOrThrow(String... subcategories) {
         CategoryTree<G> acc = this;
         for (String subcategory : subcategories) {
-            acc = acc.getOrThrow(subcategory);
+            acc = acc.getCategoryOrThrow(subcategory);
         }
         return acc;
+    }
+
+    @Nullable
+    public RecipeDescriptor getRecipe(String id) {
+        if (id.contains(".")) {
+            String[] split = id.split("\\.", 2);
+            CategoryTree<G> subcategory = getCategory(split[0]);
+            return subcategory == null ? null : subcategory.getRecipe(split[1]);
+        }
+
+        return recipesByGroup.values().stream()
+                .flatMap(Collection::stream)
+                .filter(r -> r.getName().substring(r.getName().lastIndexOf('.') + 1).equals(id))
+                .findAny()
+                .orElse(null);
     }
 
     public CategoryTree<G> putAll(G group, Environment environment) {
@@ -102,7 +129,7 @@ public class CategoryTree<G> {
     }
 
     private void add(G group, RecipeDescriptor recipe, Iterable<CategoryDescriptor> categories) {
-        String category = getCategory(recipe.getName());
+        String category = recipe.getName().substring(0, recipe.getName().lastIndexOf('.'));
         String packageName = descriptor.getPackageName();
         if (category.equals(packageName)) {
             recipesByGroup.computeIfAbsent(group, g -> new ArrayList<>()).add(recipe);
@@ -188,9 +215,5 @@ public class CategoryTree<G> {
             }
             return subtrees;
         }
-    }
-
-    private String getCategory(String id) {
-        return id.substring(0, id.lastIndexOf('.'));
     }
 }
