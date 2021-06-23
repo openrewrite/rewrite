@@ -34,8 +34,8 @@ styleConfigs:
   - org.openrewrite.java.style.TabsAndIndentsStyle:
       useTabCharacter: true
       tabSize: 4
-      indentSize: 1
-      continuationIndent: 2
+      indentSize: 4
+      continuationIndent: 8
       indentsRelativeToExpressionStart: false
 #  - org.openrewrite.java.style.DeclarationOrderStyle:
 #      layout:
