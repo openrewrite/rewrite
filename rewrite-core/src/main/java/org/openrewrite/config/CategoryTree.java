@@ -114,6 +114,21 @@ public class CategoryTree<G> {
                 .orElse(null);
     }
 
+    @Nullable
+    public G getRecipeGroup(String id) {
+        if (id.contains(".")) {
+            String[] split = id.split("\\.", 2);
+            CategoryTree<G> subcategory = getCategory(split[0]);
+            return subcategory == null ? null : subcategory.getRecipeGroup(split[1]);
+        }
+
+        return recipesByGroup.entrySet().stream()
+                .filter(g -> g.getValue().stream().anyMatch(r -> r.getName().substring(r.getName().lastIndexOf('.') + 1).equals(id)))
+                .map(Map.Entry::getKey)
+                .findAny()
+                .orElse(null);
+    }
+
     public CategoryTree<G> putAll(G group, Environment environment) {
         return putAll(group, environment.listRecipeDescriptors(), environment.listCategoryDescriptors());
     }
