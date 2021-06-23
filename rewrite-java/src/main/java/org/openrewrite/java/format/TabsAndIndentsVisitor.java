@@ -467,47 +467,53 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             char c = comment.getText().charAt(i);
             switch (c) {
                 case '\t':
+                    if (!isFirstLine && isWhitespace) {
+                        // Normalizes the whitespace char to match the `style`.
+                        // The character count is updated appropriately in `shift()` after a new line char is found.
+                        if (style.getUseTabCharacter()) {
+                            whitespace.append(c);
+                            indent += style.getTabSize();
+                        } else {
+                            /* Visualization of conversion for style.getTabSize() == 4:
+                             * s s s t => s s s s
+                             * s s t   => s s s s
+                             * s t     => s s s s
+                             * t       => s s s s
+                             */
+                            for (int j = tabLength % style.getTabSize(); j < style.getTabSize(); ++j) {
+                                whitespace.append(' ');
+                                indent ++;
+                                hasChanged = true;
+                            }
+                        }
+                        tabLength = 0;
+                    } else {
+                        currentText.append(c);
+                    }
+                    break;
+
                 case ' ':
                     if (!isFirstLine && isWhitespace) {
                         // Normalizes the whitespace char to match the `style`.
                         // The character count is updated appropriately in `shift()` after a new line char is found.
                         if (style.getUseTabCharacter()) {
-                            if (c == '\t') {
-                                whitespace.append(c);
-                                indent++;
+                            tabLength++;
+                            // Converts spaces into 1 tab, remaining values are truncated.
+                            // Note: tabSize determines how many spaces a tab is equivalent to.
+                            // A tabSize of 4 == 4 spaces.
+                            if (tabLength == style.getTabSize()) {
+                                whitespace.append('\t');
+                                indent += style.getTabSize();
                                 tabLength = 0;
-                            } else {
-                                tabLength++;
-                                // Converts 4 spaces into 1 tab, remaining values are truncated.
-                                if (tabLength == 4) {
-                                    whitespace.append('\t');
-                                    indent++;
-                                    tabLength = 0;
-                                    hasChanged = true;
-                                }
+                                hasChanged = true;
                             }
                         } else {
-                            if (c == ' ') {
-                                whitespace.append(c);
-                                indent++;
-                                tabLength++;
-                            } else {
-                                /* Visualization of conversion:
-                                 * s s s t => s s s s
-                                 * s s t   => s s s s
-                                 * s t     => s s s s
-                                 * t       => s s s s
-                                 */
-                                for (int j = tabLength % 4; j < 4; ++j) {
-                                    whitespace.append(' ');
-                                    indent++;
-                                    hasChanged = true;
-                                }
-                                tabLength = 0;
-                            }
+                            whitespace.append(c);
+                            indent++;
+                            tabLength++;
                         }
 
-                        if (tabLength == 4) {
+                        if (tabLength == style.getTabSize()) {
                             tabLength = 0;
                         }
                     } else {
@@ -591,9 +597,8 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             if (currentText.length() == 0) {
                 // Add a space to the whitespace that precedes the `*/` so that it is aligned to the prefix `*/`.
                 if (style.getUseTabCharacter()) {
-                    whitespace.append(' ');
-                    if (prev != ' ') {
-                        hasChanged = true;
+                    if (hasChanged) {
+                        whitespace.append(' ');
                     }
                 } else {
                     if (whitespace.length() - 1 == column) {

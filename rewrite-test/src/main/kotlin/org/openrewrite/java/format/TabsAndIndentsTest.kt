@@ -1740,9 +1740,9 @@ interface TabsAndIndentsTest : JavaRecipeTest {
     fun normalizeJavaDocWhitespaceToTabs(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(tabsAndIndents {
             withUseTabCharacter(true)
-                .withTabSize(1)
-                .withIndentSize(1)
-                .withContinuationIndent(2)
+                .withTabSize(4)
+                .withIndentSize(4)
+                .withContinuationIndent(8)
                 .withIndentsRelativeToExpressionStart(false)
         }).build(),
 
@@ -1793,7 +1793,13 @@ interface TabsAndIndentsTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/pull/677")
     @Test
     fun normalizeJavaDocWhitespaceToSpaces(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(tabsAndIndents()).build(),
+        jp.styles(tabsAndIndents {
+            withUseTabCharacter(false)
+                .withTabSize(4)
+                .withIndentSize(4)
+                .withContinuationIndent(8)
+                .withIndentsRelativeToExpressionStart(false)
+        }).build(),
         before = """
                     /**
                      * JavaDoc starts on 2nd line
@@ -1842,9 +1848,9 @@ interface TabsAndIndentsTest : JavaRecipeTest {
     fun normalizeBlockCommentToTabs(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(tabsAndIndents {
             withUseTabCharacter(true)
-                .withTabSize(1)
-                .withIndentSize(1)
-                .withContinuationIndent(2)
+                .withTabSize(4)
+                .withIndentSize(4)
+                .withContinuationIndent(8)
                 .withIndentsRelativeToExpressionStart(false)
         }).build(),
 
@@ -1925,13 +1931,17 @@ interface TabsAndIndentsTest : JavaRecipeTest {
     fun alignBlockComment(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(tabsAndIndents {
             withUseTabCharacter(true)
-                .withTabSize(1)
-                .withIndentSize(1)
-                .withContinuationIndent(2)
+                .withTabSize(4)
+                .withIndentSize(4)
+                .withContinuationIndent(8)
                 .withIndentsRelativeToExpressionStart(false)
         }).build(),
 
         before = """
+            /* License example.
+             *
+             */
+            package org.openrewrite;
             public class A {
             	    /* Align the Block comment, since each line starts with `*`.
                 	     * public int methodOne(int value) {
@@ -1944,6 +1954,10 @@ interface TabsAndIndentsTest : JavaRecipeTest {
             }
         """.trimIndent(),
         after = """
+            /* License example.
+             *
+             */
+            package org.openrewrite;
             public class A {
             	/* Align the Block comment, since each line starts with `*`.
             	 * public int methodOne(int value) {
