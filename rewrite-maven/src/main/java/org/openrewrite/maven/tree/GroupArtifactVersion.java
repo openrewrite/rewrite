@@ -26,8 +26,8 @@ public class GroupArtifactVersion {
     String version;
 
     /**
-     * In the form "${timestamp}-${buildNumber}", e.g. for the artifact rewrite-testing-frameworks-1.7.0-20210614.172805-1.jar,
-     * the dated snapshot version is "20210614.172805-1".
+     * In the form "${version}-${timestamp}-${buildNumber}", e.g. for the artifact rewrite-testing-frameworks-1.7.0-20210614.172805-1.jar,
+     * the dated snapshot version is "1.7.0-20210614.172805-1".
      */
     @Nullable
     String datedSnapshotVersion;

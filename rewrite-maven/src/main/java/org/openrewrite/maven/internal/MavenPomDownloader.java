@@ -322,7 +322,7 @@ public class MavenPomDownloader {
                         pinnedSnapshotVersion.getGroupId().equals(groupId) &&
                         pinnedSnapshotVersion.getArtifactId().equals(artifactId) &&
                         pinnedSnapshotVersion.getVersion().equals(version)) {
-                    return version.replaceFirst("SNAPSHOT$", pinnedSnapshotVersion.getDatedSnapshotVersion());
+                    return pinnedSnapshotVersion.getDatedSnapshotVersion();
                 }
             }
 

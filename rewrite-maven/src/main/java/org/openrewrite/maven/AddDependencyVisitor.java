@@ -26,7 +26,6 @@ import org.openrewrite.maven.internal.MavenMetadata;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.Version;
 import org.openrewrite.maven.search.DependencyInsight;
-import org.openrewrite.maven.search.FindDependency;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.Scope;
@@ -37,12 +36,12 @@ import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.regex.Pattern;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
-import static java.util.Collections.emptySet;
+import static java.util.Collections.*;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -130,7 +129,6 @@ public class AddDependencyVisitor extends MavenVisitor {
                         new Pom(randomId(), groupId, artifactId, dependencyVersion, null, null, null, packaging, classifier, null,
                                 emptyList(), new Pom.DependencyManagement(emptyList()), emptyList(), emptyList(), emptyMap(), emptyMap()),
                         dependencyVersion,
-                        null,
                         emptySet()
                 )
         );

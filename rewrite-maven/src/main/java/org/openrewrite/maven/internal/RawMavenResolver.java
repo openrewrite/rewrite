@@ -542,7 +542,6 @@ public class RawMavenResolver {
                             optional,
                             resolved,
                             depTask.getRequestedVersion(),
-                            depTaskPom.getSnapshotVersion(),
                             depTask.getExclusions()
                     ));
                 }
@@ -588,7 +587,6 @@ public class RawMavenResolver {
                                         ancestorDep.isOptional(),
                                         conflictResolved,
                                         ancestorDep.getRequestedVersion(),
-                                        ancestorDep.getDatedSnapshotVersion(),
                                         ancestorDep.getExclusions()
                                 ));
                             }

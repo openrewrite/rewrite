@@ -340,9 +340,6 @@ public class Pom implements Marker {
         @Nullable
         String requestedVersion;
 
-        @Nullable
-        String datedSnapshotVersion;
-
         Set<GroupArtifact> exclusions;
 
         public String getGroupId() {
@@ -355,6 +352,11 @@ public class Pom implements Marker {
 
         public String getVersion() {
             return model.getVersion();
+        }
+
+        @Nullable
+        public String getDatedSnapshotVersion() {
+            return model.getDatedSnapshotVersion();
         }
 
         public String getCoordinates() {
