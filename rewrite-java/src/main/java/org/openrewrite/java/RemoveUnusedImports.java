@@ -20,7 +20,6 @@ import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
@@ -165,14 +164,15 @@ public class RemoveUnusedImports extends Recipe {
                     }
                 }
             }
-            cu = changed ? cu.getPadding().withImports(importsWithUsage) : cu;
 
             if (changed) {
-                doAfterVisit(new FormatFirstClassPrefix<>());
-                if (cu.getPackageDeclaration() == null) {
-                    cu = cu.withImports(ListUtils.mapFirst(cu.getImports(), i ->
-                            autoFormat(i, ctx)));
+                cu = cu.getPadding().withImports(importsWithUsage);
+                if (!cu.getImports().isEmpty()) {
+                    cu = autoFormat(cu, cu.getImports().get(cu.getImports().size() - 1), ctx, getCursor());
+                } else if (!cu.getClasses().isEmpty()) {
+                    cu = autoFormat(cu, cu.getClasses().get(0).getName(), ctx, getCursor());
                 }
+                cu = (J.CompilationUnit) new OrderImports.OrderImportsVisitor<ExecutionContext>(false).visit(cu, ctx);
             }
 
             return cu;

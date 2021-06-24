@@ -18,6 +18,7 @@ package org.openrewrite.java
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 
 interface ChangeTypeTest : JavaRecipeTest {
     override val recipe: ChangeType
@@ -89,12 +90,14 @@ interface ChangeTypeTest : JavaRecipeTest {
         dependsOn = arrayOf(a1, a2),
         before = """
             import a.A1;
+            
             public class B {
                A1[] a = new A1[0];
             }
         """,
         after = """
             import a.A2;
+            
             public class B {
                A2[] a = new A2[0];
             }
@@ -114,10 +117,12 @@ interface ChangeTypeTest : JavaRecipeTest {
         ),
         before = """
             import a.A1;
+            
             public class B extends A1 implements I1 {}
         """,
         after = """
             import a.A2;
+            
             public class B extends A2 implements I2 {}
         """
     )
@@ -128,12 +133,14 @@ interface ChangeTypeTest : JavaRecipeTest {
         dependsOn = arrayOf(a1, a2),
         before = """
             import a.A1;
+            
             public class B {
                public A1 foo() throws A1 { return null; }
             }
         """,
         after = """
             import a.A2;
+            
             public class B {
                public A2 foo() throws A2 { return null; }
             }
@@ -146,6 +153,7 @@ interface ChangeTypeTest : JavaRecipeTest {
         dependsOn = arrayOf(a1, a2),
         before = """
             import a.A1;
+            
             public class B {
                public <T extends A1> T generic(T n, List<? super A1> in);
                public void test() {
@@ -156,6 +164,7 @@ interface ChangeTypeTest : JavaRecipeTest {
         """,
         after = """
             import a.A2;
+            
             public class B {
                public <T extends A2> T generic(T n, List<? super A2> in);
                public void test() {
@@ -172,6 +181,7 @@ interface ChangeTypeTest : JavaRecipeTest {
         dependsOn = arrayOf(a1, a2),
         before = """
             import a.A1;
+            
             public class B {
                public void test() {
                    try {}
@@ -181,6 +191,7 @@ interface ChangeTypeTest : JavaRecipeTest {
         """,
         after = """
             import a.A2;
+            
             public class B {
                public void test() {
                    try {}
@@ -196,12 +207,14 @@ interface ChangeTypeTest : JavaRecipeTest {
         dependsOn = arrayOf(a1, a2),
         before = """
             import a.A1;
+            
             public class B {
                A1 f1, f2;
             }
         """,
         after = """
             import a.A2;
+            
             public class B {
                A2 f1, f2;
             }
@@ -214,12 +227,14 @@ interface ChangeTypeTest : JavaRecipeTest {
         dependsOn = arrayOf(a1, a2),
         before = """
             import a.A1;
+            
             public class B {
                A1 a = new A1();
             }
         """,
         after = """
             import a.A2;
+            
             public class B {
                A2 a = new A2();
             }
@@ -232,12 +247,14 @@ interface ChangeTypeTest : JavaRecipeTest {
         dependsOn = arrayOf(a1, a2),
         before = """
             import a.A1;
+            
             public class B {
                Map<A1, A1> m;
             }
         """,
         after = """
             import a.A2;
+            
             public class B {
                Map<A2, A2> m;
             }
@@ -250,12 +267,14 @@ interface ChangeTypeTest : JavaRecipeTest {
         dependsOn = arrayOf(a1, a2),
         before = """
             import a.A1;
+            
             public class B {
                A1 a = (A1) null;
             }
         """,
         after = """
             import a.A2;
+            
             public class B {
                A2 a = (A2) null;
             }
@@ -268,12 +287,14 @@ interface ChangeTypeTest : JavaRecipeTest {
         dependsOn = arrayOf(a1, a2),
         before = """
             import a.A1;
+            
             public class A {
                 Class<?> clazz = A1.class;
             }
         """,
         after = """
             import a.A2;
+            
             public class A {
                 Class<?> clazz = A2.class;
             }
@@ -286,6 +307,7 @@ interface ChangeTypeTest : JavaRecipeTest {
         dependsOn = arrayOf(a1, a2),
         before = """
             import a.A1;
+            
             public class B {
                A1 a = null;
                public void test() { a.foo(); }
@@ -293,6 +315,7 @@ interface ChangeTypeTest : JavaRecipeTest {
         """,
         after = """
             import a.A2;
+            
             public class B {
                A2 a = null;
                public void test() { a.foo(); }
@@ -306,6 +329,7 @@ interface ChangeTypeTest : JavaRecipeTest {
         dependsOn = arrayOf(a1, a2),
         before = """
             import static a.A1.stat;
+            
             public class B {
                 public void test() {
                     stat();
@@ -314,6 +338,7 @@ interface ChangeTypeTest : JavaRecipeTest {
         """,
         after = """
             import static a.A2.stat;
+            
             public class B {
                 public void test() {
                     stat();
@@ -363,6 +388,44 @@ interface ChangeTypeTest : JavaRecipeTest {
                 int getFoo() {
                     return foo;
                 }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/698")
+    @Test
+    fun importOrdering(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = ChangeType("com.yourorg.a.A", "com.myorg.b.B"),
+        dependsOn = arrayOf("""
+            package com.yourorg.a;
+            public class A {}
+        """,
+        """
+            package com.myorg.b;
+            public class B {}
+        """),
+        before = """
+            package com.myorg;
+
+            import java.util.ArrayList;
+            import com.yourorg.a.A;
+            import java.util.List;
+            
+            public class Foo {
+                List<A> a = new ArrayList<>();
+            }
+        """,
+        after = """
+            package com.myorg;
+
+            import com.myorg.b.B;
+
+            import java.util.ArrayList;
+            import java.util.List;
+            
+            public class Foo {
+                List<B> a = new ArrayList<>();
             }
         """
     )

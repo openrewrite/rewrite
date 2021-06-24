@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,16 +17,17 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
 
-interface RemoveUnusedImportsTest : JavaRecipeTest {
-
-    override val recipe
-        get() = RemoveUnusedImports()
+interface RemoveImportTest : JavaRecipeTest {
+    fun removeImport(type: String) =
+            RemoveImport<ExecutionContext>(type).toRecipe()
 
     @Test
     fun removeNamedImport(jp: JavaParser) = assertChanged(
         jp,
+        recipe = removeImport("java.util.List"),
         before = """
             import java.util.List;
             class A {}
@@ -37,6 +38,7 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
     @Test
     fun leaveImportIfRemovedTypeIsStillReferredTo(jp: JavaParser) = assertUnchanged(
         jp,
+        recipe = removeImport("java.util.List"),
         before = """
             import java.util.List;
             class A {
@@ -45,33 +47,10 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
         """
     )
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/617")
-    @Test
-    fun leaveImportForStaticImportEnumInAnnotation(jp: JavaParser) = assertUnchanged(
-        jp,
-        dependsOn = arrayOf("""
-            package org.openrewrite.test;
-            
-            public @interface YesOrNo {
-                Status status();
-                enum Status {
-                    YES, NO
-                }
-            }
-        """),
-        before = """
-            package org.openrewrite.test;
-            
-            import static org.openrewrite.test.YesOrNo.Status.YES;
-            
-            @YesOrNo(status = YES)
-            public class Foo {}
-        """
-    )
-
     @Test
     fun removeStarImportIfNoTypesReferredTo(jp: JavaParser) = assertChanged(
         jp,
+        recipe = removeImport("java.util.List"),
         before = """
             import java.util.*;
             class A {}
@@ -81,27 +60,29 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
 
     @Test
     fun replaceStarImportWithNamedImportIfOnlyOneReferencedTypeRemains(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+            jp,
+            recipe = removeImport("java.util.List"),
+            before = """
             import java.util.*;
             
             class A {
-                Collection<Integer> c;
+               Collection<Integer> c;
             }
         """,
-        after = """
+            after = """
             import java.util.Collection;
             
             class A {
-                Collection<Integer> c;
+               Collection<Integer> c;
             }
         """
     )
 
     @Test
     fun leaveStarImportInPlaceIfThreeOrMoreTypesStillReferredTo(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+            jp,
+            recipe = removeImport("java.util.List"),
+            before = """
             import java.util.*;
             class A {
                Collection<Integer> c;
@@ -112,12 +93,13 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
 
     @Test
     fun removeStarStaticImport(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+            jp,
+            recipe = removeImport("java.util.Collections"),
+            before = """
             import static java.util.Collections.*;
             class A {}
         """,
-        after = "class A {}"
+            after = "class A {}"
     )
 
     @Disabled
@@ -125,6 +107,7 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
     @Test
     fun leaveStarStaticImportIfReferenceStillExists(jp: JavaParser) = assertChanged(
         jp,
+        recipe = removeImport("java.util.Collections"),
         before = """
             import static java.util.Collections.*;
             class A {
@@ -140,8 +123,9 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
     )
 
     @Test
-    fun removeStaticImportIfNotReferenced(jp: JavaParser) = assertChanged(
+    fun removeStaticImport(jp: JavaParser) = assertChanged(
         jp,
+        recipe = removeImport("java.time.DayOfWeek.MONDAY"),
         before = """
             import java.time.DayOfWeek;
             
@@ -170,6 +154,7 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
     @Test
     fun leaveNamedStaticImportIfReferenceStillExists(jp: JavaParser) = assertChanged(
         jp,
+        recipe = removeImport("java.util.Collections"),
         before = """
             import static java.util.Collections.emptyList;
             import static java.util.Collections.emptySet;
@@ -187,130 +172,14 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
         """
     )
 
-    @Test
-    fun leaveNamedStaticImportOnFieldIfReferenceStillExists(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(
-            """
-                package foo;
-                public class B {
-                    public static final String STRING = "string";
-                    public static final String STRING2 = "string2";
-                }
-            """,
-            """
-                package foo;
-                public class C {
-                    public static final String ANOTHER = "string";
-                }
-            """
-        ),
-        before = """
-            import static foo.B.STRING;
-            import static foo.B.STRING2;
-            import static foo.C.*;
-            
-            public class A {
-                String a = STRING;
-            }
-        """,
-        after = """
-            import static foo.B.STRING;
-            
-            public class A {
-                String a = STRING;
-            }
-        """
-    )
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/429")
-    @Test
-    fun removePackageInfoImports(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(
-            """
-                package foo;
-                public @interface FooAnnotation {}
-                public @interface Foo {}
-                public @interface Bar {}
-            """
-        ),
-        before = """
-            @Foo
-            @Bar
-            package foo.bar.baz;
-            
-            import foo.Bar;
-            import foo.Foo;
-            import foo.FooAnnotation;
-        """,
-        after = """
-            @Foo
-            @Bar
-            package foo.bar.baz;
-            
-            import foo.Bar;
-            import foo.Foo;
-        """
-    )
-    @Test
-    fun removePackageInfoStarImports(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(
-            """
-                package foo;
-                public @interface FooAnnotation {}
-                public @interface Foo {}
-                public @interface Bar {}
-            """
-        ),
-        before = """
-            @Foo
-            @Bar
-            package foo.bar.baz;
-            
-            import foo.*;
-        """,
-        after = """
-            @Foo
-            @Bar
-            package foo.bar.baz;
-            
-            import foo.Bar;
-            import foo.Foo;
-        """
-    )
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/594")
-    @Test
-    fun dontRemoveStaticReferenceToPrimitiveField(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
-            import static java.sql.ResultSet.TYPE_FORWARD_ONLY;
-            public class A {
-                int t = TYPE_FORWARD_ONLY;
-            }
-        """
-    )
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/580")
-    @Test
-    fun resultSetType(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
-            import java.sql.ResultSet;
-            public class A {
-                int t = ResultSet.TYPE_FORWARD_ONLY;
-            }
-        """
-    )
-
     @Issue("https://github.com/openrewrite/rewrite/issues/701")
     @Test
-    fun ensuresWhitespaceAfterPackageDeclaration(jp: JavaParser) = assertChanged(
+    fun preservesWhitespaceAfterPackageDeclaration(jp: JavaParser) = assertChanged(
         jp,
+        recipe = removeImport("java.util.List"),
         before = """
             package com.example.foo;
+            
             import java.util.List;
             import java.util.ArrayList;
             
@@ -331,11 +200,14 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/701")
     @Test
-    fun ensuresWhitespaceAfterPackageDeclarationNoImportsRemain(jp: JavaParser) = assertChanged(
+    fun preservesWhitespaceAfterPackageDeclarationNoImportsRemain(jp: JavaParser) = assertChanged(
         jp,
+        recipe = removeImport("java.util.List"),
         before = """
             package com.example.foo;
+            
             import java.util.List;
+            
             public class A {
             }
         """,
@@ -349,8 +221,9 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/701")
     @Test
-    fun ensuresWhitespaceBetweenGroupsOfImports(jp: JavaParser) = assertChanged(
+    fun preservesWhitespaceBetweenGroupsOfImports(jp: JavaParser) = assertChanged(
         jp,
+        recipe = removeImport("java.util.List"),
         dependsOn = arrayOf("""
             package com.yourorg.b;
             public class B {}
@@ -359,6 +232,7 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
             package com.example.foo;
             
             import com.yourorg.b.B;
+            
             import java.util.List;
             import java.util.ArrayList;
             
@@ -382,6 +256,7 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
     @Test
     fun doesNotAffectClassBodyFormatting(jp: JavaParser) = assertChanged(
         jp,
+        recipe = removeImport("java.util.List"),
         before = """
             package com.example.foo;
             
@@ -389,7 +264,7 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
             import java.util.ArrayList;
             
             public class A {
-            // Intentionally misaligned to ensure formatting is not overzealous
+            // Intentionally misaligned to ensure AutoFormat has not been applied to the class body
             ArrayList<String> foo = new ArrayList<>();
             }
         """,
@@ -399,7 +274,7 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
             import java.util.ArrayList;
             
             public class A {
-            // Intentionally misaligned to ensure formatting is not overzealous
+            // Intentionally misaligned to ensure AutoFormat has not been applied to the class body
             ArrayList<String> foo = new ArrayList<>();
             }
         """

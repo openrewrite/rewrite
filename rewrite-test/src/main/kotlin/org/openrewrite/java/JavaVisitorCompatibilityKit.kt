@@ -182,6 +182,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class RemoveAnnotationTck : RemoveAnnotationTest
 
     @Nested
+    inner class RemoveImportTck : RemoveImportTest
+
+    @Nested
     inner class RemoveTrailingWhitespaceTck : RemoveTrailingWhitespaceTest
 
     @Nested

@@ -38,6 +38,7 @@ interface RedundantFileCreationTest: JavaRecipeTest {
         after = """
             import java.io.FileInputStream;
             import java.io.IOException;
+            
             class Test {
                 void test() throws IOException {
                     new FileInputStream("test");

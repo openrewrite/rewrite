@@ -227,6 +227,10 @@ class Java11RemoveAnnotationTest : Java11Test, RemoveAnnotationTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11RemoveImportTest : Java11Test, RemoveImportTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11RemoveTrailingWhitespaceTest : Java11Test, RemoveTrailingWhitespaceTest
 
 @DebugOnly

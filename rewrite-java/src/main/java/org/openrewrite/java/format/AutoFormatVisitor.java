@@ -62,6 +62,10 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
                 .orElse(IntelliJ.tabsAndIndents()), stopAfter)
                 .visit(t, p, cursor.fork());
 
+        if(t instanceof J.CompilationUnit) {
+            t = visitCompilationUnit((J.CompilationUnit) t, p);
+        }
+
         return t;
     }
 
