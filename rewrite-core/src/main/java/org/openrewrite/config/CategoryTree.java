@@ -15,6 +15,7 @@
  */
 package org.openrewrite.config;
 
+import org.jetbrains.annotations.NotNull;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -55,6 +56,10 @@ public class CategoryTree<G> {
     public CategoryTree<G> getCategory(String subcategory) {
         String packageName = descriptor.getPackageName();
         synchronized (lock) {
+            if (subcategory.equals("core") && !recipesByGroup.isEmpty()) {
+                return syntheticCore();
+            }
+
             for (CategoryTree<G> t : subtrees) {
                 String tPackage = t.getDescriptor().getPackageName();
                 int endIndex = tPackage.indexOf('.', packageName.length() + 1);
@@ -206,6 +211,7 @@ public class CategoryTree<G> {
             }
             return recipesByGroup.values().stream()
                     .flatMap(Collection::stream)
+                    .distinct()
                     .collect(toList());
         }
     }
@@ -220,21 +226,24 @@ public class CategoryTree<G> {
         synchronized (lock) {
             if (!subtrees.isEmpty() && !recipesByGroup.isEmpty()) {
                 List<CategoryTree<G>> subtreesAndCore = new ArrayList<>(subtrees);
-
-                CategoryTree<G> core = new CategoryTree<>(
-                        new CategoryDescriptor(
-                                "Core",
-                                descriptor.getPackageName() + ".core",
-                                "",
-                                emptySet()
-                        )
-                );
-                core.recipesByGroup = recipesByGroup;
-                subtreesAndCore.add(core);
-
+                subtreesAndCore.add(syntheticCore());
                 return subtreesAndCore;
             }
             return subtrees;
         }
+    }
+
+    @NotNull
+    private CategoryTree<G> syntheticCore() {
+        CategoryTree<G> core = new CategoryTree<>(
+                new CategoryDescriptor(
+                        "Core",
+                        descriptor.getPackageName() + ".core",
+                        "",
+                        emptySet()
+                )
+        );
+        core.recipesByGroup = recipesByGroup;
+        return core;
     }
 }

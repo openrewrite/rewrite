@@ -45,6 +45,11 @@ class CategoryTreeTest {
     }
 
     @Test
+    fun getRecipesInArtificialCorePackage() {
+        assertThat(categoryTree.getCategory("org", "openrewrite", "java", "core")?.recipes ?: emptyList()).isNotEmpty
+    }
+
+    @Test
     fun getRecipe() {
         assertThat(categoryTree.getRecipe("org.openrewrite.java.ChangeMethodName")).isNotNull
     }

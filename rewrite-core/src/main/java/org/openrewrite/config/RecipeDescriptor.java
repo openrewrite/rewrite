@@ -15,6 +15,7 @@
  */
 package org.openrewrite.config;
 
+import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 
@@ -23,8 +24,9 @@ import java.util.List;
 import java.util.Set;
 
 @Value
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class RecipeDescriptor {
-
+    @EqualsAndHashCode.Include
     String name;
 
     String displayName;
