@@ -242,6 +242,32 @@ interface ChangeTypeTest : JavaRecipeTest {
     )
 
     @Test
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/704")
+    fun methodDeclarationParameterAssignment(jp: JavaParser) = assertChanged(
+        jp,
+        dependsOn = arrayOf(a1, a2),
+        before = """
+            import a.A1;
+
+            class B {
+                void method(A1 param) {
+                    A1 a = param;
+                }
+            }
+        """,
+        after = """
+            import a.A2;
+
+            class B {
+                void method(A2 param) {
+                    A2 a = param;
+                }
+            }
+        """
+    )
+
+    @Test
     fun parameterizedType(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(a1, a2),
