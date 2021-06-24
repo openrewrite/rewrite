@@ -23,6 +23,7 @@ import org.openrewrite.internal.lang.Nullable;
 public class GroupArtifactVersion {
     String groupId;
     String artifactId;
+    String requestedVersion;
     String version;
 
     /**
