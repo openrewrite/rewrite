@@ -18,9 +18,11 @@ package org.openrewrite.properties;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.HasSourcePath;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
 
 @Value
@@ -37,6 +39,13 @@ public class ChangePropertyKey extends Recipe {
             example = "management.metrics.enable.process.files")
     String newPropertyKey;
 
+    @Option(displayName = "Optional file matcher",
+            description = "Matching files will be modified. This is a glob expression.",
+            required = false,
+            example = "**/application-*.properties")
+    @Nullable
+    String fileMatcher;
+
     @Override
     public String getDisplayName() {
         return "Change property key";
@@ -45,6 +54,14 @@ public class ChangePropertyKey extends Recipe {
     @Override
     public String getDescription() {
         return "Change a property key leaving the value intact.";
+    }
+
+    @Override
+    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        if (fileMatcher != null) {
+            return new HasSourcePath<>(fileMatcher);
+        }
+        return null;
     }
 
     @Override
