@@ -445,21 +445,27 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
     /**
      * Normalizes the whitespace in JavaDoc and Block style comments.
-     * The text for a JavaDoc/Block comment is a string delimited by `\n` or `\r'.
-     * The whitespace and text are built separately to apply the appropriate shifts.
+     * Text for a JavaDoc/Block comment is a string delimited by `\n` or `\r'.
+     * Whitespace and text are built separately to apply the appropriate shifts to the whitespace.
+     * The length of the whitespace in a block comment will be preserved if any of the lines do not start with a *.
      *
-     * The whitespace length in Block comments will be preserved if any of the lines do not start with a *.
+     * indentSize:
+     *  - determines the number of spaces each indent is equivalent to.
+     *
+     * tabSize:
+     *  - is only applicable if useTabCharacter is true.
+     *  - tabSize sets the number of spaces each tab character is equivalent to.
      */
     private Comment indentMultilineComment(Comment comment, int column) {
         StringBuilder newTextBuilder = new StringBuilder();
         StringBuilder currentText = new StringBuilder();
         StringBuilder whitespace = new StringBuilder();
 
-        boolean hasChanged = false;  // The original comment is returned if no changes are applied.
-        boolean isWhitespace = true; // Tracks the whitespace that follows a new line until a char is not a tab or space.
-        boolean isFirstLine = true;  // Preserves whitespace that immediately follows a /* or /**. Set to false after a new line char.
+        boolean hasChanged = false; // Preserves referential equality if no changes are necessary in the comment.
+        boolean isWhitespace = true; // Determines where whitespace starts and ends.
+        boolean isFirstLine = true;  // Preserves whitespace if it immediately follows the comment prefix /* or /**.
         int indent = 0; // Track the indent of the current line in the block comment.
-        int tabLength = 0; // For block comments: Track the current tabLength to normalize and preserve whitespace.
+        int tabLength = 0; // Only applies to BLOCK style comments that are not being aligned. Track the current tabLength to normalize and preserve whitespace.
 
         boolean alignToColumn = (Comment.Style.JAVADOC.equals(comment.getStyle()) || shouldAlignBlockComment(comment));
         char prev = '$';
@@ -480,7 +486,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                              * s t     => s s s s
                              * t       => s s s s
                              */
-                            for (int j = tabLength % style.getTabSize(); j < style.getTabSize(); ++j) {
+                            for (int j = tabLength % style.getIndentSize(); j < style.getIndentSize(); ++j) {
                                 whitespace.append(' ');
                                 indent ++;
                                 hasChanged = true;
@@ -498,14 +504,14 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         // The character count is updated appropriately in `shift()` after a new line char is found.
                         if (style.getUseTabCharacter()) {
                             tabLength++;
-                            // Converts spaces into 1 tab, remaining values are truncated.
-                            // Note: tabSize determines how many spaces a tab is equivalent to.
-                            // A tabSize of 4 == 4 spaces.
+                            // Convert the previous spaces to a tab once the tabSize is reached.
                             if (tabLength == style.getTabSize()) {
-                                whitespace.append('\t');
-                                indent += style.getTabSize();
-                                tabLength = 0;
-                                hasChanged = true;
+                                if (!alignToColumn || (i + 1 < comment.getText().length() - 1 && comment.getText().charAt(i + 1) != '*')) {
+                                    whitespace.append('\t');
+                                    indent += style.getTabSize();
+                                    tabLength = 0;
+                                    hasChanged = true;
+                                }
                             }
                         } else {
                             whitespace.append(c);
@@ -513,7 +519,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                             tabLength++;
                         }
 
-                        if (tabLength == style.getTabSize()) {
+                        if (tabLength == (style.getUseTabCharacter() ? style.getTabSize() : style.getIndentSize())) {
                             tabLength = 0;
                         }
                     } else {
