@@ -33,6 +33,13 @@ import static java.util.stream.Collectors.joining;
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @JsonTypeInfo(use = JsonTypeInfo.Id.MINIMAL_CLASS, property = "@c")
 public interface JavaType extends Serializable {
+    static void clearCaches() {
+        Class.flyweights.clear();
+        Method.flyweights.clear();
+        Parameterized.flyweight.children.clear();
+        Variable.flyweights.clear();
+    }
+
     boolean deepEquals(@Nullable JavaType type);
 
     /**

@@ -46,6 +46,11 @@ import static java.util.stream.Collectors.toList;
 @SuppressWarnings("unused")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public interface J extends Serializable, Tree {
+    static void clearCaches() {
+        Identifier.flyweights.clear();
+        JavaType.clearCaches();
+    }
+
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
