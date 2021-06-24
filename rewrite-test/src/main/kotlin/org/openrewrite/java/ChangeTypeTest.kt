@@ -244,7 +244,7 @@ interface ChangeTypeTest : JavaRecipeTest {
     @Test
     @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/704")
-    fun methodDeclarationParameterAssignment(jp: JavaParser) = assertChanged(
+    fun updateAssignments(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(a1, a2),
         before = """
