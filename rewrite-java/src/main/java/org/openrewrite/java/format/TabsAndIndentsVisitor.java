@@ -597,8 +597,11 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             if (currentText.length() == 0) {
                 // Add a space to the whitespace that precedes the `*/` so that it is aligned to the prefix `*/`.
                 if (style.getUseTabCharacter()) {
-                    if (hasChanged) {
+                    if (whitespace.charAt(whitespace.length() - 1) != ' ') {
                         whitespace.append(' ');
+                        if (!hasChanged && prev != ' ') {
+                            hasChanged = true;
+                        }
                     }
                 } else {
                     if (whitespace.length() - 1 == column) {

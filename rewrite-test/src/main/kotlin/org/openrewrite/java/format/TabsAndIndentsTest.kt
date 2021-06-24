@@ -1939,7 +1939,7 @@ interface TabsAndIndentsTest : JavaRecipeTest {
 
         before = """
             /* License example.
-             *
+             * No change to comment.
              */
             package org.openrewrite;
             public class A {
@@ -1947,7 +1947,8 @@ interface TabsAndIndentsTest : JavaRecipeTest {
                 	     * public int methodOne(int value) {
               	  	   	 *     return value + 1;
                	         * }
-                */
+            	* The end of the comment is not aligned with the `*`, but the indent level is correct.
+            	*/
             	public int methodOne(int value) {
             		return value + 1;
             	}
@@ -1955,7 +1956,7 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         """.trimIndent(),
         after = """
             /* License example.
-             *
+             * No change to comment.
              */
             package org.openrewrite;
             public class A {
@@ -1963,6 +1964,7 @@ interface TabsAndIndentsTest : JavaRecipeTest {
             	 * public int methodOne(int value) {
             	 *     return value + 1;
             	 * }
+            	 * The end of the comment is not aligned with the `*`, but the indent level is correct.
             	 */
             	public int methodOne(int value) {
             		return value + 1;
