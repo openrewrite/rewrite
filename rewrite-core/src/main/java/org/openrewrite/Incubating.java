@@ -23,7 +23,7 @@ import java.lang.annotation.Target;
  * This is a feature that is experimental and may yield a breaking change in a minor release.
  */
 @Documented
-@Target({ElementType.METHOD, ElementType.TYPE, ElementType.CONSTRUCTOR})
+@Target({ElementType.METHOD, ElementType.TYPE, ElementType.CONSTRUCTOR, ElementType.FIELD})
 public @interface Incubating {
     String since();
 }
