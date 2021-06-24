@@ -63,7 +63,7 @@ public class Environment {
         for (String activeRecipe : activeRecipes) {
             boolean foundRecipe = false;
             for (Recipe recipe : recipes) {
-                if (activeRecipe.equals(recipe.getName())){
+                if (activeRecipe.equals(recipe.getName())) {
                     root.doNext(recipe);
                     foundRecipe = true;
                     break;
@@ -74,7 +74,7 @@ public class Environment {
             }
         }
         if (!recipesNotFound.isEmpty()) {
-            throw new RecipeException("Recipes not found: " + String.join(", ",recipesNotFound));
+            throw new RecipeException("Recipes not found: " + String.join(", ", recipesNotFound));
         }
         return root;
     }
@@ -140,16 +140,13 @@ public class Environment {
             return load(new ClasspathScanningLoader(properties, acceptPackages));
         }
 
-        public Builder scanClasspath(Iterable<Path> compileClasspath, String... acceptPackages) {
-            return load(new ClasspathScanningLoader(compileClasspath, properties, acceptPackages));
-        }
-
-        public Builder scanJar(String jarName, Iterable<Path> compileClasspath, String... acceptPackages) {
-            return load(new ClasspathScanningLoader(jarName, compileClasspath, properties, acceptPackages));
-        }
-
-        public Builder scanJarWithLoader(String jarName, Iterable<Path> compileClasspath, ClassLoader classLoader, String... acceptPackages) {
-            return load(new ClasspathScanningLoader(jarName, compileClasspath, properties, classLoader, acceptPackages));
+        /**
+         * @param jar         A path to a jar file to scan.
+         * @param classLoader A classloader that is populated with the transitive dependencies of the jar.
+         * @return This builder.
+         */
+        public Builder scanJar(Path jar, ClassLoader classLoader) {
+            return load(new ClasspathScanningLoader(jar, properties, classLoader));
         }
 
         public Builder scanUserHome() {

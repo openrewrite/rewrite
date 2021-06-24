@@ -25,18 +25,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Properties;
-
-import static java.util.stream.StreamSupport.stream;
 
 public class ClasspathScanningLoader implements ResourceLoader {
     private static final Logger logger = LoggerFactory.getLogger(ClasspathScanningLoader.class);
@@ -55,68 +49,11 @@ public class ClasspathScanningLoader implements ResourceLoader {
      */
     public ClasspathScanningLoader(Properties properties, String[] acceptPackages) {
         scanYaml(new ClassGraph().acceptPaths("META-INF/rewrite"), properties, null);
-        scanClasses(new ClassGraph(), acceptPackages);
+        scanClasses(new ClassGraph().acceptPackages(acceptPackages), getClass().getClassLoader());
     }
 
-    /**
-     * Construct a ClasspathScanningLoader that scans the specified compile classpath for recipes
-     *
-     * @param compileClasspath Classpath to scan
-     * @param properties Yaml placeholder properties
-     * @param acceptPackages Limit scan to specified packages
-     */
-    public ClasspathScanningLoader(Iterable<Path> compileClasspath, Properties properties, String[] acceptPackages) {
-        URLClassLoader classpathLoader = new URLClassLoader(
-                stream(compileClasspath.spliterator(), false)
-                        .map(cc -> {
-                            try {
-                                return cc.toUri().toURL();
-                            } catch (MalformedURLException e) {
-                                throw new UncheckedIOException(e);
-                            }
-                        })
-                        .toArray(URL[]::new),
-                getClass().getClassLoader()
-        );
-
-        scanYaml(new ClassGraph()
-                .ignoreParentClassLoaders()
-                .overrideClassLoaders(classpathLoader)
-                .acceptPaths("META-INF/rewrite"), properties, classpathLoader);
-
-        scanClasses(new ClassGraph()
-                .ignoreParentClassLoaders()
-                .overrideClassLoaders(classpathLoader), acceptPackages);
-    }
-
-    /**
-     * Construct a ClasspathScanningLoader that scans the specified jar name, which must be on the specified compile classpath.
-     * The classpath is used to provide symbols, but the scan is limited to just recipes contained within the jar.
-     *
-     * @param jarName Name of jar on classpath to scan for recipes
-     * @param compileClasspath Classpath to scan
-     * @param properties Yaml placeholder properties
-     * @param acceptPackages Limit scan to specified packages
-     */
-    public ClasspathScanningLoader(String jarName, Iterable<Path> compileClasspath, Properties properties, String[] acceptPackages) {
-        this(jarName, compileClasspath, properties, null, acceptPackages);
-    }
-
-    public ClasspathScanningLoader(String jarName, Iterable<Path> compileClasspath, Properties properties, @Nullable ClassLoader classLoader, String[] acceptPackages) {
-        if (classLoader == null) {
-            classLoader = new URLClassLoader(
-                    stream(compileClasspath.spliterator(), false)
-                            .map(cc -> {
-                                try {
-                                    return cc.toUri().toURL();
-                                } catch (MalformedURLException e) {
-                                    throw new UncheckedIOException(e);
-                                }
-                            })
-                            .toArray(URL[]::new),
-                    getClass().getClassLoader()
-            );
-        }
+    public ClasspathScanningLoader(Path jar, Properties properties, ClassLoader classLoader) {
+        String jarName = jar.toFile().getName();
 
         scanYaml(new ClassGraph()
                 .acceptJars(jarName)
@@ -127,7 +64,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
         scanClasses(new ClassGraph()
                 .acceptJars(jarName)
                 .ignoreParentClassLoaders()
-                .overrideClassLoaders(classLoader), acceptPackages);
+                .overrideClassLoaders(classLoader), classLoader);
     }
 
     private void scanYaml(ClassGraph classGraph, Properties properties, @Nullable ClassLoader classLoader) {
@@ -150,10 +87,9 @@ public class ClasspathScanningLoader implements ResourceLoader {
         }
     }
 
-    private void scanClasses(ClassGraph classGraph, String[] acceptPackages) {
+    private void scanClasses(ClassGraph classGraph, ClassLoader classLoader) {
         try (ScanResult result = classGraph
                 .ignoreClassVisibility()
-                .acceptPackages(acceptPackages)
                 .scan()) {
             for (ClassInfo classInfo : result.getSubclasses(Recipe.class.getName())) {
                 Class<?> recipeClass = classInfo.loadClass();
