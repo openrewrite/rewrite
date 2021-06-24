@@ -390,7 +390,7 @@ public class RawMavenResolver {
                             new HashMap<>(partialMaven.getEffectiveProperties()),
                             task.getProjectPom() == null ? partialMaven : task.getProjectPom(),
                             partialMaven.getRepositories(),
-                            null
+                            task.getSeenParentPoms()
                     );
 
                     if (!partialResults.containsKey(resolutionTask)) {
