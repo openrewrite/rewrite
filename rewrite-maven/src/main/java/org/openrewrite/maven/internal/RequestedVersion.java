@@ -55,51 +55,57 @@ public class RequestedVersion {
         this.groupArtifact = groupArtifact;
         this.nearer = nearer;
 
-        // for things like the profile activation block of where the range is unclosed but maven still handles it, e.g.
-        // https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-databind/2.12.0-rc2/jackson-databind-2.12.0-rc2.pom
-        if (requested.contains("[") || requested.contains(")")) {
+        if (requested.equals("LATEST")) {
+            this.versionSpec = new DynamicVersion(DynamicVersion.Kind.LATEST);
+        } else if (requested.equals("RELEASE")) {
+            this.versionSpec = new DynamicVersion(DynamicVersion.Kind.RELEASE);
+        } else if (requested.contains("[") || requested.contains("(")) {
+            // for things like the profile activation block of where the range is unclosed but maven still handles it, e.g.
+            // https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-databind/2.12.0-rc2/jackson-databind-2.12.0-rc2.pom
             if (!(requested.contains("]") || requested.contains(")"))) {
                 requested = requested + "]";
             }
-        }
 
-        VersionRangeParser parser = new VersionRangeParser(new CommonTokenStream(new VersionRangeLexer(
-                CharStreams.fromString(requested))));
+            VersionRangeParser parser = new VersionRangeParser(new CommonTokenStream(new VersionRangeLexer(
+                    CharStreams.fromString(requested))));
 
-        parser.removeErrorListeners();
-        parser.addErrorListener(new LoggingErrorListener());
+            parser.removeErrorListeners();
+            parser.addErrorListener(new LoggingErrorListener());
 
-        this.versionSpec = new VersionRangeParserBaseVisitor<VersionSpec>() {
-            @Override
-            public VersionSpec visitRequestedVersion(VersionRangeParser.RequestedVersionContext ctx) {
-                if (ctx.version() != null) {
-                    return new SoftRequirement(new Version(ctx.version().getText()));
+            this.versionSpec = new VersionRangeParserBaseVisitor<VersionSpec>() {
+                @Override
+                public VersionSpec visitRequestedVersion(VersionRangeParser.RequestedVersionContext ctx) {
+                    if (ctx.version() != null) {
+                        return new SoftRequirement(new Version(ctx.version().getText()));
+                    }
+
+                    return new RangeSet(ctx.range().stream()
+                            .map(range -> {
+                                Version lower, upper;
+                                if (range.bounds().boundedLower() != null) {
+                                    Iterator<TerminalNode> versionIter = range.bounds().boundedLower().Version().iterator();
+                                    lower = toVersion(versionIter.next());
+                                    upper = versionIter.hasNext() ? toVersion(versionIter.next()) : null;
+                                } else {
+                                    lower = null;
+                                    upper = toVersion(range.bounds().unboundedLower().Version());
+                                }
+                                return new Range(
+                                        range.CLOSED_RANGE_OPEN() != null, lower,
+                                        range.CLOSED_RANGE_CLOSE() != null, upper
+                                );
+                            })
+                            .collect(toList())
+                    );
                 }
 
-                return new RangeSet(ctx.range().stream()
-                        .map(range -> {
-                            Version lower, upper;
-                            if (range.bounds().boundedLower() != null) {
-                                Iterator<TerminalNode> versionIter = range.bounds().boundedLower().Version().iterator();
-                                lower = toVersion(versionIter.next());
-                                upper = versionIter.hasNext() ? toVersion(versionIter.next()) : null;
-                            } else {
-                                lower = null;
-                                upper = toVersion(range.bounds().unboundedLower().Version());
-                            }
-                            return new Range(
-                                    range.CLOSED_RANGE_OPEN() != null, lower,
-                                    range.CLOSED_RANGE_CLOSE() != null, upper
-                            );
-                        })
-                        .collect(toList())
-                );
-            }
-
-            private Version toVersion(TerminalNode version) {
-                return new Version(version.getText());
-            }
-        }.visit(parser.requestedVersion());
+                private Version toVersion(TerminalNode version) {
+                    return new Version(version.getText());
+                }
+            }.visit(parser.requestedVersion());
+        } else {
+            this.versionSpec = new SoftRequirement(new Version(requested));
+        }
     }
 
     public boolean isRange() {
