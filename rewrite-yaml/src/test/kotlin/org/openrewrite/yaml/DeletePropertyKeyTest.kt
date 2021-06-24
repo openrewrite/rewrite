@@ -16,13 +16,16 @@
 package org.openrewrite.yaml
 
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Recipe
+import java.nio.file.Path
 
 class DeletePropertyKeyTest : YamlRecipeTest {
     override val recipe: Recipe
         get() = DeleteProperty(
             "management.metrics.binders.files.enabled",
-            true
+            true,
+            null
         )
 
     @Test
@@ -44,4 +47,19 @@ class DeletePropertyKeyTest : YamlRecipeTest {
           server.port: 8080
         """
     )
+
+    @Test
+    fun changeOnlyMatchingFile(@TempDir tempDir: Path) {
+        val matchingFile = tempDir.resolve("a.yml").apply {
+            toFile().parentFile.mkdirs()
+            toFile().writeText("apiVersion: v1")
+        }.toFile()
+        val nonMatchingFile = tempDir.resolve("b.yml").apply {
+            toFile().parentFile.mkdirs()
+            toFile().writeText("apiVersion: v1")
+        }.toFile()
+        val recipe = DeleteProperty("apiVersion", true,"**/a.yml")
+        assertChanged(recipe = recipe, before = matchingFile, after = "")
+        assertUnchanged(recipe = recipe, before = nonMatchingFile)
+    }
 }

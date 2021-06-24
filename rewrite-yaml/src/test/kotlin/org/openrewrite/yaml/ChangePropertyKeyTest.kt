@@ -17,11 +17,14 @@ package org.openrewrite.yaml
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import java.nio.file.Path
 
 class ChangePropertyKeyTest : YamlRecipeTest {
     private val changeProp = ChangePropertyKey(
         "management.metrics.binders.files.enabled",
-        "management.metrics.enable.process.files"
+        "management.metrics.enable.process.files",
+        null
     )
 
     @Test
@@ -64,30 +67,49 @@ class ChangePropertyKeyTest : YamlRecipeTest {
         """
     )
 
+    @Test
+    fun changeOnlyMatchingFile(@TempDir tempDir: Path) {
+        val matchingFile = tempDir.resolve("a.yml").apply {
+            toFile().parentFile.mkdirs()
+            toFile().writeText("management.metrics.binders.files.enabled: true")
+        }.toFile()
+        val nonMatchingFile = tempDir.resolve("b.yml").apply {
+            toFile().parentFile.mkdirs()
+            toFile().writeText("management.metrics.binders.files.enabled: true")
+        }.toFile()
+        val recipe = ChangePropertyKey(
+                "management.metrics.binders.files.enabled",
+                "management.metrics.enable.process.files",
+                "**/a.yml"
+        )
+        assertChanged(recipe = recipe, before = matchingFile, after = "management.metrics.enable.process.files: true")
+        assertUnchanged(recipe = recipe, before = nonMatchingFile)
+    }
+
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = ChangePropertyKey(null, null)
+        var recipe = ChangePropertyKey(null, null, null)
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("newPropertyKey")
         assertThat(valid.failures()[1].property).isEqualTo("oldPropertyKey")
 
-        recipe = ChangePropertyKey(null, "management.metrics.enable.process.files")
+        recipe = ChangePropertyKey(null, "management.metrics.enable.process.files", null)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("oldPropertyKey")
 
-        recipe = ChangePropertyKey("management.metrics.binders.files.enabled", null)
+        recipe = ChangePropertyKey("management.metrics.binders.files.enabled", null, null)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("newPropertyKey")
 
         recipe =
-            ChangePropertyKey("management.metrics.binders.files.enabled", "management.metrics.enable.process.files")
+            ChangePropertyKey("management.metrics.binders.files.enabled", "management.metrics.enable.process.files", null)
         valid = recipe.validate()
         assertThat(valid.isValid).isTrue()
     }

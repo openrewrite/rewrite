@@ -16,7 +16,9 @@
 package org.openrewrite.yaml
 
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Issue
+import java.nio.file.Path
 
 class ChangeValueTest : YamlRecipeTest {
 
@@ -24,7 +26,8 @@ class ChangeValueTest : YamlRecipeTest {
     fun changeNestedKeyValue() = assertChanged(
         recipe = ChangeValue(
             "/metadata/name",
-            "monitoring"
+            "monitoring",
+            null
         ),
         before = """
             apiVersion: v1
@@ -44,7 +47,8 @@ class ChangeValueTest : YamlRecipeTest {
     fun changeRelativeKey() = assertChanged(
         recipe = ChangeValue(
             "name",
-            "monitoring"
+            "monitoring",
+            null
         ),
         before = """
             apiVersion: v1
@@ -64,7 +68,8 @@ class ChangeValueTest : YamlRecipeTest {
     fun changeSequenceKey() = assertChanged(
         recipe = ChangeValue(
             "/subjects/kind",
-            "Deployment"
+            "Deployment",
+            null
         ),
         before = """
             subjects:
@@ -77,4 +82,19 @@ class ChangeValueTest : YamlRecipeTest {
                 name: monitoring-tools
         """
     )
+
+    @Test
+    fun changeOnlyMatchingFile(@TempDir tempDir: Path) {
+        val matchingFile = tempDir.resolve("a.yml").apply {
+            toFile().parentFile.mkdirs()
+            toFile().writeText("metadata: monitoring-tools")
+        }.toFile()
+        val nonMatchingFile = tempDir.resolve("b.yml").apply {
+            toFile().parentFile.mkdirs()
+            toFile().writeText("metadata: monitoring-tools")
+        }.toFile()
+        val recipe = ChangeValue("/metadata", "monitoring", "**/a.yml")
+        assertChanged(recipe = recipe, before = matchingFile, after = "metadata: monitoring")
+        assertUnchanged(recipe = recipe, before = nonMatchingFile)
+    }
 }

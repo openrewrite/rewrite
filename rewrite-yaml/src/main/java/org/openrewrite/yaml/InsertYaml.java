@@ -18,6 +18,7 @@ package org.openrewrite.yaml;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.tree.Yaml;
 
 @Value
@@ -34,6 +35,14 @@ public class InsertYaml extends Recipe {
             example = "label-one: \"value-one\"")
     String yaml;
 
+    @Incubating(since = "7.8.0")
+    @Option(displayName = "Optional file matcher",
+            description = "Matching files will be modified. This is a glob expression.",
+            required = false,
+            example = "**/application-*.yml")
+    @Nullable
+    String fileMatcher;
+
     @Override
     public String getDisplayName() {
         return "Insert YAML snippet";
@@ -42,6 +51,14 @@ public class InsertYaml extends Recipe {
     @Override
     public String getDescription() {
         return "Insert a YAML snippet at a given key.";
+    }
+
+    @Override
+    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        if (fileMatcher != null) {
+            return new HasSourcePath<>(fileMatcher);
+        }
+        return null;
     }
 
     @Override

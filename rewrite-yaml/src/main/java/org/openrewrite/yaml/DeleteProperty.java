@@ -17,11 +17,9 @@ package org.openrewrite.yaml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayDeque;
@@ -46,6 +44,14 @@ public class DeleteProperty extends Recipe {
             example = "true")
     Boolean coalesce;
 
+    @Incubating(since = "7.8.0")
+    @Option(displayName = "Optional file matcher",
+            description = "Matching files will be modified. This is a glob expression.",
+            required = false,
+            example = "**/application-*.yml")
+    @Nullable
+    String fileMatcher;
+
     @Override
     public String getDisplayName() {
         return "Delete property";
@@ -55,6 +61,14 @@ public class DeleteProperty extends Recipe {
     public String getDescription() {
         return "Delete a YAML property. Nested YAML mappings are interpreted as dot separated property names, i.e. " +
                 " as Spring Boot interprets application.yml files.";
+    }
+
+    @Override
+    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        if (fileMatcher != null) {
+            return new HasSourcePath<>(fileMatcher);
+        }
+        return null;
     }
 
     @Override

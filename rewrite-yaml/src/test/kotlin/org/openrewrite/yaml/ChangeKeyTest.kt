@@ -16,7 +16,10 @@
 package org.openrewrite.yaml
 
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Issue
+import org.openrewrite.properties.ChangePropertyKey
+import java.nio.file.Path
 
 class ChangeKeyTest : YamlRecipeTest {
 
@@ -25,7 +28,8 @@ class ChangeKeyTest : YamlRecipeTest {
     fun simpleChangeRootKey() = assertChanged(
         recipe = ChangeKey(
             "/description",
-            "newDescription"
+            "newDescription",
+            null
         ),
         before = """
             id: something
@@ -43,7 +47,8 @@ class ChangeKeyTest : YamlRecipeTest {
     fun changeNestedKey() = assertChanged(
         recipe = ChangeKey(
             "/metadata/name",
-            "name2"
+            "name2",
+            null
         ),
         before = """
             apiVersion: v1
@@ -63,7 +68,8 @@ class ChangeKeyTest : YamlRecipeTest {
     fun changeRelativeKey() = assertChanged(
         recipe = ChangeKey(
             "name",
-            "name2"
+            "name2",
+            null
         ),
         before = """
             apiVersion: v1
@@ -83,7 +89,8 @@ class ChangeKeyTest : YamlRecipeTest {
     fun changeSequenceKey() = assertChanged(
         recipe = ChangeKey(
             "/subjects/kind",
-            "kind2"
+            "kind2",
+            null
         ),
         before = """
             subjects:
@@ -96,4 +103,19 @@ class ChangeKeyTest : YamlRecipeTest {
                 name: monitoring-tools
         """
     )
+
+    @Test
+    fun changeOnlyMatchingFile(@TempDir tempDir: Path) {
+        val matchingFile = tempDir.resolve("a.yml").apply {
+            toFile().parentFile.mkdirs()
+            toFile().writeText("description: desc")
+        }.toFile()
+        val nonMatchingFile = tempDir.resolve("b.yml").apply {
+            toFile().parentFile.mkdirs()
+            toFile().writeText("description: desc")
+        }.toFile()
+        val recipe = ChangeKey("description", "newDescription", "**/a.yml")
+        assertChanged(recipe = recipe, before = matchingFile, after = "newDescription: desc")
+        assertUnchanged(recipe = recipe, before = nonMatchingFile)
+    }
 }
