@@ -16,8 +16,10 @@
 package org.openrewrite.yaml
 
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Issue
 import org.openrewrite.config.Environment
+import java.nio.file.Path
 
 class InsertYamlTest : YamlRecipeTest {
 
@@ -32,7 +34,8 @@ class InsertYamlTest : YamlRecipeTest {
                         type: Delete
                     condition:
                         age: 7
-            """.trimIndent()
+            """.trimIndent(),
+            null
         ),
         before = """
             apiVersion: storage.cnrm.cloud.google.com/v1beta1
@@ -59,6 +62,7 @@ class InsertYamlTest : YamlRecipeTest {
         recipe = InsertYaml(
             "/",
             "spec: 0",
+            null
         ),
         before = """
           apiVersion: policy/v1beta1
@@ -75,7 +79,8 @@ class InsertYamlTest : YamlRecipeTest {
     fun insertInSequenceEntries() = assertChanged(
         recipe = InsertYaml(
             "/spec/containers",
-            "imagePullPolicy: Always"
+            "imagePullPolicy: Always",
+            null
         ),
         before = """
             kind: Pod
@@ -91,4 +96,26 @@ class InsertYamlTest : YamlRecipeTest {
                   imagePullPolicy: Always
         """
     )
+
+    @Test
+    fun changeOnlyMatchingFile(@TempDir tempDir: Path) {
+        val matchingFile = tempDir.resolve("a.yml").apply {
+            toFile().parentFile.mkdirs()
+            toFile().writeText("apiVersion: policy/v1beta1")
+        }.toFile()
+        val nonMatchingFile = tempDir.resolve("b.yml").apply {
+            toFile().parentFile.mkdirs()
+            toFile().writeText("apiVersion: policy/v1beta1")
+        }.toFile()
+
+        val recipe = InsertYaml("/", "spec: 0", "**/a.yml")
+        assertChanged(
+                recipe = recipe,
+                before = matchingFile,
+                after = """
+                    apiVersion: policy/v1beta1
+                    spec: 0
+        """.trimIndent())
+        assertUnchanged(recipe = recipe, before = nonMatchingFile)
+    }
 }

@@ -16,12 +16,14 @@
 package org.openrewrite.yaml
 
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import java.nio.file.Path
 
 class DeleteKeyTest : YamlRecipeTest {
 
     @Test
     fun deleteNestedKey() = assertChanged(
-        recipe = DeleteKey("/metadata/name"),
+        recipe = DeleteKey("/metadata/name", null),
         before = """
             apiVersion: v1
             metadata:
@@ -37,7 +39,7 @@ class DeleteKeyTest : YamlRecipeTest {
 
     @Test
     fun deleteRelativeKey() = assertChanged(
-        recipe = DeleteKey("name"),
+        recipe = DeleteKey("name", null),
         before = """
             apiVersion: v1
             metadata:
@@ -53,7 +55,7 @@ class DeleteKeyTest : YamlRecipeTest {
 
     @Test
     fun deleteSequenceKey() = assertChanged(
-        recipe = DeleteKey("/subjects/kind"),
+        recipe = DeleteKey("/subjects/kind", null),
         before = """
             subjects:
               - kind: ServiceAccount
@@ -64,4 +66,19 @@ class DeleteKeyTest : YamlRecipeTest {
               - name: monitoring-tools
         """
     )
+
+    @Test
+    fun changeOnlyMatchingFile(@TempDir tempDir: Path) {
+        val matchingFile = tempDir.resolve("a.yml").apply {
+            toFile().parentFile.mkdirs()
+            toFile().writeText("apiVersion: v1")
+        }.toFile()
+        val nonMatchingFile = tempDir.resolve("b.yml").apply {
+            toFile().parentFile.mkdirs()
+            toFile().writeText("apiVersion: v1")
+        }.toFile()
+        val recipe = DeleteKey("/apiVersion", "**/a.yml")
+        assertChanged(recipe = recipe, before = matchingFile, after = "")
+        assertUnchanged(recipe = recipe, before = nonMatchingFile)
+    }
 }

@@ -16,12 +16,14 @@
 package org.openrewrite.yaml
 
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import java.nio.file.Path
 
 class CopyValueTest : YamlRecipeTest {
 
     @Test
     fun copyValueAndItsFormatting() = assertChanged(
-        recipe = CopyValue("/source", "/destination"),
+        recipe = CopyValue("/source", "/destination", null),
         before = """
             id: something
             source:   password
@@ -36,7 +38,7 @@ class CopyValueTest : YamlRecipeTest {
 
     @Test
     fun onlyCopiesScalars() = assertUnchanged(
-        recipe = CopyValue("/source", "/destination"),
+        recipe = CopyValue("/source", "/destination", null),
         before = """
             id: something
             source:
@@ -48,9 +50,9 @@ class CopyValueTest : YamlRecipeTest {
 
     @Test
     fun insertCopyValueAndRemoveSource() = assertChanged(
-        recipe = InsertYaml("/", "destination: TEMP")
-            .doNext(CopyValue("/source", "/destination"))
-            .doNext(DeleteKey("/source")),
+        recipe = InsertYaml("/", "destination: TEMP", null)
+            .doNext(CopyValue("/source", "/destination", null))
+            .doNext(DeleteKey("/source", null)),
         before = """
             id: something
             source:   password
@@ -60,4 +62,32 @@ class CopyValueTest : YamlRecipeTest {
             destination:   password
         """
     )
+
+    @Test
+    fun changeOnlyMatchingFile(@TempDir tempDir: Path) {
+        val matchingFile = tempDir.resolve("a.yml").apply {
+            toFile().parentFile.mkdirs()
+            toFile().writeText("""
+            source: password
+            destination: whatever
+        """.trimIndent())
+        }.toFile()
+        val nonMatchingFile = tempDir.resolve("b.yml").apply {
+            toFile().parentFile.mkdirs()
+            toFile().writeText("""
+            source: password
+            destination: whatever
+        """.trimIndent())
+        }.toFile()
+
+        val recipe = CopyValue("/source", "/destination", "**/a.yml")
+        assertChanged(
+                recipe = recipe,
+                before = matchingFile,
+                after = """
+            source: password
+            destination: password
+        """)
+        assertUnchanged(recipe = recipe, before = nonMatchingFile)
+    }
 }
