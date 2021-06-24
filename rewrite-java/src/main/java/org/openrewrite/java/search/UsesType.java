@@ -49,7 +49,7 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
     @Override
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
         J.CompilationUnit c = cu;
-        Set<JavaType> types = c.getTypesInUse();
+        Set<JavaType> types = c.getTypesInUse().keySet();
         for (JavaType type : types) {
             if (type instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified fq = (JavaType.FullyQualified) type;

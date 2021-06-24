@@ -169,9 +169,8 @@ public class ChangeType extends Recipe {
                 } else if (targetType instanceof JavaType.Primitive) {
                     i = i.withName(((JavaType.Primitive) targetType).getKeyword());
                 }
-                i = i.withType(updateType(i.getType()));
             }
-            return i;
+            return i.withType(updateType(i.getType()));
         }
 
         @Override

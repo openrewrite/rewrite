@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.search;
 
-import org.openrewrite.Incubating;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.JavaSearchResult;
@@ -43,7 +42,7 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
-        Set<JavaType> types = cu.getTypesInUse();
+        Set<JavaType> types = cu.getTypesInUse().keySet();
         for (JavaType type : types) {
             if (type instanceof JavaType.Method) {
                 if(methodMatcher.matches(type)) {

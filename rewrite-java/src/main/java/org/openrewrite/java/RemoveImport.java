@@ -49,7 +49,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         Set<String> methodsAndFieldsUsed = new HashSet<>();
         Set<String> otherMethodsAndFieldsInTypeUsed = new TreeSet<>();
 
-        for (JavaType javaType : cu.getTypesInUse()) {
+        for (JavaType javaType : cu.getTypesInUse().keySet()) {
             if (javaType instanceof JavaType.Variable) {
                 JavaType.Variable variable = (JavaType.Variable) javaType;
                 JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getType());

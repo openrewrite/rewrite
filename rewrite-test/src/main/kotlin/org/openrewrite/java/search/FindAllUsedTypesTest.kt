@@ -48,7 +48,7 @@ interface FindAllUsedTypesTest {
         """)
 
         val foo = cus.find { it.classes[0].name.simpleName == "Foo" }!!
-        val foundTypes = FindAllUsedTypes.findAll(foo)
+        val foundTypes = FindAllUsedTypes.findAll(foo).keys
         assertThat(foundTypes.find { it is JavaType.Variable })
                 .isNotNull
                 .matches { it is JavaType.Variable && TypeUtils.asFullyQualified(it.type)!!.fullyQualifiedName.equals("org.openrewrite.test.YesOrNo.Status") }

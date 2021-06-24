@@ -57,7 +57,7 @@ public class RemoveUnusedImports extends Recipe {
             Map<String, Set<String>> methodsAndFieldsByTypeName = new HashMap<>();
             Map<String, Set<JavaType.FullyQualified>> typesByPackage = new HashMap<>();
 
-            for (JavaType javaType : cu.getTypesInUse()) {
+            for (JavaType javaType : cu.getTypesInUse().keySet()) {
                 if(javaType instanceof JavaType.Variable) {
                     JavaType.Variable variable = (JavaType.Variable) javaType;
                     JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getType());
