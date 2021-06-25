@@ -35,6 +35,7 @@ public class FormatFirstClassPrefix<P> extends JavaIsoVisitor<P> {
         if (c == cu.getClasses().get(0)) {
             J.ClassDeclaration temp = autoFormat(c.withBody(EMPTY_BLOCK), p);
             c = c.withPrefix(temp.getPrefix());
+            c = c.withModifiers(temp.getModifiers());
         }
         return c;
     }
