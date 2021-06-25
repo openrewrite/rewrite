@@ -16,8 +16,22 @@
 package org.openrewrite.xml
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 
 class AutoFormatTest : XmlRecipeTest {
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/707")
+    @Test
+    fun autoFormatAttributes() = assertUnchanged(
+        recipe = AutoFormat(),
+        before = """
+            <databaseChangeLog
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+              xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog">
+            </databaseChangeLog>
+        """
+    )
 
     @Test
     fun autoFormatTag() = assertChanged(

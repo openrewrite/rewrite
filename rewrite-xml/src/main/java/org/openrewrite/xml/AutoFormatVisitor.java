@@ -46,8 +46,13 @@ public class AutoFormatVisitor<P> extends XmlVisitor<P> {
             String prefix = x.getPrefix();
             if (prefix.contains("\n") && (scope.length == 0 || stream(scope).anyMatch(s -> getCursor().isScopeInPath(s)))) {
                 int indentMultiple = (int) getCursor().getPathAsStream().filter(Xml.Tag.class::isInstance).count() - 1;
+                if(getCursor().getValue() instanceof Xml.Attribute){
+                    indentMultiple++;
+                }
+
                 int indentToUse = findIndent.getMostCommonIndent() > 0 ?
                         findIndent.getMostCommonIndent() : 4; /* default to 4 spaces */
+
                 String shiftedPrefix = prefix.substring(0, prefix.lastIndexOf('\n') + 1) + range(0, indentMultiple * indentToUse)
                         .mapToObj(n -> findIndent.isIndentedWithSpaces() ? " " : "\t")
                         .collect(Collectors.joining(""));
