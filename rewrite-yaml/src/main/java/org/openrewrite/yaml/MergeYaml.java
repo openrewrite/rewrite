@@ -48,7 +48,7 @@ public class MergeYaml extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Merge a YAML snippet with an existing YAML document";
+        return "Merge a YAML snippet with an existing YAML document.";
     }
 
     @Override
