@@ -418,7 +418,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
             // Prevent formatting trailing comments, the whitespace in a trailing comment won't have a new line character.
             // Compilation unit prefixes are an exception, since they do not exist in a block.
-            if ((space.getWhitespace().contains("\n") || space.getWhitespace().contains("\r")) || spaceLocation.equals(Space.Location.COMPILATION_UNIT_PREFIX)) {
+            if (space.getWhitespace().contains("\n") || spaceLocation.equals(Space.Location.COMPILATION_UNIT_PREFIX)) {
                 int incrementBy = spaceLocation.equals(Space.Location.BLOCK_END) ? style.getIndentSize() : 0;
                 int indent = getLengthOfWhitespace(space.getWhitespace());
                 if (indent != (column + incrementBy)) {
@@ -637,7 +637,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
         StringBuilder newSuffix = new StringBuilder(suffix);
         indent = getLengthOfWhitespace(newSuffix.toString());
-        if (indent != column && ((newSuffix.toString().contains("\n") || newSuffix.toString().contains("\r")))) {
+        if (indent != column && newSuffix.toString().contains("\n")) {
             int shift = column - indent;
             shift(newSuffix, shift);
             hasChanged = true;
