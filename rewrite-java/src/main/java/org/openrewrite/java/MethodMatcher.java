@@ -177,6 +177,19 @@ public class MethodMatcher {
                         (matchesTargetType(type.getSupertype() == null ? JavaType.Class.OBJECT : type.getSupertype())));
     }
 
+    /**
+     * Evaluate whether this MethodMatcher and the specified FieldAccess are describing the same type or not.
+     * Known limitation/bug: MethodMatchers can have patterns/wildcards like "com.*.Bar" instead of something
+     * concrete like "com.foo.Bar". This limitation is not desirable or intentional and should be fixed.
+     * If a methodMatcher is passed that includes wildcards the result will always be "false"
+     *
+     * @param fieldAccess A J.FieldAccess that hopefully has the same fully qualified type as this matcher.
+     */
+    public boolean isFullyQualifiedClassReference(J.FieldAccess fieldAccess) {
+        String hopefullyFullyQualifiedMethod = this.getTargetTypePattern().pattern() + "." + this.getMethodNamePattern().pattern();
+        return fieldAccess.isFullyQualifiedClassReference(hopefullyFullyQualifiedMethod);
+    }
+
     @Nullable
     private static String typePattern(JavaType type) {
         if (type instanceof JavaType.Primitive) {

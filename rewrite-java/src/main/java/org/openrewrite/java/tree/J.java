@@ -1556,19 +1556,6 @@ public interface J extends Serializable, Tree {
             return isFullyQualifiedClassReference(this, className);
         }
 
-        /**
-         * Evaluate whether the specified MethodMatcher and this FieldAccess are describing the same type or not.
-         * Known limitation/bug: MethodMatchers can have patterns/wildcards like "com.*.Bar" instead of something
-         * concrete like "com.foo.Bar". This limitation is not desirable or intentional and should be fixed.
-         * If a methodMatcher is passed that includes wildcards the result will always be "false"
-         *
-         * @param methodMatcher a methodMatcher whose internal pattern is fully concrete (no wildcards)
-         */
-        public boolean isFullyQualifiedClassReference(MethodMatcher methodMatcher) {
-            String hopefullyFullyQualifiedMethod = methodMatcher.getTargetTypePattern().pattern() + "." + methodMatcher.getMethodNamePattern().pattern();
-            return isFullyQualifiedClassReference(this, hopefullyFullyQualifiedMethod);
-        }
-
         private boolean isFullyQualifiedClassReference(J.FieldAccess fieldAccess, String className) {
             if (!className.contains(".")) {
                 return false;
