@@ -51,15 +51,15 @@ public class BigDecimalRoundingConstantsToEnums extends Recipe {
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
-            private final JavaTemplate twoArgDivide = template("#{any(java.math.BigDecimal)}, #{any(java.math.RoundingMode)}")
+            private final JavaTemplate twoArgDivide = JavaTemplate.builder(this::getCursor, "#{any(java.math.BigDecimal)}, #{any(java.math.RoundingMode)}")
                     .imports("java.math.RoundingMode")
                     .build();
 
-            private final JavaTemplate twoArgScale = template("#{any(int)}, #{any(java.math.RoundingMode)}")
+            private final JavaTemplate twoArgScale = JavaTemplate.builder(this::getCursor, "#{any(int)}, #{any(java.math.RoundingMode)}")
                     .imports("java.math.RoundingMode")
                     .build();
 
-            private final JavaTemplate threeArg = template("#{any(java.math.BigDecimal)}, #{any(int)}, #{any(java.math.RoundingMode)}")
+            private final JavaTemplate threeArg = JavaTemplate.builder(this::getCursor, "#{any(java.math.BigDecimal)}, #{any(int)}, #{any(java.math.RoundingMode)}")
                     .imports("java.math.RoundingMode").build();
 
             @Override
@@ -71,7 +71,7 @@ public class BigDecimalRoundingConstantsToEnums extends Recipe {
                     if(roundingModeEnum == null) {
                         return m;
                     }
-                    J roundingMode = m.withTemplate(template(roundingModeEnum)
+                    J roundingMode = m.withTemplate(JavaTemplate.builder(this::getCursor, roundingModeEnum)
                                     .imports("java.math.RoundingMode")
                                     .build(),
                             m.getCoordinates().replace());
@@ -83,7 +83,7 @@ public class BigDecimalRoundingConstantsToEnums extends Recipe {
                     if(roundingModeEnum == null) {
                         return m;
                     }
-                    J roundingMode = m.withTemplate(template(roundingModeEnum)
+                    J roundingMode = m.withTemplate(JavaTemplate.builder(this::getCursor, roundingModeEnum)
                                     .imports("java.math.RoundingMode")
                                     .build(),
                             m.getCoordinates().replace());
@@ -97,7 +97,7 @@ public class BigDecimalRoundingConstantsToEnums extends Recipe {
                     if(roundingModeEnum == null) {
                         return m;
                     }
-                    J roundingMode = m.withTemplate(template(roundingModeEnum)
+                    J roundingMode = m.withTemplate(JavaTemplate.builder(this::getCursor, roundingModeEnum)
                                     .imports("java.math.RoundingMode")
                                     .build(),
                             m.getCoordinates().replace());

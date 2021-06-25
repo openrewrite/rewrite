@@ -18,6 +18,7 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Test
 import org.openrewrite.*
 import org.openrewrite.java.tree.J
+import java.util.function.Supplier
 
 interface AddImportTest : JavaRecipeTest {
     fun addImports(vararg adds: AddImport<ExecutionContext>): Recipe = adds
@@ -81,7 +82,7 @@ interface AddImportTest : JavaRecipeTest {
                 val c = super.visitClassDeclaration(classDecl, ctx)
                 var b = c.body
                 if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    val t = template("BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);")
+                    val t = JavaTemplate.builder(Supplier { cursor }, "BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);")
                         .imports("java.math.BigDecimal", "java.math.RoundingMode")
                         .build()
 

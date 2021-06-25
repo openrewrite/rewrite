@@ -37,7 +37,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replacePackage(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("b").build()
+            val t = JavaTemplate.builder({ cursor }, "b").build()
 
             override fun visitPackage(pkg: J.Package, p: ExecutionContext): J.Package {
                 if(pkg.expression.printTrimmed() == "a") {
@@ -62,7 +62,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceMethod(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("int test2(int n) { return n; }").build()
+            val t = JavaTemplate.builder({ cursor }, "int test2(int n) { return n; }").build()
 
             override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
                 if (method.simpleName == "test") {
@@ -89,8 +89,8 @@ interface JavaTemplateTest : JavaRecipeTest {
             val methodType = (cu.classes.first().body.statements.first() as J.MethodDeclaration).type!!
             assertThat(methodType.resolvedSignature.returnType).isEqualTo(JavaType.Primitive.Int)
             assertThat(methodType.resolvedSignature.paramTypes).containsExactly(JavaType.Primitive.Int)
-            assertThat(methodType.genericSignature.returnType).isEqualTo(JavaType.Primitive.Int)
-            assertThat(methodType.genericSignature.paramTypes).containsExactly(JavaType.Primitive.Int)
+            assertThat(methodType.genericSignature?.returnType).isEqualTo(JavaType.Primitive.Int)
+            assertThat(methodType.genericSignature?.paramTypes).containsExactly(JavaType.Primitive.Int)
         }
     )
 
@@ -98,7 +98,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceLambdaWithMethodReference(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaVisitor<ExecutionContext>() {
-            val t = template("Object::toString").build()
+            val t = JavaTemplate.builder({ cursor }, "Object::toString").build()
 
             override fun visitLambda(lambda: J.Lambda, p: ExecutionContext): J {
                 return lambda.withTemplate(t, lambda.coordinates.replace())
@@ -131,7 +131,7 @@ interface JavaTemplateTest : JavaRecipeTest {
             }
         """.trimIndent()),
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("#{anyArray(int)}").build()
+            val t = JavaTemplate.builder({ cursor }, "#{anyArray(int)}").build()
 
             override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
                 var m: J.MethodInvocation = super.visitMethodInvocation(method, p)
@@ -168,7 +168,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceMethodInvocationWithMethodReference(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaVisitor<ExecutionContext>() {
-                val t = template("Object::toString").build()
+                val t = JavaTemplate.builder({ cursor }, "Object::toString").build()
 
             override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J {
                 return method.withTemplate(t, method.coordinates.replace());
@@ -203,7 +203,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceMethodParameters(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("int m, java.util.List<String> n")
+            val t = JavaTemplate.builder({ cursor }, "int m, java.util.List<String> n")
                 .doBeforeParseTemplate(print)
                 .build()
 
@@ -263,7 +263,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceMethodParametersVariadicArray(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("Object[]... values")
+            val t = JavaTemplate.builder({ cursor }, "Object[]... values")
                     .doBeforeParseTemplate(print)
                     .build()
 
@@ -318,7 +318,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceAndInterpolateMethodParameters(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-                val t = template("int n, #{}")
+                val t = JavaTemplate.builder({ cursor }, "int n, #{}")
                         .doBeforeParseTemplate(print)
                         .build()
 
@@ -362,7 +362,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceLambdaParameters(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("int m, int n")
+            val t = JavaTemplate.builder({ cursor }, "int m, int n")
                 .doBeforeParseTemplate(print)
                 .build()
 
@@ -393,7 +393,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceSingleStatement(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaVisitor<ExecutionContext>() {
-            val t = template(
+            val t = JavaTemplate.builder({ cursor }, 
                 "if(n != 1) {\n" +
                         "  n++;\n" +
                         "}"
@@ -428,7 +428,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceStatementInBlock(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.logCompilationWarningsAndErrors(true).build(),
         recipe = object : JavaVisitor<ExecutionContext>() {
-            val t = template("n = 2;\nn = 3;")
+            val t = JavaTemplate.builder({ cursor }, "n = 2;\nn = 3;")
                 .doBeforeParseTemplate(print)
                 .build()
 
@@ -465,7 +465,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun beforeStatementInBlock(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaVisitor<ExecutionContext>() {
-            val t = template("assert n == 0;")
+            val t = JavaTemplate.builder({ cursor }, "assert n == 0;")
                 .doBeforeParseTemplate(print)
                 .build()
 
@@ -500,7 +500,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun afterStatementInBlock(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaVisitor<ExecutionContext>() {
-            val t = template("n = 1;")
+            val t = JavaTemplate.builder({ cursor }, "n = 1;")
                 .doBeforeParseTemplate(print)
                 .build()
 
@@ -534,7 +534,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun lastStatementInClassBlock(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaVisitor<ExecutionContext>() {
-            val t = template("int n;")
+            val t = JavaTemplate.builder({ cursor }, "int n;")
                 .doBeforeParseTemplate(print)
                 .build()
 
@@ -560,7 +560,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun lastStatementInMethodBlock(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaVisitor<ExecutionContext>() {
-            val t = template("n = 1;")
+            val t = JavaTemplate.builder({ cursor }, "n = 1;")
                 .doBeforeParseTemplate(print)
                 .build()
 
@@ -594,7 +594,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceStatementRequiringNewImport(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaVisitor<ExecutionContext>() {
-            val t = template("List<String> s = null;")
+            val t = JavaTemplate.builder({ cursor }, "List<String> s = null;")
                 .imports("java.util.List")
                 .doBeforeParseTemplate(print)
                 .build()
@@ -628,7 +628,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceArguments(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("m, Integer.valueOf(n), \"foo\"")
+            val t = JavaTemplate.builder({ cursor }, "m, Integer.valueOf(n), \"foo\"")
                 .doBeforeParseTemplate(print)
                 .build()
 
@@ -660,11 +660,9 @@ interface JavaTemplateTest : JavaRecipeTest {
         afterConditions = { cu ->
             val m = (cu.classes[0].body.statements[1] as J.MethodDeclaration).body!!.statements[0] as J.MethodInvocation
             val type = m.type!!
-            assertThat(type.genericSignature.paramTypes[0])
-                    .isEqualTo(JavaType.Primitive.Int)
-            assertThat(type.genericSignature.paramTypes[1])
-                    .isEqualTo(JavaType.Primitive.Int)
-            assertThat(type.genericSignature.paramTypes[2])
+            assertThat(type.genericSignature!!.paramTypes[0]).isEqualTo(JavaType.Primitive.Int)
+            assertThat(type.genericSignature!!.paramTypes[1]).isEqualTo(JavaType.Primitive.Int)
+            assertThat(type.genericSignature!!.paramTypes[2])
                     .matches { (it as JavaType.FullyQualified).fullyQualifiedName.equals("java.lang.String") }
         }
     )
@@ -673,7 +671,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceClassAnnotation(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("@Deprecated")
+            val t = JavaTemplate.builder({ cursor }, "@Deprecated")
                 .doBeforeParseTemplate(print)
                 .build()
 
@@ -692,7 +690,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceMethodAnnotations(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("@SuppressWarnings(\"other\")")
+            val t = JavaTemplate.builder({ cursor }, "@SuppressWarnings(\"other\")")
                 .doBeforeParseTemplate(print)
                 .build()
 
@@ -740,7 +738,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceClassAnnotations(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("@SuppressWarnings(\"other\")")
+            val t = JavaTemplate.builder({ cursor }, "@SuppressWarnings(\"other\")")
                 .doBeforeParseTemplate(print)
                 .build()
 
@@ -774,7 +772,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceVariableAnnotations(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("@SuppressWarnings(\"other\")")
+            val t = JavaTemplate.builder({ cursor }, "@SuppressWarnings(\"other\")")
                 .doBeforeParseTemplate(print)
                 .build()
 
@@ -807,7 +805,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun addMethodAnnotations(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("@SuppressWarnings(\"other\")")
+            val t = JavaTemplate.builder({ cursor }, "@SuppressWarnings(\"other\")")
                 .doBeforeParseTemplate(print)
                 .build()
 
@@ -841,7 +839,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun addClassAnnotations(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("@SuppressWarnings(\"other\")")
+            val t = JavaTemplate.builder({ cursor }, "@SuppressWarnings(\"other\")")
                 .doBeforeParseTemplate(print)
                 .build()
 
@@ -872,7 +870,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceClassImplements(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("Serializable, Closeable")
+            val t = JavaTemplate.builder({ cursor }, "Serializable, Closeable")
                 .imports("java.io.*")
                 .doBeforeParseTemplate(print)
                 .build()
@@ -903,7 +901,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceClassExtends(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("List<String>")
+            val t = JavaTemplate.builder({ cursor }, "List<String>")
                 .imports("java.util.*")
                 .doBeforeParseTemplate(print)
                 .build()
@@ -932,7 +930,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceThrows(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("Exception")
+            val t = JavaTemplate.builder({ cursor }, "Exception")
                 .doBeforeParseTemplate(print)
                 .build()
 
@@ -964,11 +962,11 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceMethodTypeParameters(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val typeParamsTemplate = template("T, U")
+            val typeParamsTemplate = JavaTemplate.builder({ cursor }, "T, U")
                 .doBeforeParseTemplate(print)
                 .build()
 
-            val methodArgsTemplate = template("List<T> t, U u")
+            val methodArgsTemplate = JavaTemplate.builder({ cursor }, "List<T> t, U u")
                     .imports("java.util.List")
                     .doBeforeParseTemplate(print)
                     .build()
@@ -1024,7 +1022,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceClassTypeParameters(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("T, U")
+            val t = JavaTemplate.builder({ cursor }, "T, U")
                 .doBeforeParseTemplate(print)
                 .build()
 
@@ -1049,7 +1047,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceBody(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.logCompilationWarningsAndErrors(true).build(),
         recipe = object : JavaVisitor<ExecutionContext>() {
-            val t = template("n = 1;")
+            val t = JavaTemplate.builder({ cursor }, "n = 1;")
                 .doBeforeParseTemplate(print)
                 .build()
 
@@ -1083,7 +1081,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceMissingBody(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.logCompilationWarningsAndErrors(true).build(),
         recipe = object : JavaVisitor<ExecutionContext>() {
-                val t = template("")
+                val t = JavaTemplate.builder({ cursor }, "")
                         .doBeforeParseTemplate(print)
                         .build()
 

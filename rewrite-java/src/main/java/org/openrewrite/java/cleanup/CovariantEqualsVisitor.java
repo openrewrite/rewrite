@@ -76,7 +76,7 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
                 if (m.getAllAnnotations().stream().noneMatch(OVERRIDE_ANNOTATION::matches)) {
                     m = maybeAutoFormat(m,
                             m.withTemplate(
-                                    template("@Override").build(),
+                                    JavaTemplate.builder(this::getCursor, "@Override").build(),
                                     m.getCoordinates().addAnnotation(Comparator.comparing(J.Annotation::getSimpleName))
                             ), p, getCursor().getParentOrThrow());
                 }
@@ -90,7 +90,7 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
                 String paramName = "obj".equals(oldParamName.getSimpleName()) ? "other" : "obj";
                 m = maybeAutoFormat(m,
                         m.withTemplate(
-                                template("Object #{}").build(),
+                                JavaTemplate.builder(this::getCursor, "Object #{}").build(),
                                 m.getCoordinates().replaceParameters(),
                                 paramName
                         ), p, getCursor().getParentOrThrow());
@@ -100,7 +100,7 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
                  * equals(..) method body statements, and let the existing equals(..) method definition continue
                  * with the logic doing what it was doing.
                  */
-                JavaTemplate equalsBodySnippet = template(EQUALS_BODY_PREFIX_TEMPLATE).build();
+                JavaTemplate equalsBodySnippet = JavaTemplate.builder(this::getCursor, EQUALS_BODY_PREFIX_TEMPLATE).build();
 
                 assert m.getBody() != null;
                 Object[] params = new Object[]{

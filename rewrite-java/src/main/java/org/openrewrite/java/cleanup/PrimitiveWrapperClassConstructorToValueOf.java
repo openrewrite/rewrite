@@ -68,28 +68,28 @@ public class PrimitiveWrapperClassConstructorToValueOf extends Recipe {
                     JavaTemplate.Builder valueOf = null;
                     switch (type.getFullyQualifiedName()) {
                         case "java.lang.Boolean":
-                            valueOf = template("#{}.valueOf(#{any(boolean)});");
+                            valueOf = JavaTemplate.builder(this::getCursor, "#{}.valueOf(#{any(boolean)});");
                             break;
                         case "java.lang.Byte":
-                            valueOf = template("#{}.valueOf(#{any(byte)});");
+                            valueOf = JavaTemplate.builder(this::getCursor, "#{}.valueOf(#{any(byte)});");
                             break;
                         case "java.lang.Character":
-                            valueOf = template("#{}.valueOf(#{any(char)});");
+                            valueOf = JavaTemplate.builder(this::getCursor, "#{}.valueOf(#{any(char)});");
                             break;
                         case "java.lang.Double":
-                            valueOf = template("#{}.valueOf(#{any(double)});");
+                            valueOf = JavaTemplate.builder(this::getCursor, "#{}.valueOf(#{any(double)});");
                             break;
                         case "java.lang.Float":
-                            valueOf = template("#{}.valueOf(#{any(float)});");
+                            valueOf = JavaTemplate.builder(this::getCursor, "#{}.valueOf(#{any(float)});");
                             break;
                         case "java.lang.Integer":
-                            valueOf = template("#{}.valueOf(#{any(int)});");
+                            valueOf = JavaTemplate.builder(this::getCursor, "#{}.valueOf(#{any(int)});");
                             break;
                         case "java.lang.Long":
-                            valueOf = template("#{}.valueOf(#{any(long)});");
+                            valueOf = JavaTemplate.builder(this::getCursor, "#{}.valueOf(#{any(long)});");
                             break;
                         case "java.lang.Short":
-                            valueOf = template("#{}.valueOf(#{any(short)});");
+                            valueOf = JavaTemplate.builder(this::getCursor, "#{}.valueOf(#{any(short)});");
                             break;
                         default:
                             break;

@@ -16,7 +16,6 @@
 package org.openrewrite.java;
 
 import org.openrewrite.Cursor;
-import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
@@ -34,11 +33,6 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     @Override
     public String getLanguage() {
         return "java";
-    }
-
-    @Incubating(since = "7.0.0")
-    public JavaTemplate.Builder template(String code) {
-        return JavaTemplate.builder(this::getCursor, code);
     }
 
     /**

@@ -40,6 +40,7 @@ public class BlockStatementTemplateGenerator {
     private final Set<String> imports;
 
     public String template(Cursor cursor, String template, Space.Location location) {
+        //noinspection ConstantConditions
         return Timer.builder("rewrite.template.generate.statement")
                 .register(Metrics.globalRegistry)
                 .record(() -> {

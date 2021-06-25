@@ -36,7 +36,7 @@ interface JavaVisitorTest : JavaRecipeTest {
                 override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
                     var md = super.visitMethodDeclaration(method, p)
                     if (md.simpleName == "allTheThings") {
-                        md = md.withTemplate(template("Exception").build(), md.coordinates.replaceThrows())
+                        md = md.withTemplate(JavaTemplate.builder({ cursor }, "Exception").build(), md.coordinates.replaceThrows())
                     }
                     return md
                 }

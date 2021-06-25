@@ -36,6 +36,7 @@ public class AnnotationTemplateGenerator {
     private final Set<String> imports;
 
     public String template(Cursor cursor, String template) {
+        //noinspection ConstantConditions
         return Timer.builder("rewrite.template.generate.statement")
                 .register(Metrics.globalRegistry)
                 .record(() -> {

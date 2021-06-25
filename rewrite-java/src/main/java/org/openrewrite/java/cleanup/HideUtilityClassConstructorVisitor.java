@@ -18,11 +18,7 @@ package org.openrewrite.java.cleanup;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.Incubating;
-import org.openrewrite.java.AnnotationMatcher;
-import org.openrewrite.java.ChangeMethodAccessLevelVisitor;
-import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaStyle;
-import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.*;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
@@ -97,7 +93,7 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
         public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
             J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
             if (UtilityClassMatcher.hasImplicitDefaultConstructor(c)) {
-                c = c.withTemplate(template("private #{}() {}").build(),
+                c = c.withTemplate(JavaTemplate.builder(this::getCursor, "private #{}() {}").build(),
                         c.getBody().getCoordinates().lastStatement(),
                         classDecl.getSimpleName()
                 );

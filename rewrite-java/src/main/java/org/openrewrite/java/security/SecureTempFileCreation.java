@@ -44,11 +44,11 @@ public class SecureTempFileCreation extends Recipe {
     @Override
     protected JavaIsoVisitor<ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
-            private final JavaTemplate twoArg = template("Files.createTempFile(#{any(String)}, #{any(String)}).toFile();")
+            private final JavaTemplate twoArg = JavaTemplate.builder(this::getCursor, "Files.createTempFile(#{any(String)}, #{any(String)}).toFile();")
                     .imports("java.nio.file.Files")
                     .build();
 
-            private final JavaTemplate threeArg = template("Files.createTempFile(#{any(java.io.File)}.toPath(), #{any(String)}, #{any(String)}).toFile();")
+            private final JavaTemplate threeArg = JavaTemplate.builder(this::getCursor, "Files.createTempFile(#{any(java.io.File)}.toPath(), #{any(String)}, #{any(String)}).toFile();")
                     .imports("java.nio.file.Files")
                     .build();
 

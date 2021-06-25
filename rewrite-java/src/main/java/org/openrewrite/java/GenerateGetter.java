@@ -48,7 +48,7 @@ public class GenerateGetter extends Recipe {
     }
 
     private class GenerateGetterVisitor<P> extends JavaIsoVisitor<P> {
-        private final JavaTemplate getter = template("" +
+        private final JavaTemplate getter = JavaTemplate.builder(this::getCursor, "" +
                 "public #{} get#{}() {\n" +
                 "    return #{};\n" +
                 "}"

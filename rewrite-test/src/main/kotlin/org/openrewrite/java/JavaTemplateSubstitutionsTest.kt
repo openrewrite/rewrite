@@ -34,7 +34,7 @@ interface JavaTemplateSubstitutionsTest : JavaRecipeTest {
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
             val cycle = AtomicInteger(0)
-            val t = template("test(#{any()})").build()
+            val t = JavaTemplate.builder({ cursor }, "test(#{any()})").build()
 
             override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
                 if (cycle.getAndIncrement() == 0) {
@@ -77,7 +77,7 @@ interface JavaTemplateSubstitutionsTest : JavaRecipeTest {
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
             val cycle = AtomicInteger(0)
-            val t = template("test(#{anyArray()})").build()
+            val t = JavaTemplate.builder({ cursor }, "test(#{anyArray()})").build()
 
             override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
                 if (cycle.getAndIncrement() == 0) {
@@ -119,7 +119,7 @@ interface JavaTemplateSubstitutionsTest : JavaRecipeTest {
     fun annotation(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("#{} void test2() {}")
+            val t = JavaTemplate.builder({ cursor }, "#{} void test2() {}")
                 .javaParser { JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true).build() }
                 .build()
 
@@ -155,7 +155,7 @@ interface JavaTemplateSubstitutionsTest : JavaRecipeTest {
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
             val cycle = AtomicInteger(0)
-            val t = template("test(#{any(java.util.Collection)}, #{any(int)})").build()
+            val t = JavaTemplate.builder({ cursor }, "test(#{any(java.util.Collection)}, #{any(int)})").build()
 
             override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
                 if (cycle.getAndIncrement() == 0) {
@@ -192,7 +192,7 @@ interface JavaTemplateSubstitutionsTest : JavaRecipeTest {
     fun block(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = template("if(true) #{}")
+            val t = JavaTemplate.builder({ cursor }, "if(true) #{}")
                 .doBeforeParseTemplate(print)
                 .build()
 
