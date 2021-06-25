@@ -18,11 +18,13 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.UnwrapParentheses;
 import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Space;
 
 @Incubating(since = "7.0.0")
 public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
@@ -49,7 +51,8 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
             } else if (isLiteralFalse(asBinary.getRight())) {
                 maybeUnwrapParentheses();
                 j = asBinary.getRight();
-            } else if (asBinary.getLeft().printTrimmed().replaceAll("\\s", "").equals(asBinary.getRight().printTrimmed().replaceAll("\\s", ""))) {
+            } else if (removeAllSpace(asBinary.getLeft()).printTrimmed()
+                    .equals(removeAllSpace(asBinary.getRight()).printTrimmed())) {
                 maybeUnwrapParentheses();
                 j = asBinary.getLeft();
             }
@@ -60,7 +63,8 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
             } else if (isLiteralTrue(asBinary.getRight())) {
                 maybeUnwrapParentheses();
                 j = asBinary.getRight();
-            } else if (asBinary.getLeft().printTrimmed().replaceAll("\\s", "").equals(asBinary.getRight().printTrimmed().replaceAll("\\s", ""))) {
+            } else if (removeAllSpace(asBinary.getLeft()).printTrimmed()
+                    .equals(removeAllSpace(asBinary.getRight()).printTrimmed())) {
                 maybeUnwrapParentheses();
                 j = asBinary.getLeft();
             }
@@ -141,5 +145,15 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
 
     private boolean isLiteralFalse(@Nullable Expression expression) {
         return expression instanceof J.Literal && ((J.Literal) expression).getValue() == Boolean.valueOf(false);
+    }
+
+    private J removeAllSpace(J j) {
+        //noinspection ConstantConditions
+        return new JavaIsoVisitor<Integer>() {
+            @Override
+            public Space visitSpace(Space space, Space.Location loc, Integer integer) {
+                return Space.EMPTY;
+            }
+        }.visit(j, 0);
     }
 }
