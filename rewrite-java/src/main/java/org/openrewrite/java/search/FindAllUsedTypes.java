@@ -15,57 +15,54 @@
  */
 package org.openrewrite.java.search;
 
-import org.openrewrite.Cursor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 
-import java.util.*;
+import java.util.HashSet;
+import java.util.Set;
 
 public class FindAllUsedTypes {
-    public static Map<JavaType, Set<Cursor>> findAll(J j) {
-        Map<JavaType, Set<Cursor>> types = new HashMap<>();
+    public static Set<JavaType> findAll(J j) {
+        Set<JavaType> types = new HashSet<JavaType>() {
+            @Override
+            public boolean add(@Nullable JavaType javaType) {
+                if(javaType != null) {
+                    return super.add(javaType);
+                }
+                return false;
+            }
+        };
 
         new JavaIsoVisitor<Integer>() {
 
-            private void addTypeToResults(@Nullable JavaType type) {
-                if(type != null) {
-                    types.merge(type, Collections.singleton(getCursor()), (k, v) -> {
-                        Set<Cursor> cursors = new HashSet<>();
-                        cursors.addAll(k);
-                        cursors.addAll(v);
-                        return cursors;
-                    });
-                }
-            }
-
             @Override
             public <N extends NameTree> N visitTypeName(N nameTree, Integer p) {
-                addTypeToResults(nameTree.getType());
+                types.add(nameTree.getType());
                 return super.visitTypeName(nameTree, p);
             }
 
             @Override
             public J.ArrayAccess visitArrayAccess(J.ArrayAccess arrayAccess, Integer p) {
-                addTypeToResults(arrayAccess.getType());
+                types.add(arrayAccess.getType());
                 return super.visitArrayAccess(arrayAccess, p);
             }
 
             @Override
             public J.Assignment visitAssignment(J.Assignment assignment, Integer p) {
-                addTypeToResults(assignment.getType());
+                types.add(assignment.getType());
                 return super.visitAssignment(assignment, p);
             }
 
             @Override
             public J.AssignmentOperation visitAssignmentOperation(J.AssignmentOperation assignOp, Integer p) {
-                addTypeToResults(assignOp.getType());
+                types.add(assignOp.getType());
                 return super.visitAssignmentOperation(assignOp, p);
             }
 
             @Override
             public J.Binary visitBinary(J.Binary binary, Integer p) {
-                addTypeToResults(binary.getType());
+                types.add(binary.getType());
                 return super.visitBinary(binary, p);
             }
 
@@ -89,8 +86,8 @@ public class FindAllUsedTypes {
 
             @Override
             public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
-                addTypeToResults(identifier.getType());
-                addTypeToResults(identifier.getFieldType());
+                types.add(identifier.getType());
+                types.add(identifier.getFieldType());
                 return super.visitIdentifier(identifier, p);
             }
 
@@ -109,93 +106,93 @@ public class FindAllUsedTypes {
 
             @Override
             public J.InstanceOf visitInstanceOf(J.InstanceOf instanceOf, Integer p) {
-                addTypeToResults(instanceOf.getType());
+                types.add(instanceOf.getType());
                 return super.visitInstanceOf(instanceOf, p);
             }
 
             @Override
             public J.Lambda visitLambda(J.Lambda lambda, Integer p) {
-                addTypeToResults(lambda.getType());
+                types.add(lambda.getType());
                 return super.visitLambda(lambda, p);
             }
 
             @Override
             public J.Literal visitLiteral(J.Literal literal, Integer p) {
-                addTypeToResults(literal.getType());
+                types.add(literal.getType());
                 return super.visitLiteral(literal, p);
             }
 
             @Override
             public J.MemberReference visitMemberReference(J.MemberReference memberRef, Integer p) {
-                addTypeToResults(memberRef.getType());
-                addTypeToResults(memberRef.getReferenceType());
+                types.add(memberRef.getType());
+                types.add(memberRef.getReferenceType());
                 return super.visitMemberReference(memberRef, p);
             }
 
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Integer p) {
-                addTypeToResults(method.getType());
+                types.add(method.getType());
                 return super.visitMethodDeclaration(method, p);
             }
 
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
-                addTypeToResults(method.getType());
-                addTypeToResults(method.getReturnType());
+                types.add(method.getType());
+                types.add(method.getReturnType());
                 return super.visitMethodInvocation(method, p);
             }
 
             @Override
             public J.MultiCatch visitMultiCatch(J.MultiCatch multiCatch, Integer p) {
-                addTypeToResults(multiCatch.getType());
+                types.add(multiCatch.getType());
                 return super.visitMultiCatch(multiCatch, p);
             }
 
             @Override
             public J.NewArray visitNewArray(J.NewArray newArray, Integer p) {
-                addTypeToResults(newArray.getType());
+                types.add(newArray.getType());
                 return super.visitNewArray(newArray, p);
             }
 
             @Override
             public J.NewClass visitNewClass(J.NewClass newClass, Integer p) {
-                addTypeToResults(newClass.getType());
+                types.add(newClass.getType());
                 return super.visitNewClass(newClass, p);
             }
 
             @Override
             public J.ParameterizedType visitParameterizedType(J.ParameterizedType type, Integer p) {
-                addTypeToResults(type.getType());
+                types.add(type.getType());
                 return super.visitParameterizedType(type, p);
             }
 
             @Override
             public J.Primitive visitPrimitive(J.Primitive primitive, Integer p) {
-                addTypeToResults(primitive.getType());
+                types.add(primitive.getType());
                 return super.visitPrimitive(primitive, p);
             }
 
             @Override
             public J.Ternary visitTernary(J.Ternary ternary, Integer p) {
-                addTypeToResults(ternary.getType());
+                types.add(ternary.getType());
                 return super.visitTernary(ternary, p);
             }
 
             @Override
             public J.TypeCast visitTypeCast(J.TypeCast typeCast, Integer p) {
-                addTypeToResults(typeCast.getType());
+                types.add(typeCast.getType());
                 return super.visitTypeCast(typeCast, p);
             }
 
             @Override
             public J.Unary visitUnary(J.Unary unary, Integer p) {
-                addTypeToResults(unary.getType());
+                types.add(unary.getType());
                 return super.visitUnary(unary, p);
             }
 
             @Override
             public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
-                addTypeToResults(variable.getType());
+                types.add(variable.getType());
                 return super.visitVariable(variable, p);
             }
         }.visit(j, 0);

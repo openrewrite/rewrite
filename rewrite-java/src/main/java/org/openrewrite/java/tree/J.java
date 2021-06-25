@@ -1151,7 +1151,7 @@ public interface J extends Serializable, Tree {
             return FindTypes.find(this, clazz);
         }
 
-        public Map<JavaType, Set<Cursor>> getTypesInUse() {
+        public Set<JavaType> getTypesInUse() {
             TypeCache cache;
             if (this.typesInUse == null) {
                 cache = new TypeCache(this, FindAllUsedTypes.findAll(this));
@@ -1206,7 +1206,7 @@ public interface J extends Serializable, Tree {
         @RequiredArgsConstructor
         private static class TypeCache {
             private final CompilationUnit t;
-            private final Map<JavaType, Set<Cursor>> typesInUse;
+            private final Set<JavaType> typesInUse;
         }
     }
 

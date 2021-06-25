@@ -38,7 +38,7 @@ public class UsesField<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
-        Set<JavaType> types = cu.getTypesInUse().keySet();
+        Set<JavaType> types = cu.getTypesInUse();
         for (JavaType type : types) {
             if (type instanceof JavaType.Variable) {
                 JavaType.Variable variable = (JavaType.Variable) type;

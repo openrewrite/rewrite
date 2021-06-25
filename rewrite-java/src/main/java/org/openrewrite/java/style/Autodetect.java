@@ -319,7 +319,7 @@ public class Autodetect extends NamedStyles {
                 if (anImport.getQualid().getSimpleName().equals("*")) {
                     if (anImport.isStatic()) {
                         int count = 0;
-                        for (JavaType type : cu.getTypesInUse().keySet()) {
+                        for (JavaType type : cu.getTypesInUse()) {
                             if (type instanceof JavaType.Variable) {
                                 JavaType.FullyQualified fq = TypeUtils.asFullyQualified(((JavaType.Variable) type).getType());
                                 if (fq != null && anImport.getTypeName().equals(fq.getFullyQualifiedName())) {
@@ -334,7 +334,7 @@ public class Autodetect extends NamedStyles {
                         );
                     } else {
                         Set<String> fqns = new HashSet<>();
-                        for (JavaType type : cu.getTypesInUse().keySet()) {
+                        for (JavaType type : cu.getTypesInUse()) {
                             if (type instanceof JavaType.FullyQualified) {
                                 JavaType.FullyQualified fq = (JavaType.FullyQualified) type;
                                 if (anImport.getPackageName().equals(fq.getPackageName())) {
