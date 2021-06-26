@@ -71,7 +71,13 @@ public class MergeYamlVisitor extends YamlVisitor<ExecutionContext> {
                     })
                     .orElse(existingEntry);
         });
-        return m1.withEntries(mutatedEntries);
+
+        m2.getEntries().stream()
+                .filter(e -> mutatedEntries.stream().noneMatch(me -> keyMatches(e, me)))
+                .forEach(e -> mutatedEntries.addAll(m2.getEntries()));
+
+        return m1
+                .withEntries(mutatedEntries);
     }
 
     private static Yaml.Sequence mergeSequence(Yaml.Sequence existingSeq, Yaml.Sequence incomingSeq, ExecutionContext ctx, Cursor cursor) {

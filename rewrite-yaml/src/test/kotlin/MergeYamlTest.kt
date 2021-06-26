@@ -55,17 +55,16 @@ class MergeYamlTest : YamlRecipeTest {
         cycles = 2
     )
 
-    @Disabled("MergeYaml is incomplete")
     @Test
     fun mustMergeYamlWhenBlockDoesntExist() = assertChanged(
         recipe = MergeYaml(
             "/spec/lifecycleRule",
             """
-              lifecycleRule:
-                  - action:
-                        type: Delete
-                    condition:
-                        age: 7
+            lifecycleRule:
+                - action:
+                      type: Delete
+                  condition:
+                      age: 7
             """.trimIndent()
         ),
         before = """
@@ -93,7 +92,7 @@ class MergeYamlTest : YamlRecipeTest {
         recipe = MergeYaml(
             "/spec/bucketPolicyOnly",
             """
-              bucketPolicyOnly: true
+            bucketPolicyOnly: true
             """.trimIndent()
         ),
         before = """

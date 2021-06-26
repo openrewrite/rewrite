@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.format.AutoFormatVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -69,19 +70,55 @@ public class MergeYaml extends Recipe {
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         XPathMatcher matcher = new XPathMatcher(key);
+        XPathMatcher parentMatcher;
+        if ("/".equals(key)) {
+            parentMatcher = new XPathMatcher("/");
+        } else {
+            parentMatcher = new XPathMatcher(key.substring(0, key.lastIndexOf('/')));
+        }
         Yaml.Mapping incoming = (Yaml.Mapping) new YamlParser().parse(yaml).get(0).getDocuments().get(0).getBlock();
 
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
+            public @Nullable Yaml postVisit(Yaml tree, ExecutionContext executionContext) {
+                if (tree instanceof Yaml.Mapping.Entry && ((Yaml.Mapping.Entry) tree).getKey().getValue().equals("spec")) {
+                    System.out.println(tree.print());
+                }
+                return super.postVisit(tree, executionContext);
+            }
+
+            @Override
+            public Yaml.Mapping visitMapping(Yaml.Mapping mapping, ExecutionContext executionContext) {
+                return super.visitMapping(mapping, executionContext);
+            }
+
+            @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
+
+                boolean needsFormat = false;
                 if (matcher.matches(getCursor())) {
                     doAfterVisit(new MergeYamlVisitor(getCursor().getParentOrThrow().getValue(), incoming));
+                    needsFormat = true;
+                } else if (parentMatcher.matches(getCursor())
+                        && e.getValue() instanceof Yaml.Mapping
+                        && !hasChildWithKey(e.getKey().getValue(), (Yaml.Mapping) e.getValue())) {
+                    doAfterVisit(new MergeYamlVisitor(e.getValue(), incoming));
+                    needsFormat = true;
+                }
+
+                if (needsFormat) {
                     doAfterVisit(new AutoFormatVisitor<>(e));
                 }
+
                 return e;
             }
         };
+    }
+
+    private static boolean hasChildWithKey(String key, Yaml.Mapping mapping) {
+        return mapping.getEntries().stream()
+                .anyMatch(childEntry -> key.equals(childEntry.getKey().getValue()));
     }
 
 }
