@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.yaml.MergeYaml
 import org.openrewrite.yaml.YamlRecipeTest
@@ -54,6 +55,7 @@ class MergeYamlTest : YamlRecipeTest {
         cycles = 2
     )
 
+    @Disabled("MergeYaml is incomplete")
     @Test
     fun mustMergeYamlWhenBlockDoesntExist() = assertChanged(
         recipe = MergeYaml(
