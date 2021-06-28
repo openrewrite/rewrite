@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Tree.randomId
@@ -665,7 +664,6 @@ interface OrderImportsTest : JavaRecipeTest {
         """
     )
 
-    @Disabled
     @Issue("#352")
     @Test
     fun groupImportsIsAwareOfNestedClasses(jp: JavaParser) = assertChanged(
@@ -688,7 +686,7 @@ interface OrderImportsTest : JavaRecipeTest {
         ),
         before = """
             package org.bar;
-    
+            
             import org.abc.A;
             import org.abc.B;
             import org.abc.C;
@@ -700,28 +698,28 @@ interface OrderImportsTest : JavaRecipeTest {
             import org.abc.H.H1;
             import java.util.Arrays;
             import java.util.List;
-    
+            
             public class C {
                 void c() {
                     List l = Arrays.asList(new A(), new B(), new C(), new D(), new E(), new F(), new G(), new H(), new H1());
                 }
             }
-        """,
+        """.trimIndent(),
         after = """
             package org.bar;
-    
+            
             import org.abc.*;
             import org.abc.H.H1;
+            
             import java.util.Arrays;
             import java.util.List;
-    
-    
+            
             public class C {
                 void c() {
                     List l = Arrays.asList(new A(), new B(), new C(), new D(), new E(), new F(), new G(), new H(), new H1());
                 }
             }
-        """
+        """.trimIndent()
     )
 }
 
