@@ -16,8 +16,10 @@
 package org.openrewrite.internal;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
@@ -27,15 +29,52 @@ import org.openrewrite.internal.lang.Nullable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
 
 public class RecipeIntrospectionUtils {
+    @Nullable
+    public static TreeVisitor<?, ExecutionContext> recipeApplicableTest(Recipe recipe) {
+        try {
+            Method getVisitor = recipe.getClass().getDeclaredMethod("getApplicableTest");
+            getVisitor.setAccessible(true);
+            //noinspection unchecked
+            return (TreeVisitor<?, ExecutionContext>) getVisitor.invoke(recipe);
+        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    public static TreeVisitor<?, ExecutionContext> recipeSingleSourceApplicableTest(Recipe recipe) {
+        try {
+            Method getVisitor = recipe.getClass().getDeclaredMethod("getSingleSourceApplicableTest");
+            getVisitor.setAccessible(true);
+            //noinspection unchecked
+            return (TreeVisitor<?, ExecutionContext>) getVisitor.invoke(recipe);
+        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException ignored) {
+            return null;
+        }
+    }
+
+    public static TreeVisitor<?, ExecutionContext> recipeVisitor(Recipe recipe) {
+        try {
+            Method getVisitor = recipe.getClass().getDeclaredMethod("getVisitor");
+            getVisitor.setAccessible(true);
+            //noinspection unchecked
+            return (TreeVisitor<?, ExecutionContext>) getVisitor.invoke(recipe);
+        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException ignored) {
+            // not every recipe will implement getVisitor() directly, e.g. CompositeRecipe.
+            return Recipe.NOOP;
+        }
+    }
 
     public static RecipeDescriptor recipeDescriptorFromRecipeClass(Class<?> recipeClass) {
         List<OptionDescriptor> options = getOptionDescriptors(recipeClass);
@@ -90,8 +129,8 @@ public class RecipeIntrospectionUtils {
     @Nullable
     public static Constructor<?> getZeroArgsConstructor(Class<?> recipeClass) {
         Constructor<?>[] constructors = recipeClass.getConstructors();
-        for(Constructor<?> constructor : constructors) {
-            if(constructor.getParameterCount() == 0) {
+        for (Constructor<?> constructor : constructors) {
+            if (constructor.getParameterCount() == 0) {
                 return constructor;
             }
         }
@@ -116,7 +155,7 @@ public class RecipeIntrospectionUtils {
 
     private static Recipe constructRecipe(Class<?> recipeClass) {
         Constructor<?> primaryConstructor = getZeroArgsConstructor(recipeClass);
-        if(primaryConstructor == null) {
+        if (primaryConstructor == null) {
             primaryConstructor = getPrimaryConstructor(recipeClass);
         }
         Object[] constructorArgs = new Object[primaryConstructor.getParameterCount()];
