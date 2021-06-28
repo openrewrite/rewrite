@@ -179,11 +179,17 @@ public class StringUtils {
     }
 
     public static String capitalize(String value) {
+        if(value.isEmpty()) {
+            return value;
+        }
         return Character.toUpperCase(value.charAt(0)) +
                 value.substring(1);
     }
 
     public static String uncapitalize(String value) {
+        if(value.isEmpty()) {
+            return value;
+        }
         return Character.toLowerCase(value.charAt(0)) + value.substring(1);
     }
 
