@@ -225,11 +225,16 @@ public class Autodetect extends NamedStyles {
                         }
 
                         if (!importAllOthers) {
-                            builder = builder.importAllOthers().blankLine();
+                            if (importStaticAllOthers) {
+                                // TODO: currently not supported. Insert importAllOthers() before statics if importStaticAllOthers.
+                                builder = builder.blankLine().importAllOthers();
+                            } else {
+                                builder = builder.importAllOthers();
+                            }
                         }
 
                         if (!importStaticAllOthers) {
-                            builder = builder.importStaticAllOthers().blankLine();
+                            builder = builder.blankLine().importStaticAllOthers();
                         }
 
                         // set lower limits in case type attribution is really messed up on the project
