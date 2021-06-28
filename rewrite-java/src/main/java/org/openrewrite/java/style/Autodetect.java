@@ -305,7 +305,7 @@ public class Autodetect extends NamedStyles {
             int blockStart = 0;
             int i = 0;
             for (J.Import anImport : cu.getImports()) {
-                if (anImport.getPrefix().getWhitespace().contains("\n\n")) {
+                if (anImport.getPrefix().getWhitespace().contains("\n\n") || anImport.getPrefix().getWhitespace().contains("\r\n\r\n")) {
                     if (i - blockStart > 0) {
                         blocks.add(new ImportLayoutStatistics.Block(
                                 staticBlock ?
