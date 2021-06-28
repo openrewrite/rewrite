@@ -151,6 +151,8 @@ public class Java11Parser implements JavaParser {
 
     @Override
     public List<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+        JavaExecutionContextView ctxView = new JavaExecutionContextView(ctx);
+
         if (classpath != null) { // override classpath
             if (context.get(JavaFileManager.class) != pfm) {
                 throw new IllegalStateException("JavaFileManager has been forked unexpectedly");
@@ -173,7 +175,9 @@ public class Java11Parser implements JavaParser {
                     .register(Metrics.globalRegistry)
                     .record(() -> {
                         try {
-                            return compiler.parse(new Java11ParserInputFileObject(input1));
+                            JCTree.JCCompilationUnit parsed = compiler.parse(new Java11ParserInputFileObject(input1));
+                            ctxView.increment(JavaExecutionContextView.EVENT_SOURCE_FILE_PARSED);
+                            return parsed;
                         } catch (IllegalStateException e) {
                             if (e.getMessage().equals("endPosTable already set")) {
                                 throw new IllegalStateException("Call reset() on JavaParser before parsing another" +
@@ -196,6 +200,7 @@ public class Java11Parser implements JavaParser {
             }
 
             compiler.attribute(compiler.todo);
+            ctxView.increment(JavaExecutionContextView.EVENT_TYPE_ATTRIBUTION_COMPLETE);
         } catch (Throwable t) {
             // when symbol entering fails on problems like missing types, attribution can often times proceed
             // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
@@ -216,6 +221,7 @@ public class Java11Parser implements JavaParser {
                                 sharedClassTypes,
                                 ctx
                         );
+                        ctxView.increment(JavaExecutionContextView.EVENT_SOURCE_FILE_MAPPED);
 
                         J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
                         sample.stop(MetricsHelper.successTags(

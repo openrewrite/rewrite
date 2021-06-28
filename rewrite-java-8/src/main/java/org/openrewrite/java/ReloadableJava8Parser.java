@@ -136,6 +136,8 @@ class ReloadableJava8Parser implements JavaParser {
 
     @Override
     public List<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+        JavaExecutionContextView ctxView = new JavaExecutionContextView(ctx);
+
         if (classpath != null) { // override classpath
             if (context.get(JavaFileManager.class) != pfm) {
                 throw new IllegalStateException("JavaFileManager has been forked unexpectedly");
@@ -148,7 +150,7 @@ class ReloadableJava8Parser implements JavaParser {
             }
         }
 
-        LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = acceptedInputs(sourceFiles).stream()
+        @SuppressWarnings("ConstantConditions") LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = acceptedInputs(sourceFiles).stream()
                 .collect(Collectors.toMap(
                         Function.identity(),
                         input -> MetricsHelper.successTags(
@@ -159,7 +161,9 @@ class ReloadableJava8Parser implements JavaParser {
                                 .register(Metrics.globalRegistry)
                                 .record(() -> {
                                     try {
-                                        return compiler.parse(new Java8ParserInputFileObject(input));
+                                        JCTree.JCCompilationUnit parsed = compiler.parse(new Java8ParserInputFileObject(input));
+                                        ctxView.increment(JavaExecutionContextView.EVENT_SOURCE_FILE_PARSED);
+                                        return parsed;
                                     } catch (IllegalStateException e) {
                                         if (e.getMessage().equals("endPosTable already set")) {
                                             throw new IllegalStateException("Call reset() on JavaParser before parsing another" +
@@ -173,6 +177,7 @@ class ReloadableJava8Parser implements JavaParser {
         try {
             enterAll(cus.values());
             compiler.attribute(new TimedTodo(compiler.todo));
+            ctxView.increment(JavaExecutionContextView.EVENT_TYPE_ATTRIBUTION_COMPLETE);
         } catch (Throwable t) {
             // when symbol entering fails on problems like missing types, attribution can often times proceed
             // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
@@ -193,6 +198,7 @@ class ReloadableJava8Parser implements JavaParser {
                                 sharedClassTypes,
                                 ctx);
                         J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
+                        ctxView.increment(JavaExecutionContextView.EVENT_SOURCE_FILE_MAPPED);
                         sample.stop(MetricsHelper.successTags(
                                 Timer.builder("rewrite.parse")
                                         .description("The time spent mapping the OpenJDK AST to Rewrite's AST")

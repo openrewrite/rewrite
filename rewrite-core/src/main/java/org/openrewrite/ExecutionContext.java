@@ -46,7 +46,7 @@ public interface ExecutionContext {
         return newMessage;
     }
 
-    default <V, T, C extends Collection<V>> C putMessageInCollection(String key, V value, Supplier<C> newCollection) {
+    default <V, C extends Collection<V>> C putMessageInCollection(String key, V value, Supplier<C> newCollection) {
         return computeMessage(key, value, newCollection.get(), (v, acc) -> {
             C c = newCollection.get();
             c.addAll(acc);
