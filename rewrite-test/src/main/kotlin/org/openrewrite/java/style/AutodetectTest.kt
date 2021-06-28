@@ -104,7 +104,7 @@ interface AutodetectTest {
                 @Override
                 public J.Identifier visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
                     J.Identifier i = super.visitIdentifier(ident, ctx);
-        
+             
                     if (TypeUtils.isOfClassType(i.getType(), oldPackageName)
                             && i.getSimpleName().equals(oldPackageType.getClassName())) {
                         i = i.withName((newPackageType).getClassName())
@@ -113,7 +113,7 @@ interface AutodetectTest {
                     
                     return i;
                 }
-
+            
             }
         """.trimIndent()
         )
@@ -155,7 +155,9 @@ interface AutodetectTest {
         val cus = jp.parse(
             """
             import com.fasterxml.jackson.annotation.JsonCreator;
-            import org.openrewrite.Tree;
+            
+            import org.openrewrite.internal.StringUtils;
+            import org.openrewrite.internal.ListUtils;
             import org.openrewrite.internal.lang.Nullable;
             
             import java.util.*;
@@ -163,7 +165,7 @@ interface AutodetectTest {
             
             import static java.util.Collections.*;
             import static java.util.function.Function.identity;
-
+            
             public class Test {
             }
         """.trimIndent()
@@ -173,19 +175,37 @@ interface AutodetectTest {
         val importLayout = NamedStyles.merge(ImportLayoutStyle::class.java, listOf(styles))
 
         assertThat(importLayout.layout[0]).isInstanceOf(ImportLayoutStyle.Block.AllOthers::class.java)
+
         assertThat(importLayout.layout[1]).isInstanceOf(ImportLayoutStyle.Block.BlankLines::class.java)
 
         assertThat(importLayout.layout[2])
             .isInstanceOf(ImportLayoutStyle.Block.ImportPackage::class.java)
             .matches { b -> !(b as ImportLayoutStyle.Block.ImportPackage).isStatic }
-            .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == "java\\..+" }
+            .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == "com\\.fasterxml\\.jackson\\.annotation.+" }
 
         assertThat(importLayout.layout[3]).isInstanceOf(ImportLayoutStyle.Block.BlankLines::class.java)
 
-        assertThat(importLayout.layout[4]).isInstanceOf(ImportLayoutStyle.Block.AllOthers::class.java)
+        assertThat(importLayout.layout[4])
+            .isInstanceOf(ImportLayoutStyle.Block.ImportPackage::class.java)
+            .matches { b -> !(b as ImportLayoutStyle.Block.ImportPackage).isStatic }
+            .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == "org\\.openrewrite\\.internal.+" }
+
         assertThat(importLayout.layout[5]).isInstanceOf(ImportLayoutStyle.Block.BlankLines::class.java)
 
         assertThat(importLayout.layout[6])
+            .isInstanceOf(ImportLayoutStyle.Block.ImportPackage::class.java)
+            .matches { b -> !(b as ImportLayoutStyle.Block.ImportPackage).isStatic }
+            .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == "java\\..+" }
+
+        assertThat(importLayout.layout[7]).isInstanceOf(ImportLayoutStyle.Block.BlankLines::class.java)
+
+        assertThat(importLayout.layout[8])
+            .isInstanceOf(ImportLayoutStyle.Block.AllOthers::class.java)
+            .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).isStatic }
+
+        assertThat(importLayout.layout[9]).isInstanceOf(ImportLayoutStyle.Block.BlankLines::class.java)
+
+        assertThat(importLayout.layout[10])
             .isInstanceOf(ImportLayoutStyle.Block.ImportPackage::class.java)
             .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).isStatic }
             .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == "java\\..+" }
@@ -196,7 +216,7 @@ interface AutodetectTest {
         val cus = jp.parse(
             """
             import java.util.*;
-
+            
             public class Test {
                 List<Integer> l;
                 Set<Integer> s;

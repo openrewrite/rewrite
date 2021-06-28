@@ -195,12 +195,12 @@ public class Autodetect extends NamedStyles {
                             switch (block.type) {
                                 case Import:
                                     assert block.pattern != null;
-                                    if ("all other imports".equals(block.pattern)) {
+                                    if ("all other imports".equals(block.pattern) && !importAllOthers) {
                                         importAllOthers = true;
                                         builder = builder.importAllOthers();
                                     } else {
                                         if (longestBlocks.stream().noneMatch(b -> b.type == BlockType.Import &&
-                                                "all other imports".equals(b.pattern))) {
+                                                "all other imports".equals(b.pattern)) && !importAllOthers) {
                                             importAllOthers = true;
                                             builder = builder.importAllOthers().blankLine();
                                         }
@@ -209,12 +209,12 @@ public class Autodetect extends NamedStyles {
                                     break;
                                 case ImportStatic:
                                     assert block.pattern != null;
-                                    if ("all other imports".equals(block.pattern)) {
+                                    if ("all other imports".equals(block.pattern) && !importStaticAllOthers) {
                                         importStaticAllOthers = true;
                                         builder = builder.importStaticAllOthers();
                                     } else {
                                         if (longestBlocks.stream().noneMatch(b -> b.type == BlockType.ImportStatic &&
-                                                "all other imports".equals(b.pattern))) {
+                                                "all other imports".equals(b.pattern)) && !importStaticAllOthers) {
                                             importStaticAllOthers = true;
                                             builder = builder.importStaticAllOthers().blankLine();
                                         }
