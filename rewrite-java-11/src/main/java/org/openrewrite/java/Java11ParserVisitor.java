@@ -1674,9 +1674,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             }
 
             ClassType classType = (ClassType) type;
-
-            // type.tsym.metadata.attributes.get(0).type
-
             Symbol.ClassSymbol sym = (Symbol.ClassSymbol) type.tsym;
             ClassType symType = (ClassType) sym.type;
 
