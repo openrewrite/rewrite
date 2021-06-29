@@ -85,16 +85,6 @@ public class MergeYaml extends Recipe {
 
         return new YamlVisitor<ExecutionContext>() {
             @Override
-            public Yaml visitSequence(Yaml.Sequence sequence, ExecutionContext ctx) {
-                new ContainsTree<>(sequence, filter, key).visit(sequence, searchResults, getCursor());
-                if (doesNotMatch(searchResults)) {
-                    return sequence;
-                } else {
-                    return sequence.withMarkers(sequence.getMarkers().addIfAbsent(ContainsTree.MATCHES));
-                }
-            }
-
-            @Override
             public Yaml visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
                 new ContainsTree<>(documents, filter, key).visit(documents, searchResults, getCursor());
                 if (doesNotMatch(searchResults)) {

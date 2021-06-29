@@ -57,6 +57,62 @@ class MergeYamlTest : YamlRecipeTest {
     )
 
     @Test
+    fun mustMergeMultipleYamlDocuments() = assertChanged(
+        recipe = MergeYaml(
+            "/spec/lifecycleRule",
+            """
+            lifecycleRule:
+                - condition:
+                    age: 7
+            """.trimIndent(),
+            null
+        ),
+        before = """
+            apiVersion: storage.cnrm.cloud.google.com/v1beta1
+            kind: StorageBucket
+            spec:
+                bucketPolicyOnly: true
+                lifecycleRule:
+                    - action:
+                          type: Delete
+                      condition:
+                          age: 1
+            ---
+            apiVersion: storage.cnrm.cloud.google.com/v1beta1
+            kind: StorageBucket
+            spec:
+                bucketPolicyOnly: true
+                lifecycleRule:
+                    - action:
+                          type: Delete
+                      condition:
+                          age: 1
+        """,
+        after = """
+            apiVersion: storage.cnrm.cloud.google.com/v1beta1
+            kind: StorageBucket
+            spec:
+                bucketPolicyOnly: true
+                lifecycleRule:
+                    - action:
+                          type: Delete
+                      condition:
+                          age: 7
+            ---
+            apiVersion: storage.cnrm.cloud.google.com/v1beta1
+            kind: StorageBucket
+            spec:
+                bucketPolicyOnly: true
+                lifecycleRule:
+                    - action:
+                          type: Delete
+                      condition:
+                          age: 7
+        """,
+        cycles = 2
+    )
+
+    @Test
     fun mustMergeYamlWhenBlockDoesntExist() = assertChanged(
         recipe = MergeYaml(
             "/spec/lifecycleRule",
