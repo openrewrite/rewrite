@@ -86,6 +86,8 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
 
             // Does not currently support renaming fields in a J.ClassDeclaration.
             if (!(parentScope.getParent() != null && parentScope.getParent().getValue() instanceof J.ClassDeclaration) &&
+                    // Does not apply for instance variables of anonymous inner classes
+                    !(parentScope.getParent().getValue() instanceof J.NewClass) &&
                     // Does not apply to for loop controls.
                     !(parentScope.getValue() instanceof J.ForLoop.Control) &&
                     // Does not apply to catches with 1 character.
