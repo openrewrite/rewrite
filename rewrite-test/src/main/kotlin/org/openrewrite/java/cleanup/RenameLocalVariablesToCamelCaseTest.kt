@@ -142,4 +142,23 @@ interface RenameLocalVariablesToCamelCaseTest : JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    fun doNotRenameConstantVariable(jp: JavaParser) = assertUnchanged(
+            jp,
+            before = """
+            import java.util.ArrayList;
+            import java.util.List;
+            class Test {
+                public List<String> testFoo() {
+                    return new ArrayList<>() {
+                        private final int DO_NOT_CHANGE = 1;
+                   
+                    };
+                    
+                }
+            }
+
+        """
+    )
 }
