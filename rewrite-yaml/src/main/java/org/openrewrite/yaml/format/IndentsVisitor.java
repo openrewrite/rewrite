@@ -39,7 +39,7 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
     @Override
     public @Nullable Yaml visit(@Nullable Tree tree, P p, Cursor parent) {
         setCursor(parent);
-        for (Cursor c = parent; c != null; c = c.getParent()) {
+        for (Cursor c = parent; c != null && c.getValue() instanceof Yaml; c = c.getParent()) {
             Yaml y = c.getValue();
             String prefix = y.getPrefix();
 

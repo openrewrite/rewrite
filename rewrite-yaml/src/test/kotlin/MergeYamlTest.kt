@@ -28,7 +28,8 @@ class MergeYamlTest : YamlRecipeTest {
             lifecycleRule:
                 - condition:
                     age: 7
-            """.trimIndent()
+            """.trimIndent(),
+            null
         ),
         before = """
             apiVersion: storage.cnrm.cloud.google.com/v1beta1
@@ -55,7 +56,6 @@ class MergeYamlTest : YamlRecipeTest {
         cycles = 2
     )
 
-    @Disabled("MergeYaml is incomplete")
     @Test
     fun mustMergeYamlWhenBlockDoesntExist() = assertChanged(
         recipe = MergeYaml(
@@ -66,7 +66,8 @@ class MergeYamlTest : YamlRecipeTest {
                         type: Delete
                     condition:
                         age: 7
-            """.trimIndent()
+            """.trimIndent(),
+            null
         ),
         before = """
             apiVersion: storage.cnrm.cloud.google.com/v1beta1
@@ -94,7 +95,8 @@ class MergeYamlTest : YamlRecipeTest {
             "/spec/bucketPolicyOnly",
             """
               bucketPolicyOnly: true
-            """.trimIndent()
+            """.trimIndent(),
+            null
         ),
         before = """
             apiVersion: storage.cnrm.cloud.google.com/v1beta1
@@ -107,6 +109,172 @@ class MergeYamlTest : YamlRecipeTest {
             kind: StorageBucket
             spec:
                 bucketPolicyOnly: true
+        """,
+        cycles = 2
+    )
+
+    @Test
+    fun mustMergeYamlWhenApplicable() = assertChanged(
+        recipe = MergeYaml(
+            "/",
+            """
+            spec:
+              containers:
+              - env:
+                - name: POD_NAMESPACE
+                - name: POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      apiVersion: v1
+                      fieldPath: metadata.name
+            """.trimIndent(),
+            """
+            apiVersion: v1
+            kind: Pod
+            metadata:
+              labels:
+                app: gatekeeper
+            spec:
+              containers:
+              - name: manager
+            """.trimIndent(),
+        ),
+        before = """
+            apiVersion: v1
+            kind: Pod
+            metadata:
+              labels:
+                app: gatekeeper
+            spec:
+              containers:            
+              - name: manager
+                env:
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      apiVersion: v1
+                      fieldPath: metadata.namespace
+        """,
+        after = """
+            apiVersion: v1
+            kind: Pod
+            metadata:
+              labels:
+                app: gatekeeper
+            spec:
+              containers:            
+              - name: manager
+                env:
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      apiVersion: v1
+                      fieldPath: metadata.namespace
+                - name: POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      apiVersion: v1
+                      fieldPath: metadata.name
+        """,
+        cycles = 2
+    )
+
+    @Test
+    fun mustNotMergeYamlWhenNotApplicable() = assertUnchanged(
+        recipe = MergeYaml(
+            "/",
+            """
+            spec:
+              containers:
+              - env:
+                - name: POD_NAMESPACE
+                - name: POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      apiVersion: v1
+                      fieldPath: metadata.name
+            """.trimIndent(),
+            """
+            apiVersion: v1
+            kind: Pod
+            metadata:
+              labels:
+                app: not-gatekeeper
+            """.trimIndent(),
+        ),
+        before = """
+            apiVersion: v1
+            kind: Pod
+            metadata:
+              labels:
+                app: gatekeeper
+            spec:
+              containers:            
+              - name: manager
+                env:
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      apiVersion: v1
+                      fieldPath: metadata.namespace
+        """
+    )
+
+    @Test
+    fun mustMergeYamlFragmentWhenApplicable() = assertChanged(
+        recipe = MergeYaml(
+            "/spec/containers",
+            """
+            containers:
+                - env:
+                    - name: POD_NAMESPACE
+                    - name: POD_NAME
+                      valueFrom:
+                        fieldRef:
+                          apiVersion: v1
+                          fieldPath: metadata.name
+            """.trimIndent(),
+            """
+            containers:
+                - name: manager
+            """.trimIndent(),
+        ),
+        before = """
+            apiVersion: v1
+            kind: Pod
+            metadata:
+              labels:
+                app: gatekeeper
+            spec:
+              containers:            
+              - name: manager
+                env:
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      apiVersion: v1
+                      fieldPath: metadata.namespace
+        """,
+        after = """
+            apiVersion: v1
+            kind: Pod
+            metadata:
+              labels:
+                app: gatekeeper
+            spec:
+              containers:            
+              - name: manager
+                env:
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      apiVersion: v1
+                      fieldPath: metadata.namespace
+                - name: POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      apiVersion: v1
+                      fieldPath: metadata.name
         """,
         cycles = 2
     )

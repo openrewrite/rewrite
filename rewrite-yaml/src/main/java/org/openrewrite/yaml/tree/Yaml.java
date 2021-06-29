@@ -110,7 +110,7 @@ public interface Yaml extends Serializable, Tree {
         Path sourcePath;
 
         @With
-        List<? extends Document> documents;
+        List<Document> documents;
 
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
