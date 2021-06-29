@@ -1674,6 +1674,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             }
 
             ClassType classType = (ClassType) type;
+
+            // type.tsym.metadata.attributes.get(0).type
+
             Symbol.ClassSymbol sym = (Symbol.ClassSymbol) type.tsym;
             ClassType symType = (ClassType) sym.type;
 
@@ -1702,6 +1705,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                         }
                     }
 
+
                     List<JavaType.FullyQualified> interfaces;
                     if (symType.interfaces_field == null) {
                         interfaces = emptyList();
@@ -1729,6 +1733,16 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                     if (sym.owner instanceof Symbol.ClassSymbol) {
                         owner = TypeUtils.asFullyQualified(type(sym.owner.type, stackWithSym));
                     }
+
+
+                    // Add annotation information to JavaType.Class
+                    List<JavaType.Class> annotations = new ArrayList<>();
+                    if(sym.getMetadata() != null && sym.getMetadata().getDeclarationAttributes() != null ) {
+                        //  TODO: create type by recursive call (see 1700) ?!
+                        sym.getMetadata().getDeclarationAttributes().stream()
+                                .forEach(a -> annotations.add(JavaType.Class.build(a.type.toString())));
+                    }
+
                     clazz = JavaType.Class.build(
                             //Currently only the first 16 bits are meaninful
                             (int) sym.flags_field & 0xFFFF,
@@ -1739,6 +1753,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                             null,
                             TypeUtils.asFullyQualified(type(classType.supertype_field, stackWithSym)),
                             owner,
+                            annotations,
                             relaxedClassTypeMatching);
                     sharedClassTypes.put(clazz.getFullyQualifiedName(), clazz);
                 }
