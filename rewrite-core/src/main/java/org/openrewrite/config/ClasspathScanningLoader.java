@@ -48,25 +48,29 @@ public class ClasspathScanningLoader implements ResourceLoader {
      * @param acceptPackages Limit scan to specified packages
      */
     public ClasspathScanningLoader(Properties properties, String[] acceptPackages) {
-        scanYaml(new ClassGraph().acceptPaths("META-INF/rewrite"), properties, null);
         scanClasses(new ClassGraph().acceptPackages(acceptPackages), getClass().getClassLoader());
+        scanYaml(new ClassGraph().acceptPaths("META-INF/rewrite"), properties, null);
     }
 
     public ClasspathScanningLoader(Path jar, Properties properties, ClassLoader classLoader) {
         String jarName = jar.toFile().getName();
+
+        scanClasses(new ClassGraph()
+                .acceptJars(jarName)
+                .ignoreParentClassLoaders()
+                .overrideClassLoaders(classLoader), classLoader);
 
         scanYaml(new ClassGraph()
                 .acceptJars(jarName)
                 .ignoreParentClassLoaders()
                 .overrideClassLoaders(classLoader)
                 .acceptPaths("META-INF/rewrite"), properties, classLoader);
-
-        scanClasses(new ClassGraph()
-                .acceptJars(jarName)
-                .ignoreParentClassLoaders()
-                .overrideClassLoaders(classLoader), classLoader);
     }
 
+    /**
+     * This must be called _after_ scanClasses or the descriptors of declarative recipes will be missing any
+     * non-declarative recipes they depend on that would be discovered by scanClasses
+     */
     private void scanYaml(ClassGraph classGraph, Properties properties, @Nullable ClassLoader classLoader) {
         try (ScanResult scanResult = classGraph.enableMemoryMapping().scan()) {
             List<YamlResourceLoader> yamlResourceLoaders = new ArrayList<>();
