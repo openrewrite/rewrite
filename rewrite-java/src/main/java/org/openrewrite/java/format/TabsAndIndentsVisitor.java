@@ -385,23 +385,33 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             return space;
         }
 
-        if (style.getUseTabCharacter()) {
-            if (!StringUtils.isNullOrEmpty(space.getWhitespace())) {
-                space = space.withWhitespace(space.getWhitespace().replaceAll(" ", ""));
-            }
-        } else {
-            if (!StringUtils.isNullOrEmpty(space.getWhitespace())) {
-                space = space.withWhitespace(space.getWhitespace().replaceAll("\t", ""));
-            }
-        }
-
         if (space.getComments().isEmpty()) {
+            if (!StringUtils.isNullOrEmpty(space.getWhitespace())) {
+                if (style.getUseTabCharacter()) {
+                    space = space.withWhitespace(space.getWhitespace().replaceAll(" ", ""));
+                } else {
+                    space = space.withWhitespace(space.getWhitespace().replaceAll("\t", ""));
+                }
+            }
+
             int indent = findIndent(space);
             if (indent != column) {
                 int shift = column - indent;
                 space = space.withWhitespace(indent(space.getWhitespace(), shift));
             }
         } else {
+            if (!StringUtils.isNullOrEmpty(space.getWhitespace()) &&
+                    // Preserve whitespace of trailing line comments.
+                    (!Comment.Style.LINE.equals(space.getComments().get(0).getStyle()) ||
+                            (Comment.Style.LINE.equals(space.getComments().get(0).getStyle()) &&
+                                    (space.getWhitespace().contains("\n") || space.getWhitespace().contains("\r"))))) {
+                if (style.getUseTabCharacter()) {
+                    space = space.withWhitespace(space.getWhitespace().replaceAll(" ", ""));
+                } else {
+                    space = space.withWhitespace(space.getWhitespace().replaceAll("\t", ""));
+                }
+            }
+
             Comment lastElement = space.getComments().get(space.getComments().size() - 1);
             space = space.withComments(ListUtils.map(space.getComments(), c -> {
                 // The suffix of the last element in the comment list sets the whitespace for the end of the block.

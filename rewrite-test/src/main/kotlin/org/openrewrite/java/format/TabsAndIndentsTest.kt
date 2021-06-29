@@ -583,7 +583,7 @@ interface TabsAndIndentsTest : JavaRecipeTest {
     )
 
     @Test
-    fun noIndexOutOfBoundsUsingTabs(jp: JavaParser.Builder<*, *>) = assertChanged(
+    fun noIndexOutOfBoundsUsingTabs(jp: JavaParser.Builder<*, *>) = assertUnchanged(
         jp.styles(tabsAndIndents {
             withUseTabCharacter(true)
                 .withTabSize(1)
@@ -593,13 +593,6 @@ interface TabsAndIndentsTest : JavaRecipeTest {
             class Test {
             	void test() {
             		System.out.println(); // comment
-            	}
-            }
-        """.trimIndent(),
-        after = """
-            class Test {
-            	void test() {
-            		System.out.println();// comment
             	}
             }
         """.trimIndent()
@@ -1544,6 +1537,96 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         	void normalizeWorks() {
         	}
         }
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/722")
+    @Test
+    fun alignLineCommentsWithTabs(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(tabsAndIndents {
+            withUseTabCharacter(true)
+                .withTabSize(4)
+                .withIndentSize(4)
+                .withContinuationIndent(8)
+                .withIndentsRelativeToExpressionStart(false)
+        }).build(),
+        before = """
+            		// shift left.
+            package org.openrewrite; // trailing comment.
+            
+            		// shift left.
+            		public class A { // trailing comment at class.
+            // shift right.
+            		// shift left.
+            				public int method(int value) { // trailing comment at method.
+            	// shift right.
+            			// shift left.
+            	if (value == 1) { // trailing comment at if.
+            // suffix contains new lines with whitespace.
+            		
+            		
+            		// shift right.
+            					// shift left.
+            				value += 10; // trailing comment.
+            		// shift right at end of block.
+            				// shift left at end of block.
+            						} else {
+            			value += 30;
+            		// shift right at end of block.
+            				// shift left at end of block.
+            	}
+            
+            				if (value == 11)
+            		// shift right.
+            				// shift left.
+            			value += 1;
+            
+            	return value;
+            	// shift right at end of block.
+            			// shift left at end of block.
+            			}
+            // shift right at end of block.
+            		// shift left at end of block.
+            			}
+        """.trimIndent(),
+        after = """
+            // shift left.
+            package org.openrewrite; // trailing comment.
+            
+            // shift left.
+            public class A { // trailing comment at class.
+            	// shift right.
+            	// shift left.
+            	public int method(int value) { // trailing comment at method.
+            		// shift right.
+            		// shift left.
+            		if (value == 1) { // trailing comment at if.
+            			// suffix contains new lines with whitespace.
+            		
+            		
+            			// shift right.
+            			// shift left.
+            			value += 10; // trailing comment.
+            			// shift right at end of block.
+            			// shift left at end of block.
+            		} else {
+            			value += 30;
+            			// shift right at end of block.
+            			// shift left at end of block.
+            		}
+            
+            		if (value == 11)
+            			// shift right.
+            			// shift left.
+            			value += 1;
+            
+            		return value;
+            		// shift right at end of block.
+            		// shift left at end of block.
+            	}
+            	// shift right at end of block.
+            	// shift left at end of block.
+            }
         """.trimIndent()
     )
 
