@@ -116,6 +116,17 @@ public class MergeYamlVisitor extends YamlIsoVisitor<ExecutionContext> {
     private static Yaml.Scalar mergeScalar(Yaml.Scalar y1, Yaml.Scalar y2) {
         String s1 = y1.getValue();
         String s2 = y2.getValue();
+        int valueRef = s2.indexOf("*value");
+        if (valueRef > -1) {
+            String[] parts = s2.split("\\*value");
+            if (parts.length > 2) {
+                throw new IllegalStateException("Cannot use more than a single instance of the value anchor in a replacement value.");
+            }
+            if (s1.contains(parts[0]) || (parts.length > 1 && s1.contains(parts[1]))) {
+                return y1;
+            }
+            s2 = parts[0] + s1 + (parts.length > 1 ? parts[1] : "");
+        }
         return !s1.equals(s2) ? y1.withValue(s2) : y1;
 
     }

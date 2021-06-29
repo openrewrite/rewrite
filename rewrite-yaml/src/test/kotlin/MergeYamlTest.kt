@@ -57,6 +57,40 @@ class MergeYamlTest : YamlRecipeTest {
     )
 
     @Test
+    fun mustMergeScalarValues() = assertChanged(
+        recipe = MergeYaml(
+            "/spec/containers/image",
+            """
+            image: repo.withrepo/*value
+            """.trimIndent(),
+            null
+        ),
+        before = """
+            apiVersion: v1
+            kind: Pod
+            metadata:
+              labels:
+                app: gatekeeper
+            spec:
+              containers:            
+              - name: manager
+                image: imagename
+        """,
+        after = """
+            apiVersion: v1
+            kind: Pod
+            metadata:
+              labels:
+                app: gatekeeper
+            spec:
+              containers:            
+              - name: manager
+                image: repo.withrepo/imagename
+        """,
+        cycles = 2
+    )
+
+    @Test
     fun mustMergeMultipleYamlDocuments() = assertChanged(
         recipe = MergeYaml(
             "/spec/lifecycleRule",
