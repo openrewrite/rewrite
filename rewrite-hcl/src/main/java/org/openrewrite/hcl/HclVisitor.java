@@ -37,7 +37,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
         a = (Hcl.Attribute) visitBodyContent(a, p);
         a = a.withName((Hcl.Identifier) visit(a.getName(), p));
-        visitSpace(a.getType().getBefore(), Space.Location.ATTRIBUTE_ASSIGNMENT, p);
+        visitSpace(a.getPadding().getType().getBefore(), Space.Location.ATTRIBUTE_ASSIGNMENT, p);
         a = a.withValue((Expression) visit(a.getValue(), p));
         return a;
     }
@@ -53,7 +53,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
             a = (Hcl.AttributeAccess) temp;
         }
         a = a.withAttribute((Expression) visit(a.getAttribute(), p));
-        a = a.withName(visitLeftPadded(a.getName(), HclLeftPadded.Location.ATTRIBUTE_ACCESS_NAME, p));
+        a = a.getPadding().withName(visitLeftPadded(a.getPadding().getName(), HclLeftPadded.Location.ATTRIBUTE_ACCESS_NAME, p));
         return a;
     }
 
@@ -68,7 +68,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
             b = (Hcl.Binary) temp;
         }
         b = b.withLeft((Expression) visit(b.getLeft(), p));
-        b = b.withOperator(b.getOperator().withBefore(visitSpace(b.getPrefix(), Space.Location.BINARY_OPERATOR, p)));
+        b = b.getPadding().withOperator(b.getPadding().getOperator().withBefore(visitSpace(b.getPrefix(), Space.Location.BINARY_OPERATOR, p)));
         b = b.withRight((Expression) visit(b.getRight(), p));
         return b;
     }
@@ -114,8 +114,8 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
             c = (Hcl.Conditional) temp;
         }
         c = c.withCondition((Expression) visit(c.getCondition(), p));
-        c = c.withTruePart(visitLeftPadded(c.getTruePart(), HclLeftPadded.Location.CONDITIONAL_TRUE, p));
-        c = c.withFalsePart(visitLeftPadded(c.getFalsePart(), HclLeftPadded.Location.CONDITIONAL_FALSE, p));
+        c = c.getPadding().withTruePart(visitLeftPadded(c.getPadding().getTruePart(), HclLeftPadded.Location.CONDITIONAL_TRUE, p));
+        c = c.getPadding().withFalsePart(visitLeftPadded(c.getPadding().getFalsePart(), HclLeftPadded.Location.CONDITIONAL_FALSE, p));
         return c;
     }
 
@@ -137,7 +137,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         Hcl.ForIntro f = forIntro;
         f = f.withPrefix(visitSpace(f.getPrefix(), Space.Location.FOR_INTRO, p));
         f = f.withMarkers(visitMarkers(f.getMarkers(), p));
-        f = f.withVariables(visitContainer(f.getVariables(), HclContainer.Location.FOR_VARIABLES, p));
+        f = f.getPadding().withVariables(visitContainer(f.getPadding().getVariables(), HclContainer.Location.FOR_VARIABLES, p));
         f = f.withIn((Expression) visit(f.getIn(), p));
         return f;
     }
@@ -153,10 +153,10 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
             f = (Hcl.ForObject) temp;
         }
         f = f.withIntro((Hcl.ForIntro) visit(f.getIntro(), p));
-        f = f.withUpdateName(visitLeftPadded(f.getUpdateName(), HclLeftPadded.Location.FOR_UPDATE, p));
-        f = f.withUpdateValue(visitLeftPadded(f.getUpdateValue(), HclLeftPadded.Location.FOR_UPDATE_VALUE, p));
-        if (f.getCondition() != null) {
-            f = f.withCondition(visitLeftPadded(f.getCondition(), HclLeftPadded.Location.FOR_CONDITION, p));
+        f = f.getPadding().withUpdateName(visitLeftPadded(f.getPadding().getUpdateName(), HclLeftPadded.Location.FOR_UPDATE, p));
+        f = f.getPadding().withUpdateValue(visitLeftPadded(f.getPadding().getUpdateValue(), HclLeftPadded.Location.FOR_UPDATE_VALUE, p));
+        if (f.getPadding().getCondition() != null) {
+            f = f.getPadding().withCondition(visitLeftPadded(f.getPadding().getCondition(), HclLeftPadded.Location.FOR_CONDITION, p));
         }
         visitSpace(f.getEnd(), Space.Location.FOR_TUPLE_SUFFIX, p);
         return f;
@@ -173,9 +173,9 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
             f = (Hcl.ForTuple) temp;
         }
         f = f.withIntro((Hcl.ForIntro) visit(f.getIntro(), p));
-        f = f.withUpdate(visitLeftPadded(f.getUpdate(), HclLeftPadded.Location.FOR_UPDATE, p));
-        if (f.getCondition() != null) {
-            f = f.withCondition(visitLeftPadded(f.getCondition(), HclLeftPadded.Location.FOR_CONDITION, p));
+        f = f.getPadding().withUpdate(visitLeftPadded(f.getPadding().getUpdate(), HclLeftPadded.Location.FOR_UPDATE, p));
+        if (f.getPadding().getCondition() != null) {
+            f = f.getPadding().withCondition(visitLeftPadded(f.getPadding().getCondition(), HclLeftPadded.Location.FOR_CONDITION, p));
         }
         visitSpace(f.getEnd(), Space.Location.FOR_TUPLE_SUFFIX, p);
         return f;
@@ -192,7 +192,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
             f = (Hcl.FunctionCall) temp;
         }
         f = f.withName((Hcl.Identifier) visit(f.getName(), p));
-        f = f.withArguments(visitContainer(f.getArguments(), HclContainer.Location.FUNCTION_CALL_ARGUMENTS, p));
+        f = f.getPadding().withArguments(visitContainer(f.getPadding().getArguments(), HclContainer.Location.FUNCTION_CALL_ARGUMENTS, p));
         return f;
     }
 
@@ -232,7 +232,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         Hcl.Index.Position i = indexPosition;
         i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.INDEX_POSITION, p));
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
-        i = i.withPosition(visitRightPadded(i.getPosition(), HclRightPadded.Location.INDEX_POSITION, p));
+        i = i.getPadding().withPosition(visitRightPadded(i.getPadding().getPosition(), HclRightPadded.Location.INDEX_POSITION, p));
         return i;
     }
 
@@ -259,7 +259,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         } else {
             o = (Hcl.ObjectValue) temp;
         }
-        o = o.withAttributes(visitContainer(o.getAttributes(), HclContainer.Location.OBJECT_VALUE_ATTRIBUTES, p));
+        o = o.getPadding().withAttributes(visitContainer(o.getPadding().getAttributes(), HclContainer.Location.OBJECT_VALUE_ATTRIBUTES, p));
         return o;
     }
 
@@ -273,7 +273,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         } else {
             pa = (Hcl.Parentheses) temp;
         }
-        pa = pa.withExpression(visitRightPadded(pa.getExpression(), HclRightPadded.Location.PARENTHETICAL_EXPRESSION, p));
+        pa = pa.getPadding().withExpression(visitRightPadded(pa.getPadding().getExpression(), HclRightPadded.Location.PARENTHETICAL_EXPRESSION, p));
         return pa;
     }
 
@@ -338,7 +338,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         } else {
             t = (Hcl.Tuple) temp;
         }
-        t = t.withValues(visitContainer(t.getValues(), HclContainer.Location.TUPLE_VALUES, p));
+        t = t.getPadding().withValues(visitContainer(t.getPadding().getValues(), HclContainer.Location.TUPLE_VALUES, p));
         return t;
     }
 

@@ -136,8 +136,8 @@ public class HclPrinter<P> extends HclVisitor<P> {
         visitSpace(attribute.getPrefix(), Space.Location.ATTRIBUTE, p);
         visit(attribute.getName(), p);
         StringBuilder acc = getPrinter();
-        visitSpace(attribute.getType().getBefore(), Space.Location.ATTRIBUTE_ASSIGNMENT, p);
-        acc.append(attribute.getType().getElement().equals(Hcl.Attribute.Type.Assignment) ? "=" : ":");
+        visitSpace(attribute.getPadding().getType().getBefore(), Space.Location.ATTRIBUTE_ASSIGNMENT, p);
+        acc.append(attribute.getType().equals(Hcl.Attribute.Type.Assignment) ? "=" : ":");
         visit(attribute.getValue(), p);
         return attribute;
     }
@@ -146,7 +146,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     public Hcl visitAttributeAccess(Hcl.AttributeAccess attributeAccess, P p) {
         visitSpace(attributeAccess.getPrefix(), Space.Location.ATTRIBUTE_ACCESS, p);
         visit(attributeAccess.getAttribute(), p);
-        visitLeftPadded(".", attributeAccess.getName(), HclLeftPadded.Location.ATTRIBUTE_ACCESS_NAME, p);
+        visitLeftPadded(".", attributeAccess.getPadding().getName(), HclLeftPadded.Location.ATTRIBUTE_ACCESS_NAME, p);
         return attributeAccess;
     }
 
@@ -155,8 +155,8 @@ public class HclPrinter<P> extends HclVisitor<P> {
         visitSpace(binary.getPrefix(), Space.Location.BINARY, p);
         visit(binary.getLeft(), p);
         StringBuilder acc = getPrinter();
-        visitSpace(binary.getOperator().getBefore(), Space.Location.BINARY_OPERATOR, p);
-        switch(binary.getOperator().getElement()) {
+        visitSpace(binary.getPadding().getOperator().getBefore(), Space.Location.BINARY_OPERATOR, p);
+        switch(binary.getOperator()) {
             case Addition:
                 acc.append('+');
                 break;
@@ -226,8 +226,8 @@ public class HclPrinter<P> extends HclVisitor<P> {
     public Hcl visitConditional(Hcl.Conditional conditional, P p) {
         visitSpace(conditional.getPrefix(), Space.Location.CONDITIONAL, p);
         visit(conditional.getCondition(), p);
-        visitLeftPadded("?", conditional.getTruePart(), HclLeftPadded.Location.CONDITIONAL_TRUE, p);
-        visitLeftPadded(":", conditional.getFalsePart(), HclLeftPadded.Location.CONDITIONAL_FALSE, p);
+        visitLeftPadded("?", conditional.getPadding().getTruePart(), HclLeftPadded.Location.CONDITIONAL_TRUE, p);
+        visitLeftPadded(":", conditional.getPadding().getFalsePart(), HclLeftPadded.Location.CONDITIONAL_FALSE, p);
         return conditional;
     }
 
@@ -241,7 +241,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitForIntro(Hcl.ForIntro forIntro, P p) {
         visitSpace(forIntro.getPrefix(), Space.Location.FOR_INTRO, p);
-        visitContainer("for", forIntro.getVariables(), HclContainer.Location.FOR_VARIABLES,
+        visitContainer("for", forIntro.getPadding().getVariables(), HclContainer.Location.FOR_VARIABLES,
                 ",", "in", p);
         visit(forIntro.getIn(), p);
         return forIntro;
@@ -253,14 +253,14 @@ public class HclPrinter<P> extends HclVisitor<P> {
         StringBuilder acc = getPrinter();
         acc.append("{");
         visit(forObject.getIntro(), p);
-        visitLeftPadded(":", forObject.getUpdateName(), HclLeftPadded.Location.FOR_UPDATE, p);
-        visitLeftPadded("=>", forObject.getUpdateValue(), HclLeftPadded.Location.FOR_UPDATE_VALUE, p);
+        visitLeftPadded(":", forObject.getPadding().getUpdateName(), HclLeftPadded.Location.FOR_UPDATE, p);
+        visitLeftPadded("=>", forObject.getPadding().getUpdateValue(), HclLeftPadded.Location.FOR_UPDATE_VALUE, p);
         if(forObject.getEllipsis() != null) {
             visitSpace(forObject.getEllipsis().getPrefix(), Space.Location.FOR_UPDATE_VALUE_ELLIPSIS, p);
             acc.append("...");
         }
-        if (forObject.getCondition() != null) {
-            visitLeftPadded("if", forObject.getCondition(), HclLeftPadded.Location.FOR_CONDITION, p);
+        if (forObject.getPadding().getCondition() != null) {
+            visitLeftPadded("if", forObject.getPadding().getCondition(), HclLeftPadded.Location.FOR_CONDITION, p);
         }
         visitSpace(forObject.getEnd(), Space.Location.FOR_OBJECT_SUFFIX, p);
         acc.append("}");
@@ -273,9 +273,9 @@ public class HclPrinter<P> extends HclVisitor<P> {
         StringBuilder acc = getPrinter();
         acc.append("[");
         visit(forTuple.getIntro(), p);
-        visitLeftPadded(":", forTuple.getUpdate(), HclLeftPadded.Location.FOR_UPDATE, p);
-        if (forTuple.getCondition() != null) {
-            visitLeftPadded("if", forTuple.getCondition(), HclLeftPadded.Location.FOR_CONDITION, p);
+        visitLeftPadded(":", forTuple.getPadding().getUpdate(), HclLeftPadded.Location.FOR_UPDATE, p);
+        if (forTuple.getPadding().getCondition() != null) {
+            visitLeftPadded("if", forTuple.getPadding().getCondition(), HclLeftPadded.Location.FOR_CONDITION, p);
         }
         visitSpace(forTuple.getEnd(), Space.Location.FOR_TUPLE_SUFFIX, p);
         acc.append("]");
@@ -286,7 +286,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     public Hcl visitFunctionCall(Hcl.FunctionCall functionCall, P p) {
         visitSpace(functionCall.getPrefix(), Space.Location.FUNCTION_CALL, p);
         visit(functionCall.getName(), p);
-        visitContainer("(", functionCall.getArguments(), HclContainer.Location.FUNCTION_CALL_ARGUMENTS,
+        visitContainer("(", functionCall.getPadding().getArguments(), HclContainer.Location.FUNCTION_CALL_ARGUMENTS,
                 ",", ")", p);
         return functionCall;
     }
@@ -325,7 +325,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
         StringBuilder acc = getPrinter();
         acc.append("[");
         visitMarkers(indexPosition.getMarkers(), p);
-        visitRightPadded(indexPosition.getPosition(), HclRightPadded.Location.INDEX_POSITION, p);
+        visitRightPadded(indexPosition.getPadding().getPosition(), HclRightPadded.Location.INDEX_POSITION, p);
         acc.append("]");
         return indexPosition;
     }
@@ -341,7 +341,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitObjectValue(Hcl.ObjectValue objectValue, P p) {
         visitSpace(objectValue.getPrefix(), Space.Location.OBJECT_VALUE, p);
-        visitContainer("{", objectValue.getAttributes(), HclContainer.Location.OBJECT_VALUE_ATTRIBUTES,
+        visitContainer("{", objectValue.getPadding().getAttributes(), HclContainer.Location.OBJECT_VALUE_ATTRIBUTES,
                 ",", "}", p);
         return objectValue;
     }
@@ -351,7 +351,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
         visitSpace(parentheses.getPrefix(), Space.Location.PARENTHETICAL_EXPRESSION, p);
         StringBuilder acc = getPrinter();
         acc.append('(');
-        visitRightPadded(parentheses.getExpression(), HclRightPadded.Location.PARENTHETICAL_EXPRESSION, p);
+        visitRightPadded(parentheses.getPadding().getExpression(), HclRightPadded.Location.PARENTHETICAL_EXPRESSION, p);
         acc.append(')');
         return parentheses;
     }
@@ -405,7 +405,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitTuple(Hcl.Tuple tuple, P p) {
         visitSpace(tuple.getPrefix(), Space.Location.FUNCTION_CALL, p);
-        visitContainer("[", tuple.getValues(), HclContainer.Location.TUPLE_VALUES,
+        visitContainer("[", tuple.getPadding().getValues(), HclContainer.Location.TUPLE_VALUES,
                 ",", "]", p);
         return tuple;
     }
