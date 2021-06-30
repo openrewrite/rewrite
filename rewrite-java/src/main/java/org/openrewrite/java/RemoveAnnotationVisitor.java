@@ -36,7 +36,7 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
         J.Annotation annotationRemoved = getCursor().pollMessage("annotationRemoved");
 
         List<J.Annotation> leadingAnnotations = classDecl.getLeadingAnnotations();
-        if (annotationRemoved != null) {
+        if (annotationRemoved != null && !leadingAnnotations.isEmpty()) {
             if (leadingAnnotations.get(0) == annotationRemoved && leadingAnnotations.size() == 1) {
                 if (!c.getModifiers().isEmpty()) {
                     c = c.withModifiers(Space.formatFirstPrefix(c.getModifiers(), Space.firstPrefix(c.getModifiers()).withWhitespace("")));
