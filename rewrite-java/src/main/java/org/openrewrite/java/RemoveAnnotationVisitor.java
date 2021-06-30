@@ -22,6 +22,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeUtils;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Value
@@ -36,7 +37,7 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
 
         List<J.Annotation> leadingAnnotations = classDecl.getLeadingAnnotations();
         if (annotationRemoved != null) {
-            if (leadingAnnotations.get(0) == annotationRemoved || leadingAnnotations.size() == 1) {
+            if (leadingAnnotations.get(0) == annotationRemoved && leadingAnnotations.size() == 1) {
                 if (!c.getModifiers().isEmpty()) {
                     c = c.withModifiers(Space.formatFirstPrefix(c.getModifiers(), Space.firstPrefix(c.getModifiers()).withWhitespace("")));
                 } else if (c.getPadding().getTypeParameters() != null) {
@@ -45,7 +46,10 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
                     c = c.withName(c.getName().withPrefix(c.getName().getPrefix().withWhitespace("")));
                 }
             } else {
-                c = autoFormat(c, c.getName(), ctx, getCursor().getParentOrThrow());
+                List<J.Annotation> newLeadingAnnotations = removeAnnotationOrEmpty(leadingAnnotations, annotationRemoved);
+                if (!newLeadingAnnotations.isEmpty()) {
+                    c = c.withLeadingAnnotations(newLeadingAnnotations);
+                }
             }
         }
         return c;
@@ -58,7 +62,7 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
 
         List<J.Annotation> leadingAnnotations = method.getLeadingAnnotations();
         if (annotationRemoved != null && !leadingAnnotations.isEmpty()) {
-            if (leadingAnnotations.get(0) == annotationRemoved || leadingAnnotations.size() == 1) {
+            if (leadingAnnotations.get(0) == annotationRemoved && leadingAnnotations.size() == 1) {
                 if (!m.getModifiers().isEmpty()) {
                     m = m.withModifiers(Space.formatFirstPrefix(m.getModifiers(), Space.firstPrefix(m.getModifiers()).withWhitespace("")));
                 } else if (m.getPadding().getTypeParameters() != null) {
@@ -69,7 +73,10 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
                     m = m.withName(m.getName().withPrefix(m.getName().getPrefix().withWhitespace("")));
                 }
             } else {
-                m = autoFormat(m, m.getName(), ctx, getCursor().getParentOrThrow());
+                List<J.Annotation> newLeadingAnnotations = removeAnnotationOrEmpty(leadingAnnotations, annotationRemoved);
+                if (!newLeadingAnnotations.isEmpty()) {
+                    m = m.withLeadingAnnotations(newLeadingAnnotations);
+                }
             }
         }
         return m;
@@ -82,11 +89,16 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
 
         List<J.Annotation> leadingAnnotations = multiVariable.getLeadingAnnotations();
         if (annotationRemoved != null && !leadingAnnotations.isEmpty()) {
-            if (leadingAnnotations.get(0) == annotationRemoved || leadingAnnotations.size() == 1) {
+            if (leadingAnnotations.get(0) == annotationRemoved && leadingAnnotations.size() == 1) {
                 if (!v.getModifiers().isEmpty()) {
                     v = v.withModifiers(Space.formatFirstPrefix(v.getModifiers(), Space.firstPrefix(v.getModifiers()).withWhitespace("")));
                 } else if (v.getTypeExpression() != null) {
                     v = v.withTypeExpression(v.getTypeExpression().withPrefix(v.getTypeExpression().getPrefix().withWhitespace("")));
+                }
+            } else {
+                List<J.Annotation> newLeadingAnnotations = removeAnnotationOrEmpty(leadingAnnotations, annotationRemoved);
+                if (!newLeadingAnnotations.isEmpty()) {
+                    v = v.withLeadingAnnotations(newLeadingAnnotations);
                 }
             }
         }
@@ -103,5 +115,23 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
             return null;
         }
         return super.visitAnnotation(annotation, ctx);
+    }
+
+    /* Returns a list of leading annotations with the target removed or an empty list if no changes are necessary.
+     * A prefix only needs to change if the index == 0 and the prefixes of the target annotation and next annotation are not equal.
+     */
+    private List<J.Annotation> removeAnnotationOrEmpty(List<J.Annotation> leadingAnnotations, J.Annotation targetAnnotation) {
+        int index = leadingAnnotations.indexOf(targetAnnotation);
+        List<J.Annotation> newLeadingAnnotations = new ArrayList<>();
+        if (index == 0) {
+            J.Annotation nextAnnotation = leadingAnnotations.get(1);
+            if (!nextAnnotation.getPrefix().equals(targetAnnotation.getPrefix())) {
+                newLeadingAnnotations.add(nextAnnotation.withPrefix(targetAnnotation.getPrefix()));
+                for (int i = 2; i < leadingAnnotations.size(); ++i) {
+                    newLeadingAnnotations.add(leadingAnnotations.get(i));
+                }
+            }
+        }
+        return newLeadingAnnotations;
     }
 }
