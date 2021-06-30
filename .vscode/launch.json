@@ -1,0 +1,15 @@
+{
+  "version": "2.0.0",
+  "configurations": [
+      {
+          "name": "Debug HCL Grammar",
+          "type": "antlr-debug",
+          "request": "launch",
+          "input": "rewrite-hcl/src/main/antlr/input.txt",
+          "grammar": "rewrite-hcl/src/main/antlr/HCLParser.g4",
+          "startRule": "expression",
+          "printParseTree": true,
+          "visualParseTree": true
+      }
+  ]
+}

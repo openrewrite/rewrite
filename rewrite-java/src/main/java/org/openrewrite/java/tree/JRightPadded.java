@@ -129,6 +129,7 @@ public class JRightPadded<T> {
             for (int i = 0; i < before.size(); i++) {
                 if (before.get(i).getElement() != elements.get(i)) {
                     hasChanges = true;
+                    break;
                 }
             }
             if (!hasChanges) {

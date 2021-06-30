@@ -15,6 +15,7 @@
         <module name="rewrite.rewrite-java-11.main" />
         <module name="rewrite.rewrite-xml.main" />
         <module name="rewrite.rewrite-maven.main" />
+        <module name="rewrite.rewrite-hcl.main" />
         <module name="rewrite.rewrite-java.main" />
         <module name="rewrite.rewrite-yaml.main" />
         <module name="rewrite.rewrite-properties.main" />

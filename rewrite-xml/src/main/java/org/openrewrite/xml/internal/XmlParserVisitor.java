@@ -33,6 +33,7 @@ import java.util.function.BiFunction;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
+@SuppressWarnings("ConstantConditions")
 public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     private final Path path;
     private final String source;
