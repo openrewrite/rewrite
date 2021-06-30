@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
 /**
  * An HCL element that could have trailing space.
  *
- * @param <T>
+ * @param <T> The type of instance that is being padded.
  */
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)

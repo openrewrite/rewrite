@@ -736,9 +736,6 @@ public interface Hcl extends Serializable, Tree {
         @With
         Markers markers;
 
-        /**
-         * Must be either << or <<-
-         */
         String arrow;
 
         public HeredocTemplate withArrow(String arrow) {
