@@ -732,6 +732,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
                 m.getReturnTypeExpression() == null ?
                         null :
                         visitTypeName(m.getReturnTypeExpression(), p));
+        m = m.getAnnotations().withName(m.getAnnotations().getName().withAnnotations(ListUtils.map(m.getAnnotations().getName().getAnnotations(), a -> visitAndCast(a, p))));
         m = m.withName(visitAndCast(m.getName(), p));
         m = m.getPadding().withParameters(visitContainer(m.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, p));
         if (m.getPadding().getThrows() != null) {

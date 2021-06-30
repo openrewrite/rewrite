@@ -15,8 +15,12 @@
  */
 package org.openrewrite.java.tree
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.ExecutionContext
+import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
+import org.openrewrite.java.JavaIsoVisitor
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTreeTest
 import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
@@ -111,7 +115,7 @@ interface AnnotationTest : JavaTreeTest {
                 List<@A ? extends @A String> list;
            
                 @Target({ ElementType.FIELD, ElementType.TYPE_USE, ElementType.TYPE_PARAMETER })
-                private static @interface A {
+                private @interface A {
                 }
             }
         """
@@ -154,4 +158,37 @@ interface AnnotationTest : JavaTreeTest {
                 }
             """
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/726")
+    @Test
+    fun annotationOnConstructorName(jp: JavaParser) {
+        val cu = jp.parse(
+            """
+                import java.lang.annotation.*;
+                public class TypeAnnotationTest {
+    
+                    public @Deprecated @A TypeAnnotationTests() {
+                    }
+    
+                    @Target({ ElementType.TYPE, ElementType.TYPE_USE, ElementType.TYPE_PARAMETER })
+                    private @interface A {
+                    }
+                }
+            """)[0]
+
+        val visitor = object : JavaIsoVisitor<ExecutionContext>() {
+
+            override fun visitAnnotation(annotation: J.Annotation, p: ExecutionContext): J.Annotation? {
+                if (annotation.simpleName.equals("A")) {
+                    return null
+                }
+                return super.visitAnnotation(annotation, p)
+            }
+        }
+        val after = visitor.visit(cu, InMemoryExecutionContext()) as J.CompilationUnit
+        val methodDeclaration = after.classes[0].body.statements[0] as J.MethodDeclaration
+        assertThat(methodDeclaration.allAnnotations.size).isEqualTo(1)
+        assertThat(methodDeclaration.allAnnotations[0].simpleName).isEqualTo("Deprecated")
+    }
+
 }
