@@ -263,7 +263,7 @@ public class Autodetect extends NamedStyles {
                 String longestCommonPrefix = null;
 
                 for (J.Import anImport : imports) {
-                    String pkg = anImport.getPackageName();
+                    String pkg = anImport.getPackageName() + ".";
                     longestCommonPrefix = longestCommonPrefix(pkg, longestCommonPrefix);
                     if (longestCommonPrefix.isEmpty()) {
                         return "all other imports";
