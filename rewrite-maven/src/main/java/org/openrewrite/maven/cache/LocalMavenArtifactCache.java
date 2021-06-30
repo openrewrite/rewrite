@@ -17,13 +17,12 @@ package org.openrewrite.maven.cache;
 
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.tree.Pom;
 
-import java.io.File;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -52,35 +51,41 @@ public class LocalMavenArtifactCache implements MavenArtifactCache {
     @Nullable
     public Path putArtifact(Pom.Dependency dependency, InputStream artifactInputStream, Consumer<Throwable> onError) {
         Path path = dependencyPath(dependency);
-        File folder = path.getParent().toFile();
-        if(folder.exists() || folder.mkdirs()) {
-            try (InputStream is = artifactInputStream;
-                 OutputStream out = Files.newOutputStream(path)) {
-                if (is != null) {
-                    byte[] buffer = new byte[1024];
-                    int read;
-                    while ((read = is.read(buffer, 0, 1024)) >= 0) {
-                        out.write(buffer, 0, read);
-                    }
+        try (InputStream is = artifactInputStream;
+             OutputStream out = Files.newOutputStream(path)) {
+            if (is != null) {
+                byte[] buffer = new byte[1024];
+                int read;
+                while ((read = is.read(buffer, 0, 1024)) >= 0) {
+                    out.write(buffer, 0, read);
                 }
-            } catch (Exception e) {
-                onError.accept(e);
-                return null;
             }
-        } else {
-            onError.accept(new MavenDownloadingException("Unable to create local folder for artifact"));
+        } catch (Throwable t) {
+            onError.accept(t);
             return null;
         }
+
         return path;
     }
 
     private Path dependencyPath(Pom.Dependency dependency) {
-        return cache.resolve(Paths.get(dependency.getGroupId().replace('.', '/'),
+        Path resolvedPath = cache.resolve(Paths.get(dependency.getGroupId().replace('.', '/'),
                 dependency.getArtifactId(),
-                dependency.getVersion(),
-                dependency.getArtifactId() + "-" +
-                        (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
-                        (dependency.getClassifier() == null ? "" : dependency.getClassifier()) +
-                        ".jar"));
+                dependency.getVersion()));
+
+        try {
+            synchronized (cache) {
+                if (!Files.exists(resolvedPath)) {
+                    Files.createDirectories(resolvedPath);
+                }
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+
+        return resolvedPath.resolve(dependency.getArtifactId() + "-" +
+                (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
+                (dependency.getClassifier() == null ? "" : dependency.getClassifier()) +
+                ".jar");
     }
 }
