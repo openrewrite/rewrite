@@ -721,5 +721,25 @@ interface OrderImportsTest : JavaRecipeTest {
             }
         """.trimIndent()
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/733")
+    @Test
+    fun detectBlockPattern(jp: JavaParser) = assertUnchanged(
+        jp,
+        recipe = recipe.withRemoveUnused(false),
+        before = """
+            package org.bar;
+            
+            // org.slf4j should be detected as a block pattern, and not be moved to all other imports.
+            import org.slf4j.Logger;
+            import org.slf4j.LoggerFactory;
+            
+            import java.util.Arrays;
+            import java.util.List;
+            
+            public class C {
+            }
+        """
+    )
 }
 

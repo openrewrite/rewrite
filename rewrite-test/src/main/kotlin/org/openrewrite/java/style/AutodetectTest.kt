@@ -181,14 +181,14 @@ interface AutodetectTest {
         assertThat(importLayout.layout[2])
             .isInstanceOf(ImportLayoutStyle.Block.ImportPackage::class.java)
             .matches { b -> !(b as ImportLayoutStyle.Block.ImportPackage).isStatic }
-            .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == "com\\.fasterxml\\.jackson\\.annotation.+" }
+            .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == "com\\.fasterxml\\.jackson\\.annotation\\..+" }
 
         assertThat(importLayout.layout[3]).isInstanceOf(ImportLayoutStyle.Block.BlankLines::class.java)
 
         assertThat(importLayout.layout[4])
             .isInstanceOf(ImportLayoutStyle.Block.ImportPackage::class.java)
             .matches { b -> !(b as ImportLayoutStyle.Block.ImportPackage).isStatic }
-            .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == "org\\.openrewrite\\.internal.+" }
+            .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == "org\\.openrewrite\\.internal\\..+" }
 
         assertThat(importLayout.layout[5]).isInstanceOf(ImportLayoutStyle.Block.BlankLines::class.java)
 
