@@ -19,12 +19,13 @@ import lombok.AccessLevel;
 import lombok.Data;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.template.Coordinates;
 
 import java.util.Comparator;
 
 @Data
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-public class JavaCoordinates {
+public class JavaCoordinates implements Coordinates {
     J tree;
     Space.Location spaceLocation;
     Mode mode;

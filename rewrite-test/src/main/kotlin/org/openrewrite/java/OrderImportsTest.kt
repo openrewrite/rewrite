@@ -92,7 +92,7 @@ interface OrderImportsTest : JavaRecipeTest {
         before = """
             import org.another.Comment;
             import org.openrewrite.java.tree.Comment;
-            import org.openrewrite.java.tree.Coordinates;
+            import org.openrewrite.java.tree.CoordinatesBuilder;
             import org.openrewrite.java.tree.Expression;
             import org.openrewrite.java.tree.Flag;
             import org.openrewrite.java.tree.JavaType;
@@ -113,7 +113,7 @@ interface OrderImportsTest : JavaRecipeTest {
         jp,
         before = """
             import org.openrewrite.java.tree.Comment;
-            import org.openrewrite.java.tree.Coordinates;
+            import org.openrewrite.java.tree.CoordinatesBuilder;
             import org.openrewrite.java.tree.Expression;
             import org.openrewrite.java.tree.Flag;
             import org.openrewrite.java.tree.J.Assert;

@@ -29,6 +29,7 @@ import org.openrewrite.java.internal.*;
 import org.openrewrite.java.search.FindAllUsedTypes;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.template.SourceTemplate;
 
 import java.io.Serializable;
 import java.lang.ref.WeakReference;
@@ -91,7 +92,7 @@ public interface J extends Serializable, Tree {
     }
 
     @Incubating(since = "7.0.0")
-    default <J2 extends J> J2 withTemplate(JavaTemplate template, JavaCoordinates coordinates, Object... parameters) {
+    default <J2 extends J> J2 withTemplate(SourceTemplate<J, JavaCoordinates> template, JavaCoordinates coordinates, Object... parameters) {
         return template.withTemplate(this, coordinates, parameters);
     }
 
@@ -197,8 +198,8 @@ public interface J extends Serializable, Tree {
             return v.visitAnnotation(this, p);
         }
 
-        public Coordinates.Annotation getCoordinates() {
-            return new Coordinates.Annotation(this);
+        public CoordinateBuilder.Annotation getCoordinates() {
+            return new CoordinateBuilder.Annotation(this);
         }
 
         public Padding getPadding() {
@@ -321,8 +322,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Statement getCoordinates() {
-            return new Coordinates.Statement(this);
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
     }
 
@@ -364,8 +365,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Statement getCoordinates() {
-            return new Coordinates.Statement(this);
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
 
         @With
@@ -464,8 +465,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Statement getCoordinates() {
-            return new Coordinates.Statement(this);
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
 
         @Override
@@ -672,8 +673,8 @@ public interface J extends Serializable, Tree {
             return v.visitBlock(this, p);
         }
 
-        public Coordinates.Block getCoordinates() {
-            return new Coordinates.Block(this);
+        public CoordinateBuilder.Block getCoordinates() {
+            return new CoordinateBuilder.Block(this);
         }
 
         public Padding getPadding() {
@@ -737,8 +738,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Statement getCoordinates() {
-            return new Coordinates.Statement(this);
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
     }
 
@@ -786,8 +787,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Statement getCoordinates() {
-            return new Coordinates.Statement(this);
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
 
         public Padding getPadding() {
@@ -946,8 +947,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.ClassDeclaration getCoordinates() {
-            return new Coordinates.ClassDeclaration(this);
+        public CoordinateBuilder.ClassDeclaration getCoordinates() {
+            return new CoordinateBuilder.ClassDeclaration(this);
         }
 
         public String getSimpleName() {
@@ -1234,8 +1235,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Statement getCoordinates() {
-            return new Coordinates.Statement(this);
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
     }
 
@@ -1288,8 +1289,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Statement getCoordinates() {
-            return new Coordinates.Statement(this);
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
 
         public Padding getPadding() {
@@ -1360,8 +1361,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Statement getCoordinates() {
-            return new Coordinates.Statement(this);
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
     }
 
@@ -1438,8 +1439,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Statement getCoordinates() {
-            return new Coordinates.Statement(this);
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
 
         public Padding getPadding() {
@@ -1644,8 +1645,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Statement getCoordinates() {
-            return new Coordinates.Statement(this);
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
 
         @ToString
@@ -1805,8 +1806,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Statement getCoordinates() {
-            return new Coordinates.Statement(this);
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
 
         @ToString
@@ -2129,8 +2130,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Statement getCoordinates() {
-            return new Coordinates.Statement(this);
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
 
         @ToString
@@ -2494,8 +2495,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Statement getCoordinates() {
-            return new Coordinates.Statement(this);
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
 
         public Padding getPadding() {
@@ -2560,8 +2561,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Statement getCoordinates() {
-            return new Coordinates.Statement(this);
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
 
         @ToString
@@ -2601,8 +2602,8 @@ public interface J extends Serializable, Tree {
                 return getPadding().withParams(JRightPadded.withElements(this.parameters, parameters));
             }
 
-            public Coordinates.Lambda.Parameters getCoordinates() {
-                return new Coordinates.Lambda.Parameters(this);
+            public CoordinateBuilder.Lambda.Parameters getCoordinates() {
+                return new CoordinateBuilder.Lambda.Parameters(this);
             }
 
             public Padding getPadding() {
@@ -3000,8 +3001,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.MethodDeclaration getCoordinates() {
-            return new Coordinates.MethodDeclaration(this);
+        public CoordinateBuilder.MethodDeclaration getCoordinates() {
+            return new CoordinateBuilder.MethodDeclaration(this);
         }
 
         // gather annotations from everywhere they may occur
@@ -3229,8 +3230,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.MethodInvocation getCoordinates() {
-            return new Coordinates.MethodInvocation(this);
+        public CoordinateBuilder.MethodInvocation getCoordinates() {
+            return new CoordinateBuilder.MethodInvocation(this);
         }
 
         @Nullable
@@ -3664,8 +3665,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Statement getCoordinates() {
-            return new Coordinates.Statement(this);
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
 
         @Override
@@ -3737,8 +3738,8 @@ public interface J extends Serializable, Tree {
             return v.visitPackage(this, p);
         }
 
-        public Coordinates.Package getCoordinates() {
-            return new Coordinates.Package(this);
+        public CoordinateBuilder.Package getCoordinates() {
+            return new CoordinateBuilder.Package(this);
         }
     }
 
@@ -4071,8 +4072,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Statement getCoordinates() {
-            return new Coordinates.Statement(this);
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
     }
 
@@ -4102,8 +4103,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Statement getCoordinates() {
-            return new Coordinates.Statement(this);
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
     }
 
@@ -4133,8 +4134,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Statement getCoordinates() {
-            return new Coordinates.Statement(this);
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
     }
 
@@ -4255,8 +4256,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Statement getCoordinates() {
-            return new Coordinates.Statement(this);
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
     }
 
@@ -4321,8 +4322,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Statement getCoordinates() {
-            return new Coordinates.Statement(this);
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -4652,8 +4653,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Statement getCoordinates() {
-            return new Coordinates.Statement(this);
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
 
         @Override
@@ -4785,8 +4786,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.VariableDeclarations getCoordinates() {
-            return new Coordinates.VariableDeclarations(this);
+        public CoordinateBuilder.VariableDeclarations getCoordinates() {
+            return new CoordinateBuilder.VariableDeclarations(this);
         }
 
         // gather annotations from everywhere they may occur
@@ -4984,8 +4985,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.Statement getCoordinates() {
-            return new Coordinates.Statement(this);
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
 
         public Padding getPadding() {

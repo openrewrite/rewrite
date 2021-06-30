@@ -17,10 +17,10 @@ package org.openrewrite.java.tree;
 
 import java.util.Comparator;
 
-public abstract class Coordinates {
+public abstract class CoordinateBuilder {
     J tree;
 
-    Coordinates(J tree) {
+    CoordinateBuilder(J tree) {
         this.tree = tree;
     }
 
@@ -36,7 +36,7 @@ public abstract class Coordinates {
         return new JavaCoordinates(tree, location, JavaCoordinates.Mode.REPLACEMENT, null);
     }
 
-    public static class Statement extends Coordinates {
+    public static class Statement extends CoordinateBuilder {
         Statement(org.openrewrite.java.tree.Statement tree) {
             super(tree);
         }
@@ -54,7 +54,7 @@ public abstract class Coordinates {
         }
     }
 
-    public static class Annotation extends Coordinates {
+    public static class Annotation extends CoordinateBuilder {
         Annotation(J.Annotation tree) {
             super(tree);
         }
@@ -109,7 +109,7 @@ public abstract class Coordinates {
     }
 
     public static class Lambda {
-        public static class Parameters extends Coordinates {
+        public static class Parameters extends CoordinateBuilder {
             Parameters(J.Lambda.Parameters tree) {
                 super(tree);
             }
@@ -168,7 +168,7 @@ public abstract class Coordinates {
         }
     }
 
-    public static class Package extends Coordinates {
+    public static class Package extends CoordinateBuilder {
         Package(J.Package tree) {
             super(tree);
         }

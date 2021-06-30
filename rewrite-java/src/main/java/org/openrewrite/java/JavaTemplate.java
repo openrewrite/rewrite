@@ -25,6 +25,7 @@ import org.openrewrite.java.internal.template.Substitutions;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.Space.Location;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.template.SourceTemplate;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -39,7 +40,7 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.tree.Space.Location.*;
 
-public class JavaTemplate {
+public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     private static final J.Block EMPTY_BLOCK = new J.Block(randomId(), Space.EMPTY,
             Markers.EMPTY, new JRightPadded<>(false, Space.EMPTY, Markers.EMPTY),
             emptyList(), Space.format(" "));
@@ -59,6 +60,7 @@ public class JavaTemplate {
         this.templateParser = new JavaTemplateParser(parser, onAfterVariableSubstitution, onBeforeParseTemplate, imports);
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     public <J2 extends J> J2 withTemplate(Tree changing, JavaCoordinates coordinates, Object[] parameters) {
         if (parameters.length != parameterCount) {
