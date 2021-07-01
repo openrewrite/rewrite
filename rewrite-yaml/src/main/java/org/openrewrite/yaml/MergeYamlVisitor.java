@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.List;
@@ -89,6 +90,9 @@ public class MergeYamlVisitor extends YamlVisitor<ExecutionContext> {
     private static Yaml.Scalar mergeScalar(Yaml.Scalar y1, Yaml.Scalar y2) {
         String s1 = y1.getValue();
         String s2 = y2.getValue();
+        for (Marker m : y2.getMarkers().entries()) {
+            y1 = y1.withMarkers(y1.getMarkers().addIfAbsent(m));
+        }
         return !s1.equals(s2) ? y1.withValue(s2) : y1;
 
     }
