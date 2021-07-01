@@ -20,14 +20,12 @@ import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
-import org.openrewrite.TreePrinter;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.internal.HclPrinter;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.template.SourceTemplate;
 
 import java.io.Serializable;
 import java.lang.ref.WeakReference;
@@ -68,7 +66,13 @@ public interface Hcl extends Serializable, Tree {
 
     Space getPrefix();
 
+    <H extends Hcl> H withId(UUID id);
+
     Hcl withPrefix(Space prefix);
+
+    default <H extends Hcl> H withTemplate(SourceTemplate<Hcl, HclCoordinates> template, HclCoordinates coordinates, Object... parameters) {
+        return template.withTemplate(this, coordinates, parameters);
+    }
 
     <T extends Hcl> T withMarkers(Markers markers);
 
@@ -336,6 +340,7 @@ public interface Hcl extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     class Block implements BodyContent, Expression {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -379,6 +384,7 @@ public interface Hcl extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     class Body implements Hcl {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -390,6 +396,10 @@ public interface Hcl extends Serializable, Tree {
 
         @With
         List<BodyContent> contents;
+
+        public CoordinateBuilder.Body getCoordinates() {
+            return new CoordinateBuilder.Body(this);
+        }
 
         @Override
         public <P> Hcl acceptHcl(HclVisitor<P> v, P p) {
@@ -499,6 +509,7 @@ public interface Hcl extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     class ConfigFile implements Hcl, SourceFile {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -532,6 +543,7 @@ public interface Hcl extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     class Empty implements Expression {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -929,6 +941,7 @@ public interface Hcl extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     class HeredocTemplate implements Expression {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -972,6 +985,7 @@ public interface Hcl extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     class Identifier implements Expression, Label {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -999,6 +1013,7 @@ public interface Hcl extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     class Index implements Expression {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1100,6 +1115,7 @@ public interface Hcl extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     class Literal implements Hcl, Expression, Label {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1278,6 +1294,7 @@ public interface Hcl extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     class QuotedTemplate implements Expression {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1305,6 +1322,7 @@ public interface Hcl extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     class Splat implements Expression {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1334,6 +1352,7 @@ public interface Hcl extends Serializable, Tree {
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Operator implements Hcl {
+            @With
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -1378,6 +1397,7 @@ public interface Hcl extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     class TemplateInterpolation implements Hcl, Expression {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1476,6 +1496,7 @@ public interface Hcl extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     class Unary implements Expression {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1511,6 +1532,7 @@ public interface Hcl extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     class VariableExpression implements Expression {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 

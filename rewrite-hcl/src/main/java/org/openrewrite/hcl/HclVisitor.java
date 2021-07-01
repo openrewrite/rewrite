@@ -26,6 +26,19 @@ import java.util.List;
 @SuppressWarnings("unused")
 public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
 
+    public <H extends Hcl> H autoFormat(H h, P p) {
+        return autoFormat(h, p, getCursor());
+    }
+
+    public <H extends Hcl> H autoFormat(H h, P p, Cursor cursor) {
+        return autoFormat(h, null, p, cursor);
+    }
+
+    public <H extends Hcl> H autoFormat(H h, @Nullable Hcl stopAfter, P p, Cursor cursor) {
+        // TODO implement me!
+        return h;
+    }
+    
     @Override
     public String getLanguage() {
         return "HCL";
@@ -123,6 +136,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         Hcl.ConfigFile c = configFile;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.CONFIG_FILE, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.withBody((Hcl.Body) visit(c.getBody(), p));
         return c;
     }
 
