@@ -1551,43 +1551,43 @@ interface TabsAndIndentsTest : JavaRecipeTest {
                 .withIndentsRelativeToExpressionStart(false)
         }).build(),
         before = """
-            		// shift left.
+                 	// shift left.
             package org.openrewrite; // trailing comment.
             
-            		// shift left.
-            		public class A { // trailing comment at class.
+                 	// shift left.
+                 	public class A { // trailing comment at class.
             // shift right.
-            		// shift left.
-            				public int method(int value) { // trailing comment at method.
-            	// shift right.
-            			// shift left.
-            	if (value == 1) { // trailing comment at if.
+                 	// shift left.
+                 	     	public int method(int value) { // trailing comment at method.
+              	// shift right.
+                 	    // shift left.
+              	if (value == 1) { // trailing comment at if.
             // suffix contains new lines with whitespace.
-            		
-            		
-            		// shift right.
-            					// shift left.
-            				value += 10; // trailing comment.
-            		// shift right at end of block.
-            				// shift left at end of block.
-            						} else {
-            			value += 30;
-            		// shift right at end of block.
-            				// shift left at end of block.
+                 	
+                 	
+                 	// shift right.
+                 	     	     	// shift left.
+                 	     	value += 10; // trailing comment.
+                 	     	// shift right at end of block.
+                 	     	// shift left at end of block.
+            		     	     	} else {
+            	     	value += 30;
+                 	// shift right at end of block.
+                 	     	// shift left at end of block.
             	}
             
-            				if (value == 11)
-            		// shift right.
-            				// shift left.
-            			value += 1;
+                 	     	if (value == 11)
+                 	// shift right.
+                 	     	// shift left.
+            	     	value += 1;
             
             	return value;
             	// shift right at end of block.
-            			// shift left at end of block.
-            			}
+            	     	// shift left at end of block.
+            	     	}
             // shift right at end of block.
-            		// shift left at end of block.
-            			}
+                 	// shift left at end of block.
+            	     	}
         """.trimIndent(),
         after = """
             // shift left.
@@ -1602,8 +1602,8 @@ interface TabsAndIndentsTest : JavaRecipeTest {
             		// shift left.
             		if (value == 1) { // trailing comment at if.
             			// suffix contains new lines with whitespace.
-            		
-            		
+            	
+            	
             			// shift right.
             			// shift left.
             			value += 10; // trailing comment.

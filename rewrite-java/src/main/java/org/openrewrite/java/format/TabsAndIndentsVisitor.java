@@ -401,10 +401,11 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             }
         } else {
             if (!StringUtils.isNullOrEmpty(space.getWhitespace()) &&
-                    // Preserve whitespace of trailing line comments.
-                    (!Comment.Style.LINE.equals(space.getComments().get(0).getStyle()) ||
-                            (Comment.Style.LINE.equals(space.getComments().get(0).getStyle()) &&
-                                    (space.getWhitespace().contains("\n") || space.getWhitespace().contains("\r"))))) {
+                    (Space.Location.COMPILATION_UNIT_PREFIX.equals(spaceLocation) ||
+                            // Preserve whitespace of trailing line comments.
+                            (!Comment.Style.LINE.equals(space.getComments().get(0).getStyle()) ||
+                                    (Comment.Style.LINE.equals(space.getComments().get(0).getStyle()) &&
+                                            (space.getWhitespace().contains("\n") || space.getWhitespace().contains("\r")))))) {
                 if (style.getUseTabCharacter()) {
                     space = space.withWhitespace(space.getWhitespace().replaceAll(" ", ""));
                 } else {
@@ -428,7 +429,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
             // Prevent formatting trailing comments, the whitespace in a trailing comment won't have a new line character.
             // Compilation unit prefixes are an exception, since they do not exist in a block.
-            if (space.getWhitespace().contains("\n") || spaceLocation.equals(Space.Location.COMPILATION_UNIT_PREFIX)) {
+            if (space.getWhitespace().contains("\n") || Space.Location.COMPILATION_UNIT_PREFIX.equals(spaceLocation)) {
                 int incrementBy = spaceLocation.equals(Space.Location.BLOCK_END) ? style.getIndentSize() : 0;
                 int indent = getLengthOfWhitespace(space.getWhitespace());
                 if (indent != (column + incrementBy)) {
@@ -441,13 +442,32 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         return space;
     }
 
+    /**
+     * Normalizes the whitespace to tabs or spaces based on the style.
+     * Preserves the comments if no changes are necessary or sets the indent to the appropriate column.
+     */
     private Comment indentSingleLineComment(Comment comment, int column) {
-        int indent = getLengthOfWhitespace(Space.format(comment.getSuffix()).getWhitespace());
-        if (column == indent) {
+        String normalizedSuffix = null;
+        if (!StringUtils.isNullOrEmpty(comment.getSuffix())) {
+            // This does not attempt to indent each new line following the suffix.
+            if (style.getUseTabCharacter()) {
+                if (comment.getSuffix().contains(" ")) {
+                    normalizedSuffix = comment.getSuffix().replaceAll(" ", "");
+                }
+            } else {
+                if (comment.getSuffix().contains("\t")) {
+                    normalizedSuffix = comment.getSuffix().replaceAll("\t", spacesForTab);
+                }
+            }
+        }
+
+        String suffix = normalizedSuffix == null ? comment.getSuffix() : normalizedSuffix;
+        int indent = getLengthOfWhitespace(suffix);
+        if (column == indent && normalizedSuffix == null) {
             return comment;
         }
 
-        StringBuilder newSuffix = new StringBuilder(comment.getSuffix());
+        StringBuilder newSuffix = new StringBuilder(suffix);
         int shift = column - indent;
         shift(newSuffix, shift);
         return comment.withSuffix(newSuffix.toString());
