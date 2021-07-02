@@ -58,11 +58,16 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
 
         List<Path> artifacts = new ArrayList<>();
         for (Path cpEntry : runtimeClasspath) {
+            String foundArtifactName = null;
             for (Map.Entry<String, Pattern> artifactNamePattern : artifactNamePatterns.entrySet()) {
                 if (artifactNamePattern.getValue().matcher(cpEntry.toString()).find()) {
                     artifacts.add(cpEntry);
-                    artifactNamePatterns.remove(artifactNamePattern.getKey());
+                    foundArtifactName = artifactNamePattern.getKey();
+                    break;
                 }
+            }
+            if (foundArtifactName != null) {
+                artifactNamePatterns.remove(foundArtifactName);
             }
         }
 
