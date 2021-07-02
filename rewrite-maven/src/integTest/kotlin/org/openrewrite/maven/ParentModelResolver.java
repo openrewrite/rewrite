@@ -82,7 +82,7 @@ public class ParentModelResolver extends ProjectModelResolver {
                 }
             }
         } catch (IOException e) {
-            logger.warn("Unable to add repository with URL: " + repository.getUrl(), e);
+            logger.warn("Unable to add repository with URL: {}", repository.getUrl(), e);
         }
         return result;
     }
@@ -102,7 +102,7 @@ public class ParentModelResolver extends ProjectModelResolver {
             }
             super.addRepository(repository, replace);
         } catch (IOException e) {
-            logger.warn("Unable to add repository with URL: " + repository.getUrl(), e);
+            logger.warn("Unable to add repository with URL: {}", repository.getUrl(), e);
         }
     }
 
