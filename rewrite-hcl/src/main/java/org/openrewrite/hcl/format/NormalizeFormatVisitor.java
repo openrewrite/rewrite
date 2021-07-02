@@ -71,21 +71,6 @@ public class NormalizeFormatVisitor<P> extends HclIsoVisitor<P> {
                 b = concatenateSpace(b, type.getPrefix());
                 b = b.withType(type.withPrefix(Space.EMPTY));
             }
-        } else if (b.getBody().getPrefix() != Space.EMPTY) {
-            b = concatenateSpace(b, b.getBody().getPrefix());
-            b = b.withBody(b.getBody().withPrefix(Space.EMPTY));
-        }
-
-        return b;
-    }
-
-    @Override
-    public Hcl.Body visitBody(Hcl.Body body, P p) {
-        Hcl.Body b = super.visitBody(body, p);
-
-        if (Space.firstPrefix(b.getContents()) != Space.EMPTY) {
-            b = concatenateSpace(b, Space.firstPrefix(b.getContents()));
-            b = b.withContents(Space.formatFirstPrefix(b.getContents(), Space.EMPTY));
         }
 
         return b;
@@ -107,9 +92,9 @@ public class NormalizeFormatVisitor<P> extends HclIsoVisitor<P> {
     public Hcl.ConfigFile visitConfigFile(Hcl.ConfigFile configFile, P p) {
         Hcl.ConfigFile c = super.visitConfigFile(configFile, p);
 
-        if (c.getBody().getPrefix() != Space.EMPTY) {
-            c = concatenateSpace(c, c.getBody().getPrefix());
-            c = c.withBody(c.getBody().withPrefix(Space.EMPTY));
+        if (Space.firstPrefix(c.getBody()) != Space.EMPTY) {
+            c = concatenateSpace(c, Space.firstPrefix(c.getBody()));
+            c = c.withBody(Space.formatFirstPrefix(c.getBody(), Space.EMPTY));
         }
 
         return c;

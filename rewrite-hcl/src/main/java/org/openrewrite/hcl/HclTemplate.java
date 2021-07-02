@@ -62,7 +62,6 @@ public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
 
         Tree insertionPoint = coordinates.getTree();
         Location loc = coordinates.getSpaceLocation();
-        HclCoordinates.Mode mode = coordinates.getMode();
 
         AtomicReference<Cursor> parentCursorRef = new AtomicReference<>();
 
@@ -85,19 +84,19 @@ public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
         //noinspection unchecked
         H h = (H) new HclVisitor<Integer>() {
             @Override
-            public Hcl visitBody(Hcl.Body body, Integer p) {
+            public Hcl visitBlock(Hcl.Block block, Integer p) {
                 if (loc.equals(Location.BLOCK_CLOSE)) {
-                    if (body.isScope(insertionPoint)) {
+                    if (block.isScope(insertionPoint)) {
                         List<BodyContent> gen = substitutions.unsubstitute(templateParser.parseBodyContent(substitutedTemplate));
-                        return body.withContents(
+                        return block.withBody(
                                 ListUtils.concatAll(
-                                        body.getContents(),
+                                        block.getBody(),
                                         ListUtils.map(gen, (i, s) -> autoFormat(i == 0 ? s.withPrefix(Space.format("\n")) : s, p, getCursor()))
                                 )
                         );
                     }
                 }
-                return super.visitBody(body, p);
+                return super.visitBlock(block, p);
             }
         }.visit(changing, 0, parentCursor);
 

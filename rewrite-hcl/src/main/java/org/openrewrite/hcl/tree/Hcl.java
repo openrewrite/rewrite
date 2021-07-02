@@ -364,10 +364,14 @@ public interface Hcl extends Serializable, Tree {
         Space open;
 
         @With
-        Body body;
+        List<BodyContent> body;
 
         @With
         Space close;
+
+        public CoordinateBuilder.Block getCoordinates() {
+            return new CoordinateBuilder.Block(this);
+        }
 
         @Override
         public <P> Hcl acceptHcl(HclVisitor<P> v, P p) {
@@ -377,38 +381,6 @@ public interface Hcl extends Serializable, Tree {
         @Override
         public String toString() {
             return "Block";
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
-    class Body implements Hcl {
-        @With
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        Space prefix;
-
-        @With
-        Markers markers;
-
-        @With
-        List<BodyContent> contents;
-
-        public CoordinateBuilder.Body getCoordinates() {
-            return new CoordinateBuilder.Body(this);
-        }
-
-        @Override
-        public <P> Hcl acceptHcl(HclVisitor<P> v, P p) {
-            return v.visitBody(this, p);
-        }
-
-        @Override
-        public String toString() {
-            return "Body";
         }
     }
 
@@ -523,7 +495,7 @@ public interface Hcl extends Serializable, Tree {
         Markers markers;
 
         @With
-        Body body;
+        List<BodyContent> body;
 
         @With
         Space eof;

@@ -269,7 +269,6 @@ public class Space {
         BLOCK,
         BLOCK_CLOSE,
         BLOCK_OPEN,
-        BODY,
         CONDITIONAL,
         CONDITIONAL_TRUE_PREFIX,
         CONDITIONAL_FALSE_PREFIX,

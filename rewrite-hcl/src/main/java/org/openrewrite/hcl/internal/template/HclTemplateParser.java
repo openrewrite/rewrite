@@ -51,7 +51,7 @@ public class HclTemplateParser {
         onBeforeParseTemplate.accept(stub);
         return cache(stub, () -> {
             Hcl.ConfigFile cf = compileTemplate(stub);
-            return cf.getBody().getContents();
+            return cf.getBody();
         });
     }
 

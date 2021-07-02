@@ -216,13 +216,6 @@ public class HclPrinter<P> extends HclVisitor<P> {
     }
 
     @Override
-    public Hcl visitBody(Hcl.Body body, P p) {
-        visitSpace(body.getPrefix(), Space.Location.BODY, p);
-        visit(body.getContents(), p);
-        return body;
-    }
-
-    @Override
     public Hcl visitConditional(Hcl.Conditional conditional, P p) {
         visitSpace(conditional.getPrefix(), Space.Location.CONDITIONAL, p);
         visit(conditional.getCondition(), p);

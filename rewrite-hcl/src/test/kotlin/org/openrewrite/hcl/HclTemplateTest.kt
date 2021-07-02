@@ -29,22 +29,22 @@ class HclTemplateTest : HclRecipeTest {
                 .doBeforeParseTemplate(JavaTemplateTest.print)
                 .build()
 
-            override fun visitBody(body: Hcl.Body, p: ExecutionContext): Hcl {
-                if (body.contents.size == 1 && cursor.parentOrThrow.getValue<Hcl>() !is Hcl.ConfigFile) {
-                    return body.withTemplate(t, body.coordinates.last())
+            override fun visitBlock(block: Hcl.Block, p: ExecutionContext): Hcl {
+                if (block.body.size == 1) {
+                    return block.withTemplate(t, block.coordinates.last())
                 }
-                return super.visitBody(body, p)
+                return super.visitBlock(block, p)
             }
         }.toRecipe(),
         before = """
             resource "aws_ebs_volume" {
-                size = 1
+              size = 1
             }
         """,
         after = """
             resource "aws_ebs_volume" {
-                size = 1
-                encrypted = true
+              size = 1
+              encrypted = true
             }
         """
     )

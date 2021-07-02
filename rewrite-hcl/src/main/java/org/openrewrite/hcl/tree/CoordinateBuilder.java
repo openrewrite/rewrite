@@ -34,8 +34,8 @@ public abstract class CoordinateBuilder {
         return new HclCoordinates(tree, location, HclCoordinates.Mode.REPLACEMENT, null);
     }
 
-    public static class Body extends CoordinateBuilder {
-        Body(Hcl.Body tree) {
+    public static class Block extends CoordinateBuilder {
+        Block(Hcl.Block tree) {
             super(tree);
         }
 

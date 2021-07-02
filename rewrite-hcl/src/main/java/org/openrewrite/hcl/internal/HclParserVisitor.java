@@ -150,7 +150,9 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
                 null,
                 emptyList(),
                 sourceBefore("{"),
-                (Hcl.Body) visit(c.body()),
+                c.body().bodyContent().stream()
+                        .map(bc -> (BodyContent) visit(bc))
+                        .collect(toList()),
                 sourceBefore("}")));
     }
 
@@ -187,15 +189,6 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
     }
 
     @Override
-    public Hcl visitBody(HCLParser.BodyContext ctx) {
-        return convert(ctx, (c, prefix) -> new Hcl.Body(randomId(), Space.format(prefix), Markers.EMPTY,
-                c.bodyContent().stream()
-                        .map(bc -> (BodyContent) visit(bc))
-                        .collect(toList()))
-        );
-    }
-
-    @Override
     public Hcl visitConditionalExpression(HCLParser.ConditionalExpressionContext ctx) {
         return convert(ctx, (c, prefix) -> new Hcl.Conditional(randomId(), Space.format(prefix), Markers.EMPTY,
                 (Expression) visit(c.expression(0)),
@@ -206,8 +199,16 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
 
     @Override
     public Hcl visitConfigFile(HCLParser.ConfigFileContext ctx) {
-        return convert(ctx, (c, prefix) -> new Hcl.ConfigFile(randomId(), path, Space.format(prefix), Markers.EMPTY,
-                (Hcl.Body) visit(c.body()), Space.format(source.substring(cursor))));
+        return convert(ctx, (c, prefix) -> new Hcl.ConfigFile(
+                randomId(),
+                path,
+                Space.format(prefix),
+                Markers.EMPTY,
+                c.body().bodyContent().stream()
+                        .map(bc -> (BodyContent) visit(bc))
+                        .collect(toList()),
+                Space.format(source.substring(cursor)))
+        );
     }
 
     @Override

@@ -43,11 +43,6 @@ public class HclIsoVisitor<P> extends HclVisitor<P> {
     }
 
     @Override
-    public Hcl.Body visitBody(Hcl.Body body, P p) {
-        return (Hcl.Body) super.visitBody(body, p);
-    }
-
-    @Override
     public BodyContent visitBodyContent(BodyContent bodyContent, P p) {
         return (BodyContent) super.visitBodyContent(bodyContent, p);
     }
