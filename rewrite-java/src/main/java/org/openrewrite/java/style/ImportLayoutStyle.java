@@ -552,9 +552,9 @@ class Serializer extends JsonSerializer<ImportLayoutStyle> {
                     } else if (block instanceof ImportLayoutStyle.Block.ImportPackage) {
                         ImportLayoutStyle.Block.ImportPackage importPackage = (ImportLayoutStyle.Block.ImportPackage) block;
                         return "import " + (importPackage.isStatic() ? "static " : "") + importPackage.getPackageWildcard().pattern()
-                                .replaceAll("\\.", ".")
-                                .replaceAll(".+", "*")
-                                .replaceAll("[^.]+", "*");
+                                .replace("\\.", ".")
+                                .replace(".+", "*")
+                                .replace("[^.]+", "*");
                     }
                     return new UnsupportedOperationException("Unknown block type " + block.getClass().getName());
                 })

@@ -20,7 +20,6 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.Tree
 import org.openrewrite.Tree.randomId
 import org.openrewrite.config.DeclarativeNamedStyles
 import org.openrewrite.style.Style
@@ -72,7 +71,46 @@ class ImportLayoutStyleTest {
         assertThat(style.nameCountToUseStarImport).isEqualTo(998)
 
         // round trip
-        mapper.readValue(mapper.writeValueAsBytes(style), Style::class.java)
+        when (val importLayout: Style = mapper.readValue(mapper.writeValueAsBytes(style), Style::class.java)) {
+            is ImportLayoutStyle -> {
+                assertThat(importLayout.classCountToUseStarImport).isEqualTo(999)
+                assertThat(importLayout.nameCountToUseStarImport).isEqualTo(998)
+                assertThat(importLayout.layout.size).isEqualTo(9)
+
+                assertThat(importLayout.layout[0])
+                    .isInstanceOf(ImportLayoutStyle.Block.ImportPackage::class.java)
+                    .matches { b -> !(b as ImportLayoutStyle.Block.ImportPackage).isStatic }
+                    .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == "java\\..+" }
+
+                assertThat(importLayout.layout[1]).isInstanceOf(ImportLayoutStyle.Block.BlankLines::class.java)
+
+                assertThat(importLayout.layout[2])
+                    .isInstanceOf(ImportLayoutStyle.Block.ImportPackage::class.java)
+                    .matches { b -> !(b as ImportLayoutStyle.Block.ImportPackage).isStatic }
+                    .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == "javax\\..+" }
+
+                assertThat(importLayout.layout[3]).isInstanceOf(ImportLayoutStyle.Block.BlankLines::class.java)
+
+                assertThat(importLayout.layout[4])
+                    .isInstanceOf(ImportLayoutStyle.Block.ImportPackage::class.java)
+                    .matches { b -> !(b as ImportLayoutStyle.Block.ImportPackage).isStatic }
+                    .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == ".+" }
+
+                assertThat(importLayout.layout[5]).isInstanceOf(ImportLayoutStyle.Block.BlankLines::class.java)
+
+                assertThat(importLayout.layout[6])
+                    .isInstanceOf(ImportLayoutStyle.Block.ImportPackage::class.java)
+                    .matches { b -> !(b as ImportLayoutStyle.Block.ImportPackage).isStatic }
+                    .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == "org\\.springframework\\..+" }
+
+                assertThat(importLayout.layout[7]).isInstanceOf(ImportLayoutStyle.Block.BlankLines::class.java)
+
+                assertThat(importLayout.layout[8])
+                    .isInstanceOf(ImportLayoutStyle.Block.ImportPackage::class.java)
+                    .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).isStatic }
+                    .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == ".+" }
+            }
+        }
     }
 
     @Test
