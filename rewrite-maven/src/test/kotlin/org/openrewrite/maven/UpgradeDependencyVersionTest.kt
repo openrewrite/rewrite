@@ -57,6 +57,99 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     )
 
     @Test
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/739")
+    fun upgradeVersionWithGroupIdAndArtifactIdDefinedAsProperty() = assertChanged(
+        recipe = UpgradeDependencyVersion(
+            "io.quarkus",
+            "quarkus-universe-bom",
+            "1.13.7.Final",
+            null,
+            null
+        ),
+        before = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                    <quarkus.platform.artifact-id>quarkus-universe-bom</quarkus.platform.artifact-id>
+                    <quarkus.platform.group-id>io.quarkus</quarkus.platform.group-id>
+                    <quarkus.platform.version>1.11.7.Final</quarkus.platform.version>
+                </properties>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>io.quarkus</groupId>
+                            <artifactId>quarkus-universe-bom</artifactId>
+                            <version>${"$"}{quarkus.platform.version}</version>
+                            <type>pom</type>
+                            <scope>import</scope>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>io.quarkus</groupId>
+                        <artifactId>quarkus-arc</artifactId>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.jboss.resteasy</groupId>
+                        <artifactId>resteasy-jaxrs</artifactId>
+                        <version>3.0.24.Final</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.mindrot</groupId>
+                        <artifactId>jbcrypt</artifactId>
+                        <version>0.4</version>
+                    </dependency>
+                </dependencies>
+            </project>
+        """,
+        after = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                    <quarkus.platform.artifact-id>quarkus-universe-bom</quarkus.platform.artifact-id>
+                    <quarkus.platform.group-id>io.quarkus</quarkus.platform.group-id>
+                    <quarkus.platform.version>1.13.7.Final</quarkus.platform.version>
+                </properties>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>io.quarkus</groupId>
+                            <artifactId>quarkus-universe-bom</artifactId>
+                            <version>${"$"}{quarkus.platform.version}</version>
+                            <type>pom</type>
+                            <scope>import</scope>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>io.quarkus</groupId>
+                        <artifactId>quarkus-arc</artifactId>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.jboss.resteasy</groupId>
+                        <artifactId>resteasy-jaxrs</artifactId>
+                        <version>3.0.24.Final</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.mindrot</groupId>
+                        <artifactId>jbcrypt</artifactId>
+                        <version>0.4</version>
+                    </dependency>
+                </dependencies>
+            </project>
+        """
+    )
+
+    @Test
     fun upgradeVersion() = assertChanged(
         recipe = UpgradeDependencyVersion(
             "org.springframework.boot",
