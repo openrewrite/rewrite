@@ -40,6 +40,9 @@ interface RecipeTest <T: SourceFile> {
     val parser: Parser<T>?
         get() = null
 
+    val executionContext: ExecutionContext
+        get() = InMemoryExecutionContext { t: Throwable -> fail<Any>("Failed to run parse sources or recipe", t) }
+
     @Suppress("UNCHECKED_CAST")
     fun assertChangedBase(
         parser: Parser<T> = this.parser!!,
@@ -52,7 +55,7 @@ interface RecipeTest <T: SourceFile> {
         afterConditions: (T) -> Unit = { }
     ) {
         val inputs = arrayOf(before.trimIndent()) + dependsOn.map(String::trimIndent)
-        val sources = parser.parse(InMemoryExecutionContext { t: Throwable -> fail<Any>("Parser threw an exception", t) }, *inputs )
+        val sources = parser.parse(executionContext, *inputs )
 
         assertThat(sources.size)
             .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
@@ -75,7 +78,7 @@ interface RecipeTest <T: SourceFile> {
         val sources = parser.parse(
             listOf(before).plus(dependsOn).map { it.toPath() },
             null,
-            InMemoryExecutionContext { t: Throwable -> fail<Any>("Parser threw an exception", t) }
+            executionContext
         )
 
         assertChangedBase(recipe, sources, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
@@ -104,7 +107,7 @@ interface RecipeTest <T: SourceFile> {
 
         var results = recipe.run(
             sources,
-            InMemoryExecutionContext { t: Throwable? -> fail<Any>("Recipe threw an exception", t) },
+            executionContext,
             recipeSchedulerCheckingExpectedCycles,
             cycles,
             expectedCyclesThatMakeChanges + 1
@@ -134,9 +137,7 @@ interface RecipeTest <T: SourceFile> {
         dependsOn: Array<String> = emptyArray()
     ) {
         val inputs = arrayOf(before.trimIndent()) + dependsOn.map(String::trimIndent)
-        val sources = parser.parse(
-                InMemoryExecutionContext { t: Throwable -> fail<Any>("Parser threw an exception", t) },
-                *inputs)
+        val sources = parser.parse(executionContext, *inputs)
 
         assertThat(sources.size)
             .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
@@ -154,7 +155,7 @@ interface RecipeTest <T: SourceFile> {
         val sources = parser.parse(
                 listOf(before).plus(dependsOn).map { it.toPath() },
             null,
-            InMemoryExecutionContext { t: Throwable -> fail<Any>("Parser threw an exception", t) }
+            executionContext
         )
 
         assertUnchangedBase(recipe, sources)
@@ -170,7 +171,7 @@ interface RecipeTest <T: SourceFile> {
         val recipeSchedulerCheckingExpectedCycles = RecipeSchedulerCheckingExpectedCycles(ForkJoinScheduler.common(), 0)
         val results = recipe
             .run(listOf(source),
-                InMemoryExecutionContext { t -> t.printStackTrace() },
+                executionContext,
                 recipeSchedulerCheckingExpectedCycles,
                 2,
                 2
@@ -227,7 +228,7 @@ interface RecipeTest <T: SourceFile> {
 
                 var results = recipe.run(
                     listOf(source),
-                    InMemoryExecutionContext { t: Throwable? -> fail<Any>("Recipe threw an exception", t) },
+                    executionContext,
                     recipeSchedulerCheckingExpectedCycles,
                     cycles,
                     expectedCyclesThatMakeChanges + 1
@@ -276,7 +277,7 @@ interface RecipeTest <T: SourceFile> {
                 val results = recipe
                     .run(
                         listOf(source),
-                        InMemoryExecutionContext { t -> fail<Any>("Recipe threw an exception", t) },
+                        executionContext,
                         2
                     )
 
