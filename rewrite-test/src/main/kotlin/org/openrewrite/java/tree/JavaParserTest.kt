@@ -16,6 +16,7 @@
 package org.openrewrite.java.tree
 
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Parser
@@ -28,6 +29,13 @@ import java.util.zip.ZipFile
 import kotlin.io.path.ExperimentalPathApi
 
 interface JavaParserTest {
+    @ExperimentalPathApi
+    @Test
+    fun dependenciesFromClasspathDoesntExist(jp: JavaParser.Builder<*, *>) {
+        assertThatThrownBy { JavaParser.dependenciesFromClasspath("dne", "another") }
+            .hasMessageStartingWith("Unable to find runtime dependencies beginning with: 'another', 'dne'")
+    }
+
     @ExperimentalPathApi
     @Test
     fun byteArrayAsClasspathElement(jp: JavaParser.Builder<*, *>) {

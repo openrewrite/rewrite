@@ -32,8 +32,9 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
-import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.*;
 
 public interface JavaParser extends Parser<J.CompilationUnit> {
 
@@ -52,13 +53,25 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
      * matching jars can be found.
      */
     static List<Path> dependenciesFromClasspath(String... artifactNames) {
-        List<Pattern> artifactNamePatterns = Arrays.stream(artifactNames)
-                .map(name -> Pattern.compile(name + "-.*?\\.jar$"))
-                .collect(toList());
+        Map<String, Pattern> artifactNamePatterns = Arrays.stream(artifactNames)
+                .collect(toMap(Function.identity(), name -> Pattern.compile(name + "-.*?\\.jar$")));
 
-        return runtimeClasspath.stream()
-                .filter(cpEntry -> artifactNamePatterns.stream().anyMatch(namePattern -> namePattern.matcher(cpEntry.toString()).find()))
-                .collect(toList());
+        List<Path> artifacts = new ArrayList<>();
+        for (Path cpEntry : runtimeClasspath) {
+            for (Map.Entry<String, Pattern> artifactNamePattern : artifactNamePatterns.entrySet()) {
+                if (artifactNamePattern.getValue().matcher(cpEntry.toString()).find()) {
+                    artifacts.add(cpEntry);
+                    artifactNamePatterns.remove(artifactNamePattern.getKey());
+                }
+            }
+        }
+
+        if (!artifactNamePatterns.isEmpty()) {
+            throw new IllegalArgumentException("Unable to find runtime dependencies beginning with: " +
+                    artifactNamePatterns.keySet().stream().map(a -> "'" + a + "'").sorted().collect(joining(", ")));
+        }
+
+        return artifacts;
     }
 
     /**
@@ -136,6 +149,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     /**
      * Changes the classpath on the parser. Intended for use in multiple pass parsing, where we want to keep the
      * compiler symbol table intact for type attribution on later parses, i.e. for maven multi-module projects.
+     *
      * @param classpath new classpath to use
      */
     void setClasspath(Collection<Path> classpath);
