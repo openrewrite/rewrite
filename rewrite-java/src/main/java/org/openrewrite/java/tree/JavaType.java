@@ -648,13 +648,18 @@ public interface JavaType extends Serializable {
         private final FullyQualified declaringType;
 
         private final String name;
-        @Nullable private final Signature genericSignature;
+
+        @Nullable
+        private final Signature genericSignature;
+
+        @Nullable
         private final Signature resolvedSignature;
+
         private final List<String> paramNames;
         private final List<FullyQualified> thrownExceptions;
 
         private Method(int flagsBitMap, FullyQualified declaringType, String name,
-                       @Nullable Signature genericSignature, Signature resolvedSignature, List<String> paramNames,
+                       @Nullable Signature genericSignature, @Nullable Signature resolvedSignature, List<String> paramNames,
                        List<FullyQualified> thrownExceptions) {
             this.flagsBitMap = flagsBitMap;
             this.declaringType = declaringType;
@@ -666,14 +671,14 @@ public interface JavaType extends Serializable {
         }
 
         public static Method build(Set<Flag> flags, FullyQualified declaringType, String name,
-                                   @Nullable Signature genericSignature, Signature resolvedSignature,
+                                   @Nullable Signature genericSignature, @Nullable Signature resolvedSignature,
                                    List<String> paramNames, List<FullyQualified> thrownExceptions) {
             return build(Flag.flagsToBitMap(flags), declaringType, name, genericSignature, resolvedSignature, paramNames, thrownExceptions);
         }
 
         @JsonCreator
         public static Method build(int flagsBitMap, FullyQualified declaringType, String name,
-                                   @Nullable Signature genericSignature, Signature resolvedSignature, List<String> paramNames,
+                                   @Nullable Signature genericSignature, @Nullable Signature resolvedSignature, List<String> paramNames,
                                    List<FullyQualified> thrownExceptions) {
 
             Method test = new Method(flagsBitMap, declaringType, name, genericSignature, resolvedSignature, paramNames, thrownExceptions);
@@ -740,15 +745,17 @@ public interface JavaType extends Serializable {
             return Method.build(flagsBitMap, declaringType, name, genericSignature, resolvedSignature, paramNames, thrownExceptions);
         }
 
-        public Method withGenericSignature(Signature genericSignature) {
-            if(genericSignature.equals(this.genericSignature)) {
+        public Method withGenericSignature(@Nullable Signature genericSignature) {
+            if((genericSignature == null && this.genericSignature == null) ||
+                    (genericSignature != null && genericSignature.equals(this.genericSignature))) {
                 return this;
             }
             return Method.build(flagsBitMap, declaringType, name, genericSignature, resolvedSignature, paramNames, thrownExceptions);
         }
 
-        public Method withResolvedSignature(Signature resolvedSignature) {
-            if(resolvedSignature.equals(this.resolvedSignature)) {
+        public Method withResolvedSignature(@Nullable Signature resolvedSignature) {
+            if((resolvedSignature == null && this.resolvedSignature == null) ||
+                    (resolvedSignature != null && resolvedSignature.equals(this.resolvedSignature))) {
                 return this;
             }
             return Method.build(flagsBitMap, declaringType, name, genericSignature, resolvedSignature, paramNames, thrownExceptions);
