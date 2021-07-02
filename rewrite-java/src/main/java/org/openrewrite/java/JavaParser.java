@@ -56,19 +56,20 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
         Map<String, Pattern> artifactNamePatterns = Arrays.stream(artifactNames)
                 .collect(toMap(Function.identity(), name -> Pattern.compile(name + "-.*?\\.jar$")));
 
+        Set<String> foundArtifacts = new HashSet<>();
         List<Path> artifacts = new ArrayList<>();
         for (Path cpEntry : runtimeClasspath) {
-            String foundArtifactName = null;
             for (Map.Entry<String, Pattern> artifactNamePattern : artifactNamePatterns.entrySet()) {
                 if (artifactNamePattern.getValue().matcher(cpEntry.toString()).find()) {
                     artifacts.add(cpEntry);
-                    foundArtifactName = artifactNamePattern.getKey();
+                    foundArtifacts.add(artifactNamePattern.getKey());
                     break;
                 }
             }
-            if (foundArtifactName != null) {
-                artifactNamePatterns.remove(foundArtifactName);
-            }
+        }
+
+        for (String foundArtifact : foundArtifacts) {
+            artifactNamePatterns.remove(foundArtifact);
         }
 
         if (!artifactNamePatterns.isEmpty()) {

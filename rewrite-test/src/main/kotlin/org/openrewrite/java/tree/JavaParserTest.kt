@@ -29,11 +29,15 @@ import java.util.zip.ZipFile
 import kotlin.io.path.ExperimentalPathApi
 
 interface JavaParserTest {
-    @ExperimentalPathApi
     @Test
     fun dependenciesFromClasspathDoesntExist(jp: JavaParser.Builder<*, *>) {
         assertThatThrownBy { JavaParser.dependenciesFromClasspath("dne", "another") }
             .hasMessageStartingWith("Unable to find runtime dependencies beginning with: 'another', 'dne'")
+    }
+
+    @Test
+    fun matchMultipleDependenciesWithOneName(jp: JavaParser.Builder<*, *>) {
+        assertThat(JavaParser.dependenciesFromClasspath("junit").size).isGreaterThan(1)
     }
 
     @ExperimentalPathApi
