@@ -32,7 +32,6 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static java.util.stream.Collectors.*;
 
@@ -63,7 +62,6 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
                 if (artifactNamePattern.getValue().matcher(cpEntry.toString()).find()) {
                     artifacts.add(cpEntry);
                     foundArtifacts.add(artifactNamePattern.getKey());
-                    break;
                 }
             }
         }
