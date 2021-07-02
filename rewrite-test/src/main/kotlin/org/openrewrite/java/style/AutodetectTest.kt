@@ -233,4 +233,40 @@ interface AutodetectTest {
 
         assertThat(importLayout.classCountToUseStarImport).isEqualTo(6)
     }
+
+    @Test
+    fun detectImportCounts(jp: JavaParser) {
+        val cus = jp.parse(
+            """
+            import java.util.ArrayList;
+            import java.util.Collections;
+            import java.util.HashSet;
+            import java.util.List;
+            import java.util.Set;
+            
+            import javax.persistence.Entity;
+            import javax.persistence.FetchType;
+            import javax.persistence.JoinColumn;
+            import javax.persistence.JoinTable;
+            import javax.persistence.ManyToMany;
+            import javax.persistence.Table;
+            import javax.xml.bind.annotation.XmlElement;
+            
+            public class Test {
+                List<Integer> l;
+                Set<Integer> s;
+                Map<Integer, Integer> m;
+                Collection<Integer> c;
+                LinkedHashMap<Integer, Integer> lhm;
+                HashSet<Integer> integer;
+            }
+        """.trimIndent()
+        )
+
+        val styles = Autodetect.detect(cus)
+        val importLayout = NamedStyles.merge(ImportLayoutStyle::class.java, listOf(styles))
+
+        assertThat(importLayout.classCountToUseStarImport).isEqualTo(2147483647)
+        assertThat(importLayout.nameCountToUseStarImport).isEqualTo(2147483647)
+    }
 }

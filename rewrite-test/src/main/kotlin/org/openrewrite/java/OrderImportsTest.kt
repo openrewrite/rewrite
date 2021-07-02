@@ -741,5 +741,53 @@ interface OrderImportsTest : JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    fun doNotFoldImports(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.styles(
+            listOf(
+                NamedStyles(
+                    randomId(),
+                    "custom",
+                    "custom style",
+                    null,
+                    emptySet(),
+                    listOf(
+                        ImportLayoutStyle.builder()
+                            .classCountToUseStarImport(2147483647)
+                            .nameCountToUseStarImport(2147483647)
+                            .importPackage("java.*")
+                            .blankLine()
+                            .importPackage("javax.*")
+                            .blankLine()
+                            .importAllOthers()
+                            .blankLine()
+                            .importStaticAllOthers()
+                            .build() as Style
+                    )
+                )
+            )
+        ).build(),
+        recipe = recipe.withRemoveUnused(false),
+        before = """
+            package org.bar;
+            
+            import java.util.ArrayList;
+            import java.util.Collections;
+            import java.util.HashSet;
+            import java.util.List;
+            import java.util.Set;
+            
+            import javax.persistence.Entity;
+            import javax.persistence.FetchType;
+            import javax.persistence.JoinColumn;
+            import javax.persistence.JoinTable;
+            import javax.persistence.ManyToMany;
+            import javax.persistence.Table;
+            
+            public class C {
+            }
+        """
+    )
 }
 
