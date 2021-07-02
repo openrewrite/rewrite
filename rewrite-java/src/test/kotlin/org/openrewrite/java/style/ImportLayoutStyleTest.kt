@@ -33,6 +33,21 @@ class ImportLayoutStyleTest {
     }
 
     @Test
+    fun roundTripSerialize() {
+        val style = mapper.writeValueAsString(ImportLayoutStyle
+            .builder()
+            .importPackage("import java.*")
+            .importAllOthers()
+            .importStaticAllOthers()
+            .build())
+
+        println(style)
+
+        val deserialized = mapper.readValue(style, ImportLayoutStyle::class.java)
+        assertThat(style).isEqualTo(mapper.writeValueAsString(deserialized))
+    }
+
+    @Test
     fun deserializeStyle() {
         val styleConfig = mapOf(
                 "@c" to ImportLayoutStyle::class.qualifiedName,
@@ -62,7 +77,6 @@ class ImportLayoutStyleTest {
 
     @Test
     fun deserializeInDeclarativeNamedStyles() {
-
         val style = DeclarativeNamedStyles(
                 randomId(),
                 "name",
