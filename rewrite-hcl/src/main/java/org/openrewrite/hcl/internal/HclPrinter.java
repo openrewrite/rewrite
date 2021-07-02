@@ -351,7 +351,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
         visitSpace(parentheses.getPrefix(), Space.Location.PARENTHETICAL_EXPRESSION, p);
         StringBuilder acc = getPrinter();
         acc.append('(');
-        visitRightPadded(parentheses.getPadding().getExpression(), HclRightPadded.Location.PARENTHETICAL_EXPRESSION, p);
+        visitRightPadded(parentheses.getPadding().getExpression(), HclRightPadded.Location.PARENTHESES, p);
         acc.append(')');
         return parentheses;
     }

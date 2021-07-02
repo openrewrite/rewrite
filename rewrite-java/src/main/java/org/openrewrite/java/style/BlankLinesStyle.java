@@ -21,6 +21,7 @@ import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.style.Style;
+import org.openrewrite.style.StyleHelper;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Value

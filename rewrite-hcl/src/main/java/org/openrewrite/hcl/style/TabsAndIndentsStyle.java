@@ -13,28 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.style;
+package org.openrewrite.hcl.style;
 
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
-import org.openrewrite.java.JavaStyle;
+import org.openrewrite.hcl.HclStyle;
+import org.openrewrite.hcl.format.TabsAndIndents;
 import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Data
 @With
-public class TabsAndIndentsStyle implements JavaStyle {
+public class TabsAndIndentsStyle implements HclStyle {
+    public static final TabsAndIndentsStyle DEFAULT = new TabsAndIndentsStyle(false, 2, 2);
+
     private Boolean useTabCharacter;
     private Integer tabSize;
     private Integer indentSize;
-    private Integer continuationIndent;
-    private Boolean indentsRelativeToExpressionStart;
 
     @Override
     public Style applyDefaults() {
-        return StyleHelper.merge(IntelliJ.tabsAndIndents(), this);
+        return StyleHelper.merge(DEFAULT, this);
     }
 }

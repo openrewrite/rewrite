@@ -526,7 +526,7 @@ public interface Hcl extends Serializable, Tree {
         Body body;
 
         @With
-        String eof;
+        Space eof;
 
         @Override
         public <P> Hcl acceptHcl(HclVisitor<P> v, P p) {

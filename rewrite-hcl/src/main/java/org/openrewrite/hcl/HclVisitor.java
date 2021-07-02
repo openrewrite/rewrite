@@ -17,6 +17,7 @@ package org.openrewrite.hcl;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.hcl.format.AutoFormatVisitor;
 import org.openrewrite.hcl.tree.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -34,9 +35,9 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         return autoFormat(h, null, p, cursor);
     }
 
+    @SuppressWarnings({"ConstantConditions", "unchecked"})
     public <H extends Hcl> H autoFormat(H h, @Nullable Hcl stopAfter, P p, Cursor cursor) {
-        // TODO implement me!
-        return h;
+        return (H) new AutoFormatVisitor<>(stopAfter).visit(h, p, cursor);
     }
     
     @Override
@@ -287,7 +288,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         } else {
             pa = (Hcl.Parentheses) temp;
         }
-        pa = pa.getPadding().withExpression(visitRightPadded(pa.getPadding().getExpression(), HclRightPadded.Location.PARENTHETICAL_EXPRESSION, p));
+        pa = pa.getPadding().withExpression(visitRightPadded(pa.getPadding().getExpression(), HclRightPadded.Location.PARENTHESES, p));
         return pa;
     }
 

@@ -19,9 +19,8 @@ import lombok.Value;
 import lombok.With;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.NullFields;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.style.StyleHelper;
+import org.openrewrite.style.StyleHelper;
 import org.openrewrite.style.Style;
 
 @Value

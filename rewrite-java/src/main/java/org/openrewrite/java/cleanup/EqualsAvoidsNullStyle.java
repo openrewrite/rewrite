@@ -17,7 +17,7 @@ package org.openrewrite.java.cleanup;
 
 import lombok.Value;
 import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.style.StyleHelper;
+import org.openrewrite.style.StyleHelper;
 import org.openrewrite.style.Style;
 
 @Value

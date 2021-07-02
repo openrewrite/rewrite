@@ -13,19 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.cleanup;
+@NonNullApi
+@NonNullFields
+package org.openrewrite.hcl.style;
 
-import lombok.Value;
-import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.style.StyleHelper;
-import org.openrewrite.style.Style;
-
-@Value
-public class ExplicitInitializationStyle implements Style {
-    Boolean onlyObjectReferences;
-
-    @Override
-    public Style applyDefaults() {
-        return StyleHelper.merge(IntelliJ.explicitInitialization(), this);
-    }
-}
+import org.openrewrite.internal.lang.NonNullApi;
+import org.openrewrite.internal.lang.NonNullFields;

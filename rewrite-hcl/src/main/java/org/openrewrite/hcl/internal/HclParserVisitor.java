@@ -207,7 +207,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
     @Override
     public Hcl visitConfigFile(HCLParser.ConfigFileContext ctx) {
         return convert(ctx, (c, prefix) -> new Hcl.ConfigFile(randomId(), path, Space.format(prefix), Markers.EMPTY,
-                (Hcl.Body) visit(c.body()), ""));
+                (Hcl.Body) visit(c.body()), Space.format(source.substring(cursor))));
     }
 
     @Override

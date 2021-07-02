@@ -13,19 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.cleanup;
+package org.openrewrite.hcl.format;
 
-import lombok.Value;
-import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.style.StyleHelper;
-import org.openrewrite.style.Style;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 
-@Value
-public class ExplicitInitializationStyle implements Style {
-    Boolean onlyObjectReferences;
+/**
+ * Ensures that whitespace is on the outermost AST element possible.
+ */
+public class NormalizeFormat extends Recipe {
+    @Override
+    public String getDisplayName() {
+        return "Normalize format";
+    }
 
     @Override
-    public Style applyDefaults() {
-        return StyleHelper.merge(IntelliJ.explicitInitialization(), this);
+    public String getDescription() {
+        return "Move whitespace to the outermost AST element possible.";
+    }
+
+    @Override
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new NormalizeFormatVisitor<>();
     }
 }
