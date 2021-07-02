@@ -16,7 +16,6 @@
 package org.openrewrite.maven
 
 import org.assertj.core.api.Assertions
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Issue
@@ -56,9 +55,8 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         """
     )
 
-    @Test
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/739")
+    @Test
     fun upgradeVersionWithGroupIdAndArtifactIdDefinedAsProperty() = assertChanged(
         recipe = UpgradeDependencyVersion(
             "io.quarkus",
@@ -77,6 +75,8 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                     <quarkus.platform.artifact-id>quarkus-universe-bom</quarkus.platform.artifact-id>
                     <quarkus.platform.group-id>io.quarkus</quarkus.platform.group-id>
                     <quarkus.platform.version>1.11.7.Final</quarkus.platform.version>
+                    <jboss.groupId>org.jboss.resteasy</jboss.groupId>
+                    <jboss.artifactId>resteasy-jaxrs</jboss.artifactId>
                 </properties>
                 <dependencyManagement>
                     <dependencies>
@@ -95,8 +95,8 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                         <artifactId>quarkus-arc</artifactId>
                     </dependency>
                     <dependency>
-                        <groupId>org.jboss.resteasy</groupId>
-                        <artifactId>resteasy-jaxrs</artifactId>
+                        <groupId>${"$"}{jboss.groupId}</groupId>
+                        <artifactId>${"$"}{jboss.artifactId}</artifactId>
                         <version>3.0.24.Final</version>
                     </dependency>
                     <dependency>
@@ -117,6 +117,8 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                     <quarkus.platform.artifact-id>quarkus-universe-bom</quarkus.platform.artifact-id>
                     <quarkus.platform.group-id>io.quarkus</quarkus.platform.group-id>
                     <quarkus.platform.version>1.13.7.Final</quarkus.platform.version>
+                    <jboss.groupId>org.jboss.resteasy</jboss.groupId>
+                    <jboss.artifactId>resteasy-jaxrs</jboss.artifactId>
                 </properties>
                 <dependencyManagement>
                     <dependencies>
@@ -135,8 +137,8 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                         <artifactId>quarkus-arc</artifactId>
                     </dependency>
                     <dependency>
-                        <groupId>org.jboss.resteasy</groupId>
-                        <artifactId>resteasy-jaxrs</artifactId>
+                        <groupId>${"$"}{jboss.groupId}</groupId>
+                        <artifactId>${"$"}{jboss.artifactId}</artifactId>
                         <version>3.0.24.Final</version>
                     </dependency>
                     <dependency>

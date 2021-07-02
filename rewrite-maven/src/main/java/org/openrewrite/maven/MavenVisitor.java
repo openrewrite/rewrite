@@ -100,8 +100,11 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
         Xml.Tag tag = getCursor().getValue();
         boolean isGroupIdFound = groupId.equals(tag.getChildValue("groupId").orElse(model.getGroupId()));
         if (!isGroupIdFound && model.getProperties() != null) {
-            String value = model.getValue(groupId);
-            isGroupIdFound = value != null && model.getProperties().containsValue(value);
+            if (tag.getChildValue("groupId").isPresent() && tag.getChildValue("groupId").get().trim().startsWith("${")) {
+                String propertyKey = tag.getChildValue("groupId").get().trim();
+                String value = model.getValue(propertyKey);
+                isGroupIdFound = value != null && value.equals(groupId);
+            }
         }
         return isGroupIdFound;
     }
@@ -113,10 +116,12 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
                 .orElse(artifactId == null);
 
         if (!isArtifactIdFound && artifactId != null && model.getProperties() != null) {
-            String value = model.getValue(artifactId);
-            isArtifactIdFound = value != null && model.getProperties().containsValue(value);
+            if (tag.getChildValue("artifactId").isPresent() && tag.getChildValue("artifactId").get().trim().startsWith("${")) {
+                String propertyKey = tag.getChildValue("artifactId").get().trim();
+                String value = model.getValue(propertyKey);
+                isArtifactIdFound = value != null && value.equals(artifactId);
+            }
         }
-
         return isArtifactIdFound;
     }
 
