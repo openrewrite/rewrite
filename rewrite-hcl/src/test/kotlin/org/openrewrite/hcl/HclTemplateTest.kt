@@ -43,7 +43,7 @@ class HclTemplateTest : HclRecipeTest {
         """,
         after = """
             resource "aws_ebs_volume" {
-              size = 1
+              size      = 1
               encrypted = true
             }
         """

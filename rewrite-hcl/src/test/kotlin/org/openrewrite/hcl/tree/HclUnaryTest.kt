@@ -19,11 +19,10 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.hcl.HclParser
 
 class HclUnaryTest : HclTreeTest {
-    private val parser = HclParser()
 
     @Test
     fun unary() = assertParsePrintAndProcess(
-        parser, """
+        """
             a = !true
             b = -1
         """.trimIndent()

@@ -15,13 +15,10 @@
  */
 package org.openrewrite.java.style;
 
-import lombok.AccessLevel;
 import lombok.Value;
 import lombok.With;
-import lombok.experimental.FieldDefaults;
 import org.openrewrite.java.JavaStyle;
 
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Value
 @With
 public class WrappingAndBracesStyle implements JavaStyle {

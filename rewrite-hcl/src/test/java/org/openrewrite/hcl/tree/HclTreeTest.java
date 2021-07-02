@@ -24,8 +24,8 @@ import org.openrewrite.internal.StringUtils;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public interface HclTreeTest {
-    default void assertParsePrintAndProcess(HclParser parser, String code) {
-        Hcl.ConfigFile cf = parser.parse(
+    default void assertParsePrintAndProcess(String code) {
+        Hcl.ConfigFile cf = HclParser.builder().build().parse(
                 new InMemoryExecutionContext(t -> {
                     throw new RuntimeException(t.getMessage(), t);
                 }),

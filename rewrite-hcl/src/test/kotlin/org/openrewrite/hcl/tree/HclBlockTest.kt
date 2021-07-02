@@ -16,17 +16,15 @@
 package org.openrewrite.hcl.tree
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.hcl.HclParser
 
 class HclBlockTest : HclTreeTest {
-    private val parser = HclParser()
 
     /**
      * Doesn't seem to be documented in HCL spec, but in use in plenty of places in terragoat.
      */
     @Test
     fun blockExpression() = assertParsePrintAndProcess(
-        parser, """
+        """
           tags = {
             git_file = "terraform/aws/ec2.tf"
             git_repo = "terragoat"
@@ -36,7 +34,7 @@ class HclBlockTest : HclTreeTest {
 
     @Test
     fun blockUnquotedLabel() = assertParsePrintAndProcess(
-        parser, """
+        """
             resource azurerm_monitor_log_profile "logging_profile" {
               device_name = "/dev/sdh"
             }
@@ -45,7 +43,7 @@ class HclBlockTest : HclTreeTest {
 
     @Test
     fun block() = assertParsePrintAndProcess(
-        parser, """
+        """
             resource "aws_volume_attachment" "ebs_att" {
               device_name = "/dev/sdh"
               volume_id   = "aws_ebs_volume.web_host_storage.id"
@@ -61,7 +59,7 @@ class HclBlockTest : HclTreeTest {
 
     @Test
     fun oneLineBlock() = assertParsePrintAndProcess(
-        parser, """
+        """
             resource "aws_volume_attachment" "ebs_att" { device_name = "/dev/sdh" }
         """.trimIndent()
     )

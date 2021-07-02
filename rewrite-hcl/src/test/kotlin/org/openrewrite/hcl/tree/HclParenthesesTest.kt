@@ -16,14 +16,12 @@
 package org.openrewrite.hcl.tree
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.hcl.HclParser
 
 class HclParenthesesTest : HclTreeTest {
-    private val parser = HclParser()
 
     @Test
     fun parentheses() = assertParsePrintAndProcess(
-        parser, """
+        """
             a = ( 1 )
         """.trimIndent()
     )

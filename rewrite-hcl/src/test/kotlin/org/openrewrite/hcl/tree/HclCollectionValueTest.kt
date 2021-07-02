@@ -19,18 +19,17 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.hcl.HclParser
 
 class HclCollectionValueTest : HclTreeTest {
-    private val parser = HclParser()
 
     @Test
     fun tupleValue() = assertParsePrintAndProcess(
-        parser, """
+        """
             a = [ 1, 2 ]
         """.trimIndent()
     )
 
     @Test
     fun tupleValueNewline() = assertParsePrintAndProcess(
-        parser, """
+        """
             a = [
             1]
         """.trimIndent()
@@ -38,7 +37,7 @@ class HclCollectionValueTest : HclTreeTest {
 
     @Test
     fun objectValue() = assertParsePrintAndProcess(
-        parser, """
+        """
             a = { k1 = 1, k2 = 2 }
             b = { k1 = 1, k2 = 2, }
             c = { k1: 1, k2: 2 }

@@ -18,6 +18,7 @@ package org.openrewrite.hcl.format;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.hcl.HclVisitor;
+import org.openrewrite.hcl.style.SpacesStyle;
 import org.openrewrite.hcl.style.TabsAndIndentsStyle;
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.internal.lang.Nullable;
@@ -42,21 +43,9 @@ public class AutoFormatVisitor<P> extends HclVisitor<P> {
 
         Hcl t = new NormalizeFormatVisitor<>().visit(tree, p, cursor.fork());
 
-//        t = new MinimumViableSpacingVisitor<>(stopAfter).visit(t, p, cursor.fork());
-//
-//        t = new RemoveTrailingWhitespaceVisitor<>().visit(t, p, cursor.fork());
-//
-//        t = new BlankLinesVisitor<>(Optional.ofNullable(cf.getStyle(BlankLinesStyle.class))
-//                .orElse(IntelliJ.blankLines()), stopAfter)
-//                .visit(t, p, cursor.fork());
-//
-//        t = new SpacesVisitor<>(Optional.ofNullable(cf.getStyle(SpacesStyle.class))
-//                .orElse(IntelliJ.spaces()), stopAfter)
-//                .visit(t, p, cursor.fork());
-//
-//        t = new WrappingAndBracesVisitor<>(Optional.ofNullable(cf.getStyle(WrappingAndBracesStyle.class))
-//                .orElse(IntelliJ.wrappingAndBraces()), stopAfter)
-//                .visit(t, p, cursor.fork());
+        t = new SpacesVisitor<>(Optional.ofNullable(cf.getStyle(SpacesStyle.class))
+                .orElse(SpacesStyle.DEFAULT), stopAfter)
+                .visit(t, p, cursor.fork());
 
         t = new TabsAndIndentsVisitor<>(Optional.ofNullable(cf.getStyle(TabsAndIndentsStyle.class))
                 .orElse(TabsAndIndentsStyle.DEFAULT), stopAfter)
@@ -73,17 +62,9 @@ public class AutoFormatVisitor<P> extends HclVisitor<P> {
     public Hcl visitConfigFile(Hcl.ConfigFile cf, P p) {
         Hcl.ConfigFile t = (Hcl.ConfigFile) new RemoveTrailingWhitespaceVisitor<>().visit(cf, p);
 
-//        t = (Hcl.ConfigFile) new BlankLinesVisitor<>(Optional.ofNullable(cf.getStyle(BlankLinesStyle.class))
-//                .orElse(IntelliJ.blankLines()), stopAfter)
-//                .visit(t, p);
-//
-//        t = (Hcl.ConfigFile) new SpacesVisitor<>(Optional.ofNullable(cf.getStyle(SpacesStyle.class))
-//                .orElse(IntelliJ.spaces()), stopAfter)
-//                .visit(t, p);
-//
-//        t = (Hcl.ConfigFile) new WrappingAndBracesVisitor<>(Optional.ofNullable(cf.getStyle(WrappingAndBracesStyle.class))
-//                .orElse(IntelliJ.wrappingAndBraces()), stopAfter)
-//                .visit(t, p);
+        t = (Hcl.ConfigFile) new SpacesVisitor<>(Optional.ofNullable(cf.getStyle(SpacesStyle.class))
+                .orElse(SpacesStyle.DEFAULT), stopAfter)
+                .visit(t, p);
 
         t = (Hcl.ConfigFile) new TabsAndIndentsVisitor<>(Optional.ofNullable(cf.getStyle(TabsAndIndentsStyle.class))
                 .orElse(TabsAndIndentsStyle.DEFAULT), stopAfter)

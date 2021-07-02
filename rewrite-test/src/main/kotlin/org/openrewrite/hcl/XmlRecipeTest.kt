@@ -23,7 +23,7 @@ import java.io.File
 @Suppress("unused")
 interface HclRecipeTest : RecipeTest<Hcl.ConfigFile> {
     override val parser: HclParser
-        get() = HclParser()
+        get() = HclParser.builder().build()
 
     fun assertChanged(
         recipe: Recipe = this.recipe!!,

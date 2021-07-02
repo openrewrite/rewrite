@@ -16,13 +16,11 @@
 package org.openrewrite.hcl.tree
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.hcl.HclParser
 
 class HclAttributeTest : HclTreeTest {
-    private val parser = HclParser()
 
     @Test
     fun attribute() = assertParsePrintAndProcess(
-        parser, "a = true"
+        "a = true"
     )
 }

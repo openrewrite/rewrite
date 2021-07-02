@@ -10,7 +10,7 @@ configFile
     ;
 
 body
-    : bodyContent+
+    : bodyContent*
     ;
 
 bodyContent

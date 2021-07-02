@@ -16,14 +16,12 @@
 package org.openrewrite.hcl.tree
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.hcl.HclParser
 
 class HclBinaryTest : HclTreeTest {
-    private val parser = HclParser()
 
     @Test
     fun binary() = assertParsePrintAndProcess(
-        parser, """
+        """
             a = 1 + 2
             b = 1 <= 2
             c = true && false

@@ -13,16 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.hcl.tree
+package org.openrewrite.hcl.style;
 
-import org.junit.jupiter.api.Test
+import lombok.Value;
+import lombok.With;
+import org.openrewrite.hcl.HclStyle;
 
-class HclConditionalTest : HclTreeTest {
+@Value
+@With
+public class SpacesStyle implements HclStyle {
+    public static final SpacesStyle DEFAULT = new SpacesStyle(
+            new BodyContent(true)
+    );
 
-    @Test
-    fun conditional() = assertParsePrintAndProcess(
-        """
-            a = isTrue() ? 1 : 2
-        """.trimIndent()
-    )
+    BodyContent bodyContent;
+
+    @Value
+    @With
+    public static class BodyContent {
+        Boolean columnarAlignment;
+    }
 }

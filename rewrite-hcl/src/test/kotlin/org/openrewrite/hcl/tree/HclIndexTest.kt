@@ -16,14 +16,12 @@
 package org.openrewrite.hcl.tree
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.hcl.HclParser
 
 class HclIndexTest : HclTreeTest {
-    private val parser = HclParser()
 
     @Test
     fun index() = assertParsePrintAndProcess(
-        parser, """
+        """
             a = b [ 1 ]
         """.trimIndent()
     )

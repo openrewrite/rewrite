@@ -34,7 +34,7 @@ public class HclTemplateParser {
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("#{", "}", null);
 
     private final Object templateCacheLock = new Object();
-    private final HclParser parser = new HclParser();
+    private final HclParser parser = HclParser.builder().build();
 
     private static final Map<String, List<? extends Hcl>> templateCache = new LinkedHashMap<String, List<? extends Hcl>>() {
         @Override

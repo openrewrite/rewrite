@@ -15,22 +15,18 @@
  */
 package org.openrewrite.java.style;
 
-import lombok.AccessLevel;
 import lombok.Value;
 import lombok.With;
-import lombok.experimental.FieldDefaults;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Value
 @With
 public class BlankLinesStyle implements JavaStyle {
     KeepMaximum keepMaximum;
     Minimum minimum;
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Value
     @With
     public static class KeepMaximum {
@@ -40,7 +36,6 @@ public class BlankLinesStyle implements JavaStyle {
         Integer betweenHeaderAndPackage;
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Value
     @With
     public static class Minimum {

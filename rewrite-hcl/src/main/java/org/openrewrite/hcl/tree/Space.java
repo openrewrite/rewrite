@@ -19,6 +19,8 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.EqualsAndHashCode;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
@@ -217,7 +219,7 @@ public class Space {
     public static <H extends Hcl> List<H> formatFirstPrefix(List<H> trees, Space prefix) {
         if (!trees.isEmpty() && !trees.get(0).getPrefix().equals(prefix)) {
             List<H> formattedTrees = new ArrayList<>(trees);
-            formattedTrees.set(0, (H) formattedTrees.get(0).withPrefix(prefix));
+            formattedTrees.set(0, formattedTrees.get(0).withPrefix(prefix));
             return formattedTrees;
         }
 

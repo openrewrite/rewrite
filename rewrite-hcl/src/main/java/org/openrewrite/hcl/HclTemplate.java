@@ -17,8 +17,10 @@ package org.openrewrite.hcl;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
+import org.openrewrite.hcl.format.AttributeSpaceVisitor;
 import org.openrewrite.hcl.internal.template.HclTemplateParser;
 import org.openrewrite.hcl.internal.template.Substitutions;
+import org.openrewrite.hcl.style.SpacesStyle;
 import org.openrewrite.hcl.tree.BodyContent;
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.hcl.tree.HclCoordinates;
@@ -30,6 +32,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.template.SourceTemplate;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -85,18 +88,24 @@ public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
         H h = (H) new HclVisitor<Integer>() {
             @Override
             public Hcl visitBlock(Hcl.Block block, Integer p) {
+                Hcl.Block b = (Hcl.Block) super.visitBlock(block, p);
                 if (loc.equals(Location.BLOCK_CLOSE)) {
-                    if (block.isScope(insertionPoint)) {
+                    if (b.isScope(insertionPoint)) {
                         List<BodyContent> gen = substitutions.unsubstitute(templateParser.parseBodyContent(substitutedTemplate));
-                        return block.withBody(
+                        b = b.withBody(
                                 ListUtils.concatAll(
                                         block.getBody(),
                                         ListUtils.map(gen, (i, s) -> autoFormat(i == 0 ? s.withPrefix(Space.format("\n")) : s, p, getCursor()))
                                 )
                         );
+
+                        Hcl.ConfigFile cf = getCursor().firstEnclosingOrThrow(Hcl.ConfigFile.class);
+                        b = (Hcl.Block) new AttributeSpaceVisitor<Integer>(Optional.ofNullable(cf.getStyle(SpacesStyle.class))
+                                .orElse(SpacesStyle.DEFAULT)).visit(b, p, getCursor().getParentOrThrow());
+                        assert b != null;
                     }
                 }
-                return super.visitBlock(block, p);
+                return b;
             }
         }.visit(changing, 0, parentCursor);
 

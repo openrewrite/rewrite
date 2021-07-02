@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2020 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,21 +17,37 @@ package org.openrewrite.hcl.format;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.hcl.HclIsoVisitor;
 import org.openrewrite.hcl.HclVisitor;
+import org.openrewrite.hcl.style.SpacesStyle;
+import org.openrewrite.hcl.tree.Hcl;
 
-public class AutoFormat extends Recipe {
+public class Spaces extends Recipe {
+
     @Override
     public String getDisplayName() {
-        return "Format HCL code";
+        return "Spaces";
     }
 
     @Override
     public String getDescription() {
-        return "Format HCL code using a standard comprehensive set of HCL formatting recipes.";
+        return "Format whitespace in HCL code.";
     }
 
     @Override
     protected HclVisitor<ExecutionContext> getVisitor() {
-        return new AutoFormatVisitor<>(null);
+        return new SpacesFromCompilationUnitStyle();
+    }
+
+    private static class SpacesFromCompilationUnitStyle extends HclIsoVisitor<ExecutionContext> {
+        @Override
+        public Hcl.ConfigFile visitConfigFile(Hcl.ConfigFile cf, ExecutionContext ctx) {
+            SpacesStyle style = cf.getStyle(SpacesStyle.class);
+            if (style == null) {
+                style = SpacesStyle.DEFAULT;
+            }
+            doAfterVisit(new SpacesVisitor<>(style));
+            return super.visitConfigFile(cf, ctx);
+        }
     }
 }

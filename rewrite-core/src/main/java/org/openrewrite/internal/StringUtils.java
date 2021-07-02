@@ -179,7 +179,7 @@ public class StringUtils {
     }
 
     public static String capitalize(String value) {
-        if(value.isEmpty()) {
+        if (value.isEmpty()) {
             return value;
         }
         return Character.toUpperCase(value.charAt(0)) +
@@ -187,7 +187,7 @@ public class StringUtils {
     }
 
     public static String uncapitalize(String value) {
-        if(value.isEmpty()) {
+        if (value.isEmpty()) {
             return value;
         }
         return Character.toLowerCase(value.charAt(0)) + value.substring(1);
@@ -342,5 +342,31 @@ public class StringUtils {
             }
             return newValue.toString();
         }
+    }
+
+    public static String repeat(String s, int count) {
+        if (count == 1) {
+            return s;
+        }
+
+        byte[] value = s.getBytes();
+        int len = value.length;
+        if (len == 0 || count == 0) {
+            return "";
+        }
+        if (len == 1) {
+            final byte[] single = new byte[count];
+            Arrays.fill(single, value[0]);
+            return new String(single);
+        }
+        int limit = len * count;
+        byte[] multiple = new byte[limit];
+        System.arraycopy(value, 0, multiple, 0, len);
+        int copied = len;
+        for (; copied < limit - copied; copied <<= 1) {
+            System.arraycopy(multiple, 0, multiple, copied, copied);
+        }
+        System.arraycopy(multiple, 0, multiple, copied, limit - copied);
+        return new String(multiple);
     }
 }

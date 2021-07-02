@@ -68,7 +68,7 @@ public interface Hcl extends Serializable, Tree {
 
     <H extends Hcl> H withId(UUID id);
 
-    Hcl withPrefix(Space prefix);
+    <H extends Hcl> H withPrefix(Space prefix);
 
     default <H extends Hcl> H withTemplate(SourceTemplate<Hcl, HclCoordinates> template, HclCoordinates coordinates, Object... parameters) {
         return template.withTemplate(this, coordinates, parameters);

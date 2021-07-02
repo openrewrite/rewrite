@@ -16,21 +16,19 @@
 package org.openrewrite.hcl.tree
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.hcl.HclParser
 
 class HclSplatTest : HclTreeTest {
-    private val parser = HclParser()
 
     @Test
     fun attributeSplat() = assertParsePrintAndProcess(
-        parser, """
+        """
             a = tuple . *.foo.bar[0]
         """.trimIndent()
     )
 
     @Test
     fun fullSplat() = assertParsePrintAndProcess(
-        parser, """
+        """
             b = tuple [ * ].foo.bar[0]
         """.trimIndent()
     )

@@ -15,15 +15,12 @@
  */
 package org.openrewrite.java.style;
 
-import lombok.AccessLevel;
 import lombok.Value;
 import lombok.With;
-import lombok.experimental.FieldDefaults;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Value
 @With
 public class SpacesStyle implements JavaStyle {
@@ -37,7 +34,6 @@ public class SpacesStyle implements JavaStyle {
     Other other;
     TypeParameters typeParameters;
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Value
     @With
     public static class BeforeParentheses {
@@ -53,7 +49,6 @@ public class SpacesStyle implements JavaStyle {
         Boolean annotationParameters;
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Value
     @With
     public static class AroundOperators {
@@ -70,7 +65,6 @@ public class SpacesStyle implements JavaStyle {
         Boolean methodReferenceDoubleColon;
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Value
     @With
     public static class BeforeLeftBrace {
@@ -90,7 +84,6 @@ public class SpacesStyle implements JavaStyle {
         Boolean annotationArrayInitializerLeftBrace;
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Value
     @With
     public static class BeforeKeywords {
@@ -100,7 +93,6 @@ public class SpacesStyle implements JavaStyle {
         Boolean finallyKeyword;
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Value
     @With
     public static class Within {
@@ -134,7 +126,6 @@ public class SpacesStyle implements JavaStyle {
         Boolean recordHeader;
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Value
     @With
     public static class TernaryOperator {
@@ -144,7 +135,6 @@ public class SpacesStyle implements JavaStyle {
         Boolean afterColon;
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Value
     @With
     public static class TypeArguments {
@@ -153,7 +143,6 @@ public class SpacesStyle implements JavaStyle {
         Boolean afterClosingAngleBracket;
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Value
     @With
     public static class Other {
@@ -166,7 +155,6 @@ public class SpacesStyle implements JavaStyle {
         Boolean insideOneLineEnumBraces;
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Value
     @With
     public static class TypeParameters {

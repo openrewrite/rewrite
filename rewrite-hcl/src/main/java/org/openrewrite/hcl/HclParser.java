@@ -18,8 +18,6 @@ package org.openrewrite.hcl;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.atn.ATNConfigSet;
-import org.antlr.v4.runtime.dfa.DFA;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.hcl.internal.HclParserVisitor;
@@ -29,15 +27,23 @@ import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.style.NamedStyles;
 
 import java.nio.file.Path;
-import java.util.BitSet;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 import static java.util.stream.Collectors.toList;
 
 public class HclParser implements Parser<Hcl.ConfigFile> {
+    private final List<NamedStyles> styles;
+
+    private HclParser(List<NamedStyles> styles) {
+        this.styles = styles;
+    }
+
     @Override
     public List<Hcl.ConfigFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         return acceptedInputs(sourceFiles).stream()
@@ -59,6 +65,8 @@ public class HclParser implements Parser<Hcl.ConfigFile> {
                                 sourceFile.getRelativePath(relativeTo),
                                 StringUtils.readFully(sourceFile.getSource())
                         ).visitConfigFile(parser.configFile());
+
+                        configFile = configFile.withMarkers(Markers.build(styles));
 
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         return configFile;
@@ -91,6 +99,25 @@ public class HclParser implements Parser<Hcl.ConfigFile> {
                                 int line, int charPositionInLine, String msg, RecognitionException e) {
             ctx.getOnError().accept(new HclParsingException(sourcePath,
                     String.format("Syntax error at line %d:%d %s.", line, charPositionInLine, msg), e));
+        }
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        protected final List<NamedStyles> styles = new ArrayList<>();
+
+        public Builder styles(Iterable<? extends NamedStyles> styles) {
+            for (NamedStyles style : styles) {
+                this.styles.add(style);
+            }
+            return this;
+        }
+
+        public HclParser build() {
+            return new HclParser(styles);
         }
     }
 }

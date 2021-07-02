@@ -16,21 +16,19 @@
 package org.openrewrite.hcl.tree
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.hcl.HclParser
 
 class HclQuotedTemplateTest : HclTreeTest {
-    private val parser = HclParser()
 
     @Test
     fun quotedTemplate() = assertParsePrintAndProcess(
-        parser, """
+        """
             a = "abc${'$'}{1}"
         """.trimIndent()
     )
 
     @Test
     fun nestedQuotedTemplate() = assertParsePrintAndProcess(
-        parser, """
+        """
             a = "abc${'$'}{"a${'$'}{b}"}"
         """.trimIndent()
     )

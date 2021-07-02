@@ -16,14 +16,12 @@
 package org.openrewrite.hcl.tree
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.hcl.HclParser
 
 class HclHeredocTest : HclTreeTest {
-    private val parser = HclParser()
 
     @Test
     fun heredoc() = assertParsePrintAndProcess(
-        parser, """
+        """
             user_data = <<EOF
                 #! /bin/bash
                 sudo apt-get update
@@ -35,7 +33,7 @@ class HclHeredocTest : HclTreeTest {
 
     @Test
     fun heredocWithQuote() = assertParsePrintAndProcess(
-        parser, """
+        """
             user_data = <<EOF
             hello
             EOF
@@ -45,7 +43,7 @@ class HclHeredocTest : HclTreeTest {
 
     @Test
     fun heredocInsideBlock() = assertParsePrintAndProcess(
-        parser, """
+        """
             resource {
               user_data = <<EOF
                 hello
@@ -56,7 +54,7 @@ class HclHeredocTest : HclTreeTest {
 
     @Test
     fun heredocTemplateExpression() = assertParsePrintAndProcess(
-        parser, """
+        """
             a = <<EOF
               ${'$'}{b}
             EOF

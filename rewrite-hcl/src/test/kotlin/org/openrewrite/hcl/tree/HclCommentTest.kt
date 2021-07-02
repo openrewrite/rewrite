@@ -16,14 +16,12 @@
 package org.openrewrite.hcl.tree
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.hcl.HclParser
 
 class HclCommentTest : HclTreeTest {
-    private val parser = HclParser()
 
     @Test
     fun comment() = assertParsePrintAndProcess(
-        parser, """
+        """
             # test
             /*
              multiline
