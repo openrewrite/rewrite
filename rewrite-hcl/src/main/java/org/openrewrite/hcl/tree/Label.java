@@ -16,5 +16,4 @@
 package org.openrewrite.hcl.tree;
 
 public interface Label extends Hcl {
-    Label withPrefix(Space prefix);
 }

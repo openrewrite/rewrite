@@ -276,6 +276,7 @@ public class Space {
         CONDITIONAL_FALSE_PREFIX,
         CONFIG_FILE,
         EMPTY,
+        EXPRESSION_PREFIX,
         FOR_CONDITION,
         FOR_INTRO,
         FOR_OBJECT,

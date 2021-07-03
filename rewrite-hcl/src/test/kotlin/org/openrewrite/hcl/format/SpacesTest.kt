@@ -33,8 +33,8 @@ class SpacesTest : HclRecipeTest {
     fun columnarAlignment() = assertChanged(
         before = """
             resource "aws_ebs_volume" {
-              size = 1
-              encrypted = true
+              size =1
+              encrypted =true
             }
         """,
         after = """

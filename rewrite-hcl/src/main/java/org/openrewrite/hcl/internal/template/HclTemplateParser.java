@@ -19,10 +19,12 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.hcl.HclParser;
 import org.openrewrite.hcl.RandomizeIdVisitor;
 import org.openrewrite.hcl.tree.BodyContent;
+import org.openrewrite.hcl.tree.Expression;
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +38,9 @@ public class HclTemplateParser {
     private final Object templateCacheLock = new Object();
     private final HclParser parser = HclParser.builder().build();
 
+    private static final String BODY_STUB = "#{}";
+    private static final String EXPRESSION_STUB = "a=#{}";
+
     private static final Map<String, List<? extends Hcl>> templateCache = new LinkedHashMap<String, List<? extends Hcl>>() {
         @Override
         protected boolean removeEldestEntry(Map.Entry eldest) {
@@ -47,12 +52,21 @@ public class HclTemplateParser {
     private final Consumer<String> onBeforeParseTemplate;
 
     public List<BodyContent> parseBodyContent(String template) {
-        String stub = substitute("#{}", template);
+        String stub = substitute(BODY_STUB, template);
         onBeforeParseTemplate.accept(stub);
         return cache(stub, () -> {
             Hcl.ConfigFile cf = compileTemplate(stub);
             return cf.getBody();
         });
+    }
+
+    public Expression parseExpression(String template) {
+        String stub = substitute(EXPRESSION_STUB, template);
+        onBeforeParseTemplate.accept(stub);
+        return (Expression) cache(stub, () -> {
+            Hcl.ConfigFile cf = compileTemplate(stub);
+            return Collections.singletonList(((Hcl.Attribute) cf.getBody().get(0)).getValue());
+        }).get(0);
     }
 
     private Hcl.ConfigFile compileTemplate(String stub) {

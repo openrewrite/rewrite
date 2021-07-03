@@ -15,11 +15,13 @@
  */
 package org.openrewrite.hcl.format;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.hcl.HclIsoVisitor;
 import org.openrewrite.hcl.style.SpacesStyle;
-import org.openrewrite.hcl.tree.*;
-import org.openrewrite.internal.StringUtils;
+import org.openrewrite.hcl.tree.Expression;
+import org.openrewrite.hcl.tree.Hcl;
+import org.openrewrite.hcl.tree.Space;
 import org.openrewrite.internal.lang.Nullable;
 
 public class SpacesVisitor<P> extends HclIsoVisitor<P> {
@@ -46,12 +48,22 @@ public class SpacesVisitor<P> extends HclIsoVisitor<P> {
     }
 
     @Override
-    public Hcl.Block visitBlock(Hcl.Block block, P p) {
-        return super.visitBlock(block.withOpen(block.getOpen().withWhitespace(" ")), p);
+    public Expression visitExpression(Expression expression, P p) {
+        Expression e = super.visitExpression(expression, p);
+
+        Hcl parent = getCursor().getParentOrThrow().getValue();
+        if(parent instanceof Hcl.Attribute && ((Hcl.Attribute) parent).getValue() == expression) {
+            if(e.getPrefix().getWhitespace().isEmpty()) {
+                e = e.withPrefix(e.getPrefix().withWhitespace(" "));
+            }
+        }
+
+        return e;
     }
 
-    private int endColumn(Hcl.Attribute attribute) {
-        return (attribute.getPrefix().getIndent() + attribute.getName().print()).length();
+    @Override
+    public Hcl.Block visitBlock(Hcl.Block block, P p) {
+        return super.visitBlock(block.withOpen(block.getOpen().withWhitespace(" ")), p);
     }
 
     @Nullable

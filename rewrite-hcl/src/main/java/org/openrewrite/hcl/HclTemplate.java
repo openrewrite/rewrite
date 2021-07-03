@@ -21,10 +21,7 @@ import org.openrewrite.hcl.format.AttributeSpaceVisitor;
 import org.openrewrite.hcl.internal.template.HclTemplateParser;
 import org.openrewrite.hcl.internal.template.Substitutions;
 import org.openrewrite.hcl.style.SpacesStyle;
-import org.openrewrite.hcl.tree.BodyContent;
-import org.openrewrite.hcl.tree.Hcl;
-import org.openrewrite.hcl.tree.HclCoordinates;
-import org.openrewrite.hcl.tree.Space;
+import org.openrewrite.hcl.tree.*;
 import org.openrewrite.hcl.tree.Space.Location;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -104,8 +101,26 @@ public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
                                 .orElse(SpacesStyle.DEFAULT)).visit(b, p, getCursor().getParentOrThrow());
                         assert b != null;
                     }
+                } else if(loc.equals(Location.BLOCK)) {
+                    if (b.isScope(insertionPoint)) {
+                        b = (Hcl.Block) autoFormat(templateParser.parseBodyContent(substitutedTemplate).get(0), p,
+                                getCursor().getParentOrThrow());
+                    }
                 }
                 return b;
+            }
+
+            @Override
+            public Hcl visitExpression(Expression expression, Integer p) {
+                Hcl e = super.visitExpression(expression, p);
+
+                if (loc.equals(Location.EXPRESSION_PREFIX)) {
+                    if (e.isScope(insertionPoint)) {
+                        e = templateParser.parseExpression(substitutedTemplate).withPrefix(expression.getPrefix());
+                    }
+                }
+
+                return e;
             }
         }.visit(changing, 0, parentCursor);
 

@@ -41,17 +41,17 @@ public class JavaTemplateParser {
         }
     };
 
-    public static final String PACKAGE_STUB = "package #{}; class $Template {}";
-    public static final String PARAMETER_STUB = "abstract class $Template { abstract void $template(#{}); }";
-    public static final String LAMBDA_PARAMETER_STUB = "class $Template { { Object o = (#{}) -> {}; } }";
-    public static final String EXPRESSION_STUB = "class $Template { { Object o = #{} } }";
-    public static final String EXTENDS_STUB = "class $Template extends #{} {}";
-    public static final String IMPLEMENTS_STUB = "class $Template implements #{} {}";
-    public static final String THROWS_STUB = "abstract class $Template { abstract void $template() throws #{}; }";
-    public static final String TYPE_PARAMS_STUB = "class $Template<#{}> {}";
+    private static final String PACKAGE_STUB = "package #{}; class $Template {}";
+    private static final String PARAMETER_STUB = "abstract class $Template { abstract void $template(#{}); }";
+    private static final String LAMBDA_PARAMETER_STUB = "class $Template { { Object o = (#{}) -> {}; } }";
+    private static final String EXPRESSION_STUB = "class $Template { { Object o = #{} } }";
+    private static final String EXTENDS_STUB = "class $Template extends #{} {}";
+    private static final String IMPLEMENTS_STUB = "class $Template implements #{} {}";
+    private static final String THROWS_STUB = "abstract class $Template { abstract void $template() throws #{}; }";
+    private static final String TYPE_PARAMS_STUB = "class $Template<#{}> {}";
 
     @Language("java")
-    public static final String SUBSTITUTED_ANNOTATION = "@java.lang.annotation.Documented public @interface SubAnnotation { int value(); }";
+    private static final String SUBSTITUTED_ANNOTATION = "@java.lang.annotation.Documented public @interface SubAnnotation { int value(); }";
 
     private final Supplier<JavaParser> parser;
     private final Consumer<String> onAfterVariableSubstitution;

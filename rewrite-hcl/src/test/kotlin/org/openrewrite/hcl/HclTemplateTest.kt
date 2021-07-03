@@ -17,17 +17,15 @@ package org.openrewrite.hcl
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
+import org.openrewrite.hcl.tree.Expression
 import org.openrewrite.hcl.tree.Hcl
-import org.openrewrite.java.JavaTemplateTest
 
 class HclTemplateTest : HclRecipeTest {
 
     @Test
     fun lastBodyContentInBlock() = assertChanged(
         recipe = object : HclVisitor<ExecutionContext>() {
-            val t = HclTemplate.builder({ cursor }, "encrypted = true")
-                .doBeforeParseTemplate(JavaTemplateTest.print)
-                .build()
+            val t = HclTemplate.builder({ cursor }, "encrypted = true").build()
 
             override fun visitBlock(block: Hcl.Block, p: ExecutionContext): Hcl {
                 if (block.body.size == 1) {
@@ -46,6 +44,56 @@ class HclTemplateTest : HclRecipeTest {
               size      = 1
               encrypted = true
             }
+        """
+    )
+
+    @Test
+    fun replaceBlock() = assertChanged(
+        recipe = object : HclVisitor<ExecutionContext>() {
+            val t = HclTemplate.builder(
+                { cursor }, """
+                resource "azure_storage_volume" {
+                  size = 1
+                }
+            """.trimIndent()
+            ).build()
+
+            override fun visitBlock(block: Hcl.Block, p: ExecutionContext): Hcl {
+                if ((block.labels[0] as Hcl.Literal).valueSource.contains("aws")) {
+                    return block.withTemplate(t, block.coordinates.replace())
+                }
+                return super.visitBlock(block, p)
+            }
+        }.toRecipe(),
+        before = """
+            resource "aws_ebs_volume" {
+              size = 1
+            }
+        """,
+        after = """
+            resource "azure_storage_volume" {
+              size = 1
+            }
+        """
+    )
+
+    @Test
+    fun replaceExpression() = assertChanged(
+        recipe = object : HclVisitor<ExecutionContext>() {
+            val t = HclTemplate.builder({ cursor }, "\"jonathan\"").build()
+
+            override fun visitExpression(expression: Expression, p: ExecutionContext): Hcl {
+                if (expression is Hcl.QuotedTemplate && expression.print().contains("you")) {
+                    return expression.withTemplate(t, expression.coordinates.replace())
+                }
+                return super.visitExpression(expression, p)
+            }
+        }.toRecipe(),
+        before = """
+            hello = "you"
+        """,
+        after = """
+            hello = "jonathan"
         """
     )
 }

@@ -34,13 +34,27 @@ public abstract class CoordinateBuilder {
         return new HclCoordinates(tree, location, HclCoordinates.Mode.REPLACEMENT, null);
     }
 
-    public static class Block extends CoordinateBuilder {
+    public static class Expression extends CoordinateBuilder {
+        Expression(org.openrewrite.hcl.tree.Expression tree) {
+            super(tree);
+        }
+
+        public HclCoordinates replace() {
+            return replace(Space.Location.EXPRESSION_PREFIX);
+        }
+    }
+
+    public static class Block extends Expression {
         Block(Hcl.Block tree) {
             super(tree);
         }
 
         public HclCoordinates last() {
             return before(Space.Location.BLOCK_CLOSE);
+        }
+
+        public HclCoordinates replace() {
+            return replace(Space.Location.BLOCK);
         }
     }
 }

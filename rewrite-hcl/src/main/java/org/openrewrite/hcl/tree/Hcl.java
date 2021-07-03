@@ -1098,11 +1098,9 @@ public interface Hcl extends Serializable, Tree {
         Markers markers;
 
         @With
-        @Nullable
         Object value;
 
         @With
-        @Nullable
         String valueSource;
 
         @Override

@@ -16,5 +16,7 @@
 package org.openrewrite.hcl.tree;
 
 public interface Expression extends Hcl {
-    Expression withPrefix(Space prefix);
+    default CoordinateBuilder.Expression getCoordinates() {
+        return new CoordinateBuilder.Expression(this);
+    }
 }
