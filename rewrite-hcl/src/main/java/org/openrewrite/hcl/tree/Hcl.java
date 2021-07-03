@@ -16,11 +16,15 @@
 package org.openrewrite.hcl.tree;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
-import org.openrewrite.*;
+import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.TreePrinter;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.internal.HclPrinter;
 import org.openrewrite.internal.lang.Nullable;
@@ -107,6 +111,15 @@ public interface Hcl extends Serializable, Tree {
         @With
         @Getter
         Expression name;
+
+        @JsonIgnore
+        public String getSimpleName() {
+            return getSimpleName(name);
+        }
+
+        private String getSimpleName(Expression e) {
+            return e instanceof Parentheses ? getSimpleName(((Parentheses) e).getExpression()) : ((Identifier) e).getName();
+        }
 
         HclLeftPadded<Type> type;
 
