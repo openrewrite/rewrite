@@ -22,6 +22,8 @@ import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.tree.*;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markers;
 
 import java.util.List;
 
@@ -101,6 +103,25 @@ public class HclPrinter<P> extends HclVisitor<P> {
         acc.append(after == null ? "" : after);
     }
 
+    @Override
+    public <M extends Marker> M visitMarker(Marker marker, P p) {
+        StringBuilder acc = getPrinter();
+        treePrinter.doBefore(marker, acc, p);
+        acc.append(marker.print(treePrinter, p));
+        treePrinter.doAfter(marker, acc, p);
+        //noinspection unchecked
+        return (M) marker;
+    }
+
+    @Override
+    public Markers visitMarkers(Markers markers, P p) {
+        StringBuilder acc = getPrinter();
+        treePrinter.doBefore(markers, acc, p);
+        Markers m = super.visitMarkers(markers, p);
+        treePrinter.doAfter(markers, acc, p);
+        return m;
+    }
+
     public String print(Hcl hcl, P p) {
         setCursor(new Cursor(null, "EPSILON"));
         visit(hcl, p);
@@ -134,6 +155,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitAttribute(Hcl.Attribute attribute, P p) {
         visitSpace(attribute.getPrefix(), Space.Location.ATTRIBUTE, p);
+        visitMarkers(attribute.getMarkers(), p);
         visit(attribute.getName(), p);
         StringBuilder acc = getPrinter();
         visitSpace(attribute.getPadding().getType().getBefore(), Space.Location.ATTRIBUTE_ASSIGNMENT, p);
@@ -145,6 +167,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitAttributeAccess(Hcl.AttributeAccess attributeAccess, P p) {
         visitSpace(attributeAccess.getPrefix(), Space.Location.ATTRIBUTE_ACCESS, p);
+        visitMarkers(attributeAccess.getMarkers(), p);
         visit(attributeAccess.getAttribute(), p);
         visitLeftPadded(".", attributeAccess.getPadding().getName(), HclLeftPadded.Location.ATTRIBUTE_ACCESS_NAME, p);
         return attributeAccess;
@@ -153,6 +176,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitBinary(Hcl.Binary binary, P p) {
         visitSpace(binary.getPrefix(), Space.Location.BINARY, p);
+        visitMarkers(binary.getMarkers(), p);
         visit(binary.getLeft(), p);
         StringBuilder acc = getPrinter();
         visitSpace(binary.getPadding().getOperator().getBefore(), Space.Location.BINARY_OPERATOR, p);
@@ -204,6 +228,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitBlock(Hcl.Block block, P p) {
         visitSpace(block.getPrefix(), Space.Location.BLOCK, p);
+        visitMarkers(block.getMarkers(), p);
         visit(block.getType(), p);
         visit(block.getLabels(), p);
         StringBuilder acc = getPrinter();
@@ -218,6 +243,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitConditional(Hcl.Conditional conditional, P p) {
         visitSpace(conditional.getPrefix(), Space.Location.CONDITIONAL, p);
+        visitMarkers(conditional.getMarkers(), p);
         visit(conditional.getCondition(), p);
         visitLeftPadded("?", conditional.getPadding().getTruePart(), HclLeftPadded.Location.CONDITIONAL_TRUE, p);
         visitLeftPadded(":", conditional.getPadding().getFalsePart(), HclLeftPadded.Location.CONDITIONAL_FALSE, p);
@@ -227,6 +253,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitConfigFile(Hcl.ConfigFile configFile, P p) {
         visitSpace(configFile.getPrefix(), Space.Location.CONFIG_FILE, p);
+        visitMarkers(configFile.getMarkers(), p);
         visit(configFile.getBody(), p);
         return configFile;
     }
@@ -234,6 +261,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitForIntro(Hcl.ForIntro forIntro, P p) {
         visitSpace(forIntro.getPrefix(), Space.Location.FOR_INTRO, p);
+        visitMarkers(forIntro.getMarkers(), p);
         visitContainer("for", forIntro.getPadding().getVariables(), HclContainer.Location.FOR_VARIABLES,
                 ",", "in", p);
         visit(forIntro.getIn(), p);
@@ -243,6 +271,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitForObject(Hcl.ForObject forObject, P p) {
         visitSpace(forObject.getPrefix(), Space.Location.FOR_OBJECT, p);
+        visitMarkers(forObject.getMarkers(), p);
         StringBuilder acc = getPrinter();
         acc.append("{");
         visit(forObject.getIntro(), p);
@@ -263,6 +292,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitForTuple(Hcl.ForTuple forTuple, P p) {
         visitSpace(forTuple.getPrefix(), Space.Location.FOR_TUPLE, p);
+        visitMarkers(forTuple.getMarkers(), p);
         StringBuilder acc = getPrinter();
         acc.append("[");
         visit(forTuple.getIntro(), p);
@@ -278,6 +308,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitFunctionCall(Hcl.FunctionCall functionCall, P p) {
         visitSpace(functionCall.getPrefix(), Space.Location.FUNCTION_CALL, p);
+        visitMarkers(functionCall.getMarkers(), p);
         visit(functionCall.getName(), p);
         visitContainer("(", functionCall.getPadding().getArguments(), HclContainer.Location.FUNCTION_CALL_ARGUMENTS,
                 ",", ")", p);
@@ -287,6 +318,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitHeredocTemplate(Hcl.HeredocTemplate heredocTemplate, P p) {
         visitSpace(heredocTemplate.getPrefix(), Space.Location.HEREDOC, p);
+        visitMarkers(heredocTemplate.getMarkers(), p);
         StringBuilder acc = getPrinter();
         acc.append(heredocTemplate.getArrow());
         visit(heredocTemplate.getDelimiter(), p);
@@ -299,6 +331,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitIdentifier(Hcl.Identifier identifier, P p) {
         visitSpace(identifier.getPrefix(), Space.Location.IDENTIFIER, p);
+        visitMarkers(identifier.getMarkers(), p);
         StringBuilder acc = getPrinter();
         acc.append(identifier.getName());
         return identifier;
@@ -307,6 +340,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitIndex(Hcl.Index index, P p) {
         visitSpace(index.getPrefix(), Space.Location.INDEX, p);
+        visitMarkers(index.getMarkers(), p);
         visit(index.getIndexed(), p);
         visit(index.getPosition(), p);
         return index;
@@ -315,6 +349,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitIndexPosition(Hcl.Index.Position indexPosition, P p) {
         visitSpace(indexPosition.getPrefix(), Space.Location.INDEX_POSITION, p);
+        visitMarkers(indexPosition.getMarkers(), p);
         StringBuilder acc = getPrinter();
         acc.append("[");
         visitMarkers(indexPosition.getMarkers(), p);
@@ -326,6 +361,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitLiteral(Hcl.Literal literal, P p) {
         visitSpace(literal.getPrefix(), Space.Location.LITERAL, p);
+        visitMarkers(literal.getMarkers(), p);
         StringBuilder acc = getPrinter();
         acc.append(literal.getValueSource());
         return literal;
@@ -334,6 +370,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitObjectValue(Hcl.ObjectValue objectValue, P p) {
         visitSpace(objectValue.getPrefix(), Space.Location.OBJECT_VALUE, p);
+        visitMarkers(objectValue.getMarkers(), p);
         visitContainer("{", objectValue.getPadding().getAttributes(), HclContainer.Location.OBJECT_VALUE_ATTRIBUTES,
                 ",", "}", p);
         return objectValue;
@@ -342,6 +379,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitParentheses(Hcl.Parentheses parentheses, P p) {
         visitSpace(parentheses.getPrefix(), Space.Location.PARENTHETICAL_EXPRESSION, p);
+        visitMarkers(parentheses.getMarkers(), p);
         StringBuilder acc = getPrinter();
         acc.append('(');
         visitRightPadded(parentheses.getPadding().getExpression(), HclRightPadded.Location.PARENTHESES, p);
@@ -352,6 +390,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitQuotedTemplate(Hcl.QuotedTemplate template, P p) {
         visitSpace(template.getPrefix(), Space.Location.QUOTED_TEMPLATE, p);
+        visitMarkers(template.getMarkers(), p);
         StringBuilder acc = getPrinter();
         acc.append('"');
         visit(template.getExpressions(), p);
@@ -362,6 +401,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitTemplateInterpolation(Hcl.TemplateInterpolation template, P p) {
         visitSpace(template.getPrefix(), Space.Location.TEMPLATE_INTERPOLATION, p);
+        visitMarkers(template.getMarkers(), p);
         StringBuilder acc = getPrinter();
         acc.append("${");
         visit(template.getExpression(), p);
@@ -372,6 +412,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitSplat(Hcl.Splat splat, P p) {
         visitSpace(splat.getPrefix(), Space.Location.ATTRIBUTE_ACCESS, p);
+        visitMarkers(splat.getMarkers(), p);
         visit(splat.getSelect(), p);
         visit(splat.getOperator(), p);
         return splat;
@@ -380,6 +421,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitSplatOperator(Hcl.Splat.Operator splatOperator, P p) {
         visitSpace(splatOperator.getPrefix(), Space.Location.SPLAT_OPERATOR, p);
+        visitMarkers(splatOperator.getMarkers(), p);
         StringBuilder acc = getPrinter();
         if (splatOperator.getType().equals(Hcl.Splat.Operator.Type.Full)) {
             acc.append('[');
@@ -398,6 +440,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitTuple(Hcl.Tuple tuple, P p) {
         visitSpace(tuple.getPrefix(), Space.Location.FUNCTION_CALL, p);
+        visitMarkers(tuple.getMarkers(), p);
         visitContainer("[", tuple.getPadding().getValues(), HclContainer.Location.TUPLE_VALUES,
                 ",", "]", p);
         return tuple;
@@ -406,6 +449,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitUnary(Hcl.Unary unary, P p) {
         visitSpace(unary.getPrefix(), Space.Location.UNARY, p);
+        visitMarkers(unary.getMarkers(), p);
         StringBuilder acc = getPrinter();
         switch(unary.getOperator()) {
             case Negative:
@@ -422,6 +466,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     @Override
     public Hcl visitVariableExpression(Hcl.VariableExpression variableExpression, P p) {
         visitSpace(variableExpression.getPrefix(), Space.Location.VARIABLE_EXPRESSION, p);
+        visitMarkers(variableExpression.getMarkers(), p);
         visit(variableExpression.getName(), p);
         return variableExpression;
     }
