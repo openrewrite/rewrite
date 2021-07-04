@@ -49,8 +49,8 @@ public class HclParser implements Parser<Hcl.ConfigFile> {
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
                     Timer.Builder timer = Timer.builder("rewrite.parse")
-                            .description("The time spent parsing an XML file")
-                            .tag("file.type", "XML");
+                            .description("The time spent parsing an HCL file")
+                            .tag("file.type", "HCL");
                     Timer.Sample sample = Timer.start();
                     try {
                         HCLLexer lexer = new HCLLexer(CharStreams.fromStream(sourceFile.getSource()));
