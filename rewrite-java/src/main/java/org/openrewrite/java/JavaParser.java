@@ -97,7 +97,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
             }
         } catch (Exception e) {
             throw new IllegalStateException("Unable to create a Java parser instance. " +
-                    "`rewrite-java-8` or `rewrite-java-11` must be on the classpath.");
+                    "`rewrite-java-8` or `rewrite-java-11` must be on the classpath.", e);
         }
 
         return javaParser;
