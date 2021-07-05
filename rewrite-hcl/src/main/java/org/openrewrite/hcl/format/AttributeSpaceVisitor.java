@@ -41,7 +41,7 @@ public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
     public Hcl.Attribute visitAttribute(Hcl.Attribute attribute, P p) {
         Hcl.Attribute a = super.visitAttribute(attribute, p);
 
-        Hcl parent = getCursor().getParentOrThrow().getValue();
+        Hcl parent = getCursor().dropParentUntil(t -> t instanceof Hcl).getValue();
         if (parent instanceof Hcl.Block) {
             Hcl.Block block = (Hcl.Block) parent;
 
