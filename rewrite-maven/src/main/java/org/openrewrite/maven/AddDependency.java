@@ -98,6 +98,13 @@ public class AddDependency extends Recipe {
     @With
     private String type;
 
+    @Option(displayName = "Optional",
+            description = "Set the value of the `<optional>` tag. No `<optional>` tag will be added when this is `null`.",
+            example = "true",
+            required = false)
+    @Nullable
+    private Boolean optional;
+
     /**
      * A glob expression used to identify other dependencies in the same family as the dependency to be added.
      */
@@ -164,6 +171,7 @@ public class AddDependency extends Recipe {
                 classifier,
                 scope,
                 type,
+                optional,
                 familyPattern == null ? null : Pattern.compile(familyPattern.replace("*", ".*"))
         );
     }

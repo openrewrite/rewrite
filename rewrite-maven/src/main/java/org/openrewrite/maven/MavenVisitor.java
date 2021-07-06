@@ -161,7 +161,7 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
     }
 
     public void maybeAddDependency(String groupId, String artifactId, String version,
-                                   @Nullable String classifier, @Nullable String scope, @Nullable String type) {
+                                   @Nullable String classifier, @Nullable String scope, @Nullable String type, @Nullable Boolean optional) {
         AddDependencyVisitor op = new AddDependencyVisitor(
                 groupId,
                 artifactId,
@@ -171,6 +171,7 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
                 classifier,
                 scope,
                 type,
+                optional,
                 null);
 
         if (!getAfterVisit().contains(op)) {

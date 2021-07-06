@@ -79,6 +79,9 @@ public class AddDependencyVisitor extends MavenVisitor {
     private final String type;
 
     @Nullable
+    private final Boolean optional;
+
+    @Nullable
     private final Pattern familyPattern;
 
     @Nullable
@@ -125,7 +128,7 @@ public class AddDependencyVisitor extends MavenVisitor {
                         Scope.fromName(scope),
                         classifier,
                         type,
-                        false,
+                        optional != null && optional,
                         new Pom(randomId(), groupId, artifactId, dependencyVersion, null, null, null, packaging, classifier, null,
                                 emptyList(), new Pom.DependencyManagement(emptyList()), emptyList(), emptyList(), emptyMap(), emptyMap()),
                         dependencyVersion,
@@ -155,7 +158,6 @@ public class AddDependencyVisitor extends MavenVisitor {
                         versionToUse = findVersionToUse(groupId, artifactId, ctx);
                     }
                 }
-
                 Xml.Tag dependencyTag = Xml.Tag.build(
                         "\n<dependency>\n" +
                                 "<groupId>" + groupId + "</groupId>\n" +
@@ -166,6 +168,8 @@ public class AddDependencyVisitor extends MavenVisitor {
                                         "<classifier>" + classifier + "</classifier>\n") +
                                 (scope == null ? "" :
                                         "<scope>" + scope + "</scope>\n") +
+                                (optional == null ? "" :
+                                        "<optional>" + optional + "</optional>\n") +
                                 "</dependency>"
                 );
 

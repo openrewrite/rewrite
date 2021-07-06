@@ -56,6 +56,7 @@ class AddDependencyTest : MavenRecipeTest {
             null,
             null,
             null,
+            null,
             listOf("com.google.common.math.IntMath")
         )
         val javaSource = jp.parse(
@@ -112,6 +113,7 @@ class AddDependencyTest : MavenRecipeTest {
             "29.0-jre",
             null,
             true,
+            null,
             null,
             null,
             null,
@@ -175,6 +177,7 @@ class AddDependencyTest : MavenRecipeTest {
             "29.0-jre",
             null,
             true,
+            null,
             null,
             null,
             null,
@@ -250,6 +253,7 @@ class AddDependencyTest : MavenRecipeTest {
             true,
             null,
             "test",
+            null,
             null,
             null,
             null
@@ -525,6 +529,53 @@ class AddDependencyTest : MavenRecipeTest {
                   <groupId>com.fasterxml.jackson.module</groupId>
                   <artifactId>jackson-module-afterburner</artifactId>
                   <version>${'$'}{jackson.version}</version>
+                </dependency>
+              </dependencies>
+            </project>
+        """
+    )
+
+    @Test
+    fun addOptionalDependency() = assertChanged(
+        recipe = AddDependency(
+                "com.google.guava",
+                "guava",
+                "29.0-jre",
+                null,
+                true,
+                null,
+                null,
+                null,
+                true,
+                null,
+                null
+        ),
+        before = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+
+              <dependencies>
+              </dependencies>
+            </project>
+        """,
+        after = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>29.0-jre</version>
+                  <optional>true</optional>
                 </dependency>
               </dependencies>
             </project>
