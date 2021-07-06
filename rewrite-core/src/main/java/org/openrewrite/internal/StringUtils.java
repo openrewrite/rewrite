@@ -22,6 +22,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
@@ -32,6 +33,8 @@ import static java.util.stream.Collectors.counting;
 import static java.util.stream.Collectors.groupingBy;
 
 public class StringUtils {
+    private final static FileSystem FS = FileSystems.getDefault();
+
     private StringUtils() {
     }
 
@@ -369,4 +372,26 @@ public class StringUtils {
         System.arraycopy(multiple, 0, multiple, copied, limit - copied);
         return new String(multiple);
     }
+
+    private static boolean matchesGlob(@Nullable String value, @Nullable String globPattern) {
+        if ("*".equals(globPattern)) {
+            return true;
+        }
+        PathMatcher pm = FS.getPathMatcher("glob:" + globPattern);
+        Path path;
+        if (value != null && value.contains("/")) {
+            String[] parts = value.split("/");
+            if (parts.length > 1) {
+                path = Paths.get(parts[0], Arrays.copyOfRange(parts, 1, parts.length - 1));
+            } else {
+                path = Paths.get(parts[0]);
+            }
+        } else if (value == null) {
+            path = Paths.get("");
+        } else {
+            path = Paths.get(value);
+        }
+        return pm.matches(path);
+    }
+
 }
