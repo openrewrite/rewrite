@@ -333,10 +333,13 @@ public class Autodetect extends NamedStyles {
                             }
                         }
 
-                        importLayoutStatistics.minimumFoldedStaticImports = Math.min(
-                                importLayoutStatistics.minimumFoldedStaticImports,
-                                count
-                        );
+                        if (importLayoutStatistics.minimumFoldedStaticImports == Integer.MAX_VALUE ||
+                                count > importLayoutStatistics.minimumFoldedStaticImports) {
+                            importLayoutStatistics.minimumFoldedStaticImports = Math.min(
+                                    importLayoutStatistics.minimumFoldedStaticImports,
+                                    count
+                            );
+                        }
                     } else {
                         Set<String> fqns = new HashSet<>();
                         for (JavaType type : cu.getTypesInUse()) {
@@ -350,10 +353,13 @@ public class Autodetect extends NamedStyles {
                             }
                         }
 
-                        importLayoutStatistics.minimumFoldedImports = Math.min(
-                                importLayoutStatistics.minimumFoldedImports,
-                                fqns.size()
-                        );
+                        if (importLayoutStatistics.minimumFoldedImports == Integer.MAX_VALUE ||
+                                fqns.size() > importLayoutStatistics.minimumFoldedImports) {
+                            importLayoutStatistics.minimumFoldedImports = Math.min(
+                                    importLayoutStatistics.minimumFoldedImports,
+                                    fqns.size()
+                            );
+                        }
                     }
                 }
 
