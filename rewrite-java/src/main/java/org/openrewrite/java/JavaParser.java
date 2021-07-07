@@ -193,6 +193,13 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
             return (B) this;
         }
 
+        public B dependsOn(String... inputsAsStrings) {
+            this.dependsOn = Arrays.stream(inputsAsStrings)
+                    .map(Input::fromString)
+                    .collect(toList());
+            return (B) this;
+        }
+
         public B classpath(Collection<Path> classpath) {
             this.classpath = classpath;
             return (B) this;
