@@ -98,6 +98,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class EmptyBlockTck : EmptyBlockTest
 
     @Nested
+    inner class EmptyForInitializerTck : EmptyForInitializerPadTest
+
+    @Nested
     inner class EqualsAvoidsNullTck : EqualsAvoidsNullTest
 
     @Nested
