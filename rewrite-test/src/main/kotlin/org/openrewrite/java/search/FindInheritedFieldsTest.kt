@@ -36,6 +36,9 @@ interface FindInheritedFieldsTest {
         assertThat(FindInheritedFields.find(b.classes[0], "java.util.List").firstOrNull()?.name)
             .isEqualTo("list")
 
+        assertThat(FindInheritedFields.find(b.classes[0], "java.util.Collection").firstOrNull()?.name)
+            .isEqualTo("list")
+
         // the Set field is not considered to be inherited because it is private
         assertThat(FindInheritedFields.find(b.classes[0], "java.util.Set")).isEmpty()
     }

@@ -123,11 +123,8 @@ public class TypeUtils {
         if (type instanceof JavaType.Array) {
             return hasElementType(((JavaType.Array) type).getElemType(), fullyQualifiedName);
         }
-        if (type instanceof JavaType.Class) {
-            return ((JavaType.Class) type).getFullyQualifiedName().equals(fullyQualifiedName);
-        }
-        if (type instanceof JavaType.GenericTypeVariable) {
-            return ((JavaType.GenericTypeVariable) type).getFullyQualifiedName().equals(fullyQualifiedName);
+        if (type instanceof JavaType.Class || type instanceof JavaType.GenericTypeVariable) {
+            return isAssignableTo(JavaType.Class.build(fullyQualifiedName), type);
         }
         return false;
     }
