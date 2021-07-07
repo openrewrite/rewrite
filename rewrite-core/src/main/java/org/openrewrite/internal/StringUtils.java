@@ -25,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
@@ -373,18 +374,32 @@ public class StringUtils {
         return new String(multiple);
     }
 
-    private static boolean matchesGlob(@Nullable String value, @Nullable String globPattern) {
+    public static boolean matchesGlob(@Nullable String value, @Nullable String globPattern) {
         if ("*".equals(globPattern)) {
             return true;
+        }
+        Function<String, String> normalizeSlashesFn = s -> {
+            if (s.startsWith("//")) {
+                return s.substring(2);
+            } else if (s.startsWith("/")) {
+                return s.substring(1);
+            } else
+                return s;
+        };
+        if (null != value) {
+            value = normalizeSlashesFn.apply(value);
+        }
+        if (null != globPattern) {
+            globPattern = normalizeSlashesFn.apply(globPattern);
         }
         PathMatcher pm = FS.getPathMatcher("glob:" + globPattern);
         Path path;
         if (value != null && value.contains("/")) {
             String[] parts = value.split("/");
-            if (parts.length > 1) {
-                path = Paths.get(parts[0], Arrays.copyOfRange(parts, 1, parts.length - 1));
+            if (parts.length > 0 && StringUtils.isBlank(parts[0])) {
+                path = Paths.get("", Arrays.copyOfRange(parts, 1, parts.length - 1));
             } else {
-                path = Paths.get(parts[0]);
+                path = Paths.get("", parts);
             }
         } else if (value == null) {
             path = Paths.get("");
