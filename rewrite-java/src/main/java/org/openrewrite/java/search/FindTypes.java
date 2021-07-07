@@ -61,13 +61,14 @@ public class FindTypes extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        JavaType.FullyQualified fullyQualifiedType = JavaType.Class.build(fullyQualifiedTypeName);
         return new JavaVisitor<ExecutionContext>() {
 
             @Override
             public <N extends NameTree> N visitTypeName(N name, ExecutionContext ctx) {
                 N n = super.visitTypeName(name, ctx);
                 JavaType.FullyQualified asFullyQualified = TypeUtils.asFullyQualified(n.getType());
-                if (asFullyQualified != null && asFullyQualified.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
+                if (asFullyQualified != null && fullyQualifiedType.isAssignableFrom(asFullyQualified) &&
                         getCursor().firstEnclosing(J.Import.class) == null) {
                     return n.withMarkers(n.getMarkers().addIfAbsent(new JavaSearchResult(FindTypes.this)));
                 }
@@ -78,7 +79,7 @@ public class FindTypes extends Recipe {
             public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
                 J.FieldAccess fa = (J.FieldAccess) super.visitFieldAccess(fieldAccess, ctx);
                 JavaType.FullyQualified asFullyQualified = TypeUtils.asFullyQualified(fa.getTarget().getType());
-                if (asFullyQualified != null && asFullyQualified.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
+                if (asFullyQualified != null && fullyQualifiedType.isAssignableFrom(asFullyQualified) &&
                         fa.getName().getSimpleName().equals("class")) {
                     return fa.withMarkers(fa.getMarkers().addIfAbsent(new JavaSearchResult(FindTypes.this)));
                 }
@@ -88,13 +89,14 @@ public class FindTypes extends Recipe {
     }
 
     public static Set<NameTree> find(J j, String fullyQualifiedClassName) {
-        JavaIsoVisitor<Set<NameTree>> findVisitor = new JavaIsoVisitor<Set<NameTree>>() {
+        JavaType.FullyQualified fullyQualifiedType = JavaType.Class.build(fullyQualifiedClassName);
 
+        JavaIsoVisitor<Set<NameTree>> findVisitor = new JavaIsoVisitor<Set<NameTree>>() {
             @Override
             public <N extends NameTree> N visitTypeName(N name, Set<NameTree> ns) {
                 N n = super.visitTypeName(name, ns);
                 JavaType.FullyQualified asFullyQualified = TypeUtils.asFullyQualified(n.getType());
-                if (asFullyQualified != null && asFullyQualified.getFullyQualifiedName().equals(fullyQualifiedClassName) &&
+                if (asFullyQualified != null && fullyQualifiedType.isAssignableFrom(asFullyQualified) &&
                         getCursor().firstEnclosing(J.Import.class) == null) {
                     ns.add(name);
                 }
@@ -104,8 +106,8 @@ public class FindTypes extends Recipe {
             @Override
             public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Set<NameTree> ns) {
                 J.FieldAccess fa = super.visitFieldAccess(fieldAccess, ns);
-                JavaType.FullyQualified targetClass = TypeUtils.asFullyQualified(fa.getTarget().getType());
-                if (targetClass != null && targetClass.getFullyQualifiedName().equals(fullyQualifiedClassName) &&
+                JavaType.FullyQualified asFullyQualified = TypeUtils.asFullyQualified(fa.getTarget().getType());
+                if (asFullyQualified != null && fullyQualifiedType.isAssignableFrom(asFullyQualified) &&
                         fa.getName().getSimpleName().equals("class")) {
                     ns.add(fieldAccess);
                 }

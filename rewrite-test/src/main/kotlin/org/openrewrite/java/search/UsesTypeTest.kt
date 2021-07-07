@@ -86,4 +86,23 @@ interface UsesTypeTest : JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    fun usesTypeFindsInheritedTypes(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = UsesType<ExecutionContext>("java.util.Collection")
+            .toRecipe(),
+        before = """
+            import java.util.List;
+            
+            class Test {
+            }
+        """,
+        after = """
+            /*~~>*/import java.util.List;
+            
+            class Test {
+            }
+        """
+    )
 }

@@ -244,6 +244,24 @@ interface FindTypesTest : JavaRecipeTest {
     )
 
     @Test
+    fun inheritedTypes(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = FindTypes("java.util.Collection"),
+        before = """
+            import java.util.List;
+            public class B {
+               List<String> l;
+            }
+        """,
+        after = """
+            import java.util.List;
+            public class B {
+               /*~~>*/List<String> l;
+            }
+        """
+    )
+
+    @Test
     fun typeCast(jp: JavaParser) = assertChanged(
         jp,
         before = """

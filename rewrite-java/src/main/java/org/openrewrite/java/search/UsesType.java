@@ -35,9 +35,12 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
     @SuppressWarnings("ConstantConditions")
     private static final Marker FOUND_TYPE = new JavaSearchResult(randomId(), null, null);
 
+    private final JavaType.FullyQualified fullyQualifiedType;
     private final List<String> fullyQualifiedTypeSegments;
 
     public UsesType(String fullyQualifiedType) {
+        this.fullyQualifiedType = JavaType.Class.build(fullyQualifiedType);
+
         Scanner scanner = new Scanner(fullyQualifiedType);
         scanner.useDelimiter("\\.");
         this.fullyQualifiedTypeSegments = new ArrayList<>();
@@ -82,6 +85,10 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
     private J.CompilationUnit maybeMark(J.CompilationUnit c, @Nullable JavaType.FullyQualified fq) {
         if (fq == null) {
             return c;
+        }
+
+        if(fullyQualifiedType.isAssignableFrom(fq)) {
+            return c.withMarkers(c.getMarkers().addIfAbsent(FOUND_TYPE));
         }
 
         Scanner scanner = new Scanner(fq.getFullyQualifiedName());
