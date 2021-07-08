@@ -17,7 +17,6 @@ package org.openrewrite.java.format
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
-import org.openrewrite.Tree
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
@@ -4716,5 +4715,67 @@ interface SpacesTest : JavaRecipeTest {
                 class Test<T extends Integer & Appendable> {
                 }
             """
+    )
+
+    @Test
+    fun noSpaceInitializerPadding(jp: JavaParser) = assertUnchanged(
+            jp,
+            before = """
+            public class A {
+                {
+                    for (; i < j; i++, j--) { }
+                }
+            }
+        """
+    )
+
+    @Test
+    fun addSpaceToEmptyInitializer(jp: JavaParser.Builder<*, *>) = assertChanged(
+        parser = jp.styles(
+                namedStyles(listOf(IntelliJ.spaces().run {
+                    withOther(other.run {
+                        withPadEmptyForInitializer(true)
+                    })
+                }))
+        ).build(),
+        before = """
+            public class A {
+                {
+                    for (; i < j; i++, j--) { }
+                }
+            }
+        """,
+        after = """
+            public class A {
+                {
+                    for ( ; i < j; i++, j--) { }
+                }
+            }
+        """
+    )
+
+    @Test
+    fun removeSpaceFromEmptyInitializer(jp: JavaParser.Builder<*, *>) = assertChanged(
+            parser = jp.styles(
+                    namedStyles(listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withPadEmptyForInitializer(false)
+                        })
+                    }))
+            ).build(),
+            before = """
+            public class A {
+                {
+                    for ( ; i < j; i++, j--) { }
+                }
+            }
+        """,
+            after = """
+            public class A {
+                {
+                    for (; i < j; i++, j--) { }
+                }
+            }
+        """
     )
 }

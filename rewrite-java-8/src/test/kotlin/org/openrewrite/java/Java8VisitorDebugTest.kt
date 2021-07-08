@@ -115,10 +115,6 @@ class Java8EmptyBlockTest : Java8Test, EmptyBlockTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java8EmptyForInitializerPadTest : Java8Test, EmptyForInitializerPadTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
 class Java8EqualsAvoidsNullTest : Java8Test, EqualsAvoidsNullTest
 
 @DebugOnly

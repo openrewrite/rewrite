@@ -17,6 +17,7 @@ package org.openrewrite.java.style;
 
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
@@ -148,6 +149,15 @@ public class SpacesStyle implements JavaStyle {
     public static class Other {
         Boolean beforeComma;
         Boolean afterComma;
+        /**
+         * Track whether empty for loop initializers should have a space or not.
+         * When true: for ( ; i < 10; i++)
+         * When false: for(; i < 10; i++)
+         * When null: This style has no effect.
+         *
+         */
+        @Nullable
+        Boolean padEmptyForInitializer;
         Boolean beforeForSemicolon;
         Boolean afterForSemicolon;
         Boolean afterTypeCast;

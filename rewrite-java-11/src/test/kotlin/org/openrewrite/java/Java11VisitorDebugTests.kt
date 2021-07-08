@@ -115,10 +115,6 @@ class Java11EmptyBlockTest : Java11Test, EmptyBlockTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11EmptyForInitializerPadTest : Java11Test, EmptyForInitializerPadTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
 class Java11EqualsAvoidsNullTest : Java11Test, EqualsAvoidsNullTest
 
 @DebugOnly
