@@ -21,6 +21,7 @@ description: Applies security best practices to Java code.
 tags:
   - security
 recipeList:
-  - org.openrewrite.java.security.ResultOfFileMkdirsIgnored
   - org.openrewrite.java.security.XmlParserXXEVulnerability
   - org.openrewrite.java.security.SecureTempFileCreation
+  - org.openrewrite.java.search.ResultOfMethodCallIgnored:
+      methodPattern: 'java.io.File mkdir*(..)'
