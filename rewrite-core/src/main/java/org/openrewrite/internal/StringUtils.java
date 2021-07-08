@@ -25,10 +25,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
+import static java.util.Arrays.copyOfRange;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.counting;
 import static java.util.stream.Collectors.groupingBy;
@@ -378,31 +378,26 @@ public class StringUtils {
         if ("*".equals(globPattern)) {
             return true;
         }
-        Function<String, String> normalizeSlashesFn = s -> {
-            if (s.startsWith("//")) {
-                return s.substring(2);
-            } else if (s.startsWith("/")) {
-                return s.substring(1);
-            } else
-                return s;
-        };
-        if (null != value) {
-            value = normalizeSlashesFn.apply(value);
+        if (null == globPattern) {
+            return false;
         }
-        if (null != globPattern) {
-            globPattern = normalizeSlashesFn.apply(globPattern);
+        if (null == value) {
+            value = "";
         }
         PathMatcher pm = FS.getPathMatcher("glob:" + globPattern);
-        Path path;
-        if (value != null && value.contains("/")) {
+        Path path = Paths.get("");
+        if (value.contains("/")) {
             String[] parts = value.split("/");
-            if (parts.length > 0 && StringUtils.isBlank(parts[0])) {
-                path = Paths.get("", Arrays.copyOfRange(parts, 1, parts.length - 1));
+            if (parts.length > 1) {
+                for (int i = 0, len = parts.length; i < len; i++) {
+                    path = Paths.get("", copyOfRange(parts, i, parts.length));
+                    if (!isBlank(parts[i])) {
+                        break;
+                    }
+                }
             } else {
-                path = Paths.get("", parts);
+                path = Paths.get(parts[0]);
             }
-        } else if (value == null) {
-            path = Paths.get("");
         } else {
             path = Paths.get(value);
         }

@@ -174,8 +174,8 @@ class StringUtilsTest {
     fun globMatching() {
         assertThat(matchesGlob("expression", "expr*")).isTrue()
         assertThat(matchesGlob("some/xpath", "some/*")).isTrue()
-        assertThat(matchesGlob("/some/xpath/expression", "/some/**")).isTrue()
-        assertThat(matchesGlob("//some/xpath/expression", "*/xpath/*")).isTrue()
+        assertThat(matchesGlob("some/xpath/expression", "some/**")).isTrue()
+        assertThat(matchesGlob("//some/xpath/expression", "**/xpath/*")).isTrue()
     }
 
 }
