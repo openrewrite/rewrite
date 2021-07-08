@@ -169,4 +169,13 @@ class StringUtilsTest {
         assertThat(countOccurrences("nonononono", "yo")).isEqualTo(0)
         assertThat(countOccurrences("", "")).isEqualTo(0)
     }
+
+    @Test
+    fun globMatching() {
+        assertThat(matchesGlob("expression", "expr*")).isTrue()
+        assertThat(matchesGlob("some/xpath", "some/*")).isTrue()
+        assertThat(matchesGlob("some/xpath/expression", "some/**")).isTrue()
+        assertThat(matchesGlob("//some/xpath/expression", "**/xpath/*")).isTrue()
+    }
+
 }
