@@ -4778,4 +4778,54 @@ interface SpacesTest : JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    fun addSpaceToEmptyIterator(jp: JavaParser.Builder<*, *>) = assertChanged(
+        parser = jp.styles(
+                namedStyles(listOf(IntelliJ.spaces().run {
+                    withOther(other.run {
+                        withPadEmptyForIterator(true)
+                    })
+                }))
+        ).build(),
+        before = """
+            public class A {
+                {
+                    for (int i = 0; i < 10;) { i++; }
+                }
+            }
+        """,
+            after = """
+            public class A {
+                {
+                    for (int i = 0; i < 10; ) { i++; }
+                }
+            }
+        """
+    )
+
+    @Test
+    fun removeSpaceFromEmptyIterator(jp: JavaParser.Builder<*, *>) = assertChanged(
+        parser = jp.styles(
+                    namedStyles(listOf(IntelliJ.spaces().run {
+                        withOther(other.run {
+                            withPadEmptyForIterator(false)
+                        })
+                    }))
+            ).build(),
+        before = """
+            public class A {
+                {
+                    for (int i = 0; i < 10; ) { i++; }
+                }
+            }
+        """,
+        after = """
+            public class A {
+                {
+                    for (int i = 0; i < 10;) { i++; }
+                }
+            }
+        """
+    )
 }

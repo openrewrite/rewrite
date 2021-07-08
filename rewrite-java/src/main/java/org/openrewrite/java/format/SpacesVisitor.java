@@ -351,27 +351,39 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                 )
         );
         int updateStatementsSize = f.getControl().getUpdate().size();
-        control = control.getPadding().withUpdate(
-                ListUtils.map(control.getPadding().getUpdate(),
-                        (index, elemContainer) -> {
-                            if (index == 0) {
-                                elemContainer = elemContainer.withElement(
-                                        spaceBefore(elemContainer.getElement(), spaceAfterSemicolon)
-                                );
-                            } else {
-                                elemContainer = elemContainer.withElement(
-                                        spaceBefore(elemContainer.getElement(), style.getOther().getAfterComma())
-                                );
+        Boolean padEmptyForIterator = style.getOther().getPadEmptyForIterator();
+        if(padEmptyForIterator != null && updateStatementsSize == 1 && f.getControl().getUpdate().get(0) instanceof J.Empty) {
+            control = control.getPadding().withUpdate(
+                    ListUtils.map(control.getPadding().getUpdate(), (index, elemContainer) -> {
+                        elemContainer = elemContainer.withElement(
+                                spaceBefore(elemContainer.getElement(), padEmptyForIterator)
+                        );
+                        return elemContainer;
+                    })
+            );
+        } else {
+            control = control.getPadding().withUpdate(
+                    ListUtils.map(control.getPadding().getUpdate(),
+                            (index, elemContainer) -> {
+                                if (index == 0) {
+                                    elemContainer = elemContainer.withElement(
+                                            spaceBefore(elemContainer.getElement(), spaceAfterSemicolon)
+                                    );
+                                } else {
+                                    elemContainer = elemContainer.withElement(
+                                            spaceBefore(elemContainer.getElement(), style.getOther().getAfterComma())
+                                    );
+                                }
+                                if (index == updateStatementsSize - 1) {
+                                    elemContainer = spaceAfter(elemContainer, spaceWithinForParens);
+                                } else {
+                                    elemContainer = spaceAfter(elemContainer, style.getOther().getBeforeComma());
+                                }
+                                return elemContainer;
                             }
-                            if (index == updateStatementsSize - 1) {
-                                elemContainer = spaceAfter(elemContainer, spaceWithinForParens);
-                            } else {
-                                elemContainer = spaceAfter(elemContainer, style.getOther().getBeforeComma());
-                            }
-                            return elemContainer;
-                        }
-                )
-        );
+                    )
+            );
+        }
         f = f.withControl(control);
         f = f.getPadding().withBody(spaceBeforeRightPaddedElement(f.getPadding().getBody(), style.getBeforeLeftBrace().getForLeftBrace()));
         return f;

@@ -158,6 +158,12 @@ public class SpacesStyle implements JavaStyle {
          */
         @Nullable
         Boolean padEmptyForInitializer;
+
+        /**
+         *
+         */
+        @Nullable
+        Boolean padEmptyForIterator;
         Boolean beforeForSemicolon;
         Boolean afterForSemicolon;
         Boolean afterTypeCast;
