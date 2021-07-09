@@ -560,7 +560,6 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 case '\r':
                     // Check for Windows OS CRLF \r\n.
                     if ((i + 1 <= comment.getText().length() - 1) && comment.getText().charAt(i + 1) == '\n') {
-                        whitespace.append(c);
                         continue;
                     }
 
@@ -581,6 +580,9 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     indent = 0;
                     tabLength = 0;
 
+                    if ((i - 1 >= 0) && comment.getText().charAt(i - 1) == '\r' && c == '\n') {
+                        whitespace.append(comment.getText().charAt(i - 1));
+                    }
                     whitespace.append(c);
                     isWhitespace = true;
                     break;
