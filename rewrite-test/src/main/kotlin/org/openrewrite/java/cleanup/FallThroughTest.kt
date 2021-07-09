@@ -23,7 +23,7 @@ import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.style.NamedStyles
 
 interface FallThroughTest : JavaRecipeTest {
-    override val recipe: Recipe?
+    override val recipe: Recipe
         get() = FallThrough()
 
     @Test

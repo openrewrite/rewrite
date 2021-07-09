@@ -127,6 +127,10 @@ class Java8FallThroughTest : Java8Test, FallThroughTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8FinalClassTest : Java8Test, FinalClassTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8FinalizeLocalVariablesTest : Java8Test, FinalizeLocalVariablesTest
 
 @DebugOnly

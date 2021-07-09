@@ -43,6 +43,11 @@ public class StyleHelper {
         return type.isPrimitive() || primitiveWrapperClasses.contains(type);
     }
 
+    private static boolean isEnum(Object value) {
+        Class<?> type = value.getClass();
+        return type.isEnum();
+    }
+
     /**
      * Copies all non-null properties from right into left, recursively. Assumes use of @With from project lombok.
      *
@@ -68,7 +73,7 @@ public class StyleHelper {
             try {
                 Object rightValue = getter.invoke(right);
                 if (rightValue != null) {
-                    if (!isPrimitiveOrWrapper(rightValue)) {
+                    if (!isPrimitiveOrWrapper(rightValue) && !isEnum(rightValue)) {
                         Object leftValue = getter.invoke(left);
                         rightValue = merge(leftValue, rightValue);
                     }

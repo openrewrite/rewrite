@@ -127,6 +127,10 @@ class Java11FallThroughTest : Java11Test, FallThroughTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11FinalClassTest : Java11Test, FinalClassTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11FinalizeLocalVariablesTest : Java11Test, FinalizeLocalVariablesTest
 
 @DebugOnly
