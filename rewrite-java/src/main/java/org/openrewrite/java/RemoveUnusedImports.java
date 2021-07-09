@@ -17,12 +17,11 @@ package org.openrewrite.java;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
 
 import java.util.*;
 
@@ -58,20 +57,20 @@ public class RemoveUnusedImports extends Recipe {
             Map<String, Set<JavaType.FullyQualified>> typesByPackage = new HashMap<>();
 
             for (JavaType javaType : cu.getTypesInUse()) {
-                if(javaType instanceof JavaType.Variable) {
+                if (javaType instanceof JavaType.Variable) {
                     JavaType.Variable variable = (JavaType.Variable) javaType;
                     JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getType());
-                    if(fq != null) {
+                    if (fq != null) {
                         methodsAndFieldsByTypeName.computeIfAbsent(fq.getFullyQualifiedName(), f -> new HashSet<>())
-                            .add(variable.getName());
+                                .add(variable.getName());
                     }
-                } else if(javaType instanceof JavaType.Method) {
+                } else if (javaType instanceof JavaType.Method) {
                     JavaType.Method method = (JavaType.Method) javaType;
-                    if(method.hasFlags(Flag.Static)) {
+                    if (method.hasFlags(Flag.Static)) {
                         methodsAndFieldsByTypeName.computeIfAbsent(method.getDeclaringType().getFullyQualifiedName(), t -> new HashSet<>())
                                 .add(method.getName());
                     }
-                } else if(javaType instanceof JavaType.FullyQualified) {
+                } else if (javaType instanceof JavaType.FullyQualified) {
                     JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) javaType;
                     typesByPackage.computeIfAbsent(fullyQualified.getPackageName(), f -> new HashSet<>())
                             .add(fullyQualified);
@@ -80,102 +79,110 @@ public class RemoveUnusedImports extends Recipe {
 
             boolean changed = false;
 
-            // Whenever an import statement is found to be used it should be added to this list
-            // At the end this list will contain only imports which are actually used
-            final List<JRightPadded<J.Import>> importsWithUsage = new ArrayList<>();
-
+            // the key is a list because one star import may get replaced with multiple unfolded imports
+            List<ImportUsage> importUsage = new ArrayList<>(cu.getPadding().getImports().size());
             for (JRightPadded<J.Import> anImport : cu.getPadding().getImports()) {
-                J.Import elem = anImport.getElement();
+                // assume initially that all imports are unused
+                ImportUsage singleUsage = new ImportUsage();
+                singleUsage.imports.add(anImport);
+                importUsage.add(singleUsage);
+            }
+
+            // whenever an import statement is found to be used it should be marked true
+            for (ImportUsage anImport : importUsage) {
+                J.Import elem = anImport.imports.get(0).getElement();
                 J.FieldAccess qualid = elem.getQualid();
                 J.Identifier name = qualid.getName();
 
-                if (anImport.getElement().isStatic()) {
-                    Set<String> methodsAndFields = methodsAndFieldsByTypeName.get(anImport.getElement().getTypeName());
+                if (elem.isStatic()) {
+                    Set<String> methodsAndFields = methodsAndFieldsByTypeName.get(elem.getTypeName());
                     if (methodsAndFields == null) {
+                        anImport.used = false;
                         changed = true;
-                        continue;
-                    }
-
-                    if ("*".equals(qualid.getSimpleName())) {
+                    } else if ("*".equals(qualid.getSimpleName())) {
                         if (methodsAndFields.size() < layoutStyle.getNameCountToUseStarImport()) {
+                            // replacing the star with a series of unfolded imports
+                            anImport.imports.clear();
+
+                            // add each unfolded import
                             methodsAndFields.stream().sorted().forEach(method ->
-                                    importsWithUsage.add(anImport.withElement(elem.withQualid(qualid.withName(name.withName(method)))))
+                                    anImport.imports.add(new JRightPadded<>(elem
+                                            .withQualid(qualid.withName(name.withName(method)))
+                                            .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY))
                             );
+
+                            // move whatever the original prefix of the star import was to the first unfolded import
+                            anImport.imports.set(0, anImport.imports.get(0).withElement(anImport.imports.get(0)
+                                    .getElement().withPrefix(elem.getPrefix())));
+
                             changed = true;
-                        } else {
-                            importsWithUsage.add(anImport);
                         }
-                    } else if(methodsAndFields.contains(qualid.getSimpleName())) {
-                        importsWithUsage.add(anImport);
-                    } else {
+                    } else if (!methodsAndFields.contains(qualid.getSimpleName())) {
+                        anImport.used = false;
                         changed = true;
                     }
                 } else {
-                    Set<JavaType.FullyQualified> types = typesByPackage.get(anImport.getElement().getPackageName());
+                    Set<JavaType.FullyQualified> types = typesByPackage.get(elem.getPackageName());
                     if (types == null) {
+                        anImport.used = false;
                         changed = true;
-                        continue;
-                    }
-                    if ("*".equals(anImport.getElement().getQualid().getSimpleName())) {
+                    } else if ("*".equals(elem.getQualid().getSimpleName())) {
                         if (types.size() < layoutStyle.getClassCountToUseStarImport()) {
-                            List<String> toSort = new ArrayList<>();
-                            for (JavaType.FullyQualified type : types) {
-                                String typeClassName = type.getClassName();
-                                toSort.add(typeClassName);
-                            }
-                            toSort.sort(null);
-                            List<JRightPadded<J.Import>> unfoldedWildcardImports = new ArrayList<>(toSort.size());
-                            for (String typeClassName : toSort) {
-                                JRightPadded<J.Import> importJRightPadded = anImport.withElement(
-                                        new J.Import(
-                                                Tree.randomId(),
-                                                elem.getPrefix(),
-                                                elem.getMarkers(),
-                                                elem.getPadding().getStatic(),
-                                                elem.getQualid().withName(
-                                                        name.withName(typeClassName)
-                                                )
-                                        )
-                                );
-                                unfoldedWildcardImports.add(importJRightPadded);
-                            }
+                            // replacing the star with a series of unfolded imports
+                            anImport.imports.clear();
 
-                            importsWithUsage.addAll(ListUtils.map(unfoldedWildcardImports, (index, paddedImport) -> {
-                                if (index != 0) {
-                                    paddedImport = paddedImport.withElement(
-                                            paddedImport.getElement().withPrefix(
-                                                    Space.format("\n")
-                                            )
-                                    );
-                                }
-                                return paddedImport;
-                            }));
+                            // add each unfolded import
+                            types.stream().map(JavaType.FullyQualified::getClassName).sorted().distinct().forEach(type ->
+                                    anImport.imports.add(new JRightPadded<>(elem
+                                            .withQualid(qualid.withName(name.withName(type)))
+                                            .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY))
+                            );
+
+                            // move whatever the original prefix of the star import was to the first unfolded import
+                            anImport.imports.set(0, anImport.imports.get(0).withElement(anImport.imports.get(0)
+                                    .getElement().withPrefix(elem.getPrefix())));
 
                             changed = true;
-                        } else {
-                            importsWithUsage.add(anImport);
                         }
-                    } else if (types.stream()
-                            .filter(c -> anImport.getElement().isFromType(c.getFullyQualifiedName()))
-                            .findAny().isPresent()) {
-                        importsWithUsage.add(anImport);
-                    } else {
+                    } else if (types.stream().noneMatch(c -> elem.isFromType(c.getFullyQualifiedName()))) {
+                        anImport.used = false;
                         changed = true;
                     }
                 }
             }
 
             if (changed) {
-                cu = cu.getPadding().withImports(importsWithUsage);
-                if (!cu.getImports().isEmpty()) {
-                    cu = autoFormat(cu, cu.getImports().get(cu.getImports().size() - 1), ctx, getCursor());
-                } else if (!cu.getClasses().isEmpty()) {
+                List<JRightPadded<J.Import>> imports = new ArrayList<>();
+                Space lastUnusedImportSpace = null;
+                for (ImportUsage anImportGroup : importUsage) {
+                    if (anImportGroup.used) {
+                        List<JRightPadded<J.Import>> importGroup = anImportGroup.imports;
+                        for (int i = 0; i < importGroup.size(); i++) {
+                            JRightPadded<J.Import> anImport = importGroup.get(i);
+                            if (i == 0 && lastUnusedImportSpace != null && anImport.getElement().getPrefix().getLastWhitespace()
+                                    .chars().filter(c -> c == '\n').count() <= 1) {
+                                anImport = anImport.withElement(anImport.getElement().withPrefix(lastUnusedImportSpace));
+                            }
+                            imports.add(anImport);
+                        }
+                        lastUnusedImportSpace = null;
+                    } else if(lastUnusedImportSpace == null) {
+                        lastUnusedImportSpace = anImportGroup.imports.get(0).getElement().getPrefix();
+                    }
+                }
+
+                cu = cu.getPadding().withImports(imports);
+                if (cu.getImports().isEmpty() && !cu.getClasses().isEmpty()) {
                     cu = autoFormat(cu, cu.getClasses().get(0).getName(), ctx, getCursor());
                 }
-                cu = (J.CompilationUnit) new OrderImports.OrderImportsVisitor<ExecutionContext>(false).visit(cu, ctx);
             }
 
             return cu;
         }
+    }
+
+    private static class ImportUsage {
+        final List<JRightPadded<J.Import>> imports = new ArrayList<>();
+        boolean used = true;
     }
 }

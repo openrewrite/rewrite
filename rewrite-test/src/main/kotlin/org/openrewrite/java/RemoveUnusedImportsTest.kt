@@ -307,30 +307,6 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/701")
     @Test
-    fun ensuresWhitespaceAfterPackageDeclaration(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
-            package com.example.foo;
-            import java.util.List;
-            import java.util.ArrayList;
-            
-            public class A {
-                ArrayList<String> foo = new ArrayList<>();
-            }
-        """,
-        after = """
-            package com.example.foo;
-            
-            import java.util.ArrayList;
-            
-            public class A {
-                ArrayList<String> foo = new ArrayList<>();
-            }
-        """
-    )
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/701")
-    @Test
     fun ensuresWhitespaceAfterPackageDeclarationNoImportsRemain(jp: JavaParser) = assertChanged(
         jp,
         before = """
@@ -343,38 +319,6 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
             package com.example.foo;
             
             public class A {
-            }
-        """
-    )
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/701")
-    @Test
-    fun ensuresWhitespaceBetweenGroupsOfImports(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf("""
-            package com.yourorg.b;
-            public class B {}
-        """),
-        before = """
-            package com.example.foo;
-            
-            import com.yourorg.b.B;
-            import java.util.List;
-            import java.util.ArrayList;
-            
-            public class A {
-                ArrayList<B> foo = new ArrayList<>();
-            }
-        """,
-        after = """
-            package com.example.foo;
-            
-            import com.yourorg.b.B;
-            
-            import java.util.ArrayList;
-            
-            public class A {
-                ArrayList<B> foo = new ArrayList<>();
             }
         """
     )
