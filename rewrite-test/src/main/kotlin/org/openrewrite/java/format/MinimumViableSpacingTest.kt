@@ -15,12 +15,18 @@
  */
 package org.openrewrite.java.format
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
+import org.openrewrite.InMemoryExecutionContext
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
+import org.openrewrite.internal.ListUtils
+import org.openrewrite.java.JavaIsoVisitor
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.java.JavaVisitor
+import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.Space
 
 @Suppress("StatementWithEmptyBody")
@@ -119,6 +125,21 @@ interface MinimumViableSpacingTest : JavaRecipeTest {
         """,
         after = """
             class Test{void foo(final int[] arr){for(int n=0,x=0;n<100;n++,x++){}for(int i:arr){}for(final int i:arr){}}}
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/758")
+    @Test
+    fun spacesBetweenModifiers(jp: JavaParser) = assertChanged(
+        before = """
+            public final class A {
+                public static String foo() { 
+                    return "foo"; 
+                } 
+            }
+        """,
+        after = """
+            public final class A{public static String foo(){return "foo";}}
         """
     )
 }

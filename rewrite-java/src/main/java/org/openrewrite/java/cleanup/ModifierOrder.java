@@ -58,15 +58,15 @@ public class ModifierOrder extends Recipe {
                 J.VariableDeclarations v = super.visitVariableDeclarations(multiVariable, executionContext);
                 return v.withModifiers(sortModifiers(v.getModifiers()));
             }
-
-            private List<J.Modifier> sortModifiers(List<J.Modifier> modifiers) {
-                List<J.Modifier.Type> sortedTypes = modifiers.stream()
-                        .map(J.Modifier::getType)
-                        .sorted(Comparator.comparingInt(J.Modifier.Type::ordinal))
-                        .collect(toList());
-
-                return ListUtils.map(modifiers, (i, mod) -> mod.getType() == sortedTypes.get(i) ? mod : mod.withType(sortedTypes.get(i)));
-            }
         };
+    }
+
+    public static List<J.Modifier> sortModifiers(List<J.Modifier> modifiers) {
+        List<J.Modifier.Type> sortedTypes = modifiers.stream()
+                .map(J.Modifier::getType)
+                .sorted(Comparator.comparingInt(J.Modifier.Type::ordinal))
+                .collect(toList());
+
+        return ListUtils.map(modifiers, (i, mod) -> mod.getType() == sortedTypes.get(i) ? mod : mod.withType(sortedTypes.get(i)));
     }
 }

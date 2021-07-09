@@ -14,7 +14,7 @@ interface FinalClassTest : JavaRecipeTest {
             public class A {
                 private A(String s) {
                 }
-                
+            
                 private A() {
                 }
             }
@@ -23,7 +23,7 @@ interface FinalClassTest : JavaRecipeTest {
             public final class A {
                 private A(String s) {
                 }
-                
+            
                 private A() {
                 }
             }
@@ -41,5 +41,44 @@ interface FinalClassTest : JavaRecipeTest {
                 }
             }
         """
+    )
+
+    @Test
+    fun hasImplicitConstructor() = assertUnchanged(
+        before = """
+            public class A {
+            }
+        """
+    )
+
+    @Test
+    fun innerClass() = assertChanged(
+        before = """
+            class A {
+            
+                class B {
+                    private B() {}
+                }
+            }
+        """,
+        after = """
+            class A {
+            
+                final class B {
+                    private B() {}
+                }
+            }
+        """
+    )
+
+    @Test
+    fun classInsideInterfaceIsImplicitlyFinal() = assertUnchanged(
+         before = """
+             public interface A {
+                class B {
+                    private B() { }
+                }
+             }
+         """
     )
 }
