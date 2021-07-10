@@ -39,8 +39,6 @@ import java.util.Optional;
  * imports that are not referenced within the compilation unit.
  */
 @EqualsAndHashCode(callSuper = true)
-@AllArgsConstructor(onConstructor_ = @JsonCreator)
-@NoArgsConstructor
 public class OrderImports extends Recipe {
 
     @SuppressWarnings("FieldMayBeFinal")
@@ -48,6 +46,16 @@ public class OrderImports extends Recipe {
     @With
     @Option(displayName = "Remove unused", description = "Remove unnecessary imports.", required = false, example = "true")
     private boolean removeUnused = true;
+
+    public OrderImports() {
+        System.out.println("here");
+    }
+
+
+    @JsonCreator
+    public OrderImports(boolean removeUnused) {
+        this.removeUnused = removeUnused;
+    }
 
     @Override
     public String getDisplayName() {
@@ -64,10 +72,7 @@ public class OrderImports extends Recipe {
         return new OrderImportsVisitor<>(removeUnused);
     }
 
-    /**
-     * This visitor is used directly by AddImport, which is why this class is both static and package private
-     */
-    static class OrderImportsVisitor<P> extends JavaIsoVisitor<P> {
+    private static class OrderImportsVisitor<P> extends JavaIsoVisitor<P> {
         private final boolean removeUnused;
 
         OrderImportsVisitor(boolean removeUnused) {

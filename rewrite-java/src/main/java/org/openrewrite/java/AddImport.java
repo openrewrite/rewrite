@@ -20,11 +20,14 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.search.FindTypes;
+import org.openrewrite.java.style.ImportLayoutStyle;
+import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -80,12 +83,10 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             String ending = i.getQualid().getSimpleName();
             if (statik == null) {
                 return !i.isStatic() && i.getPackageName().equals(classType.getPackageName()) &&
-                        (ending.equals(classType.getClassName()) ||
-                                ending.equals("*"));
+                        (ending.equals(classType.getClassName()) || ending.equals("*"));
             }
             return i.isStatic() && i.getTypeName().equals(classType.getFullyQualifiedName()) &&
-                    (ending.equals(statik) ||
-                            ending.equals("*"));
+                    (ending.equals(statik) || ending.equals("*"));
         })) {
             return cu;
         }
@@ -106,10 +107,11 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                     importToAdd.withPrefix(Space.format("\n\n"));
         }
 
-        imports.add(new JRightPadded<>(importToAdd, Space.EMPTY, Markers.EMPTY));
-        cu = cu.getPadding().withImports(imports);
+        ImportLayoutStyle layoutStyle = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
+                .orElse(IntelliJ.importLayout());
+        cu = cu.getPadding().withImports(layoutStyle.addImport(cu.getPadding().getImports(), importToAdd,
+                cu.getPackageDeclaration()));
 
-        doAfterVisit(new OrderImports.OrderImportsVisitor<>(false));
         doAfterVisit(new FormatFirstClassPrefix<>());
 
         return cu;

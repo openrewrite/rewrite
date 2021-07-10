@@ -16,9 +16,11 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.*
+import org.openrewrite.ExecutionContext
+import org.openrewrite.Issue
+import org.openrewrite.Recipe
+import org.openrewrite.TreeVisitor
 import org.openrewrite.java.tree.J
-import java.util.function.Supplier
 
 interface AddImportTest : JavaRecipeTest {
     fun addImports(vararg adds: AddImport<ExecutionContext>): Recipe = adds
@@ -70,6 +72,54 @@ interface AddImportTest : JavaRecipeTest {
         """
     )
 
+    @Test
+    fun addImportInsertsNewMiddleBlock(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = addImports(
+            AddImport("java.util.List", null, false)
+        ),
+        before = """
+            package a;
+            
+            import com.sun.naming.*;
+            
+            import static java.util.Collections.*;
+            
+            class A {}
+        """,
+        after = """
+            package a;
+            
+            import com.sun.naming.*;
+            
+            import java.util.List;
+            
+            import static java.util.Collections.*;
+            
+            class A {}
+        """
+    )
+
+    @Test
+    fun addFirstImport(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = addImports(
+            AddImport("java.util.List", null, false)
+        ),
+        before = """
+            package a;
+            
+            class A {}
+        """,
+        after = """
+            package a;
+            
+            import java.util.List;
+            
+            class A {}
+        """
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/484")
     @Test
     fun addImportIfReferenced(jp: JavaParser) = assertChanged(
@@ -82,7 +132,7 @@ interface AddImportTest : JavaRecipeTest {
                 val c = super.visitClassDeclaration(classDecl, ctx)
                 var b = c.body
                 if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    val t = JavaTemplate.builder(Supplier { cursor }, "BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);")
+                    val t = JavaTemplate.builder({ cursor }, "BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);")
                         .imports("java.math.BigDecimal", "java.math.RoundingMode")
                         .build()
 

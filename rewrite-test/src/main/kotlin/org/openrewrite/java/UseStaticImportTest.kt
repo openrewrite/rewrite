@@ -45,8 +45,8 @@ interface UseStaticImportTest : JavaRecipeTest {
             class Test {
                 void test() {
                     Assert.assertTrue(true);
-                    Assert.assertFalse(false);
                     Assert.assertEquals(1, 2);
+                    Assert.assertFalse(false);
                 }
             }
         """,
@@ -58,8 +58,8 @@ interface UseStaticImportTest : JavaRecipeTest {
             class Test {
                 void test() {
                     assertTrue(true);
-                    assertFalse(false);
                     assertEquals(1, 2);
+                    assertFalse(false);
                 }
             }
         """

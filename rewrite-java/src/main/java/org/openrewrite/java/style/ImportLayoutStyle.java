@@ -28,19 +28,24 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
-import org.jetbrains.annotations.NotNull;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.marker.Markers;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.internal.StreamUtils.distinctBy;
@@ -86,6 +91,135 @@ public class ImportLayoutStyle implements JavaStyle {
     }
 
     /**
+     * Adds a new import in a block that best represents the import layout style without
+     * re-ordering any of the existing imports, i.e. a minimally invasive add.
+     *
+     * @param originalImports The import list before inserting.
+     * @param toAdd           The import to add.
+     * @param pkg             A package declaration, if one exists.
+     * @return The import list with a new import added.
+     */
+    public List<JRightPadded<J.Import>> addImport(List<JRightPadded<J.Import>> originalImports,
+                                                  J.Import toAdd, @Nullable J.Package pkg) {
+        JRightPadded<J.Import> paddedToAdd = new JRightPadded<>(toAdd, Space.EMPTY, Markers.EMPTY);
+
+        if (originalImports.isEmpty()) {
+            return singletonList(pkg == null ?
+                    paddedToAdd :
+                    paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(Space.format("\n\n")))
+            );
+        }
+
+        // don't star fold just yet, because we are only going to star fold adjacent imports along with
+        // the import to add at most. we don't even want to star fold other non-adjacent imports in the same
+        // block that should be star folded according to the layout style (minimally invasive change).
+        List<JRightPadded<J.Import>> ideallyOrdered = new ImportLayoutStyle(Integer.MAX_VALUE, Integer.MAX_VALUE, layout).
+                orderImports(ListUtils.concat(originalImports, paddedToAdd));
+
+        JRightPadded<J.Import> before = null;
+        JRightPadded<J.Import> after = null;
+
+        Block addToBlock = block(paddedToAdd);
+        int insertPosition = 0;
+
+        for (int i = 0; i < ideallyOrdered.size(); i++) {
+            JRightPadded<J.Import> anImport = ideallyOrdered.get(i);
+            if (anImport.getElement().isScope(paddedToAdd.getElement())) {
+                before = i > 0 ? ideallyOrdered.get(i - 1) : null;
+                after = i < ideallyOrdered.size() - 1 ? ideallyOrdered.get(i + 1) : null;
+                insertPosition = i;
+                break;
+            }
+        }
+
+        if (before == null) {
+            if (pkg != null) {
+                Space prefix = originalImports.get(0).getElement().getPrefix();
+                paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(prefix));
+            }
+        } else if (block(before) != addToBlock) {
+            paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(Space.format("\n\n")));
+        } else {
+            paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(Space.format("\n")));
+        }
+
+        AtomicInteger starFoldFrom = new AtomicInteger(0);
+        AtomicInteger starFoldTo = new AtomicInteger(0);
+        AtomicBoolean starFold = new AtomicBoolean(false);
+        for (int i = insertPosition; i < originalImports.size(); i++) {
+            JRightPadded<J.Import> anImport = originalImports.get(i);
+            if (block(anImport) == addToBlock && packageOrOuterClassName(anImport)
+                    .equals(packageOrOuterClassName(paddedToAdd))) {
+                starFoldTo.set(i);
+            } else {
+                break;
+            }
+        }
+        for (int i = insertPosition - 1; i > 0; i--) {
+            JRightPadded<J.Import> anImport = originalImports.get(i);
+            if (block(anImport) == addToBlock && packageOrOuterClassName(anImport)
+                    .equals(packageOrOuterClassName(paddedToAdd))) {
+                starFoldFrom.set(i);
+            } else {
+                break;
+            }
+        }
+
+        if ((paddedToAdd.getElement().isStatic() && nameCountToUseStarImport <= starFoldTo.get() - starFoldFrom.get() + 2) ||
+                (!paddedToAdd.getElement().isStatic() && classCountToUseStarImport <= starFoldTo.get() - starFoldFrom.get() + 2)) {
+            starFold.set(true);
+            if(insertPosition != starFoldFrom.get()) {
+                // if we're adding to the middle of a group of imports that are getting star folded,
+                // adopt the prefix of the first import in this group.
+                paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(
+                        originalImports.get(starFoldFrom.get()).getElement().getPrefix()
+                ));
+            }
+        }
+
+        if (starFold.get()) {
+            paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withQualid(
+                    paddedToAdd.getElement().getQualid().withName(
+                            paddedToAdd.getElement().getQualid().getName().withName("*")
+                    )
+            ));
+            after = starFoldTo.get() < originalImports.size() - 1 ?
+                    originalImports.get(starFoldTo.get() + 1) : null;
+        }
+
+        if (after != null) {
+            if (block(after) != addToBlock && after.getElement().getPrefix().getLastWhitespace().chars()
+                    .filter(c -> c == '\n').count() < 2) {
+                after = after.withElement(after.getElement().withPrefix(Space.format("\n\n")));
+            }
+        }
+
+        JRightPadded<J.Import> finalToAdd = paddedToAdd;
+        JRightPadded<J.Import> finalAfter = after;
+        return ListUtils.flatMap(originalImports, (i, anImport) -> {
+            if (starFold.get() && i >= starFoldFrom.get() && i <= starFoldTo.get()) {
+                return i == starFoldFrom.get() ?
+                        finalToAdd /* only add the star import once */ :
+                        null;
+            } else if (finalAfter != null && anImport.getElement().isScope(finalAfter.getElement())) {
+                return Arrays.asList(finalToAdd, finalAfter);
+            } else if (i == originalImports.size() - 1 && finalAfter == null) {
+                return Arrays.asList(anImport, finalToAdd);
+            }
+            return anImport;
+        });
+    }
+
+    private Block block(JRightPadded<J.Import> anImport) {
+        for (Block block : layout) {
+            if (block.accept(anImport)) {
+                return block;
+            }
+        }
+        throw new IllegalStateException("Expected to find a block to fit import into.");
+    }
+
+    /**
      * This method will order and group a list of imports producing a new list that conforms to the rules defined
      * by the import layout style.
      *
@@ -97,19 +231,19 @@ public class ImportLayoutStyle implements JavaStyle {
         List<JRightPadded<J.Import>> orderedImports = new ArrayList<>();
 
         // Allocate imports to blocks, preferring to put imports into non-catchall blocks
+        nextImport:
         for (JRightPadded<J.Import> anImport : originalImports) {
-            boolean accepted = false;
             for (Block block : blocksNoCatchalls) {
-                if (block.accept(layoutState, anImport)) {
-                    accepted = true;
-                    break;
+                if (block.accept(anImport)) {
+                    layoutState.claimImport(block, anImport);
+                    continue nextImport;
                 }
             }
-            if (!accepted) {
-                for (Block block : blocksOnlyCatchalls) {
-                    if (block.accept(layoutState, anImport)) {
-                        break;
-                    }
+
+            for (Block block : blocksOnlyCatchalls) {
+                if (block.accept(anImport)) {
+                    layoutState.claimImport(block, anImport);
+                    continue nextImport;
                 }
             }
         }
@@ -245,11 +379,10 @@ public class ImportLayoutStyle implements JavaStyle {
          * This method will determine if the passed in import is a match for the rules defined on the block. If the
          * import is matched, it will be internally stored in the block.
          *
-         * @param layoutState The in-progress state of a layout operation.
-         * @param anImport    The import to be compared against the block's matching rules.
-         * @return true if the import was a match (and was stored within the block)
+         * @param anImport The import to be compared against the block's matching rules.
+         * @return {@code true} if the import was a match
          */
-        boolean accept(LayoutState layoutState, JRightPadded<J.Import> anImport);
+        boolean accept(JRightPadded<J.Import> anImport);
 
         /**
          * @return Imports belonging to this block, folded appropriately.
@@ -267,7 +400,7 @@ public class ImportLayoutStyle implements JavaStyle {
             }
 
             @Override
-            public boolean accept(LayoutState layoutState, JRightPadded<J.Import> anImport) {
+            public boolean accept(JRightPadded<J.Import> anImport) {
                 return false;
             }
 
@@ -322,13 +455,9 @@ public class ImportLayoutStyle implements JavaStyle {
             }
 
             @Override
-            public boolean accept(LayoutState layoutState, JRightPadded<J.Import> anImport) {
-                if (anImport.getElement().isStatic() == statik &&
-                        packageWildcard.matcher(anImport.getElement().getQualid().printTrimmed()).matches()) {
-                    layoutState.claimImport(this, anImport);
-                    return true;
-                }
-                return false;
+            public boolean accept(JRightPadded<J.Import> anImport) {
+                return anImport.getElement().isStatic() == statik &&
+                        packageWildcard.matcher(anImport.getElement().getQualid().printTrimmed()).matches();
             }
 
             @Override
@@ -339,7 +468,7 @@ public class ImportLayoutStyle implements JavaStyle {
                         .stream()
                         .sorted(IMPORT_SORTING)
                         .collect(groupingBy(
-                                this::packageOrOuterClassName,
+                                ImportLayoutStyle::packageOrOuterClassName,
                                 LinkedHashMap::new, // Use an ordered map to preserve sorting
                                 Collectors.toList()
                         ));
@@ -391,21 +520,6 @@ public class ImportLayoutStyle implements JavaStyle {
                 return ordered;
             }
 
-            @NotNull
-            private String packageOrOuterClassName(JRightPadded<J.Import> anImport) {
-                String typeName = anImport.getElement().getTypeName();
-                if (anImport.getElement().isStatic()) {
-                    return typeName;
-                } else {
-                    String className = anImport.getElement().getClassName();
-                    if (className.contains(".")) {
-                        return anImport.getElement().getPackageName() +
-                                className.substring(0, className.lastIndexOf('.'));
-                    }
-                    return anImport.getElement().getPackageName();
-                }
-            }
-
             @Override
             public String toString() {
                 return "import " + (statik ? "static " : "") + packageWildcard;
@@ -431,16 +545,11 @@ public class ImportLayoutStyle implements JavaStyle {
             }
 
             @Override
-            public boolean accept(LayoutState layoutState, JRightPadded<J.Import> anImport) {
-                boolean b = true;
+            public boolean accept(JRightPadded<J.Import> anImport) {
                 for (ImportPackage pi : packageImports) {
-                    if (pi.accept(layoutState, anImport)) {
-                        b = false;
-                        break;
+                    if (pi.accept(anImport)) {
+                        return false;
                     }
-                }
-                if (b) {
-                    super.accept(layoutState, anImport);
                 }
                 return anImport.getElement().isStatic() == statik;
             }
@@ -464,6 +573,20 @@ public class ImportLayoutStyle implements JavaStyle {
             s.append(block).append("\n");
         }
         return s.toString();
+    }
+
+    private static String packageOrOuterClassName(JRightPadded<J.Import> anImport) {
+        String typeName = anImport.getElement().getTypeName();
+        if (anImport.getElement().isStatic()) {
+            return typeName;
+        } else {
+            String className = anImport.getElement().getClassName();
+            if (className.contains(".")) {
+                return anImport.getElement().getPackageName() +
+                        className.substring(0, className.lastIndexOf('.'));
+            }
+            return anImport.getElement().getPackageName();
+        }
     }
 }
 
@@ -542,7 +665,7 @@ class Serializer extends JsonSerializer<ImportLayoutStyle> {
         gen.writeNumberField("classCountToUseStarImport", value.getClassCountToUseStarImport());
         gen.writeNumberField("nameCountToUseStarImport", value.getNameCountToUseStarImport());
 
-        String[] blocks = value.getLayout().stream()
+        @SuppressWarnings("SuspiciousToArrayCall") String[] blocks = value.getLayout().stream()
                 .map(block -> {
                     if (block instanceof ImportLayoutStyle.Block.BlankLines) {
                         return "<blank line>";
