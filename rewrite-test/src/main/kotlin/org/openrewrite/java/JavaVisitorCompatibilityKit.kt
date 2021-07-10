@@ -155,6 +155,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class JavaTemplateSubstitutionsTck : JavaTemplateSubstitutionsTest
 
     @Nested
+    inner class JavaTypeTck : JavaTypeTest
+
+    @Nested
     inner class JavaVisitorTestTck : JavaVisitorTest
 
     @Nested

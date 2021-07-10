@@ -1716,6 +1716,18 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                     if (sym.owner instanceof Symbol.ClassSymbol) {
                         owner = TypeUtils.asFullyQualified(type(sym.owner.type, stackWithSym));
                     }
+
+                    List<JavaType.FullyQualified> annotations = emptyList();
+                    if (!sym.getDeclarationAttributes().isEmpty()) {
+                        annotations = new ArrayList<>(sym.getDeclarationAttributes().size());
+                        for (Attribute.Compound a : sym.getDeclarationAttributes()) {
+                            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(a.type, stackWithSym));
+                            if (fq != null) {
+                                annotations.add(fq);
+                            }
+                        }
+                    }
+
                     clazz = JavaType.Class.build(
                             //Currently only the first 16 bits are meaninful
                             (int) sym.flags_field & 0xFFFF,
@@ -1726,6 +1738,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                             null,
                             TypeUtils.asFullyQualified(type(classType.supertype_field, stackWithSym)),
                             owner,
+                            annotations,
                             relaxedClassTypeMatching);
                     sharedClassTypes.put(clazz.getFullyQualifiedName(), clazz);
                 }
@@ -1965,15 +1978,6 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         if (source.startsWith(token, cursor))
             cursor += token.length();
         return token;
-    }
-
-    // return index of next non-whitespace position after index
-    private int nextTokenIndexAfter(int index) {
-        int c = index;
-        while (Character.isWhitespace(source.charAt(c))) {
-            c++;
-        }
-        return c;
     }
 
     // Only exists as a function to make it easier to debug unexpected cursor shifts

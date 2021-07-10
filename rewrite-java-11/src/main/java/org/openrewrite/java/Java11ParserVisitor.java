@@ -18,11 +18,8 @@ package org.openrewrite.java;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
-import com.sun.tools.javac.code.BoundKind;
-import com.sun.tools.javac.code.Flags;
-import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.code.*;
 import com.sun.tools.javac.code.Type.*;
-import com.sun.tools.javac.code.TypeTag;
 import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
@@ -1702,7 +1699,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                         }
                     }
 
-
                     List<JavaType.FullyQualified> interfaces;
                     if (symType.interfaces_field == null) {
                         interfaces = emptyList();
@@ -1731,13 +1727,15 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                         owner = TypeUtils.asFullyQualified(type(sym.owner.type, stackWithSym));
                     }
 
-
-                    // Add annotation information to JavaType.Class
-                    List<JavaType.Class> annotations = new ArrayList<>();
-                    if(sym.getMetadata() != null && sym.getMetadata().getDeclarationAttributes() != null ) {
-                        //  TODO: create type by recursive call (see 1700) ?!
-                        sym.getMetadata().getDeclarationAttributes().stream()
-                                .forEach(a -> annotations.add(JavaType.Class.build(a.type.toString())));
+                    List<JavaType.FullyQualified> annotations = emptyList();
+                    if (!sym.getDeclarationAttributes().isEmpty()) {
+                        annotations = new ArrayList<>(sym.getDeclarationAttributes().size());
+                        for (Attribute.Compound a : sym.getDeclarationAttributes()) {
+                            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(a.type, stackWithSym));
+                            if (fq != null) {
+                                annotations.add(fq);
+                            }
+                        }
                     }
 
                     clazz = JavaType.Class.build(

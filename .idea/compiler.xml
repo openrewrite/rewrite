@@ -11,7 +11,6 @@
         <module name="rewrite.rewrite-benchmarks.main" />
         <module name="rewrite.rewrite-test.main" />
         <module name="rewrite.rewrite-core.main" />
-        <module name="rewrite.rewrite-java-8.main" />
         <module name="rewrite.rewrite-java-11.main" />
         <module name="rewrite.rewrite-xml.main" />
         <module name="rewrite.rewrite-maven.main" />

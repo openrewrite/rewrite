@@ -283,6 +283,10 @@ class Java11TabsAndIndentsTest : Java11Test, TabsAndIndentsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11TypeTest : Java11Test, JavaTypeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11TypeTreeTest : Java11Test, TypeTreeTest
 
 @DebugOnly

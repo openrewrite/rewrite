@@ -279,6 +279,10 @@ class Java8TabsAndIndentsTest : Java8Test, TabsAndIndentsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8TypeTest : Java8Test, JavaTypeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8TypeTreeTest : Java8Test, TypeTreeTest
 
 @DebugOnly

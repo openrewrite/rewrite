@@ -27,6 +27,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.joining;
 
@@ -74,6 +75,8 @@ public interface JavaType extends Serializable {
 
         public abstract String getFullyQualifiedName();
 
+        public abstract List<FullyQualified> getAnnotations();
+
         public abstract boolean hasFlags(Flag... test);
 
         public abstract Set<Flag> getFlags();
@@ -112,7 +115,7 @@ public interface JavaType extends Serializable {
                     .collect(joining("."));
         }
 
-        public boolean isAssignableFrom(@Nullable JavaType.FullyQualified clazz) {
+        public boolean isAssignableFrom(@Nullable FullyQualified clazz) {
             //TODO This does not take into account type parameters.
             return clazz != null && (this == Class.OBJECT ||
                     getFullyQualifiedName().equals(clazz.getFullyQualifiedName()) ||
@@ -140,6 +143,11 @@ public interface JavaType extends Serializable {
         }
 
         @Override
+        public List<FullyQualified> getAnnotations() {
+            return emptyList();
+        }
+
+        @Override
         public boolean hasFlags(Flag... test) {
             return test.length == 1 && test[0] == Flag.Public;
         }
@@ -151,12 +159,12 @@ public interface JavaType extends Serializable {
 
         @Override
         public List<FullyQualified> getInterfaces() {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         @Override
         public List<Variable> getMembers() {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         @Override
@@ -171,7 +179,7 @@ public interface JavaType extends Serializable {
 
         @Override
         public List<Variable> getVisibleSupertypeMembers() {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         @Override
@@ -198,7 +206,7 @@ public interface JavaType extends Serializable {
         @Getter(AccessLevel.NONE)
         private final int flagsBitMap;
         private final Kind kind;
-        private final List<JavaType.Class> annotations;
+        private final List<FullyQualified> annotations;
 
         private final List<Variable> members;
         private final List<FullyQualified> interfaces;
@@ -220,7 +228,7 @@ public interface JavaType extends Serializable {
                       @Nullable List<Method> constructors,
                       @Nullable FullyQualified supertype,
                       @Nullable FullyQualified owningClass,
-                      List<JavaType.Class> annotations) {
+                      List<FullyQualified> annotations) {
             this.fullyQualifiedName = fullyQualifiedName;
             this.flagsBitMap = flagsBitMap;
             this.kind = kind;
@@ -286,7 +294,7 @@ public interface JavaType extends Serializable {
                                   List<Method> constructors,
                                   @Nullable FullyQualified supertype,
                                   @Nullable FullyQualified owningClass,
-                                  List<JavaType.Class> annotations) {
+                                  List<FullyQualified> annotations) {
             return build(Flag.flagsToBitMap(flags), fullyQualifiedName, kind, members, interfaces, constructors, supertype, owningClass, annotations,false);
         }
 
@@ -299,7 +307,7 @@ public interface JavaType extends Serializable {
                                      @Nullable List<Method> constructors,
                                      @Nullable FullyQualified supertype,
                                      @Nullable FullyQualified owningClass,
-                                     List<JavaType.Class> annotations) {
+                                     List<FullyQualified> annotations) {
             return build(flagsBitMap, fullyQualifiedName, kind, members, interfaces, constructors, supertype, owningClass, annotations, false);
         }
 
@@ -311,7 +319,7 @@ public interface JavaType extends Serializable {
                                   @Nullable List<Method> constructors,
                                   @Nullable FullyQualified supertype,
                                   @Nullable FullyQualified owningClass,
-                                  List<JavaType.Class> annotations,
+                                  List<FullyQualified> annotations,
                                   boolean relaxedClassTypeMatching) {
             Set<JavaType.Class> variants = flyweights.get(fullyQualifiedName);
             if (relaxedClassTypeMatching && variants != null && !variants.isEmpty()) {
@@ -364,7 +372,7 @@ public interface JavaType extends Serializable {
                                                      @Nullable List<Method> constructors,
                                                      @Nullable FullyQualified supertype,
                                                      @Nullable FullyQualified owningClass,
-                                                     List<JavaType.Class> annotations) {
+                                                     List<FullyQualified> annotations) {
             List<Variable> sortedMembers;
             if (!members.isEmpty()) {
                 if (fullyQualifiedName.equals("java.lang.String")) {
@@ -412,7 +420,8 @@ public interface JavaType extends Serializable {
                     fullyQualifiedName.equals(c.fullyQualifiedName) &&
                     TypeUtils.deepEquals(members, c.members) &&
                     TypeUtils.deepEquals(interfaces, c.interfaces) &&
-                    TypeUtils.deepEquals(supertype, c.supertype));
+                    TypeUtils.deepEquals(supertype, c.supertype)) &&
+                    TypeUtils.deepEquals(annotations, c.annotations);
         }
 
         @Override
@@ -484,6 +493,11 @@ public interface JavaType extends Serializable {
         }
 
         @Override
+        public List<FullyQualified> getAnnotations() {
+            return type.getAnnotations();
+        }
+
+        @Override
         public boolean hasFlags(Flag... test) {
             return type.hasFlags();
         }
@@ -550,6 +564,11 @@ public interface JavaType extends Serializable {
         }
 
         @Override
+        public List<FullyQualified> getAnnotations() {
+            return emptyList();
+        }
+
+        @Override
         public boolean hasFlags(Flag... test) {
             return test.length == 1 && test[0] == Flag.Public;
         }
@@ -561,12 +580,12 @@ public interface JavaType extends Serializable {
 
         @Override
         public List<FullyQualified> getInterfaces() {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         @Override
         public List<Variable> getMembers() {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         @Override
@@ -581,7 +600,7 @@ public interface JavaType extends Serializable {
 
         @Override
         public List<Variable> getVisibleSupertypeMembers() {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         @Override
@@ -813,6 +832,11 @@ public interface JavaType extends Serializable {
         private final FullyQualified bound;
 
         @Override
+        public List<FullyQualified> getAnnotations() {
+            return bound == null ? emptyList() : bound.getAnnotations();
+        }
+
+        @Override
         public Class.Kind getKind() {
             return Class.Kind.Class;
         }
@@ -824,17 +848,17 @@ public interface JavaType extends Serializable {
 
         @Override
         public Set<Flag> getFlags() {
-            return bound == null ? Collections.emptySet() : bound.getFlags();
+            return bound == null ? emptySet() : bound.getFlags();
         }
 
         @Override
         public List<FullyQualified> getInterfaces() {
-            return bound == null ? Collections.emptyList() : bound.getInterfaces();
+            return bound == null ? emptyList() : bound.getInterfaces();
         }
 
         @Override
         public List<Variable> getMembers() {
-            return bound == null ? Collections.emptyList() : bound.getMembers();
+            return bound == null ? emptyList() : bound.getMembers();
         }
 
         @Override
@@ -849,7 +873,7 @@ public interface JavaType extends Serializable {
 
         @Override
         public List<Variable> getVisibleSupertypeMembers() {
-            return bound == null ? Collections.emptyList() : bound.getVisibleSupertypeMembers();
+            return bound == null ? emptyList() : bound.getVisibleSupertypeMembers();
         }
 
         @Override
