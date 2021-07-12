@@ -130,7 +130,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
                         })
                         .collect(toList()),
                 null,
-                new InMemoryExecutionContext()
+                ctx
         );
     }
 

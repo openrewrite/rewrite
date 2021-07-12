@@ -1025,7 +1025,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         J.Try.Resource r = tryResource;
         r = tryResource.withPrefix(visitSpace(r.getPrefix(), Space.Location.TRY_RESOURCE, p));
         r = r.withMarkers(visitMarkers(r.getMarkers(), p));
-        r = tryResource.withVariableDeclarations(visitAndCast(r.getVariableDeclarations(), p, this::visitVariableDeclarations));
+        r = tryResource.withVariableDeclarations(visitAndCast(r.getVariableDeclarations(), p));
         return r;
     }
 

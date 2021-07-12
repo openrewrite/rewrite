@@ -26,9 +26,22 @@ import java.util.concurrent.atomic.AtomicInteger
 
 interface TryCatchTest : JavaTreeTest {
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/763")
+    @Test
+    fun tryWithResourcesIdentifier(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        Block,
+        """
+            InputStream in;
+            try (in) {
+            }
+        """
+    )
+
     @Test
     fun catchRightPadding(jp: JavaParser) {
-        val j = jp.parse("""
+        val j = jp.parse(
+            """
             class Test {
                 void method() {
                     try {
@@ -38,9 +51,10 @@ interface TryCatchTest : JavaTreeTest {
                     }
                 }
             }
-        """.trimIndent())[0]
+        """.trimIndent()
+        )[0]
 
-        object: JavaIsoVisitor<Int>() {
+        object : JavaIsoVisitor<Int>() {
             override fun visitCatch(c: J.Try.Catch, p: Int): J.Try.Catch {
                 assertThat(c.parameter.padding.tree.after.whitespace).isEqualTo(" ")
                 return super.visitCatch(c, p)

@@ -22,13 +22,9 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.NameTree;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -70,12 +66,17 @@ public class UnnecessaryThrows extends Recipe {
 
                         @Override
                         public J.Try.Resource visitTryResource(J.Try.Resource tryResource, ExecutionContext executionContext) {
-                            JavaType.FullyQualified resourceType = tryResource.getVariableDeclarations().getTypeAsFullyQualified();
-                            if (TypeUtils.isAssignableTo(JavaType.Class.build("java.io.Closeable"), resourceType)) {
-                                unusedThrows.remove(JavaType.Class.build("java.io.IOException"));
-                            } else if (TypeUtils.isAssignableTo(JavaType.Class.build("java.lang.AutoCloseable"), resourceType)) {
-                                unusedThrows.remove(JavaType.Class.build("java.lang.Exception"));
+                            TypedTree resource = tryResource.getVariableDeclarations();
+
+                            JavaType.FullyQualified resourceType = TypeUtils.asFullyQualified(resource.getType());
+                            if (resourceType != null) {
+                                if (TypeUtils.isAssignableTo(JavaType.Class.build("java.io.Closeable"), resourceType)) {
+                                    unusedThrows.remove(JavaType.Class.build("java.io.IOException"));
+                                } else if (TypeUtils.isAssignableTo(JavaType.Class.build("java.lang.AutoCloseable"), resourceType)) {
+                                    unusedThrows.remove(JavaType.Class.build("java.lang.Exception"));
+                                }
                             }
+
                             return super.visitTryResource(tryResource, executionContext);
                         }
 

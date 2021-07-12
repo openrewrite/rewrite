@@ -1132,7 +1132,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
             for (int i = 0; i < node.getResources().size(); i++) {
                 Tree resource = node.getResources().get(i);
-                J.VariableDeclarations resourceVar = convert(resource);
+                J resourceVar = convert(resource);
                 boolean semicolonPresent = true;
                 if (i == node.getResources().size() - 1) {
                     semicolonPresent = positionOfNext(";", ')') > 0;
@@ -1141,8 +1141,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 Space resourcePrefix = resourceVar.getPrefix();
                 resourceVar = resourceVar.withPrefix(EMPTY); // moved to the containing Try.Resource
 
-                if (semicolonPresent) {
-                    resourceVar = resourceVar.getPadding().withVariables(Space.formatLastSuffix(resourceVar
+                if (semicolonPresent && resourceVar instanceof J.VariableDeclarations) {
+                    J.VariableDeclarations resourceVarDecl = (J.VariableDeclarations) resourceVar;
+                    resourceVar = resourceVarDecl.getPadding().withVariables(Space.formatLastSuffix(resourceVarDecl
                             .getPadding().getVariables(), sourceBefore(";")));
                 }
 

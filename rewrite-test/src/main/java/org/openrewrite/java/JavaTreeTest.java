@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.TreeSerializer;
 import org.openrewrite.internal.StringUtils;
@@ -24,8 +25,13 @@ import java.util.Arrays;
 
 import static java.util.stream.Collectors.joining;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 
 public interface JavaTreeTest {
+    default ExecutionContext getExecutionContext() {
+        return new InMemoryExecutionContext(t -> fail("Failed to parse", t));
+    }
+
     default void assertParsePrintAndProcess(JavaParser parser, NestingLevel nestingLevel, String code,
                                             String... imports) {
         String source = Arrays.stream(imports).map(i -> "import " + i + ";").collect(joining(""));
@@ -42,7 +48,7 @@ public interface JavaTreeTest {
                 break;
         }
 
-        J.CompilationUnit cu = parser.parse(new InMemoryExecutionContext(t -> {throw new RuntimeException(t.getMessage(), t);}), source).iterator().next();
+        J.CompilationUnit cu = parser.parse(getExecutionContext(), source).iterator().next();
 
         J processed = new JavaVisitor<>().visit(cu, new Object());
         assertThat(processed).as("Processing is idempotent").isSameAs(cu);

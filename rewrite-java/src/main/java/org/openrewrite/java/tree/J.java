@@ -4341,7 +4341,7 @@ public interface J extends Serializable, Tree {
             Markers markers;
 
             @With
-            VariableDeclarations variableDeclarations;
+            TypedTree variableDeclarations;
 
             /**
              * Only honored on the last resource in a collection of resources.
@@ -4730,7 +4730,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class VariableDeclarations implements J, Statement {
+    final class VariableDeclarations implements J, Statement, TypedTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -4805,6 +4805,19 @@ public interface J extends Serializable, Tree {
         @Nullable
         public JavaType.FullyQualified getTypeAsFullyQualified() {
             return typeExpression == null ? null : TypeUtils.asFullyQualified(typeExpression.getType());
+        }
+
+        @Nullable
+        @Override
+        public JavaType getType() {
+            return typeExpression == null ? null : typeExpression.getType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public VariableDeclarations withType(@Nullable JavaType type) {
+            return typeExpression == null ? this :
+                    withTypeExpression(typeExpression.withType(type));
         }
 
         @ToString
