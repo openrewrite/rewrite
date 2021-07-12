@@ -47,6 +47,9 @@ public class OrderImports extends Recipe {
     @Option(displayName = "Remove unused", description = "Remove unnecessary imports.", required = false, example = "true")
     private boolean removeUnused = true;
 
+    public OrderImports() {
+    }
+
     @JsonCreator
     public OrderImports(boolean removeUnused) {
         this.removeUnused = removeUnused;

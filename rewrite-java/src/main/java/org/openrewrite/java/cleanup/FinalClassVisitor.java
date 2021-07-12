@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
@@ -44,18 +43,21 @@ public class FinalClassVisitor extends JavaIsoVisitor<ExecutionContext> {
         }
 
         boolean allPrivate = true;
-        List<J.MethodDeclaration> constructors = new ArrayList<>();
+        int constructorCount = 0;
         for(Statement s : cd.getBody().getStatements()) {
             if(s instanceof J.MethodDeclaration && ((J.MethodDeclaration)s).isConstructor()) {
                 J.MethodDeclaration constructor = (J.MethodDeclaration)s;
-                constructors.add(constructor);
+                constructorCount++;
                 if(!constructor.hasModifier(J.Modifier.Type.Private)) {
                     allPrivate = false;
                 }
             }
+            if(constructorCount > 0 && !allPrivate) {
+                return cd;
+            }
         }
 
-        if(constructors.size() > 0 && allPrivate) {
+        if(constructorCount > 0) {
             List<J.Modifier> modifiers = new ArrayList<>(cd.getModifiers());
             modifiers.add(new J.Modifier(randomId(), Space.EMPTY, Markers.EMPTY,  J.Modifier.Type.Final, emptyList()));
             modifiers = sortModifiers(modifiers);
