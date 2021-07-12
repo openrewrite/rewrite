@@ -35,7 +35,7 @@ public class OrderImportsBenchmark {
 
     @Benchmark
     public void orderImports(JavaCompilationUnitState state) {
-        new OrderImports().run(state.getSourceFiles());
+        new OrderImports(false).run(state.getSourceFiles());
     }
 
     public static void main(String[] args) throws RunnerException {

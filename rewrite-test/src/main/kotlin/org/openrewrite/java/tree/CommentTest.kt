@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.tree
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTreeTest
@@ -33,5 +34,18 @@ interface CommentTest : JavaTreeTest {
                 */
             }
         """
+    )
+
+    @Test
+    @Disabled("https://github.com/openrewrite/rewrite/issues/764")
+    fun multilineNestedInsideSingleLine(jp: JavaParser) = assertParsePrintAndProcess(
+            jp,
+            CompilationUnit,
+            """
+                class Test {
+                    // /* + /hotel -> /hotel ; "/*.*" + "/*.html" -> /*.html
+			        // However /user + /user -> /usr/user ; /{foo} + /bar -> /{foo}/bar
+                }
+            """
     )
 }
