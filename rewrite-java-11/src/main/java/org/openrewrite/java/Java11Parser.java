@@ -127,7 +127,7 @@ public class Java11Parser implements JavaParser {
             public void write(char[] cbuf, int off, int len) {
                 if (logCompilationWarningsAndErrors) {
                     String log = new String(Arrays.copyOfRange(cbuf, off, len));
-                    if (!log.isBlank() && !log.startsWith("warning: a package-info.java file has already")) {
+                    if (!log.isBlank() && !log.contains("warning: a package-info.java file has already")) {
                         org.slf4j.LoggerFactory.getLogger(Java11Parser.class).warn(log);
                     }
                 }
