@@ -24,10 +24,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.marker.JavaSearchResult;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.NameTree;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -65,6 +62,16 @@ public class FindTypes extends Recipe {
         return new JavaVisitor<ExecutionContext>() {
 
             @Override
+            public J visitIdentifier(J.Identifier ident, ExecutionContext executionContext) {
+                if (ident.getType() != null) {
+                    if (fullyQualifiedType.equals(TypeUtils.asFullyQualified(ident.getType()))) {
+                        return ident.withMarkers(ident.getMarkers().addIfAbsent(new JavaSearchResult(FindTypes.this)));
+                    }
+                }
+                return super.visitIdentifier(ident, executionContext);
+            }
+
+            @Override
             public <N extends NameTree> N visitTypeName(N name, ExecutionContext ctx) {
                 N n = super.visitTypeName(name, ctx);
                 JavaType.FullyQualified asFullyQualified = TypeUtils.asFullyQualified(n.getType());
@@ -92,6 +99,16 @@ public class FindTypes extends Recipe {
         JavaType.FullyQualified fullyQualifiedType = JavaType.Class.build(fullyQualifiedClassName);
 
         JavaIsoVisitor<Set<NameTree>> findVisitor = new JavaIsoVisitor<Set<NameTree>>() {
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier ident, Set<NameTree> ns) {
+                if (ident.getType() != null) {
+                    if (fullyQualifiedType.equals(TypeUtils.asFullyQualified(ident.getType()))) {
+                        ns.add(ident);
+                    }
+                }
+                return super.visitIdentifier(ident, ns);
+            }
+
             @Override
             public <N extends NameTree> N visitTypeName(N name, Set<NameTree> ns) {
                 N n = super.visitTypeName(name, ns);

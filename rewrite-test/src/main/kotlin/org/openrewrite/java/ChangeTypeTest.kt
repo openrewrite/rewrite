@@ -42,6 +42,27 @@ interface ChangeTypeTest : JavaRecipeTest {
         """.trimIndent()
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/768")
+    @Test
+    fun changeStaticFieldAccess(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = ChangeType("java.io.File", "my.pkg.List"),
+        before = """
+            import java.io.File;
+            
+            class Test {
+                String p = File.separator;
+            }
+        """,
+        after = """
+            import my.pkg.List;
+            
+            class Test {
+                String p = List.separator;
+            }
+        """
+    )
+
     @Test
     fun dontAddImportWhenNoChangesWereMade(jp: JavaParser) = assertUnchanged(
         jp,
