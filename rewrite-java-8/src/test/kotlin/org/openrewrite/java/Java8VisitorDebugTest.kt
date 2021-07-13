@@ -207,6 +207,10 @@ class Java8ModifierOrderTest : Java8Test, ModifierOrderTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8NoFinalizerTest : Java8Test, NoFinalizerTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8NormalizeFormatTest : Java8Test, NormalizeFormatTest
 
 @DebugOnly
