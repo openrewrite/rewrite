@@ -18,6 +18,7 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
@@ -25,7 +26,7 @@ import org.openrewrite.java.tree.J;
 public class NoFinalizer extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Remove `finalize()` method declarations.";
+        return "Remove `finalize()` finalizer method.";
     }
 
     @Override
@@ -42,12 +43,20 @@ public class NoFinalizer extends Recipe {
         private static final MethodMatcher FINALIZER = new MethodMatcher("java.lang.Object finalize()");
 
         @Override
-        public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-            if (FINALIZER.matches(method, getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class))) {
-                return null;
-            }
-            return super.visitMethodDeclaration(method, ctx);
+        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+            J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
+            cd = cd.withBody(cd.getBody().withStatements(ListUtils.map(cd.getBody().getStatements(), stmt -> {
+                if (stmt instanceof J.MethodDeclaration) {
+                    if (FINALIZER.matches((J.MethodDeclaration) stmt, classDecl)) {
+                        return null;
+                    }
+                }
+                return stmt;
+            })));
+
+            return cd;
         }
+
     }
 
 }
