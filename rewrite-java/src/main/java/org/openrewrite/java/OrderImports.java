@@ -15,11 +15,11 @@
  */
 package org.openrewrite.java;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.*;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
 import org.openrewrite.Option;
+import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.style.ImportLayoutStyle;
@@ -37,23 +37,16 @@ import java.util.Optional;
  * <p>
  * The @{link {@link OrderImports#removeUnused}} flag (which is defaulted to true) can be used to also remove any
  * imports that are not referenced within the compilation unit.
- */
+         */
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class OrderImports extends Recipe {
 
-    @SuppressWarnings("FieldMayBeFinal")
-    @Getter
-    @With
-    @Option(displayName = "Remove unused", description = "Remove unnecessary imports.", required = false, example = "true")
-    private boolean removeUnused = true;
-
-    public OrderImports() {
-    }
-
-    @JsonCreator
-    public OrderImports(boolean removeUnused) {
-        this.removeUnused = removeUnused;
-    }
+    @Option(displayName = "Remove unused",
+            description = "Remove unnecessary imports.",
+            required = false,
+            example = "true")
+    boolean removeUnused;
 
     @Override
     public String getDisplayName() {

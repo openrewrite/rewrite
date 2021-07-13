@@ -220,7 +220,7 @@ interface OrderImportsTest : JavaRecipeTest {
     @Test
     fun unfoldStar(jp: JavaParser) = assertChanged(
         jp,
-        recipe = recipe.withRemoveUnused(true),
+        recipe = OrderImports(true),
         before = """
             import java.util.*;
             
@@ -242,7 +242,7 @@ interface OrderImportsTest : JavaRecipeTest {
     @Test
     fun unfoldStarMultiple(jp: JavaParser) = assertChanged(
         jp,
-        recipe = recipe.withRemoveUnused(true),
+        recipe = OrderImports(true),
         before = """
             import java.util.*;
             
@@ -267,7 +267,7 @@ interface OrderImportsTest : JavaRecipeTest {
     @Test
     fun removeUnused(jp: JavaParser) = assertChanged(
         jp,
-        recipe = recipe.withRemoveUnused(true),
+        recipe = OrderImports(true),
         before = """
             import java.util.*;
             
@@ -283,7 +283,7 @@ interface OrderImportsTest : JavaRecipeTest {
     @Test
     fun unfoldStaticStar(jp: JavaParser) = assertChanged(
         jp,
-        recipe = recipe.withRemoveUnused(true),
+        recipe = OrderImports(true),
         before = """
             import java.util.List;
             
@@ -456,7 +456,7 @@ interface OrderImportsTest : JavaRecipeTest {
     @Test
     fun preservesStaticInheritanceImport(jp: JavaParser) = assertUnchanged(
         jp,
-        recipe = recipe.withRemoveUnused(true),
+        recipe = OrderImports(true),
         dependsOn = arrayOf(
             """
                 package com.baz;
@@ -499,7 +499,7 @@ interface OrderImportsTest : JavaRecipeTest {
     @Test
     fun preservesStaticMethodArguments(jp: JavaParser) = assertUnchanged(
         jp,
-        recipe = recipe.withRemoveUnused(true),
+        recipe = OrderImports(true),
         dependsOn = arrayOf(
             """
                 package com.foo;
@@ -531,7 +531,7 @@ interface OrderImportsTest : JavaRecipeTest {
     @Test
     fun preservesDifferentStaticImportsFromSamePackage(jp: JavaParser) = assertUnchanged(
         jp,
-        recipe = recipe.withRemoveUnused(true),
+        recipe = OrderImports(true),
         dependsOn = arrayOf(a, b),
         before = """
             package org.bar;
@@ -552,7 +552,7 @@ interface OrderImportsTest : JavaRecipeTest {
     @Test
     fun collapsesDifferentStaticImportsFromSamePackage(jp: JavaParser) = assertChanged(
         jp,
-        recipe = recipe.withRemoveUnused(true),
+        recipe = OrderImports(true),
         dependsOn = arrayOf(a, b),
         before = """
             package org.bar;
@@ -668,7 +668,6 @@ interface OrderImportsTest : JavaRecipeTest {
     @Test
     fun groupImportsIsAwareOfNestedClasses(jp: JavaParser) = assertChanged(
         jp,
-        recipe = recipe.withRemoveUnused(false),
         dependsOn = arrayOf(
             """
             package org.abc;
@@ -726,7 +725,6 @@ interface OrderImportsTest : JavaRecipeTest {
     @Test
     fun detectBlockPattern(jp: JavaParser) = assertUnchanged(
         jp,
-        recipe = recipe.withRemoveUnused(false),
         before = """
             package org.bar;
             
@@ -768,7 +766,6 @@ interface OrderImportsTest : JavaRecipeTest {
                 )
             )
         ).build(),
-        recipe = recipe.withRemoveUnused(false),
         before = """
             package org.bar;
             
