@@ -23,13 +23,6 @@ import org.openrewrite.Recipe
 import org.openrewrite.config.Environment
 
 class EnvironmentTest {
-    @Suppress("unused")
-    class MixedConstructorRecipe @JsonCreator constructor(val opt: Boolean) : Recipe() {
-        constructor() : this(true)
-
-        override fun getDisplayName(): String = "Mixed constructor"
-    }
-
     @Issue("https://github.com/openrewrite/rewrite/issues/616")
     @Test
     fun canLoadRecipeWithZeroArgsConstructorAndPrimaryConstructor() {
@@ -51,4 +44,11 @@ class EnvironmentTest {
         val styles = env.listStyles()
         assertThat(styles).isNotEmpty
     }
+}
+
+@Suppress("unused")
+class MixedConstructorRecipe @JsonCreator constructor(val opt: Boolean) : Recipe() {
+    constructor() : this(true)
+
+    override fun getDisplayName(): String = "Mixed constructor"
 }

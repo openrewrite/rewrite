@@ -24,10 +24,12 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.newSetFromMap;
 
 @RequiredArgsConstructor
 public class AnnotationTemplateGenerator {
@@ -43,7 +45,7 @@ public class AnnotationTemplateGenerator {
                     StringBuilder before = new StringBuilder();
                     StringBuilder after = new StringBuilder();
 
-                    template(next(cursor), cursor.getValue(), before, after);
+                    template(next(cursor), cursor.getValue(), before, after, newSetFromMap(new IdentityHashMap<>()));
 
                     J j = cursor.getValue();
                     if (j instanceof J.MethodDeclaration) {
@@ -77,7 +79,8 @@ public class AnnotationTemplateGenerator {
         return annotations;
     }
 
-    private void template(Cursor cursor, J prior, StringBuilder before, StringBuilder after) {
+    private void template(Cursor cursor, J prior, StringBuilder before, StringBuilder after, Set<J> templated) {
+        templated.add(cursor.getValue());
         J j = cursor.getValue();
         if (j instanceof J.CompilationUnit) {
             J.CompilationUnit cu = (J.CompilationUnit) j;
@@ -96,7 +99,7 @@ public class AnnotationTemplateGenerator {
         if (j instanceof J.Block) {
             J parent = next(cursor).getValue();
             if (parent instanceof J.ClassDeclaration) {
-                classDeclaration(before, (J.ClassDeclaration) parent);
+                classDeclaration(before, (J.ClassDeclaration) parent, templated);
                 after.append('}');
             } else if (parent instanceof J.MethodDeclaration) {
                 J.MethodDeclaration m = (J.MethodDeclaration) parent;
@@ -159,12 +162,16 @@ public class AnnotationTemplateGenerator {
             after.append("};");
         }
 
-        template(next(cursor), j, before, after);
+        template(next(cursor), j, before, after, templated);
     }
 
-    private void classDeclaration(StringBuilder before, J.ClassDeclaration parent) {
+    private void classDeclaration(StringBuilder before, J.ClassDeclaration parent, Set<J> templated) {
         J.ClassDeclaration c = parent;
         for (Statement statement : c.getBody().getStatements()) {
+            if(templated.contains(statement)) {
+                continue;
+            }
+
             if (statement instanceof J.VariableDeclarations) {
                 J.VariableDeclarations v = (J.VariableDeclarations) statement;
                 if (v.hasModifier(J.Modifier.Type.Final) && v.hasModifier(J.Modifier.Type.Static)) {
@@ -174,7 +181,7 @@ public class AnnotationTemplateGenerator {
                 // this is a sibling class. we need declarations for all variables and methods.
                 // setting prior to null will cause them all to be written.
                 before.insert(0, '}');
-                classDeclaration(before, (J.ClassDeclaration) statement);
+                classDeclaration(before, (J.ClassDeclaration) statement, templated);
             }
         }
         c = c.withBody(null).withLeadingAnnotations(null).withPrefix(Space.EMPTY);
