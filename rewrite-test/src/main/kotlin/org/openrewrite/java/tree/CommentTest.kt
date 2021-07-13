@@ -37,14 +37,11 @@ interface CommentTest : JavaTreeTest {
     )
 
     @Test
-    @Disabled("https://github.com/openrewrite/rewrite/issues/764")
     fun multilineNestedInsideSingleLine(jp: JavaParser) = assertParsePrintAndProcess(
             jp,
             CompilationUnit,
             """
-                class Test {
-                    // /* + /hotel -> /hotel ; "/*.*" + "/*.html" -> /*.html
-			        // However /user + /user -> /usr/user ; /{foo} + /bar -> /{foo}/bar
+                class Test {// /*
                 }
             """
     )

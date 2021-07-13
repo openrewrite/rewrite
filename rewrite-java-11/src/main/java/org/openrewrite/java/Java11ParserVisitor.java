@@ -1884,8 +1884,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
         int delimIndex = cursor;
         for (; delimIndex < source.length() - untilDelim.length() + 1; delimIndex++) {
-            if (inSingleLineComment && source.charAt(delimIndex) == '\n') {
-                inSingleLineComment = false;
+            if (inSingleLineComment) {
+                if(source.charAt(delimIndex) == '\n') {
+                    inSingleLineComment = false;
+                }
             } else {
                 if (source.length() - untilDelim.length() > delimIndex + 1) {
                     switch (source.substring(delimIndex, delimIndex + 2)) {

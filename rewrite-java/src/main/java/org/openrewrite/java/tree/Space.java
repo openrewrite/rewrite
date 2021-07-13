@@ -153,7 +153,9 @@ public class Space {
         for (char c : charArray) {
             switch (c) {
                 case '/':
-                    if (last == '/' && !inSingleLineComment && !inMultiLineComment && !inJavadoc) {
+                    if (inSingleLineComment) {
+                        comment.append(c);
+                    } else if (last == '/' && !inMultiLineComment && !inJavadoc) {
                         inSingleLineComment = true;
                         comment = new StringBuilder();
                     } else if (last == '*' && inMultiLineComment && comment.length() > 0) {
@@ -189,7 +191,9 @@ public class Space {
                     }
                     break;
                 case '*':
-                    if (last == '/' && !inMultiLineComment && !inJavadoc) {
+                    if (inSingleLineComment) {
+                        comment.append(c);
+                    } else if (last == '/' && !inMultiLineComment && !inJavadoc) {
                         inMultiLineComment = true;
                         comment = new StringBuilder();
                     } else if (last == '*' && inMultiLineComment && comment.toString().isEmpty()) {
