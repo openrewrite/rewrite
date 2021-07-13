@@ -26,12 +26,12 @@ import org.openrewrite.java.tree.J;
 public class NoFinalizer extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Remove `finalize()` finalizer method.";
+        return "Remove `finalize()` method";
     }
 
     @Override
     public String getDescription() {
-        return "Finalizers are problematic, and their use can lead to performance issues, deadlocks, hangs, and other unnecessary behavior.";
+        return "Finalizers are deprecated. Use of `finalize()` can lead to performance issues, deadlocks, hangs, and other undesirable behavior.";
     }
 
     @Override
