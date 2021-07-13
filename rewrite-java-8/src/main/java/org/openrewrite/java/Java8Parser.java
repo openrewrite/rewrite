@@ -20,6 +20,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 
 import java.io.File;
+import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;

@@ -26,18 +26,6 @@ import java.util.concurrent.atomic.AtomicInteger
 
 interface TryCatchTest : JavaTreeTest {
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/763")
-    @Test
-    fun tryWithResourcesIdentifier(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        Block,
-        """
-            InputStream in;
-            try (in) {
-            }
-        """
-    )
-
     @Test
     fun catchRightPadding(jp: JavaParser) {
         val j = jp.parse(

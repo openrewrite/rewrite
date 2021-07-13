@@ -26,8 +26,7 @@ import org.openrewrite.java.marker.JavaSearchResult
 import org.openrewrite.java.search.FindTypes
 
 @ExtendWith(JavaParserResolver::class)
-class VariableDeclarations11Test : JavaTreeTest {
-    fun javaParser(): Java11Parser.Builder = Java11Parser.builder()
+class VariableDeclarationsJava11Test : JavaTreeTest, Java11Test {
 
     @Test
     fun implicitlyDeclaredLocalVariable(jp: JavaParser) = assertParsePrintAndProcess(
@@ -42,7 +41,6 @@ class VariableDeclarations11Test : JavaTreeTest {
 
     @Test
     fun implicitlyDeclaredLocalAstValidation(jp: JavaParser) {
-
         val statements = (jp.parse("""
             import java.util.Date;
             public class Sample {
@@ -71,7 +69,7 @@ class VariableDeclarations11Test : JavaTreeTest {
         assertThat(secondVariable.prefix.comments[0].suffix).isEqualTo("   ")
     }
 
-    fun typeTree(statement : Statement) : J.VarType {
+    private fun typeTree(statement : Statement) : J.VarType {
         return (statement as J.VariableDeclarations).typeExpression as J.VarType
     }
 
