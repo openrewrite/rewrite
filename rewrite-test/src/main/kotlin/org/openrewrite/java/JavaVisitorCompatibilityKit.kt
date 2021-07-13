@@ -230,6 +230,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class TypeTreeTck : TypeTreeTest
 
     @Nested
+    inner class StringLiteralEqualityTestTck : StringLiteralEqualityTest
+
+    @Nested
     inner class UnnecessaryExplicitTypeArgumentsTck : UnnecessaryExplicitTypeArgumentsTest
 
     @Nested

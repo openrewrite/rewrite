@@ -287,6 +287,10 @@ class Java8TypeTreeTest : Java8Test, TypeTreeTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8StringLiteralEqualityTest : Java8Test, StringLiteralEqualityTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8UnnecessaryExplicitTypeArgumentsTest : Java8Test, UnnecessaryExplicitTypeArgumentsTest
 
 @DebugOnly
