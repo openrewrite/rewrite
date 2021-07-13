@@ -246,6 +246,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             a = (J.Assert) temp;
         }
         a = a.withCondition(visitAndCast(a.getCondition(), p));
+        a = a.withDetail(visitLeftPadded(a.getDetail(), JLeftPadded.Location.ASSERT_DETAIL, p));
         return a;
     }
 

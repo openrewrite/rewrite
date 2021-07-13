@@ -268,6 +268,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
         StringBuilder acc = getPrinter();
         acc.append("assert");
         visit(azzert.getCondition(), p);
+        visitLeftPadded(":", azzert.getDetail(), JLeftPadded.Location.ASSERT_DETAIL, p);
         return azzert;
     }
 

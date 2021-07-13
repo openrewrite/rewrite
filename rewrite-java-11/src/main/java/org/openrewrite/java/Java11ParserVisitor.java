@@ -179,7 +179,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     @Override
     public J visitAssert(AssertTree node, Space fmt) {
         skip("assert");
-        return new J.Assert(randomId(), fmt, Markers.EMPTY, convert(((JCAssert) node).cond));
+        JCAssert jcAssert = (JCAssert) node;
+        return new J.Assert(randomId(), fmt, Markers.EMPTY,
+                convert(jcAssert.cond),
+                jcAssert.detail == null ? null : padLeft(sourceBefore(":"), convert(jcAssert.detail)));
     }
 
     @Override

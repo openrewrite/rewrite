@@ -316,6 +316,10 @@ public interface J extends Serializable, Tree {
         @With
         Expression condition;
 
+        @Nullable
+        @With
+        JLeftPadded<Expression> detail;
+
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitAssert(this, p);

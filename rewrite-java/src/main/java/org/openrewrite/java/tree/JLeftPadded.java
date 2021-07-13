@@ -66,6 +66,7 @@ public class JLeftPadded<T> {
     }
 
     public enum Location {
+        ASSERT_DETAIL(Space.Location.ASSERT_DETAIL_PREFIX),
         ASSIGNMENT(Space.Location.ASSIGNMENT),
         ASSIGNMENT_OPERATION_OPERATOR(Space.Location.ASSIGNMENT_OPERATION_OPERATOR),
         BINARY_OPERATOR(Space.Location.BINARY_OPERATOR),

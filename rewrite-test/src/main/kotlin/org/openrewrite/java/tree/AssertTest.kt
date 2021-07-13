@@ -16,6 +16,7 @@
 package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTreeTest
 import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
@@ -27,5 +28,14 @@ interface AssertTest : JavaTreeTest {
         jp, Block, """
             assert 1 == 1;
         """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/766")
+    @Test
+    fun assertDetail(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, Block, """
+            assert newRouting.initializing() == false :
+                        "a started primary shard; ";
+        """.trimIndent()
     )
 }
