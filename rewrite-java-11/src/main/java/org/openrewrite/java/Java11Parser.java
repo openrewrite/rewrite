@@ -127,7 +127,7 @@ public class Java11Parser implements JavaParser {
             public void write(char[] cbuf, int off, int len) {
                 if (logCompilationWarningsAndErrors) {
                     String log = new String(Arrays.copyOfRange(cbuf, off, len));
-                    if (!log.isBlank()) {
+                    if (!log.isBlank() && !log.startsWith("warning: a package-info.java file has already")) {
                         org.slf4j.LoggerFactory.getLogger(Java11Parser.class).warn(log);
                     }
                 }
@@ -388,7 +388,7 @@ public class Java11Parser implements JavaParser {
             classReader.accept(new ClassVisitor(Opcodes.ASM9) {
                 @Override
                 public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
-                    if(name.contains("/")) {
+                    if (name.contains("/")) {
                         pkgRef.set(name.substring(0, name.lastIndexOf('/'))
                                 .replace('/', '.'));
                         nameRef.set(name.substring(name.lastIndexOf('/') + 1));

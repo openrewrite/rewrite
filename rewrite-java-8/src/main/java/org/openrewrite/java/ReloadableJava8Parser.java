@@ -34,8 +34,8 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.style.NamedStyles;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.style.NamedStyles;
 
 import javax.tools.*;
 import java.io.*;
@@ -116,9 +116,11 @@ class ReloadableJava8Parser implements JavaParser {
         compilerLog.setWriters(new PrintWriter(new Writer() {
             @Override
             public void write(char[] cbuf, int off, int len) {
-                String log = new String(Arrays.copyOfRange(cbuf, off, len));
-                if (logCompilationWarningsAndErrors && !StringUtils.isBlank(log)) {
-                    org.slf4j.LoggerFactory.getLogger(ReloadableJava8Parser.class).warn(log);
+                if(logCompilationWarningsAndErrors) {
+                    String log = new String(Arrays.copyOfRange(cbuf, off, len));
+                    if (!StringUtils.isBlank(log) && !log.startsWith("warning: a package-info.java file has already")) {
+                        org.slf4j.LoggerFactory.getLogger(ReloadableJava8Parser.class).warn(log);
+                    }
                 }
             }
 
