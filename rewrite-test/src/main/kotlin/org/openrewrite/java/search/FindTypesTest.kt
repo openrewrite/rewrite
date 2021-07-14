@@ -23,7 +23,7 @@ import org.openrewrite.java.JavaRecipeTest
 
 interface FindTypesTest : JavaRecipeTest {
     override val recipe: FindTypes
-        get() = FindTypes("a.A1")
+        get() = FindTypes("a.A1", false)
 
     companion object {
         private const val a1 = """
@@ -59,7 +59,7 @@ interface FindTypesTest : JavaRecipeTest {
     @Test
     fun annotation(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindTypes("A1"),
+        recipe = FindTypes("A1", false),
         before = "@A1 public class B {}",
         after = "@/*~~>*/A1 public class B {}",
         dependsOn = arrayOf("public @interface A1 {}")
@@ -86,7 +86,7 @@ interface FindTypesTest : JavaRecipeTest {
     @Test
     fun classDecl(jp: JavaParser) = assertChanged(
         jp,
-        recipe = recipe.doNext(FindTypes("I1")),
+        recipe = recipe.doNext(FindTypes("I1", false)),
         before = """
             import a.A1;
             public class B extends A1 implements I1 {}
@@ -120,7 +120,7 @@ interface FindTypesTest : JavaRecipeTest {
     @Test
     fun methodWithParameterizedType(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindTypes("java.util.List"),
+        recipe = FindTypes("java.util.List", false),
         before = """
             import java.util.List;
             public class B {
@@ -244,9 +244,9 @@ interface FindTypesTest : JavaRecipeTest {
     )
 
     @Test
-    fun inheritedTypes(jp: JavaParser) = assertChanged(
+    fun assignableTypes(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindTypes("java.util.Collection"),
+        recipe = FindTypes("java.util.Collection", true),
         before = """
             import java.util.List;
             public class B {
@@ -256,7 +256,7 @@ interface FindTypesTest : JavaRecipeTest {
         after = """
             import java.util.List;
             public class B {
-               /*~~>*/List<String> l;
+               /*~~>*//*~~>*/List<String> l;
             }
         """
     )
@@ -300,13 +300,13 @@ interface FindTypesTest : JavaRecipeTest {
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = FindTypes(null)
+        var recipe = FindTypes(null, false)
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("fullyQualifiedTypeName")
 
-        recipe = FindTypes("com.foo.Foo")
+        recipe = FindTypes("com.foo.Foo", false)
         valid = recipe.validate()
         assertThat(valid.isValid).isTrue()
     }

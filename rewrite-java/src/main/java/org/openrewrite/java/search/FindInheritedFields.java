@@ -51,7 +51,7 @@ public class FindInheritedFields {
             }
             Set<JavaType.Variable> types = new HashSet<>();
             type.getMembers().stream()
-                    .filter(m -> !m.hasFlags(Flag.Private) && TypeUtils.hasElementType(m.getType(), fullyQualifiedName))
+                    .filter(m -> !m.hasFlags(Flag.Private) && TypeUtils.hasElementTypeAssignable(m.getType(), fullyQualifiedName))
                     .forEach(types::add);
             types.addAll(superFields(type.getSupertype()));
             return types;

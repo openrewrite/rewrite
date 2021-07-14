@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.marker.JavaSearchResult;
@@ -40,6 +41,12 @@ public class FindTypes extends Recipe {
             description = "A fully-qualified type name, that is used to find matching type references.",
             example = "java.util.List")
     String fullyQualifiedTypeName;
+
+    @Option(displayName = "Check for assignability",
+            description = "When enabled, find type references that are assignable to the provided type.",
+            required = false)
+    @Nullable
+    Boolean checkAssignability;
 
     @Override
     public String getDisplayName() {
@@ -65,7 +72,8 @@ public class FindTypes extends Recipe {
             public J visitIdentifier(J.Identifier ident, ExecutionContext executionContext) {
                 if (ident.getType() != null) {
                     JavaType.FullyQualified type = TypeUtils.asFullyQualified(ident.getType());
-                    if (fullyQualifiedType.equals(type) && ident.getSimpleName().equals(type.getClassName())) {
+                    if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
+                            ident.getSimpleName().equals(type.getClassName())) {
                         return ident.withMarkers(ident.getMarkers().addIfAbsent(new JavaSearchResult(FindTypes.this)));
                     }
                 }
@@ -75,8 +83,8 @@ public class FindTypes extends Recipe {
             @Override
             public <N extends NameTree> N visitTypeName(N name, ExecutionContext ctx) {
                 N n = super.visitTypeName(name, ctx);
-                JavaType.FullyQualified asFullyQualified = TypeUtils.asFullyQualified(n.getType());
-                if (asFullyQualified != null && fullyQualifiedType.isAssignableFrom(asFullyQualified) &&
+                JavaType.FullyQualified type = TypeUtils.asFullyQualified(n.getType());
+                if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
                         getCursor().firstEnclosing(J.Import.class) == null) {
                     return n.withMarkers(n.getMarkers().addIfAbsent(new JavaSearchResult(FindTypes.this)));
                 }
@@ -86,8 +94,8 @@ public class FindTypes extends Recipe {
             @Override
             public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
                 J.FieldAccess fa = (J.FieldAccess) super.visitFieldAccess(fieldAccess, ctx);
-                JavaType.FullyQualified asFullyQualified = TypeUtils.asFullyQualified(fa.getTarget().getType());
-                if (asFullyQualified != null && fullyQualifiedType.isAssignableFrom(asFullyQualified) &&
+                JavaType.FullyQualified type = TypeUtils.asFullyQualified(fa.getTarget().getType());
+                if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
                         fa.getName().getSimpleName().equals("class")) {
                     return fa.withMarkers(fa.getMarkers().addIfAbsent(new JavaSearchResult(FindTypes.this)));
                 }
@@ -96,7 +104,15 @@ public class FindTypes extends Recipe {
         };
     }
 
+    public static Set<NameTree> findAssignable(J j, String fullyQualifiedClassName) {
+        return find(true, j, fullyQualifiedClassName);
+    }
+
     public static Set<NameTree> find(J j, String fullyQualifiedClassName) {
+        return find(false, j, fullyQualifiedClassName);
+    }
+
+    private static Set<NameTree> find(boolean checkAssignability, J j, String fullyQualifiedClassName) {
         JavaType.FullyQualified fullyQualifiedType = JavaType.Class.build(fullyQualifiedClassName);
 
         JavaIsoVisitor<Set<NameTree>> findVisitor = new JavaIsoVisitor<Set<NameTree>>() {
@@ -104,7 +120,7 @@ public class FindTypes extends Recipe {
             public J.Identifier visitIdentifier(J.Identifier ident, Set<NameTree> ns) {
                 if (ident.getType() != null) {
                     JavaType.FullyQualified type = TypeUtils.asFullyQualified(ident.getType());
-                    if (fullyQualifiedType.equals(type) && ident.getSimpleName().equals(type.getClassName())) {
+                    if (typeMatches(checkAssignability, fullyQualifiedType, type) && ident.getSimpleName().equals(type.getClassName())) {
                         ns.add(ident);
                     }
                 }
@@ -114,8 +130,8 @@ public class FindTypes extends Recipe {
             @Override
             public <N extends NameTree> N visitTypeName(N name, Set<NameTree> ns) {
                 N n = super.visitTypeName(name, ns);
-                JavaType.FullyQualified asFullyQualified = TypeUtils.asFullyQualified(n.getType());
-                if (asFullyQualified != null && fullyQualifiedType.isAssignableFrom(asFullyQualified) &&
+                JavaType.FullyQualified type = TypeUtils.asFullyQualified(n.getType());
+                if (typeMatches(checkAssignability, fullyQualifiedType, type) &&
                         getCursor().firstEnclosing(J.Import.class) == null) {
                     ns.add(name);
                 }
@@ -125,8 +141,8 @@ public class FindTypes extends Recipe {
             @Override
             public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Set<NameTree> ns) {
                 J.FieldAccess fa = super.visitFieldAccess(fieldAccess, ns);
-                JavaType.FullyQualified asFullyQualified = TypeUtils.asFullyQualified(fa.getTarget().getType());
-                if (asFullyQualified != null && fullyQualifiedType.isAssignableFrom(asFullyQualified) &&
+                JavaType.FullyQualified type = TypeUtils.asFullyQualified(fa.getTarget().getType());
+                if (typeMatches(checkAssignability, fullyQualifiedType, type) &&
                         fa.getName().getSimpleName().equals("class")) {
                     ns.add(fieldAccess);
                 }
@@ -137,5 +153,13 @@ public class FindTypes extends Recipe {
         Set<NameTree> ts = new HashSet<>();
         findVisitor.visit(j, ts);
         return ts;
+    }
+
+    private static boolean typeMatches(boolean checkAssignability, JavaType.FullyQualified match,
+                                       @Nullable JavaType.FullyQualified test) {
+        return test != null && (checkAssignability ?
+                match.isAssignableFrom(test) :
+                match.getFullyQualifiedName().equals(test.getFullyQualifiedName())
+        );
     }
 }

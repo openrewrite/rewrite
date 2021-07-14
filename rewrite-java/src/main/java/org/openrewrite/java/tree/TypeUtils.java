@@ -119,12 +119,22 @@ public class TypeUtils {
         return type instanceof JavaType.FullyQualified ? (JavaType.FullyQualified) type : null;
     }
 
-    public static boolean hasElementType(@Nullable JavaType type, String fullyQualifiedName) {
+    public static boolean hasElementTypeAssignable(@Nullable JavaType type, String fullyQualifiedName) {
         if (type instanceof JavaType.Array) {
             return hasElementType(((JavaType.Array) type).getElemType(), fullyQualifiedName);
         }
         if (type instanceof JavaType.Class || type instanceof JavaType.GenericTypeVariable) {
             return isAssignableTo(JavaType.Class.build(fullyQualifiedName), type);
+        }
+        return false;
+    }
+
+    public static boolean hasElementType(@Nullable JavaType type, String fullyQualifiedName) {
+        if (type instanceof JavaType.Array) {
+            return hasElementType(((JavaType.Array) type).getElemType(), fullyQualifiedName);
+        }
+        if (type instanceof JavaType.Class || type instanceof JavaType.GenericTypeVariable) {
+            return fullyQualifiedName.equals(((JavaType.FullyQualified) type).getFullyQualifiedName());
         }
         return false;
     }

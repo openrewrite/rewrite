@@ -69,7 +69,7 @@ interface JavaParserTest {
                 """.trimIndent()
                 )
 
-            assertThat(FindTypes("org.junit.jupiter.api.Test").run(cus)).isNotEmpty
+            assertThat(FindTypes("org.junit.jupiter.api.Test", false).run(cus)).isNotEmpty
         }
     }
 

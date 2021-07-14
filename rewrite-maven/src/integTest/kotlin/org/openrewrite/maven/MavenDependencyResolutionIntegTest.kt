@@ -1015,7 +1015,7 @@ class MavenDependencyResolutionIntegTest {
 
     private fun dependencyString(dep: Pom.Dependency, ignoreScopes: Boolean): String =
         dep.run { "$groupId:$artifactId:$version${if (classifier?.isNotBlank() == true) ":${classifier}" else ""}" } +
-                (if (ignoreScopes) "" else "[${dep.scope.toString().toLowerCase()}]") +
+                (if (ignoreScopes) "" else "[${dep.scope.toString().lowercase()}]") +
                 dep.run {
                     " https://repo1.maven.org/maven2/${
                         groupId.replace(

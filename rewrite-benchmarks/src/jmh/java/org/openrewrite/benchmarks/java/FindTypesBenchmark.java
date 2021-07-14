@@ -43,6 +43,6 @@ public class FindTypesBenchmark {
 
     @Benchmark
     public void findTypes(JavaCompilationUnitState state) {
-        new FindTypes("java.util.List").run(state.getSourceFiles());
+        new FindTypes("java.util.List", false).run(state.getSourceFiles());
     }
 }
