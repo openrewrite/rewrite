@@ -17,8 +17,9 @@ package org.openrewrite.java.cleanup;
 
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.style.StyleHelper;
+import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.style.Style;
+import org.openrewrite.style.StyleHelper;
 
 import java.util.regex.Pattern;
 
@@ -38,16 +39,6 @@ public class FallThroughStyle implements Style {
 
     @Override
     public Style applyDefaults() {
-        return StyleHelper.merge(fallThroughStyle(), this);
-    }
-
-    /**
-     * The default of what would be part of {@link org.openrewrite.java.style.IntelliJ} (as of the time of writing) is to not
-     * include this at all. Therefore, it is not included as a default there.
-     *
-     * @return instantiation of {@link FallThroughStyle} with default settings.
-     */
-    public static FallThroughStyle fallThroughStyle() {
-        return new FallThroughStyle(false);
+        return StyleHelper.merge(Checkstyle.fallThrough(), this);
     }
 }

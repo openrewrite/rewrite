@@ -19,9 +19,9 @@ import lombok.Value;
 import lombok.With;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.NullFields;
-import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.style.StyleHelper;
+import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.style.Style;
+import org.openrewrite.style.StyleHelper;
 
 @Value
 @With
@@ -50,7 +50,7 @@ public class EmptyBlockStyle implements Style {
          *         // This is a bad coding practice
          *     }
          */
-        Text,
+        TEXT,
 
         /**
          * Require that there is a statement in the block. For example:
@@ -58,11 +58,11 @@ public class EmptyBlockStyle implements Style {
          *         lock.release();
          *     }
          */
-        Statement
+        STATEMENT
     }
 
     @Override
     public Style applyDefaults() {
-        return StyleHelper.merge(IntelliJ.emptyBlock(), this);
+        return StyleHelper.merge(Checkstyle.emptyBlock(), this);
     }
 }

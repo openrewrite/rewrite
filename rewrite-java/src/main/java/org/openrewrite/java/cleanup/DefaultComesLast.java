@@ -19,6 +19,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.J;
 
 public class DefaultComesLast extends Recipe {
@@ -43,7 +44,7 @@ public class DefaultComesLast extends Recipe {
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
             DefaultComesLastStyle style = cu.getStyle(DefaultComesLastStyle.class);
             if (style == null) {
-                style = DefaultComesLastStyle.defaultComesLastStyle();
+                style = Checkstyle.defaultComesLast();
             }
             doAfterVisit(new DefaultComesLastVisitor<>(style));
             return cu;

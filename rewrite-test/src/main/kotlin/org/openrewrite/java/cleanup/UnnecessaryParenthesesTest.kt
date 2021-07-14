@@ -21,6 +21,7 @@ import org.openrewrite.Recipe
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.java.style.Checkstyle
 import org.openrewrite.java.style.IntelliJ
 import org.openrewrite.style.NamedStyles
 
@@ -77,7 +78,7 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             listOf(
                 NamedStyles(
                         randomId(), "test", "test", "test", emptySet(), listOf(
-                        IntelliJ.unnecessaryParentheses()
+                        Checkstyle.unnecessaryParentheses()
                     )
                 )
             )

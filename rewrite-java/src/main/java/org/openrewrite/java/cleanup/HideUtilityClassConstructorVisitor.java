@@ -15,8 +15,6 @@
  */
 package org.openrewrite.java.cleanup;
 
-import lombok.Value;
-import lombok.With;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.*;
 import org.openrewrite.java.tree.J;
@@ -24,7 +22,6 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 
 /**
@@ -285,24 +282,4 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
 
 }
 
-/**
- * This style configuration is not intended for direct usage yet.
- * As such, this is not included in other named default styles.
- */
-@Incubating(since = "7.0.0")
-@Value
-@With
-class HideUtilityClassConstructorStyle implements JavaStyle {
-    /**
-     * If any of the annotation signatures are present on the utility class, the visitor will ignore operating on the class.
-     * These should be {@link AnnotationMatcher}-compatible, fully-qualified annotation signature strings.
-     */
-    Collection<String> ignoreIfAnnotatedBy;
 
-    static HideUtilityClassConstructorStyle hideUtilityClassConstructorStyle() {
-        return new HideUtilityClassConstructorStyle(Arrays.asList(
-                "@lombok.experimental.UtilityClass",
-                "@lombok.Data"
-        ));
-    }
-}

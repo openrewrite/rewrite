@@ -218,7 +218,7 @@ public class EmptyBlockVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private boolean isEmptyBlock(Statement blockNode) {
-        return EmptyBlockStyle.BlockPolicy.Statement.equals(emptyBlockStyle.getBlockPolicy()) &&
+        return EmptyBlockStyle.BlockPolicy.STATEMENT.equals(emptyBlockStyle.getBlockPolicy()) &&
                 blockNode instanceof J.Block &&
                 ((J.Block) blockNode).getStatements().isEmpty();
     }

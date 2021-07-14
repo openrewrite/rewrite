@@ -18,7 +18,7 @@ dependencies {
     api("org.jetbrains:annotations:latest.release")
 
     implementation("org.antlr:antlr4:4.8-1")
-
+    implementation("com.puppycrawl.tools:checkstyle:latest.release")
     implementation("commons-lang:commons-lang:latest.release")
 
     api("com.fasterxml.jackson.core:jackson-annotations:2.12.+")

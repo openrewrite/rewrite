@@ -16,9 +16,9 @@
 package org.openrewrite.java.cleanup;
 
 import lombok.Value;
-import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.style.StyleHelper;
+import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.style.Style;
+import org.openrewrite.style.StyleHelper;
 
 @Value
 public class ExplicitInitializationStyle implements Style {
@@ -26,6 +26,6 @@ public class ExplicitInitializationStyle implements Style {
 
     @Override
     public Style applyDefaults() {
-        return StyleHelper.merge(IntelliJ.explicitInitialization(), this);
+        return StyleHelper.merge(Checkstyle.explicitInitialization(), this);
     }
 }
