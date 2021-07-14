@@ -1319,10 +1319,12 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         if (vartype == null || vartype instanceof JCErroneous) {
             typeExpr = null;
         } else if (endPos(vartype) < 0) {
-            if (skipIfPresent("var")) {
-                typeExpr = new J.VarType(randomId(), Space.EMPTY, Markers.EMPTY, type(vartype));
+            if((node.sym.flags() & Flags.PARAMETER) > 0) {
+                // this is a lambda parameter with an inferred type expression
+                typeExpr = null;
             } else {
-                typeExpr = null; // this is a lambda parameter with an inferred type expression
+                skip("var");
+                typeExpr = new J.VarType(randomId(), Space.EMPTY, Markers.EMPTY, type(vartype));
             }
         } else if (vartype instanceof JCArrayTypeTree) {
             // we'll capture the array dimensions in a bit, just convert the element type
@@ -1974,20 +1976,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         if (source.startsWith(token, cursor))
             cursor += token.length();
         return token;
-    }
-
-    /**
-     * Advances the cursor if the current cursor position starts with the given token.
-     *
-     * @param token Token to skip
-     * @return true if the token is found, otherwise false.
-     */
-    private boolean skipIfPresent(String token) {
-        if (source.startsWith(token, cursor)) {
-            cursor += token.length();
-            return true;
-        }
-        return false;
     }
 
     // Only exists as a function to make it easier to debug unexpected cursor shifts

@@ -16,14 +16,13 @@
 package org.openrewrite.java.tree
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
-import org.openrewrite.java.*
+import org.openrewrite.java.Java11Test
+import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaParserResolver
+import org.openrewrite.java.JavaTreeTest
 import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
-import org.openrewrite.java.JavaTreeTest.NestingLevel.Class
-import org.openrewrite.java.marker.JavaSearchResult
-import org.openrewrite.java.search.FindTypes
 
 @ExtendWith(JavaParserResolver::class)
 class VariableDeclarationsJava11Test : JavaTreeTest, Java11Test {
