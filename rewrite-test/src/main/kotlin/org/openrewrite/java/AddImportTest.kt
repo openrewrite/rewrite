@@ -27,6 +27,22 @@ interface AddImportTest : JavaRecipeTest {
         .map { add -> add.toRecipe() }
         .reduce { r1, r2 -> return r1.doNext(r2) }
 
+    @Test
+    fun dontDuplicateImports(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = addImports(
+            AddImport("org.springframework.http.HttpStatus", null, false),
+            AddImport("org.springframework.http.HttpStatus.Series", null, false)
+        ),
+        before = "class A {}",
+        after = """
+            import org.springframework.http.HttpStatus;
+            import org.springframework.http.HttpStatus.Series;
+            
+            class A {}
+        """
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/772")
     @Test
     fun importOrderingIssue(jp: JavaParser) = assertChanged(

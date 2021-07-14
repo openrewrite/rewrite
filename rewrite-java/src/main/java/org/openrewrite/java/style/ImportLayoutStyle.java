@@ -113,8 +113,13 @@ public class ImportLayoutStyle implements JavaStyle {
         // don't star fold just yet, because we are only going to star fold adjacent imports along with
         // the import to add at most. we don't even want to star fold other non-adjacent imports in the same
         // block that should be star folded according to the layout style (minimally invasive change).
-        List<JRightPadded<J.Import>> ideallyOrdered = new ImportLayoutStyle(Integer.MAX_VALUE, Integer.MAX_VALUE, layout).
-                orderImports(ListUtils.concat(originalImports, paddedToAdd));
+        List<JRightPadded<J.Import>> ideallyOrdered = new ImportLayoutStyle(Integer.MAX_VALUE, Integer.MAX_VALUE, layout)
+                .orderImports(ListUtils.concat(originalImports, paddedToAdd));
+
+        if (ideallyOrdered.size() == originalImports.size()) {
+            // must be a duplicate of an existing import
+            return originalImports;
+        }
 
         JRightPadded<J.Import> before = null;
         JRightPadded<J.Import> after = null;
@@ -198,7 +203,9 @@ public class ImportLayoutStyle implements JavaStyle {
         }
 
         if (after != null) {
-            if (block(after) != addToBlock && after.getElement().getPrefix().getLastWhitespace().chars()
+            if (block(after) == addToBlock) {
+                after = after.withElement(after.getElement().withPrefix(Space.format("\n")));
+            } else if (after.getElement().getPrefix().getLastWhitespace().chars()
                     .filter(c -> c == '\n').count() < 2) {
                 after = after.withElement(after.getElement().withPrefix(Space.format("\n\n")));
             }
