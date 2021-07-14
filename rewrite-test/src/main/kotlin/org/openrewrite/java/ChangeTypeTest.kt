@@ -42,6 +42,29 @@ interface ChangeTypeTest : JavaRecipeTest {
         """.trimIndent()
     }
 
+    @Test
+    fun changeInnerClassToOuterClass(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = ChangeType("java.util.Map.Entry", "my.pkg.List"),
+        before = """
+            import java.util.Map;
+            import java.util.Map.Entry;
+            
+            class Test {
+                Entry p;
+                Map.Entry p2;
+            }
+        """,
+        after = """
+            import my.pkg.List;
+            
+            class Test {
+                List p;
+                List p2;
+            }
+        """
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/768")
     @Test
     fun changeStaticFieldAccess(jp: JavaParser) = assertChanged(
