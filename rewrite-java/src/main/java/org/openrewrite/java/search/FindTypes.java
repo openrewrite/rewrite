@@ -59,12 +59,13 @@ public class FindTypes extends Recipe {
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         JavaType.FullyQualified fullyQualifiedType = JavaType.Class.build(fullyQualifiedTypeName);
-        return new JavaVisitor<ExecutionContext>() {
 
+        return new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitIdentifier(J.Identifier ident, ExecutionContext executionContext) {
                 if (ident.getType() != null) {
-                    if (fullyQualifiedType.equals(TypeUtils.asFullyQualified(ident.getType()))) {
+                    JavaType.FullyQualified type = TypeUtils.asFullyQualified(ident.getType());
+                    if (fullyQualifiedType.equals(type) && ident.getSimpleName().equals(type.getClassName())) {
                         return ident.withMarkers(ident.getMarkers().addIfAbsent(new JavaSearchResult(FindTypes.this)));
                     }
                 }
@@ -102,7 +103,8 @@ public class FindTypes extends Recipe {
             @Override
             public J.Identifier visitIdentifier(J.Identifier ident, Set<NameTree> ns) {
                 if (ident.getType() != null) {
-                    if (fullyQualifiedType.equals(TypeUtils.asFullyQualified(ident.getType()))) {
+                    JavaType.FullyQualified type = TypeUtils.asFullyQualified(ident.getType());
+                    if (fullyQualifiedType.equals(type) && ident.getSimpleName().equals(type.getClassName())) {
                         ns.add(ident);
                     }
                 }
