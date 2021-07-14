@@ -572,6 +572,54 @@ interface AddImportTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/776")
+    @Test
+    fun addImportAndFoldIntoWildcard(jp: JavaParser) = assertChanged(
+        jp,
+        dependsOn = arrayOf("""
+                package foo;
+                public class B {
+                }
+                public class C {
+                }
+            """),
+        recipe = addImports(
+            AddImport("java.util.ArrayList", null, false)
+        ),
+        before = """
+            import foo.B;
+            import foo.C;
+            import java.util.Arrays;
+            import java.util.List;
+            import java.util.HashSet;
+            import java.util.HashMap;
+            
+            class A {
+                B b = new B();
+                C c = new C();
+                Map<String, String> map = new HashMap<>();
+                Set<String> set = new HashSet<>();
+                List<String> test = Arrays.asList("test");
+                List<String> test2 = new ArrayList<>();
+            }
+        """,
+        after = """
+            import foo.B;
+            import foo.C;
+            
+            import java.util.*;
+
+            class A {
+                B b = new B();
+                C c = new C();
+                Map<String, String> map = new HashMap<>();
+                Set<String> set = new HashSet<>();
+                List<String> test = Arrays.asList("test");
+                List<String> test2 = new ArrayList<>();
+            }
+        """
+    )
+
     /**
      * This visitor removes the "java.util.Collections" receiver from method invocations of "java.util.Collections.emptyList()".
      * This allows us to test that AddImport with setOnlyIfReferenced = true will add a static import when an applicable static method call is present

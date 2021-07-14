@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 
@@ -120,7 +119,6 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
         after = "class A {}"
     )
 
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/687")
     @Test
     fun leaveStarStaticImportIfReferenceStillExists(jp: JavaParser) = assertChanged(

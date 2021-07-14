@@ -170,7 +170,7 @@ public class ImportLayoutStyle implements JavaStyle {
                 break;
             }
         }
-        for (int i = insertPosition - 1; i > 0; i--) {
+        for (int i = starFoldTo.get(); i >= insertPosition ; i--) {
             JRightPadded<J.Import> anImport = originalImports.get(i);
             if (block(anImport) == addToBlock && packageOrOuterClassName(anImport)
                     .equals(packageOrOuterClassName(paddedToAdd))) {
