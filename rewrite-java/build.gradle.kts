@@ -21,7 +21,7 @@ dependencies {
 
     implementation("commons-lang:commons-lang:latest.release")
 
-    api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
+    api("com.fasterxml.jackson.core:jackson-annotations:2.12.+")
 
     implementation("org.ow2.asm:asm:latest.release")
     implementation("org.ow2.asm:asm-util:latest.release")

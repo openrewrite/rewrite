@@ -9,10 +9,10 @@ dependencies {
     compileOnly("org.eclipse.jgit:org.eclipse.jgit:latest.release")
     testImplementation("org.eclipse.jgit:org.eclipse.jgit:latest.release")
 
-    api("com.fasterxml.jackson.core:jackson-databind:latest.release")
-    api("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")
-    api("com.fasterxml.jackson.module:jackson-module-parameter-names:latest.release")
-    api("com.fasterxml.jackson.module:jackson-module-kotlin:latest.release")
+    api("com.fasterxml.jackson.core:jackson-databind:2.12.+")
+    api("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.12.+")
+    api("com.fasterxml.jackson.module:jackson-module-parameter-names:2.12.+")
+    api("com.fasterxml.jackson.module:jackson-module-kotlin:2.12.+")
 
     implementation("io.micrometer:micrometer-core:latest.release")
     implementation("io.github.classgraph:classgraph:latest.release")

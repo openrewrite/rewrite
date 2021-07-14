@@ -12,13 +12,13 @@ dependencies {
     api(project(":rewrite-xml"))
     api("org.jetbrains:annotations:latest.release")
 
-    api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
+    api("com.fasterxml.jackson.core:jackson-annotations:2.12.+")
 
     implementation("org.antlr:antlr4:4.8-1")
     implementation("io.github.resilience4j:resilience4j-retry:latest.release")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:latest.release")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")
-    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:latest.release")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:2.12.+")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.12.+")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.12.+")
 
     implementation("org.slf4j:slf4j-api:1.7.+")
 
