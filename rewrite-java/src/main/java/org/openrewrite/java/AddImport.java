@@ -71,6 +71,15 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             return cu;
         }
 
+        // No need to add imports for classes within the same package
+        int dotIndex = classType.getFullyQualifiedName().lastIndexOf('.');
+        if(cu.getPackageDeclaration() != null && dotIndex >= 0) {
+            String packageName = classType.getFullyQualifiedName().substring(0, dotIndex);
+            if(packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed())) {
+                return cu;
+            }
+        }
+
         if (onlyIfReferenced && !hasReference(cu)) {
             return cu;
         }

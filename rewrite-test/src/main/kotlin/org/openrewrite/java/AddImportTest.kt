@@ -43,6 +43,37 @@ interface AddImportTest : JavaRecipeTest {
         """
     )
 
+    @Test
+    fun dontImportYourself(jp: JavaParser) = assertUnchanged(
+        jp,
+        recipe = addImports(AddImport("com.myorg.A", null, false)),
+        before = """
+            package com.myorg;
+            
+            class A {
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/777")
+    @Test
+    fun dontImportFromSamePackage(jp: JavaParser) = assertUnchanged(
+        jp,
+        recipe = addImports(AddImport("com.myorg.B", null, false)),
+        dependsOn = arrayOf("""
+            package com.myorg;
+            
+            class B {
+            }
+        """),
+        before = """
+            package com.myorg;
+            
+            class A {
+            }
+        """
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/772")
     @Test
     fun importOrderingIssue(jp: JavaParser) = assertChanged(

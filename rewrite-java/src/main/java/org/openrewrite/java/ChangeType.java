@@ -77,7 +77,17 @@ public class ChangeType extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>(oldFullyQualifiedTypeName);
+        return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+                boolean definesTypeBeingChanged = cu.getClasses().stream().anyMatch(it -> TypeUtils.isOfClassType(it.getType(), oldFullyQualifiedTypeName));
+                if(definesTypeBeingChanged) {
+                    return null;
+                }
+                doAfterVisit(new UsesType<>(oldFullyQualifiedTypeName));
+                return cu;
+            }
+        };
     }
 
     private class ChangeTypeVisitor extends JavaVisitor<ExecutionContext> {

@@ -499,6 +499,21 @@ interface ChangeTypeTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/775")
+    @Test
+    fun changeTypeInTypeDeclaration(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = ChangeType("de.Class2", "de.Class1"),
+        before = """
+            package de;
+            public class Class2 {}
+        """,
+            after = """
+            package de;
+            public class Class1 {}
+        """
+    )
+
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
