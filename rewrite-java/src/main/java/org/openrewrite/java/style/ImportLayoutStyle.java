@@ -126,7 +126,17 @@ public class ImportLayoutStyle implements JavaStyle {
             JRightPadded<J.Import> anImport = ideallyOrdered.get(i);
             if (anImport.getElement().isScope(paddedToAdd.getElement())) {
                 before = i > 0 ? ideallyOrdered.get(i - 1) : null;
-                after = i < ideallyOrdered.size() - 1 ? ideallyOrdered.get(i + 1) : null;
+                if (before == null) {
+                    after = originalImports.isEmpty() ? null : originalImports.get(0);
+                } else {
+                    for (int j = 0; j < originalImports.size(); j++) {
+                        if (before == originalImports.get(j)) {
+                            after = originalImports.size() > j + 1 ? originalImports.get(j + 1) : null;
+                            break;
+                        }
+                    }
+                }
+
                 insertPosition = i;
                 break;
             }
@@ -168,7 +178,7 @@ public class ImportLayoutStyle implements JavaStyle {
         if ((paddedToAdd.getElement().isStatic() && nameCountToUseStarImport <= starFoldTo.get() - starFoldFrom.get() + 2) ||
                 (!paddedToAdd.getElement().isStatic() && classCountToUseStarImport <= starFoldTo.get() - starFoldFrom.get() + 2)) {
             starFold.set(true);
-            if(insertPosition != starFoldFrom.get()) {
+            if (insertPosition != starFoldFrom.get()) {
                 // if we're adding to the middle of a group of imports that are getting star folded,
                 // adopt the prefix of the first import in this group.
                 paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(

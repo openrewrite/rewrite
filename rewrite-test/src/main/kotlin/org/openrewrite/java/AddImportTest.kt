@@ -27,6 +27,29 @@ interface AddImportTest : JavaRecipeTest {
         .map { add -> add.toRecipe() }
         .reduce { r1, r2 -> return r1.doNext(r2) }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/772")
+    @Test
+    fun importOrderingIssue(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = addImports(
+            AddImport("org.springframework.http.HttpHeaders", null, false),
+        ),
+        before = """
+            import java.util.Locale;
+            import javax.ws.rs.core.Response.ResponseBuilder;
+
+            class A {}
+        """,
+        after = """
+            import org.springframework.http.HttpHeaders;
+
+            import java.util.Locale;
+            import javax.ws.rs.core.Response.ResponseBuilder;
+
+            class A {}
+        """
+    )
+
     @Test
     fun addMultipleImports(jp: JavaParser) = assertChanged(
         jp,
