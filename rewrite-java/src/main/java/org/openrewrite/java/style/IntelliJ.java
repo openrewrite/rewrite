@@ -16,10 +16,6 @@
 package org.openrewrite.java.style;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import org.openrewrite.java.cleanup.EmptyBlockStyle;
-import org.openrewrite.java.cleanup.EqualsAvoidsNullStyle;
-import org.openrewrite.java.cleanup.ExplicitInitializationStyle;
-import org.openrewrite.java.cleanup.UnnecessaryParenthesesStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
@@ -43,11 +39,7 @@ public class IntelliJ extends NamedStyles {
                         blankLines(),
                         tabsAndIndents(),
                         spaces(),
-                        wrappingAndBraces(),
-                        unnecessaryParentheses(),
-                        emptyBlock(),
-                        equalsAvoidsNull(),
-                        explicitInitialization()
+                        wrappingAndBraces()
                 )
         );
     }
@@ -103,19 +95,4 @@ public class IntelliJ extends NamedStyles {
         return new WrappingAndBracesStyle();
     }
 
-    public static UnnecessaryParenthesesStyle unnecessaryParentheses() {
-        return new UnnecessaryParenthesesStyle(true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true);
-    }
-
-    public static EmptyBlockStyle emptyBlock() {
-        return new EmptyBlockStyle(EmptyBlockStyle.BlockPolicy.Statement, true, true, true, true, true, true, true, true, true, true, true, true);
-    }
-
-    public static EqualsAvoidsNullStyle equalsAvoidsNull() {
-        return new EqualsAvoidsNullStyle(false);
-    }
-
-    public static ExplicitInitializationStyle explicitInitialization() {
-        return new ExplicitInitializationStyle(false);
-    }
 }

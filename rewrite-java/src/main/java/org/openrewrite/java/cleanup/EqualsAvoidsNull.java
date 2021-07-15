@@ -19,7 +19,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.style.IntelliJ;
+import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.J;
 
 public class EqualsAvoidsNull extends Recipe {
@@ -44,7 +44,7 @@ public class EqualsAvoidsNull extends Recipe {
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
             EqualsAvoidsNullStyle style = cu.getStyle(EqualsAvoidsNullStyle.class);
             if (style == null) {
-                style = IntelliJ.equalsAvoidsNull();
+                style = Checkstyle.equalsAvoidsNull();
             }
             doAfterVisit(new EqualsAvoidsNullVisitor<>(style));
             return cu;

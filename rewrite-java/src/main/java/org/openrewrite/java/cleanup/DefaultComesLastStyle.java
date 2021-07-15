@@ -17,29 +17,20 @@ package org.openrewrite.java.cleanup;
 
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.style.StyleHelper;
+import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.style.Style;
+import org.openrewrite.style.StyleHelper;
 
 @Value
 @With
 public class DefaultComesLastStyle implements Style {
     /**
-     * Whether to allow the default label to be not last if it's evaluation is shared with a case.
+     * Whether to allow the default label to be not last if its evaluation is shared with a case.
      */
     Boolean skipIfLastAndSharedWithCase;
 
     @Override
     public Style applyDefaults() {
-        return StyleHelper.merge(defaultComesLastStyle(), this);
-    }
-
-    /**
-     * The default of what would be part of {@link org.openrewrite.java.style.IntelliJ} (as the time of writing) is to not
-     * inspect on whether the "default" case comes last in a switch block at all. Therefore, it is not included as a default there.
-     *
-     * @return instantiation of DefaultComesLastStyle with default settings.
-     */
-    public static DefaultComesLastStyle defaultComesLastStyle() {
-        return new DefaultComesLastStyle(false);
+        return StyleHelper.merge(Checkstyle.defaultComesLast(), this);
     }
 }

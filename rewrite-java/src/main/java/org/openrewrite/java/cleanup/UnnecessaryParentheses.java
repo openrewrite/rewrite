@@ -19,7 +19,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.style.IntelliJ;
+import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.J;
 
 public class UnnecessaryParentheses extends Recipe {
@@ -43,7 +43,7 @@ public class UnnecessaryParentheses extends Recipe {
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
             UnnecessaryParenthesesStyle style = cu.getStyle(UnnecessaryParenthesesStyle.class);
             if (style == null) {
-                style = IntelliJ.unnecessaryParentheses();
+                style = Checkstyle.unnecessaryParentheses();
             }
             doAfterVisit(new UnnecessaryParenthesesVisitor<>(style));
             return cu;

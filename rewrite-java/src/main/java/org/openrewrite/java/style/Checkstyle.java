@@ -1,0 +1,101 @@
+/*
+ * Copyright 2021 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.java.style;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import org.openrewrite.java.cleanup.*;
+import org.openrewrite.style.NamedStyles;
+import org.openrewrite.style.Style;
+
+import java.util.Arrays;
+import java.util.Collection;
+
+import static java.util.Collections.emptySet;
+import static org.openrewrite.Tree.randomId;
+
+public class Checkstyle extends NamedStyles {
+    private static final Checkstyle INSTANCE = new Checkstyle();
+    private static final String NAME = "org.openrewrite.java.Checkstyle";
+    private static final String DISPLAY_NAME = "Checkstyle";
+    private static final String DESCRIPTION = "Checkstyle defaults for styles";
+
+    private Checkstyle() {
+        super(randomId(),
+                NAME,
+                DISPLAY_NAME,
+                DESCRIPTION,
+                emptySet(),
+                Arrays.asList(
+                        defaultComesLast(),
+                        emptyBlock(),
+                        equalsAvoidsNull(),
+                        explicitInitialization(),
+                        fallThrough(),
+                        hiddenFieldStyle(),
+                        hideUtilityClassConstructorStyle(),
+                        unnecessaryParentheses()
+                ));
+    }
+
+    Checkstyle(Collection<Style> styles) {
+        super(randomId(), NAME, DISPLAY_NAME, DESCRIPTION, emptySet(), styles);
+    }
+
+    @JsonCreator
+    public static Checkstyle defaults() {
+        return INSTANCE;
+    }
+
+    public static DefaultComesLastStyle defaultComesLast() {
+        return new DefaultComesLastStyle(false);
+    }
+
+    public static final EmptyBlockStyle.BlockPolicy defaultBlockPolicy = EmptyBlockStyle.BlockPolicy.STATEMENT;
+    public static EmptyBlockStyle emptyBlock() {
+        return new EmptyBlockStyle(defaultBlockPolicy, true, true, true, true,
+                true, true, true, true,true, true, true, true);
+    }
+
+    public static EqualsAvoidsNullStyle equalsAvoidsNull() {
+        return new EqualsAvoidsNullStyle(false);
+    }
+
+    public static ExplicitInitializationStyle explicitInitialization() {
+        return new ExplicitInitializationStyle(false);
+    }
+
+    public static FallThroughStyle fallThrough() {
+        return new FallThroughStyle(false);
+    }
+
+    public static HiddenFieldStyle hiddenFieldStyle() {
+        return new HiddenFieldStyle(false, false, false, false);
+    }
+
+    public static HideUtilityClassConstructorStyle hideUtilityClassConstructorStyle() {
+        return new HideUtilityClassConstructorStyle(Arrays.asList(
+                "@lombok.experimental.UtilityClass",
+                "@lombok.Data"
+        ));
+    }
+
+    public static UnnecessaryParenthesesStyle unnecessaryParentheses() {
+        return new UnnecessaryParenthesesStyle(true, true, true, true, true,
+                true, true, true, true, true, true, true,
+                true, true, true, true, true, true,
+                true, true, true, true, true);
+    }
+}

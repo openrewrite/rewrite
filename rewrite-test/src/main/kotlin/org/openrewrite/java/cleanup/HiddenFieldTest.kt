@@ -20,6 +20,7 @@ import org.openrewrite.Recipe
 import org.openrewrite.Tree
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.java.style.Checkstyle
 import org.openrewrite.style.NamedStyles
 
 interface HiddenFieldTest : JavaRecipeTest {
@@ -30,7 +31,7 @@ interface HiddenFieldTest : JavaRecipeTest {
         listOf(
             NamedStyles(
                 Tree.randomId(), "test", "test", "test", emptySet(), listOf(
-                    HiddenFieldStyle.hiddenFieldStyle().run { with(this) }
+                    Checkstyle.hiddenFieldStyle().run { with(this) }
                 )
             )
         )

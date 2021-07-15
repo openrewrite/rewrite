@@ -21,6 +21,8 @@ import org.openrewrite.Incubating;
 import org.openrewrite.style.StyleHelper;
 import org.openrewrite.style.Style;
 
+import static org.openrewrite.java.style.Checkstyle.hiddenFieldStyle;
+
 @Value
 @With
 @Incubating(since = "7.6.0")
@@ -51,10 +53,4 @@ public class HiddenFieldStyle implements Style {
         return StyleHelper.merge(hiddenFieldStyle(), this);
     }
 
-    /**
-     * @return instantiation of {@link HiddenFieldStyle} with default settings.
-     */
-    public static HiddenFieldStyle hiddenFieldStyle() {
-        return new HiddenFieldStyle(false, false, false, false);
-    }
 }

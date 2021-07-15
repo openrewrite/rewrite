@@ -20,6 +20,7 @@ import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.J;
 
 @Incubating(since = "7.6.0")
@@ -44,7 +45,7 @@ public class HiddenField extends Recipe {
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
             HiddenFieldStyle style = cu.getStyle(HiddenFieldStyle.class);
             if (style == null) {
-                style = HiddenFieldStyle.hiddenFieldStyle();
+                style = Checkstyle.hiddenFieldStyle();
             }
             doAfterVisit(new HiddenFieldVisitor<>(style));
             return cu;

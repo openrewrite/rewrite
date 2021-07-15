@@ -206,7 +206,8 @@ subprojects {
             publications {
                 named("nebula", MavenPublication::class.java) {
                     suppressPomMetadataWarningsFor("runtimeElements")
-
+                    suppressPomMetadataWarningsFor("checkstyleApiElements")
+                    suppressPomMetadataWarningsFor("checkstyleRuntimeElements")
                     pom.withXml {
                         (asElement().getElementsByTagName("dependencies")
                             .item(0) as org.w3c.dom.Element).let { dependencies ->

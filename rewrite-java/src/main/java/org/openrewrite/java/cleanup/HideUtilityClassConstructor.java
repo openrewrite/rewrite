@@ -20,6 +20,7 @@ import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.J;
 
 @Incubating(since = "7.0.0")
@@ -45,7 +46,7 @@ public class HideUtilityClassConstructor extends Recipe {
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
             HideUtilityClassConstructorStyle style = cu.getStyle(HideUtilityClassConstructorStyle.class);
             if (style == null) {
-                style = HideUtilityClassConstructorStyle.hideUtilityClassConstructorStyle();
+                style = Checkstyle.hideUtilityClassConstructorStyle();
             }
             doAfterVisit(new HideUtilityClassConstructorVisitor<>(style));
             return cu;

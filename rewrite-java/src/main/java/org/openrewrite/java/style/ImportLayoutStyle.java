@@ -66,6 +66,7 @@ import static org.openrewrite.internal.StreamUtils.distinctBy;
 @JsonDeserialize(using = Deserializer.class)
 @JsonSerialize(using = Serializer.class)
 public class ImportLayoutStyle implements JavaStyle {
+
     @EqualsAndHashCode.Include
     private final int classCountToUseStarImport;
 
