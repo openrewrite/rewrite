@@ -1029,6 +1029,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     public J.NewClass visitNewClass(J.NewClass newClass, P p) {
         J.NewClass nc = super.visitNewClass(newClass, p);
         if (nc.getPadding().getArguments() != null) {
+            nc = nc.getPadding().withArguments(spaceBefore(nc.getPadding().getArguments(), style.getBeforeParentheses().getMethodCall()));
             int argsSize = nc.getPadding().getArguments().getElements().size();
             nc = nc.getPadding().withArguments(
                     nc.getPadding().getArguments().getPadding().withElements(

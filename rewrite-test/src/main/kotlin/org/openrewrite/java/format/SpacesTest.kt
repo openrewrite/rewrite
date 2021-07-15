@@ -104,6 +104,7 @@ interface SpacesTest : JavaRecipeTest {
                 class Test {
                     void foo() {
                         foo();
+                        Test test = new Test();
                     }
                 }
             """,
@@ -111,6 +112,7 @@ interface SpacesTest : JavaRecipeTest {
                 class Test {
                     void foo() {
                         foo ();
+                        Test test = new Test ();
                     }
                 }
             """
@@ -129,6 +131,7 @@ interface SpacesTest : JavaRecipeTest {
                 class Test {
                     void foo() {
                         foo ();
+                        Test test = new Test ();
                     }
                 }
             """,
@@ -136,6 +139,7 @@ interface SpacesTest : JavaRecipeTest {
                 class Test {
                     void foo() {
                         foo();
+                        Test test = new Test();
                     }
                 }
             """
