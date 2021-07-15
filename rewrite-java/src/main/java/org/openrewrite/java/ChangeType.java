@@ -26,6 +26,8 @@ import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
+import java.util.Stack;
+
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -102,7 +104,11 @@ public class ChangeType extends Recipe {
         public J visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
             maybeRemoveImport(oldFullyQualifiedTypeName);
             if (targetType instanceof JavaType.FullyQualified) {
-                maybeAddImport((JavaType.FullyQualified) targetType);
+                if (((JavaType.FullyQualified) targetType).getOwningClass() != null) {
+                    maybeAddImport(((JavaType.FullyQualified) targetType).getOwningClass());
+                } else {
+                    maybeAddImport((JavaType.FullyQualified) targetType);
+                }
             }
             return super.visitCompilationUnit(cu, ctx);
         }
@@ -152,8 +158,8 @@ public class ChangeType extends Recipe {
         public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
             if (fieldAccess.isFullyQualifiedClassReference(oldFullyQualifiedTypeName)) {
                 if (targetType instanceof JavaType.FullyQualified) {
-                    return TypeTree.build(((JavaType.FullyQualified) targetType).getFullyQualifiedName())
-                            .withPrefix(fieldAccess.getPrefix());
+                    return updateType((Expression) TypeTree.build(((JavaType.FullyQualified) targetType).getFullyQualifiedName())
+                            .withPrefix(fieldAccess.getPrefix()));
                 } else if (targetType instanceof JavaType.Primitive) {
                     return new J.Primitive(
                             fieldAccess.getId(),
@@ -180,8 +186,8 @@ public class ChangeType extends Recipe {
                 JavaType.Class oldType = JavaType.Class.build(oldFullyQualifiedTypeName);
                 if (maybeClass.toString().equals(oldType.getClassName())) {
                     maybeRemoveImport(oldType.getOwningClass());
-                    return ((J) TypeTree.build(((JavaType.FullyQualified) targetType).getClassName())
-                            .withType(targetType))
+                    return TypeTree.build(((JavaType.FullyQualified) targetType).getClassName())
+                            .withType(targetType)
                             .withPrefix(fieldAccess.getPrefix());
                 }
             }
@@ -203,7 +209,12 @@ public class ChangeType extends Recipe {
 
                 if (i.getSimpleName().equals(className)) {
                     if (targetType instanceof JavaType.FullyQualified) {
-                        i = i.withName(((JavaType.FullyQualified) targetType).getClassName());
+                        if (((JavaType.FullyQualified) targetType).getOwningClass() != null) {
+                            return updateType((Expression) TypeTree.build(((JavaType.FullyQualified) targetType).getClassName())
+                                    .withPrefix(i.getPrefix()));
+                        } else {
+                            i = i.withName(((JavaType.FullyQualified) targetType).getClassName());
+                        }
                     } else if (targetType instanceof JavaType.Primitive) {
                         i = i.withName(((JavaType.Primitive) targetType).getKeyword());
                     }
@@ -311,15 +322,75 @@ public class ChangeType extends Recipe {
             return nameField;
         }
 
-        // updateType/updateSignature are always used to swap things in-place
-        // The true nullability is that the return has the same nullability as the input
-        // Because it's always an in-place operation it isn't problematic to tell a white lie about the nullability of the return value
-        private Expression updateType(@Nullable Expression e) {
-            if (e == null) {
+        private Expression updateType(@Nullable Expression typeTree) {
+            if (typeTree == null) {
+                // updateType/updateSignature are always used to swap things in-place
+                // The true nullability is that the return has the same nullability as the input
+                // Because it's always an in-place operation it isn't problematic to tell a white lie about the nullability of the return value
+
                 //noinspection ConstantConditions
                 return null;
             }
-            return e.withType(updateType(e.getType()));
+
+            if (typeTree instanceof J.FieldAccess) {
+                JavaType.FullyQualified type = (JavaType.FullyQualified) targetType;
+
+                if(type.getOwningClass() == null) {
+                    // just a performance shortcut when this isn't an inner class
+                    typeTree.withType(updateType(targetType));
+                }
+
+                Stack<Expression> typeStack = new Stack<>();
+                typeStack.push(typeTree);
+
+                Stack<JavaType.FullyQualified> attrStack = new Stack<>();
+                attrStack.push(type);
+
+                for (Expression t = ((J.FieldAccess) typeTree).getTarget(); ; ) {
+                    typeStack.push(t);
+                    if (t instanceof J.FieldAccess) {
+                        if (Character.isUpperCase(((J.FieldAccess) t).getSimpleName().charAt(0))) {
+                            if(attrStack.peek().getOwningClass() != null) {
+                                attrStack.push(attrStack.peek().getOwningClass());
+                            }
+                        }
+                        t = ((J.FieldAccess) t).getTarget();
+                    } else if (t instanceof J.Identifier) {
+                        if (Character.isUpperCase(((J.Identifier) t).getSimpleName().charAt(0))) {
+                            if(attrStack.peek().getOwningClass() != null) {
+                                attrStack.push(attrStack.peek().getOwningClass());
+                            }
+                        }
+                        break;
+                    }
+                }
+
+                Expression attributed = null;
+                for (Expression e = typeStack.pop(); ; e = typeStack.pop()) {
+                    if (e instanceof J.Identifier) {
+                        if (attrStack.size() == typeStack.size() + 1) {
+                            attributed = ((J.Identifier) e).withType(attrStack.pop());
+                        } else {
+                            attributed = e;
+                        }
+                    } else if (e instanceof J.FieldAccess) {
+                        if (attrStack.size() == typeStack.size() + 1) {
+                            attributed = ((J.FieldAccess) e).withTarget(attributed)
+                                    .withType(attrStack.pop());
+                        } else {
+                            attributed = ((J.FieldAccess) e).withTarget(attributed);
+                        }
+                    }
+                    if (typeStack.isEmpty()) {
+                        break;
+                    }
+                }
+
+                assert attributed != null;
+                return attributed;
+            }
+
+            return typeTree.withType(updateType(targetType));
         }
 
         private JavaType updateType(@Nullable JavaType type) {

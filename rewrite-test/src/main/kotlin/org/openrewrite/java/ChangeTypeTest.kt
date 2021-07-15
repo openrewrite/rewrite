@@ -92,6 +92,27 @@ interface ChangeTypeTest : JavaRecipeTest {
         before = "public class B {}"
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/774")
+    @Test
+    fun replaceWithNestedType(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = ChangeType("java.io.File", "java.util.Map.Entry"),
+        before = """
+            import java.io.File;
+            
+            class Test {
+                File p;
+            }
+        """,
+        after = """
+            import java.util.Map;
+            
+            class Test {
+                Map.Entry p;
+            }
+        """
+    )
+
     @Test
     fun simpleName(jp: JavaParser) = assertChanged(
         jp,

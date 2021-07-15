@@ -28,5 +28,5 @@ public interface TypedTree extends J {
     @Nullable
     JavaType getType();
 
-    <T extends Tree> T withType(@Nullable JavaType type);
+    <T extends J> T withType(@Nullable JavaType type);
 }

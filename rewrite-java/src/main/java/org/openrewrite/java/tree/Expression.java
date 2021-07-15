@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.tree;
 
-import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.List;
@@ -26,7 +25,7 @@ public interface Expression extends J {
     @Nullable
     JavaType getType();
 
-    <T extends Tree> T withType(@Nullable JavaType type);
+    <T extends J> T withType(@Nullable JavaType type);
 
     /**
      * @return A list of the side effects emitted by the statement, if the statement was decomposed.

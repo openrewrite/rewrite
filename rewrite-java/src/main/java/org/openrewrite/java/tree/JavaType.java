@@ -258,7 +258,26 @@ public interface JavaType extends Serializable {
          * @return Any class found in the type cache
          */
         public static Class build(String fullyQualifiedName) {
-            return build(1, fullyQualifiedName, Kind.Class, emptyList(), emptyList(), null, null, null, emptyList(), true);
+            Class owningClass = null;
+            int firstClassNameIndex = 0;
+            int lastDot = 0;
+            char[] fullyQualifiedNameChars = fullyQualifiedName.toCharArray();
+            for (int i = 0; i < fullyQualifiedNameChars.length; i++) {
+                char c = fullyQualifiedNameChars[i];
+                if (firstClassNameIndex == 0 && Character.isUpperCase(c)) {
+                    firstClassNameIndex = i;
+                } else if (c == '.') {
+                    lastDot = i;
+                }
+            }
+
+            if (lastDot > firstClassNameIndex) {
+                owningClass = build(fullyQualifiedName.substring(0, lastDot));
+            }
+
+            return build(1, fullyQualifiedName, Kind.Class, emptyList(),
+                    emptyList(), null, null,
+                    owningClass, emptyList(), true);
         }
 
         /**
@@ -283,7 +302,7 @@ public interface JavaType extends Serializable {
                                   List<Method> constructors,
                                   @Nullable FullyQualified supertype,
                                   @Nullable FullyQualified owningClass) {
-            return build(Flag.flagsToBitMap(flags), fullyQualifiedName, kind, members, interfaces, constructors, supertype, owningClass, emptyList(),false);
+            return build(Flag.flagsToBitMap(flags), fullyQualifiedName, kind, members, interfaces, constructors, supertype, owningClass, emptyList(), false);
         }
 
         public static Class build(Set<Flag> flags,
@@ -295,7 +314,7 @@ public interface JavaType extends Serializable {
                                   @Nullable FullyQualified supertype,
                                   @Nullable FullyQualified owningClass,
                                   List<FullyQualified> annotations) {
-            return build(Flag.flagsToBitMap(flags), fullyQualifiedName, kind, members, interfaces, constructors, supertype, owningClass, annotations,false);
+            return build(Flag.flagsToBitMap(flags), fullyQualifiedName, kind, members, interfaces, constructors, supertype, owningClass, annotations, false);
         }
 
         @JsonCreator
@@ -761,7 +780,7 @@ public interface JavaType extends Serializable {
         }
 
         public Method withName(String name) {
-            if(this.name.equals(name)) {
+            if (this.name.equals(name)) {
                 return this;
             }
             return Method.build(flagsBitMap, declaringType, name, genericSignature, resolvedSignature, paramNames, thrownExceptions);
@@ -769,21 +788,21 @@ public interface JavaType extends Serializable {
 
         public Method withFlags(Set<Flag> flags) {
             int flagsBitMap = Flag.flagsToBitMap(flags);
-            if(this.flagsBitMap == flagsBitMap) {
+            if (this.flagsBitMap == flagsBitMap) {
                 return this;
             }
             return Method.build(flagsBitMap, declaringType, name, genericSignature, resolvedSignature, paramNames, thrownExceptions);
         }
 
         public Method withDeclaringType(FullyQualified declaringType) {
-            if(this.declaringType.equals(declaringType)) {
+            if (this.declaringType.equals(declaringType)) {
                 return this;
             }
             return Method.build(flagsBitMap, declaringType, name, genericSignature, resolvedSignature, paramNames, thrownExceptions);
         }
 
         public Method withGenericSignature(@Nullable Signature genericSignature) {
-            if((genericSignature == null && this.genericSignature == null) ||
+            if ((genericSignature == null && this.genericSignature == null) ||
                     (genericSignature != null && genericSignature.equals(this.genericSignature))) {
                 return this;
             }
@@ -791,7 +810,7 @@ public interface JavaType extends Serializable {
         }
 
         public Method withResolvedSignature(@Nullable Signature resolvedSignature) {
-            if((resolvedSignature == null && this.resolvedSignature == null) ||
+            if ((resolvedSignature == null && this.resolvedSignature == null) ||
                     (resolvedSignature != null && resolvedSignature.equals(this.resolvedSignature))) {
                 return this;
             }
