@@ -15,10 +15,13 @@
  */
 package org.openrewrite.java
 
+import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
+import org.openrewrite.java.tree.J
+import org.openrewrite.java.tree.JavaType
 
 interface RemoveImportTest : JavaRecipeTest {
     fun removeImport(type: String) =
@@ -336,6 +339,9 @@ interface RemoveImportTest : JavaRecipeTest {
                 Set<Integer> s;
                 Collection<Integer> l;
             }
-        """
+        """,
+        afterConditions = { cu ->
+            cu.imports[0].id != cu.imports[1].id
+        }
     )
 }
