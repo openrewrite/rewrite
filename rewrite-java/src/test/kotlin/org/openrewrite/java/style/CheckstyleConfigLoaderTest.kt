@@ -20,13 +20,13 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.cleanup.DefaultComesLastStyle
 import org.openrewrite.java.cleanup.EmptyBlockStyle
 import org.openrewrite.java.cleanup.EqualsAvoidsNullStyle
-import org.openrewrite.java.style.Checkstyle.parseCheckstyleConfig
+import org.openrewrite.java.style.CheckstyleConfigLoader.loadCheckstyleConfig
 
-class CheckstyleTest {
+class CheckstyleConfigLoaderTest {
 
     @Test
     fun basicSingleStyle() {
-        val checkstyle = parseCheckstyleConfig("""
+        val checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC
                 "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
                 "https://checkstyle.org/dtds/configuration_1_2.dtd">
@@ -45,7 +45,7 @@ class CheckstyleTest {
 
     @Test
     fun singleStyleWithProperty() {
-        val checkstyle = parseCheckstyleConfig("""
+        val checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC
                 "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
                 "https://checkstyle.org/dtds/configuration_1_2.dtd">
@@ -66,7 +66,7 @@ class CheckstyleTest {
 
     @Test
     fun emptyBlockStyle() {
-        val checkstyle = parseCheckstyleConfig("""
+        val checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC
                 "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
                 "https://checkstyle.org/dtds/configuration_1_2.dtd">
@@ -92,7 +92,7 @@ class CheckstyleTest {
 
     @Test
     fun equalsAvoidsNull() {
-        val checkstyle = parseCheckstyleConfig("""
+        val checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC
                 "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
                 "https://checkstyle.org/dtds/configuration_1_2.dtd">
