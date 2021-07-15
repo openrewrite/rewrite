@@ -53,9 +53,7 @@ interface UseStaticImportTest : JavaRecipeTest {
         after = """
             package test;
             
-            import static asserts.Assert.assertEquals;
-            import static asserts.Assert.assertFalse;
-            import static asserts.Assert.assertTrue;
+            import static asserts.Assert.*;
             
             class Test {
                 void test() {
