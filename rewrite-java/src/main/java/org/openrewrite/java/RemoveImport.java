@@ -48,6 +48,12 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
 
         Set<String> methodsAndFieldsUsed = new HashSet<>();
         Set<String> otherMethodsAndFieldsInTypeUsed = new TreeSet<>();
+        Set<String> originalImports = new HashSet<>();
+        for (J.Import cuImport : cu.getImports()) {
+            if (cuImport.getQualid().getType() != null) {
+                originalImports.add(((JavaType.Class) cuImport.getQualid().getType()).getFullyQualifiedName());
+            }
+        }
 
         for (JavaType javaType : cu.getTypesInUse()) {
             if (javaType instanceof JavaType.Variable) {
@@ -68,7 +74,9 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 if (fullyQualified.getFullyQualifiedName().equals(type)) {
                     typeUsed = true;
                 } else if (fullyQualified.getFullyQualifiedName().equals(owner) || fullyQualified.getPackageName().equals(owner)) {
-                    otherTypesInPackageUsed.add(fullyQualified.getClassName());
+                    if (!originalImports.contains(fullyQualified.getFullyQualifiedName())) {
+                        otherTypesInPackageUsed.add(fullyQualified.getClassName());
+                    }
                 }
             }
         }

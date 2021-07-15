@@ -279,4 +279,33 @@ interface RemoveImportTest : JavaRecipeTest {
             }
         """
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/784")
+    @Test
+    fun removeFromWildcardAndDuplicateImport(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = removeImport("java.util.Collection"),
+        before = """
+            package a;
+
+            import java.util.*;
+            import java.util.List;
+
+            public class A {
+                Set<String> s;
+                List<String> l;
+            }
+        """,
+        after = """
+            package a;
+
+            import java.util.Set;
+            import java.util.List;
+
+            public class A {
+                Set<String> s;
+                List<String> l;
+            }
+        """
+    )
 }
