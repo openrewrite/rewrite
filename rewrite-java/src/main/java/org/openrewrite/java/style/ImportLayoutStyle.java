@@ -140,22 +140,39 @@ public class ImportLayoutStyle implements JavaStyle {
         Block addToBlock = block(paddedToAdd);
         int insertPosition = 0;
 
+        //Using the ideal ordering, find the imports immediately before/after.
+        //
+        //Pick either the before/after as context for insertion based on:
+        // - Does the import's block match that of the import being added?
+        // - If neither the before/after have the same block, prefer the import that has the same static flag.
+        // - If there is any ambiguity, the default is to use the "after"
         for (int i = 0; i < ideallyOrdered.size(); i++) {
             JRightPadded<J.Import> anImport = ideallyOrdered.get(i);
             if (anImport.getElement().isScope(paddedToAdd.getElement())) {
                 before = i > 0 ? ideallyOrdered.get(i - 1) : null;
-                if (before == null) {
-                    after = originalImports.isEmpty() ? null : originalImports.get(0);
-                } else {
+                after = i + 1 < ideallyOrdered.size() ? ideallyOrdered.get(i + 1) : null;
+                if (before != null && (block(before) == addToBlock || after == null
+                        || (after.getElement().isStatic() != toAdd.isStatic() && before.getElement().isStatic() == toAdd.isStatic()))) {
+                    //Use the "before" import to determine insertion point.
+                    //Find the import in the original list to establish insertion position.
                     for (int j = 0; j < originalImports.size(); j++) {
-                        if (before == originalImports.get(j)) {
-                            after = originalImports.size() > j + 1 ? originalImports.get(j + 1) : null;
+                        if (before.getElement().equals(originalImports.get(j).getElement())) {
+                            insertPosition = j + 1;
+                            after = j + 1 < originalImports.size() ? originalImports.get(j + 1) : null;
+                            break;
+                        }
+                    }
+                } else if (after != null) {
+                    //Otherwise, "after" as the basis for the insertion.
+                    //Find the import in the original list to establish insertion position.
+                    for (int j = 0; j < originalImports.size(); j++) {
+                        if (after.getElement().equals(originalImports.get(j).getElement())) {
+                            insertPosition = j + 1;
+                            before = j > 0 ? originalImports.get(j - 1) : null;
                             break;
                         }
                     }
                 }
-
-                insertPosition = i;
                 break;
             }
         }
@@ -171,30 +188,36 @@ public class ImportLayoutStyle implements JavaStyle {
             paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(Space.format("\n")));
         }
 
-        AtomicInteger starFoldFrom = new AtomicInteger(0);
-        AtomicInteger starFoldTo = new AtomicInteger(0);
+        //Walk both directions from the insertion point, looking for imports that are in the same block and have the
+        //same package/outerclassname.
+        AtomicInteger starFoldFrom = new AtomicInteger(insertPosition);
+        AtomicInteger starFoldTo = new AtomicInteger(insertPosition);
         AtomicBoolean starFold = new AtomicBoolean(false);
+        int sameCount = 1; //start at 1 to account for the import being added.
+
         for (int i = insertPosition; i < originalImports.size(); i++) {
             JRightPadded<J.Import> anImport = originalImports.get(i);
             if (block(anImport) == addToBlock && packageOrOuterClassName(anImport)
                     .equals(packageOrOuterClassName(paddedToAdd))) {
                 starFoldTo.set(i);
+                sameCount++;
             } else {
                 break;
             }
         }
-        for (int i = starFoldTo.get() - 1; i >= insertPosition ; i--) {
+        for (int i = insertPosition - 1; i >= 0 ; i--) {
             JRightPadded<J.Import> anImport = originalImports.get(i);
             if (block(anImport) == addToBlock && packageOrOuterClassName(anImport)
                     .equals(packageOrOuterClassName(paddedToAdd))) {
                 starFoldFrom.set(i);
+                sameCount++;
             } else {
                 break;
             }
         }
 
-        if ((paddedToAdd.getElement().isStatic() && nameCountToUseStarImport <= starFoldTo.get() - starFoldFrom.get() + 2) ||
-                (!paddedToAdd.getElement().isStatic() && classCountToUseStarImport <= starFoldTo.get() - starFoldFrom.get() + 2)) {
+        if ((paddedToAdd.getElement().isStatic() && nameCountToUseStarImport <= sameCount) ||
+                (!paddedToAdd.getElement().isStatic() && classCountToUseStarImport <= sameCount)) {
             starFold.set(true);
             if (insertPosition != starFoldFrom.get()) {
                 // if we're adding to the middle of a group of imports that are getting star folded,
