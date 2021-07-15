@@ -292,8 +292,8 @@ interface RemoveImportTest : JavaRecipeTest {
             import java.util.List;
 
             public class A {
-                Set<String> s;
-                List<String> l;
+                Set<Integer> s;
+                List<Integer> l;
             }
         """,
         after = """
@@ -303,8 +303,38 @@ interface RemoveImportTest : JavaRecipeTest {
             import java.util.List;
 
             public class A {
-                Set<String> s;
-                List<String> l;
+                Set<Integer> s;
+                List<Integer> l;
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/781")
+    @Test
+    fun generateNewUUIDPerUnfoldedImport(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = removeImport("java.util.Collection")
+            .doNext(ChangeType("java.util.List", "java.util.Collection")),
+        before = """
+            package a;
+
+            import java.util.*;
+            import java.util.List;
+
+            public class A {
+                Set<Integer> s;
+                List<Integer> l;
+            }
+        """,
+        after = """
+            package a;
+
+            import java.util.Collection;
+            import java.util.Set;
+
+            public class A {
+                Set<Integer> s;
+                Collection<Integer> l;
             }
         """
     )

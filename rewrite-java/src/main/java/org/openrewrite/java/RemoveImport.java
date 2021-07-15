@@ -25,6 +25,8 @@ import org.openrewrite.java.tree.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.openrewrite.Tree.randomId;
+
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class RemoveImport<P> extends JavaIsoVisitor<P> {
     @EqualsAndHashCode.Include
@@ -140,7 +142,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         int i = 0;
         for (String other : otherImportsUsed) {
             J.Import unfolded = starImport.withQualid(starImport.getQualid().withName(starImport
-                    .getQualid().getName().withName(other)));
+                    .getQualid().getName().withName(other))).withId(randomId());
             unfoldedImports.add(i++ == 0 ? unfolded : unfolded.withPrefix(Space.format("\n")));
         }
         return unfoldedImports;
