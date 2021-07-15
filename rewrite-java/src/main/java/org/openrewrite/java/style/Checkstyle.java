@@ -179,12 +179,12 @@ public class Checkstyle extends NamedStyles {
     }
 
     @Nullable
-    private static DefaultComesLastStyle equalsAvoidsNull(Map<String, Module> conf) {
-        Module module = conf.get("EqualsAvoidNull");
+    private static EqualsAvoidsNullStyle equalsAvoidsNull(Map<String, Module> conf) {
+        Module module = conf.get("EqualsAvoidsNull");
         if(module == null) {
             return null;
         }
-        return new DefaultComesLastStyle(module.prop("ignoreEqualsIgnoreCase", false));
+        return new EqualsAvoidsNullStyle(module.prop("ignoreEqualsIgnoreCase", false));
     }
 
 

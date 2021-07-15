@@ -19,6 +19,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.cleanup.DefaultComesLastStyle
 import org.openrewrite.java.cleanup.EmptyBlockStyle
+import org.openrewrite.java.cleanup.EqualsAvoidsNullStyle
 import org.openrewrite.java.style.Checkstyle.parseCheckstyleConfig
 
 class CheckstyleTest {
@@ -87,5 +88,27 @@ class CheckstyleTest {
         assertThat(blockStyle.literalWhile).isTrue
         assertThat(blockStyle.literalTry).isTrue
         assertThat(blockStyle.literalCatch).isFalse
+    }
+
+    @Test
+    fun equalsAvoidsNull() {
+        val checkstyle = parseCheckstyleConfig("""
+            <!DOCTYPE module PUBLIC
+                "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
+                "https://checkstyle.org/dtds/configuration_1_2.dtd">
+            <module name="Checker">
+                <module name="EqualsAvoidsNull">
+                    <property name="ignoreEqualsIgnoreCase" value="true" />
+                </module>
+            </module>
+        """.trimIndent(), emptyMap())
+
+        assertThat(checkstyle.styles)
+                .hasSize(1)
+
+        assertThat(checkstyle.styles.first()).isExactlyInstanceOf(EqualsAvoidsNullStyle::class.java)
+        val equalsAvoidsNullStyle = checkstyle.styles.first() as EqualsAvoidsNullStyle
+
+        assertThat(equalsAvoidsNullStyle.ignoreEqualsIgnoreCase).isTrue
     }
 }
