@@ -117,8 +117,20 @@ public class ImportLayoutStyle implements JavaStyle {
                 .orderImports(ListUtils.concat(originalImports, paddedToAdd));
 
         if (ideallyOrdered.size() == originalImports.size()) {
-            // must be a duplicate of an existing import
-            return originalImports;
+            Set<String> originalPaths = new HashSet<>();
+            for (JRightPadded<J.Import> originalImport : originalImports) {
+                originalPaths.add(originalImport.getElement().getQualid().toString());
+            }
+            int sharedImports = 0;
+            for (JRightPadded<J.Import> importJRightPadded : ideallyOrdered) {
+                if (originalPaths.contains(importJRightPadded.getElement().getQualid().toString())) {
+                    sharedImports++;
+                }
+            }
+            if (sharedImports == originalImports.size()) {
+                // must be a duplicate of an existing import
+                return originalImports;
+            }
         }
 
         JRightPadded<J.Import> before = null;

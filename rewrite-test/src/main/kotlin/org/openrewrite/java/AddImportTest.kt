@@ -620,6 +620,27 @@ interface AddImportTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/780")
+    @Test
+    fun addImportWhenDuplicatesExist(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = addImports(AddImport("org.springframework.http.MediaType", null, false)),
+        before = """
+            import javax.ws.rs.Path;
+            import javax.ws.rs.Path;
+            
+            class A {}
+        """,
+        after = """
+            import org.springframework.http.MediaType;
+            
+            import javax.ws.rs.Path;
+            import javax.ws.rs.Path;
+            
+            class A {}
+        """
+    )
+
     /**
      * This visitor removes the "java.util.Collections" receiver from method invocations of "java.util.Collections.emptyList()".
      * This allows us to test that AddImport with setOnlyIfReferenced = true will add a static import when an applicable static method call is present
