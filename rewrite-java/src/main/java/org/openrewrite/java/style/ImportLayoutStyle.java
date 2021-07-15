@@ -26,10 +26,8 @@ import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
-import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
-import lombok.With;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaStyle;
@@ -65,20 +63,16 @@ import static org.openrewrite.internal.StreamUtils.distinctBy;
  */
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Getter
-@AllArgsConstructor
 @JsonDeserialize(using = Deserializer.class)
 @JsonSerialize(using = Serializer.class)
 public class ImportLayoutStyle implements JavaStyle {
 
-    @With
     @EqualsAndHashCode.Include
     private final int classCountToUseStarImport;
 
-    @With
     @EqualsAndHashCode.Include
     private final int nameCountToUseStarImport;
 
-    @With
     @EqualsAndHashCode.Include
     private final List<Block> layout;
 
