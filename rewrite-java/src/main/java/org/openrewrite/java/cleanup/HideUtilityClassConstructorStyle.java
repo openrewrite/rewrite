@@ -26,8 +26,7 @@ import java.util.Collection;
 @Incubating(since = "7.0.0")
 @Value
 @With
-public
-class HideUtilityClassConstructorStyle implements JavaStyle {
+public class HideUtilityClassConstructorStyle implements JavaStyle {
     /**
      * If any of the annotation signatures are present on the utility class, the visitor will ignore operating on the class.
      * These should be {@link AnnotationMatcher}-compatible, fully-qualified annotation signature strings.

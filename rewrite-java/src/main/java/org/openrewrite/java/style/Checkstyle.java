@@ -184,7 +184,7 @@ public class Checkstyle extends NamedStyles {
         if(module == null) {
             return null;
         }
-        return new DefaultComesLastStyle(module.prop("skipIfLastAndSharedWithCase", false));
+        return new DefaultComesLastStyle(module.prop("ignoreEqualsIgnoreCase", false));
     }
 
 

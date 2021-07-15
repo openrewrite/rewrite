@@ -17,7 +17,10 @@ package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
+import org.openrewrite.Tree.randomId
+import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.style.NamedStyles
 
 @Suppress("ClassInitializerMayBeStatic", "StatementWithEmptyBody", "ConstantConditions")
 interface EqualsAvoidsNullTest: JavaRecipeTest {
@@ -25,7 +28,8 @@ interface EqualsAvoidsNullTest: JavaRecipeTest {
         get() = EqualsAvoidsNull()
 
     @Test
-    fun invertConditional() = assertChanged(
+    fun invertConditional(jp: JavaParser) = assertChanged(
+        jp,
         before = """
             public class A {
                 {
@@ -47,7 +51,33 @@ interface EqualsAvoidsNullTest: JavaRecipeTest {
     )
 
     @Test
-    fun removeUnnecessaryNullCheckAndParens() = assertChanged(
+    fun ignoreEqualsIgnoreCase(jp: JavaParser.Builder<*,*>) = assertChanged(
+        jp.styles(listOf(
+                NamedStyles(randomId(), "test", "", "", emptySet(), listOf(EqualsAvoidsNullStyle(true)))
+        )).build(),
+        before = """
+            public class A {
+                {
+                    String s = null;
+                    if(s.equals("test")) {}
+                    if(s.equalsIgnoreCase("test")) {}
+                }
+            }
+        """,
+        after = """
+            public class A {
+                {
+                    String s = null;
+                    if("test".equals(s)) {}
+                    if(s.equalsIgnoreCase("test")) {}
+                }
+            }
+        """
+    )
+
+    @Test
+    fun removeUnnecessaryNullCheckAndParens(jp: JavaParser) = assertChanged(
+        jp,
         before = """
             public class A {
                 {

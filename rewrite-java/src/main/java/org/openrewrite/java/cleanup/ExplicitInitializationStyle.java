@@ -16,10 +16,12 @@
 package org.openrewrite.java.cleanup;
 
 import lombok.Value;
+import lombok.With;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
+@With
 @Value
 public class ExplicitInitializationStyle implements Style {
     Boolean onlyObjectReferences;
