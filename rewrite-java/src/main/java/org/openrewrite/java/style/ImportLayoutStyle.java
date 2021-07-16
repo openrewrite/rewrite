@@ -168,7 +168,7 @@ public class ImportLayoutStyle implements JavaStyle {
                     for (int j = 0; j < originalImports.size(); j++) {
                         if (after.getElement().equals(originalImports.get(j).getElement())) {
                             insertPosition = j;
-                            before = j > 0 ? originalImports.get(insertPosition) : null;
+                            before = j > 0 ? originalImports.get(insertPosition - 1) : null;
                             break;
                         }
                     }
