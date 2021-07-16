@@ -66,13 +66,20 @@ public class Autodetect extends NamedStyles {
         private final Map<Integer, Long> indentFrequencies = new HashMap<>();
         private int linesWithSpaceIndents = 0;
         private int linesWithTabIndents = 0;
+        private int linesWithCRLFNewLines = 0;
+        private int linesWithLFNewLines = 0;
 
         public boolean isIndentedWithSpaces() {
             return linesWithSpaceIndents >= linesWithTabIndents;
         }
 
+        public boolean isIndentedWithLFNewLines() {
+            return linesWithLFNewLines >= linesWithCRLFNewLines;
+        }
+
         public TabsAndIndentsStyle getTabsAndIndentsStyle() {
             boolean useTabs = !isIndentedWithSpaces();
+            boolean useCRLF = !isIndentedWithLFNewLines();
 
             Map.Entry<Integer, Long> i1 = null;
             Map.Entry<Integer, Long> i2 = null;
@@ -99,7 +106,8 @@ public class Autodetect extends NamedStyles {
                     useTabs ? indent : 1,
                     useTabs ? 1 : indent,
                     continuationIndent,
-                    false
+                    false,
+                    useCRLF
             );
         }
     }
@@ -113,6 +121,28 @@ public class Autodetect extends NamedStyles {
             }
 
             String prefix = space.getWhitespace();
+            char[] chars = prefix.toCharArray();
+
+            int indent = 0;
+            // Note: new lines in multiline comments will not be counted.
+            for (int i = 0; i < chars.length; i++) {
+                char c = chars[i];
+                if (c == '\n' || c == '\r') {
+                    if (c == '\n') {
+                        if (i == 0 || chars[i - 1] != '\r') {
+                            stats.linesWithLFNewLines++;
+                        } else {
+                            stats.linesWithCRLFNewLines++;
+                        }
+                    }
+
+                    indent = 0;
+                    continue;
+                }
+                if (Character.isWhitespace(c)) {
+                    indent++;
+                }
+            }
 
             AtomicBoolean takeWhile = new AtomicBoolean(true);
             if (prefix.chars()
@@ -121,18 +151,6 @@ public class Autodetect extends NamedStyles {
                         return takeWhile.get();
                     })
                     .count() > 0) {
-                int indent = 0;
-                char[] chars = prefix.toCharArray();
-                for (char c : chars) {
-                    if (c == '\n' || c == '\r') {
-                        indent = 0;
-                        continue;
-                    }
-                    if (Character.isWhitespace(c)) {
-                        indent++;
-                    }
-                }
-
                 stats.indentFrequencies.merge(indent - lastIndent, 1L, Long::sum);
                 getCursor().putMessage("lastIndent", indent);
 
