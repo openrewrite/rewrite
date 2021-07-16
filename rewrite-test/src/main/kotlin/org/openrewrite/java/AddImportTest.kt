@@ -82,16 +82,16 @@ interface AddImportTest : JavaRecipeTest {
             AddImport("org.springframework.http.HttpHeaders", null, false),
         ),
         before = """
-            import java.util.Locale;
             import javax.ws.rs.core.Response.ResponseBuilder;
+            import java.util.Locale;
 
             class A {}
         """,
         after = """
             import org.springframework.http.HttpHeaders;
 
-            import java.util.Locale;
             import javax.ws.rs.core.Response.ResponseBuilder;
+            import java.util.Locale;
 
             class A {}
         """
@@ -589,7 +589,7 @@ interface AddImportTest : JavaRecipeTest {
         before = """
             import foo.B;
             import foo.C;
-            import java.util.LinkedHashMap;
+            import java.util.Collections;
             import java.util.List;
             import java.util.HashSet;
             import java.util.HashMap;
@@ -597,10 +597,10 @@ interface AddImportTest : JavaRecipeTest {
             class A {
                 B b = new B();
                 C c = new C();
-                Map<String, String> importUse1 = new HashMap<>();
-                Map<String, String> importUse2 = new LinkedHashMap<>();
-                Set<String> importUse3 = new HashSet<>();
-                List<String> importUse4 = new ArrayList<>();
+                Map<String, String> map = new HashMap<>();
+                Set<String> set = new HashSet<>();
+                List<String> test = Collections.singletonList("test");
+                List<String> test2 = new ArrayList<>();
             }
         """,
         after = """
@@ -612,10 +612,10 @@ interface AddImportTest : JavaRecipeTest {
             class A {
                 B b = new B();
                 C c = new C();
-                Map<String, String> importUse1 = new HashMap<>();
-                Map<String, String> importUse2 = new LinkedHashMap<>();
-                Set<String> importUse3 = new HashSet<>();
-                List<String> importUse4 = new ArrayList<>();
+                Map<String, String> map = new HashMap<>();
+                Set<String> set = new HashSet<>();
+                List<String> test = Collections.singletonList("test");
+                List<String> test2 = new ArrayList<>();
             }
         """
     )
