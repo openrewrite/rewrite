@@ -140,9 +140,9 @@ public class ImportLayoutStyle implements JavaStyle {
         Block addToBlock = block(paddedToAdd);
         int insertPosition = 0;
 
-        //Using the ideal ordering, find the imports immediately before/after.
+        // Using the ideal ordering, find the imports immediately before/after.
         //
-        //Pick either the before/after as context for insertion based on:
+        // Pick either the before/after as context for insertion based on:
         // - Does the import's block match that of the import being added?
         // - If neither the before/after have the same block, prefer the import that has the same static flag.
         // - If there is any ambiguity, the default is to use the "after"
@@ -153,8 +153,8 @@ public class ImportLayoutStyle implements JavaStyle {
                 after = i + 1 < ideallyOrdered.size() ? ideallyOrdered.get(i + 1) : null;
                 if (before != null && (block(before) == addToBlock || after == null
                         || (block(after) != addToBlock && after.getElement().isStatic() != toAdd.isStatic() && before.getElement().isStatic() == toAdd.isStatic()))) {
-                    //Use the "before" import to determine insertion point.
-                    //Find the import in the original list to establish insertion position.
+                    // Use the "before" import to determine insertion point.
+                    // Find the import in the original list to establish insertion position.
                     for (int j = 0; j < originalImports.size(); j++) {
                         if (before.getElement().equals(originalImports.get(j).getElement())) {
                             insertPosition = j + 1;
@@ -163,8 +163,8 @@ public class ImportLayoutStyle implements JavaStyle {
                         }
                     }
                 } else if (after != null) {
-                    //Otherwise, "after" as the basis for the insertion.
-                    //Find the import in the original list to establish insertion position.
+                    // Otherwise, "after" as the basis for the insertion.
+                    // Find the import in the original list to establish insertion position.
                     for (int j = 0; j < originalImports.size(); j++) {
                         if (after.getElement().equals(originalImports.get(j).getElement())) {
                             insertPosition = j;
