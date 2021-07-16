@@ -32,10 +32,6 @@ dependencies {
     testRuntimeOnly("com.puppycrawl.tools:checkstyle:latest.release")
 }
 
-tasks.named<Jar>("jar") {
-    from(sourceSets.getByName("checkstyle").output)
-}
-
 tasks.withType<Javadoc> {
     // generated ANTLR sources violate doclint
     (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:none", "-quiet")
