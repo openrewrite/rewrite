@@ -18,6 +18,7 @@ dependencies {
     implementation("io.github.resilience4j:resilience4j-retry:latest.release")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:2.12.+")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.12.+")
+    implementation("com.fasterxml.jackson.module:jackson-module-jaxb-annotations:2.12.+")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.12.+")
 
     implementation("org.slf4j:slf4j-api:1.7.+")
