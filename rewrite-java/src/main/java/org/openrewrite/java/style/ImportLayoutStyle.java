@@ -140,12 +140,6 @@ public class ImportLayoutStyle implements JavaStyle {
         Block addToBlock = block(paddedToAdd);
         int insertPosition = 0;
 
-        // Using the ideal ordering, find the imports immediately before/after.
-        //
-        // Pick either the before/after as context for insertion based on:
-        // - Does the import's block match that of the import being added?
-        // - If neither the before/after have the same block, prefer the import that has the same static flag.
-        // - If there is any ambiguity, the default is to use the "after"
         for (int i = 0; i < ideallyOrdered.size(); i++) {
             JRightPadded<J.Import> anImport = ideallyOrdered.get(i);
             if (anImport.getElement().isScope(paddedToAdd.getElement())) {
@@ -182,6 +176,13 @@ public class ImportLayoutStyle implements JavaStyle {
                 paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(prefix));
             }
         } else if (block(before) != addToBlock) {
+            for (int j = insertPosition; j < originalImports.size(); j++) {
+                if (block(originalImports.get(j)) == addToBlock) {
+                    insertPosition = j;
+                    after = originalImports.get(j);
+                    break;
+                }
+            }
             paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(Space.format("\n\n")));
         } else {
             paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(Space.format("\n")));
