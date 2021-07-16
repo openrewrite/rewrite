@@ -88,7 +88,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         boolean keepImport = typeUsed;
         AtomicReference<Space> spaceForNextImport = new AtomicReference<>();
         c = c.withImports(ListUtils.flatMap(c.getImports(), impoort -> {
-            if(spaceForNextImport.get() != null) {
+            if (spaceForNextImport.get() != null) {
                 impoort = impoort.withPrefix(spaceForNextImport.get());
                 spaceForNextImport.set(null);
             }
@@ -115,7 +115,9 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                     return null;
                 }
             } else if (!keepImport && typeName.equals(type)) {
-                spaceForNextImport.set(impoort.getPrefix());
+                if (impoort.getPrefix().isEmpty() || impoort.getPrefix().getLastWhitespace().chars().filter(s -> s == '\n').count() > 1) {
+                    spaceForNextImport.set(impoort.getPrefix());
+                }
                 return null;
             } else if (!keepImport && impoort.getPackageName().equals(owner) &&
                     "*".equals(impoort.getClassName()) &&

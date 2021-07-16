@@ -15,13 +15,10 @@
  */
 package org.openrewrite.java
 
-import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
-import org.openrewrite.java.tree.J
-import org.openrewrite.java.tree.JavaType
 
 interface RemoveImportTest : JavaRecipeTest {
     fun removeImport(type: String) =
@@ -197,6 +194,33 @@ interface RemoveImportTest : JavaRecipeTest {
             
             public class A {
                 ArrayList<String> foo = new ArrayList<>();
+            }
+        """
+    )
+
+    @Test
+    fun preservesWhitespaceAfterRemovedImport(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = removeImport("java.util.List"),
+        before = """
+            package com.example.foo;
+            
+            import java.util.Collection;
+            import java.util.List;
+            
+            import java.util.ArrayList;
+            
+            public class A {
+            }
+        """,
+        after = """
+            package com.example.foo;
+            
+            import java.util.Collection;
+            
+            import java.util.ArrayList;
+            
+            public class A {
             }
         """
     )
