@@ -303,6 +303,7 @@ public class ImportLayoutStyle implements JavaStyle {
 
         int importIndex = 0;
         String extraLineSpace = "";
+        String prevWhitespace = "";
         for (Block block : layout) {
             if (block instanceof Block.BlankLines) {
                 extraLineSpace = "";
@@ -314,8 +315,14 @@ public class ImportLayoutStyle implements JavaStyle {
                 for (JRightPadded<J.Import> orderedImport : block.orderedImports(layoutState,
                         classCountToUseStarImport, nameCountToUseStarImport)) {
 
+                    /* Preserve the existing newline character type of either CRLF or LF.
+                     * Does not detect Classic Mac OS '\r' carriage returns.
+                     * Classic Mac OS return types are replaced by '\n'(s).
+                     */
                     Space prefix = importIndex == 0 ? originalImports.get(0).getElement().getPrefix() :
-                            orderedImport.getElement().getPrefix().withWhitespace(extraLineSpace + "\n");
+                            orderedImport.getElement().getPrefix().withWhitespace(
+                                    orderedImport.getElement().getPrefix().getWhitespace().contains("\r\n") ?
+                                            extraLineSpace.replaceAll("(\n)", "\r\n") + "\r\n" : extraLineSpace + prevWhitespace);
 
                     if (!orderedImport.getElement().getPrefix().equals(prefix)) {
                         orderedImports.add(orderedImport.withElement(orderedImport.getElement()
@@ -323,6 +330,8 @@ public class ImportLayoutStyle implements JavaStyle {
                     } else {
                         orderedImports.add(orderedImport);
                     }
+                    // Imports with null or empty whitespace will be set to the previous prefix.
+                    prevWhitespace = orderedImport.getElement().getPrefix().getWhitespace().contains("\r\n") ? "\r\n" : "\n";
                     extraLineSpace = "";
                     importIndex++;
                 }
