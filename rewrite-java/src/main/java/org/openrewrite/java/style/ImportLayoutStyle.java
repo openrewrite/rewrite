@@ -152,13 +152,13 @@ public class ImportLayoutStyle implements JavaStyle {
                 before = i > 0 ? ideallyOrdered.get(i - 1) : null;
                 after = i + 1 < ideallyOrdered.size() ? ideallyOrdered.get(i + 1) : null;
                 if (before != null && (block(before) == addToBlock || after == null
-                        || (after.getElement().isStatic() != toAdd.isStatic() && before.getElement().isStatic() == toAdd.isStatic()))) {
+                        || (block(after) != addToBlock && after.getElement().isStatic() != toAdd.isStatic() && before.getElement().isStatic() == toAdd.isStatic()))) {
                     //Use the "before" import to determine insertion point.
                     //Find the import in the original list to establish insertion position.
                     for (int j = 0; j < originalImports.size(); j++) {
                         if (before.getElement().equals(originalImports.get(j).getElement())) {
                             insertPosition = j + 1;
-                            after = j + 1 < originalImports.size() ? originalImports.get(j + 1) : null;
+                            after = insertPosition < originalImports.size() ? originalImports.get(insertPosition) : null;
                             break;
                         }
                     }
@@ -167,8 +167,8 @@ public class ImportLayoutStyle implements JavaStyle {
                     //Find the import in the original list to establish insertion position.
                     for (int j = 0; j < originalImports.size(); j++) {
                         if (after.getElement().equals(originalImports.get(j).getElement())) {
-                            insertPosition = j + 1;
-                            before = j > 0 ? originalImports.get(j - 1) : null;
+                            insertPosition = j - 1;
+                            before = j > 0 ? originalImports.get(insertPosition) : null;
                             break;
                         }
                     }
