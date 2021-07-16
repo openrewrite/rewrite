@@ -173,6 +173,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class ModifierOrderTck : ModifierOrderTest
 
     @Nested
+    inner class MultipleVariableDeclarationsTck : MultipleVariableDeclarationsTest
+
+    @Nested
     inner class NoFinalizerTck : NoFinalizerTest
 
     @Nested
