@@ -23,7 +23,7 @@ class StyleHelperTest {
 
     @Test
     fun mergeTabsAndIndentsStyles() {
-        val merged = StyleHelper.merge(IntelliJ.tabsAndIndents(), TabsAndIndentsStyle(true, 1, 1, 2, true))
+        val merged = StyleHelper.merge(IntelliJ.tabsAndIndents(), TabsAndIndentsStyle(true, 1, 1, 2, true, false))
         assertThat(merged.useTabCharacter).isTrue
         assertThat(merged.tabSize).isEqualTo(1)
         assertThat(merged.indentSize).isEqualTo(1)
