@@ -97,7 +97,53 @@ class CheckstyleConfigLoaderTest {
                 "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
                 "https://checkstyle.org/dtds/configuration_1_2.dtd">
             <module name="Checker">
-                <module name="EqualsAvoidsNull">
+                <module name="EqualsAvoidNull">
+                    <property name="ignoreEqualsIgnoreCase" value="true" />
+                </module>
+            </module>
+        """.trimIndent(), emptyMap())
+
+        assertThat(checkstyle.styles)
+                .hasSize(1)
+
+        assertThat(checkstyle.styles.first()).isExactlyInstanceOf(EqualsAvoidsNullStyle::class.java)
+        val equalsAvoidsNullStyle = checkstyle.styles.first() as EqualsAvoidsNullStyle
+
+        assertThat(equalsAvoidsNullStyle.ignoreEqualsIgnoreCase).isTrue
+    }
+
+    @Test
+    fun insideTreeWalker() {
+        val checkstyle = loadCheckstyleConfig("""
+            <!DOCTYPE module PUBLIC
+                "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
+                "https://checkstyle.org/dtds/configuration_1_2.dtd">
+            <module name="Checker">
+                <module name="TreeWalker">
+                    <module name="EqualsAvoidNull">
+                        <property name="ignoreEqualsIgnoreCase" value="true" />
+                    </module>
+                </module>
+            </module>
+        """.trimIndent(), emptyMap())
+
+        assertThat(checkstyle.styles)
+                .hasSize(1)
+
+        assertThat(checkstyle.styles.first()).isExactlyInstanceOf(EqualsAvoidsNullStyle::class.java)
+        val equalsAvoidsNullStyle = checkstyle.styles.first() as EqualsAvoidsNullStyle
+
+        assertThat(equalsAvoidsNullStyle.ignoreEqualsIgnoreCase).isTrue
+    }
+
+    @Test
+    fun moduleNameEndsWithCheck() {
+        val checkstyle = loadCheckstyleConfig("""
+            <!DOCTYPE module PUBLIC
+                "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
+                "https://checkstyle.org/dtds/configuration_1_2.dtd">
+            <module name="Checker">
+                <module name="EqualsAvoidNullCheck">
                     <property name="ignoreEqualsIgnoreCase" value="true" />
                 </module>
             </module>

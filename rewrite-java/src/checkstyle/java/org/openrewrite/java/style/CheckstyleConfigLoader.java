@@ -130,7 +130,7 @@ public class CheckstyleConfigLoader {
 
     @Nullable
     private static EqualsAvoidsNullStyle equalsAvoidsNull(Map<String, Module> conf) {
-        Module module = conf.get("EqualsAvoidsNull");
+        Module module = conf.get("EqualsAvoidNull");
         if(module == null) {
             return null;
         }
@@ -240,7 +240,13 @@ public class CheckstyleConfigLoader {
         private final Map<String, String> properties;
 
         public Module(String name, Map<String, String> properties) {
-            this.name = name;
+            // Checkstyle allows both "EqualsAvoidNull" and "EqualsAvoidsNullCheck"
+            // For consistency, remove the "Check" suffix if it exists
+            if(name.endsWith("Check")) {
+                this.name = name.substring(0, name.lastIndexOf("Check"));
+            } else {
+                this.name = name;
+            }
             this.properties = properties;
         }
 
@@ -303,7 +309,6 @@ public class CheckstyleConfigLoader {
                 modules.add(new Module(firstLevelChild.getName(), props));
             }
         }
-
         return modules.stream()
                 .collect(toMap(Module::getName, identity()));
     }
