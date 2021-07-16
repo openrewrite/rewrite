@@ -151,8 +151,7 @@ public class ImportLayoutStyle implements JavaStyle {
             if (anImport.getElement().isScope(paddedToAdd.getElement())) {
                 before = i > 0 ? ideallyOrdered.get(i - 1) : null;
                 after = i + 1 < ideallyOrdered.size() ? ideallyOrdered.get(i + 1) : null;
-                if (before != null && (block(before) == addToBlock || after == null
-                        || (block(after) != addToBlock && after.getElement().isStatic() != toAdd.isStatic() && before.getElement().isStatic() == toAdd.isStatic()))) {
+                if (before != null) {
                     // Use the "before" import to determine insertion point.
                     // Find the import in the original list to establish insertion position.
                     for (int j = 0; j < originalImports.size(); j++) {

@@ -606,6 +606,7 @@ interface AddImportTest : JavaRecipeTest {
         after = """
             import foo.B;
             import foo.C;
+            
             import java.util.*;
 
             class A {
