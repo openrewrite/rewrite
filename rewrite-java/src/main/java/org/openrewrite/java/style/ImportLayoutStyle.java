@@ -167,7 +167,7 @@ public class ImportLayoutStyle implements JavaStyle {
                     //Find the import in the original list to establish insertion position.
                     for (int j = 0; j < originalImports.size(); j++) {
                         if (after.getElement().equals(originalImports.get(j).getElement())) {
-                            insertPosition = j - 1;
+                            insertPosition = j;
                             before = j > 0 ? originalImports.get(insertPosition) : null;
                             break;
                         }
