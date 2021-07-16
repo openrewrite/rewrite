@@ -42,6 +42,33 @@ interface ChangeTypeTest : JavaRecipeTest {
         """.trimIndent()
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/788")
+    @Test
+    fun unnecessaryImport(jp: JavaParser) = assertUnchanged(
+        jp,
+        recipe = ChangeType("test.Outer.Inner", "java.util.ArrayList"),
+        before = """
+            import test.Outer;
+            
+            class Test {
+                private Outer p = Outer.of();
+                private Outer p2 = test.Outer.of();
+            }
+        """,
+        dependsOn = arrayOf("""
+            package test;
+            
+            public class Outer {
+                public static Outer of() {
+                    return new Outer();
+                }
+            
+                public static class Inner {
+                }
+            }
+        """.trimIndent())
+    )
+
     @Test
     fun changeInnerClassToOuterClass(jp: JavaParser) = assertChanged(
         jp,
