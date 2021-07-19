@@ -211,6 +211,10 @@ class Java11ModifierOrderTest : Java11Test, ModifierOrderTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11MultipleVariableDeclarationsTest : Java11Test, MultipleVariableDeclarationsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11NoFinalizerTest : Java11Test, NoFinalizerTest
 
 @DebugOnly
