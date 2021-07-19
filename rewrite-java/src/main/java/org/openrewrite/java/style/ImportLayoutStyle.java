@@ -29,6 +29,7 @@ import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.tree.J;
@@ -302,27 +303,35 @@ public class ImportLayoutStyle implements JavaStyle {
         }
 
         int importIndex = 0;
-        String extraLineSpace = "";
+        int extraLineSpaceCount = 0;
         String prevWhitespace = "";
         for (Block block : layout) {
             if (block instanceof Block.BlankLines) {
-                extraLineSpace = "";
+                extraLineSpaceCount = 0;
                 for (int i = 0; i < ((Block.BlankLines) block).getCount(); i++) {
-                    //noinspection StringConcatenationInLoop
-                    extraLineSpace += "\n";
+                    extraLineSpaceCount += 1;
                 }
             } else {
                 for (JRightPadded<J.Import> orderedImport : block.orderedImports(layoutState,
                         classCountToUseStarImport, nameCountToUseStarImport)) {
 
-                    /* Preserve the existing newline character type of either CRLF or LF.
-                     * Does not detect Classic Mac OS '\r' carriage returns.
-                     * Classic Mac OS return types are replaced by '\n'(s).
-                     */
-                    Space prefix = importIndex == 0 ? originalImports.get(0).getElement().getPrefix() :
-                            orderedImport.getElement().getPrefix().withWhitespace(
-                                    orderedImport.getElement().getPrefix().getWhitespace().contains("\r\n") ?
-                                            extraLineSpace.replaceAll("(\n)", "\r\n") + "\r\n" : extraLineSpace + prevWhitespace);
+                    boolean whitespaceContainsCRLF = orderedImport.getElement().getPrefix().getWhitespace().contains("\r\n");
+                    Space prefix;
+                    if (importIndex == 0) {
+                        prefix = originalImports.get(0).getElement().getPrefix();
+                    } else {
+                        // Preserve the existing newline character type of either CRLF or LF.
+                        // Classic Mac OS new line return '\r' is replaced by '\n'.
+                        String newLineCharacters = whitespaceContainsCRLF ||
+                                StringUtils.isNullOrEmpty(orderedImport.getElement().getPrefix().getWhitespace()) &&
+                                        prevWhitespace.equals("\r\n") ? "\r\n" : "\n";
+
+                        StringBuilder newWhitespace = new StringBuilder(newLineCharacters);
+                        for (int i = 0; i < extraLineSpaceCount; i++) {
+                            newWhitespace.append(newLineCharacters);
+                        }
+                        prefix = orderedImport.getElement().getPrefix().withWhitespace(newWhitespace.toString());
+                    }
 
                     if (!orderedImport.getElement().getPrefix().equals(prefix)) {
                         orderedImports.add(orderedImport.withElement(orderedImport.getElement()
@@ -331,8 +340,8 @@ public class ImportLayoutStyle implements JavaStyle {
                         orderedImports.add(orderedImport);
                     }
                     // Imports with null or empty whitespace will be set to the previous prefix.
-                    prevWhitespace = orderedImport.getElement().getPrefix().getWhitespace().contains("\r\n") ? "\r\n" : "\n";
-                    extraLineSpace = "";
+                    prevWhitespace = whitespaceContainsCRLF ? "\r\n" : "\n";
+                    extraLineSpaceCount = 0;
                     importIndex++;
                 }
             }
