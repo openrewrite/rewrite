@@ -17,14 +17,18 @@ package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.java.style.Checkstyle
-import org.openrewrite.java.style.IntelliJ
 import org.openrewrite.style.NamedStyles
 
+@Suppress(
+    "UnnecessaryLocalVariable", "ConstantConditions", "UnusedAssignment", "PointlessBooleanExpression",
+    "MismatchedStringCase", "SillyAssignment", "StatementWithEmptyBody"
+)
 interface UnnecessaryParenthesesTest : JavaRecipeTest {
     override val recipe: Recipe?
         get() = UnnecessaryParentheses()
@@ -42,7 +46,7 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
     fun unnecessaryParentheses(with: UnnecessaryParenthesesStyle.() -> UnnecessaryParenthesesStyle = { this }) =
         listOf(
             NamedStyles(
-                    randomId(), "test", "test", "test", emptySet(), listOf(
+                randomId(), "test", "test", "test", emptySet(), listOf(
                     UnnecessaryParenthesesStyle(
                         false,
                         false,
@@ -77,7 +81,7 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
         jp.styles(
             listOf(
                 NamedStyles(
-                        randomId(), "test", "test", "test", emptySet(), listOf(
+                    randomId(), "test", "test", "test", emptySet(), listOf(
                         Checkstyle.unnecessaryParentheses()
                     )
                 )
@@ -85,20 +89,21 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
         ).build(),
         before = """
             import java.util.*;
-            public class A {
+
+            class Test {
                 int square(int a, int b) {
                     int square = (a * b);
 
                     int sumOfSquares = 0;
-                    for(int i = (0); i < 10; i++) {
-                      sumOfSquares += (square(i * i, i));
+                    for (int i = (0); i < 10; i++) {
+                        sumOfSquares += (square(i * i, i));
                     }
                     double num = (10.0);
 
                     List<String> list = Arrays.asList("a1", "b1", "c1");
                     list.stream()
-                      .filter((s) -> s.startsWith("c"))
-                      .forEach(System.out::println);
+                            .filter((s) -> s.startsWith("c"))
+                            .forEach(System.out::println);
 
                     return (square);
                 }
@@ -106,20 +111,21 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
         """,
         after = """
             import java.util.*;
-            public class A {
+
+            class Test {
                 int square(int a, int b) {
                     int square = a * b;
 
                     int sumOfSquares = 0;
-                    for(int i = 0; i < 10; i++) {
-                      sumOfSquares += square(i * i, i);
+                    for (int i = 0; i < 10; i++) {
+                        sumOfSquares += square(i * i, i);
                     }
                     double num = 10.0;
 
                     List<String> list = Arrays.asList("a1", "b1", "c1");
                     list.stream()
-                      .filter(s -> s.startsWith("c"))
-                      .forEach(System.out::println);
+                            .filter(s -> s.startsWith("c"))
+                            .forEach(System.out::println);
 
                     return square;
                 }
@@ -128,24 +134,45 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
     )
 
     @Test
-    @Disabled
-    fun unwrapExpr(jp: JavaParser.Builder<*, *>) = assertChanged(
+    @Issue("https://github.com/openrewrite/rewrite/issues/798")
+    fun unwrapExprWillNotTryToDeduceOrderOfOperations(jp: JavaParser.Builder<*, *>) = assertUnchanged(
         jp.styles(unnecessaryParentheses {
             withExpr(true)
         }).build(),
         before = """
-            public class A {
+            class Test {
                 void doNothing() {
                     int a = ((1 + 2) + 3);
                     int b = (a + a) * a;
                 }
             }
+        """
+    )
+
+    @Test
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/798")
+    fun unwrapExprDoubleParentheses(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(unnecessaryParentheses {
+            withExpr(true)
+        }).build(),
+        before = """
+            class Test {
+                int method(int x, int y, boolean a) {
+                    if (a && ((x + y > 0))) {
+                    }
+
+                    return ((x + 1));
+                }
+            }
         """,
         after = """
-            public class A {
-                void doNothing() {
-                    int a = 1 + 2 + 3;
-                    int b = (a + a) * a;
+            class Test {
+                int method(int x, int y, boolean a) {
+                    if (a && (x + y > 0)) {
+                    }
+
+                    return (x + 1);
                 }
             }
         """
@@ -157,7 +184,7 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             withIdent(true)
         }).build(),
         before = """
-            public class A {
+            class Test {
                 double doNothing() {
                     double num = (10.0);
                     return (num);
@@ -165,7 +192,7 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             }
         """,
         after = """
-            public class A {
+            class Test {
                 double doNothing() {
                     double num = (10.0);
                     return num;
@@ -183,7 +210,7 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
                 .withNumLong(true)
         }).build(),
         before = """
-            public class A {
+            class Test {
                 void doNothing() {
                     double a = (1000.0);
                     if ((1000.0) == a) {
@@ -196,7 +223,7 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             }
         """,
         after = """
-            public class A {
+            class Test {
                 void doNothing() {
                     double a = 1000.0;
                     if (1000.0 == a) {
@@ -219,7 +246,7 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
                 .withStringLiteral(true)
         }).build(),
         before = """
-            public class A {
+            class Test {
                 void doNothing() {
                     boolean a = (true);
                     boolean b = (false);
@@ -228,7 +255,7 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
                     } else if (b == (false)) {
                         a = (true);
                     }
-                    
+
                     String s = ("literallyString");
                     String t = ("literallyString" + "stringLiteral");
                     if (s == (null)) {
@@ -240,7 +267,7 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             }
         """,
         after = """
-            public class A {
+            class Test {
                 void doNothing() {
                     boolean a = true;
                     boolean b = false;
@@ -249,7 +276,7 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
                     } else if (b == false) {
                         a = true;
                     }
-                    
+
                     String s = "literallyString";
                     String t = ("literallyString" + "stringLiteral");
                     if (s == null) {
@@ -268,7 +295,7 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             withAssign(true)
         }).build(),
         before = """
-            public class A {
+            class Test {
                 void doNothing() {
                     double a = (10.0);
                     a = (10.0);
@@ -288,7 +315,7 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             }
         """,
         after = """
-            public class A {
+            class Test {
                 void doNothing() {
                     double a = 10.0;
                     a = 10.0;
@@ -315,9 +342,10 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             withBitAndAssign(true)
         }).build(),
         before = """
-            public class A {
+            class Test {
                 int a = 5;
                 int b = 7;
+
                 void bitwiseAnd() {
                     int c = (a & b);
                     c &= (c);
@@ -325,9 +353,10 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             }
         """,
         after = """
-            public class A {
+            class Test {
                 int a = 5;
                 int b = 7;
+
                 void bitwiseAnd() {
                     int c = (a & b);
                     c &= c;
@@ -342,9 +371,10 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             withBitOrAssign(true)
         }).build(),
         before = """
-            public class A {
+            class Test {
                 int a = 5;
                 int b = 7;
+
                 void bitwiseOr() {
                     int c = (a | b);
                     c |= (c);
@@ -352,9 +382,10 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             }
         """,
         after = """
-            public class A {
+            class Test {
                 int a = 5;
                 int b = 7;
+
                 void bitwiseOr() {
                     int c = (a | b);
                     c |= c;
@@ -369,8 +400,9 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             withBitShiftRightAssign(true)
         }).build(),
         before = """
-            public class A {
+            class Test {
                 int a = -1;
+
                 void unsignedRightShiftAssignment() {
                     int b = a >>> 1;
                     b >>>= (b);
@@ -378,8 +410,9 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             }
         """,
         after = """
-            public class A {
+            class Test {
                 int a = -1;
+
                 void unsignedRightShiftAssignment() {
                     int b = a >>> 1;
                     b >>>= b;
@@ -394,9 +427,10 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             withBitXorAssign(true)
         }).build(),
         before = """
-            public class A {
+            class Test {
                 boolean a = true;
                 boolean b = false;
+
                 void bitwiseExclusiveOr() {
                     boolean c = (a ^ b);
                     c ^= (c);
@@ -404,9 +438,10 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             }
         """,
         after = """
-            public class A {
+            class Test {
                 boolean a = true;
                 boolean b = false;
+
                 void bitwiseExclusiveOr() {
                     boolean c = (a ^ b);
                     c ^= c;
@@ -421,9 +456,10 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             withDivAssign(true)
         }).build(),
         before = """
-            public class A {
+            class Test {
                 int a = 10;
                 int b = 5;
+
                 void divisionAssignmentOperator() {
                     int c = (a / b);
                     c /= (c);
@@ -431,9 +467,10 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             }
         """,
         after = """
-            public class A {
+            class Test {
                 int a = 10;
                 int b = 5;
+
                 void divisionAssignmentOperator() {
                     int c = (a / b);
                     c /= c;
@@ -448,9 +485,10 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             withMinusAssign(true)
         }).build(),
         before = """
-            public class A {
+            class Test {
                 int a = 10;
                 int b = 5;
+
                 void minusAssignment() {
                     int c = (a - b);
                     c -= (c);
@@ -458,9 +496,10 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             }
         """,
         after = """
-            public class A {
+            class Test {
                 int a = 10;
                 int b = 5;
+
                 void minusAssignment() {
                     int c = (a - b);
                     c -= c;
@@ -475,9 +514,10 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             withModAssign(true)
         }).build(),
         before = """
-            public class A {
+            class Test {
                 int a = 5;
                 int b = 3;
+
                 void remainderAssignment() {
                     int c = a % b;
                     c %= (c);
@@ -485,9 +525,10 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             }
         """,
         after = """
-            public class A {
+            class Test {
                 int a = 5;
                 int b = 3;
+
                 void remainderAssignment() {
                     int c = a % b;
                     c %= c;
@@ -502,9 +543,10 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             withPlusAssign(true)
         }).build(),
         before = """
-            public class A {
+            class Test {
                 int a = 1;
                 int b = 1;
+
                 void plusAssignment() {
                     int c = a + b;
                     c += (c);
@@ -512,9 +554,10 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             }
         """,
         after = """
-            public class A {
+            class Test {
                 int a = 1;
                 int b = 1;
+
                 void plusAssignment() {
                     int c = a + b;
                     c += c;
@@ -529,9 +572,10 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             withShiftLeftAssign(true)
         }).build(),
         before = """
-            public class A {
+            class Test {
                 int a = 1;
                 int b = 1;
+
                 void leftShiftAssignment() {
                     int c = a << b;
                     c <<= (c);
@@ -539,9 +583,10 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             }
         """,
         after = """
-            public class A {
+            class Test {
                 int a = 1;
                 int b = 1;
+
                 void leftShiftAssignment() {
                     int c = a << b;
                     c <<= c;
@@ -556,9 +601,10 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             withShiftRightAssign(true)
         }).build(),
         before = """
-            public class A {
+            class Test {
                 int a = 1;
                 int b = 1;
+
                 void signedRightShiftAssignment() {
                     int c = a >> b;
                     c >>= (c);
@@ -566,9 +612,10 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             }
         """,
         after = """
-            public class A {
+            class Test {
                 int a = 1;
                 int b = 1;
+
                 void signedRightShiftAssignment() {
                     int c = a >> b;
                     c >>= c;
@@ -583,9 +630,10 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             withStarAssign(true)
         }).build(),
         before = """
-            public class A {
+            class Test {
                 int a = 1;
                 int b = 1;
+
                 void multiplicationAssignmentOperator() {
                     int c = a * b;
                     c *= (c);
@@ -593,9 +641,10 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
             }
         """,
         after = """
-            public class A {
+            class Test {
                 int a = 1;
                 int b = 1;
+
                 void multiplicationAssignmentOperator() {
                     int c = a * b;
                     c *= c;
@@ -611,23 +660,25 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
         }).build(),
         before = """
             import java.util.*;
-            public class A {
+
+            class Test {
                 void doNothing() {
                     List<String> list = Arrays.asList("a1", "b1", "c1");
                     list.stream()
-                      .filter((s) -> s.startsWith("c"))
-                      .forEach(System.out::println);
+                            .filter((s) -> s.startsWith("c"))
+                            .forEach(System.out::println);
                 }
             }
         """,
         after = """
             import java.util.*;
-            public class A {
+
+            class Test {
                 void doNothing() {
                     List<String> list = Arrays.asList("a1", "b1", "c1");
                     list.stream()
-                      .filter(s -> s.startsWith("c"))
-                      .forEach(System.out::println);
+                            .filter(s -> s.startsWith("c"))
+                            .forEach(System.out::println);
                 }
             }
         """
