@@ -17,7 +17,7 @@ dependencies {
     api("io.micrometer:micrometer-core:latest.release")
     api("org.jetbrains:annotations:latest.release")
 
-    implementation("org.antlr:antlr4:4.8-1")
+    implementation("org.antlr:antlr4:4.9.2")
     compileOnly("com.puppycrawl.tools:checkstyle:latest.release")
     implementation("commons-lang:commons-lang:latest.release")
 

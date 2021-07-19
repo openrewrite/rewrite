@@ -16,7 +16,7 @@ dependencies {
     api("org.jetbrains:annotations:latest.release")
     api("com.fasterxml.jackson.core:jackson-annotations:2.12.+")
 
-    implementation("org.antlr:antlr4:4.8-1")
+    implementation("org.antlr:antlr4:4.9.2")
     implementation("io.micrometer:micrometer-core:latest.release")
 
     testImplementation(project(":rewrite-test"))

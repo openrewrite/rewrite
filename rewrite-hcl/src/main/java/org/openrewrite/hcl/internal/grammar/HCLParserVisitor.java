@@ -1,19 +1,4 @@
-/*
- * Copyright 2021 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-hcl/src/main/antlr/HCLParser.g4 by ANTLR 4.8
+// Generated from /Users/tyler.vangorder/work/rewrite/rewrite-hcl/src/main/antlr/HCLParser.g4 by ANTLR 4.9.2
 package org.openrewrite.hcl.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 
@@ -63,98 +48,98 @@ public interface HCLParserVisitor<T> extends ParseTreeVisitor<T> {
 	T visitBlockLabel(HCLParser.BlockLabelContext ctx);
 	/**
 	 * Visit a parse tree produced by the {@code OperationExpression}
-	 * labeled alternative in {@link HCLParser#expression}.
+	 * labeled alternative in {@link HCLParser#expression()}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitOperationExpression(HCLParser.OperationExpressionContext ctx);
 	/**
 	 * Visit a parse tree produced by the {@code ConditionalExpression}
-	 * labeled alternative in {@link HCLParser#expression}.
+	 * labeled alternative in {@link HCLParser#expression()}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitConditionalExpression(HCLParser.ConditionalExpressionContext ctx);
 	/**
 	 * Visit a parse tree produced by the {@code ExpressionTerm}
-	 * labeled alternative in {@link HCLParser#expression}.
+	 * labeled alternative in {@link HCLParser#expression()}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitExpressionTerm(HCLParser.ExpressionTermContext ctx);
 	/**
 	 * Visit a parse tree produced by the {@code ParentheticalExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm}.
+	 * labeled alternative in {@link HCLParser#exprTerm()}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitParentheticalExpression(HCLParser.ParentheticalExpressionContext ctx);
 	/**
 	 * Visit a parse tree produced by the {@code AttributeAccessExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm}.
+	 * labeled alternative in {@link HCLParser#exprTerm()}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitAttributeAccessExpression(HCLParser.AttributeAccessExpressionContext ctx);
 	/**
 	 * Visit a parse tree produced by the {@code LiteralExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm}.
+	 * labeled alternative in {@link HCLParser#exprTerm()}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitLiteralExpression(HCLParser.LiteralExpressionContext ctx);
 	/**
 	 * Visit a parse tree produced by the {@code TemplateExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm}.
+	 * labeled alternative in {@link HCLParser#exprTerm()}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitTemplateExpression(HCLParser.TemplateExpressionContext ctx);
 	/**
 	 * Visit a parse tree produced by the {@code VariableExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm}.
+	 * labeled alternative in {@link HCLParser#exprTerm()}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitVariableExpression(HCLParser.VariableExpressionContext ctx);
 	/**
 	 * Visit a parse tree produced by the {@code SplatExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm}.
+	 * labeled alternative in {@link HCLParser#exprTerm()}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitSplatExpression(HCLParser.SplatExpressionContext ctx);
 	/**
 	 * Visit a parse tree produced by the {@code IndexAccessExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm}.
+	 * labeled alternative in {@link HCLParser#exprTerm()}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitIndexAccessExpression(HCLParser.IndexAccessExpressionContext ctx);
 	/**
 	 * Visit a parse tree produced by the {@code BlockExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm}.
+	 * labeled alternative in {@link HCLParser#exprTerm()}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitBlockExpression(HCLParser.BlockExpressionContext ctx);
 	/**
 	 * Visit a parse tree produced by the {@code ForExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm}.
+	 * labeled alternative in {@link HCLParser#exprTerm()}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitForExpression(HCLParser.ForExpressionContext ctx);
 	/**
 	 * Visit a parse tree produced by the {@code FunctionCallExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm}.
+	 * labeled alternative in {@link HCLParser#exprTerm()}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitFunctionCallExpression(HCLParser.FunctionCallExpressionContext ctx);
 	/**
 	 * Visit a parse tree produced by the {@code CollectionValueExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm}.
+	 * labeled alternative in {@link HCLParser#exprTerm()}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
