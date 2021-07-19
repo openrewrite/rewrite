@@ -19,10 +19,8 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JLeftPadded;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -40,11 +38,24 @@ public class MultipleVariableDeclarationsVisitor extends JavaIsoVisitor<Executio
                 J.VariableDeclarations mv = (J.VariableDeclarations) stmt;
                 if (mv.getVariables().size() > 1 && getCursor().getValue() instanceof J.Block) {
                     splitAtLeastOneVariable.set(true);
-                    for (J.VariableDeclarations.NamedVariable nv : mv.getVariables()) {
+                    for (int i = 0; i < mv.getVariables().size(); i++) {
+                        J.VariableDeclarations.NamedVariable nv = mv.getVariables().get(i);
                         List<JLeftPadded<Space>> dimensions = ListUtils.concatAll(mv.getDimensionsBeforeName(), nv.getDimensionsAfterName());
-                        J.VariableDeclarations vd = mv.withId(Tree.randomId())
-                                .withVariables(Collections.singletonList(nv.withDimensionsAfterName(dimensions)))
-                                .withDimensionsBeforeName(Collections.emptyList());
+                        J.VariableDeclarations vd = new J.VariableDeclarations(
+                                Tree.randomId(),
+                                Space.EMPTY,
+                                Markers.EMPTY,
+                                mv.getLeadingAnnotations(),
+                                mv.getModifiers(),
+                                mv.getTypeExpression(),
+                                mv.getVarargs(),
+                                Collections.emptyList(),
+                                Collections.singletonList(JRightPadded.build(nv.withDimensionsAfterName(dimensions)))
+                        );
+                        if (i == 0) {
+                            vd = vd.withComments(mv.getComments()).withPrefix(mv.getPrefix());
+                        }
+                        vd = autoFormat(vd, ctx);
                         statements.add(vd);
                     }
                 } else {
@@ -58,3 +69,4 @@ public class MultipleVariableDeclarationsVisitor extends JavaIsoVisitor<Executio
     }
 
 }
+

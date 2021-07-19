@@ -58,4 +58,51 @@ interface MultipleVariableDeclarationsTest : JavaRecipeTest {
         """
     )
 
+    @Test
+    fun singleLineCommentPreserved(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            class Test {
+                // a before-statement example
+                int a = 0, b = 0;
+                int n = 0, m = 0; // an end-of-line example
+            }
+        """,
+        after = """
+            class Test {
+                // a before-statement example
+                int a = 0;
+                int b = 0;
+                int n = 0;
+                int m = 0; // an end-of-line example
+            }
+        """
+    )
+
+    @Test
+    fun blockCommentPreserved(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            class Test {
+                int a = 0;
+
+                /**
+                 * An example minimum and maximum.
+                 */
+                private int max = Integer.MAX_VALUE, min = Integer.MIN_VALUE;
+            }
+        """,
+        after = """
+            class Test {
+                int a = 0;
+
+                /**
+                 * An example minimum and maximum.
+                 */
+                private int max = Integer.MAX_VALUE;
+                private int min = Integer.MIN_VALUE;
+            }
+        """
+    )
+
 }
