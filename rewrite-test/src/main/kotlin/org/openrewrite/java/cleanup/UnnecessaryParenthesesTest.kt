@@ -134,45 +134,29 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
     )
 
     @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/798")
-    fun unwrapExprWillNotTryToDeduceOrderOfOperations(jp: JavaParser.Builder<*, *>) = assertUnchanged(
-        jp.styles(unnecessaryParentheses {
-            withExpr(true)
-        }).build(),
-        before = """
-            class Test {
-                void doNothing() {
-                    int a = ((1 + 2) + 3);
-                    int b = (a + a) * a;
-                }
-            }
-        """
-    )
-
-    @Test
     @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/798")
-    fun unwrapExprDoubleParentheses(jp: JavaParser.Builder<*, *>) = assertChanged(
+    fun unwrapExpr(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(unnecessaryParentheses {
             withExpr(true)
         }).build(),
         before = """
             class Test {
-                int method(int x, int y, boolean a) {
+                void method(int x, int y, boolean a) {
                     if (a && ((x + y > 0))) {
+                        int q = ((1 + 2) + 3);
+                        int z = (q + q) * q;
                     }
-
-                    return ((x + 1));
                 }
             }
         """,
         after = """
             class Test {
-                int method(int x, int y, boolean a) {
+                void method(int x, int y, boolean a) {
                     if (a && (x + y > 0)) {
+                        int q = (1 + 2) + 3;
+                        int z = (q + q) * q;
                     }
-
-                    return (x + 1);
                 }
             }
         """
