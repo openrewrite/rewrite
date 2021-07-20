@@ -28,6 +28,33 @@ interface WrappingAndBracesTest : JavaRecipeTest {
     override val recipe: Recipe
         get() = WrappingAndBracesVisitor<ExecutionContext>(WrappingAndBracesStyle()).toRecipe()
 
+    @Suppress("StatementWithEmptyBody", "ConstantConditions")
+    @Issue("https://github.com/openrewrite/rewrite/issues/804")
+    @Test
+    fun conditionalsShouldStartOnNewLines(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = WrappingAndBraces().doNext(TabsAndIndents()),
+        before = """
+            class Test {
+                void test() {
+                    if (1 == 2) {
+                    } if (1 == 3) {
+                    }
+                }
+            }
+        """,
+        after = """
+            class Test {
+                void test() {
+                    if (1 == 2) {
+                    }
+                    if (1 == 3) {
+                    }
+                }
+            }
+        """
+    )
+
     @Test
     fun blockLevelStatements(jp: JavaParser) = assertChanged(
         jp,
