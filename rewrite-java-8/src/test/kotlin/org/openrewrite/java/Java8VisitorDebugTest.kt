@@ -247,6 +247,10 @@ class Java8RemoveAnnotationTest : Java8Test, RemoveAnnotationTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8RemoveExtraSemicolonsTest : Java8Test, RemoveExtraSemicolonsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8RemoveImportTest : Java8Test, RemoveImportTest
 
 @DebugOnly

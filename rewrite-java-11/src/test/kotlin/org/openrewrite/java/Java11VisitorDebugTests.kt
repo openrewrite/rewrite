@@ -251,6 +251,10 @@ class Java11RemoveAnnotationTest : Java11Test, RemoveAnnotationTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11RemoveExtraSemicolonsTest : Java11Test, RemoveExtraSemicolonsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11RemoveImportTest : Java11Test, RemoveImportTest
 
 @DebugOnly
