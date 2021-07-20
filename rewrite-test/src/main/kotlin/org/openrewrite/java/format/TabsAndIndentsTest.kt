@@ -2151,4 +2151,23 @@ interface TabsAndIndentsTest : JavaRecipeTest {
             }
         """.trimIndent()
     )
+    @Test
+    fun alignInlineBlockComments() = assertChanged(
+        before = """
+            public class WhitespaceIsHard {
+            /* align comment */ public void method() { /* tricky */
+            /* align comment */ int val = 10; /* tricky */
+            // align comment and end paren.
+            }
+            }
+        """.trimIndent(),
+        after = """
+            public class WhitespaceIsHard {
+                /* align comment */ public void method() { /* tricky */
+                    /* align comment */ int val = 10; /* tricky */
+                    // align comment and end paren.
+                }
+            }
+        """.trimIndent()
+    )
 }

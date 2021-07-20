@@ -128,7 +128,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     !(getCursor().getParentOrThrow().getValue() instanceof J.Annotation);
         }
 
-        if (!space.getLastWhitespace().contains("\n") || parent == null) {
+        if (space.getComments().isEmpty() && !space.getLastWhitespace().contains("\n") || parent == null) {
             return space;
         }
 
@@ -381,7 +381,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private Space indentTo(Space space, int column, Space.Location spaceLocation) {
-        if (!space.getLastWhitespace().contains("\n")) {
+        if (space.getComments().isEmpty() && !space.getLastWhitespace().contains("\n")) {
             return space;
         }
 
