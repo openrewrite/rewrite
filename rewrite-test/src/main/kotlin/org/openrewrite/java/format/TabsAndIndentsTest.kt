@@ -37,6 +37,35 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         )
     )
 
+    // https://rules.sonarsource.com/java/tag/confusing/RSPEC-3973
+    @Test
+    fun rspec3973(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            class Test {{
+                if (condition)
+                doTheThing();
+            
+                doTheOtherThing();
+                somethingElseEntirely();
+            
+                foo();
+            }}
+        """,
+        after = """
+            class Test {{
+                if (condition)
+                    doTheThing();
+            
+                doTheOtherThing();
+                somethingElseEntirely();
+            
+                foo();
+            }}
+        """,
+        skipEnhancedTypeValidation = true
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/623")
     @Test
     fun ifElseWithComments(jp: JavaParser.Builder<*, *>) = assertUnchanged(
