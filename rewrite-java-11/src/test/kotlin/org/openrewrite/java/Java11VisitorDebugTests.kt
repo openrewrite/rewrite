@@ -187,6 +187,10 @@ class Java11HideUtilityClassConstructorTest : Java11Test, HideUtilityClassConstr
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11IndexOfReplaceableByContainsTest : Java11Test, IndexOfReplaceableByContainsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11IndexOfShouldNotCompareGreaterThanZeroTest : Java11Test, IndexOfShouldNotCompareGreaterThanZeroTest
 
 @DebugOnly
