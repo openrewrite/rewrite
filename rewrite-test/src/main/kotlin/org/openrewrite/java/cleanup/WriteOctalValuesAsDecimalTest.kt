@@ -37,6 +37,9 @@ interface WriteOctalValuesAsDecimalTest : JavaRecipeTest {
                     int o = 0b01;
                     int p = 12;
                     int q = 1;
+                    long r = 0L;
+                    float s = 0.01f;
+                    double t = 0.01;
                 }
             }
         """,
@@ -49,6 +52,9 @@ interface WriteOctalValuesAsDecimalTest : JavaRecipeTest {
                     int o = 0b01;
                     int p = 12;
                     int q = 1;
+                    long r = 0L;
+                    float s = 0.01f;
+                    double t = 0.01;
                 }
             }
         """
