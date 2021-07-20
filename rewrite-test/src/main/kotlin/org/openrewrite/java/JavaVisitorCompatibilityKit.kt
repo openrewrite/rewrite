@@ -188,6 +188,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class MultipleVariableDeclarationsTck : MultipleVariableDeclarationsTest
 
     @Nested
+    inner class NoEqualityInForConditionTck : NoEqualityInForConditionTest
+
+    @Nested
     inner class NoFinalizerTck : NoFinalizerTest
 
     @Nested

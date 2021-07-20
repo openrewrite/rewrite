@@ -23,5 +23,6 @@ tags:
 recipeList:
   - org.openrewrite.java.security.XmlParserXXEVulnerability
   - org.openrewrite.java.security.SecureTempFileCreation
+  - org.openrewrite.java.cleanup.NoEqualityInForCondition
   - org.openrewrite.java.search.ResultOfMethodCallIgnored:
       methodPattern: 'java.io.File mkdir*(..)'

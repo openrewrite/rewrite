@@ -227,6 +227,10 @@ class Java8MultipleVariableDeclarationsTest : Java8Test, MultipleVariableDeclara
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8NoEqualityInForConditionTest : Java8Test, NoEqualityInForConditionTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8NoFinalizerTest : Java8Test, NoFinalizerTest
 
 @DebugOnly
