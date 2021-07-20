@@ -211,6 +211,10 @@ class Java8MinimumViableSpacingTest : Java8Test, MinimumViableSpacingTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8MinimumSwitchCasesTest : Java8Test, MinimumSwitchCasesTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8ModifierOrderTest : Java8Test, ModifierOrderTest
 
 @DebugOnly

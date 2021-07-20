@@ -176,6 +176,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class MinimumViableSpacingTck : MinimumViableSpacingTest
 
     @Nested
+    inner class MinimumSwitchCasesTck : MinimumSwitchCasesTest
+
+    @Nested
     inner class ModifierOrderTck : ModifierOrderTest
 
     @Nested
