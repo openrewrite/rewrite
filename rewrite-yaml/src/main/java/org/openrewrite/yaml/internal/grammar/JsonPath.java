@@ -1,19 +1,4 @@
-/*
- * Copyright 2021 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-yaml/src/main/antlr/JsonPath.g4 by ANTLR 4.8
+// Generated from /Users/jbrisbin/src/github.com/openrewrite/rewrite/rewrite-yaml/src/main/antlr/JsonPath.g4 by ANTLR 4.8
 package org.openrewrite.yaml.internal.grammar;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
@@ -434,9 +419,9 @@ public class JsonPath extends Parser {
 		enterRule(_localctx, 4, RULE_rangeOp);
 		int _la;
 		try {
-			setState(57);
+			setState(58);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,5,_ctx) ) {
+			switch ( getInterpreter().adaptivePredict(_input,6,_ctx) ) {
 			case 1:
 				enterOuterAlt(_localctx, 1);
 				{
@@ -467,9 +452,17 @@ public class JsonPath extends Parser {
 				match(LBRACK);
 				setState(53);
 				match(COLON);
-				setState(54);
-				end();
 				setState(55);
+				_errHandler.sync(this);
+				_la = _input.LA(1);
+				if (_la==NumericLiteral) {
+					{
+					setState(54);
+					end();
+					}
+				}
+
+				setState(57);
 				match(RBRACK);
 				}
 				break;
@@ -513,7 +506,7 @@ public class JsonPath extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(59);
+			setState(60);
 			match(NumericLiteral);
 			}
 		}
@@ -555,7 +548,7 @@ public class JsonPath extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(61);
+			setState(62);
 			match(NumericLiteral);
 			}
 		}
@@ -813,7 +806,7 @@ public class JsonPath extends Parser {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(84);
+			setState(85);
 			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case NOT:
@@ -822,9 +815,9 @@ public class JsonPath extends Parser {
 				_ctx = _localctx;
 				_prevctx = _localctx;
 
-				setState(64);
-				match(NOT);
 				setState(65);
+				match(NOT);
+				setState(66);
 				expression(8);
 				}
 				break;
@@ -833,13 +826,13 @@ public class JsonPath extends Parser {
 				_localctx = new FilterExpressionContext(_localctx);
 				_ctx = _localctx;
 				_prevctx = _localctx;
-				setState(66);
-				match(QUESTION);
 				setState(67);
-				match(LPAREN);
+				match(QUESTION);
 				setState(68);
-				expression(0);
+				match(LPAREN);
 				setState(69);
+				expression(0);
+				setState(70);
 				match(RPAREN);
 				}
 				break;
@@ -848,11 +841,11 @@ public class JsonPath extends Parser {
 				_localctx = new ParentheticalExpressionContext(_localctx);
 				_ctx = _localctx;
 				_prevctx = _localctx;
-				setState(71);
-				match(LPAREN);
 				setState(72);
-				expression(0);
+				match(LPAREN);
 				setState(73);
+				expression(0);
+				setState(74);
 				match(RPAREN);
 				}
 				break;
@@ -865,7 +858,7 @@ public class JsonPath extends Parser {
 				_localctx = new LiteralExpressionContext(_localctx);
 				_ctx = _localctx;
 				_prevctx = _localctx;
-				setState(75);
+				setState(76);
 				litExpression();
 				}
 				break;
@@ -874,7 +867,7 @@ public class JsonPath extends Parser {
 				_localctx = new IdentifierContext(_localctx);
 				_ctx = _localctx;
 				_prevctx = _localctx;
-				setState(76);
+				setState(77);
 				match(Identifier);
 				}
 				break;
@@ -886,7 +879,7 @@ public class JsonPath extends Parser {
 				_localctx = new PathExpressionContext(_localctx);
 				_ctx = _localctx;
 				_prevctx = _localctx;
-				setState(77);
+				setState(78);
 				jsonpath();
 				}
 				break;
@@ -895,9 +888,9 @@ public class JsonPath extends Parser {
 				_localctx = new ScopedPathExpressionContext(_localctx);
 				_ctx = _localctx;
 				_prevctx = _localctx;
-				setState(78);
+				setState(79);
 				match(AT);
-				setState(80); 
+				setState(81); 
 				_errHandler.sync(this);
 				_alt = 1;
 				do {
@@ -905,7 +898,7 @@ public class JsonPath extends Parser {
 					case 1:
 						{
 						{
-						setState(79);
+						setState(80);
 						object();
 						}
 						}
@@ -913,9 +906,9 @@ public class JsonPath extends Parser {
 					default:
 						throw new NoViableAltException(this);
 					}
-					setState(82); 
+					setState(83); 
 					_errHandler.sync(this);
-					_alt = getInterpreter().adaptivePredict(_input,6,_ctx);
+					_alt = getInterpreter().adaptivePredict(_input,7,_ctx);
 				} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
 				}
 				break;
@@ -923,26 +916,26 @@ public class JsonPath extends Parser {
 				throw new NoViableAltException(this);
 			}
 			_ctx.stop = _input.LT(-1);
-			setState(97);
+			setState(98);
 			_errHandler.sync(this);
-			_alt = getInterpreter().adaptivePredict(_input,9,_ctx);
+			_alt = getInterpreter().adaptivePredict(_input,10,_ctx);
 			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
 					if ( _parseListeners!=null ) triggerExitRuleEvent();
 					_prevctx = _localctx;
 					{
-					setState(95);
+					setState(96);
 					_errHandler.sync(this);
-					switch ( getInterpreter().adaptivePredict(_input,8,_ctx) ) {
+					switch ( getInterpreter().adaptivePredict(_input,9,_ctx) ) {
 					case 1:
 						{
 						_localctx = new AndExpressionContext(new ExpressionContext(_parentctx, _parentState));
 						pushNewRecursionContext(_localctx, _startState, RULE_expression);
-						setState(86);
-						if (!(precpred(_ctx, 10))) throw new FailedPredicateException(this, "precpred(_ctx, 10)");
 						setState(87);
-						match(AND);
+						if (!(precpred(_ctx, 10))) throw new FailedPredicateException(this, "precpred(_ctx, 10)");
 						setState(88);
+						match(AND);
+						setState(89);
 						expression(11);
 						}
 						break;
@@ -950,11 +943,11 @@ public class JsonPath extends Parser {
 						{
 						_localctx = new OrExpressionContext(new ExpressionContext(_parentctx, _parentState));
 						pushNewRecursionContext(_localctx, _startState, RULE_expression);
-						setState(89);
-						if (!(precpred(_ctx, 9))) throw new FailedPredicateException(this, "precpred(_ctx, 9)");
 						setState(90);
-						match(OR);
+						if (!(precpred(_ctx, 9))) throw new FailedPredicateException(this, "precpred(_ctx, 9)");
 						setState(91);
+						match(OR);
+						setState(92);
 						expression(10);
 						}
 						break;
@@ -962,9 +955,9 @@ public class JsonPath extends Parser {
 						{
 						_localctx = new BinaryExpressionContext(new ExpressionContext(_parentctx, _parentState));
 						pushNewRecursionContext(_localctx, _startState, RULE_expression);
-						setState(92);
-						if (!(precpred(_ctx, 3))) throw new FailedPredicateException(this, "precpred(_ctx, 3)");
 						setState(93);
+						if (!(precpred(_ctx, 3))) throw new FailedPredicateException(this, "precpred(_ctx, 3)");
+						setState(94);
 						_la = _input.LA(1);
 						if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << EQ) | (1L << GE) | (1L << GT) | (1L << LE) | (1L << LT) | (1L << NE))) != 0)) ) {
 						_errHandler.recoverInline(this);
@@ -974,16 +967,16 @@ public class JsonPath extends Parser {
 							_errHandler.reportMatch(this);
 							consume();
 						}
-						setState(94);
+						setState(95);
 						expression(4);
 						}
 						break;
 					}
 					} 
 				}
-				setState(99);
+				setState(100);
 				_errHandler.sync(this);
-				_alt = getInterpreter().adaptivePredict(_input,9,_ctx);
+				_alt = getInterpreter().adaptivePredict(_input,10,_ctx);
 			}
 			}
 		}
@@ -1030,7 +1023,7 @@ public class JsonPath extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(100);
+			setState(101);
 			_la = _input.LA(1);
 			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << StringLiteral) | (1L << NumericLiteral) | (1L << TRUE) | (1L << FALSE) | (1L << NULL))) != 0)) ) {
 			_errHandler.recoverInline(this);
@@ -1073,33 +1066,34 @@ public class JsonPath extends Parser {
 	}
 
 	public static final String _serializedATN =
-		"\3\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964\3 i\4\2\t\2\4\3\t\3"+
+		"\3\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964\3 j\4\2\t\2\4\3\t\3"+
 		"\4\4\t\4\4\5\t\5\4\6\t\6\4\7\t\7\4\b\t\b\3\2\5\2\22\n\2\3\2\6\2\25\n\2"+
 		"\r\2\16\2\26\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\7\3%\n\3"+
 		"\f\3\16\3(\13\3\3\3\3\3\3\3\5\3-\n\3\3\4\3\4\3\4\3\4\5\4\63\n\4\3\4\3"+
-		"\4\3\4\3\4\3\4\3\4\3\4\5\4<\n\4\3\5\3\5\3\6\3\6\3\7\3\7\3\7\3\7\3\7\3"+
-		"\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\6\7S\n\7\r\7\16\7T\5\7"+
-		"W\n\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\7\7b\n\7\f\7\16\7e\13\7\3\b"+
-		"\3\b\3\b\2\3\f\t\2\4\6\b\n\f\16\2\4\3\2\13\20\4\2\3\4\23\25\2t\2\21\3"+
-		"\2\2\2\4,\3\2\2\2\6;\3\2\2\2\b=\3\2\2\2\n?\3\2\2\2\fV\3\2\2\2\16f\3\2"+
-		"\2\2\20\22\7\b\2\2\21\20\3\2\2\2\21\22\3\2\2\2\22\24\3\2\2\2\23\25\5\4"+
-		"\3\2\24\23\3\2\2\2\25\26\3\2\2\2\26\24\3\2\2\2\26\27\3\2\2\2\27\3\3\2"+
-		"\2\2\30\31\7\30\2\2\31\32\5\f\7\2\32\33\7\31\2\2\33-\3\2\2\2\34\35\7\7"+
-		"\2\2\35-\5\f\7\2\36\37\7\6\2\2\37-\5\f\7\2 !\7\30\2\2!&\5\f\7\2\"#\7\33"+
-		"\2\2#%\5\f\7\2$\"\3\2\2\2%(\3\2\2\2&$\3\2\2\2&\'\3\2\2\2\')\3\2\2\2(&"+
-		"\3\2\2\2)*\7\31\2\2*-\3\2\2\2+-\5\6\4\2,\30\3\2\2\2,\34\3\2\2\2,\36\3"+
-		"\2\2\2, \3\2\2\2,+\3\2\2\2-\5\3\2\2\2./\7\30\2\2/\60\5\b\5\2\60\62\7\32"+
-		"\2\2\61\63\5\n\6\2\62\61\3\2\2\2\62\63\3\2\2\2\63\64\3\2\2\2\64\65\7\31"+
-		"\2\2\65<\3\2\2\2\66\67\7\30\2\2\678\7\32\2\289\5\n\6\29:\7\31\2\2:<\3"+
-		"\2\2\2;.\3\2\2\2;\66\3\2\2\2<\7\3\2\2\2=>\7\4\2\2>\t\3\2\2\2?@\7\4\2\2"+
-		"@\13\3\2\2\2AB\b\7\1\2BC\7\21\2\2CW\5\f\7\nDE\7\36\2\2EF\7\34\2\2FG\5"+
-		"\f\7\2GH\7\35\2\2HW\3\2\2\2IJ\7\34\2\2JK\5\f\7\2KL\7\35\2\2LW\3\2\2\2"+
-		"MW\5\16\b\2NW\7\37\2\2OW\5\2\2\2PR\7\5\2\2QS\5\4\3\2RQ\3\2\2\2ST\3\2\2"+
-		"\2TR\3\2\2\2TU\3\2\2\2UW\3\2\2\2VA\3\2\2\2VD\3\2\2\2VI\3\2\2\2VM\3\2\2"+
-		"\2VN\3\2\2\2VO\3\2\2\2VP\3\2\2\2Wc\3\2\2\2XY\f\f\2\2YZ\7\n\2\2Zb\5\f\7"+
-		"\r[\\\f\13\2\2\\]\7\22\2\2]b\5\f\7\f^_\f\5\2\2_`\t\2\2\2`b\5\f\7\6aX\3"+
-		"\2\2\2a[\3\2\2\2a^\3\2\2\2be\3\2\2\2ca\3\2\2\2cd\3\2\2\2d\r\3\2\2\2ec"+
-		"\3\2\2\2fg\t\3\2\2g\17\3\2\2\2\f\21\26&,\62;TVac";
+		"\4\3\4\3\4\3\4\5\4:\n\4\3\4\5\4=\n\4\3\5\3\5\3\6\3\6\3\7\3\7\3\7\3\7\3"+
+		"\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\6\7T\n\7\r\7\16\7U"+
+		"\5\7X\n\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\7\7c\n\7\f\7\16\7f\13\7"+
+		"\3\b\3\b\3\b\2\3\f\t\2\4\6\b\n\f\16\2\4\3\2\13\20\4\2\3\4\23\25\2v\2\21"+
+		"\3\2\2\2\4,\3\2\2\2\6<\3\2\2\2\b>\3\2\2\2\n@\3\2\2\2\fW\3\2\2\2\16g\3"+
+		"\2\2\2\20\22\7\b\2\2\21\20\3\2\2\2\21\22\3\2\2\2\22\24\3\2\2\2\23\25\5"+
+		"\4\3\2\24\23\3\2\2\2\25\26\3\2\2\2\26\24\3\2\2\2\26\27\3\2\2\2\27\3\3"+
+		"\2\2\2\30\31\7\30\2\2\31\32\5\f\7\2\32\33\7\31\2\2\33-\3\2\2\2\34\35\7"+
+		"\7\2\2\35-\5\f\7\2\36\37\7\6\2\2\37-\5\f\7\2 !\7\30\2\2!&\5\f\7\2\"#\7"+
+		"\33\2\2#%\5\f\7\2$\"\3\2\2\2%(\3\2\2\2&$\3\2\2\2&\'\3\2\2\2\')\3\2\2\2"+
+		"(&\3\2\2\2)*\7\31\2\2*-\3\2\2\2+-\5\6\4\2,\30\3\2\2\2,\34\3\2\2\2,\36"+
+		"\3\2\2\2, \3\2\2\2,+\3\2\2\2-\5\3\2\2\2./\7\30\2\2/\60\5\b\5\2\60\62\7"+
+		"\32\2\2\61\63\5\n\6\2\62\61\3\2\2\2\62\63\3\2\2\2\63\64\3\2\2\2\64\65"+
+		"\7\31\2\2\65=\3\2\2\2\66\67\7\30\2\2\679\7\32\2\28:\5\n\6\298\3\2\2\2"+
+		"9:\3\2\2\2:;\3\2\2\2;=\7\31\2\2<.\3\2\2\2<\66\3\2\2\2=\7\3\2\2\2>?\7\4"+
+		"\2\2?\t\3\2\2\2@A\7\4\2\2A\13\3\2\2\2BC\b\7\1\2CD\7\21\2\2DX\5\f\7\nE"+
+		"F\7\36\2\2FG\7\34\2\2GH\5\f\7\2HI\7\35\2\2IX\3\2\2\2JK\7\34\2\2KL\5\f"+
+		"\7\2LM\7\35\2\2MX\3\2\2\2NX\5\16\b\2OX\7\37\2\2PX\5\2\2\2QS\7\5\2\2RT"+
+		"\5\4\3\2SR\3\2\2\2TU\3\2\2\2US\3\2\2\2UV\3\2\2\2VX\3\2\2\2WB\3\2\2\2W"+
+		"E\3\2\2\2WJ\3\2\2\2WN\3\2\2\2WO\3\2\2\2WP\3\2\2\2WQ\3\2\2\2Xd\3\2\2\2"+
+		"YZ\f\f\2\2Z[\7\n\2\2[c\5\f\7\r\\]\f\13\2\2]^\7\22\2\2^c\5\f\7\f_`\f\5"+
+		"\2\2`a\t\2\2\2ac\5\f\7\6bY\3\2\2\2b\\\3\2\2\2b_\3\2\2\2cf\3\2\2\2db\3"+
+		"\2\2\2de\3\2\2\2e\r\3\2\2\2fd\3\2\2\2gh\t\3\2\2h\17\3\2\2\2\r\21\26&,"+
+		"\629<UWbd";
 	public static final ATN _ATN =
 		new ATNDeserializer().deserialize(_serializedATN.toCharArray());
 	static {

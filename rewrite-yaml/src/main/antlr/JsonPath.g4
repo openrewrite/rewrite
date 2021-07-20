@@ -16,7 +16,7 @@ object
 
 rangeOp
     : LBRACK start COLON end? RBRACK
-    | LBRACK COLON end RBRACK
+    | LBRACK COLON end? RBRACK
     ;
 
 start
