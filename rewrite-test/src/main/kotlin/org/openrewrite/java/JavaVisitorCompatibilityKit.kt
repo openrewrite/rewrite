@@ -284,5 +284,8 @@ abstract class JavaVisitorCompatibilityKit {
     inner class WrappingAndBracesTck : WrappingAndBracesTest
 
     @Nested
+    inner class WriteOctalValuesAsDecimalTck : WriteOctalValuesAsDecimalTest
+
+    @Nested
     inner class XmlParserXXEVulnerabilityTck : XmlParserXXEVulnerabilityTest
 }

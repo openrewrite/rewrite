@@ -353,6 +353,10 @@ class Java8UsesTypeTest : Java8Test, UsesTypeTest
 @ExtendWith(JavaParserResolver::class)
 class Java8WhileInsteadOfForTest : Java8Test, WhileInsteadOfForTest
 
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8WriteOctalValuesAsDecimalTest : Java8Test, WriteOctalValuesAsDecimalTest
+
 @ExtendWith(JavaParserResolver::class)
 class Java8WrappingAndBracesTest : Java8Test, WrappingAndBracesTest
 
