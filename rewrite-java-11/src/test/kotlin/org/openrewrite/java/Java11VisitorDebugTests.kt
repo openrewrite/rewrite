@@ -115,6 +115,10 @@ class Java11EmptyBlockTest : Java11Test, EmptyBlockTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11EmptyNewlineAtEndOfFileTest : Java11Test, EmptyNewlineAtEndOfFileTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11EqualsAvoidsNullTest : Java11Test, EqualsAvoidsNullTest
 
 @DebugOnly

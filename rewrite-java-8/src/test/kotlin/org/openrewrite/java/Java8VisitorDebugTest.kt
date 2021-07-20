@@ -115,6 +115,10 @@ class Java8EmptyBlockTest : Java8Test, EmptyBlockTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8EmptyNewlineAtEndOfFileTest : Java8Test, EmptyNewlineAtEndOfFileTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8EqualsAvoidsNullTest : Java8Test, EqualsAvoidsNullTest
 
 @DebugOnly
