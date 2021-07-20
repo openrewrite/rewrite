@@ -187,6 +187,10 @@ class Java8HideUtilityClassConstructorTest : Java8Test, HideUtilityClassConstruc
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8IndexOfShouldNotCompareGreaterThanZeroTest : Java8Test, IndexOfShouldNotCompareGreaterThanZeroTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8ImplementInterfaceTest : Java8Test, ImplementInterfaceTest
 
 @DebugOnly
