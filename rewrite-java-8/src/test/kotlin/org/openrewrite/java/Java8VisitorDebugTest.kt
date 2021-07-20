@@ -143,6 +143,10 @@ class Java8FinalizeLocalVariablesTest : Java8Test, FinalizeLocalVariablesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8ForLoopIncrementInUpdateTest : Java8Test, ForLoopIncrementInUpdateTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8StaticMethodNotFinalTest : Java8Test, StaticMethodNotFinalTest
 
 @DebugOnly

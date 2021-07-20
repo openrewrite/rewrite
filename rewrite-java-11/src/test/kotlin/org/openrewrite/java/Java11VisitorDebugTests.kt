@@ -143,6 +143,10 @@ class Java11FinalizeLocalVariablesTest : Java11Test, FinalizeLocalVariablesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11ForLoopIncrementInUpdateTest : Java11Test, ForLoopIncrementInUpdateTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11StaticMethodNotFinalTest : Java11Test, StaticMethodNotFinalTest
 
 @DebugOnly
