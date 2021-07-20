@@ -49,8 +49,8 @@ public class MultipleVariableDeclarationsVisitor extends JavaIsoVisitor<Executio
                                 mv.getModifiers(),
                                 mv.getTypeExpression(),
                                 mv.getVarargs(),
-                                Collections.emptyList(),
-                                Collections.singletonList(JRightPadded.build(nv.withDimensionsAfterName(dimensions)))
+                                dimensions,
+                                Collections.singletonList(JRightPadded.build(nv))
                         );
                         if (i == 0) {
                             vd = vd.withComments(mv.getComments()).withPrefix(mv.getPrefix());
@@ -67,6 +67,4 @@ public class MultipleVariableDeclarationsVisitor extends JavaIsoVisitor<Executio
         }
         return splitAtLeastOneVariable.get() ? b.withStatements(statements) : b;
     }
-
 }
-

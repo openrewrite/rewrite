@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
@@ -24,6 +25,27 @@ import org.openrewrite.java.JavaRecipeTest
 interface MultipleVariableDeclarationsTest : JavaRecipeTest {
     override val recipe: Recipe
         get() = MultipleVariableDeclarations()
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/812")
+    @Test
+    fun arrayDimensionsBeforeName(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            class Test {
+                void test() {
+                    int[] m, n;
+                }
+            }
+        """,
+        after = """
+            class Test {
+                void test() {
+                    int[] m;
+                    int[] n;
+                }
+            }
+        """
+    )
 
     @Test
     fun replaceWithIndividualVariableDeclarations(jp: JavaParser) = assertChanged(
