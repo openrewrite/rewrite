@@ -331,6 +331,9 @@ class Java8UsesTypeTest : Java8Test, UsesTypeTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8WhileInsteadOfForTest : Java8Test, WhileInsteadOfForTest
+
+@ExtendWith(JavaParserResolver::class)
 class Java8WrappingAndBracesTest : Java8Test, WrappingAndBracesTest
 
 @DebugOnly

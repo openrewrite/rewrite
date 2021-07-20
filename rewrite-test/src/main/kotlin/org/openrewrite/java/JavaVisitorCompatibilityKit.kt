@@ -263,6 +263,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class UsesTypeTck : UsesTypeTest
 
     @Nested
+    inner class WhileInsteadOfForTck : WhileInsteadOfForTest
+
+    @Nested
     inner class WrappingAndBracesTck : WrappingAndBracesTest
 
     @Nested
