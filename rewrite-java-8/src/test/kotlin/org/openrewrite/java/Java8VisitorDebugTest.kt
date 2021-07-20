@@ -59,6 +59,10 @@ class Java8BlockStatementTemplateGeneratorTest : Java8Test, BlockStatementTempla
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8BooleanChecksNotInvertedTest : Java8Test, BooleanChecksNotInvertedTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8ChangeFieldNameTest : Java8Test, ChangeFieldNameTest
 
 @DebugOnly

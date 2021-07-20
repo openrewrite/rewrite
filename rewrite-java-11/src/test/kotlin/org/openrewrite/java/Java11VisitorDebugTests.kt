@@ -59,6 +59,10 @@ class Java11BlockStatementTemplateGeneratorTest : Java11Test, BlockStatementTemp
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11BooleanChecksNotInvertedTest : Java11Test, BooleanChecksNotInvertedTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11ChangeFieldNameTest : Java11Test, ChangeFieldNameTest
 
 @DebugOnly

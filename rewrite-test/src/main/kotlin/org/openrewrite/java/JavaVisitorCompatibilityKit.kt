@@ -56,6 +56,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class BlockStatementTemplateGeneratorTck : BlockStatementTemplateGeneratorTest
 
     @Nested
+    inner class BooleanChecksNotInvertedTck : BooleanChecksNotInvertedTest
+
+    @Nested
     inner class ChangeFieldNameTck : ChangeFieldNameTest
 
     @Nested
