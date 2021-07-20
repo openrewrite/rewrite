@@ -38,7 +38,10 @@ public class WriteOctalValuesAsDecimal extends Recipe {
             public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
                 String src = literal.getValueSource();
                 if (src != null && src.startsWith("0")) {
-                    if (src.length() >= 2 && src.charAt(1) != 'x' && src.charAt(1) != 'b' && src.charAt(1) != '.' &&
+                    if (src.length() >= 2 &&
+                            src.charAt(1) != 'x' && src.charAt(1) != 'X' &&
+                            src.charAt(1) != 'b' && src.charAt(1) != 'B' &&
+                            src.charAt(1) != '.' &&
                             src.charAt(src.length() - 1) != 'L' && src.charAt(src.length() - 1) != 'l' &&
                             src.charAt(src.length() - 1) != 'F' && src.charAt(src.length() - 1) != 'f' &&
                             src.charAt(src.length() - 1) != 'D' && src.charAt(src.length() - 1) != 'd' &&
