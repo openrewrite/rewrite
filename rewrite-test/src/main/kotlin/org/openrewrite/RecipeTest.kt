@@ -123,8 +123,9 @@ interface RecipeTest <T: SourceFile> {
 
         assertThat(result).`as`("The recipe must make changes").isNotNull
         assertThat(result!!.after).isNotNull
-        assertThat(after.trimIndent())
-            .isEqualTo(result.after!!.print(treePrinter ?: TreePrinter.identity<Any>(), null))
+        val actual = result.after!!.print(treePrinter ?: TreePrinter.identity<Any>(), null)
+        val expected = after.trimIndent()
+        assertThat(actual).isEqualTo(expected)
         afterConditions(result.after as T)
 
         recipeSchedulerCheckingExpectedCycles.verify()

@@ -25,22 +25,24 @@ import org.openrewrite.marker.Markers;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
+
+import static java.util.Collections.emptyList;
 
 public class MultipleVariableDeclarationsVisitor extends JavaIsoVisitor<ExecutionContext> {
     @Override
     public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
         J.Block b = super.visitBlock(block, ctx);
-        AtomicBoolean splitAtLeastOneVariable = new AtomicBoolean(false);
+        boolean splitAtLeastOneVariable = false;
         List<Statement> statements = new ArrayList<>();
         for (Statement stmt : b.getStatements()) {
             if (stmt instanceof J.VariableDeclarations) {
                 J.VariableDeclarations mv = (J.VariableDeclarations) stmt;
-                if (mv.getVariables().size() > 1 && getCursor().getValue() instanceof J.Block) {
-                    splitAtLeastOneVariable.set(true);
+                if (mv.getVariables().size() > 1) {
+                    splitAtLeastOneVariable = true;
                     for (int i = 0; i < mv.getVariables().size(); i++) {
                         J.VariableDeclarations.NamedVariable nv = mv.getVariables().get(i);
                         List<JLeftPadded<Space>> dimensions = ListUtils.concatAll(mv.getDimensionsBeforeName(), nv.getDimensionsAfterName());
+                        nv = nv.withDimensionsAfterName(emptyList());
                         J.VariableDeclarations vd = new J.VariableDeclarations(
                                 Tree.randomId(),
                                 Space.EMPTY,
@@ -65,6 +67,6 @@ public class MultipleVariableDeclarationsVisitor extends JavaIsoVisitor<Executio
                 statements.add(stmt);
             }
         }
-        return splitAtLeastOneVariable.get() ? b.withStatements(statements) : b;
+        return splitAtLeastOneVariable ? b.withStatements(statements) : b;
     }
 }

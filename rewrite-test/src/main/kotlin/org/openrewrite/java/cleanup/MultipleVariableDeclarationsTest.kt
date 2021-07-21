@@ -57,7 +57,6 @@ interface MultipleVariableDeclarationsTest : JavaRecipeTest {
                 int s, t = 0;
 
                 public void method() {
-                    Integer[] q = {0}, r[] = {{0}};
                     for (int i = 0, j = 0; ; ) ;
                 }
             }
@@ -72,9 +71,27 @@ interface MultipleVariableDeclarationsTest : JavaRecipeTest {
                 int t = 0;
 
                 public void method() {
-                    Integer q[] = {0};
-                    Integer r[][] = {{0}};
                     for (int i = 0, j = 0; ; ) ;
+                }
+            }
+        """
+    )
+
+    @Test
+    fun arrayTypes(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            class Test {
+                public void method() {
+                    Integer[] q = {0}, r[] = {{0}};
+                }
+            }
+        """,
+        after = """
+            class Test {
+                public void method() {
+                    Integer[] q = {0};
+                    Integer[][] r = {{0}};
                 }
             }
         """
