@@ -30,8 +30,6 @@ import java.util.stream.Collectors;
 @SuppressWarnings({"unchecked", "ConstantConditions"})
 public class JsonPathYamlVisitor extends JsonPathBaseVisitor<Object> {
 
-    protected static final String RESULT = "result";
-
     private final List<Tree> cursorPath;
 
     @Nullable
@@ -40,10 +38,6 @@ public class JsonPathYamlVisitor extends JsonPathBaseVisitor<Object> {
     public JsonPathYamlVisitor(List<Tree> cursorPath, @Nullable Object context) {
         this.cursorPath = cursorPath;
         this.context = context;
-    }
-
-    public List<Tree> getCursorPath() {
-        return cursorPath;
     }
 
     @Override
@@ -69,23 +63,15 @@ public class JsonPathYamlVisitor extends JsonPathBaseVisitor<Object> {
 
     @Override
     public @Nullable Object visitRecursiveDescent(JsonPath.RecursiveDescentContext ctx) {
-        System.out.println("================================");
-        System.out.println("RECURSION PARENT: " + ctx.getParent().getText());
-        System.out.println("RECURSIVE DESCENT: " + ctx.getText());
-
         if (context == null) {
-            System.out.println(">>> NO CONTEXT FROM WHICH TO RECURSE");
             return null;
         }
 
         Object result = null;
         for (Tree path : cursorPath) {
-            System.out.println("================================");
-            System.out.println("RECURSING FROM: " + path.getClass().getSimpleName());
             JsonPathYamlVisitor v = new JsonPathYamlVisitor(cursorPath, path);
             for (int i = 1, len = ctx.getParent().getChildCount(); i < len; i++) {
                 result = v.visit(ctx.getParent().getChild(i));
-                System.out.println("    >>> " + result);
                 if (result == null) {
                     break;
                 }
@@ -100,7 +86,6 @@ public class JsonPathYamlVisitor extends JsonPathBaseVisitor<Object> {
     @Override
     public @Nullable Object visitRangeOp(JsonPath.RangeOpContext ctx) {
         if (context == null) {
-            System.out.println(">>> NO CONTEXT FROM WHICH TO EXTRACT RANGE");
             return null;
         }
 
@@ -140,16 +125,8 @@ public class JsonPathYamlVisitor extends JsonPathBaseVisitor<Object> {
     }
 
     @Override
-    public Object visitFilterExpression(JsonPath.FilterExpressionContext ctx) {
-        Object currentCtx = context;
-        Object result = visit(ctx.expression());
-        return result;
-    }
-
-    @Override
     public @Nullable Object visitBinaryExpression(JsonPath.BinaryExpressionContext ctx) {
         if (context == null) {
-            System.out.println(">>> NO CONTEXT FROM WHICH TO EVALUATE");
             return null;
         }
 
@@ -174,33 +151,16 @@ public class JsonPathYamlVisitor extends JsonPathBaseVisitor<Object> {
                 context = e.getBlock();
                 Object leftHand = visit(leftHandExpr);
 
-                final Object rightHand;
+                Object rightHand;
                 if (ctx.expression(1) instanceof JsonPath.LiteralExpressionContext) {
                     rightHand = unquoteExpression((JsonPath.LiteralExpressionContext) ctx.expression(1));
                 } else {
                     rightHand = visit(ctx.expression(1));
                 }
 
-                System.out.println("================================");
-                System.out.println(ctx.getText());
-                System.out.println("RH: " + rightHand);
-
-                if (leftHand instanceof List) {
-                    results.addAll(((List<Yaml>) leftHand).stream()
-                            .map(lhy -> {
-                                Object lho = getValue(lhy);
-                                if (predicate.test(lho, rightHand)) {
-                                    return e.getBlock();
-                                }
-                                return null;
-                            })
-                            .filter(Objects::nonNull)
-                            .collect(Collectors.toList()));
-                } else {
-                    Object lho = getValue(leftHand);
-                    if (predicate.test(lho, rightHand)) {
-                        results.add(e.getBlock());
-                    }
+                Object lho = getValue(leftHand);
+                if (predicate.test(lho, rightHand)) {
+                    results.add(e.getBlock());
                 }
             }
             if (!results.isEmpty()) {
@@ -212,15 +172,10 @@ public class JsonPathYamlVisitor extends JsonPathBaseVisitor<Object> {
 
     @Override
     public @Nullable Object visitIdentifier(JsonPath.IdentifierContext ctx) {
-        System.out.println("================================");
-        System.out.println("ID: " + ctx.getText());
-
         if (context == null) {
-            System.out.println(">>> NO CONTEXT FROM WHICH TO ID");
             return null;
         }
 
-        System.out.println("RESOLVING FROM: " + (null != context ? context.getClass().getSimpleName() : "null"));
         if (context instanceof List) {
             List<Object> l = (List<Object>) context;
             return l.stream()

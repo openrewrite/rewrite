@@ -32,7 +32,8 @@ import static java.util.Collections.disjoint;
 
 /**
  * Provides methods for matching the given cursor location to a specified JsonPath expression.
- *
+ * <p/>
+ * This is not a full implementation of the JsonPath syntax documented here: <a href="https://support.smartbear.com/alertsite/docs/monitors/api/endpoint/jsonpath.html">https://support.smartbear.com/alertsite/docs/monitors/api/endpoint/jsonpath.html</a>.
  */
 public class JsonPathMatcher {
 
@@ -59,13 +60,8 @@ public class JsonPathMatcher {
     }
 
     public boolean matches(Cursor cursor) {
-        System.out.println("\n================================");
-        System.out.println(cursor);
         List<Object> cursorPath = cursor.getPathAsStream().collect(Collectors.toList());
-
         return find(cursor).map(o -> {
-            System.out.println("================================");
-            System.out.println("FOUND: " + o);
             if (o instanceof List) {
                 //noinspection unchecked
                 return !disjoint((List<Yaml>) o, cursorPath);
@@ -78,8 +74,6 @@ public class JsonPathMatcher {
     public boolean encloses(Cursor cursor) {
         List<Object> cursorPath = cursor.getPathAsStream().collect(Collectors.toList());
         return find(cursor).map(o -> {
-            System.out.println("================================");
-            System.out.println("ENCLOSES: " + o);
             if (o instanceof List) {
                 //noinspection unchecked
                 return ((List<Object>) o).stream().anyMatch(cursorPath::contains);
