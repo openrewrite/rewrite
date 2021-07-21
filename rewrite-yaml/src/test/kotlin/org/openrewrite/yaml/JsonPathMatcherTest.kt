@@ -34,7 +34,7 @@ class JsonPathMatcherTest {
           annotations:
             mycompany.io/commit-hash: hash
         spec:
-          containers:            
+          containers:
             - name: nginx
               image: nginx:latest
         ---
@@ -42,13 +42,13 @@ class JsonPathMatcherTest {
         kind: Pod
         metadata:
           name: barepodB
-          labels: 
+          labels:
             app: myapp
             role: B
           annotations:
             mycompany.io/commit-hash: hash
         spec:
-          containers:            
+          containers:
             - name: nginx
               image: nginx:latest
         ---
@@ -87,7 +87,7 @@ class JsonPathMatcherTest {
     @Test
     fun `must recurse to find elements`() {
         val results = visit(recurseSpecContainers, json)
-        assertThat(results).hasSize(2)
+        assertThat(results).hasSize(3)
     }
 
     @Test

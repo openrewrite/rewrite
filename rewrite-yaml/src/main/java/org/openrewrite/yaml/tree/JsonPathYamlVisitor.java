@@ -16,98 +16,263 @@
 
 package org.openrewrite.yaml.tree;
 
-import org.antlr.v4.runtime.tree.TerminalNode;
 import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.yaml.internal.grammar.JsonPath;
+import org.openrewrite.yaml.internal.grammar.JsonPathBaseVisitor;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.function.BiPredicate;
+import java.util.stream.Collectors;
 
-public class JsonPathYamlVisitor extends AbstractJsonPathTreeVisitor<Yaml> {
+@SuppressWarnings({"unchecked", "ConstantConditions"})
+public class JsonPathYamlVisitor extends JsonPathBaseVisitor<Object> {
 
-    public JsonPathYamlVisitor(List<Tree> cursorPath) {
-        super(cursorPath);
+    protected static final String RESULT = "result";
+
+    private final List<Tree> cursorPath;
+
+    @Nullable
+    protected Object context;
+
+    public JsonPathYamlVisitor(List<Tree> cursorPath, @Nullable Object context) {
+        this.cursorPath = cursorPath;
+        this.context = context;
+    }
+
+    public List<Tree> getCursorPath() {
+        return cursorPath;
     }
 
     @Override
-    protected TreeVisitor<? extends Tree, TerminalNode> rootNodeVisitor() {
-        return new TreeVisitor<Tree, TerminalNode>() {
-            @Override
-            public @Nullable Tree visit(@Nullable Tree tree, TerminalNode terminalNode) {
-                if (tree instanceof Yaml.Mapping) {
-                    return tree;
+    protected Object defaultResult() {
+        return context;
+    }
+
+    @Override
+    protected Object aggregateResult(Object aggregate, Object nextResult) {
+        return (context = nextResult);
+    }
+
+    @Override
+    public @Nullable Object visitJsonpath(JsonPath.JsonpathContext ctx) {
+        if (ctx.ROOT() != null) {
+            context = cursorPath.stream()
+                    .filter(t -> t instanceof Yaml.Mapping)
+                    .findFirst()
+                    .orElse(null);
+        }
+        return super.visitJsonpath(ctx);
+    }
+
+    @Override
+    public @Nullable Object visitRecursiveDescent(JsonPath.RecursiveDescentContext ctx) {
+        System.out.println("================================");
+        System.out.println("RECURSION PARENT: " + ctx.getParent().getText());
+        System.out.println("RECURSIVE DESCENT: " + ctx.getText());
+
+        if (context == null) {
+            System.out.println(">>> NO CONTEXT FROM WHICH TO RECURSE");
+            return null;
+        }
+
+        Object result = null;
+        for (Tree path : cursorPath) {
+            System.out.println("================================");
+            System.out.println("RECURSING FROM: " + path.getClass().getSimpleName());
+            JsonPathYamlVisitor v = new JsonPathYamlVisitor(cursorPath, path);
+            for (int i = 1, len = ctx.getParent().getChildCount(); i < len; i++) {
+                result = v.visit(ctx.getParent().getChild(i));
+                System.out.println("    >>> " + result);
+                if (result == null) {
+                    break;
                 }
-                return null;
             }
-        };
+            if (result != null) {
+                return path;
+            }
+        }
+        return result;
     }
 
     @Override
-    protected TreeVisitor<Yaml, List<Yaml>> arraySliceVisitor() {
-        return new TreeVisitor<Yaml, List<Yaml>>() {
-            @Override
-            public @Nullable Yaml visit(@Nullable Tree tree, List<Yaml> results) {
-                if (tree instanceof Yaml.Mapping.Entry) {
-                    visit(((Yaml.Mapping.Entry) tree).getValue(), results);
-                } else if (tree instanceof Yaml.Mapping) {
-                    ((Yaml.Mapping) tree).getEntries().forEach(e -> results.add(e.getValue()));
-                } else if (tree instanceof Yaml.Sequence) {
-                    ((Yaml.Sequence) tree).getEntries().forEach(e -> results.add(e.getBlock()));
+    public @Nullable Object visitRangeOp(JsonPath.RangeOpContext ctx) {
+        if (context == null) {
+            System.out.println(">>> NO CONTEXT FROM WHICH TO EXTRACT RANGE");
+            return null;
+        }
+
+        List<Yaml> results;
+        if (context instanceof List) {
+            results = (List<Yaml>) context;
+        } else if (context instanceof Yaml.Mapping) {
+            // TODO: support ranges in mappings
+            return context;
+        } else if (context instanceof Yaml.Sequence) {
+            Yaml.Sequence s = (Yaml.Sequence) context;
+            results = s.getEntries().stream()
+                    .map(Yaml.Sequence.Entry::getBlock)
+                    .collect(Collectors.toList());
+        } else if (context instanceof Yaml.Mapping.Entry) {
+            context = ((Yaml.Mapping.Entry) context).getValue();
+            return visitRangeOp(ctx);
+        } else {
+            results = new ArrayList<>();
+        }
+
+        int start = ctx.start() != null ? Integer.parseInt(ctx.start().getText()) : 0;
+        int end = ctx.end() != null ? Integer.parseInt(ctx.end().getText()) : Integer.MAX_VALUE;
+
+        int entryCount = results.size();
+        int limit = 0;
+        if (end > 0) {
+            limit = end - start;
+        } else if (end < 0) {
+            limit = entryCount + end;
+        }
+
+        return results.stream()
+                .skip(start)
+                .limit(limit)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public Object visitFilterExpression(JsonPath.FilterExpressionContext ctx) {
+        Object currentCtx = context;
+        Object result = visit(ctx.expression());
+        return result;
+    }
+
+    @Override
+    public @Nullable Object visitBinaryExpression(JsonPath.BinaryExpressionContext ctx) {
+        if (context == null) {
+            System.out.println(">>> NO CONTEXT FROM WHICH TO EVALUATE");
+            return null;
+        }
+
+        BiPredicate<Object, Object> predicate = (lh, rh) -> {
+            if (ctx.EQ() != null) {
+                return Objects.equals(lh, rh);
+            }
+            return false;
+        };
+        if (context instanceof Yaml.Mapping.Entry) {
+            context = ((Yaml.Mapping.Entry) context).getValue();
+            return visitBinaryExpression(ctx);
+        } else if (context instanceof Yaml.Mapping) {
+            // TODO: support filtering of mappings
+            return context;
+        } else if (context instanceof Yaml.Sequence) {
+            Yaml.Sequence s = (Yaml.Sequence) context;
+            JsonPath.ExpressionContext leftHandExpr = ctx.expression(0);
+
+            List<Yaml> results = new ArrayList<>();
+            for (Yaml.Sequence.Entry e : s.getEntries()) {
+                context = e.getBlock();
+                Object leftHand = visit(leftHandExpr);
+
+                final Object rightHand;
+                if (ctx.expression(1) instanceof JsonPath.LiteralExpressionContext) {
+                    rightHand = unquoteExpression((JsonPath.LiteralExpressionContext) ctx.expression(1));
                 } else {
-                    results.add((Yaml) tree);
+                    rightHand = visit(ctx.expression(1));
                 }
-                return null;
-            }
-        };
-    }
 
-    @Override
-    protected TreeVisitor<Yaml, List<Yaml>> resolveExpressionVisitor() {
-        return new TreeVisitor<Yaml, List<Yaml>>() {
-            @Override
-            public @Nullable Yaml visit(@Nullable Tree tree, List<Yaml> results) {
-                if (tree instanceof Yaml.Mapping.Entry) {
-                    visit(((Yaml.Mapping.Entry) tree).getValue(), results);
-                } else if (tree instanceof Yaml.Sequence) {
-                    Yaml.Sequence s = (Yaml.Sequence) tree;
-                    for (Yaml.Sequence.Entry e : s.getEntries()) {
+                System.out.println("================================");
+                System.out.println(ctx.getText());
+                System.out.println("RH: " + rightHand);
+
+                if (leftHand instanceof List) {
+                    results.addAll(((List<Yaml>) leftHand).stream()
+                            .map(lhy -> {
+                                Object lho = getValue(lhy);
+                                if (predicate.test(lho, rightHand)) {
+                                    return e.getBlock();
+                                }
+                                return null;
+                            })
+                            .filter(Objects::nonNull)
+                            .collect(Collectors.toList()));
+                } else {
+                    Object lho = getValue(leftHand);
+                    if (predicate.test(lho, rightHand)) {
                         results.add(e.getBlock());
                     }
                 }
-                return null;
             }
-        };
+            if (!results.isEmpty()) {
+                return results;
+            }
+        }
+        return null;
     }
 
     @Override
-    protected TreeVisitor<Yaml, List<Yaml>> findByIdentifierVisitor(TerminalNode id) {
-        return new TreeVisitor<Yaml, List<Yaml>>() {
-            @Override
-            public @Nullable Yaml visit(@Nullable Tree tree, List<Yaml> results) {
-                if (tree instanceof Yaml.Mapping.Entry) {
-                    return visit(((Yaml.Mapping.Entry) tree).getValue(), results);
-                } else if (tree instanceof Yaml.Mapping) {
-                    Yaml.Mapping m = (Yaml.Mapping) super.visit(tree, results);
-                    if (m != null) {
-                        return m.getEntries().stream()
-                                .filter(e -> e.getKey().getValue().equals(id.getText()))
-                                .findFirst()
-                                .orElse(null);
-                    }
-                } else if (tree instanceof Yaml.Sequence) {
-                    Yaml.Sequence s = (Yaml.Sequence) super.visit(tree, results);
-                    if (s != null) {
-                        for (Yaml.Sequence.Entry e : s.getEntries()) {
-                            Yaml y = super.visit(e.getBlock(), results);
-                            if (y != null) {
-                                results.add(y);
-                            }
-                        }
-                    }
-                }
-                return null;
+    public @Nullable Object visitIdentifier(JsonPath.IdentifierContext ctx) {
+        System.out.println("================================");
+        System.out.println("ID: " + ctx.getText());
+
+        if (context == null) {
+            System.out.println(">>> NO CONTEXT FROM WHICH TO ID");
+            return null;
+        }
+
+        System.out.println("RESOLVING FROM: " + (null != context ? context.getClass().getSimpleName() : "null"));
+        if (context instanceof List) {
+            List<Object> l = (List<Object>) context;
+            return l.stream()
+                    .map(o -> {
+                        context = o;
+                        return visitIdentifier(ctx);
+                    })
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+        } else if (context instanceof Yaml.Mapping) {
+            Yaml.Mapping m = (Yaml.Mapping) context;
+            return m.getEntries().stream()
+                    .filter(e -> e.getKey().getValue().equals(ctx.Identifier().getText()))
+                    .findFirst()
+                    .orElse(null);
+        } else if (context instanceof Yaml.Sequence) {
+            Yaml.Sequence s = (Yaml.Sequence) context;
+            return s.getEntries().stream()
+                    .map(e -> {
+                        context = e;
+                        return visitIdentifier(ctx);
+                    })
+                    .collect(Collectors.toList());
+        } else if (context instanceof Yaml.Mapping.Entry) {
+            Yaml.Mapping.Entry e = (Yaml.Mapping.Entry) context;
+            context = e.getValue();
+            return visitIdentifier(ctx);
+        }
+
+        return null;
+    }
+
+    private static @Nullable String unquoteExpression(JsonPath.LiteralExpressionContext ctx) {
+        String s = null;
+        if (ctx.litExpression().StringLiteral() != null) {
+            s = ctx.litExpression().StringLiteral().getText();
+        }
+        if (s != null && (s.startsWith("'") || s.startsWith("\""))) {
+            return s.substring(1, s.length() - 1);
+        }
+        return "null".equals(s) ? null : s;
+    }
+
+    private static @Nullable Object getValue(Object o) {
+        if (o instanceof Yaml.Mapping.Entry) {
+            Yaml.Mapping.Entry e = (Yaml.Mapping.Entry) o;
+            if (e.getValue() instanceof Yaml.Scalar) {
+                Yaml.Scalar s = (Yaml.Scalar) e.getValue();
+                return s.getValue();
             }
-        };
+        }
+        return null;
     }
 
 }

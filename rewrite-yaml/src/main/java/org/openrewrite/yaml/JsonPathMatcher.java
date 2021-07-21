@@ -21,6 +21,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.yaml.internal.grammar.JsonPath;
 import org.openrewrite.yaml.internal.grammar.JsonPathLexer;
+import org.openrewrite.yaml.internal.grammar.JsonPathVisitor;
 import org.openrewrite.yaml.tree.JsonPathYamlVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -29,6 +30,10 @@ import java.util.stream.Collectors;
 
 import static java.util.Collections.disjoint;
 
+/**
+ * Provides methods for matching the given cursor location to a specified JsonPath expression.
+ *
+ */
 public class JsonPathMatcher {
 
     private final String jsonPath;
@@ -38,7 +43,6 @@ public class JsonPathMatcher {
     }
 
     public Optional<Object> find(Cursor cursor) {
-        JsonPath jsonPath = new JsonPath(new CommonTokenStream(new JsonPathLexer(CharStreams.fromString(this.jsonPath))));
         LinkedList<Tree> cursorPath = cursor.getPathAsStream()
                 .filter(o -> o instanceof Tree)
                 .map(Tree.class::cast)
@@ -48,15 +52,21 @@ public class JsonPathMatcher {
         }
         Collections.reverse(cursorPath);
 
-        JsonPath.JsonpathContext ctx = jsonPath.jsonpath();
-        Object result = new JsonPathYamlVisitor(cursorPath).visit(ctx);
+        JsonPathVisitor<Object> v = new JsonPathYamlVisitor(cursorPath, cursorPath.peekFirst());
+        JsonPath.JsonpathContext ctx = jsonPath().jsonpath();
+        Object result = v.visit(ctx);
         return Optional.ofNullable(result);
     }
 
     public boolean matches(Cursor cursor) {
+        System.out.println("\n================================");
+        System.out.println(cursor);
+        List<Object> cursorPath = cursor.getPathAsStream().collect(Collectors.toList());
+
         return find(cursor).map(o -> {
+            System.out.println("================================");
+            System.out.println("FOUND: " + o);
             if (o instanceof List) {
-                List<Object> cursorPath = cursor.getPathAsStream().collect(Collectors.toList());
                 //noinspection unchecked
                 return !disjoint((List<Yaml>) o, cursorPath);
             } else {
@@ -66,7 +76,21 @@ public class JsonPathMatcher {
     }
 
     public boolean encloses(Cursor cursor) {
-        return false;
+        List<Object> cursorPath = cursor.getPathAsStream().collect(Collectors.toList());
+        return find(cursor).map(o -> {
+            System.out.println("================================");
+            System.out.println("ENCLOSES: " + o);
+            if (o instanceof List) {
+                //noinspection unchecked
+                return ((List<Object>) o).stream().anyMatch(cursorPath::contains);
+            } else {
+                return cursorPath.contains(o) && !Objects.equals(o, cursor.getValue());
+            }
+        }).orElse(false);
+    }
+
+    private JsonPath jsonPath() {
+        return new JsonPath(new CommonTokenStream(new JsonPathLexer(CharStreams.fromString(this.jsonPath))));
     }
 
 }
