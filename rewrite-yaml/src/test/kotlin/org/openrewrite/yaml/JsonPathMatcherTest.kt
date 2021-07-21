@@ -70,11 +70,11 @@ class JsonPathMatcherTest {
                 - name: init
                   image: mycompany.io/init:latest
     """.trimIndent()
-    val simpleJsonPath = "$.metadata"
     val appLabel = "$.metadata.labels.app"
     val recurseSpecContainers = "..spec.containers"
     val firstContainerSlice = "$.spec.template.spec.containers[:1]"
     val containerByNameImage = "..spec.containers[?(@.name == 'app')].image"
+    val image = ".image"
 
     @Test
     fun `must find expression result`() {
@@ -107,6 +107,12 @@ class JsonPathMatcherTest {
         val results = visit(containerByNameImage, json)
         assertThat(results).hasSize(1)
         assertThat(((results.get(0) as Yaml.Mapping.Entry).value as Yaml.Scalar).value).isEqualTo("mycompany.io/app:v2@digest")
+    }
+
+    @Test
+    fun `must filter by relative expression`() {
+        val results = visit(image, json)
+        assertThat(results).hasSize(4)
     }
 
     private fun visit(jsonPath: String, json: String, encloses: Boolean = false): List<Yaml> {

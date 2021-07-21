@@ -32,9 +32,9 @@ import static java.util.Collections.disjoint;
 
 /**
  * Provides methods for matching the given cursor location to a specified JsonPath expression.
- *
+ * <p>
  * This is not a full implementation of the JsonPath syntax documented here:
- *     https://support.smartbear.com/alertsite/docs/monitors/api/endpoint/jsonpath.html
+ * https://support.smartbear.com/alertsite/docs/monitors/api/endpoint/jsonpath.html
  */
 public class JsonPathMatcher {
 
@@ -54,7 +54,13 @@ public class JsonPathMatcher {
         }
         Collections.reverse(cursorPath);
 
-        JsonPathVisitor<Object> v = new JsonPathYamlVisitor(cursorPath, cursorPath.peekFirst());
+        Tree start;
+        if (jsonPath.startsWith(".") && !jsonPath.startsWith("..")) {
+            start = cursor.getValue();
+        } else {
+            start = cursorPath.peekFirst();
+        }
+        JsonPathVisitor<Object> v = new JsonPathYamlVisitor(cursorPath, start);
         JsonPath.JsonpathContext ctx = jsonPath().jsonpath();
         Object result = v.visit(ctx);
         return Optional.ofNullable(result);

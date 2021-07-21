@@ -14,7 +14,7 @@
  *  limitations under the License.
  */
 
-// Generated from /Users/jbrisbin/src/github.com/openrewrite/rewrite/rewrite-yaml/src/main/antlr/JsonPath.g4 by ANTLR 4.8
+// Generated from /Users/jbrisbin/src/github.com/openrewrite/rewrite/rewrite-yaml/src/main/antlr/JsonPath.g4 by ANTLR 4.9.2
 package org.openrewrite.yaml.internal.grammar;
 import org.antlr.v4.runtime.tree.AbstractParseTreeVisitor;
 

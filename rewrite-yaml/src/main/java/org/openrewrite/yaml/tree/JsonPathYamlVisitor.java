@@ -200,6 +200,9 @@ public class JsonPathYamlVisitor extends JsonPathBaseVisitor<Object> {
                     .collect(Collectors.toList());
         } else if (context instanceof Yaml.Mapping.Entry) {
             Yaml.Mapping.Entry e = (Yaml.Mapping.Entry) context;
+            if (e.getValue() instanceof Yaml.Scalar) {
+                return e.getKey().getValue().equals(ctx.Identifier().getText()) ? e : null;
+            }
             context = e.getValue();
             return visitIdentifier(ctx);
         }
