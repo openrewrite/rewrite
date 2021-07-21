@@ -146,20 +146,18 @@ public class JsonPathYamlVisitor extends JsonPathBaseVisitor<Object> {
             Yaml.Sequence s = (Yaml.Sequence) context;
             JsonPath.ExpressionContext leftHandExpr = ctx.expression(0);
 
+            Object rightHand;
+            if (ctx.expression(1) instanceof JsonPath.LiteralExpressionContext) {
+                rightHand = unquoteExpression((JsonPath.LiteralExpressionContext) ctx.expression(1));
+            } else {
+                rightHand = visit(ctx.expression(1));
+            }
+
             List<Yaml> results = new ArrayList<>();
             for (Yaml.Sequence.Entry e : s.getEntries()) {
                 context = e.getBlock();
-                Object leftHand = visit(leftHandExpr);
-
-                Object rightHand;
-                if (ctx.expression(1) instanceof JsonPath.LiteralExpressionContext) {
-                    rightHand = unquoteExpression((JsonPath.LiteralExpressionContext) ctx.expression(1));
-                } else {
-                    rightHand = visit(ctx.expression(1));
-                }
-
-                Object lho = getValue(leftHand);
-                if (predicate.test(lho, rightHand)) {
+                Object leftHand = getValue(visit(leftHandExpr));
+                if (predicate.test(leftHand, rightHand)) {
                     results.add(e.getBlock());
                 }
             }
