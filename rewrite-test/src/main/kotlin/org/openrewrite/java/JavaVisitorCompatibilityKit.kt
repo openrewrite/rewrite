@@ -155,6 +155,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class HideUtilityClassConstructorTck : HideUtilityClassConstructorTest
 
     @Nested
+    inner class IndexOfReplaceableByContainsTck : IndexOfReplaceableByContainsTest
+
+    @Nested
     inner class IndexOfShouldNotCompareGreaterThanZeroTckTest : IndexOfShouldNotCompareGreaterThanZeroTest
 
     @Nested
