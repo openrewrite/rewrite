@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("InfiniteRecursion")
+
 package org.openrewrite.java.format
 
 import org.junit.jupiter.api.Test
@@ -20,6 +22,8 @@ import org.openrewrite.Recipe
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.java.cleanup.EmptyForInitializerPadStyle
+import org.openrewrite.java.cleanup.EmptyForIteratorPadStyle
 import org.openrewrite.java.style.IntelliJ
 import org.openrewrite.style.NamedStyles
 import org.openrewrite.style.Style
@@ -4735,13 +4739,7 @@ interface SpacesTest : JavaRecipeTest {
 
     @Test
     fun addSpaceToEmptyInitializer(jp: JavaParser.Builder<*, *>) = assertChanged(
-        parser = jp.styles(
-                namedStyles(listOf(IntelliJ.spaces().run {
-                    withOther(other.run {
-                        withPadEmptyForInitializer(true)
-                    })
-                }))
-        ).build(),
+        parser = jp.styles(namedStyles(listOf(EmptyForInitializerPadStyle(true)))).build(),
         before = """
             public class A {
                 {
@@ -4760,21 +4758,15 @@ interface SpacesTest : JavaRecipeTest {
 
     @Test
     fun removeSpaceFromEmptyInitializer(jp: JavaParser.Builder<*, *>) = assertChanged(
-            parser = jp.styles(
-                    namedStyles(listOf(IntelliJ.spaces().run {
-                        withOther(other.run {
-                            withPadEmptyForInitializer(false)
-                        })
-                    }))
-            ).build(),
-            before = """
+        parser = jp.styles(namedStyles(listOf(EmptyForInitializerPadStyle(false)))).build(),
+        before = """
             public class A {
                 {
                     for ( ; i < j; i++, j--) { }
                 }
             }
         """,
-            after = """
+        after = """
             public class A {
                 {
                     for (; i < j; i++, j--) { }
@@ -4785,13 +4777,7 @@ interface SpacesTest : JavaRecipeTest {
 
     @Test
     fun addSpaceToEmptyIterator(jp: JavaParser.Builder<*, *>) = assertChanged(
-        parser = jp.styles(
-                namedStyles(listOf(IntelliJ.spaces().run {
-                    withOther(other.run {
-                        withPadEmptyForIterator(true)
-                    })
-                }))
-        ).build(),
+        parser = jp.styles(namedStyles(listOf(EmptyForIteratorPadStyle(true)))).build(),
         before = """
             public class A {
                 {
@@ -4810,13 +4796,7 @@ interface SpacesTest : JavaRecipeTest {
 
     @Test
     fun removeSpaceFromEmptyIterator(jp: JavaParser.Builder<*, *>) = assertChanged(
-        parser = jp.styles(
-                    namedStyles(listOf(IntelliJ.spaces().run {
-                        withOther(other.run {
-                            withPadEmptyForIterator(false)
-                        })
-                    }))
-            ).build(),
+        parser = jp.styles(namedStyles(listOf(EmptyForIteratorPadStyle(false)))).build(),
         before = """
             public class A {
                 {

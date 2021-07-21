@@ -19,6 +19,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.cleanup.DefaultComesLastStyle
 import org.openrewrite.java.cleanup.EmptyBlockStyle
+import org.openrewrite.java.cleanup.EmptyForInitializerPadStyle
 import org.openrewrite.java.cleanup.EqualsAvoidsNullStyle
 import org.openrewrite.java.style.CheckstyleConfigLoader.loadCheckstyleConfig
 
@@ -156,5 +157,27 @@ class CheckstyleConfigLoaderTest {
         val equalsAvoidsNullStyle = checkstyle.styles.first() as EqualsAvoidsNullStyle
 
         assertThat(equalsAvoidsNullStyle.ignoreEqualsIgnoreCase).isTrue
+    }
+
+    @Test
+    fun emptyForPadInitializer() {
+        val checkstyle = loadCheckstyleConfig("""
+            <!DOCTYPE module PUBLIC
+                "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
+                "https://checkstyle.org/dtds/configuration_1_2.dtd">
+            <module name="Checker">
+              <module name="EmptyForInitializerPad">
+                <property name="option" value=" space"/>
+              </module>
+            </module>
+        """.trimIndent(), emptyMap())
+
+        assertThat(checkstyle.styles)
+                .hasSize(1)
+
+        assertThat(checkstyle.styles.first()).isExactlyInstanceOf(EmptyForInitializerPadStyle::class.java)
+        val emptyForPadInitializerStyle = checkstyle.styles.first() as EmptyForInitializerPadStyle
+
+        assertThat(emptyForPadInitializerStyle.space).isTrue
     }
 }

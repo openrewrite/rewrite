@@ -41,6 +41,8 @@ public class Checkstyle extends NamedStyles {
                 Arrays.asList(
                         defaultComesLast(),
                         emptyBlock(),
+                        emptyForInitializerPadStyle(),
+                        emptyForIteratorPadStyle(),
                         equalsAvoidsNull(),
                         explicitInitialization(),
                         fallThrough(),
@@ -97,5 +99,13 @@ public class Checkstyle extends NamedStyles {
                 true, true, true, true, true, true, true,
                 true, true, true, true, true, true,
                 true, true, true, true, true);
+    }
+
+    public static EmptyForInitializerPadStyle emptyForInitializerPadStyle() {
+        return new EmptyForInitializerPadStyle(false);
+    }
+
+    public static EmptyForIteratorPadStyle emptyForIteratorPadStyle() {
+        return new EmptyForIteratorPadStyle(false);
     }
 }

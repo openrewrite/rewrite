@@ -19,6 +19,8 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.cleanup.EmptyForInitializerPadStyle;
+import org.openrewrite.java.cleanup.EmptyForIteratorPadStyle;
 import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
 
@@ -50,8 +52,12 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
                 .orElse(IntelliJ.blankLines()), stopAfter)
                 .visit(t, p, cursor.fork());
 
-        t = new SpacesVisitor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
-                .orElse(IntelliJ.spaces()), stopAfter)
+        t = new SpacesVisitor<>(
+                Optional.ofNullable(cu.getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces()),
+                cu.getStyle(EmptyForInitializerPadStyle.class),
+                cu.getStyle(EmptyForIteratorPadStyle.class),
+                stopAfter
+        )
                 .visit(t, p, cursor.fork());
 
         t = new WrappingAndBracesVisitor<>(Optional.ofNullable(cu.getStyle(WrappingAndBracesStyle.class))
@@ -62,34 +68,6 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
                 .orElse(IntelliJ.tabsAndIndents()), stopAfter)
                 .visit(t, p, cursor.fork());
 
-        if(t instanceof J.CompilationUnit) {
-            t = visitCompilationUnit((J.CompilationUnit) t, p);
-        }
-
-        return t;
-    }
-
-    @Override
-    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
-        J.CompilationUnit t = (J.CompilationUnit) new RemoveTrailingWhitespaceVisitor<>().visit(cu, p);
-
-        t = (J.CompilationUnit) new BlankLinesVisitor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
-                .orElse(IntelliJ.blankLines()), stopAfter)
-                .visit(t, p);
-
-        t = (J.CompilationUnit) new SpacesVisitor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
-                .orElse(IntelliJ.spaces()), stopAfter)
-                .visit(t, p);
-
-        t = (J.CompilationUnit) new WrappingAndBracesVisitor<>(Optional.ofNullable(cu.getStyle(WrappingAndBracesStyle.class))
-                .orElse(IntelliJ.wrappingAndBraces()), stopAfter)
-                .visit(t, p);
-
-        t = (J.CompilationUnit) new TabsAndIndentsVisitor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
-                .orElse(IntelliJ.tabsAndIndents()), stopAfter)
-                .visit(t, p);
-
-        assert t != null;
         return t;
     }
 }

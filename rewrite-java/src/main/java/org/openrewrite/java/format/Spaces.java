@@ -19,6 +19,8 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.cleanup.EmptyForInitializerPadStyle;
+import org.openrewrite.java.cleanup.EmptyForIteratorPadStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.tree.J;
@@ -47,7 +49,7 @@ public class Spaces extends Recipe {
             if (style == null) {
                 style = IntelliJ.spaces();
             }
-            doAfterVisit(new SpacesVisitor<>(style));
+            doAfterVisit(new SpacesVisitor<>(style, cu.getStyle(EmptyForInitializerPadStyle.class), cu.getStyle(EmptyForIteratorPadStyle.class)));
             return super.visitCompilationUnit(cu, executionContext);
         }
     }

@@ -62,6 +62,8 @@ public class CheckstyleConfigLoader {
         return new Checkstyle(Stream.of(
                 defaultComesLast(conf),
                 emptyBlock(conf),
+                emptyForInitializerPadStyle(conf),
+                emptyForIteratorPadStyle(conf),
                 equalsAvoidsNull(conf),
                 explicitInitialization(conf),
                 fallThrough(conf),
@@ -126,6 +128,30 @@ public class CheckstyleConfigLoader {
         return new EmptyBlockStyle(blockPolicy, instanceInit, literalCatch, literalDo,
                 literalElse, literalFinally, literalFor, literalIf, literalSwitch, literalSynchronized, literalTry,
                 literalWhile, staticInit);
+    }
+
+    @Nullable
+    private static EmptyForInitializerPadStyle emptyForInitializerPadStyle(Map<String, Module> conf) {
+        Module module = conf.get("EmptyForInitializerPad");
+        if(module == null) {
+            return null;
+        }
+        String option = module.properties.get("option");
+        // nospace is default, so no option means pad is false
+        boolean pad = option != null && "space".equals(option.trim());
+        return new EmptyForInitializerPadStyle(pad);
+    }
+
+    @Nullable
+    private static EmptyForIteratorPadStyle emptyForIteratorPadStyle(Map<String, Module> conf) {
+        Module module = conf.get("EmptyForIteratorPad");
+        if(module == null) {
+            return null;
+        }
+        String option = module.properties.get("option");
+        // nospace is default, so no option means pad is false
+        boolean pad = option != null && "space".equals(option.trim());
+        return new EmptyForIteratorPadStyle(pad);
     }
 
     @Nullable

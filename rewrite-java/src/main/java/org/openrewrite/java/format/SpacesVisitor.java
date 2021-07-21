@@ -20,6 +20,8 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.cleanup.EmptyForInitializerPadStyle;
+import org.openrewrite.java.cleanup.EmptyForIteratorPadStyle;
 import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.tree.*;
 
@@ -33,13 +35,21 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
 
     private final SpacesStyle style;
 
-    public SpacesVisitor(SpacesStyle style) {
-        this(style, null);
+    @Nullable
+    private final EmptyForInitializerPadStyle emptyForInitializerPadStyle;
+
+    @Nullable
+    private final EmptyForIteratorPadStyle emptyForIteratorPadStyle;
+
+    public SpacesVisitor(SpacesStyle style, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle) {
+        this(style, emptyForInitializerPadStyle, emptyForIteratorPadStyle, null);
     }
 
-    public SpacesVisitor(SpacesStyle style, @Nullable Tree stopAfter) {
+    public SpacesVisitor(SpacesStyle style, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle, @Nullable Tree stopAfter) {
         this.style = style;
         this.stopAfter = stopAfter;
+        this.emptyForInitializerPadStyle = emptyForInitializerPadStyle;
+        this.emptyForIteratorPadStyle = emptyForIteratorPadStyle;
     }
 
     <T extends J> T spaceBefore(T j, boolean spaceBefore) {
@@ -326,7 +336,11 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         J.ForLoop f = super.visitForLoop(forLoop, p);
         J.ForLoop.Control control = f.getControl();
         control = spaceBefore(control, style.getBeforeParentheses().getForParentheses());
-        Boolean padEmptyForInitializer = style.getOther().getPadEmptyForInitializer();
+
+        Boolean padEmptyForInitializer = null;
+        if(emptyForInitializerPadStyle != null) {
+            padEmptyForInitializer = emptyForInitializerPadStyle.getSpace();
+        }
         boolean spaceWithinForParens = style.getWithin().getForParentheses();
         boolean shouldPutSpaceOnInit;
         if(padEmptyForInitializer != null && f.getControl().getInit() instanceof J.Empty) {
@@ -351,7 +365,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                 )
         );
         int updateStatementsSize = f.getControl().getUpdate().size();
-        Boolean padEmptyForIterator = style.getOther().getPadEmptyForIterator();
+        Boolean padEmptyForIterator = (emptyForIteratorPadStyle == null) ? null : emptyForIteratorPadStyle.getSpace();
         if(padEmptyForIterator != null && updateStatementsSize == 1 && f.getControl().getUpdate().get(0) instanceof J.Empty) {
             control = control.getPadding().withUpdate(
                     ListUtils.map(control.getPadding().getUpdate(), (index, elemContainer) -> {
