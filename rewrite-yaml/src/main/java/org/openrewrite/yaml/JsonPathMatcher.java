@@ -62,7 +62,7 @@ public class JsonPathMatcher {
         } else {
             start = cursorPath.peekFirst();
         }
-        JsonPathVisitor<Object> v = new JsonPathYamlVisitor(cursorPath, start);
+        @SuppressWarnings("ConstantConditions") JsonPathVisitor<Object> v = new JsonPathYamlVisitor(cursorPath, start);
         JsonPath.JsonpathContext ctx = jsonPath().jsonpath();
         Object result = v.visit(ctx);
         return Optional.ofNullable(result);
@@ -73,7 +73,8 @@ public class JsonPathMatcher {
         return find(cursor).map(o -> {
             if (o instanceof List) {
                 //noinspection unchecked
-                return !disjoint((List<Yaml>) o, cursorPath);
+                List<Object> l = (List<Object>) o;
+                return !disjoint(l, cursorPath) && l.contains(cursor.getValue());
             } else {
                 return Objects.equals(o, cursor.getValue());
             }
@@ -96,14 +97,14 @@ public class JsonPathMatcher {
         return new JsonPath(new CommonTokenStream(new JsonPathLexer(CharStreams.fromString(this.jsonPath))));
     }
 
+    @SuppressWarnings({"ConstantConditions", "unchecked"})
     private static class JsonPathYamlVisitor extends JsonPathBaseVisitor<Object> {
 
         private final List<Tree> cursorPath;
 
-        @Nullable
         protected Object context;
 
-        public JsonPathYamlVisitor(List<Tree> cursorPath, @Nullable Object context) {
+        public JsonPathYamlVisitor(List<Tree> cursorPath, Object context) {
             this.cursorPath = cursorPath;
             this.context = context;
         }
@@ -119,7 +120,7 @@ public class JsonPathMatcher {
         }
 
         @Override
-        public @Nullable Object visitJsonpath(JsonPath.JsonpathContext ctx) {
+        public Object visitJsonpath(JsonPath.JsonpathContext ctx) {
             if (ctx.ROOT() != null) {
                 context = cursorPath.stream()
                         .filter(t -> t instanceof Yaml.Mapping)
@@ -130,7 +131,7 @@ public class JsonPathMatcher {
         }
 
         @Override
-        public @Nullable Object visitRecursiveDescent(JsonPath.RecursiveDescentContext ctx) {
+        public Object visitRecursiveDescent(JsonPath.RecursiveDescentContext ctx) {
             if (context == null) {
                 return null;
             }
@@ -151,8 +152,32 @@ public class JsonPathMatcher {
             return result;
         }
 
+
         @Override
-        public @Nullable Object visitRangeOp(JsonPath.RangeOpContext ctx) {
+        public Object visitWildcardExpression(JsonPath.WildcardExpressionContext ctx) {
+            if (context instanceof Yaml.Mapping.Entry) {
+                Yaml.Mapping.Entry e = (Yaml.Mapping.Entry) context;
+                if (e.getValue() instanceof Yaml.Scalar) {
+                    return e;
+                }
+                context = e.getValue();
+                return visitWildcardExpression(ctx);
+            } else if (context instanceof List) {
+                return context;
+            } else if (context instanceof Yaml.Mapping) {
+                Yaml.Mapping m = (Yaml.Mapping) context;
+                return m.getEntries();
+            } else if (context instanceof Yaml.Sequence) {
+                Yaml.Sequence s = (Yaml.Sequence) context;
+                return s.getEntries().stream()
+                        .map(Yaml.Sequence.Entry::getBlock)
+                        .collect(Collectors.toList());
+            }
+            return null;
+        }
+
+        @Override
+        public Object visitRangeOp(JsonPath.RangeOpContext ctx) {
             if (context == null) {
                 return null;
             }
@@ -194,11 +219,7 @@ public class JsonPathMatcher {
         }
 
         @Override
-        public @Nullable Object visitBinaryExpression(JsonPath.BinaryExpressionContext ctx) {
-            if (context == null) {
-                return null;
-            }
-
+        public Object visitBinaryExpression(JsonPath.BinaryExpressionContext ctx) {
             BiPredicate<Object, Object> predicate = (lh, rh) -> {
                 if (ctx.EQ() != null) {
                     return Objects.equals(lh, rh);
@@ -239,12 +260,15 @@ public class JsonPathMatcher {
 
         @Override
         public @Nullable Object visitIdentifier(JsonPath.IdentifierContext ctx) {
-            if (context == null) {
-                return null;
-            }
-
-            if (context instanceof List) {
-                @SuppressWarnings("unchecked") List<Object> l = (List<Object>) context;
+            if (context instanceof Yaml.Mapping.Entry) {
+                Yaml.Mapping.Entry e = (Yaml.Mapping.Entry) context;
+                if (e.getValue() instanceof Yaml.Scalar) {
+                    return e.getKey().getValue().equals(ctx.Identifier().getText()) ? e : null;
+                }
+                context = e.getValue();
+                return visitIdentifier(ctx);
+            } else if (context instanceof List) {
+                List<Object> l = (List<Object>) context;
                 return l.stream()
                         .map(o -> {
                             context = o;
@@ -267,19 +291,11 @@ public class JsonPathMatcher {
                         })
                         .filter(Objects::nonNull)
                         .collect(Collectors.toList());
-            } else if (context instanceof Yaml.Mapping.Entry) {
-                Yaml.Mapping.Entry e = (Yaml.Mapping.Entry) context;
-                if (e.getValue() instanceof Yaml.Scalar) {
-                    return e.getKey().getValue().equals(ctx.Identifier().getText()) ? e : null;
-                }
-                context = e.getValue();
-                return visitIdentifier(ctx);
             }
-
             return null;
         }
 
-        private static @Nullable String unquoteExpression(JsonPath.LiteralExpressionContext ctx) {
+        private static String unquoteExpression(JsonPath.LiteralExpressionContext ctx) {
             String s = null;
             if (ctx.litExpression().StringLiteral() != null) {
                 s = ctx.litExpression().StringLiteral().getText();
@@ -290,7 +306,7 @@ public class JsonPathMatcher {
             return "null".equals(s) ? null : s;
         }
 
-        private static @Nullable Object getValue(Object o) {
+        private static Object getValue(Object o) {
             if (o instanceof Yaml.Mapping.Entry) {
                 Yaml.Mapping.Entry e = (Yaml.Mapping.Entry) o;
                 if (e.getValue() instanceof Yaml.Scalar) {

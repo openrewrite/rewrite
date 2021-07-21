@@ -73,6 +73,8 @@ class JsonPathMatcherTest {
     val appLabel = "$.metadata.labels.app"
     val recurseSpecContainers = "..spec.containers"
     val firstContainerSlice = "$.spec.template.spec.containers[:1]"
+    val allContainerSlices = "$.spec.template.spec.containers[*]"
+    val allSpecChildren = "$.spec.template.spec.*"
     val containerByNameImage = "..spec.containers[?(@.name == 'app')].image"
     val image = ".image"
 
@@ -98,7 +100,7 @@ class JsonPathMatcherTest {
 
     @Test
     fun `must slice sequences`() {
-        val results = visit(firstContainerSlice, json)
+        val results = visit(firstContainerSlice, json, true)
         assertThat(results).hasSize(2)
     }
 
@@ -115,6 +117,18 @@ class JsonPathMatcherTest {
         assertThat(results).hasSize(4)
     }
 
+    @Test
+    fun `must support wildcards as identifiers`() {
+        val results = visit(allSpecChildren, json)
+        assertThat(results).hasSize(3)
+    }
+
+    @Test
+    fun `must support wildcards in range operators`() {
+        val results = visit(allContainerSlices, json, true)
+        assertThat(results).hasSize(2)
+    }
+
     private fun visit(jsonPath: String, json: String, encloses: Boolean = false): List<Yaml> {
         val ctx = InMemoryExecutionContext({ it.printStackTrace() })
         val documents = YamlParser().parse(ctx, json)
@@ -127,13 +141,11 @@ class JsonPathMatcherTest {
         documents.forEach {
             object : YamlVisitor<MutableList<Yaml>>() {
                 override fun visitMappingEntry(entry: Yaml.Mapping.Entry, p: MutableList<Yaml>): Yaml? {
-                    val matches = if (encloses) matcher.encloses(cursor) else matcher.matches(cursor)
-                    if (matches) {
-                        val e = super.visitMappingEntry(entry, p)
+                    val e = super.visitMappingEntry(entry, p)
+                    if (if (encloses) matcher.encloses(cursor) else matcher.matches(cursor)) {
                         p.add(e)
-                        return e
                     }
-                    return super.visitMappingEntry(entry, p)
+                    return e
                 }
             }.visit(it, results)
         }

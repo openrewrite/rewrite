@@ -142,6 +142,13 @@ public interface JsonPathVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitNotExpression(JsonPath.NotExpressionContext ctx);
 	/**
+	 * Visit a parse tree produced by the {@code WildcardExpression}
+	 * labeled alternative in {@link JsonPath#expression}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitWildcardExpression(JsonPath.WildcardExpressionContext ctx);
+	/**
 	 * Visit a parse tree produced by the {@code FilterExpression}
 	 * labeled alternative in {@link JsonPath#expression}.
 	 * @param ctx the parse tree

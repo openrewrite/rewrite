@@ -37,6 +37,7 @@ expression
     | Identifier                                                #Identifier
     | expression ( EQ | NE | LT | LE | GT | GE ) expression     #BinaryExpression
     | jsonpath                                                  #PathExpression
+    | WILDCARD                                                  #WildcardExpression
     | AT object+                                                #ScopedPathExpression
     ;
 

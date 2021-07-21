@@ -220,6 +220,18 @@ public interface JsonPathListener extends ParseTreeListener {
 	 */
 	void exitNotExpression(JsonPath.NotExpressionContext ctx);
 	/**
+	 * Enter a parse tree produced by the {@code WildcardExpression}
+	 * labeled alternative in {@link JsonPath#expression}.
+	 * @param ctx the parse tree
+	 */
+	void enterWildcardExpression(JsonPath.WildcardExpressionContext ctx);
+	/**
+	 * Exit a parse tree produced by the {@code WildcardExpression}
+	 * labeled alternative in {@link JsonPath#expression}.
+	 * @param ctx the parse tree
+	 */
+	void exitWildcardExpression(JsonPath.WildcardExpressionContext ctx);
+	/**
 	 * Enter a parse tree produced by the {@code FilterExpression}
 	 * labeled alternative in {@link JsonPath#expression}.
 	 * @param ctx the parse tree
