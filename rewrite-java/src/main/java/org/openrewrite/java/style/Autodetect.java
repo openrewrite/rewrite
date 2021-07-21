@@ -18,6 +18,7 @@ package org.openrewrite.java.style;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
@@ -50,6 +51,7 @@ public class Autodetect extends NamedStyles {
         ImportLayoutStatistics importLayoutStatistics = new ImportLayoutStatistics();
         SpacesStatistics spacesStatistics = new SpacesStatistics();
 
+        importLayoutStatistics.mapBlockPatterns(cus);
         for (J.CompilationUnit cu : cus) {
             new FindIndentJavaVisitor().visit(cu, indentStatistics);
             new FindImportLayout().visit(cu, importLayoutStatistics);
@@ -181,8 +183,15 @@ public class Autodetect extends NamedStyles {
 
     private static class ImportLayoutStatistics {
         List<List<Block>> blocksPerSourceFile = new ArrayList<>();
+        Map<String, String> pkgToBlockPattern = new LinkedHashMap<>();
+        int staticAtTopCount = 0;
+        int staticAtBotCount = 0;
         int minimumFoldedImports = Integer.MAX_VALUE;
         int minimumFoldedStaticImports = Integer.MAX_VALUE;
+
+        public boolean isStaticImportsAtBot() {
+            return staticAtBotCount >= staticAtTopCount;
+        }
 
         enum BlockType {
             Import,
@@ -202,57 +211,172 @@ public class Autodetect extends NamedStyles {
                     )
                     .map(longestBlocks -> {
                         ImportLayoutStyle.Builder builder = ImportLayoutStyle.builder();
-                        boolean importAllOthers = false;
-                        boolean importStaticAllOthers = false;
-                        int i = 0;
+                        boolean insertAllOthers = false;
+                        boolean importStaticAllOthers = true;
+                        boolean addJavaOrJavax = true;
+                        boolean containsJava = false;
+                        boolean containsJavax = false;
+
+                        List<Integer> countOfBlocksInGroup = new ArrayList<>(Collections.nCopies(longestBlocks.size(), 0));
+                        int pos = 0;
+                        int max = Integer.MIN_VALUE;
+                        int insertAllOtherAtIndex = 0;
+                        // The longest sequence of non-static imports without blank lines is converted
+                        // into an 'all others' block.
+                        for (int i = 0; i < longestBlocks.size(); i++) {
+                            Block block = longestBlocks.get(i);
+                            if (!containsJava && block.pattern.equals("java.*")) {
+                                containsJava = true;
+                            }
+
+                            if (!containsJavax && block.pattern.equals("javax.*")) {
+                                containsJavax = true;
+                            }
+
+                            if (BlockType.Import.equals(block.type)) {
+                                countOfBlocksInGroup.set(pos, countOfBlocksInGroup.get(pos) + 1);
+                            }
+
+                            if (max < countOfBlocksInGroup.get(pos)) {
+                                max = countOfBlocksInGroup.get(pos);
+                                insertAllOtherAtIndex = pos;
+                                insertAllOthers = true;
+                            }
+
+                            if (i + 1 < longestBlocks.size() - 1 && block.addBlankLine) {
+                                pos = i + 1;
+                            }
+                        }
+
                         for (Block block : longestBlocks) {
-                            if (i++ != 0) {
+                            if (!isStaticImportsAtBot()) {
+                                if (importStaticAllOthers) {
+                                    builder = builder.importStaticAllOthers();
+                                    importStaticAllOthers = false;
+                                }
+
+                                if (BlockType.ImportStatic.equals(block.type)) {
+                                    builder = builder.blankLine().staticImportPackage(block.pattern);
+                                }
+                            }
+                        }
+
+                        boolean addNewLine = !isStaticImportsAtBot();
+                        if (!insertAllOthers) {
+                            if (addNewLine) {
                                 builder = builder.blankLine();
                             }
 
-                            switch (block.type) {
-                                case Import:
-                                    assert block.pattern != null;
-                                    if ("all other imports".equals(block.pattern) && !importAllOthers) {
-                                        importAllOthers = true;
-                                        builder = builder.importAllOthers();
+                            builder = builder.importAllOthers();
+                            if (!containsJava && !containsJavax) {
+                                builder = builder.blankLine().importPackage("javax.*");
+                                builder = builder.blankLine().importPackage("java.*");
+                            }
+                            addNewLine = true;
+                        }
+
+                        for (int i = 0; i < longestBlocks.size(); i++) {
+                            // Insert the all others block.
+                            if (insertAllOthers) {
+                                if (i == insertAllOtherAtIndex) {
+                                    if (addNewLine) {
+                                        builder = builder.blankLine();
+                                    }
+                                    builder = builder.importAllOthers();
+                                    if (!containsJava && !containsJavax) {
+                                        builder = builder.blankLine().importPackage("javax.*");
+                                        builder = builder.blankLine().importPackage("java.*");
+                                    }
+                                    builder = builder.blankLine();
+
+                                    continue;
+                                } else if (i > insertAllOtherAtIndex) {
+                                    if (countOfBlocksInGroup.get(i) == 0) {
+                                        continue;
                                     } else {
-                                        if (longestBlocks.stream().noneMatch(b -> b.type == BlockType.Import &&
-                                                "all other imports".equals(b.pattern)) && !importAllOthers) {
-                                            importAllOthers = true;
-                                            builder = builder.importAllOthers().blankLine();
-                                        }
+                                        insertAllOthers = false;
+                                    }
+                                }
+                            }
+
+                            Block block = longestBlocks.get(i);
+                            if (BlockType.Import.equals(block.type)) {
+                                if (addJavaOrJavax && block.pattern.equals("java.*")) {
+                                    if (addNewLine) {
+                                        builder = builder.blankLine();
+                                        addNewLine = false;
+                                    }
+
+                                    if (!((i - 1 >= 0 &&
+                                            longestBlocks.get(i - 1).pattern.equals("javax.*")) ||
+                                            (i + 1 < longestBlocks.size() - 1 &&
+                                                    longestBlocks.get(i + 1).pattern.equals("javax.*")))) {
+                                        builder = builder.importPackage("javax.*");
+                                        builder = builder.blankLine().importPackage(block.pattern);
+                                        addJavaOrJavax = false;
+                                    } else {
                                         builder = builder.importPackage(block.pattern);
                                     }
-                                    break;
-                                case ImportStatic:
-                                    assert block.pattern != null;
-                                    if ("all other imports".equals(block.pattern) && !importStaticAllOthers) {
-                                        importStaticAllOthers = true;
-                                        builder = builder.importStaticAllOthers();
-                                    } else {
-                                        if (longestBlocks.stream().noneMatch(b -> b.type == BlockType.ImportStatic &&
-                                                "all other imports".equals(b.pattern)) && !importStaticAllOthers) {
-                                            importStaticAllOthers = true;
-                                            builder = builder.importStaticAllOthers().blankLine();
-                                        }
-                                        builder = builder.staticImportPackage(block.pattern);
+
+                                    if (block.addBlankLine) {
+                                        builder = builder.blankLine();
                                     }
-                                    break;
+                                } else if (addJavaOrJavax && block.pattern.equals("javax.*")) {
+                                    if (addNewLine) {
+                                        builder = builder.blankLine();
+                                        addNewLine = false;
+                                    }
+
+                                    if (!((i - 1 >= 0 &&
+                                            longestBlocks.get(i - 1).pattern.equals("java.*")) ||
+                                            (i + 1 < longestBlocks.size() - 1 &&
+                                                    longestBlocks.get(i + 1).pattern.equals("java.*")))) {
+                                        builder = builder.importPackage(block.pattern);
+                                        builder = builder.blankLine().importPackage("java.*");
+                                        addJavaOrJavax = false;
+                                    } else {
+                                        builder = builder.importPackage(block.pattern);
+                                    }
+
+                                    if (block.addBlankLine) {
+                                        builder = builder.blankLine();
+                                    }
+                                } else {
+                                    if (addNewLine) {
+                                        builder = builder.blankLine();
+                                        addNewLine = false;
+                                    }
+
+                                    builder = builder.importPackage(block.pattern);
+
+                                    if (block.addBlankLine) {
+                                        builder = builder.blankLine();
+                                    }
+                                }
                             }
                         }
 
-                        if (!importAllOthers) {
-                            if (importStaticAllOthers) {
-                                // TODO: currently not supported. Insert importAllOthers() before statics if importStaticAllOthers.
-                                builder = builder.blankLine().importAllOthers();
-                            } else {
-                                builder = builder.importAllOthers();
+                        for (Block block : longestBlocks) {
+                            if (isStaticImportsAtBot()) {
+                                if (importStaticAllOthers) {
+                                    if (BlockType.ImportStatic.equals(longestBlocks.get(0).type)) {
+                                        builder = builder.blankLine();
+                                    }
+
+                                    builder = builder.importStaticAllOthers();
+                                    importStaticAllOthers = false;
+                                }
+
+                                if (BlockType.ImportStatic.equals(block.type)) {
+                                    builder = builder.blankLine().staticImportPackage(block.pattern);
+                                }
                             }
                         }
 
-                        if (!importStaticAllOthers) {
-                            builder = builder.blankLine().importStaticAllOthers();
+                        if (longestBlocks.isEmpty()) {
+                            builder.importAllOthers();
+                            builder.blankLine();
+                            builder.importStaticAllOthers();
                         }
 
                         // set lower limits in case type attribution is really messed up on the project
@@ -268,54 +392,73 @@ public class Autodetect extends NamedStyles {
         @EqualsAndHashCode
         static class Block {
             private final BlockType type;
-
-            @Nullable
             private final String pattern;
+            private final boolean addBlankLine;
 
-            Block(BlockType type, List<J.Import> imports) {
+            Block(BlockType type, String pattern, boolean addBlankLine) {
                 this.type = type;
-                this.pattern = getPattern(imports);
+                this.pattern = pattern;
+                this.addBlankLine = addBlankLine;
+            }
+        }
+
+        /**
+         * Maps the imported packages to patterns used to create Blocks in the ImportLayout.
+         * Patterns are generated early to prevent block patterns that are too specific.
+         * Ex. org.openrewrite.* vs. org.openrewrite.java.test.*
+         *
+         * @param cus list of compilation units to create Block patterns from.
+         */
+        public void mapBlockPatterns(List<J.CompilationUnit> cus) {
+            Set<String> importedPackages = new TreeSet<>();
+            for (J.CompilationUnit cu : cus) {
+                for (J.Import anImport : cu.getImports()) {
+                    importedPackages.add(anImport.getPackageName() + ".");
+                }
             }
 
-            static String getPattern(List<J.Import> imports) {
-                String longestCommonPrefix = null;
+            String longestCommonPrefix = null;
+            String prevLCP = null;
+            List<String> prevPackages = new ArrayList<>();
 
-                for (J.Import anImport : imports) {
-                    String pkg = anImport.getPackageName() + ".";
-                    longestCommonPrefix = longestCommonPrefix(pkg, longestCommonPrefix);
-                    if (longestCommonPrefix.isEmpty()) {
-                        return "all other imports";
+            for (String pkg : importedPackages) {
+                longestCommonPrefix = longestCommonPrefix(pkg, longestCommonPrefix);
+                if (!prevPackages.isEmpty() && longestCommonPrefix.chars().filter(c -> c == '.').count() <= 1 && !StringUtils.isNullOrEmpty(prevLCP)) {
+                    for (String prev : prevPackages) {
+                        if (prevLCP.startsWith("java.")) {
+                            prevLCP = "java.";
+                        } else if (prevLCP.startsWith("javax.")) {
+                            prevLCP = "javax.";
+                        }
+                        this.pkgToBlockPattern.put(prev, prevLCP + "*");
                     }
+                    longestCommonPrefix = pkg;
+                    prevPackages.clear();
                 }
 
-                if (longestCommonPrefix == null) {
-                    return "all other imports";
-                } else if (longestCommonPrefix.startsWith("java.")) {
-                    return "java.*";
-                } else if (longestCommonPrefix.startsWith("javax.")) {
-                    return "javax.*";
-                } else if (longestCommonPrefix.chars().filter(c -> c == '.').count() > 1) {
-                    return longestCommonPrefix + "*";
-                } else {
-                    return "all other imports";
-                }
+                prevPackages.add(pkg);
+                prevLCP = longestCommonPrefix;
             }
 
-            static String longestCommonPrefix(String pkg, @Nullable String lcp) {
-                if (lcp == null) {
-                    return pkg;
-                }
-
-                char[] p1 = pkg.toCharArray();
-                char[] p2 = lcp.toCharArray();
-                int i = 0;
-                for (; i < p1.length && i < p2.length; i++) {
-                    if (p1[i] != p2[i]) {
-                        break;
-                    }
-                }
-                return lcp.substring(0, i);
+            for (String prev : prevPackages) {
+                this.pkgToBlockPattern.put(prev, prevLCP + "*");
             }
+        }
+
+        private String longestCommonPrefix(String pkg, @Nullable String lcp) {
+            if (lcp == null) {
+                return pkg;
+            }
+
+            char[] p1 = pkg.toCharArray();
+            char[] p2 = lcp.toCharArray();
+            int i = 0;
+            for (; i < p1.length && i < p2.length; i++) {
+                if (p1[i] != p2[i]) {
+                    break;
+                }
+            }
+            return lcp.substring(0, i);
         }
     }
 
@@ -324,17 +467,37 @@ public class Autodetect extends NamedStyles {
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ImportLayoutStatistics importLayoutStatistics) {
             Set<ImportLayoutStatistics.Block> blocks = new LinkedHashSet<>();
 
+            importLayoutStatistics.staticAtBotCount += (cu.getImports().size() > 0 &&
+                    cu.getImports().get(cu.getImports().size() - 1).isStatic()) ? 1 : 0;
+            importLayoutStatistics.staticAtTopCount += (cu.getImports().size() > 0 &&
+                    cu.getImports().get(0).isStatic()) ? 1 : 0;
+
             boolean staticBlock = false;
             int blockStart = 0;
             int i = 0;
+            String previousPkg = "";
+            int previousPkgCount = 0;
+            Map<ImportLayoutStatistics.Block, Integer> referenceCount = new HashMap<>();
             for (J.Import anImport : cu.getImports()) {
-                if (anImport.getPrefix().getWhitespace().contains("\n\n") || anImport.getPrefix().getWhitespace().contains("\r\n\r\n")) {
+                previousPkgCount += previousPkg != null && previousPkg.equals(importLayoutStatistics.pkgToBlockPattern.get(anImport.getPackageName() + ".")) ? 1 : 0;
+                if (anImport.getPrefix().getWhitespace().contains("\n\n") || anImport.getPrefix().getWhitespace().contains("\r\n\r\n") ||
+                        i > 0 && previousPkg != null && importLayoutStatistics.pkgToBlockPattern.containsKey(anImport.getPackageName() + ".") &&
+                                !previousPkg.equals(importLayoutStatistics.pkgToBlockPattern.get(anImport.getPackageName() + "."))) {
                     if (i - blockStart > 0) {
-                        blocks.add(new ImportLayoutStatistics.Block(
+                        assert previousPkg != null;
+                        ImportLayoutStatistics.Block block = new ImportLayoutStatistics.Block(
                                 staticBlock ?
                                         ImportLayoutStatistics.BlockType.ImportStatic :
                                         ImportLayoutStatistics.BlockType.Import,
-                                cu.getImports().subList(blockStart, i)));
+                                previousPkg,
+                                anImport.getPrefix().getWhitespace().contains("\n\n") || anImport.getPrefix().getWhitespace().contains("\r\n\r\n"));
+
+                        if (blocks.contains(block) && previousPkgCount > referenceCount.get(block)) {
+                            blocks.remove(block);
+                        }
+                        blocks.add(block);
+                        referenceCount.put(block, previousPkgCount + 1);
+                        previousPkgCount = 0;
                     }
                     blockStart = i;
                 }
@@ -377,14 +540,21 @@ public class Autodetect extends NamedStyles {
 
                 staticBlock = anImport.isStatic();
                 i++;
+                previousPkg = importLayoutStatistics.pkgToBlockPattern.get(anImport.getPackageName() + ".");
             }
 
             if (i - blockStart > 0) {
-                blocks.add(new ImportLayoutStatistics.Block(
+                ImportLayoutStatistics.Block block = new ImportLayoutStatistics.Block(
                         staticBlock ?
                                 ImportLayoutStatistics.BlockType.ImportStatic :
                                 ImportLayoutStatistics.BlockType.Import,
-                        cu.getImports().subList(blockStart, i)));
+                        previousPkg,
+                        false);
+
+                if (blocks.contains(block) && previousPkgCount > referenceCount.get(block)) {
+                    blocks.remove(block);
+                }
+                blocks.add(block);
             }
 
             importLayoutStatistics.blocksPerSourceFile.add(new ArrayList<>(blocks));
