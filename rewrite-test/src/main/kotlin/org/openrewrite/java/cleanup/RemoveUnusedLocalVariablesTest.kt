@@ -171,6 +171,24 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
     )
 
     @Test
+    @Disabled
+    @Issue("https://github.com/apache/dubbo/blob/747282cdf851c144af562d3f92e10349cc315e36/dubbo-rpc/dubbo-rpc-api/src/main/java/org/apache/dubbo/rpc/RpcStatus.java#L108-L118")
+    fun forLoopWithExternalIncrementLogic() = assertUnchanged(
+        before = """
+            class Test {
+                static void method() {
+                    for (int i; ; ) {
+                        i = 41;
+                        if (i == 42) {
+                            break;
+                        }
+                    }
+                }
+            }
+        """
+    )
+
+    @Test
     fun forLoopIncrementVariableReadInEvaluationCondition() = assertUnchanged(
         before = """
             class Test {
