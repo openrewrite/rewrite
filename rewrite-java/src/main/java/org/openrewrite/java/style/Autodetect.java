@@ -186,11 +186,17 @@ public class Autodetect extends NamedStyles {
         Map<String, String> pkgToBlockPattern = new LinkedHashMap<>();
         int staticAtTopCount = 0;
         int staticAtBotCount = 0;
+        int javaBeforeJavaxCount = 0;
+        int javaxBeforeJavaCount = 0;
         int minimumFoldedImports = Integer.MAX_VALUE;
         int minimumFoldedStaticImports = Integer.MAX_VALUE;
 
         public boolean isStaticImportsAtBot() {
             return staticAtBotCount >= staticAtTopCount;
+        }
+
+        public boolean isJavaxBeforeJava() {
+            return javaxBeforeJavaCount >= javaBeforeJavaxCount;
         }
 
         enum BlockType {
@@ -318,8 +324,13 @@ public class Autodetect extends NamedStyles {
                             // Add java/javax if they're missing from the block that is being used as a template.
                             if (!containsJava && !containsJavax) {
                                 builder = builder.blankLine();
-                                builder = builder.importPackage("javax.*");
-                                builder = builder.importPackage("java.*");
+                                if (isJavaxBeforeJava()) {
+                                    builder = builder.importPackage("javax.*");
+                                    builder = builder.importPackage("java.*");
+                                } else {
+                                    builder = builder.importPackage("java.*");
+                                    builder = builder.importPackage("javax.*");
+                                }
                             }
                             addNewLine = true;
                         }
@@ -337,8 +348,13 @@ public class Autodetect extends NamedStyles {
                                     // Add java/javax if they're missing from the block that is being used as a template.
                                     if (!containsJava && !containsJavax) {
                                         builder = builder.blankLine();
-                                        builder = builder.importPackage("javax.*");
-                                        builder = builder.importPackage("java.*");
+                                        if (isJavaxBeforeJava()) {
+                                            builder = builder.importPackage("javax.*");
+                                            builder = builder.importPackage("java.*");
+                                        } else {
+                                            builder = builder.importPackage("java.*");
+                                            builder = builder.importPackage("javax.*");
+                                        }
                                     }
                                     continue;
                                 } else if (i > insertAllOtherAtIndex){
@@ -360,8 +376,13 @@ public class Autodetect extends NamedStyles {
 
                                 if (!(i - 1 >= 0 && nonStaticBlocks.get(i - 1).pattern.equals("javax.*") ||
                                         i + 1 < nonStaticBlocks.size() && nonStaticBlocks.get(i + 1).pattern.equals("javax.*"))) {
-                                    builder = builder.importPackage("javax.*");
-                                    builder = builder.importPackage(block.pattern);
+                                    if (isJavaxBeforeJava()) {
+                                        builder = builder.importPackage("javax.*");
+                                        builder = builder.importPackage("java.*");
+                                    } else {
+                                        builder = builder.importPackage("java.*");
+                                        builder = builder.importPackage("javax.*");
+                                    }
                                     addNewLine = true;
                                     addJavaOrJavax = false;
                                 } else {
@@ -375,8 +396,13 @@ public class Autodetect extends NamedStyles {
 
                                 if (!(i - 1 >= 0 && nonStaticBlocks.get(i - 1).pattern.equals("java.*") ||
                                         i + 1 < nonStaticBlocks.size() - 1 && nonStaticBlocks.get(i + 1).pattern.equals("java.*"))) {
-                                    builder = builder.importPackage(block.pattern);
-                                    builder = builder.importPackage("java.*");
+                                    if (isJavaxBeforeJava()) {
+                                        builder = builder.importPackage("javax.*");
+                                        builder = builder.importPackage("java.*");
+                                    } else {
+                                        builder = builder.importPackage("java.*");
+                                        builder = builder.importPackage("javax.*");
+                                    }
                                     addNewLine = true;
                                     addJavaOrJavax = false;
                                 } else {
@@ -434,8 +460,13 @@ public class Autodetect extends NamedStyles {
                         if (longestBlocks.isEmpty()) {
                             builder.importAllOthers();
                             builder.blankLine();
-                            builder = builder.importPackage("javax.*");
-                            builder = builder.importPackage("java.*");
+                            if (isJavaxBeforeJava()) {
+                                builder = builder.importPackage("javax.*");
+                                builder = builder.importPackage("java.*");
+                            } else {
+                                builder = builder.importPackage("java.*");
+                                builder = builder.importPackage("javax.*");
+                            }
                             builder.blankLine();
                             builder.importStaticAllOthers();
                         }
@@ -538,8 +569,11 @@ public class Autodetect extends NamedStyles {
             int i = 0;
             String previousPkg = "";
             int previousPkgCount = 0;
+            int javaPos = Integer.MAX_VALUE;
+            int javaxPos = Integer.MAX_VALUE;
             Map<ImportLayoutStatistics.Block, Integer> referenceCount = new HashMap<>();
-            for (J.Import anImport : cu.getImports()) {
+            for (int j = 0; j < cu.getImports().size(); j++) {
+                J.Import anImport = cu.getImports().get(j);
                 previousPkgCount += previousPkg != null && previousPkg.equals(importLayoutStatistics.pkgToBlockPattern.get(anImport.getPackageName() + ".")) ? 1 : 0;
                 if (anImport.getPrefix().getWhitespace().contains("\n\n") || anImport.getPrefix().getWhitespace().contains("\r\n\r\n") ||
                         i > 0 && previousPkg != null && importLayoutStatistics.pkgToBlockPattern.containsKey(anImport.getPackageName() + ".") &&
@@ -552,6 +586,9 @@ public class Autodetect extends NamedStyles {
                                         ImportLayoutStatistics.BlockType.Import,
                                 previousPkg,
                                 anImport.getPrefix().getWhitespace().contains("\n\n") || anImport.getPrefix().getWhitespace().contains("\r\n\r\n"));
+
+                        javaPos = block.pattern.equals("java.*") && javaPos > j ? j : javaPos;
+                        javaxPos = block.pattern.equals("javax.*") && javaxPos > j ? j : javaxPos;
 
                         if (blocks.contains(block) && previousPkgCount > referenceCount.get(block)) {
                             blocks.remove(block);
@@ -615,8 +652,14 @@ public class Autodetect extends NamedStyles {
                 if (blocks.contains(block) && previousPkgCount > referenceCount.get(block)) {
                     blocks.remove(block);
                 }
+                int lastIndex = cu.getImports().size() - 1;
+                javaPos = block.pattern.equals("java.*") ? lastIndex : javaPos;
+                javaxPos = block.pattern.equals("javax.*") ? lastIndex : javaxPos;
                 blocks.add(block);
             }
+
+            importLayoutStatistics.javaBeforeJavaxCount += javaPos != Integer.MAX_VALUE && javaPos > javaxPos ? 1 : 0;
+            importLayoutStatistics.javaxBeforeJavaCount += javaxPos != Integer.MAX_VALUE && javaxPos > javaPos ? 1 : 0;
 
             importLayoutStatistics.blocksPerSourceFile.add(new ArrayList<>(blocks));
 
