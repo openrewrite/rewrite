@@ -71,6 +71,7 @@ class JsonPathMatcherTest {
                   image: mycompany.io/init:latest
     """.trimIndent()
     val appLabel = "$.metadata.labels.app"
+    val appLabelBracket = "$.metadata.labels['app']"
     val recurseSpecContainers = "..spec.containers"
     val firstContainerSlice = "$.spec.template.spec.containers[:1]"
     val allContainerSlices = "$.spec.template.spec.containers[*]"
@@ -127,6 +128,14 @@ class JsonPathMatcherTest {
     fun `must support wildcards in range operators`() {
         val results = visit(allContainerSlices, json, true)
         assertThat(results).hasSize(2)
+    }
+
+    @Test
+    fun `must support identifiers in bracket operators`() {
+        val results = visit(appLabelBracket, json)
+        assertThat(results).hasSize(2)
+        assertThat(results.get(0) is Yaml.Mapping.Entry).isTrue()
+        assertThat((((results.get(0) as Yaml.Mapping.Entry).value) as Yaml.Scalar).value).isEqualTo("myapp")
     }
 
     private fun visit(jsonPath: String, json: String, encloses: Boolean = false): List<Yaml> {

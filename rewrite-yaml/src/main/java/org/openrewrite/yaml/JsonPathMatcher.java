@@ -259,6 +259,27 @@ public class JsonPathMatcher {
         }
 
         @Override
+        public Object visitBracketOperator(JsonPath.BracketOperatorContext ctx) {
+            if (ctx.expression() instanceof JsonPath.LiteralExpressionContext) {
+                if (context instanceof Yaml.Mapping.Entry) {
+                    context = ((Yaml.Mapping.Entry) context).getValue();
+                    return visitBracketOperator(ctx);
+                } else if (context instanceof Yaml.Mapping) {
+                    Yaml.Mapping m = (Yaml.Mapping) context;
+
+                    JsonPath.LiteralExpressionContext litExpr = (JsonPath.LiteralExpressionContext) ctx.expression();
+                    String key = unquoteExpression(litExpr);
+
+                    return m.getEntries().stream()
+                            .filter(e -> e.getKey().getValue().equals(key))
+                            .findFirst()
+                            .orElse(null);
+                }
+            }
+            return super.visitBracketOperator(ctx);
+        }
+
+        @Override
         public @Nullable Object visitIdentifier(JsonPath.IdentifierContext ctx) {
             if (context instanceof Yaml.Mapping.Entry) {
                 Yaml.Mapping.Entry e = (Yaml.Mapping.Entry) context;
