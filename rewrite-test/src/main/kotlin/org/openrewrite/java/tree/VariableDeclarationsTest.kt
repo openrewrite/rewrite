@@ -33,6 +33,13 @@ interface VariableDeclarationsTest : JavaTreeTest {
     )
 
     @Test
+    fun finalVar(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, Block, """
+            final var a = "";
+        """.trimIndent()
+    )
+
+    @Test
     fun localVariableDefinition(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             String a = "";

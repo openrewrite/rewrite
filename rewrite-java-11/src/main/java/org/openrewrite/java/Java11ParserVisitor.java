@@ -1323,8 +1323,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 // this is a lambda parameter with an inferred type expression
                 typeExpr = null;
             } else {
-                skip("var");
-                typeExpr = new J.VarType(randomId(), Space.EMPTY, Markers.EMPTY, type(vartype));
+                typeExpr = new J.VarType(randomId(), sourceBefore("var"), Markers.EMPTY, type(vartype));
             }
         } else if (vartype instanceof JCArrayTypeTree) {
             // we'll capture the array dimensions in a bit, just convert the element type
