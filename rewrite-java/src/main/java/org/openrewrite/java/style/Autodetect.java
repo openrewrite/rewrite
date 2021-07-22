@@ -317,8 +317,9 @@ public class Autodetect extends NamedStyles {
                             builder = builder.importAllOthers();
                             // Add java/javax if they're missing from the block that is being used as a template.
                             if (!containsJava && !containsJavax) {
-                                builder = builder.blankLine().importPackage("javax.*");
-                                builder = builder.blankLine().importPackage("java.*");
+                                builder = builder.blankLine();
+                                builder = builder.importPackage("javax.*");
+                                builder = builder.importPackage("java.*");
                             }
                             addNewLine = true;
                         }
@@ -335,10 +336,9 @@ public class Autodetect extends NamedStyles {
                                     builder = builder.importAllOthers();
                                     // Add java/javax if they're missing from the block that is being used as a template.
                                     if (!containsJava && !containsJavax) {
-                                        builder = builder.blankLine().importPackage("javax.*");
-                                        // Note: newlines between java/javax depends on the project.
-                                        // It may be helpful to count when newlines exist between java/javax.
-                                        builder = builder.blankLine().importPackage("java.*");
+                                        builder = builder.blankLine();
+                                        builder = builder.importPackage("javax.*");
+                                        builder = builder.importPackage("java.*");
                                     }
                                     continue;
                                 } else if (i > insertAllOtherAtIndex){
@@ -361,7 +361,6 @@ public class Autodetect extends NamedStyles {
                                 if (!(i - 1 >= 0 && nonStaticBlocks.get(i - 1).pattern.equals("javax.*") ||
                                         i + 1 < nonStaticBlocks.size() && nonStaticBlocks.get(i + 1).pattern.equals("javax.*"))) {
                                     builder = builder.importPackage("javax.*");
-                                    builder = builder.blankLine();
                                     builder = builder.importPackage(block.pattern);
                                     addNewLine = true;
                                     addJavaOrJavax = false;
@@ -377,7 +376,6 @@ public class Autodetect extends NamedStyles {
                                 if (!(i - 1 >= 0 && nonStaticBlocks.get(i - 1).pattern.equals("java.*") ||
                                         i + 1 < nonStaticBlocks.size() - 1 && nonStaticBlocks.get(i + 1).pattern.equals("java.*"))) {
                                     builder = builder.importPackage(block.pattern);
-                                    builder = builder.blankLine();
                                     builder = builder.importPackage("java.*");
                                     addNewLine = true;
                                     addJavaOrJavax = false;
@@ -437,7 +435,6 @@ public class Autodetect extends NamedStyles {
                             builder.importAllOthers();
                             builder.blankLine();
                             builder = builder.importPackage("javax.*");
-                            builder.blankLine();
                             builder = builder.importPackage("java.*");
                             builder.blankLine();
                             builder.importStaticAllOthers();

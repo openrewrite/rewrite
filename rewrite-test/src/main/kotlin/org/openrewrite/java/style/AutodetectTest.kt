@@ -190,16 +190,14 @@ interface AutodetectTest {
             .matches { b -> !(b as ImportLayoutStyle.Block.ImportPackage).isStatic }
             .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == "javax\\..+" }
 
-        assertThat(importLayout.layout[5]).isInstanceOf(ImportLayoutStyle.Block.BlankLines::class.java)
-
-        assertThat(importLayout.layout[6])
+        assertThat(importLayout.layout[5])
             .isInstanceOf(ImportLayoutStyle.Block.ImportPackage::class.java)
             .matches { b -> !(b as ImportLayoutStyle.Block.ImportPackage).isStatic }
             .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == "java\\..+" }
 
-        assertThat(importLayout.layout[7]).isInstanceOf(ImportLayoutStyle.Block.BlankLines::class.java)
+        assertThat(importLayout.layout[6]).isInstanceOf(ImportLayoutStyle.Block.BlankLines::class.java)
 
-        assertThat(importLayout.layout[8])
+        assertThat(importLayout.layout[7])
             .isInstanceOf(ImportLayoutStyle.Block.AllOthers::class.java)
             .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).isStatic }
     }
