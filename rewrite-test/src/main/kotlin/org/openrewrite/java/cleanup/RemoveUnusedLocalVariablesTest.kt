@@ -27,7 +27,7 @@ import org.openrewrite.java.JavaRecipeTest
     "EmptyTryBlock",
     "CatchMayIgnoreException",
     "UnusedAssignment",
-    "ResultOfMethodCallIgnored"
+    "ResultOfMethodCallIgnored", "BooleanMethodNameMustStartWithQuestion"
 )
 interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
     override val recipe: Recipe
@@ -92,6 +92,20 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
                     }
                     size += dataSize;
                     return size;
+                }
+            }
+        """
+    )
+
+    @Test
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/blob/706a172ed5449214a4a08637a27dbe768fb4eecd/rewrite-core/src/main/java/org/openrewrite/internal/StringUtils.java#L55-L65")
+    fun localVariableReadWithinExpression() = assertUnchanged(
+        before = """
+            class Test {
+                static boolean method() {
+                    boolean a = false;
+                    return a |= false;
                 }
             }
         """
