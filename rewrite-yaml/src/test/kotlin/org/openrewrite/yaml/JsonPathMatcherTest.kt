@@ -142,7 +142,7 @@ class JsonPathMatcherTest {
     fun `must find mapping at document level`() {
         val results = visitDocument(appLabel, json)
         @Suppress("SameParameterValue")
-        assertThat(results).hasSize(1)
+        assertThat(results).hasSize(2)
     }
 
     private fun visit(jsonPath: String, json: String, encloses: Boolean = false): List<Yaml> {
