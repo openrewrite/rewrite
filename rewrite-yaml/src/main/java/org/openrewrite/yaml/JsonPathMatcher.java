@@ -125,7 +125,11 @@ public class JsonPathMatcher {
                 context = cursorPath.stream()
                         .filter(t -> t instanceof Yaml.Mapping)
                         .findFirst()
-                        .orElse(null);
+                        .orElseGet(() -> cursorPath.stream()
+                                .filter(t -> t instanceof Yaml.Document && ((Yaml.Document) t).getBlock() instanceof Yaml.Mapping)
+                                .map(t -> ((Yaml.Document) t).getBlock())
+                                .findFirst()
+                                .orElse(null));
             }
             return super.visitJsonpath(ctx);
         }

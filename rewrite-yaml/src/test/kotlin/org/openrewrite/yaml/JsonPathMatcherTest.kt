@@ -138,6 +138,13 @@ class JsonPathMatcherTest {
         assertThat((((results.get(0) as Yaml.Mapping.Entry).value) as Yaml.Scalar).value).isEqualTo("myapp")
     }
 
+    @Test
+    fun `must find mapping at document level`() {
+        val results = visitDocument(appLabel, json)
+        @Suppress("SameParameterValue")
+        assertThat(results).hasSize(1)
+    }
+
     private fun visit(jsonPath: String, json: String, encloses: Boolean = false): List<Yaml> {
         val ctx = InMemoryExecutionContext({ it.printStackTrace() })
         val documents = YamlParser().parse(ctx, json)
@@ -155,6 +162,29 @@ class JsonPathMatcherTest {
                         p.add(e)
                     }
                     return e
+                }
+            }.visit(it, results)
+        }
+        return results
+    }
+
+    private fun visitDocument(jsonPath: String, json: String): List<Yaml> {
+        val ctx = InMemoryExecutionContext({ it.printStackTrace() })
+        val documents = YamlParser().parse(ctx, json)
+        if (documents.isEmpty()) {
+            return emptyList()
+        }
+        val matcher = JsonPathMatcher(jsonPath)
+
+        val results = ArrayList<Yaml>()
+        documents.forEach {
+            object : YamlVisitor<MutableList<Yaml>>() {
+                override fun visitDocument(document: Yaml.Document, p: MutableList<Yaml>): Yaml {
+                    val d = super.visitDocument(document, p)
+                    if (matcher.find(cursor).isPresent) {
+                        p.add(d)
+                    }
+                    return d
                 }
             }.visit(it, results)
         }
