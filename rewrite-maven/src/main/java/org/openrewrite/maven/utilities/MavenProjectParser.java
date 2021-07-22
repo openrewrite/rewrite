@@ -77,27 +77,7 @@ public class MavenProjectParser {
                 .orElseThrow(() -> new RuntimeException("Unable to locate root pom source file"));
         Pom rootMavenModel = rootMaven.getModel();
 
-        // sort maven projects so that multi-module build dependencies parse before the dependent projects
-        mavens.sort((m1, m2) -> {
-            Pom m1Model = m1.getModel();
-            Collection<Pom.Dependency> m1Dependencies = m1Model.getDependencies();
-            Pom m2Model = m2.getModel();
-            Collection<Pom.Dependency> m2Dependencies = m2Model.getDependencies();
-            if (m1Dependencies.stream().anyMatch(m1Dependency ->
-                    m1Dependency.getGroupId().equals(m2Model.getGroupId()) &&
-                            m1Dependency.getArtifactId().equals(m2Model.getArtifactId()))) {
-                return 1;
-            } else if (m2Dependencies.stream().anyMatch(m2Dependency ->
-                    m2Dependency.getGroupId().equals(m1Model.getGroupId()) &&
-                            m2Dependency.getArtifactId().equals(m1Model.getArtifactId()))) {
-                return -1;
-            } else {
-                if (m1.getModel().getGroupId().equals(m2.getModel().getGroupId())) {
-                    return m1.getModel().getArtifactId().compareTo(m2.getModel().getArtifactId());
-                }
-                return m1.getModel().getGroupId().compareTo(m2.getModel().getGroupId());
-            }
-        });
+        mavens = sort(mavens);
 
         JavaParser javaParser = javaParserBuilder
                 .build();
@@ -233,5 +213,40 @@ public class MavenProjectParser {
                 .map(artifactDownloader::downloadArtifact)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
+    }
+
+    public static List<Maven> sort(List<Maven> mavens) {
+        // the value is the set of maven projects that depend on the key
+        Map<Maven, Set<Maven>> byDependedOn = new HashMap<>();
+
+        for (Maven maven : mavens) {
+            byDependedOn.computeIfAbsent(maven, m -> new HashSet<>());
+            for (Pom.Dependency dependency : maven.getModel().getDependencies()) {
+                for (Maven test : mavens) {
+                    if (test.getModel().getGroupId().equals(dependency.getGroupId()) &&
+                            test.getModel().getArtifactId().equals(dependency.getArtifactId())) {
+                        byDependedOn.computeIfAbsent(maven, m -> new HashSet<>()).add(test);
+                    }
+                }
+            }
+        }
+
+        List<Maven> sorted = new ArrayList<>(mavens.size());
+        next:
+        while (!byDependedOn.isEmpty()) {
+            for (Map.Entry<Maven, Set<Maven>> mavenAndDependencies : byDependedOn.entrySet()) {
+                if (mavenAndDependencies.getValue().isEmpty()) {
+                    Maven maven = mavenAndDependencies.getKey();
+                    byDependedOn.remove(maven);
+                    sorted.add(maven);
+                    for (Set<Maven> dependencies : byDependedOn.values()) {
+                        dependencies.remove(maven);
+                    }
+                    continue next;
+                }
+            }
+        }
+
+        return sorted;
     }
 }
