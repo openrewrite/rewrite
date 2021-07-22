@@ -21,6 +21,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.DeleteStatement;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.Statement;
@@ -29,6 +30,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
+@SuppressWarnings({"ConstantConditions", "StatementWithEmptyBody"})
 public class RemoveUnusedLocalVariables extends Recipe {
     @Override
     public String getDisplayName() {
@@ -69,27 +71,27 @@ public class RemoveUnusedLocalVariables extends Recipe {
         @Override
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
             Cursor parentScope = getCursorToParentScope(getCursor());
-            if (!(parentScope.getParent() != null &&
-                    // skip class instance variables
-                    parentScope.getParent().getValue() instanceof J.ClassDeclaration) &&
+            // skip class instance variables
+            if (!(parentScope.getParent() != null && parentScope.getParent().getValue() instanceof J.ClassDeclaration) &&
                     // skip anonymous class instance variables
                     !(parentScope.getParent().getValue() instanceof J.NewClass) &&
                     // skip if method declaration parameter
                     !(parentScope.getValue() instanceof J.MethodDeclaration) &&
-                    // skip if defined in an enhanced for loop, since there isn't much we can do about the semantics at that point
-                    !(parentScope.getValue() instanceof J.ForEachLoop) &&
+                    // skip if defined in an enhanced or standard for loop, since there isn't much we can do about the semantics at that point
+                    !(parentScope.getValue() instanceof J.ForEachLoop || parentScope.getValue() instanceof J.ForLoop.Control) &&
                     // skip if try resource
                     !(parentScope.getValue() instanceof J.Try) &&
                     // skip if defined in a try's catch clause
                     !(parentScope.getValue() instanceof J.Try.Catch || parentScope.getValue() instanceof J.MultiCatch) &&
                     // skip if defined as a parameter to a lambda expression
                     !(parentScope.getValue() instanceof J.Lambda)) {
-                if (FindReadReferencesToVariable.find(parentScope.getValue(), variable).isEmpty()) {
-                    FindAssignmentReferencesToVariable.find(parentScope.getValue(), variable).forEach(ref -> doAfterVisit(new DeleteStatement<>(ref)));
+                Set<NameTree> readReferences = FindReadReferencesToVariable.find(parentScope.getValue(), variable);
+                if (readReferences.isEmpty()) {
+                    Set<Statement> assignmentReferences = FindAssignmentReferencesToVariable.find(parentScope.getValue(), variable);
+                    assignmentReferences.forEach(ref -> doAfterVisit(new DeleteStatement<>(ref)));
                     return null;
                 }
             }
-
             return super.visitVariable(variable, ctx);
         }
 
@@ -110,27 +112,43 @@ public class RemoveUnusedLocalVariables extends Recipe {
 
         /**
          * @param j        The subtree to search.
-         * @param variable A {@link J.VariableDeclarations.NamedVariable} to check for any read calls.
-         * @return A set of {@link NameTree} locations of read-access calls to this variable.
+         * @param variable A {@link J.VariableDeclarations.NamedVariable} to check for usages.
+         * @return A set of {@link NameTree} locations of "right-hand" read calls.
          */
         public static Set<NameTree> find(J j, J.VariableDeclarations.NamedVariable variable) {
-            JavaIsoVisitor<Set<NameTree>> findVisitor = new JavaIsoVisitor<Set<NameTree>>() {
+            final Set<NameTree> refs = new HashSet<>();
+            new JavaIsoVisitor<Set<NameTree>>() {
                 @Override
                 public J.Identifier visitIdentifier(J.Identifier identifier, Set<NameTree> ctx) {
                     J.Identifier i = super.visitIdentifier(identifier, ctx);
                     if (i.getSimpleName().equals(variable.getSimpleName())) {
                         assert getCursor().getParent() != null;
                         Object parent = getCursor().getParent().getValue();
-                        if (!(parent instanceof J.Assignment || parent instanceof J.AssignmentOperation || parent instanceof J.VariableDeclarations.NamedVariable)) {
+                        if (parent instanceof J.Assignment) {
+                            J.Assignment parentTree = (J.Assignment) parent;
+                            if (!parentTree.getVariable().isScope(i)) {
+                                ctx.add(i);
+                            }
+                        } else if (parent instanceof J.AssignmentOperation) {
+                            J.AssignmentOperation parentTree = (J.AssignmentOperation) parent;
+                            if (parentTree.getVariable().isScope(i)) {
+                                Object grandParent = getCursor().getParent().dropParentUntil(J.class::isInstance).getValue();
+                                if (grandParent instanceof Expression || grandParent instanceof J.Return) {
+                                    ctx.add(i);
+                                }
+                            } else {
+                                // implying the identifier is on the "assignment" side of the operation, thus a read
+                                ctx.add(i);
+                            }
+                        } else if (parent instanceof J.VariableDeclarations.NamedVariable) {
+                            // do nothing
+                        } else {
                             ctx.add(i);
                         }
                     }
                     return i;
                 }
-            };
-
-            Set<NameTree> refs = new HashSet<>();
-            findVisitor.visit(j, refs);
+            }.visit(j, refs);
             return refs;
         }
     }
@@ -141,11 +159,11 @@ public class RemoveUnusedLocalVariables extends Recipe {
 
         /**
          * @param j        The subtree to search.
-         * @param variable A {@link J.VariableDeclarations.NamedVariable} to check for any reassignment calls.
-         * @return A set of {@link Statement} locations of reassignment calls to this variable.
+         * @param variable A {@link J.VariableDeclarations.NamedVariable} to check for usages.
+         * @return A set of {@link Statement} locations of "left-hand" assignment write calls.
          */
         private static Set<Statement> find(J j, J.VariableDeclarations.NamedVariable variable) {
-            JavaIsoVisitor<Set<Statement>> findVisitor = new JavaIsoVisitor<Set<Statement>>() {
+            JavaIsoVisitor<Set<Statement>> visitor = new JavaIsoVisitor<Set<Statement>>() {
                 @Override
                 public J.Assignment visitAssignment(J.Assignment assignment, Set<Statement> ctx) {
                     J.Assignment a = super.visitAssignment(assignment, ctx);
@@ -181,11 +199,10 @@ public class RemoveUnusedLocalVariables extends Recipe {
                     }
                     return u;
                 }
-
             };
 
             Set<Statement> refs = new HashSet<>();
-            findVisitor.visit(j, refs);
+            visitor.visit(j, refs);
             return refs;
         }
     }

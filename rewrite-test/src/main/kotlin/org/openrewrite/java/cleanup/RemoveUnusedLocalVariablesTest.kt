@@ -83,14 +83,13 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
     )
 
     @Test
-    @Disabled
     @Issue("https://github.com/apache/dubbo/blob/747282cdf851c144af562d3f92e10349cc315e36/dubbo-metadata/dubbo-metadata-definition-protobuf/src/test/java/org/apache/dubbo/metadata/definition/protobuf/model/GooglePB.java#L938-L944")
-    fun keepLocalVariablesUsedToUpdateOtherVariables() = assertUnchanged(
+    fun keepLocalVariablesAssignmentOperationToOtherVariables() = assertUnchanged(
         before = """
             class Test {
                 static int method() {
-                    int size = 0;
                     int dataSize = 0;
+                    int size = 0;
                     for (int j = 0; j < 10; j++) {
                         dataSize += 1;
                     }
@@ -102,14 +101,54 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
     )
 
     @Test
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/blob/706a172ed5449214a4a08637a27dbe768fb4eecd/rewrite-core/src/main/java/org/openrewrite/internal/StringUtils.java#L55-L65")
-    fun localVariableReadWithinExpression() = assertUnchanged(
+    fun keepLocalVariableAssignmentOperation() = assertUnchanged(
         before = """
             class Test {
                 static boolean method() {
                     boolean a = false;
                     return a |= false;
+                }
+            }
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/blob/706a172ed5449214a4a08637a27dbe768fb4eecd/rewrite-core/src/main/java/org/openrewrite/internal/StringUtils.java#L55-L65")
+    fun removeUnusedLocalVariableBitwiseAssignmentOperation() = assertChanged(
+        before = """
+            class Test {
+                static boolean method() {
+                    boolean a = false;
+                    boolean b = false;
+                    b &= true;
+                    return a |= false;
+                }
+            }
+        """,
+        after = """
+            class Test {
+                static boolean method() {
+                    boolean a = false;
+                    return a |= false;
+                }
+            }
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/blob/706a172ed5449214a4a08637a27dbe768fb4eecd/rewrite-core/src/main/java/org/openrewrite/internal/StringUtils.java#L55-L65")
+    fun keepLocalVariableBitwiseAssignmentOperationWithinExpression() = assertUnchanged(
+        before = """
+            class Test {
+                static boolean method(String string) {
+                    boolean a = false;
+                    for (char c : string.toCharArray()) {
+                        if (false || (a |= !Character.isWhitespace(c))) {
+                            break;
+                        }
+                    }
+                    return a;
                 }
             }
         """
@@ -216,35 +255,6 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
     )
 
     @Test
-    @Disabled
-    @Issue("This still causes SonarQube to throw a warning, but there is not much that can be reasonably done in these cases. Maybe change to forEach?")
-    fun enhancedForLoops() = assertChanged(
-        before = """
-            import java.util.List;
-
-            class Test {
-                static void method(List<String> list) {
-                    for (String s : list) {
-                        // do nothing
-                    }
-                }
-            }
-        """,
-        after = """
-            import java.util.List;
-
-            class Test {
-                static void method(List<String> list) {
-                    list.forEach(s -> {
-                        // do nothing
-                    });
-                }
-            }
-        """
-    )
-
-    @Test
-    @Disabled
     @Issue("https://github.com/apache/dubbo/blob/747282cdf851c144af562d3f92e10349cc315e36/dubbo-rpc/dubbo-rpc-api/src/main/java/org/apache/dubbo/rpc/RpcStatus.java#L108-L118")
     fun forLoopWithExternalIncrementLogic() = assertUnchanged(
         before = """
@@ -267,36 +277,6 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
             class Test {
                 static void method() {
                     for (int j = 0; j < 10; j++) {
-                    }
-                }
-            }
-        """
-    )
-
-    @Test
-    @Disabled
-    @Issue("this causes SonarQube to be angry, but there is not much that can be done in these cases. maybe change these to WHILE loops?")
-    fun forLoopIncrementVariableNeverRead() = assertChanged(
-        before = """
-            class Test {
-                static boolean isTrue() {
-                    return true;
-                }
-
-                static void method() {
-                    for (int j = 0; isTrue(); j++) {
-                    }
-                }
-            }
-        """,
-        after = """
-            class Test {
-                static boolean isTrue() {
-                    return true;
-                }
-
-                static void method() {
-                    while (isTrue()) {
                     }
                 }
             }
@@ -358,6 +338,39 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
                     list.forEach(item -> {
                         // do nothing with "item"
                     });
+                }
+            }
+        """
+    )
+
+    @Test
+    @Issue("This still causes SonarQube to warn, but there isn't much that can be done in these cases. Maybe change to a while loop?")
+    fun ignoreForLoopIncrementVariableNeverRead() = assertUnchanged(
+        before = """
+            class Test {
+                static boolean isTrue() {
+                    return true;
+                }
+
+                static void method() {
+                    for (int j = 0; isTrue(); j++) {
+                    }
+                }
+            }
+        """
+    )
+
+    @Test
+    @Issue("This still causes SonarQube to warn, but there isn't much that can be done in these cases. Maybe change to a forEach?")
+    fun ignoreEnhancedForLoops() = assertUnchanged(
+        before = """
+            import java.util.List;
+
+            class Test {
+                static void method(List<String> list) {
+                    for (String s : list) {
+                        // do nothing
+                    }
                 }
             }
         """
