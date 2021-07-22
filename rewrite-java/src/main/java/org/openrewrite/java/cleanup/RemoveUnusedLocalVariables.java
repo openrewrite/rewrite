@@ -70,8 +70,10 @@ public class RemoveUnusedLocalVariables extends Recipe {
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
             Cursor parentScope = getCursorToParentScope(getCursor());
             if (!(parentScope.getParent() != null &&
-                    // skip if class declaration field
+                    // skip class instance variables
                     parentScope.getParent().getValue() instanceof J.ClassDeclaration) &&
+                    // skip anonymous class instance variables
+                    !(parentScope.getParent().getValue() instanceof J.NewClass) &&
                     // skip if method declaration parameter
                     !(parentScope.getValue() instanceof J.MethodDeclaration) &&
                     // skip if defined in an enhanced for loop, since there isn't much we can do about the semantics at that point

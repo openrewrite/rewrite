@@ -27,7 +27,11 @@ import org.openrewrite.java.JavaRecipeTest
     "EmptyTryBlock",
     "CatchMayIgnoreException",
     "UnusedAssignment",
-    "ResultOfMethodCallIgnored", "BooleanMethodNameMustStartWithQuestion", "PointlessBooleanExpression"
+    "ResultOfMethodCallIgnored",
+    "BooleanMethodNameMustStartWithQuestion",
+    "PointlessBooleanExpression",
+    "UseOfObsoleteCollectionType",
+    "UnnecessaryLocalVariable"
 )
 interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
     override val recipe: Recipe
@@ -152,7 +156,7 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
     )
 
     @Test
-    fun ignoreLocalVariablesUsedAsMethodInvocationArguments() = assertUnchanged(
+    fun keepLocalVariablesWhenUsedAsMethodInvocationArgument() = assertUnchanged(
         before = """
             class Test {
                 static void method() {
@@ -164,7 +168,7 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
     )
 
     @Test
-    fun ignoreLocalVariablesHavingMethodInvocationsOnThem() = assertUnchanged(
+    fun keepLocalVariablesWhenMethodInvocationsCalledOnThem() = assertUnchanged(
         before = """
             class Test {
                 void method() {
@@ -182,14 +186,30 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
     )
 
     @Test
-    fun ignoreUnusedClassFields() = assertUnchanged(
+    fun ignoreClassVariables() = assertUnchanged(
         before = """
             class Test {
-                int a = 0;
-                int b = 0;
+                static int someClassVariable = 0;
+                int someInstanceVariable = 0;
 
-                int method() {
-                    return b + 1;
+                static void method() {
+                    // do nothing
+                }
+            }
+        """
+    )
+
+    @Test
+    fun ignoreAnonymousClassVariables() = assertUnchanged(
+        before = """
+            import java.io.File;
+
+            class Test {
+                static File method(File dir) {
+                    final File src = new File(dir, "child") {
+                        private static final long serialVersionUID = 1L;
+                    };
+                    return src;
                 }
             }
         """
