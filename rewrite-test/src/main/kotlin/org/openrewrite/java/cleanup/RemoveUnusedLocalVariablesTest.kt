@@ -79,6 +79,25 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
     )
 
     @Test
+    @Disabled
+    @Issue("https://github.com/apache/dubbo/blob/747282cdf851c144af562d3f92e10349cc315e36/dubbo-metadata/dubbo-metadata-definition-protobuf/src/test/java/org/apache/dubbo/metadata/definition/protobuf/model/GooglePB.java#L938-L944")
+    fun keepLocalVariablesUsedToUpdateOtherVariables() = assertUnchanged(
+        before = """
+            class Test {
+                static int method() {
+                    int size = 0;
+                    int dataSize = 0;
+                    for (int j = 0; j < 10; j++) {
+                        dataSize += 1;
+                    }
+                    size += dataSize;
+                    return size;
+                }
+            }
+        """
+    )
+
+    @Test
     fun removeUnusedLocalVariablesFromMultiVariablesDeclaration() = assertChanged(
         before = """
             class Test {
