@@ -206,6 +206,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class OrderImportsTck : OrderImportsTest
 
     @Nested
+    inner class PadEmptyForLoopComponentsTck : PadEmptyForLoopComponentsTest
+
+    @Nested
     inner class PrimitiveWrapperClassConstructorToValueOfTck : PrimitiveWrapperClassConstructorToValueOfTest
 
     @Nested

@@ -255,6 +255,10 @@ class Java11OrderImportsTest : Java11Test, OrderImportsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11PadEmptyForLoopComponentsTest : Java11Test, PadEmptyForLoopComponentsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11PrimitiveWrapperClassConstructorToValueOfTest : Java11Test, PrimitiveWrapperClassConstructorToValueOfTest
 
 @DebugOnly

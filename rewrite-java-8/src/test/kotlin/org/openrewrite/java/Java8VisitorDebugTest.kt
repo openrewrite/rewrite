@@ -251,6 +251,10 @@ class Java8OrderImportsTest : Java8Test, OrderImportsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8PadEmptyForLoopComponentsTest : Java8Test, PadEmptyForLoopComponentsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8PrimitiveWrapperClassConstructorToValueOfTest : Java8Test, PrimitiveWrapperClassConstructorToValueOfTest
 
 @DebugOnly
