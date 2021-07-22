@@ -212,62 +212,110 @@ public class Autodetect extends NamedStyles {
                     .map(longestBlocks -> {
                         ImportLayoutStyle.Builder builder = ImportLayoutStyle.builder();
                         boolean insertAllOthers = false;
-                        boolean importStaticAllOthers = true;
-                        boolean addJavaOrJavax = true;
+                        boolean insertStaticAllOthers = false;
                         boolean containsJava = false;
                         boolean containsJavax = false;
 
-                        List<Integer> countOfBlocksInGroup = new ArrayList<>(Collections.nCopies(longestBlocks.size(), 0));
-                        int pos = 0;
-                        int max = Integer.MIN_VALUE;
                         int insertAllOtherAtIndex = 0;
-                        // The longest sequence of non-static imports without blank lines is converted
-                        // into an 'all others' block.
-                        for (int i = 0; i < longestBlocks.size(); i++) {
-                            Block block = longestBlocks.get(i);
-                            if (!containsJava && block.pattern.equals("java.*")) {
-                                containsJava = true;
-                            }
+                        int insertStaticAllOtherAtIndex = 0;
+                        int nonStaticMaxCount = Integer.MIN_VALUE;
+                        int staticMaxCount = Integer.MIN_VALUE;
+                        int nonStaticCountPos = 0;
+                        int staticCountPos = 0;
+                        int nonStaticPos = 0;
+                        int staticPos = 0;
 
-                            if (!containsJavax && block.pattern.equals("javax.*")) {
-                                containsJavax = true;
-                            }
-
-                            if (BlockType.Import.equals(block.type)) {
-                                countOfBlocksInGroup.set(pos, countOfBlocksInGroup.get(pos) + 1);
-                            }
-
-                            if (max < countOfBlocksInGroup.get(pos)) {
-                                max = countOfBlocksInGroup.get(pos);
-                                insertAllOtherAtIndex = pos;
-                                insertAllOthers = true;
-                            }
-
-                            if (i + 1 < longestBlocks.size() - 1 && block.addBlankLine) {
-                                pos = i + 1;
-                            }
-                        }
+                        List<Block> nonStaticBlocks = new ArrayList<>(); // Isolate static imports to add at top or bottom of layout.
+                        List<Block> staticBlocks = new ArrayList<>(); // Isolate static imports to add at top or bottom of layout.
+                        List<Integer> countOfBlocksInNonStaticGroups = new ArrayList<>();
+                        List<Integer> countOfBlocksInStaticGroups = new ArrayList<>();
 
                         for (Block block : longestBlocks) {
-                            if (!isStaticImportsAtBot()) {
-                                if (importStaticAllOthers) {
-                                    builder = builder.importStaticAllOthers();
-                                    importStaticAllOthers = false;
+                            if (BlockType.ImportStatic.equals(block.type)) {
+                                staticBlocks.add(block);
+                                countOfBlocksInStaticGroups.add(0);
+                                countOfBlocksInStaticGroups.set(staticCountPos, countOfBlocksInStaticGroups.get(staticCountPos) + 1);
+                                if (staticMaxCount < countOfBlocksInStaticGroups.get(staticCountPos)) {
+                                    staticMaxCount = countOfBlocksInStaticGroups.get(staticCountPos);
+                                    insertStaticAllOtherAtIndex = staticCountPos;
+                                    insertStaticAllOthers = true;
                                 }
 
-                                if (BlockType.ImportStatic.equals(block.type)) {
-                                    builder = builder.blankLine().staticImportPackage(block.pattern);
+                                if (block.addBlankLine) {
+                                    staticCountPos = staticPos + 1;
                                 }
+                                staticPos++;
+                            } else {
+                                if (!containsJava && block.pattern.equals("java.*")) {
+                                    containsJava = true;
+                                }
+
+                                if (!containsJavax && block.pattern.equals("javax.*")) {
+                                    containsJavax = true;
+                                }
+
+                                nonStaticBlocks.add(block);
+                                countOfBlocksInNonStaticGroups.add(0);
+                                countOfBlocksInNonStaticGroups.set(nonStaticCountPos, countOfBlocksInNonStaticGroups.get(nonStaticCountPos) + 1);
+                                if (nonStaticMaxCount < countOfBlocksInNonStaticGroups.get(nonStaticCountPos)) {
+                                    nonStaticMaxCount = countOfBlocksInNonStaticGroups.get(nonStaticCountPos);
+                                    insertAllOtherAtIndex = nonStaticCountPos;
+                                    insertAllOthers = true;
+                                }
+
+                                if (block.addBlankLine) {
+                                    nonStaticCountPos = nonStaticPos + 1;
+                                }
+                                nonStaticPos++;
                             }
                         }
 
-                        boolean addNewLine = !isStaticImportsAtBot();
+                        // Add static imports at the top if it's the standard.
+                        boolean addNewLine = false;
+                        if (!isStaticImportsAtBot()) {
+                            // There are no static imports, add an all other import block.
+                            if (!insertStaticAllOthers) {
+                                builder = builder.importStaticAllOthers();
+                            }
+
+                            for (int i = 0; i < staticBlocks.size(); i++) {
+                                // Insert the static all others block.
+                                if (insertStaticAllOthers) {
+                                    if (i == insertStaticAllOtherAtIndex) {
+                                        builder = builder.importStaticAllOthers();
+                                        addNewLine = true;
+                                        continue;
+                                    } else {
+                                        if (countOfBlocksInStaticGroups.get(i) == 0) {
+                                            continue;
+                                        } else {
+                                            insertStaticAllOthers = false;
+                                        }
+                                    }
+                                }
+
+                                if (addNewLine) {
+                                    builder = builder.blankLine();
+                                    addNewLine = false;
+                                }
+
+                                Block block = staticBlocks.get(i);
+                                builder.staticImportPackage(block.pattern);
+                                if (block.addBlankLine && i != staticBlocks.size() - 1) {
+                                    builder = builder.blankLine();
+                                }
+                            }
+                        }
+                        addNewLine = !isStaticImportsAtBot();
+
+                        // There are no non-static imports, add a block of all other import.
                         if (!insertAllOthers) {
                             if (addNewLine) {
                                 builder = builder.blankLine();
                             }
 
                             builder = builder.importAllOthers();
+                            // Add java/javax if they're missing from the block that is being used as a template.
                             if (!containsJava && !containsJavax) {
                                 builder = builder.blankLine().importPackage("javax.*");
                                 builder = builder.blankLine().importPackage("java.*");
@@ -275,106 +323,122 @@ public class Autodetect extends NamedStyles {
                             addNewLine = true;
                         }
 
-                        for (int i = 0; i < longestBlocks.size(); i++) {
-                            // Insert the all others block.
+                        boolean addJavaOrJavax = true; // Used to normalize the pos of java and javax imports.
+                        for (int i = 0; i < nonStaticBlocks.size(); i++) {
                             if (insertAllOthers) {
+                                // Insert the all others block.
                                 if (i == insertAllOtherAtIndex) {
                                     if (addNewLine) {
                                         builder = builder.blankLine();
+                                        addNewLine = false;
                                     }
                                     builder = builder.importAllOthers();
+                                    // Add java/javax if they're missing from the block that is being used as a template.
                                     if (!containsJava && !containsJavax) {
                                         builder = builder.blankLine().importPackage("javax.*");
+                                        // Note: newlines between java/javax depends on the project.
+                                        // It may be helpful to count when newlines exist between java/javax.
                                         builder = builder.blankLine().importPackage("java.*");
                                     }
-                                    builder = builder.blankLine();
-
                                     continue;
-                                } else if (i > insertAllOtherAtIndex) {
-                                    if (countOfBlocksInGroup.get(i) == 0) {
+                                } else if (i > insertAllOtherAtIndex){
+                                    if (countOfBlocksInNonStaticGroups.get(i) == 0) {
                                         continue;
                                     } else {
                                         insertAllOthers = false;
+                                        addNewLine = true;
                                     }
                                 }
                             }
 
-                            Block block = longestBlocks.get(i);
-                            if (BlockType.Import.equals(block.type)) {
-                                if (addJavaOrJavax && block.pattern.equals("java.*")) {
-                                    if (addNewLine) {
-                                        builder = builder.blankLine();
-                                        addNewLine = false;
-                                    }
-
-                                    if (!((i - 1 >= 0 &&
-                                            longestBlocks.get(i - 1).pattern.equals("javax.*")) ||
-                                            (i + 1 < longestBlocks.size() - 1 &&
-                                                    longestBlocks.get(i + 1).pattern.equals("javax.*")))) {
-                                        builder = builder.importPackage("javax.*");
-                                        builder = builder.blankLine().importPackage(block.pattern);
-                                        addJavaOrJavax = false;
-                                    } else {
-                                        builder = builder.importPackage(block.pattern);
-                                    }
-
-                                    if (block.addBlankLine) {
-                                        builder = builder.blankLine();
-                                    }
-                                } else if (addJavaOrJavax && block.pattern.equals("javax.*")) {
-                                    if (addNewLine) {
-                                        builder = builder.blankLine();
-                                        addNewLine = false;
-                                    }
-
-                                    if (!((i - 1 >= 0 &&
-                                            longestBlocks.get(i - 1).pattern.equals("java.*")) ||
-                                            (i + 1 < longestBlocks.size() - 1 &&
-                                                    longestBlocks.get(i + 1).pattern.equals("java.*")))) {
-                                        builder = builder.importPackage(block.pattern);
-                                        builder = builder.blankLine().importPackage("java.*");
-                                        addJavaOrJavax = false;
-                                    } else {
-                                        builder = builder.importPackage(block.pattern);
-                                    }
-
-                                    if (block.addBlankLine) {
-                                        builder = builder.blankLine();
-                                    }
-                                } else {
-                                    if (addNewLine) {
-                                        builder = builder.blankLine();
-                                        addNewLine = false;
-                                    }
-
-                                    builder = builder.importPackage(block.pattern);
-
-                                    if (block.addBlankLine) {
-                                        builder = builder.blankLine();
-                                    }
+                            Block block = nonStaticBlocks.get(i);
+                            if (addJavaOrJavax && block.pattern.equals("java.*")) {
+                                if (addNewLine) {
+                                    builder = builder.blankLine();
+                                    addNewLine = false;
                                 }
+
+                                if (!(i - 1 >= 0 && nonStaticBlocks.get(i - 1).pattern.equals("javax.*") ||
+                                        i + 1 < nonStaticBlocks.size() && nonStaticBlocks.get(i + 1).pattern.equals("javax.*"))) {
+                                    builder = builder.importPackage("javax.*");
+                                    builder = builder.blankLine();
+                                    builder = builder.importPackage(block.pattern);
+                                    addNewLine = true;
+                                    addJavaOrJavax = false;
+                                } else {
+                                    builder = builder.importPackage(block.pattern);
+                                }
+                            } else if (addJavaOrJavax && block.pattern.equals("javax.*")) {
+                                if (addNewLine) {
+                                    builder = builder.blankLine();
+                                    addNewLine = false;
+                                }
+
+                                if (!(i - 1 >= 0 && nonStaticBlocks.get(i - 1).pattern.equals("java.*") ||
+                                        i + 1 < nonStaticBlocks.size() - 1 && nonStaticBlocks.get(i + 1).pattern.equals("java.*"))) {
+                                    builder = builder.importPackage(block.pattern);
+                                    builder = builder.blankLine();
+                                    builder = builder.importPackage("java.*");
+                                    addNewLine = true;
+                                    addJavaOrJavax = false;
+                                } else {
+                                    builder = builder.importPackage(block.pattern);
+                                }
+                            } else {
+                                if (addNewLine) {
+                                    builder = builder.blankLine();
+                                    addNewLine = false;
+                                }
+
+                                builder = builder.importPackage(block.pattern);
+                            }
+                            if (block.addBlankLine && i != nonStaticBlocks.size() - 1) {
+                                builder = builder.blankLine();
                             }
                         }
 
-                        for (Block block : longestBlocks) {
-                            if (isStaticImportsAtBot()) {
-                                if (importStaticAllOthers) {
-                                    if (BlockType.ImportStatic.equals(longestBlocks.get(0).type)) {
-                                        builder = builder.blankLine();
+                        // Add statics at bottom.
+                        if (isStaticImportsAtBot()) {
+                            builder = builder.blankLine();
+                            addNewLine = false;
+
+                            // There are no static imports, add an all other import block.
+                            if (!insertStaticAllOthers) {
+                                builder = builder.importStaticAllOthers();
+                            }
+
+                            for (int i = 0; i < staticBlocks.size(); i++) {
+                                // Insert the static all others block.
+                                if (insertStaticAllOthers) {
+                                    if (i == insertStaticAllOtherAtIndex) {
+                                        builder = builder.importStaticAllOthers();
+                                        continue;
+                                    } else if (i > insertStaticAllOtherAtIndex){
+                                        if (countOfBlocksInStaticGroups.get(i) == 0) {
+                                            continue;
+                                        } else {
+                                            insertStaticAllOthers = false;
+                                            addNewLine = true;
+                                        }
                                     }
-
-                                    builder = builder.importStaticAllOthers();
-                                    importStaticAllOthers = false;
                                 }
 
-                                if (BlockType.ImportStatic.equals(block.type)) {
-                                    builder = builder.blankLine().staticImportPackage(block.pattern);
+                                Block block = staticBlocks.get(i);
+                                if (addNewLine || i > 0 && staticBlocks.get(i - 1).addBlankLine) {
+                                    builder = builder.blankLine();
+                                    addNewLine = false;
                                 }
+
+                                builder = builder.staticImportPackage(block.pattern);
                             }
                         }
 
                         if (longestBlocks.isEmpty()) {
                             builder.importAllOthers();
+                            builder.blankLine();
+                            builder = builder.importPackage("javax.*");
+                            builder.blankLine();
+                            builder = builder.importPackage("java.*");
                             builder.blankLine();
                             builder.importStaticAllOthers();
                         }

@@ -202,13 +202,6 @@ interface AutodetectTest {
         assertThat(importLayout.layout[8])
             .isInstanceOf(ImportLayoutStyle.Block.AllOthers::class.java)
             .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).isStatic }
-
-        assertThat(importLayout.layout[9]).isInstanceOf(ImportLayoutStyle.Block.BlankLines::class.java)
-
-        assertThat(importLayout.layout[10])
-            .isInstanceOf(ImportLayoutStyle.Block.ImportPackage::class.java)
-            .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).isStatic }
-            .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == "java\\..+" }
     }
 
     @Test
