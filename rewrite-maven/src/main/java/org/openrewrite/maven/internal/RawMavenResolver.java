@@ -390,7 +390,7 @@ public class RawMavenResolver {
                             dep.getClassifier(),
                             dep.getType(),
                             dep.getVersion(),
-                            new HashMap<>(partialMaven.getEffectiveProperties()),
+                            new HashMap<>(),
                             partialMaven.getRepositories(),
                             task.getProjectPom() == null ? partialMaven : task.getProjectPom(),
                             task.getSeenParentPoms()
