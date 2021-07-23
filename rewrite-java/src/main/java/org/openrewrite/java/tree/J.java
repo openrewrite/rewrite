@@ -24,9 +24,9 @@ import lombok.experimental.NonFinal;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.*;
+import org.openrewrite.java.JavaPrinter;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.internal.*;
-import org.openrewrite.java.search.FindAllUsedTypes;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.template.SourceTemplate;
@@ -1157,18 +1157,26 @@ public interface J extends Serializable, Tree {
         }
 
         public Set<JavaType> getTypesInUse() {
+            return typeCache().getTypesInUse();
+        }
+
+        public Set<JavaType.Method> getDeclaredMethods() {
+            return typeCache().getDeclaredMethods();
+        }
+
+        private TypeCache typeCache() {
             TypeCache cache;
             if (this.typesInUse == null) {
-                cache = new TypeCache(this, FindAllUsedTypes.findAll(this));
+                cache = TypeCache.build(this);
                 this.typesInUse = new WeakReference<>(cache);
             } else {
                 cache = this.typesInUse.get();
-                if (cache == null || cache.t != this) {
-                    cache = new TypeCache(this, FindAllUsedTypes.findAll(this));
+                if (cache == null || cache.getCu() != this) {
+                    cache = TypeCache.build(this);
                     this.typesInUse = new WeakReference<>(cache);
                 }
             }
-            return cache.typesInUse;
+            return cache;
         }
 
         public Padding getPadding() {
@@ -1206,12 +1214,6 @@ public interface J extends Serializable, Tree {
             public CompilationUnit withImports(List<JRightPadded<Import>> imports) {
                 return t.imports == imports ? t : new CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.packageDeclaration, imports, t.classes, t.eof);
             }
-        }
-
-        @RequiredArgsConstructor
-        private static class TypeCache {
-            private final CompilationUnit t;
-            private final Set<JavaType> typesInUse;
         }
     }
 

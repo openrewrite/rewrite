@@ -21,7 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
-import org.openrewrite.java.search.UsesMethod;
+import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.tree.J;
 
 @Value
@@ -57,7 +57,7 @@ public class ChangeMethodAccessLevel extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(methodPattern);
+        return new DeclaresMethod<>(methodPattern);
     }
 
     @Override

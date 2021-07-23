@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.format.*
+import org.openrewrite.java.internal.TypeCacheTest
 import org.openrewrite.java.search.*
 import org.openrewrite.java.security.SecureTempFileCreationTest
 import org.openrewrite.java.security.XmlParserXXEVulnerabilityTest
@@ -131,7 +132,7 @@ abstract class JavaVisitorCompatibilityKit {
     inner class StaticMethodNotFinalTck : StaticMethodNotFinalTest
 
     @Nested
-    inner class FindAllUsedTypesTck : FindAllUsedTypesTest
+    inner class TypeCacheTck : TypeCacheTest
 
     @Nested
     inner class FindAnnotationsTck : FindAnnotationsTest
@@ -227,7 +228,7 @@ abstract class JavaVisitorCompatibilityKit {
     inner class RemoveExtraSemicolonsTck : RemoveExtraSemicolonsTest
 
     @Nested
-    inner class RemoveUnusedLocalVariablesTck : RemoveUnusedLocalVariablesTest
+    inner class RemoveUnusedPrivateMethodsTck : RemoveUnusedPrivateMethodsTest
 
     @Nested
     inner class RemoveImportTck : RemoveImportTest

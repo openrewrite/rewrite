@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,28 +26,26 @@ import java.util.Set;
 
 import static org.openrewrite.Tree.randomId;
 
-public class UsesMethod<P> extends JavaIsoVisitor<P> {
+public class DeclaresMethod<P> extends JavaIsoVisitor<P> {
     @SuppressWarnings("ConstantConditions")
     private static final Marker FOUND_METHOD = new JavaSearchResult(randomId(), null, null);
 
     private final MethodMatcher methodMatcher;
 
-    public UsesMethod(String methodPattern) {
+    public DeclaresMethod(String methodPattern) {
         this(new MethodMatcher(methodPattern));
     }
 
-    public UsesMethod(MethodMatcher methodMatcher) {
+    public DeclaresMethod(MethodMatcher methodMatcher) {
         this.methodMatcher = methodMatcher;
     }
 
     @Override
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
-        Set<JavaType> types = cu.getTypesInUse();
-        for (JavaType type : types) {
-            if (type instanceof JavaType.Method) {
-                if(methodMatcher.matches(type)) {
-                    return cu.withMarkers(cu.getMarkers().addIfAbsent(FOUND_METHOD));
-                }
+        Set<JavaType.Method> methods = cu.getDeclaredMethods();
+        for (JavaType.Method method : methods) {
+            if (methodMatcher.matches(method)) {
+                return cu.withMarkers(cu.getMarkers().addIfAbsent(FOUND_METHOD));
             }
         }
         return cu;

@@ -19,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
 import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.format.*
+import org.openrewrite.java.internal.TypeCacheTest
 import org.openrewrite.java.search.*
 import org.openrewrite.java.security.SecureTempFileCreationTest
 import org.openrewrite.java.security.XmlParserXXEVulnerabilityTest
@@ -155,10 +156,6 @@ class Java8StaticMethodNotFinalTest : Java8Test, StaticMethodNotFinalTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java8FindAllUsedTypesTest : Java8Test, FindAllUsedTypesTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
 class Java8FindAnnotationsTest : Java8Test, FindAnnotationsTest
 
 @DebugOnly
@@ -279,7 +276,7 @@ class Java8RemoveExtraSemicolonsTest : Java8Test, RemoveExtraSemicolonsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java8RemoveUnusedLocalVariablesTest : Java8Test, RemoveUnusedLocalVariablesTest
+class Java8RemoveUnusedPrivateMethodsTest : Java8Test, RemoveUnusedPrivateMethodsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
@@ -332,6 +329,10 @@ class Java8SpacesTest : Java8Test, SpacesTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java8TabsAndIndentsTest : Java8Test, TabsAndIndentsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8TypeCacheTest : Java8Test, TypeCacheTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

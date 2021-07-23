@@ -13,17 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.search
+package org.openrewrite.java.internal
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.asFullyQualified
 import org.openrewrite.java.tree.JavaType
 import org.openrewrite.java.tree.TypeUtils
 
-interface FindAllUsedTypesTest {
+interface TypeCacheTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/617")
     @Test
@@ -48,13 +47,13 @@ interface FindAllUsedTypesTest {
         """)
 
         val foo = cus.find { it.classes[0].name.simpleName == "Foo" }!!
-        val foundTypes = FindAllUsedTypes.findAll(foo)
+        val foundTypes = foo.typesInUse
         assertThat(foundTypes.find { it is JavaType.Variable })
                 .isNotNull
                 .matches { it is JavaType.Variable && TypeUtils.asFullyQualified(it.type)!!.fullyQualifiedName.equals("org.openrewrite.test.YesOrNo.Status") }
 
         assertThat(
-                foundTypes.filterIsInstance<JavaType.FullyQualified>().map { it.asFullyQualified()!!.fullyQualifiedName }
+                foundTypes.filterIsInstance<JavaType.FullyQualified>().map { TypeUtils.asFullyQualified(it)!!.fullyQualifiedName }
         ).containsExactlyInAnyOrder("org.openrewrite.test.YesOrNo", "org.openrewrite.test.YesOrNo.Status")
     }
 }
