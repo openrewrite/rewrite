@@ -568,35 +568,35 @@ public class Autodetect extends NamedStyles {
             int blockStart = 0;
             int i = 0;
             String previousPkg = "";
-            int previousPkgCount = 0;
+            int previousPkgCount = 1;
             int javaPos = Integer.MAX_VALUE;
             int javaxPos = Integer.MAX_VALUE;
             Map<ImportLayoutStatistics.Block, Integer> referenceCount = new HashMap<>();
-            for (int j = 0; j < cu.getImports().size(); j++) {
-                J.Import anImport = cu.getImports().get(j);
-                previousPkgCount += previousPkg != null && previousPkg.equals(importLayoutStatistics.pkgToBlockPattern.get(anImport.getPackageName() + ".")) ? 1 : 0;
-                if (anImport.getPrefix().getWhitespace().contains("\n\n") || anImport.getPrefix().getWhitespace().contains("\r\n\r\n") ||
-                        i > 0 && previousPkg != null && importLayoutStatistics.pkgToBlockPattern.containsKey(anImport.getPackageName() + ".") &&
+            for (J.Import anImport : cu.getImports()) {
+                previousPkgCount += previousPkg.equals(importLayoutStatistics.pkgToBlockPattern.get(anImport.getPackageName() + ".")) ? 1 : 0;
+                boolean containsNewLine = anImport.getPrefix().getWhitespace().contains("\n\n") || anImport.getPrefix().getWhitespace().contains("\r\n\r\n");
+                if (containsNewLine ||
+                        i > 0 && importLayoutStatistics.pkgToBlockPattern.containsKey(anImport.getPackageName() + ".") &&
                                 !previousPkg.equals(importLayoutStatistics.pkgToBlockPattern.get(anImport.getPackageName() + "."))) {
                     if (i - blockStart > 0) {
-                        assert previousPkg != null;
                         ImportLayoutStatistics.Block block = new ImportLayoutStatistics.Block(
                                 staticBlock ?
                                         ImportLayoutStatistics.BlockType.ImportStatic :
                                         ImportLayoutStatistics.BlockType.Import,
                                 previousPkg,
-                                anImport.getPrefix().getWhitespace().contains("\n\n") || anImport.getPrefix().getWhitespace().contains("\r\n\r\n"));
+                                containsNewLine);
 
-                        javaPos = block.pattern.equals("java.*") && javaPos > j ? j : javaPos;
-                        javaxPos = block.pattern.equals("javax.*") && javaxPos > j ? j : javaxPos;
+                        javaPos = block.pattern.equals("java.*") && javaPos > blockStart ? blockStart : javaPos;
+                        javaxPos = block.pattern.equals("javax.*") && javaxPos > blockStart ? blockStart: javaxPos;
 
                         if (blocks.contains(block) && previousPkgCount > referenceCount.get(block)) {
                             blocks.remove(block);
                         }
                         blocks.add(block);
                         referenceCount.put(block, previousPkgCount + 1);
-                        previousPkgCount = 0;
+                        previousPkgCount = 1;
                     }
+
                     blockStart = i;
                 }
 
@@ -652,14 +652,16 @@ public class Autodetect extends NamedStyles {
                 if (blocks.contains(block) && previousPkgCount > referenceCount.get(block)) {
                     blocks.remove(block);
                 }
-                int lastIndex = cu.getImports().size() - 1;
-                javaPos = block.pattern.equals("java.*") ? lastIndex : javaPos;
-                javaxPos = block.pattern.equals("javax.*") ? lastIndex : javaxPos;
+
+                javaPos = block.pattern.equals("java.*") ? blockStart : javaPos;
+                javaxPos = block.pattern.equals("javax.*") ? blockStart : javaxPos;
                 blocks.add(block);
             }
 
-            importLayoutStatistics.javaBeforeJavaxCount += javaPos != Integer.MAX_VALUE && javaPos > javaxPos ? 1 : 0;
-            importLayoutStatistics.javaxBeforeJavaCount += javaxPos != Integer.MAX_VALUE && javaxPos > javaPos ? 1 : 0;
+            if (javaPos != Integer.MAX_VALUE && javaxPos != Integer.MAX_VALUE) {
+                importLayoutStatistics.javaBeforeJavaxCount += javaPos < javaxPos ? 1 : 0;
+                importLayoutStatistics.javaxBeforeJavaCount += javaxPos < javaPos ? 1 : 0;
+            }
 
             importLayoutStatistics.blocksPerSourceFile.add(new ArrayList<>(blocks));
 
