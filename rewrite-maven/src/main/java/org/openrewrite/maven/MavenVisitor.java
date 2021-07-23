@@ -47,6 +47,12 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
 
     public Maven visitMaven(Maven maven, ExecutionContext ctx) {
         this.model = maven.getModel();
+
+        //noinspection ConstantConditions
+        if(model == null) {
+            return maven;
+        }
+
         this.modules = maven.getModules();
         return (Maven) visitDocument(maven, ctx);
     }
