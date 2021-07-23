@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.cleanup
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
@@ -155,7 +154,6 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
     )
 
     @Test
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/blob/706a172ed5449214a4a08637a27dbe768fb4eecd/rewrite-core/src/main/java/org/openrewrite/internal/StringUtils.java#L55-L65")
     fun handleInstanceOf() = assertUnchanged(
         before = """
