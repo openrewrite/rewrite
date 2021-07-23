@@ -21,7 +21,7 @@ import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
 
 interface RemoveImportTest : JavaRecipeTest {
-    fun removeImport(type: String, force: Boolean = true) =
+    fun removeImport(type: String, force: Boolean = false) =
             RemoveImport<ExecutionContext>(type, force).toRecipe()
 
     @Test

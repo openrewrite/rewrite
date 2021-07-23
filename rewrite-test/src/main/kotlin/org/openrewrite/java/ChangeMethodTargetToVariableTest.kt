@@ -51,7 +51,6 @@ interface ChangeMethodTargetToVariableTest : JavaRecipeTest {
         """,
         after = """
             import a.*;
-            
             public class C {
                A a;
                public void test() {
@@ -91,7 +90,6 @@ interface ChangeMethodTargetToVariableTest : JavaRecipeTest {
         """,
         after = """
             import a.*;
-            
             public class C {
                A a;
                public void test() {
