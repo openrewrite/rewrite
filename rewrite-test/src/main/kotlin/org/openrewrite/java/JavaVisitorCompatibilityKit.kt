@@ -59,6 +59,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class BooleanChecksNotInvertedTck : BooleanChecksNotInvertedTest
 
     @Nested
+    inner class CatchClauseOnlyRethrowsTcx : CatchClauseOnlyRethrowsTest
+
+    @Nested
     inner class ChangeFieldNameTck : ChangeFieldNameTest
 
     @Nested

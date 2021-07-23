@@ -63,6 +63,10 @@ class Java11BooleanChecksNotInvertedTest : Java11Test, BooleanChecksNotInvertedT
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11CatchClauseOnlyRethrowsTest : Java11Test, CatchClauseOnlyRethrowsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11ChangeFieldNameTest : Java11Test, ChangeFieldNameTest
 
 @DebugOnly

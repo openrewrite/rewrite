@@ -63,6 +63,10 @@ class Java8BooleanChecksNotInvertedTest : Java8Test, BooleanChecksNotInvertedTes
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8CatchClauseOnlyRethrowsTest : Java8Test, CatchClauseOnlyRethrowsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8ChangeFieldNameTest : Java8Test, ChangeFieldNameTest
 
 @DebugOnly
