@@ -16,6 +16,8 @@
 package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
@@ -39,7 +41,9 @@ import java.util.stream.Collectors;
 import static java.util.Collections.emptyList;
 
 public class Maven extends Xml.Document {
-    private final transient Pom model;
+    @Getter
+    private final transient MavenModel mavenModel;
+
     private final transient Collection<Pom> modules;
 
     public Maven(Xml.Document document) {
@@ -53,8 +57,8 @@ public class Maven extends Xml.Document {
                 document.getEof()
         );
 
-        model = document.getMarkers().findFirst(Pom.class).orElse(null);
-        assert model != null;
+        mavenModel = document.getMarkers().findFirst(MavenModel.class).orElse(null);
+        assert mavenModel != null;
 
         modules = document.getMarkers().findFirst(Modules.class)
                 .map(Modules::getModules)
@@ -64,8 +68,8 @@ public class Maven extends Xml.Document {
     @JsonCreator
     public Maven(UUID id, Path sourcePath, String prefix, Markers markers, Prolog prolog, Tag root, String eof) {
         super(id, sourcePath, prefix, markers, prolog, root, eof);
-        model = markers.findFirst(Pom.class).orElse(null);
-        assert model != null;
+        mavenModel = markers.findFirst(MavenModel.class).orElse(null);
+        assert mavenModel != null;
 
         modules = markers.findFirst(Modules.class)
                 .map(Modules::getModules)
@@ -80,7 +84,7 @@ public class Maven extends Xml.Document {
     }
 
     public List<Path> getJavaSources(Path projectDir, ExecutionContext ctx) {
-        if (!"jar".equals(model.getPackaging()) && !"bundle".equals(model.getPackaging())) {
+        if (!"jar".equals(mavenModel.getPom().getPackaging()) && !"bundle".equals(mavenModel.getPom().getPackaging())) {
             return emptyList();
         }
         return getSources(projectDir.resolve(getSourcePath()).getParent().resolve(Paths.get("src", "main", "java")),
@@ -88,7 +92,7 @@ public class Maven extends Xml.Document {
     }
 
     public List<Path> getTestJavaSources(Path projectDir, ExecutionContext ctx) {
-        if (!"jar".equals(model.getPackaging()) && !"bundle".equals(model.getPackaging())) {
+        if (!"jar".equals(mavenModel.getPom().getPackaging()) && !"bundle".equals(mavenModel.getPom().getPackaging())) {
             return emptyList();
         }
         return getSources(projectDir.resolve(getSourcePath()).getParent().resolve(Paths.get("src", "test", "java")),
@@ -96,7 +100,7 @@ public class Maven extends Xml.Document {
     }
 
     public List<Path> getResources(Path projectDir, ExecutionContext ctx) {
-        if (!"jar".equals(model.getPackaging()) && !"bundle".equals(model.getPackaging())) {
+        if (!"jar".equals(mavenModel.getPom().getPackaging()) && !"bundle".equals(mavenModel.getPom().getPackaging())) {
             return emptyList();
         }
         return getSources(projectDir.resolve(getSourcePath()).getParent().resolve(Paths.get("src", "main", "resources")),
@@ -104,7 +108,7 @@ public class Maven extends Xml.Document {
     }
 
     public List<Path> getTestResources(Path projectDir, ExecutionContext ctx) {
-        if (!"jar".equals(model.getPackaging()) && !"bundle".equals(model.getPackaging())) {
+        if (!"jar".equals(mavenModel.getPom().getPackaging()) && !"bundle".equals(mavenModel.getPom().getPackaging())) {
             return emptyList();
         }
         return getSources(projectDir.resolve(getSourcePath()).getParent().resolve(Paths.get("src", "test", "resources")),
@@ -126,8 +130,9 @@ public class Maven extends Xml.Document {
         }
     }
 
+    @JsonIgnore
     public Pom getModel() {
-        return model;
+        return mavenModel.getPom();
     }
 
     public Collection<Pom> getModules() {
@@ -188,6 +193,7 @@ public class Maven extends Xml.Document {
     }
 
     public Maven withModel(Pom model) {
-        return withMarkers(getMarkers().computeByType(model, (old, n) -> n));
+        MavenModel withMavenModel = mavenModel.withPom(model);
+        return withMarkers(getMarkers().computeByType(withMavenModel, (old, n) -> n));
     }
 }

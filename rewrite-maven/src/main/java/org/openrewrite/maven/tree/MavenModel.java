@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,15 +15,19 @@
  */
 package org.openrewrite.maven.tree;
 
+import lombok.EqualsAndHashCode;
 import lombok.Value;
+import lombok.With;
 import org.openrewrite.marker.Marker;
 
-import java.util.Collection;
 import java.util.UUID;
 
 @Value
-public class Modules implements Marker {
+public class MavenModel implements Marker {
+    @EqualsAndHashCode.Include
+    @With
     UUID id;
 
-    Collection<Pom> modules;
+    @With
+    Pom pom;
 }

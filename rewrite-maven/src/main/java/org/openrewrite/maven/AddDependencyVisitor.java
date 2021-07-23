@@ -42,7 +42,6 @@ import java.util.Comparator;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.*;
-import static org.openrewrite.Tree.randomId;
 
 /**
  * Adds a dependency if there is no dependency matching <code>groupId</code> and <code>artifactId</code>.
@@ -129,7 +128,7 @@ public class AddDependencyVisitor extends MavenVisitor {
                         classifier,
                         type,
                         optional != null && optional,
-                        new Pom(randomId(), groupId, artifactId, dependencyVersion, null, null, null, packaging, classifier, null,
+                        new Pom(groupId, artifactId, dependencyVersion, null, null, null, packaging, classifier, null,
                                 emptyList(), new Pom.DependencyManagement(emptyList()), emptyList(), emptyList(), emptyMap(), emptyMap()),
                         dependencyVersion,
                         emptySet()

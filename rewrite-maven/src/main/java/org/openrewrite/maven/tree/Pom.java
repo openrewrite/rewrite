@@ -21,10 +21,7 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.Marker;
-import org.openrewrite.maven.utilities.MavenArtifactDownloader;
 
-import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -34,17 +31,22 @@ import java.util.stream.Stream;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Getter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class Pom implements Marker {
+@RequiredArgsConstructor
+public class Pom {
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
 
     @EqualsAndHashCode.Include
-    UUID id;
-
     @Nullable
     String groupId;
 
+    /**
+     * Cannot be inherited from a parent POM.
+     */
+    @EqualsAndHashCode.Include
+    @Getter
     String artifactId;
 
+    @EqualsAndHashCode.Include
     @Nullable
     String version;
 
@@ -57,12 +59,15 @@ public class Pom implements Marker {
     /**
      * The timestamp and build numbered version number (the latest snapshot at time dependencies were resolved).
      */
+    @EqualsAndHashCode.Include
     @Nullable
     String datedSnapshotVersion;
 
     @Nullable
     String packaging;
 
+    @EqualsAndHashCode.Include
+    @Getter
     @Nullable
     String classifier;
 
@@ -79,48 +84,17 @@ public class Pom implements Marker {
 
     Collection<MavenRepository> repositories;
 
-    //The properties parsed direction from this pom's XML file. The values may be different than the effective property
-    //values.
+    /**
+     * The properties parsed directly from this POM. The values may be different than the effective property values.
+     */
     Map<String, String> properties;
 
-    //Effective properties are collected across all pom.xml files that were resolved during a parse. These properties
-    //reflect the what the value should be in the context of the entire maven tree and account for property precedence
-    //when the same property key is encountered multiple times.
+    /**
+     * Effective properties are collected across all pom.xml files that were resolved during a parse. These properties
+     * reflect what the value should be in the context of the entire maven tree and account for property precedence
+     * when the same property key is encountered multiple times.
+     */
     Map<String, String> effectiveProperties;
-
-    public Pom(UUID id,
-               @Nullable String groupId,
-               String artifactId,
-               @Nullable String version,
-               @Nullable String name,
-               @Nullable String description,
-               @Nullable String datedSnapshotVersion,
-               @Nullable String packaging,
-               @Nullable String classifier,
-               @Nullable Pom parent,
-               Collection<Dependency> dependencies,
-               DependencyManagement dependencyManagement,
-               Collection<License> licenses,
-               Collection<MavenRepository> repositories,
-               Map<String, String> properties,
-               Map<String, String> effectiveProperties) {
-        this.id = id;
-        this.groupId = groupId;
-        this.artifactId = artifactId;
-        this.version = version;
-        this.name = name;
-        this.description = description;
-        this.datedSnapshotVersion = datedSnapshotVersion;
-        this.packaging = packaging;
-        this.classifier = classifier;
-        this.parent = parent;
-        this.dependencies = dependencies;
-        this.dependencyManagement = dependencyManagement;
-        this.licenses = licenses;
-        this.repositories = repositories;
-        this.properties = properties;
-        this.effectiveProperties = effectiveProperties;
-    }
 
     public Set<Dependency> getDependencies(Scope scope) {
         Set<Dependency> dependenciesForScope = new TreeSet<>(Comparator.comparing(Dependency::getCoordinates));
@@ -230,13 +204,6 @@ public class Pom implements Marker {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Cannot be inherited from a parent POM.
-     */
-    public String getArtifactId() {
-        return artifactId;
-    }
-
     public String getVersion() {
         if (version == null) {
             if (parent == null) {
@@ -249,11 +216,6 @@ public class Pom implements Marker {
 
     public String getPackaging() {
         return packaging == null ? "jar" : packaging;
-    }
-
-    @Nullable
-    public String getClassifier() {
-        return classifier;
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

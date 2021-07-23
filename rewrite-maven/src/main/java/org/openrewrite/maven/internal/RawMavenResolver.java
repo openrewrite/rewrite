@@ -81,7 +81,7 @@ public class RawMavenResolver {
                 .tag("file.type", "Maven"))
                 .register(Metrics.globalRegistry));
         return rawMaven.getDocument().withMarkers(rawMaven.getDocument().getMarkers()
-                .compute(pom, (old, n) -> n));
+                .compute(new MavenModel(randomId(), pom), (old, n) -> n));
     }
 
     /**
@@ -94,16 +94,19 @@ public class RawMavenResolver {
      * @return A transitively resolved POM model.
      */
     @Nullable
-    public Pom resolve(RawMaven rawMaven, Scope scope, @Nullable String requestedVersion, Map<String, String> effectiveProperties, Collection<MavenRepository> repositories) {
+    public Pom resolve(RawMaven rawMaven, Scope scope, @Nullable String requestedVersion,
+                       Map<String, String> effectiveProperties, List<MavenRepository> repositories) {
         return resolve(rawMaven, scope, requestedVersion, effectiveProperties, null, repositories, null);
     }
 
     @Nullable
-    private Pom resolve(RawMaven rawMaven, Scope scope, @Nullable String requestedVersion, Map<String, String> effectiveProperties, @Nullable PartialMaven projectPom, Collection<MavenRepository> repositories,
-                        @Nullable LinkedHashSet<PartialTreeKey> seenParentPoms) {
+    private Pom resolve(RawMaven rawMaven, Scope scope, @Nullable String requestedVersion,
+                        Map<String, String> effectiveProperties, @Nullable PartialMaven projectPom,
+                        List<MavenRepository> repositories, @Nullable Set<PartialTreeKey> seenParentPoms) {
 
         ResolutionTask rootTask = new ResolutionTask(scope, rawMaven, emptySet(),
-                false, null, null, requestedVersion, effectiveProperties, projectPom, repositories, seenParentPoms);
+                false, null, null, requestedVersion, effectiveProperties,
+                repositories, projectPom, seenParentPoms);
 
         workQueue.add(rootTask);
 
@@ -388,8 +391,8 @@ public class RawMavenResolver {
                             dep.getType(),
                             dep.getVersion(),
                             new HashMap<>(partialMaven.getEffectiveProperties()),
-                            task.getProjectPom() == null ? partialMaven : task.getProjectPom(),
                             partialMaven.getRepositories(),
+                            task.getProjectPom() == null ? partialMaven : task.getProjectPom(),
                             task.getSeenParentPoms()
                     );
 
@@ -572,8 +575,8 @@ public class RawMavenResolver {
                                                     ancestorDep.getType(),
                                                     ancestorDep.getRequestedVersion(),
                                                     partial.effectiveProperties,
-                                                    task.getProjectPom(),
                                                     task.getRepositories(),
+                                                    task.getProjectPom(),
                                                     null), nextAssemblyStack);
 
                             if (conflictResolved == null) {
@@ -608,7 +611,6 @@ public class RawMavenResolver {
 
                 result = Optional.of(
                         new Pom(
-                                randomId(),
                                 groupId,
                                 rawPom.getArtifactId(),
                                 version,
@@ -699,14 +701,16 @@ public class RawMavenResolver {
          * An effective property may have a value that, itself contains a property place holder to a second property and
          * resolution of placeholders is done on-demand when a value is requested from the pom.
          */
-        private Map<String, String> effectiveProperties;
+        @EqualsAndHashCode.Include
+        Map<String, String> effectiveProperties;
 
-        private PartialMaven projectPom;
+        @EqualsAndHashCode.Include
+        List<MavenRepository> repositories;
 
-        Collection<MavenRepository> repositories;
+        PartialMaven projectPom;
 
         @Nullable
-        LinkedHashSet<PartialTreeKey> seenParentPoms;
+        Set<PartialTreeKey> seenParentPoms;
 
         public Set<GroupArtifact> getExclusions() {
             return exclusions == null ? emptySet() : exclusions;
