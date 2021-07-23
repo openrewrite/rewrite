@@ -80,7 +80,7 @@ public class MavenArtifactDownloader {
      */
     @Nullable
     public Path downloadArtifact(Pom.Dependency dependency) {
-        if ("jar".equals(dependency.getType())) {
+        if (dependency.getType() != null && !"jar".equals(dependency.getType())) {
             return null;
         }
 

@@ -210,7 +210,7 @@ interface RecipeTest <T: SourceFile> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (T) -> Unit = { }
     ) {
-        val treeSerializer = TreeSerializer<J.CompilationUnit>()
+        val treeSerializer = TreeSerializer<T>()
         val httpClient = OkHttpClient.Builder().build()
         try {
             val request = Request.Builder()
@@ -261,7 +261,7 @@ interface RecipeTest <T: SourceFile> {
         moderneAstLink: String,
         moderneApiBearerToken: String = apiTokenFromUserHome()
     ) {
-        val treeSerializer = TreeSerializer<J.CompilationUnit>()
+        val treeSerializer = TreeSerializer<T>()
         val httpClient = OkHttpClient.Builder().build()
         try {
             val request = Request.Builder()
