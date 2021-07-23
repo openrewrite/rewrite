@@ -203,6 +203,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class NoFinalizerTck : NoFinalizerTest
 
     @Nested
+    inner class NoStaticImportTck : NoStaticImportTest
+
+    @Nested
     inner class NormalizeFormatTck : NormalizeFormatTest
 
     @Nested

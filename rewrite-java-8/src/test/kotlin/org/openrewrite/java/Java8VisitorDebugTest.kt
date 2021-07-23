@@ -247,6 +247,10 @@ class Java8NoFinalizerTest : Java8Test, NoFinalizerTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8NoStaticImportTest : Java8Test, NoStaticImportTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8NormalizeFormatTest : Java8Test, NormalizeFormatTest
 
 @DebugOnly

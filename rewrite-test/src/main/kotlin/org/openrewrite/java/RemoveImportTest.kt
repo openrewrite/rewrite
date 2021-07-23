@@ -21,8 +21,8 @@ import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
 
 interface RemoveImportTest : JavaRecipeTest {
-    fun removeImport(type: String) =
-            RemoveImport<ExecutionContext>(type).toRecipe()
+    fun removeImport(type: String, force: Boolean = true) =
+            RemoveImport<ExecutionContext>(type, force).toRecipe()
 
     @Test
     fun removeNamedImport(jp: JavaParser) = assertChanged(
@@ -100,6 +100,41 @@ interface RemoveImportTest : JavaRecipeTest {
             class A {}
         """,
             after = "class A {}"
+    )
+
+    @Test
+    fun removeStarStaticImportWhenRemovingSpecificMethod(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = removeImport("java.util.Collections.emptyList"),
+        before = """
+            import static java.util.Collections.*;
+            class A {
+                Object o = emptySet();
+            }
+        """,
+        after = """
+            import static java.util.Collections.emptySet;
+            class A {
+                Object o = emptySet();
+            }
+        """
+    )
+
+    @Test
+    fun removeStarImportEvenIfReferredTo(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = removeImport("java.util.List", true),
+        before = """
+            import java.util.List;
+            class A {
+                List<String> l;
+            }
+        """,
+        after = """
+            class A {
+                List<String> l;
+            }
+        """
     )
 
     @Disabled

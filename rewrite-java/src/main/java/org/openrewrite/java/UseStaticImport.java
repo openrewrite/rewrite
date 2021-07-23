@@ -24,10 +24,6 @@ import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
-/**
- * This recipe will find any method invocations that match the method pattern, ensure the method is statically imported
- * and convert's the invocation to use the static import by dropping the invocation's select.
- */
 @ToString
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Getter

@@ -251,6 +251,10 @@ class Java11NoFinalizerTest : Java11Test, NoFinalizerTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11NoStaticImport : Java11Test, NoStaticImportTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11NormalizeFormatTest : Java11Test, NormalizeFormatTest
 
 @DebugOnly

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
@@ -34,9 +35,18 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
 
     private final String owner;
 
+    @EqualsAndHashCode.Include
+    private final boolean force;
+
     public RemoveImport(String type) {
+        this(type, false);
+    }
+
+    @JsonCreator
+    public RemoveImport(String type, boolean force) {
         this.type = type;
         this.owner = type.substring(0, Math.max(0, type.lastIndexOf('.')));
+        this.force = force;
     }
 
     @Override
@@ -67,8 +77,15 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             } else if (javaType instanceof JavaType.Method) {
                 JavaType.Method method = (JavaType.Method) javaType;
                 if (method.hasFlags(Flag.Static)) {
-                    if (method.getDeclaringType().getFullyQualifiedName().equals(type)) {
+                    String declaringType = method.getDeclaringType().getFullyQualifiedName();
+                    if (declaringType.equals(type)) {
                         methodsAndFieldsUsed.add(method.getName());
+                    } else if (declaringType.equals(owner)) {
+                        if (method.getName().equals(type.substring(type.lastIndexOf('.') + 1))) {
+                            methodsAndFieldsUsed.add(method.getName());
+                        } else {
+                            otherMethodsAndFieldsInTypeUsed.add(method.getName());
+                        }
                     }
                 }
             } else if (javaType instanceof JavaType.FullyQualified) {
@@ -85,7 +102,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
 
         J.CompilationUnit c = cu;
 
-        boolean keepImport = typeUsed;
+        boolean keepImport = typeUsed && !force;
         AtomicReference<Space> spaceForNextImport = new AtomicReference<>();
         c = c.withImports(ListUtils.flatMap(c.getImports(), impoort -> {
             if (spaceForNextImport.get() != null) {
@@ -96,7 +113,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             String typeName = impoort.getTypeName();
             if (impoort.isStatic()) {
                 String imported = impoort.getQualid().getSimpleName();
-                if ((typeName + "." + imported).equals(type) && !methodsAndFieldsUsed.contains(imported)) {
+                if ((typeName + "." + imported).equals(type) && (force || !methodsAndFieldsUsed.contains(imported))) {
                     // e.g. remove java.util.Collections.emptySet when type is java.util.Collections.emptySet
                     spaceForNextImport.set(impoort.getPrefix());
                     return null;
@@ -113,6 +130,13 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                     // e.g. remove java.util.Collections.emptySet when type is java.util.Collections
                     spaceForNextImport.set(impoort.getPrefix());
                     return null;
+                } else if (imported.equals("*") && (typeName + type.substring(type.lastIndexOf('.'))).equals(type)) {
+                    // e.g. remove java.util.Collections.* when type is java.util.Collections.emptySet
+                    if (otherMethodsAndFieldsInTypeUsed.isEmpty()) {
+                        spaceForNextImport.set(impoort.getPrefix());
+                        return null;
+                    }
+                    return unfoldStarImport(impoort, otherMethodsAndFieldsInTypeUsed);
                 }
             } else if (!keepImport && typeName.equals(type)) {
                 if (impoort.getPrefix().isEmpty() || impoort.getPrefix().getLastWhitespace().chars().filter(s -> s == '\n').count() > 1) {
@@ -132,7 +156,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             return impoort;
         }));
 
-        if (c != cu) {
+        if (c != cu && c.getPackageDeclaration() == null && c.getImports().isEmpty() &&
+                c.getPrefix() == Space.EMPTY) {
             doAfterVisit(new FormatFirstClassPrefix<>());
         }
 
