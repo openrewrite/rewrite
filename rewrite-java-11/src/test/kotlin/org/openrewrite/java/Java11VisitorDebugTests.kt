@@ -68,6 +68,10 @@ class Java11CatchClauseOnlyRethrowsTest : Java11Test, CatchClauseOnlyRethrowsTes
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11ControlFlowIndentationTest : Java11Test, ControlFlowIndentationTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11ChangeFieldNameTest : Java11Test, ChangeFieldNameTest
 
 @DebugOnly

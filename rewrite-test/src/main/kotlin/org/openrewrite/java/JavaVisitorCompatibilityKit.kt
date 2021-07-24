@@ -63,6 +63,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class CatchClauseOnlyRethrowsTcx : CatchClauseOnlyRethrowsTest
 
     @Nested
+    inner class ControlFlowIndentationTcx : ControlFlowIndentationTest
+
+    @Nested
     inner class ChangeFieldNameTck : ChangeFieldNameTest
 
     @Nested

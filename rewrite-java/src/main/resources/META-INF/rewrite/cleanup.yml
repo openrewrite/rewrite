@@ -39,3 +39,4 @@ recipeList:
   - org.openrewrite.java.cleanup.FinalClass
   - org.openrewrite.java.cleanup.PadEmptyForLoopComponents
   - org.openrewrite.java.cleanup.CatchClauseOnlyRethrows
+  - org.openrewrite.java.cleanup.ControlFlowIndentation
