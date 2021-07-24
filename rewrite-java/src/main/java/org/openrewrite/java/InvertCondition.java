@@ -17,24 +17,20 @@ package org.openrewrite.java;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.cleanup.SimplifyBooleanExpressionVisitor;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
-
-import java.util.Collections;
-import java.util.UUID;
 
 import static org.openrewrite.Tree.randomId;
 
 public class InvertCondition<P> extends JavaVisitor<P> {
-    private static final class Inverted implements Marker {
-        @Override
-        public UUID getId() {
-            return randomId();
-        }
+
+    @SuppressWarnings("unchecked")
+    public static <J2 extends J> J.ControlParentheses<J2> invert(J.ControlParentheses<J2> controlParentheses, Cursor cursor) {
+        //noinspection ConstantConditions
+        return (J.ControlParentheses<J2>) new InvertCondition<Integer>()
+                .visit(controlParentheses, 0, cursor.getParentOrThrow());
     }
 
     @Nullable
@@ -54,41 +50,32 @@ public class InvertCondition<P> extends JavaVisitor<P> {
 
     @Override
     public J visitBinary(J.Binary binary, P p) {
-        J after;
         switch (binary.getOperator()) {
             case LessThan:
-                after = binary.withOperator(J.Binary.Type.GreaterThanOrEqual);
-                break;
+                return binary.withOperator(J.Binary.Type.GreaterThanOrEqual);
             case GreaterThan:
-                after = binary.withOperator(J.Binary.Type.LessThanOrEqual);
-                break;
+                return binary.withOperator(J.Binary.Type.LessThanOrEqual);
             case LessThanOrEqual:
-                after = binary.withOperator(J.Binary.Type.GreaterThan);
-                break;
+                return binary.withOperator(J.Binary.Type.GreaterThan);
             case GreaterThanOrEqual:
-                after = binary.withOperator(J.Binary.Type.LessThan);
-                break;
+                return binary.withOperator(J.Binary.Type.LessThan);
             case Equal:
-                after = binary.withOperator(J.Binary.Type.NotEqual);
-                break;
+                return binary.withOperator(J.Binary.Type.NotEqual);
             case NotEqual:
-                after = binary.withOperator(J.Binary.Type.Equal);
-                break;
-            default:
-                after = new J.Unary(
-                        randomId(),
-                        binary.getPrefix(),
-                        Markers.EMPTY,
-                        JLeftPadded.build(J.Unary.Type.Not),
-                        new J.Parentheses<>(
-                                randomId(),
-                                Space.EMPTY,
-                                Markers.EMPTY,
-                                JRightPadded.build(binary.withPrefix(Space.EMPTY))
-                        ),
-                        binary.getType());
+                return binary.withOperator(J.Binary.Type.Equal);
         }
 
-        return after.withMarkers(Markers.build(Collections.singletonList(new Inverted())));
+        return new J.Unary(
+                randomId(),
+                binary.getPrefix(),
+                Markers.EMPTY,
+                JLeftPadded.build(J.Unary.Type.Not),
+                new J.Parentheses<>(
+                        randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        JRightPadded.build(binary.withPrefix(Space.EMPTY))
+                ),
+                binary.getType());
     }
 }

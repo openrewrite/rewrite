@@ -200,6 +200,10 @@ class Java8ImplementInterfaceTest : Java8Test, ImplementInterfaceTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8InvertConditionTest : Java8Test, InvertConditionTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8JavaTemplateTest : Java8Test, JavaTemplateTest
 
 @DebugOnly
@@ -241,6 +245,10 @@ class Java8NoEqualityInForConditionTest : Java8Test, NoEqualityInForConditionTes
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java8NoFinalizerTest : Java8Test, NoFinalizerTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8NoRedundantJumpStatementsTest : Java8Test, NoRedundantJumpStatementsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

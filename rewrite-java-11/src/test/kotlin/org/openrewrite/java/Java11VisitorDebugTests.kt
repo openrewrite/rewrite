@@ -200,6 +200,10 @@ class Java11ImplementInterfaceTest : Java11Test, ImplementInterfaceTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11InvertConditionTest : Java11Test, InvertConditionTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11JavaTemplateTest : Java11Test, JavaTemplateTest
 
 @DebugOnly
@@ -245,6 +249,10 @@ class Java11NoEqualityInForConditionTest : Java11Test, NoEqualityInForConditionT
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11NoFinalizerTest : Java11Test, NoFinalizerTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11NoRedundantJumpStatementsTest : Java11Test, NoRedundantJumpStatementsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

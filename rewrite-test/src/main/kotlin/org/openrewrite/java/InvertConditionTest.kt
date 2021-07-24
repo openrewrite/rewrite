@@ -18,19 +18,17 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
-import org.openrewrite.java.tree.Expression
 import org.openrewrite.java.tree.J
 
-interface InvertConditionTest  : JavaRecipeTest {
+interface InvertConditionTest : JavaRecipeTest {
     override val recipe: Recipe?
         get() = object : JavaIsoVisitor<ExecutionContext>() {
-            @Suppress("UNCHECKED_CAST")
             override fun visitIf(iff: J.If, p: ExecutionContext): J.If {
-                return iff.withIfCondition(InvertCondition<ExecutionContext>().visit(iff.ifCondition, p, cursor.parentOrThrow)
-                        as J.ControlParentheses<Expression>)
+                return iff.withIfCondition(InvertCondition.invert(iff.ifCondition, cursor))
             }
         }.toRecipe()
 
+    @Suppress("StatementWithEmptyBody", "ConstantConditions", "InfiniteRecursion")
     @Test
     fun invertCondition(jp: JavaParser) = assertChanged(
         jp,

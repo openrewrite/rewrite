@@ -168,6 +168,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class ImplementInterfaceTck : ImplementInterfaceTest
 
     @Nested
+    inner class InvertConditionTck : InvertConditionTest
+
+    @Nested
     inner class JavaTemplateTck : JavaTemplateTest
 
     @Nested
@@ -202,6 +205,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class NoFinalizerTck : NoFinalizerTest
+
+    @Nested
+    inner class NoRedundantJumpStatementsTck : NoRedundantJumpStatementsTest
 
     @Nested
     inner class NoStaticImportTck : NoStaticImportTest
