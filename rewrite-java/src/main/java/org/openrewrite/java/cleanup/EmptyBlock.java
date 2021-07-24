@@ -22,6 +22,9 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.J;
 
+import java.util.Collections;
+import java.util.Set;
+
 public class EmptyBlock extends Recipe {
 
     @Override
@@ -32,6 +35,11 @@ public class EmptyBlock extends Recipe {
     @Override
     public String getDescription() {
         return "Remove empty blocks that effectively do nothing.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-108");
     }
 
     @Override
