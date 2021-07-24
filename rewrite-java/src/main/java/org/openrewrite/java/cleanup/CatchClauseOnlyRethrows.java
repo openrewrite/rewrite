@@ -31,7 +31,7 @@ import static java.util.Collections.singleton;
 public class CatchClauseOnlyRethrows extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Catch clause shouldn't only rethrow";
+        return "Catch clause should do more than just rethrow";
     }
 
     @Override
