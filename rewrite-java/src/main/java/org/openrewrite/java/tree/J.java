@@ -1251,7 +1251,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class DoWhileLoop implements J, Statement {
+    final class DoWhileLoop implements J, Loop {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -1613,7 +1613,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class ForEachLoop implements J, Statement {
+    final class ForEachLoop implements J, Loop {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -1774,7 +1774,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class ForLoop implements J, Statement {
+    final class ForLoop implements J, Loop {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -4966,7 +4966,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class WhileLoop implements J, Statement {
+    final class WhileLoop implements J, Loop {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
