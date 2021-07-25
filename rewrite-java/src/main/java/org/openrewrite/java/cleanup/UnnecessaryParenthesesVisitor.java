@@ -20,6 +20,7 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.UnwrapParentheses;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Space;
 
 public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     private final UnnecessaryParenthesesStyle style;
@@ -37,7 +38,14 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         if (c != null && (c.getValue() instanceof J.Literal || c.getValue() instanceof J.Identifier)) {
             par = new UnwrapParentheses<>((J.Parentheses<?>) par).visit(par, p, getCursor());
         }
+
         assert par != null;
+        if (par instanceof J.Parentheses) {
+            if (getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.Parentheses) {
+                return ((J.Parentheses<?>) par).getTree().withPrefix(Space.EMPTY);
+            }
+        }
+
         return par;
     }
 

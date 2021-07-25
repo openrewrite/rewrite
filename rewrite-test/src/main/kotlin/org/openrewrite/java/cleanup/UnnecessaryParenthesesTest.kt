@@ -668,4 +668,23 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/798")
+    @Test
+    fun unwrapDoubleParens(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(unnecessaryParentheses()).build(),
+        before = """
+            class Test {
+                void test() {
+                    int sum = 1 + ((2 + 3));
+                }
+            }
+        """,
+        after = """
+            class Test {
+                void test() {
+                    int sum = 1 + (2 + 3);
+                }
+            }
+        """
+    )
 }

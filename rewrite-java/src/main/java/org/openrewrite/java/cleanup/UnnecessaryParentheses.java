@@ -17,12 +17,13 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.J;
 
 public class UnnecessaryParentheses extends Recipe {
+
     @Override
     public String getDisplayName() {
         return "Remove unnecessary parentheses";
@@ -34,20 +35,18 @@ public class UnnecessaryParentheses extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new UnnecessaryParenthesesFromCompilationUnitStyle();
-    }
-
-    private static class UnnecessaryParenthesesFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
-        @Override
-        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
-            UnnecessaryParenthesesStyle style = cu.getStyle(UnnecessaryParenthesesStyle.class);
-            if (style == null) {
-                style = Checkstyle.unnecessaryParentheses();
+    protected JavaVisitor<ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+                UnnecessaryParenthesesStyle style = cu.getStyle(UnnecessaryParenthesesStyle.class);
+                if (style == null) {
+                    style = Checkstyle.unnecessaryParentheses();
+                }
+                doAfterVisit(new UnnecessaryParenthesesVisitor<>(style));
+                return cu;
             }
-            doAfterVisit(new UnnecessaryParenthesesVisitor<>(style));
-            return cu;
-        }
+        };
     }
 
     @Override
