@@ -24,6 +24,26 @@ interface CatchClauseOnlyRethrowsTest : JavaRecipeTest {
         get() = CatchClauseOnlyRethrows()
 
     @Test
+    fun catchShouldBePreservedBecauseLessSpecificCatchFollows() = assertUnchanged(
+        before = """
+            import java.io.FileReader;
+            import java.io.IOException;
+            
+            class A {
+                void foo() throws IOException {
+                    try {
+                        new FileReader("").read();
+                    } catch (IOException e) {
+                        throw e;
+                    } catch(Throwable t) {
+                        t.printStackTrace();
+                    }
+                }
+            }
+        """
+    )
+
+    @Test
     fun tryCanBeRemoved() = assertChanged(
         before = """
             import java.io.FileReader;

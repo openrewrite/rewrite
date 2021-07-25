@@ -17,18 +17,19 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.J.Try.Catch;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Set;
 
 import static java.util.Collections.singleton;
 
 public class CatchClauseOnlyRethrows extends Recipe {
+
     @Override
     public String getDisplayName() {
         return "Catch clause should do more than just rethrow";
@@ -50,67 +51,49 @@ public class CatchClauseOnlyRethrows extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
 
             @Override
-            public J.Block visitBlock(J.Block block, ExecutionContext executionContext) {
-                J.Block b = super.visitBlock(block, executionContext);
-                List<Statement> statements = new ArrayList<>(b.getStatements().size());
-                boolean statementsModified = false;
-                for(Statement statement : b.getStatements()) {
-                    if(!(statement instanceof J.Try)) {
-                        statements.add(statement);
-                        continue;
+            public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+                J.Block b = super.visitBlock(block, ctx);
+                return b.withStatements(ListUtils.flatMap(b.getStatements(), statement -> {
+                    if (statement instanceof J.Try) {
+                        // if a try has no catches, no finally, and no resources get rid of it and merge its statements into the current block
+                        J.Try aTry = (J.Try) statement;
+                        if (aTry.getCatches().isEmpty() && aTry.getResources() == null && aTry.getFinally() == null) {
+                            return ListUtils.map(aTry.getBody().getStatements(), tryStat -> autoFormat(tryStat, ctx, getCursor()));
+                        }
                     }
-                    J.Try aTry = (J.Try) statement;
-                    // If a try has no catches, no finally, and no resources get rid of it and merge its statements into the current block
-                    if(aTry.getCatches().size() != 0 || aTry.getResources() != null || aTry.getFinally() != null) {
-                        statements.add(statement);
-                        continue;
-                    }
-
-                    // Adjust indentation to match the block the statements will be inserted into
-                    for(Statement tryStatement : aTry.getBody().getStatements()) {
-                        statements.add(autoFormat(tryStatement, executionContext, getCursor()));
-                    }
-
-                    statementsModified = true;
-                }
-                if(statementsModified) {
-                    return b.withStatements(statements);
-                }
-                return b;
+                    return statement;
+                }));
             }
 
             @Override
             public J.Try visitTry(J.Try tryable, ExecutionContext executionContext) {
                 J.Try t = super.visitTry(tryable, executionContext);
+                return t.withCatches(ListUtils.map(t.getCatches(), (i, aCatch) -> {
+                    if (onlyRethrows(aCatch)) {
+                        // if a subsequent catch is a wider exception type and doesn't rethrow, we should
+                        // keep this one
+                        for (int j = i + 1; j < tryable.getCatches().size(); j++) {
+                            Catch next = tryable.getCatches().get(j);
+                            if (!onlyRethrows(next) && TypeUtils.isAssignableTo(next.getParameter().getType(),
+                                    aCatch.getParameter().getType())) {
+                                return aCatch;
+                            }
+                        }
+                        return null;
+                    }
+                    return aCatch;
+                }));
+            }
 
-                List<Catch> catches = new ArrayList<>(t.getCatches().size());
-                for(Catch aCatch : t.getCatches()) {
-                    if(aCatch.getBody().getStatements().size() != 1) {
-                        catches.add(aCatch);
-                        continue;
-                    }
-                    Statement statement = aCatch.getBody().getStatements().get(0);
-                    if(!(statement instanceof J.Throw)) {
-                        catches.add(aCatch);
-                        continue;
-                    }
-                    J.Throw aThrow = (J.Throw) statement;
-                    if(!(aThrow.getException() instanceof J.Identifier)) {
-                        catches.add(aCatch);
-                        continue;
-                    }
-                    J.Identifier caughtIdent = aCatch.getParameter().getTree().getVariables().get(0).getName();
-                    J.Identifier identToThrow = (J.Identifier) aThrow.getException();
-                    if(!caughtIdent.getSimpleName().equals(identToThrow.getSimpleName())) {
-                        catches.add(aCatch);
-                        continue;
-                    }
-                }
-                if(catches.size() != t.getCatches().size()) {
-                    t = t.withCatches(catches);
+            private boolean onlyRethrows(Catch aCatch) {
+                if (aCatch.getBody().getStatements().size() != 1 ||
+                        !(aCatch.getBody().getStatements().get(0) instanceof J.Throw)) {
+                    return false;
                 }
 
-                return t;
+                JavaType.FullyQualified catchType = TypeUtils.asFullyQualified(aCatch.getParameter().getType());
+                return catchType != null && catchType.equals(((J.Throw) aCatch.getBody()
+                        .getStatements().get(0)).getException().getType());
             }
         };
     }

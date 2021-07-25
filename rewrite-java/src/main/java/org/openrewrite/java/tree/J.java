@@ -924,11 +924,11 @@ public interface J extends Serializable, Tree {
         @SuppressWarnings("unchecked")
         @Override
         public ClassDeclaration withType(@Nullable JavaType type) {
-            if(type == this.type) {
+            if (type == this.type) {
                 return this;
             }
 
-            if(!(type instanceof JavaType.FullyQualified)) {
+            if (!(type instanceof JavaType.FullyQualified)) {
                 throw new IllegalArgumentException("A class can only be type attributed with a fully qualified type name");
             }
 
@@ -2697,11 +2697,11 @@ public interface J extends Serializable, Tree {
 
         /**
          * See <a href="https://docs.oracle.com/javase/specs/jls/se7/html/jls-3.html#jls-3.3">jls-3.3</a>.
-         *
+         * <p>
          * Unmatched UTF-16 surrogate pairs (composed of two escape and code point pairs) are unserializable
          * by technologies like Jackson. So we separate and store the code point off and reconstruct
          * the escape sequence when printing later.
-         *
+         * <p>
          * We only escape unicode characters that are part of UTF-16 surrogate pairs. Others are generally
          * treated well by tools like Jackson.
          */
@@ -2969,11 +2969,11 @@ public interface J extends Serializable, Tree {
         @SuppressWarnings("unchecked")
         @Override
         public MethodDeclaration withType(@Nullable JavaType type) {
-            if(type == this.type) {
+            if (type == this.type) {
                 return this;
             }
 
-            if(!(type instanceof JavaType.Method)) {
+            if (!(type instanceof JavaType.Method)) {
                 throw new IllegalArgumentException("A method can only be type attributed with a method type");
             }
 
@@ -3183,11 +3183,11 @@ public interface J extends Serializable, Tree {
         Identifier name;
 
         public MethodInvocation withName(J.Identifier name) {
-            if(this.name == name) {
+            if (this.name == name) {
                 return this;
             }
             JavaType.Method newType = null;
-            if(this.type != null) {
+            if (this.type != null) {
                 newType = this.type.withName(name.getSimpleName());
             }
             return new MethodInvocation(id, prefix, markers, select, typeParameters, name, arguments, newType);
@@ -3200,7 +3200,7 @@ public interface J extends Serializable, Tree {
         }
 
         public MethodInvocation withArguments(List<Expression> arguments) {
-            if(this.arguments.getElements() == arguments) {
+            if (this.arguments.getElements() == arguments) {
                 return this;
             }
             return getPadding().withArguments(JContainer.withElements(this.arguments, arguments));
@@ -3969,9 +3969,17 @@ public interface J extends Serializable, Tree {
 
         @Override
         public JavaType getType() {
-            return tree instanceof Expression ? ((Expression) tree).getType() :
-                    tree instanceof NameTree ? ((NameTree) tree).getType() :
-                            null;
+            J2 element = tree.getElement();
+            if (element instanceof Expression) {
+                return ((Expression) tree).getType();
+            }
+            if (element instanceof NameTree) {
+                return ((NameTree) element).getType();
+            }
+            if (element instanceof J.VariableDeclarations) {
+                return ((VariableDeclarations) element).getType();
+            }
+            return null;
         }
 
         @SuppressWarnings("unchecked")
