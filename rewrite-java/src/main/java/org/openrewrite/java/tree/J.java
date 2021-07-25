@@ -3971,7 +3971,7 @@ public interface J extends Serializable, Tree {
         public JavaType getType() {
             J2 element = tree.getElement();
             if (element instanceof Expression) {
-                return ((Expression) tree).getType();
+                return ((Expression) element).getType();
             }
             if (element instanceof NameTree) {
                 return ((NameTree) element).getType();
