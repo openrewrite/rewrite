@@ -19,10 +19,17 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.java.search.FindMethods
 
 interface RemoveUnusedPrivateMethodsTest : JavaRecipeTest {
     override val recipe: Recipe
         get() = RemoveUnusedPrivateMethods()
+
+    @Test
+    fun priam() = assertUnchanged(
+//        recipe = FindMethods("com.netflix.priam.backupv2.MetaFileWriterBuilder.MetaFileWriter toFileUploadResult(..)"),
+        moderneAstLink = "https://api.moderne.io/worker/cmVjaXBld29ya2VyLXByb2QtdjEwMC0wZ3di/ast/file/Netflix%3APriam/a05db7288cb828c12394c9f2d73184ff2e1a36de/cHJpYW0vc3JjL21haW4vamF2YS9jb20vbmV0ZmxpeC9wcmlhbS9iYWNrdXB2Mi9NZXRhRmlsZVdyaXRlckJ1aWxkZXIuamF2YQ=="
+    )
 
     @Test
     fun removeUnusedPrivateMethods() = assertChanged(

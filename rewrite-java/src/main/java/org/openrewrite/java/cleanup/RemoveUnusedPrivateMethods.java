@@ -47,17 +47,27 @@ public class RemoveUnusedPrivateMethods extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
+                J.MethodDeclaration m = super.visitMethodDeclaration(method, executionContext);
                 JavaType.Method methodType = TypeUtils.asMethod(method.getType());
 
-                if (methodType != null && methodType.hasFlags(Flag.Private)) {
+                if (methodType != null && methodType.hasFlags(Flag.Private) &&
+                        methodType.getGenericSignature() != null &&
+                        method.getAllAnnotations().isEmpty()) {
                     J.CompilationUnit cu = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
-                    if(!cu.getTypesInUse().contains(methodType)) {
-                        //noinspection ConstantConditions
-                        return null;
+                    for (JavaType type : cu.getTypesInUse()) {
+                        if(type instanceof JavaType.Method) {
+                            JavaType.Method usedMethodType = (JavaType.Method) type;
+                            if(methodType.getGenericSignature().equals(usedMethodType.getGenericSignature())) {
+                                return m;
+                            }
+                        }
                     }
+
+                    //noinspection ConstantConditions
+                    return null;
                 }
 
-                return super.visitMethodDeclaration(method, executionContext);
+                return m;
             }
         };
     }
