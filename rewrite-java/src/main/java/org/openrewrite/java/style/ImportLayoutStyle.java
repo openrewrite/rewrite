@@ -236,7 +236,7 @@ public class ImportLayoutStyle implements JavaStyle {
                             paddedToAdd.getElement().getQualid().getName().withName("*")
                     )
             ));
-            after = starFoldTo.get() < originalImports.size() - 1 ?
+            after = starFoldTo.get() < originalImports.size() ?
                     originalImports.get(starFoldTo.get()) : null;
         }
 

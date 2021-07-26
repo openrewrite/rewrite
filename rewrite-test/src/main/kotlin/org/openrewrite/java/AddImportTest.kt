@@ -71,6 +71,31 @@ interface AddImportTest : JavaRecipeTest {
     )
 
     @Test
+    fun dontDuplicateImports3(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = addImports(
+            AddImport("org.junit.jupiter.api.Assertions", "assertNull", false)
+        ),
+        before = """
+            import static org.junit.jupiter.api.Assertions.assertFalse;
+            import static org.junit.jupiter.api.Assertions.assertTrue;
+            
+            import java.util.List;
+
+            class A {}
+        """,
+        after = """
+            import static org.junit.jupiter.api.Assertions.*;
+            
+            import java.util.List;
+            
+            class A {}
+        """,
+        cycles = 1,
+        expectedCyclesThatMakeChanges = 1
+    )
+
+    @Test
     fun dontImportYourself(jp: JavaParser) = assertUnchanged(
         jp,
         recipe = addImports(AddImport("com.myorg.A", null, false)),
