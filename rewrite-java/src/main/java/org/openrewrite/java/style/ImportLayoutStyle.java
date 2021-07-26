@@ -189,24 +189,25 @@ public class ImportLayoutStyle implements JavaStyle {
             paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(Space.format("\n")));
         }
 
-        //Walk both directions from the insertion point, looking for imports that are in the same block and have the
-        //same package/outerclassname.
+        // Walk both directions from the insertion point, looking for imports that are in the same block and have the
+        // same package/outerclassname.
         AtomicInteger starFoldFrom = new AtomicInteger(insertPosition);
         AtomicInteger starFoldTo = new AtomicInteger(insertPosition);
         AtomicBoolean starFold = new AtomicBoolean(false);
-        int sameCount = 1; //start at 1 to account for the import being added.
+        int sameCount = 1; // start at 1 to account for the import being added.
 
         for (int i = insertPosition; i < originalImports.size(); i++) {
             JRightPadded<J.Import> anImport = originalImports.get(i);
             if (block(anImport) == addToBlock && packageOrOuterClassName(anImport)
                     .equals(packageOrOuterClassName(paddedToAdd))) {
-                starFoldTo.set(i);
+                starFoldTo.set(i + 1);
                 sameCount++;
             } else {
                 break;
             }
         }
-        for (int i = insertPosition - 1; i >= 0 ; i--) {
+
+        for (int i = insertPosition - 1; i >= 0; i--) {
             JRightPadded<J.Import> anImport = originalImports.get(i);
             if (block(anImport) == addToBlock && packageOrOuterClassName(anImport)
                     .equals(packageOrOuterClassName(paddedToAdd))) {
@@ -236,7 +237,7 @@ public class ImportLayoutStyle implements JavaStyle {
                     )
             ));
             after = starFoldTo.get() < originalImports.size() - 1 ?
-                    originalImports.get(starFoldTo.get() + 1) : null;
+                    originalImports.get(starFoldTo.get()) : null;
         }
 
         if (after != null) {
@@ -251,12 +252,14 @@ public class ImportLayoutStyle implements JavaStyle {
         JRightPadded<J.Import> finalToAdd = paddedToAdd;
         JRightPadded<J.Import> finalAfter = after;
         return ListUtils.flatMap(originalImports, (i, anImport) -> {
-            if (starFold.get() && i >= starFoldFrom.get() && i <= starFoldTo.get()) {
+            if (starFold.get() && i >= starFoldFrom.get() && i < starFoldTo.get()) {
                 return i == starFoldFrom.get() ?
                         finalToAdd /* only add the star import once */ :
                         null;
             } else if (finalAfter != null && anImport.getElement().isScope(finalAfter.getElement())) {
-                return Arrays.asList(finalToAdd, finalAfter);
+                return starFold.get() ?
+                        finalAfter :
+                        Arrays.asList(finalToAdd, finalAfter);
             } else if (i == originalImports.size() - 1 && finalAfter == null) {
                 return Arrays.asList(anImport, finalToAdd);
             }

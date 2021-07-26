@@ -44,6 +44,33 @@ interface AddImportTest : JavaRecipeTest {
     )
 
     @Test
+    fun dontDuplicateImports2(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = addImports(
+            AddImport("org.junit.jupiter.api.Test", null, false)
+        ),
+        before = """
+            import org.junit.jupiter.api.AfterEach;
+            import org.junit.jupiter.api.Assertions;
+            import org.junit.jupiter.api.BeforeAll;
+            import org.junit.jupiter.api.BeforeEach;
+            import org.slf4j.Logger;
+            import org.slf4j.LoggerFactory;
+
+            class A {}
+        """,
+        after = """
+            import org.junit.jupiter.api.*;
+            import org.slf4j.Logger;
+            import org.slf4j.LoggerFactory;
+            
+            class A {}
+        """,
+        cycles = 1,
+        expectedCyclesThatMakeChanges = 1
+    )
+
+    @Test
     fun dontImportYourself(jp: JavaParser) = assertUnchanged(
         jp,
         recipe = addImports(AddImport("com.myorg.A", null, false)),
@@ -60,12 +87,14 @@ interface AddImportTest : JavaRecipeTest {
     fun dontImportFromSamePackage(jp: JavaParser) = assertUnchanged(
         jp,
         recipe = addImports(AddImport("com.myorg.B", null, false)),
-        dependsOn = arrayOf("""
+        dependsOn = arrayOf(
+            """
             package com.myorg;
             
             class B {
             }
-        """),
+        """
+        ),
         before = """
             package com.myorg;
             
@@ -202,7 +231,10 @@ interface AddImportTest : JavaRecipeTest {
                 val c = super.visitClassDeclaration(classDecl, ctx)
                 var b = c.body
                 if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    val t = JavaTemplate.builder({ cursor }, "BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);")
+                    val t = JavaTemplate.builder(
+                        { cursor },
+                        "BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);"
+                    )
                         .imports("java.math.BigDecimal", "java.math.RoundingMode")
                         .build()
 
@@ -576,13 +608,15 @@ interface AddImportTest : JavaRecipeTest {
     @Test
     fun addImportAndFoldIntoWildcard(jp: JavaParser) = assertChanged(
         jp,
-        dependsOn = arrayOf("""
+        dependsOn = arrayOf(
+            """
                 package foo;
                 public class B {
                 }
                 public class C {
                 }
-            """),
+            """
+        ),
         recipe = addImports(
             AddImport("java.util.ArrayList", null, false)
         ),
