@@ -57,7 +57,7 @@ public class RemoveUnusedPrivateMethods extends Recipe {
                     for (JavaType type : cu.getTypesInUse()) {
                         if(type instanceof JavaType.Method) {
                             JavaType.Method usedMethodType = (JavaType.Method) type;
-                            if(methodType.getGenericSignature().equals(usedMethodType.getGenericSignature())) {
+                            if(methodType.getName().equals(usedMethodType.getName()) && methodType.getGenericSignature().equals(usedMethodType.getGenericSignature())) {
                                 return m;
                             }
                         }
