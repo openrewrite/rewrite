@@ -51,6 +51,7 @@ public class RemoveUnusedPrivateMethods extends Recipe {
                 JavaType.Method methodType = TypeUtils.asMethod(method.getType());
 
                 if (methodType != null && methodType.hasFlags(Flag.Private) &&
+                        !method.isConstructor() &&
                         methodType.getGenericSignature() != null &&
                         method.getAllAnnotations().isEmpty()) {
                     J.CompilationUnit cu = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
