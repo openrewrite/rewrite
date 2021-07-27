@@ -1,0 +1,21 @@
+---
+name: Moderne ingest
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: ingest
+        uses: docker://moderne/ingest:java11-latest
+        env:
+          MODERNE_API_ACCESS_TOKEN: ${{ secrets.MODERNE_API_ACCESS_TOKEN }}
+        with:
+          args: --style-name org.openrewrite.java.SpringFormat
