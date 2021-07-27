@@ -32,7 +32,7 @@ import static java.util.Collections.singleton;
 public class ControlFlowIndentation extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Control Flow Statement Indentation";
+        return "Control flow statement indentation";
     }
 
     @Override
