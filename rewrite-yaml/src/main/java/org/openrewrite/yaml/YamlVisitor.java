@@ -15,9 +15,12 @@
  */
 package org.openrewrite.yaml;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.cleanup.RemoveUnusedVisitor;
+import org.openrewrite.yaml.format.AutoFormatVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
 public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
@@ -27,6 +30,35 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
         return "yaml";
     }
 
+    public <Y2 extends Yaml> Y2 maybeAutoFormat(Y2 before, Y2 after, P p) {
+        return maybeAutoFormat(before, after, p, getCursor());
+    }
+
+    public <Y2 extends Yaml> Y2 maybeAutoFormat(Y2 before, Y2 after, P p, Cursor cursor) {
+        return maybeAutoFormat(before, after, null, p, cursor);
+    }
+
+    @SuppressWarnings({"unchecked", "ConstantConditions"})
+    public <Y2 extends Yaml> Y2 maybeAutoFormat(Y2 before, Y2 after, @Nullable Yaml stopAfter, P p, Cursor cursor) {
+        if (before != after) {
+            return (Y2) new AutoFormatVisitor<>(stopAfter).visit(after, p, cursor);
+        }
+        return after;
+    }
+
+    public <Y2 extends Yaml> Y2 autoFormat(Y2 y, P p) {
+        return autoFormat(y, p, getCursor());
+    }
+
+    public <Y2 extends Yaml> Y2 autoFormat(Y2 y, P p, Cursor cursor) {
+        return autoFormat(y, null, p, cursor);
+    }
+
+    @SuppressWarnings({"ConstantConditions", "unchecked"})
+    public <Y2 extends Yaml> Y2 autoFormat(Y2 y, @Nullable Yaml stopAfter, P p, Cursor cursor) {
+        return (Y2) new AutoFormatVisitor<>(stopAfter).visit(y, p, cursor);
+    }
+    
     public Yaml visitDocuments(Yaml.Documents documents, P p) {
         return documents.withDocuments(ListUtils.map(documents.getDocuments(), d -> visitAndCast(d, p)))
                 .withMarkers(visitMarkers(documents.getMarkers(), p));
