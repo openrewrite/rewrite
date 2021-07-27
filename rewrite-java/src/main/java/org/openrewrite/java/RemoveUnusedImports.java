@@ -97,8 +97,11 @@ public class RemoveUnusedImports extends Recipe {
                 if (elem.isStatic()) {
                     Set<String> methodsAndFields = methodsAndFieldsByTypeName.get(elem.getTypeName());
                     if (methodsAndFields == null) {
-                        anImport.used = false;
-                        changed = true;
+                        Set<JavaType.FullyQualified> types = typesByPackage.get(elem.getPackageName());
+                        if (types == null || types.stream().noneMatch(c -> qualid.printTrimmed().equals(c.getFullyQualifiedName()))) {
+                            anImport.used = false;
+                            changed = true;
+                        }
                     } else if ("*".equals(qualid.getSimpleName())) {
                         if (methodsAndFields.size() < layoutStyle.getNameCountToUseStarImport()) {
                             // replacing the star with a series of unfolded imports

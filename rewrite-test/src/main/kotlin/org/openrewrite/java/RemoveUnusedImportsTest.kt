@@ -346,4 +346,29 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
             }
         """
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/845")
+    @Test
+    fun doesNotRemoveStaticReferenceToNewClass() = assertUnchanged(
+        dependsOn = arrayOf("""
+            package org.openrewrite;
+            public class Bar {
+                public static final class Buz {
+                    public Buz() {}
+                }
+            }
+        """),
+        before = """
+            package foo.test;
+
+            import static org.openrewrite.Bar.Buz;
+
+            public class Test {
+                private void method() {
+                    new Buz();
+                }
+            }
+        """
+    )
+
 }
