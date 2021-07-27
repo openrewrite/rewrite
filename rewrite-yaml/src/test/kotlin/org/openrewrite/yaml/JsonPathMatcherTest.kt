@@ -23,7 +23,7 @@ import org.openrewrite.yaml.tree.Yaml
 
 class JsonPathMatcherTest {
 
-    val json = """
+    private val json = """
         apiVersion: v1
         kind: Pod
         metadata:
@@ -70,21 +70,22 @@ class JsonPathMatcherTest {
                 - name: init
                   image: mycompany.io/init:latest
     """.trimIndent()
-    val appLabel = "$.metadata.labels.app"
-    val appLabelBracket = "$.metadata.labels['app']"
-    val recurseSpecContainers = "..spec.containers"
-    val firstContainerSlice = "$.spec.template.spec.containers[:1]"
-    val allContainerSlices = "$.spec.template.spec.containers[*]"
-    val allSpecChildren = "$.spec.template.spec.*"
-    val containerByNameImage = "..spec.containers[?(@.name == 'app')].image"
-    val image = ".image"
+
+    private val appLabel = "$.metadata.labels.app"
+    private val appLabelBracket = "$.metadata.labels['app']"
+    private val recurseSpecContainers = "..spec.containers"
+    private val firstContainerSlice = "$.spec.template.spec.containers[:1]"
+    private val allContainerSlices = "$.spec.template.spec.containers[*]"
+    private val allSpecChildren = "$.spec.template.spec.*"
+    private val containerByNameImage = "..spec.containers[?(@.name == 'app')].image"
+    private val image = ".image"
 
     @Test
     fun `must find expression result`() {
         val results = visit(appLabel, json)
         assertThat(results).hasSize(2)
-        assertThat(results.get(0) is Yaml.Mapping.Entry).isTrue()
-        assertThat((((results.get(0) as Yaml.Mapping.Entry).value) as Yaml.Scalar).value).isEqualTo("myapp")
+        assertThat(results[0] is Yaml.Mapping.Entry).isTrue
+        assertThat((((results[0] as Yaml.Mapping.Entry).value) as Yaml.Scalar).value).isEqualTo("myapp")
     }
 
     @Test
@@ -109,7 +110,7 @@ class JsonPathMatcherTest {
     fun `must filter by expression`() {
         val results = visit(containerByNameImage, json)
         assertThat(results).hasSize(1)
-        assertThat(((results.get(0) as Yaml.Mapping.Entry).value as Yaml.Scalar).value).isEqualTo("mycompany.io/app:v2@digest")
+        assertThat(((results[0] as Yaml.Mapping.Entry).value as Yaml.Scalar).value).isEqualTo("mycompany.io/app:v2@digest")
     }
 
     @Test
@@ -134,8 +135,8 @@ class JsonPathMatcherTest {
     fun `must support identifiers in bracket operators`() {
         val results = visit(appLabelBracket, json)
         assertThat(results).hasSize(2)
-        assertThat(results.get(0) is Yaml.Mapping.Entry).isTrue()
-        assertThat((((results.get(0) as Yaml.Mapping.Entry).value) as Yaml.Scalar).value).isEqualTo("myapp")
+        assertThat(results[0] is Yaml.Mapping.Entry).isTrue
+        assertThat((((results[0] as Yaml.Mapping.Entry).value) as Yaml.Scalar).value).isEqualTo("myapp")
     }
 
     @Test
@@ -169,7 +170,7 @@ class JsonPathMatcherTest {
     }
 
     private fun visitDocument(jsonPath: String, json: String): List<Yaml> {
-        val ctx = InMemoryExecutionContext({ it.printStackTrace() })
+        val ctx = InMemoryExecutionContext { it.printStackTrace() }
         val documents = YamlParser().parse(ctx, json)
         if (documents.isEmpty()) {
             return emptyList()
@@ -190,5 +191,4 @@ class JsonPathMatcherTest {
         }
         return results
     }
-
 }
