@@ -35,6 +35,8 @@ interface CatchClauseOnlyRethrowsTest : JavaRecipeTest {
                         new FileReader("").read();
                     } catch (IOException e) {
                         throw new IOException("another message", e);
+                    } catch(Exception e) {
+                        throw new Exception("another message");
                     }
                 }
             }
@@ -52,6 +54,8 @@ interface CatchClauseOnlyRethrowsTest : JavaRecipeTest {
                     try {
                         new FileReader("").read();
                     } catch (IOException e) {
+                        throw e;
+                    } catch(Exception e) {
                         throw e;
                     } catch(Throwable t) {
                         t.printStackTrace();

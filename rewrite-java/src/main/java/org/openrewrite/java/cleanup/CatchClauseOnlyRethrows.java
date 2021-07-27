@@ -94,8 +94,15 @@ public class CatchClauseOnlyRethrows extends Recipe {
 
                 Expression exception = ((J.Throw) aCatch.getBody().getStatements().get(0)).getException();
                 JavaType.FullyQualified catchType = TypeUtils.asFullyQualified(aCatch.getParameter().getType());
-                return catchType != null && catchType.equals(exception.getType()) &&
-                        (!(exception instanceof J.NewClass) || ((J.NewClass) exception).getArguments().size() == 1);
+                if(catchType == null || !catchType.equals(exception.getType())) {
+                    return false;
+                }
+
+                if(exception instanceof J.Identifier) {
+                    return ((J.Identifier) exception).getSimpleName().equals(aCatch.getParameter().getTree().getVariables().get(0).getSimpleName());
+                }
+
+                return false;
             }
         };
     }
