@@ -70,4 +70,31 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
 
         return t;
     }
+
+    @Override
+    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
+        J.CompilationUnit t = (J.CompilationUnit) new RemoveTrailingWhitespaceVisitor<>().visit(cu, p);
+
+        t = (J.CompilationUnit) new BlankLinesVisitor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
+                .orElse(IntelliJ.blankLines()), stopAfter)
+                .visit(t, p);
+
+        t = (J.CompilationUnit) new SpacesVisitor<P>(Optional.ofNullable(
+                cu.getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces()),
+                cu.getStyle(EmptyForInitializerPadStyle.class),
+                cu.getStyle(EmptyForIteratorPadStyle.class),
+                stopAfter)
+                .visit(t, p);
+
+        t = (J.CompilationUnit) new WrappingAndBracesVisitor<>(Optional.ofNullable(cu.getStyle(WrappingAndBracesStyle.class))
+                .orElse(IntelliJ.wrappingAndBraces()), stopAfter)
+                .visit(t, p);
+
+        t = (J.CompilationUnit) new TabsAndIndentsVisitor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
+                .orElse(IntelliJ.tabsAndIndents()), stopAfter)
+                .visit(t, p);
+
+        assert t != null;
+        return t;
+    }
 }
