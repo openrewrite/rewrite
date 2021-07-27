@@ -343,18 +343,18 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         }
         boolean spaceWithinForParens = style.getWithin().getForParentheses();
         boolean shouldPutSpaceOnInit;
-        if(padEmptyForInitializer != null && f.getControl().getInit() instanceof J.Empty) {
+        if(padEmptyForInitializer != null && f.getControl().getInit().get(0) instanceof J.Empty) {
             shouldPutSpaceOnInit = padEmptyForInitializer;
         } else {
             shouldPutSpaceOnInit = spaceWithinForParens;
         }
         control = control.withInit(
-                spaceBefore(f.getControl().getInit(), shouldPutSpaceOnInit)
+                ListUtils.mapFirst(f.getControl().getInit(), i -> spaceBefore(i, shouldPutSpaceOnInit))
         );
         boolean spaceBeforeSemicolon = style.getOther().getBeforeForSemicolon();
         boolean spaceAfterSemicolon = style.getOther().getAfterForSemicolon();
         control = control.getPadding().withInit(
-                spaceAfter(control.getPadding().getInit(), spaceBeforeSemicolon)
+                ListUtils.mapFirst(control.getPadding().getInit(), i -> spaceAfter(i, spaceBeforeSemicolon))
         );
         control = control.getPadding().withCondition(
                 spaceAfter(control.getPadding().getCondition(), spaceBeforeSemicolon)

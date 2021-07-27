@@ -1839,14 +1839,14 @@ public interface J extends Serializable, Tree {
             @Getter
             Markers markers;
 
-            JRightPadded<Statement> init;
+            List<JRightPadded<Statement>> init;
 
-            public Statement getInit() {
-                return init.getElement();
+            public List<Statement> getInit() {
+                return JRightPadded.getElements(init);
             }
 
-            public Control withInit(Statement init) {
-                return getPadding().withInit(this.init.withElement(init));
+            public Control withInit(List<Statement> init) {
+                return getPadding().withInit(JRightPadded.withElements(this.init, init));
             }
 
             JRightPadded<Expression> condition;
@@ -1893,11 +1893,11 @@ public interface J extends Serializable, Tree {
             public static class Padding {
                 private final Control t;
 
-                public JRightPadded<Statement> getInit() {
+                public List<JRightPadded<Statement>> getInit() {
                     return t.init;
                 }
 
-                public ForLoop.Control withInit(JRightPadded<Statement> init) {
+                public ForLoop.Control withInit(List<JRightPadded<Statement>> init) {
                     return t.init == init ? t : new ForLoop.Control(t.id, t.prefix, t.markers, init, t.condition, t.update);
                 }
 

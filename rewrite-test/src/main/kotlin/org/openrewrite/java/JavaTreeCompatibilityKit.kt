@@ -77,6 +77,9 @@ abstract class JavaTreeCompatibilityKit {
     inner class FieldAccessTck : FieldAccessTest
 
     @Nested
+    inner class ForLoopTck : ForLoopTest
+
+    @Nested
     inner class ForEachLoopTck : ForEachLoopTest
 
     @Nested

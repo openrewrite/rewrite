@@ -615,10 +615,13 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         skip("for");
         Space ctrlPrefix = sourceBefore("(");
 
-        JRightPadded<Statement> init = convertStatements(node.getInitializer())
-                .stream()
-                .findAny()
-                .orElseGet(() -> padRight(new J.Empty(randomId(), sourceBefore(";"), Markers.EMPTY), EMPTY));
+        List<JRightPadded<Statement>> init = node.getInitializer().isEmpty() ?
+                singletonList(padRight((Statement) new J.Empty(randomId(), sourceBefore(";"), Markers.EMPTY), EMPTY)) :
+                convertStatements(node.getInitializer(), t ->
+                        positionOfNext(",", ';') == -1 ?
+                                semiDelim.apply(t) :
+                                commaDelim.apply(t)
+                );
 
         JRightPadded<Expression> condition = convertOrNull(node.getCondition(), semiDelim);
         if (condition == null) {
@@ -629,8 +632,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         if (node.getUpdate().isEmpty()) {
             update = singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY));
         } else {
-            update = new ArrayList<>();
             List<? extends ExpressionStatementTree> nodeUpdate = node.getUpdate();
+            update = new ArrayList<>(nodeUpdate.size());
             for (int i = 0; i < nodeUpdate.size(); i++) {
                 ExpressionStatementTree tree = nodeUpdate.get(i);
                 update.add(convert(tree, i == nodeUpdate.size() - 1 ? t -> sourceBefore(")") : commaDelim));
@@ -1319,7 +1322,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         if (vartype == null || vartype instanceof JCErroneous) {
             typeExpr = null;
         } else if (endPos(vartype) < 0) {
-            if((node.sym.flags() & Flags.PARAMETER) > 0) {
+            if ((node.sym.flags() & Flags.PARAMETER) > 0) {
                 // this is a lambda parameter with an inferred type expression
                 typeExpr = null;
             } else {
@@ -1547,8 +1550,13 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         return EMPTY;
     }
 
-    @SuppressWarnings("unchecked")
     private List<JRightPadded<Statement>> convertStatements(@Nullable List<? extends Tree> trees) {
+        return convertStatements(trees, this::statementDelim);
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<JRightPadded<Statement>> convertStatements(@Nullable List<? extends Tree> trees,
+                                                            Function<Tree, Space> suffix) {
         if (trees == null)
             return emptyList();
 
@@ -1560,7 +1568,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         List<JRightPadded<Statement>> converted = new ArrayList<>();
         for (List<? extends Tree> treeGroup : treesGroupedByStartPosition.values()) {
             if (treeGroup.size() == 1) {
-                converted.add(convert(treeGroup.get(0), this::statementDelim));
+                converted.add(convert(treeGroup.get(0), suffix));
             } else {
                 // multi-variable declarations are split into independent overlapping JCVariableDecl's by the OpenJDK AST
                 String prefix = source.substring(cursor, max(((JCTree) treeGroup.get(0)).getStartPosition(), cursor));
@@ -1889,7 +1897,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         int delimIndex = cursor;
         for (; delimIndex < source.length() - untilDelim.length() + 1; delimIndex++) {
             if (inSingleLineComment) {
-                if(source.charAt(delimIndex) == '\n') {
+                if (source.charAt(delimIndex) == '\n') {
                     inSingleLineComment = false;
                 }
             } else {

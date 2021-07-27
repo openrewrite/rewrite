@@ -85,6 +85,10 @@ class Java8FieldAccessTest: Java8Test, FieldAccessTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8ForLoopTest: Java8Test, ForLoopTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8ForEachLoopTest: Java8Test, ForEachLoopTest
 
 @DebugOnly

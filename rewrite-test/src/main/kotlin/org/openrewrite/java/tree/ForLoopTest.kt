@@ -23,6 +23,16 @@ import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
 interface ForLoopTest : JavaTreeTest {
 
     @Test
+    fun forLoopMultipleInit(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, Block, """
+            int i;
+            int j;
+            for(i = 0, j = 0;;) {
+            }
+        """
+    )
+
+    @Test
     fun forLoop(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             for(int i = 0; i < 10; i++) {

@@ -17,6 +17,7 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaSearchResult;
@@ -84,12 +85,12 @@ public class PadEmptyForLoopComponents extends Recipe {
                     fl = fl.withControl(fl.getControl().withUpdate(singletonList(update)));
                 }
 
-                Statement init = forLoop.getControl().getInit();
-                if(emptyForInitializerPadStyle != null && init instanceof J.Empty) {
-                    if(emptyForInitializerPadStyle.getSpace() && init.getPrefix().getWhitespace().isEmpty()) {
-                        init = init.withPrefix(init.getPrefix().withWhitespace(" "));
-                    } else if(!emptyForInitializerPadStyle.getSpace() && !init.getPrefix().getWhitespace().isEmpty()) {
-                        init = init.withPrefix(init.getPrefix().withWhitespace(""));
+                List<Statement> init = forLoop.getControl().getInit();
+                if(emptyForInitializerPadStyle != null && init.get(0) instanceof J.Empty) {
+                    if(emptyForInitializerPadStyle.getSpace() && init.get(0).getPrefix().getWhitespace().isEmpty()) {
+                        init = ListUtils.mapFirst(init, i -> i.withPrefix(i.getPrefix().withWhitespace(" ")));
+                    } else if(!emptyForInitializerPadStyle.getSpace() && !init.get(0).getPrefix().getWhitespace().isEmpty()) {
+                        init = ListUtils.mapFirst(init, i -> i.withPrefix(i.getPrefix().withWhitespace("")));
                     }
                     fl = fl.withControl(fl.getControl().withInit(init));
                 }

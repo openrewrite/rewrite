@@ -24,26 +24,15 @@ import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 
-/**
- * A recipe that will look for a specific method target (using a method pattern) and rename the method. This recipe renames
- * both the method declaration and any invocations/references to the method.
- */
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeMethodName extends Recipe {
 
-    /**
-     * A method pattern, expressed as a pointcut expression, that is used to find matching method declarations/invocations.
-     * See {@link  MethodMatcher} for details on the expression's syntax.
-     */
     @Option(displayName = "Method pattern",
             description = "A method pattern, expressed as a pointcut expression, that is used to find matching method declarations/invocations.",
             example = "org.mockito.Matchers anyVararg()")
     String methodPattern;
 
-    /**
-     * The method name that will replace the existing name.
-     */
     @Option(displayName = "New method name",
             description = "The method name that will replace the existing name.",
             example = "any")

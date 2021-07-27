@@ -89,6 +89,10 @@ class Java11FieldAccessTest: Java11Test, FieldAccessTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11ForLoopTest: Java11Test, ForLoopTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11ForEachLoopTest: Java11Test, ForEachLoopTest
 
 @DebugOnly

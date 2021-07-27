@@ -613,10 +613,13 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         skip("for");
         Space ctrlPrefix = sourceBefore("(");
 
-        JRightPadded<Statement> init = convertStatements(node.getInitializer())
-                .stream()
-                .findAny()
-                .orElseGet(() -> padRight(new J.Empty(randomId(), sourceBefore(";"), Markers.EMPTY), EMPTY));
+        List<JRightPadded<Statement>> init = node.getInitializer().isEmpty() ?
+                singletonList(padRight((Statement) new J.Empty(randomId(), sourceBefore(";"), Markers.EMPTY), EMPTY)) :
+                convertStatements(node.getInitializer(), t ->
+                        positionOfNext(",", ';') == -1 ?
+                                semiDelim.apply(t) :
+                                commaDelim.apply(t)
+                );
 
         JRightPadded<Expression> condition = convertOrNull(node.getCondition(), semiDelim);
         if (condition == null) {
@@ -627,8 +630,8 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         if (node.getUpdate().isEmpty()) {
             update = singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY));
         } else {
-            update = new ArrayList<>();
             List<? extends ExpressionStatementTree> nodeUpdate = node.getUpdate();
+            update = new ArrayList<>(nodeUpdate.size());
             for (int i = 0; i < nodeUpdate.size(); i++) {
                 ExpressionStatementTree tree = nodeUpdate.get(i);
                 update.add(convert(tree, i == nodeUpdate.size() - 1 ? t -> sourceBefore(")") : commaDelim));
@@ -1535,9 +1538,13 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
         return EMPTY;
     }
+    private List<JRightPadded<Statement>> convertStatements(@Nullable List<? extends Tree> trees) {
+        return convertStatements(trees, this::statementDelim);
+    }
 
     @SuppressWarnings("unchecked")
-    private List<JRightPadded<Statement>> convertStatements(@Nullable List<? extends Tree> trees) {
+    private List<JRightPadded<Statement>> convertStatements(@Nullable List<? extends Tree> trees,
+                                                            Function<Tree, Space> suffix) {
         if (trees == null)
             return emptyList();
 
@@ -1549,7 +1556,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         List<JRightPadded<Statement>> converted = new ArrayList<>();
         for (List<? extends Tree> treeGroup : treesGroupedByStartPosition.values()) {
             if (treeGroup.size() == 1) {
-                converted.add(convert(treeGroup.get(0), this::statementDelim));
+                converted.add(convert(treeGroup.get(0), suffix));
             } else {
                 // multi-variable declarations are split into independent overlapping JCVariableDecl's by the OpenJDK AST
                 String prefix = source.substring(cursor, max(((JCTree) treeGroup.get(0)).getStartPosition(), cursor));

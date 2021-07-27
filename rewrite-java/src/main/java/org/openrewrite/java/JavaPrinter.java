@@ -644,7 +644,8 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
         ForLoop.Control ctrl = forLoop.getControl();
         visitSpace(ctrl.getPrefix(), Space.Location.FOR_CONTROL_PREFIX, p);
         acc.append('(');
-        visitRightPadded(ctrl.getPadding().getInit(), JRightPadded.Location.FOR_INIT, ";", p);
+        visitRightPadded(ctrl.getPadding().getInit(), JRightPadded.Location.FOR_INIT, ",", p);
+        acc.append(';');
         visitRightPadded(ctrl.getPadding().getCondition(), JRightPadded.Location.FOR_CONDITION, ";", p);
         visitRightPadded(ctrl.getPadding().getUpdate(), JRightPadded.Location.FOR_UPDATE, ",", p);
         acc.append(')');

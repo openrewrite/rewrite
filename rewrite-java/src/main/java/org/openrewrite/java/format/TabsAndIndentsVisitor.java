@@ -187,7 +187,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     case FOR_CONDITION:
                     case FOR_UPDATE: {
                         J.ForLoop.Control control = getCursor().getParentOrThrow().getValue();
-                        Space initPrefix = control.getPadding().getInit().getElement().getPrefix();
+                        Space initPrefix = Space.firstPrefix(control.getInit());
                         if (!initPrefix.getLastWhitespace().contains("\n")) {
                             int initIndent = forInitColumn();
                             getCursor().getParentOrThrow().putMessage("lastIndent", initIndent - style.getContinuationIndent());
