@@ -36,6 +36,20 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
     override val recipe: Recipe
         get() = RemoveUnusedLocalVariables()
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/841")
+    @Test
+    fun ignoreSuppressWarnings() = assertUnchanged(
+        before = """
+            class Test {
+                static int method(int x) {
+                    int a = 0;
+                    @SuppressWarnings("unused") int b = 0;
+                    return a + 1;
+                }
+            }
+        """
+    )
+
     @Test
     fun removeUnusedLocalVariables() = assertChanged(
         before = """

@@ -72,7 +72,8 @@ public class RemoveUnusedLocalVariables extends Recipe {
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
             Cursor parentScope = getCursorToParentScope(getCursor());
             // skip class instance variables
-            if (!(parentScope.getParent() != null && parentScope.getParent().getValue() instanceof J.ClassDeclaration) &&
+            if (!(getCursor().getParent(2).getValue() instanceof J.VariableDeclarations && !((J.VariableDeclarations) getCursor().getParent(2).getValue()).getAllAnnotations().isEmpty()) &&
+                    !(parentScope.getParent() != null && parentScope.getParent().getValue() instanceof J.ClassDeclaration) &&
                     // skip anonymous class instance variables
                     !(parentScope.getParent().getValue() instanceof J.NewClass) &&
                     // skip if method declaration parameter
@@ -88,7 +89,9 @@ public class RemoveUnusedLocalVariables extends Recipe {
                 Set<NameTree> readReferences = FindReadReferencesToVariable.find(parentScope.getValue(), variable);
                 if (readReferences.isEmpty()) {
                     Set<Statement> assignmentReferences = FindAssignmentReferencesToVariable.find(parentScope.getValue(), variable);
-                    assignmentReferences.forEach(ref -> doAfterVisit(new DeleteStatement<>(ref)));
+                    for (Statement ref : assignmentReferences) {
+                        doAfterVisit(new DeleteStatement<>(ref));
+                    }
                     return null;
                 }
             }
