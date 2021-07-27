@@ -98,7 +98,8 @@ public class YamlPrinter<P> extends YamlVisitor<P> {
     public Yaml visitDocuments(Yaml.Documents documents, P p) {
         getPrinter().append(documents.getPrefix());
         visitMarkers(documents.getMarkers(), p);
-        return super.visitDocuments(documents, p);
+        visit(documents.getDocuments(), p);
+        return documents;
     }
 
     @Override
