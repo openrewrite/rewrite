@@ -20,6 +20,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.UUID;
@@ -43,5 +44,14 @@ public class RecipeSearchResult implements SearchResult {
 
     public RecipeSearchResult(UUID id, Recipe recipe) {
         this(id, recipe, null);
+    }
+
+    @Override
+    public <P> String print(TreePrinter<P> printer, P p) {
+        if (getDescription() == null) {
+            return "~~>";
+        } else {
+            return String.format("~~(%s)~~>", getDescription());
+        }
     }
 }

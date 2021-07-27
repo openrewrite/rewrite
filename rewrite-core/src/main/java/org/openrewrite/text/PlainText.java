@@ -21,11 +21,9 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.UUID;
 
 /**
@@ -57,11 +55,11 @@ public class PlainText implements SourceFile, Tree {
 
     @Override
     public <P> String print(TreePrinter<P> printer, P p) {
-        return print(p);
+        return new PlainTextPrinter<>(printer).print(this, p);
     }
 
     @Override
     public <P> String print(P p) {
-        return text;
+        return print(TreePrinter.identity(), p);
     }
 }

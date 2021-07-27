@@ -19,6 +19,6 @@ import org.openrewrite.TreeVisitor;
 
 public class PlainTextVisitor<P> extends TreeVisitor<PlainText, P> {
     public PlainText visitText(PlainText text, P p) {
-        return text;
+        return text.withMarkers(visitMarkers(text.getMarkers(), p));
     }
 }
