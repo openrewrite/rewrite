@@ -19,6 +19,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.J.Try.Catch;
 import org.openrewrite.java.tree.JavaType;
@@ -91,9 +92,11 @@ public class CatchClauseOnlyRethrows extends Recipe {
                     return false;
                 }
 
+                Expression exception = ((J.Throw) aCatch.getBody().getStatements().get(0)).getException();
                 JavaType.FullyQualified catchType = TypeUtils.asFullyQualified(aCatch.getParameter().getType());
-                return catchType != null && catchType.equals(((J.Throw) aCatch.getBody()
-                        .getStatements().get(0)).getException().getType());
+                return catchType != null && catchType.equals(exception.getType()) &&
+                        exception instanceof J.NewClass &&
+                        ((J.NewClass) exception).getArguments().size() == 1;
             }
         };
     }

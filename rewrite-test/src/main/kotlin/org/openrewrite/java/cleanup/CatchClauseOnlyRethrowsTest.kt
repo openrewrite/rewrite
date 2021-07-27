@@ -24,6 +24,24 @@ interface CatchClauseOnlyRethrowsTest : JavaRecipeTest {
         get() = CatchClauseOnlyRethrows()
 
     @Test
+    fun rethrownButWithDifferentMessage() = assertUnchanged(
+        before = """
+            import java.io.FileReader;
+            import java.io.IOException;
+            
+            class A {
+                void foo() throws IOException {
+                    try {
+                        new FileReader("").read();
+                    } catch (IOException e) {
+                        throw new IOException("another message", e);
+                    }
+                }
+            }
+        """
+    )
+
+    @Test
     fun catchShouldBePreservedBecauseLessSpecificCatchFollows() = assertUnchanged(
         before = """
             import java.io.FileReader;
