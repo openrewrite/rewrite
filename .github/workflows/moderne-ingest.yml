@@ -17,5 +17,3 @@ jobs:
         uses: docker://moderne/ingest:java11-latest
         env:
           MODERNE_API_ACCESS_TOKEN: ${{ secrets.MODERNE_API_ACCESS_TOKEN }}
-        with:
-          args: --style-name org.openrewrite.java.SpringFormat
