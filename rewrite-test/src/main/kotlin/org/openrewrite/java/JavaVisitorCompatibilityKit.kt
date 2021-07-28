@@ -243,9 +243,6 @@ abstract class JavaVisitorCompatibilityKit {
     inner class RemoveUnusedPrivateMethodsTck : RemoveUnusedPrivateMethodsTest
 
     @Nested
-    inner class RemoveUnusedAssignmentsTck : RemoveUnusedAssignmentsTest
-
-    @Nested
     inner class RemoveImportTck : RemoveImportTest
 
     @Nested
