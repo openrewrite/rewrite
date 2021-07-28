@@ -18,6 +18,7 @@ package org.openrewrite.java.style;
 import com.puppycrawl.tools.checkstyle.ConfigurationLoader;
 import com.puppycrawl.tools.checkstyle.api.CheckstyleException;
 import com.puppycrawl.tools.checkstyle.api.Configuration;
+import java.util.stream.Collectors;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.cleanup.*;
@@ -33,7 +34,6 @@ import java.util.stream.Stream;
 
 import static com.google.common.base.Charsets.UTF_8;
 import static java.lang.Boolean.parseBoolean;
-import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.*;
 import static org.openrewrite.java.style.Checkstyle.defaultBlockPolicy;
 
@@ -57,9 +57,10 @@ public class CheckstyleConfigLoader {
     }
 
     public static Checkstyle loadCheckstyleConfig(InputStream checkstyleConf, Map<String, Object> properties) throws CheckstyleException {
-        Map<String, Module> conf = loadConfiguration(checkstyleConf, properties);
+        Map<String, List<Module>> conf = loadConfiguration(checkstyleConf, properties);
 
-        return new Checkstyle(Stream.of(
+        return new Checkstyle(
+            Stream.of(
                 defaultComesLast(conf),
                 emptyBlock(conf),
                 emptyForInitializerPadStyle(conf),
@@ -69,196 +70,222 @@ public class CheckstyleConfigLoader {
                 fallThrough(conf),
                 hiddenFieldStyle(conf),
                 hideUtilityClassConstructorStyle(conf),
-                unnecessaryParentheses(conf)
-        )
-                .filter(Objects::nonNull)
-                .collect(toSet()));
+                unnecessaryParentheses(conf))
+            .filter(Objects::nonNull)
+            .flatMap(Set::stream)
+            .collect(toSet()));
     }
 
     @Nullable
-    private static DefaultComesLastStyle defaultComesLast(Map<String, Module> conf) {
-        Module defaultComesLastRaw = conf.get("DefaultComesLast");
-        if(defaultComesLastRaw == null) {
+    private static Set<DefaultComesLastStyle> defaultComesLast(Map<String, List<Module>> conf) {
+        List<Module> moduleList = conf.get("DefaultComesLast");
+        if(moduleList == null) {
             return null;
         }
-        return new DefaultComesLastStyle(parseBoolean(defaultComesLastRaw.properties.get("skipIfLastAndSharedWithCase")));
+        return moduleList.stream()
+            .map(module -> new DefaultComesLastStyle(parseBoolean(module.properties.get("skipIfLastAndSharedWithCase"))))
+            .collect(Collectors.toSet());
     }
 
     @Nullable
-    private static EmptyBlockStyle emptyBlock(Map<String, Module> conf) {
-        Module emptyBlockRaw = conf.get("EmptyBlock");
-        if(emptyBlockRaw == null) {
+    private static Set<EmptyBlockStyle> emptyBlock(Map<String, List<Module>> conf) {
+        List<Module> moduleList = conf.get("EmptyBlock");
+        if(moduleList == null) {
             return null;
         }
-        String rawOption = emptyBlockRaw.properties.get("option");
-        EmptyBlockStyle.BlockPolicy blockPolicy = defaultBlockPolicy;
-        if(rawOption != null) {
-            blockPolicy = Enum.valueOf(EmptyBlockStyle.BlockPolicy.class, rawOption.toUpperCase());
-        }
-        String rawTokens = emptyBlockRaw.properties.get("tokens");
-        boolean instanceInit = true;
-        boolean literalCatch = true;
-        boolean literalDo = true;
-        boolean literalElse = true;
-        boolean literalFinally = true;
-        boolean literalFor = true;
-        boolean literalIf = true;
-        boolean literalSwitch = true;
-        boolean literalSynchronized = true;
-        boolean literalTry = true;
-        boolean literalWhile = true;
-        boolean staticInit = true;
-        if(rawTokens != null) {
-            Set<String> tokens = Arrays.stream(rawTokens.split("\\s*,\\s*"))
-                    .collect(toSet());
-            instanceInit = tokens.contains("INSTANCE_INIT");
-            literalCatch = tokens.contains("LITERAL_CATCH");
-            literalDo = tokens.contains("LITERAL_DO");
-            literalElse = tokens.contains("LITERAL_ELSE");
-            literalFinally = tokens.contains("LITERAL_FINALLY");
-            literalFor = tokens.contains("LITERAL_FOR");
-            literalIf = tokens.contains("LITERAL_IF");
-            literalSwitch = tokens.contains("LITERAL_SWITCH");
-            literalSynchronized = tokens.contains("LITERAL_SYNCHRONIZED");
-            literalTry = tokens.contains("LITERAL_TRY");
-            literalWhile = tokens.contains("LITERAL_WHILE");
-            staticInit = tokens.contains("STATIC_INIT");
-        }
+        return moduleList.stream()
+            .map(module -> {
+                String rawOption = module.properties.get("option");
+                EmptyBlockStyle.BlockPolicy blockPolicy = defaultBlockPolicy;
+                if(rawOption != null) {
+                    blockPolicy = Enum.valueOf(EmptyBlockStyle.BlockPolicy.class, rawOption.toUpperCase());
+                }
+                String rawTokens = module.properties.get("tokens");
+                boolean instanceInit = true;
+                boolean literalCatch = true;
+                boolean literalDo = true;
+                boolean literalElse = true;
+                boolean literalFinally = true;
+                boolean literalFor = true;
+                boolean literalIf = true;
+                boolean literalSwitch = true;
+                boolean literalSynchronized = true;
+                boolean literalTry = true;
+                boolean literalWhile = true;
+                boolean staticInit = true;
+                if(rawTokens != null) {
+                    Set<String> tokens = Arrays.stream(rawTokens.split("\\s*,\\s*"))
+                        .collect(toSet());
+                    instanceInit = tokens.contains("INSTANCE_INIT");
+                    literalCatch = tokens.contains("LITERAL_CATCH");
+                    literalDo = tokens.contains("LITERAL_DO");
+                    literalElse = tokens.contains("LITERAL_ELSE");
+                    literalFinally = tokens.contains("LITERAL_FINALLY");
+                    literalFor = tokens.contains("LITERAL_FOR");
+                    literalIf = tokens.contains("LITERAL_IF");
+                    literalSwitch = tokens.contains("LITERAL_SWITCH");
+                    literalSynchronized = tokens.contains("LITERAL_SYNCHRONIZED");
+                    literalTry = tokens.contains("LITERAL_TRY");
+                    literalWhile = tokens.contains("LITERAL_WHILE");
+                    staticInit = tokens.contains("STATIC_INIT");
+                }
 
-        return new EmptyBlockStyle(blockPolicy, instanceInit, literalCatch, literalDo,
-                literalElse, literalFinally, literalFor, literalIf, literalSwitch, literalSynchronized, literalTry,
-                literalWhile, staticInit);
+                return new EmptyBlockStyle(blockPolicy, instanceInit, literalCatch, literalDo,
+                    literalElse, literalFinally, literalFor, literalIf, literalSwitch, literalSynchronized, literalTry,
+                    literalWhile, staticInit);
+            })
+            .collect(Collectors.toSet());
     }
 
     @Nullable
-    private static EmptyForInitializerPadStyle emptyForInitializerPadStyle(Map<String, Module> conf) {
-        Module module = conf.get("EmptyForInitializerPad");
-        if(module == null) {
+    private static Set<EmptyForInitializerPadStyle> emptyForInitializerPadStyle(Map<String, List<Module>> conf) {
+        List<Module> moduleList = conf.get("EmptyForInitializerPad");
+        if(moduleList == null) {
             return null;
         }
-        String option = module.properties.get("option");
-        // nospace is default, so no option means pad is false
-        boolean pad = option != null && "space".equals(option.trim());
-        return new EmptyForInitializerPadStyle(pad);
+        return moduleList.stream()
+            .map(module -> {
+                String option = module.properties.get("option");
+                // nospace is default, so no option means pad is false
+                boolean pad = option != null && "space".equals(option.trim());
+                return new EmptyForInitializerPadStyle(pad);
+            })
+            .collect(Collectors.toSet());
     }
 
     @Nullable
-    private static EmptyForIteratorPadStyle emptyForIteratorPadStyle(Map<String, Module> conf) {
-        Module module = conf.get("EmptyForIteratorPad");
-        if(module == null) {
+    private static Set<EmptyForIteratorPadStyle> emptyForIteratorPadStyle(Map<String, List<Module>> conf) {
+        List<Module> moduleList = conf.get("EmptyForIteratorPad");
+        if(moduleList == null) {
             return null;
         }
-        String option = module.properties.get("option");
-        // nospace is default, so no option means pad is false
-        boolean pad = option != null && "space".equals(option.trim());
-        return new EmptyForIteratorPadStyle(pad);
+        return moduleList.stream()
+            .map(module -> {
+                String option = module.properties.get("option");
+                // nospace is default, so no option means pad is false
+                boolean pad = option != null && "space".equals(option.trim());
+                return new EmptyForIteratorPadStyle(pad);
+            })
+            .collect(toSet());
     }
 
     @Nullable
-    private static EqualsAvoidsNullStyle equalsAvoidsNull(Map<String, Module> conf) {
-        Module module = conf.get("EqualsAvoidNull");
-        if(module == null) {
+    private static Set<EqualsAvoidsNullStyle> equalsAvoidsNull(Map<String, List<Module>> conf) {
+        List<Module> moduleList = conf.get("EqualsAvoidNull");
+        if(moduleList == null) {
             return null;
         }
-        return new EqualsAvoidsNullStyle(module.prop("ignoreEqualsIgnoreCase", false));
+        return moduleList.stream()
+            .map(module -> new EqualsAvoidsNullStyle(module.prop("ignoreEqualsIgnoreCase", false)))
+            .collect(toSet());
     }
 
 
     @Nullable
-    private static FallThroughStyle fallThrough(Map<String, Module> conf) {
-        Module module = conf.get("FallThrough");
-        if(module == null) {
+    private static Set<FallThroughStyle> fallThrough(Map<String, List<Module>> conf) {
+        List<Module> moduleList = conf.get("FallThrough");
+        if(moduleList == null) {
             return null;
         }
-        return new FallThroughStyle(module.prop("checkLastCaseGroup", false));
+        return moduleList.stream()
+            .map(module -> new FallThroughStyle(module.prop("checkLastCaseGroup", false)))
+            .collect(toSet());
     }
 
     @Nullable
-    private static HiddenFieldStyle hiddenFieldStyle(Map<String, Module> conf) {
-        Module module = conf.get("HiddenField");
-        if(module == null) {
+    private static Set<HiddenFieldStyle> hiddenFieldStyle(Map<String, List<Module>> conf) {
+        List<Module> moduleList = conf.get("HiddenField");
+        if(moduleList == null) {
             return null;
         }
-        return new HiddenFieldStyle(
+        return moduleList.stream()
+            .map(module -> new HiddenFieldStyle(
                 module.prop("ignoreConstructorParameter", false),
                 module.prop("ignoreSetter", false),
                 module.prop("setterCanReturnItsClass", false),
                 module.prop("ignoreAbstractMethods", false)
-        );
+            ))
+            .collect(toSet());
     }
 
     @SuppressWarnings("DuplicatedCode")
     @Nullable
-    private static UnnecessaryParenthesesStyle unnecessaryParentheses(Map<String, Module> conf) {
-        Module module = conf.get("UnnecessaryParentheses");
-        if(module == null) {
+    private static Set<UnnecessaryParenthesesStyle> unnecessaryParentheses(Map<String, List<Module>> conf) {
+        List<Module> moduleList = conf.get("UnnecessaryParentheses");
+        if(moduleList == null) {
             return null;
         }
-        String rawTokens = module.properties.get("tokens");
-        boolean expr = true;
-        boolean ident = true;
-        boolean numDouble = true;
-        boolean numFloat = true;
-        boolean numInt = true;
-        boolean numLong = true;
-        boolean stringLiteral = true;
-        boolean literalNull = true;
-        boolean literalFalse = true;
-        boolean literalTrue = true;
-        boolean assign = true;
-        boolean bitAndAssign = true;
-        boolean bitOrAssign = true;
-        boolean bitShiftRightAssign = true;
-        boolean bitXorAssign = true;
-        boolean divAssign = true;
-        boolean minusAssign = true;
-        boolean modAssign = true;
-        boolean plusAssign = true;
-        boolean shiftLeftAssign = true;
-        boolean shiftRightAssign = true;
-        boolean starAssign = true;
-        boolean lambda = true;
-        if(rawTokens != null) {
-            Set<String> tokens = Arrays.stream(rawTokens.split("\\s*,\\s*"))
-                    .collect(toSet());
-            expr = tokens.contains("EXPR");
-            ident = tokens.contains("IDENT");
-            numDouble = tokens.contains("NUM_DOUBLE");
-            numFloat = tokens.contains("NUM_FLOAT");
-            numInt = tokens.contains("NUM_INT");
-            numLong = tokens.contains("NUM_LONG");
-            stringLiteral = tokens.contains("STRING_LITERAL");
-            literalNull = tokens.contains("LITERAL_NULL");
-            literalFalse = tokens.contains("LITERAL_FALSE");
-            literalTrue = tokens.contains("LITERAL_TRUE");
-            assign = tokens.contains("ASSIGN");
-            bitAndAssign = tokens.contains("BIT_AND_ASSIGN");
-            bitOrAssign = tokens.contains("BIT_OR_ASSIGN");
-            bitShiftRightAssign = tokens.contains("BIT_SHIFT_RIGHT_ASSIGN");
-            bitXorAssign = tokens.contains("BIT_XOR_ASSIGN");
-            divAssign = tokens.contains("DIV_ASSIGN");
-            minusAssign = tokens.contains("MINUS_ASSIGN");
-            modAssign = tokens.contains("MOD_ASSIGN");
-            plusAssign = tokens.contains("PLUS_ASSIGN");
-            shiftLeftAssign = tokens.contains("SHIFT_LEFT_ASSIGN");
-            shiftRightAssign = tokens.contains("SHIFT_RIGHT_ASSIGN");
-            starAssign = tokens.contains("STAR_ASSIGN");
-            lambda = tokens.contains("LAMBDA");
-        }
-        return new UnnecessaryParenthesesStyle(expr, ident, numDouble, numFloat, numInt, numLong, stringLiteral,
-                literalNull, literalFalse, literalTrue, assign, bitAndAssign, bitOrAssign, bitShiftRightAssign,
-                bitXorAssign, divAssign, minusAssign, modAssign, plusAssign, shiftLeftAssign, shiftRightAssign,
-                starAssign, lambda
-        );
+        return moduleList.stream()
+            .map(module -> {
+                String rawTokens = module.properties.get("tokens");
+                boolean expr = true;
+                boolean ident = true;
+                boolean numDouble = true;
+                boolean numFloat = true;
+                boolean numInt = true;
+                boolean numLong = true;
+                boolean stringLiteral = true;
+                boolean literalNull = true;
+                boolean literalFalse = true;
+                boolean literalTrue = true;
+                boolean assign = true;
+                boolean bitAndAssign = true;
+                boolean bitOrAssign = true;
+                boolean bitShiftRightAssign = true;
+                boolean bitXorAssign = true;
+                boolean divAssign = true;
+                boolean minusAssign = true;
+                boolean modAssign = true;
+                boolean plusAssign = true;
+                boolean shiftLeftAssign = true;
+                boolean shiftRightAssign = true;
+                boolean starAssign = true;
+                boolean lambda = true;
+                if(rawTokens != null) {
+                    Set<String> tokens = Arrays.stream(rawTokens.split("\\s*,\\s*"))
+                        .collect(toSet());
+                    expr = tokens.contains("EXPR");
+                    ident = tokens.contains("IDENT");
+                    numDouble = tokens.contains("NUM_DOUBLE");
+                    numFloat = tokens.contains("NUM_FLOAT");
+                    numInt = tokens.contains("NUM_INT");
+                    numLong = tokens.contains("NUM_LONG");
+                    stringLiteral = tokens.contains("STRING_LITERAL");
+                    literalNull = tokens.contains("LITERAL_NULL");
+                    literalFalse = tokens.contains("LITERAL_FALSE");
+                    literalTrue = tokens.contains("LITERAL_TRUE");
+                    assign = tokens.contains("ASSIGN");
+                    bitAndAssign = tokens.contains("BIT_AND_ASSIGN");
+                    bitOrAssign = tokens.contains("BIT_OR_ASSIGN");
+                    bitShiftRightAssign = tokens.contains("BIT_SHIFT_RIGHT_ASSIGN");
+                    bitXorAssign = tokens.contains("BIT_XOR_ASSIGN");
+                    divAssign = tokens.contains("DIV_ASSIGN");
+                    minusAssign = tokens.contains("MINUS_ASSIGN");
+                    modAssign = tokens.contains("MOD_ASSIGN");
+                    plusAssign = tokens.contains("PLUS_ASSIGN");
+                    shiftLeftAssign = tokens.contains("SHIFT_LEFT_ASSIGN");
+                    shiftRightAssign = tokens.contains("SHIFT_RIGHT_ASSIGN");
+                    starAssign = tokens.contains("STAR_ASSIGN");
+                    lambda = tokens.contains("LAMBDA");
+                }
+                return new UnnecessaryParenthesesStyle(expr, ident, numDouble, numFloat, numInt, numLong, stringLiteral,
+                    literalNull, literalFalse, literalTrue, assign, bitAndAssign, bitOrAssign, bitShiftRightAssign,
+                    bitXorAssign, divAssign, minusAssign, modAssign, plusAssign, shiftLeftAssign, shiftRightAssign,
+                    starAssign, lambda
+                );
+            })
+            .collect(Collectors.toSet());
     }
 
     @Nullable
-    private static HideUtilityClassConstructorStyle hideUtilityClassConstructorStyle(Map<String, Module> conf) {
-        Module module = conf.get("HiddenField");
-        if(module == null) {
+    private static Set<HideUtilityClassConstructorStyle> hideUtilityClassConstructorStyle(Map<String, List<Module>> conf) {
+        List<Module> moduleList = conf.get("HiddenField");
+        if(moduleList == null) {
             return null;
         }
-        return Checkstyle.hideUtilityClassConstructorStyle();
+        return moduleList.stream()
+            .map(module -> Checkstyle.hideUtilityClassConstructorStyle())
+            .collect(Collectors.toSet());
     }
 
     protected static class Module {
@@ -284,19 +311,28 @@ public class CheckstyleConfigLoader {
             return properties.containsKey(key) ? parseBoolean(properties.get(key))
                     : defaultValue;
         }
+
+        @Override
+        public String toString() {
+            return "Module{" +
+                "name='" + name + '\'' +
+                '}';
+        }
     }
 
 
     @Nullable
-    private static ExplicitInitializationStyle explicitInitialization(Map<String, Module> conf) {
-        Module module = conf.get("ExplicitInitialization");
-        if(module == null) {
+    private static Set<ExplicitInitializationStyle> explicitInitialization(Map<String, List<Module>> conf) {
+        List<Module> moduleList = conf.get("ExplicitInitialization");
+        if(moduleList == null) {
             return null;
         }
-        return new ExplicitInitializationStyle(module.prop("onlyObjectReferences", false));
+        return moduleList.stream()
+            .map(module -> new ExplicitInitializationStyle(module.prop("onlyObjectReferences", false)))
+            .collect(Collectors.toSet());
     }
 
-    private static Map<String, Module> loadConfiguration(InputStream inputStream, Map<String, Object> properties) throws CheckstyleException {
+    private static Map<String, List<Module>> loadConfiguration(InputStream inputStream, Map<String, Object> properties) throws CheckstyleException {
         Configuration checkstyleConfig = ConfigurationLoader.loadConfiguration(new InputSource(inputStream),
                 name -> {
                     Object prop = properties.get(name);
@@ -336,6 +372,15 @@ public class CheckstyleConfigLoader {
             }
         }
         return modules.stream()
-                .collect(toMap(Module::getName, identity()));
+                .collect(toMap(Module::getName, Collections::singletonList, CheckstyleConfigLoader::mergeModules));
     }
+
+    private static List<Module> mergeModules(List<Module> list, List<Module> anotherList) {
+        List<Module> result = new ArrayList<>(list);
+        result.addAll(anotherList);
+
+        return result;
+    }
+
+
 }

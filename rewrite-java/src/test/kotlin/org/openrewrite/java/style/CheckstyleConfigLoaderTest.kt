@@ -21,6 +21,7 @@ import org.openrewrite.java.cleanup.DefaultComesLastStyle
 import org.openrewrite.java.cleanup.EmptyBlockStyle
 import org.openrewrite.java.cleanup.EmptyForInitializerPadStyle
 import org.openrewrite.java.cleanup.EqualsAvoidsNullStyle
+import org.openrewrite.java.cleanup.UnnecessaryParenthesesStyle
 import org.openrewrite.java.style.CheckstyleConfigLoader.loadCheckstyleConfig
 
 class CheckstyleConfigLoaderTest {
@@ -179,5 +180,30 @@ class CheckstyleConfigLoaderTest {
         val emptyForPadInitializerStyle = checkstyle.styles.first() as EmptyForInitializerPadStyle
 
         assertThat(emptyForPadInitializerStyle.space).isTrue
+    }
+
+    @Test
+    fun duplicatedModuleNames() {
+        val checkstyle = loadCheckstyleConfig("""
+            <!DOCTYPE module PUBLIC
+                "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
+                "https://checkstyle.org/dtds/configuration_1_2.dtd">
+            <module name="Checker">
+                <module name="UnnecessaryParentheses">
+                    <property name="id" value="expr"/>
+                    <property name="tokens" value="EXPR"/>
+                </module>
+                <module name="UnnecessaryParentheses">
+                    <property name="id" value="stringLiteral"/>
+                    <property name="tokens" value="STRING_LITERAL"/>
+                </module>
+            </module>
+        """.trimIndent(), emptyMap())
+
+        assertThat(checkstyle.styles).hasSize(2)
+        assertThat(checkstyle.styles).allMatch { it is UnnecessaryParenthesesStyle }
+
+        val unnecessaryParenthesesStyle = checkstyle.styles.first() as UnnecessaryParenthesesStyle
+        assertThat(unnecessaryParenthesesStyle.stringLiteral).isTrue
     }
 }
