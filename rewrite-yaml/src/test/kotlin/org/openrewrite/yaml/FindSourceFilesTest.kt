@@ -36,4 +36,3 @@ class FindSourceFilesTest : YamlRecipeTest {
         after = "~~>key: value"
     )
 }
-
