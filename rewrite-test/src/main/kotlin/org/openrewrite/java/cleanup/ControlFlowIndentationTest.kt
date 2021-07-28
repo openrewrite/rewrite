@@ -34,7 +34,10 @@ interface ControlFlowIndentationTest : JavaRecipeTest {
                         foo();
                 }
                 
-                static void foo(){}
+                static void foo() { 
+                // There's no control flow in this method body, so its indentation should remain untouched
+                            int a = 0;
+                        }
             }
         """,
         after = """
@@ -45,7 +48,10 @@ interface ControlFlowIndentationTest : JavaRecipeTest {
                     foo();
                 }
                 
-                static void foo(){}
+                static void foo() { 
+                // There's no control flow in this method body, so its indentation should remain untouched
+                            int a = 0;
+                        }
             }
         """
     )

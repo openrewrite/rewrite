@@ -27,7 +27,7 @@ import org.openrewrite.java.tree.*;
 import java.util.List;
 import java.util.Optional;
 
-class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
+public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     @Nullable
     private final Tree stopAfter;
 

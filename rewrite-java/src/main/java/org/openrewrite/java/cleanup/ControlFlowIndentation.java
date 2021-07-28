@@ -17,10 +17,11 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.format.TabsAndIndents;
+import org.openrewrite.java.format.TabsAndIndentsVisitor;
+import org.openrewrite.java.style.IntelliJ;
+import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Loop;
 import org.openrewrite.java.tree.Statement;
@@ -50,6 +51,17 @@ public class ControlFlowIndentation extends Recipe {
     @Override
     protected JavaIsoVisitor<ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
+            TabsAndIndentsStyle tabsAndIndentsStyle;
+            @Override
+            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+                TabsAndIndentsStyle style = cu.getStyle(TabsAndIndentsStyle.class);
+                if (style == null) {
+                    style = IntelliJ.tabsAndIndents();
+                }
+                tabsAndIndentsStyle = style;
+                return super.visitCompilationUnit(cu, executionContext);
+            }
+
             @Override
             public J.Block visitBlock(J.Block block, ExecutionContext executionContext) {
                 J.Block b = super.visitBlock(block, executionContext);
@@ -57,14 +69,14 @@ public class ControlFlowIndentation extends Recipe {
                     if(s instanceof J.If) {
                         J.If ifs = (J.If) s;
                         if(shouldReformat(ifs)) {
-                            doAfterVisit(new TabsAndIndents());
+                            doAfterVisit(new TabsAndIndentsVisitor<>(tabsAndIndentsStyle, b));
                             return b;
                         }
                     } else if(s instanceof Loop) {
                         Loop loop = (Loop)s;
                         Statement body = loop.getBody();
                         if(!(body instanceof J.Block)) {
-                            doAfterVisit(new TabsAndIndents());
+                            doAfterVisit(new TabsAndIndentsVisitor<>(tabsAndIndentsStyle, b));
                             return b;
                         }
                     }
