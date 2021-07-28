@@ -20,8 +20,8 @@ import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.maven.cache.InMemoryMavenPomCache
 import org.openrewrite.maven.tree.Maven
-import org.openrewrite.xml.tree.Xml
 import java.io.File
+import java.nio.file.Path
 
 @Suppress("unused")
 interface MavenRecipeTest : RecipeTest<Maven> {
@@ -63,13 +63,14 @@ interface MavenRecipeTest : RecipeTest<Maven> {
         parser: MavenParser = this.parser,
         recipe: Recipe = this.recipe!!,
         @Language("xml") before: File,
+        relativeTo: Path? = null,
         @Language("xml") dependsOn: Array<File> = emptyArray(),
         @Language("xml") after: String,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Maven) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        super.assertChangedBase(parser, recipe, before, relativeTo, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
 
     fun assertUnchanged(
@@ -85,8 +86,9 @@ interface MavenRecipeTest : RecipeTest<Maven> {
         parser: MavenParser = this.parser,
         recipe: Recipe = this.recipe!!,
         @Language("xml") before: File,
+        relativeTo: Path? = null,
         @Language("xml") dependsOn: Array<File> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, before, dependsOn)
+        super.assertUnchangedBase(parser, recipe, before, relativeTo, dependsOn)
     }
 }

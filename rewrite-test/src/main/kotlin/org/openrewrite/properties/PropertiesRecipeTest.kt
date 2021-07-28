@@ -19,8 +19,8 @@ import org.intellij.lang.annotations.Language
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.properties.tree.Properties
-import org.openrewrite.xml.tree.Xml
 import java.io.File
+import java.nio.file.Path
 
 @Suppress("unused")
 interface PropertiesRecipeTest : RecipeTest<Properties.File> {
@@ -56,13 +56,14 @@ interface PropertiesRecipeTest : RecipeTest<Properties.File> {
         parser: PropertiesParser = this.parser,
         recipe: Recipe = this.recipe!!,
         @Language("properties") before: File,
+        relativeTo: Path? = null,
         @Language("properties") dependsOn: Array<File> = emptyArray(),
         @Language("properties") after: String,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Properties.File) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        super.assertChangedBase(parser, recipe, before, relativeTo, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
 
     fun assertUnchanged(
@@ -78,8 +79,9 @@ interface PropertiesRecipeTest : RecipeTest<Properties.File> {
         parser: PropertiesParser = this.parser,
         recipe: Recipe = this.recipe!!,
         before: File,
+        relativeTo: Path? = null,
         dependsOn: Array<File> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, before, dependsOn)
+        super.assertUnchangedBase(parser, recipe, before, relativeTo, dependsOn)
     }
 }

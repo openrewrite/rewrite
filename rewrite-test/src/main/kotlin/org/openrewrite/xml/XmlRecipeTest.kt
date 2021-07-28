@@ -21,6 +21,7 @@ import org.openrewrite.RecipeTest
 import org.openrewrite.java.tree.J
 import org.openrewrite.xml.tree.Xml
 import java.io.File
+import java.nio.file.Path
 
 @Suppress("unused")
 interface XmlRecipeTest : RecipeTest<Xml.Document> {
@@ -56,13 +57,14 @@ interface XmlRecipeTest : RecipeTest<Xml.Document> {
         parser: XmlParser = this.parser,
         recipe: Recipe = this.recipe!!,
         @Language("xml") before: File,
+        relativeTo: Path? = null,
         @Language("xml") dependsOn: Array<File> = emptyArray(),
         @Language("xml") after: String,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Xml.Document) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        super.assertChangedBase(parser, recipe, before, relativeTo, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
 
     fun assertUnchanged(
@@ -78,8 +80,9 @@ interface XmlRecipeTest : RecipeTest<Xml.Document> {
         parser:XmlParser = this.parser,
         recipe: Recipe = this.recipe!!,
         @Language("xml") before: File,
+        relativeTo: Path? = null,
         @Language("xml") dependsOn: Array<File> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, before, dependsOn)
+        super.assertUnchangedBase(parser, recipe, before, relativeTo, dependsOn)
     }
 }

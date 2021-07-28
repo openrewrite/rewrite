@@ -20,9 +20,9 @@ import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.TreePrinter
 import org.openrewrite.marker.SearchResult
-import org.openrewrite.xml.tree.Xml
 import org.openrewrite.yaml.tree.Yaml
 import java.io.File
+import java.nio.file.Path
 
 @Suppress("unused")
 interface YamlRecipeTest : RecipeTest<Yaml.Documents> {
@@ -61,13 +61,14 @@ interface YamlRecipeTest : RecipeTest<Yaml.Documents> {
         parser: YamlParser = this.parser,
         recipe: Recipe = this.recipe!!,
         @Language("yaml") before: File,
+        relativeTo: Path? = null,
         @Language("yaml") dependsOn: Array<File> = emptyArray(),
         @Language("yaml") after: String,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Yaml.Documents) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        super.assertChangedBase(parser, recipe, before, relativeTo, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
 
     fun assertUnchanged(
@@ -83,8 +84,9 @@ interface YamlRecipeTest : RecipeTest<Yaml.Documents> {
         parser: YamlParser = this.parser,
         recipe: Recipe = this.recipe!!,
         @Language("yaml") before: File,
+        relativeTo: Path? = null,
         @Language("yaml") dependsOn: Array<File> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, before, dependsOn)
+        super.assertUnchangedBase(parser, recipe, before, relativeTo, dependsOn)
     }
 }

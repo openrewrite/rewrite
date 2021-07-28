@@ -20,6 +20,7 @@ import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.java.tree.J
 import java.io.File
+import java.nio.file.Path
 
 interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
     override val parser: JavaParser
@@ -65,6 +66,7 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
         parser: JavaParser = this.parser,
         recipe: Recipe = this.recipe!!,
         @Language("java") before: File,
+        relativeTo: Path? = null,
         @Language("java") dependsOn: Array<File> = emptyArray(),
         @Language("java") after: String,
         cycles: Int = 2,
@@ -80,7 +82,7 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
                 afterConditions(it)
             }
         }
-        super.assertChangedBase(parser, recipe, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, typeValidatingAfterConditions)
+        super.assertChangedBase(parser, recipe, before, relativeTo, dependsOn, after, cycles, expectedCyclesThatMakeChanges, typeValidatingAfterConditions)
     }
 
     fun assertUnchanged(
@@ -96,8 +98,9 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
         parser:JavaParser = this.parser,
         recipe: Recipe = this.recipe!!,
         @Language("java") before: File,
+        relativeTo: Path? = null,
         @Language("java") dependsOn: Array<File> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, before, dependsOn)
+        super.assertUnchangedBase(parser, recipe, before, relativeTo, dependsOn)
     }
 }

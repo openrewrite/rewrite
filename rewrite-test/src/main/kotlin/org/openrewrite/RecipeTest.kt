@@ -25,6 +25,7 @@ import org.openrewrite.scheduling.ForkJoinScheduler
 import java.io.File
 import java.io.IOException
 import java.io.UncheckedIOException
+import java.nio.file.Path
 import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.CompletableFuture
@@ -69,6 +70,7 @@ interface RecipeTest <T: SourceFile> {
         parser: Parser<T> = this.parser!!,
         recipe: Recipe = this.recipe!!,
         before: File,
+        relativeTo: Path? = null,
         dependsOn: Array<File> = emptyArray(),
         after: String,
         cycles: Int = 2,
@@ -77,7 +79,7 @@ interface RecipeTest <T: SourceFile> {
     ) {
         val sources = parser.parse(
             listOf(before).plus(dependsOn).map { it.toPath() },
-            null,
+            relativeTo,
             executionContext
         )
 
@@ -151,11 +153,12 @@ interface RecipeTest <T: SourceFile> {
         parser: Parser<T> = this.parser!!,
         recipe: Recipe = this.recipe!!,
         before: File,
+        relativeTo: Path? = null,
         dependsOn: Array<File> = emptyArray()
     ) {
         val sources = parser.parse(
                 listOf(before).plus(dependsOn).map { it.toPath() },
-            null,
+            relativeTo,
             executionContext
         )
 

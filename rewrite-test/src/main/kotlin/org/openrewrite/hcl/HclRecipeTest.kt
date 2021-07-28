@@ -19,6 +19,7 @@ import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.hcl.tree.Hcl
 import java.io.File
+import java.nio.file.Path
 
 @Suppress("unused")
 interface HclRecipeTest : RecipeTest<Hcl.ConfigFile> {
@@ -54,13 +55,14 @@ interface HclRecipeTest : RecipeTest<Hcl.ConfigFile> {
         parser: HclParser = this.parser,
         recipe: Recipe = this.recipe!!,
         before: File,
+        relativeTo: Path? = null,
         dependsOn: Array<File> = emptyArray(),
         after: String,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Hcl.ConfigFile) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        super.assertChangedBase(parser, recipe, before, relativeTo, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
 
     fun assertUnchanged(
@@ -76,8 +78,9 @@ interface HclRecipeTest : RecipeTest<Hcl.ConfigFile> {
         parser: HclParser = this.parser,
         recipe: Recipe = this.recipe!!,
         before: File,
+        relativeTo: Path? = null,
         dependsOn: Array<File> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, before, dependsOn)
+        super.assertUnchangedBase(parser, recipe, before, relativeTo, dependsOn)
     }
 }
