@@ -158,7 +158,7 @@ interface RemoveUnusedAssignmentsTest : JavaRecipeTest {
     )
 
     @Test
-    fun handleLocalVariableNameScope() = assertChanged(
+    fun localVariableNameScopeBetweenMethods() = assertChanged(
         before = """
             class Test {
                 static void method0() {
@@ -190,7 +190,7 @@ interface RemoveUnusedAssignmentsTest : JavaRecipeTest {
 
     @Test
     @Disabled
-    fun assignmentPathsWithinIfStatements() = assertUnchanged(
+    fun localVariableAssignmentPathsWithinIfStatements() = assertUnchanged(
         before = """
             class Test {
                 static String method(int a) {
@@ -207,49 +207,55 @@ interface RemoveUnusedAssignmentsTest : JavaRecipeTest {
     )
 
     @Test
-    // This shows how there may be unwanted removal of unused assignments in situations
-    // where the assignment is technically "unused", but it's an intentional choice.
-    // https://github.com/apache/drill/blob/958d849144a662a781e4d7d59adbf3300ad3bdea/contrib/format-esri/src/main/java/org/apache/drill/exec/store/esri/ShpBatchReader.java#L298-L316
-    fun removesUnusedAssignmentToNull() = assertChanged(
+    @Disabled
+    fun localVariableIdentifierEnclosedInParentheses() = assertChanged(
         before = """
-            import java.io.IOException;
-            import java.io.InputStream;
-
             class Test {
-                static void closeStream(InputStream inputStream, String name) {
-                    if (inputStream == null) {
-                        return;
-                    }
-                    try {
-                        inputStream.close();
-                    } catch (IOException e) {
-                        System.out.println(String.format("Error when closing {}: {}", name, e.getMessage()));
-                    }
-                    inputStream = null;
+                static void method() {
+                    int i = 0;
+                    System.out.println(i);
+                    (i) = 99;
                 }
             }
         """,
         after = """
-            import java.io.IOException;
-            import java.io.InputStream;
-
             class Test {
-                static void closeStream(InputStream inputStream, String name) {
-                    if (inputStream == null) {
-                        return;
-                    }
-                    try {
-                        inputStream.close();
-                    } catch (IOException e) {
-                        System.out.println(String.format("Error when closing {}: {}", name, e.getMessage()));
-                    }
+                static void method() {
+                    int i = 0;
+                    System.out.println(i);
                 }
             }
         """
     )
 
     @Test
-    fun handleShadowedNameScope() = assertChanged(
+    fun localVariableReadInAssertStatement() = assertUnchanged(
+        before = """
+            class Test {
+                static void method(boolean x) {
+                    boolean y = !x;
+                    assert y;
+                }
+            }
+        """
+    )
+
+    @Test
+    fun localVariableSelfAssignmentOperation() = assertUnchanged(
+        before = """
+            class Test {
+                static int method() {
+                    int a;
+                    a = 0;
+                    a += 1;
+                    return a;
+                }
+            }
+        """
+    )
+
+    @Test
+    fun shadowedNameScope() = assertChanged(
         before = """
             class Test {
                 int a = 0;
@@ -285,32 +291,6 @@ interface RemoveUnusedAssignmentsTest : JavaRecipeTest {
                         }
                     }
                     return new InnerTest();
-                }
-            }
-        """
-    )
-
-    @Test
-    fun localVariableReadInAssertStatement() = assertUnchanged(
-        before = """
-            class Test {
-                static void method(boolean x) {
-                    boolean y = !x;
-                    assert y;
-                }
-            }
-        """
-    )
-
-    @Test
-    fun localVariableSelfAssignmentOperation() = assertUnchanged(
-        before = """
-            class Test {
-                static int method() {
-                    int a;
-                    a = 0;
-                    a += 1;
-                    return a;
                 }
             }
         """
@@ -439,5 +419,48 @@ interface RemoveUnusedAssignmentsTest : JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    // This shows how there may be unwanted removal of unused assignments in situations
+    // where the assignment is technically "unused", but it's an intentional choice.
+    // https://github.com/apache/drill/blob/958d849144a662a781e4d7d59adbf3300ad3bdea/contrib/format-esri/src/main/java/org/apache/drill/exec/store/esri/ShpBatchReader.java#L298-L316
+    fun removesUnusedAssignmentToNull() = assertChanged(
+        before = """
+            import java.io.IOException;
+            import java.io.InputStream;
+
+            class Test {
+                static void closeStream(InputStream inputStream, String name) {
+                    if (inputStream == null) {
+                        return;
+                    }
+                    try {
+                        inputStream.close();
+                    } catch (IOException e) {
+                        System.out.println(String.format("Error when closing {}: {}", name, e.getMessage()));
+                    }
+                    inputStream = null;
+                }
+            }
+        """,
+        after = """
+            import java.io.IOException;
+            import java.io.InputStream;
+
+            class Test {
+                static void closeStream(InputStream inputStream, String name) {
+                    if (inputStream == null) {
+                        return;
+                    }
+                    try {
+                        inputStream.close();
+                    } catch (IOException e) {
+                        System.out.println(String.format("Error when closing {}: {}", name, e.getMessage()));
+                    }
+                }
+            }
+        """
+    )
+
 
 }
