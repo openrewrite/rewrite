@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.cleanup
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaRecipeTest
@@ -181,6 +182,24 @@ interface RemoveUnusedAssignmentsTest : JavaRecipeTest {
                     int a = 3;
                     a = 4;
                     System.out.println(a);
+                }
+            }
+        """
+    )
+
+    @Test
+    @Disabled
+    fun assignmentPathsWithinIfStatements() = assertUnchanged(
+        before = """
+            class Test {
+                static String method(int a) {
+                    String str;
+                    if (a == 0) {
+                        str = "zero";
+                    } else {
+                        str = "not zero";
+                    }
+                    return str;
                 }
             }
         """
