@@ -16,9 +16,13 @@
 package org.openrewrite.java.format;
 
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.Space;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Ensures that whitespace is on the outermost AST element possible.
@@ -121,6 +125,19 @@ public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private <J2 extends J> J2 concatenatePrefix(J2 j, Space prefix) {
-        return j.withPrefix(j.getPrefix().withWhitespace(j.getPrefix().getWhitespace() + prefix.getWhitespace()));
+        List<Comment> jComments = j.getComments();
+        List<Comment> pComments = prefix.getComments();
+        List<Comment> comments;
+        if(!jComments.isEmpty() && !pComments.isEmpty()) {
+            comments = new ArrayList<>(jComments);
+            comments.addAll(pComments);
+        } else if(!pComments.isEmpty()) {
+            comments = pComments;
+        } else {
+            comments = jComments;
+        }
+        return j.withPrefix(j.getPrefix()
+                .withWhitespace(j.getPrefix().getWhitespace() + prefix.getWhitespace())
+                .withComments(comments));
     }
 }
