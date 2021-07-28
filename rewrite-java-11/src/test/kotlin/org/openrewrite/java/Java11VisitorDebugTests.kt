@@ -292,10 +292,6 @@ class Java11RemoveExtraSemicolonsTest : Java11Test, RemoveExtraSemicolonsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11RemoveUnusedAssignmentsTest : Java11Test, RemoveUnusedAssignmentsTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
 class Java11RemoveUnusedLocalVariablesTest : Java11Test, RemoveUnusedLocalVariablesTest
 
 @DebugOnly
