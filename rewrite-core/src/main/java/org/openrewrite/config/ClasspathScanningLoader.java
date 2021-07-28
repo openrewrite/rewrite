@@ -32,6 +32,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Properties;
 
+import static org.openrewrite.internal.RecipeIntrospectionUtils.constructRecipe;
+import static org.openrewrite.internal.RecipeIntrospectionUtils.recipeDescriptorFromRecipe;
+
 public class ClasspathScanningLoader implements ResourceLoader {
     private static final Logger logger = LoggerFactory.getLogger(ClasspathScanningLoader.class);
 
@@ -101,13 +104,9 @@ public class ClasspathScanningLoader implements ResourceLoader {
                     continue;
                 }
                 try {
-                    recipeDescriptors.add(RecipeIntrospectionUtils.recipeDescriptorFromRecipeClass(recipeClass));
-                    Constructor<?> constructor = RecipeIntrospectionUtils.getZeroArgsConstructor(recipeClass);
-
-                    if (constructor != null) {
-                        constructor.setAccessible(true);
-                        recipes.add((Recipe) constructor.newInstance());
-                    }
+                    Recipe recipe = constructRecipe(recipeClass);
+                    recipeDescriptors.add(recipeDescriptorFromRecipe(recipe));
+                    recipes.add(recipe);
                 } catch (Exception e) {
                     logger.warn("Unable to configure {}", recipeClass.getName(), e);
                 }

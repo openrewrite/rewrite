@@ -35,7 +35,6 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
 
 import static java.util.Collections.emptyList;
 
@@ -74,30 +73,6 @@ public class RecipeIntrospectionUtils {
             // not every recipe will implement getVisitor() directly, e.g. CompositeRecipe.
             return Recipe.NOOP;
         }
-    }
-
-    public static RecipeDescriptor recipeDescriptorFromRecipeClass(Class<?> recipeClass) {
-        List<OptionDescriptor> options = getOptionDescriptors(recipeClass);
-        Recipe recipe = constructRecipe(recipeClass);
-        URI recipeSource;
-        try {
-            recipeSource = recipeClass.getProtectionDomain().getCodeSource().getLocation().toURI();
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
-
-        RecipeDescriptor recipeDescriptor = new RecipeDescriptor(recipeClass.getName(), recipe.getDisplayName(),
-                recipe.getDescription(),
-                recipe.getTags(),
-                options,
-                recipe.getLanguages(),
-                emptyList(),
-                recipeSource);
-        List<RecipeDescriptor> recipeList = new ArrayList<>();
-        for (Recipe next : recipe.getRecipeList()) {
-            recipeList.add(recipeDescriptorFromRecipe(next));
-        }
-        return recipeDescriptor.withRecipeList(recipeList);
     }
 
     public static RecipeDescriptor recipeDescriptorFromDeclarativeRecipe(DeclarativeRecipe recipe, URI source) {
@@ -153,7 +128,7 @@ public class RecipeIntrospectionUtils {
                 recipe.getTags(), options, recipe.getLanguages(), recipeList, recipeSource);
     }
 
-    private static Recipe constructRecipe(Class<?> recipeClass) {
+    public static Recipe constructRecipe(Class<?> recipeClass) {
         Constructor<?> primaryConstructor = getZeroArgsConstructor(recipeClass);
         if (primaryConstructor == null) {
             primaryConstructor = getPrimaryConstructor(recipeClass);
