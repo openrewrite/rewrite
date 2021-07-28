@@ -31,7 +31,8 @@ import org.openrewrite.java.JavaRecipeTest
     "ParameterCanBeLocal",
     "PointlessArithmeticExpression",
     "EmptyTryBlock",
-    "AssignmentReplaceableWithOperatorAssignment"
+    "AssignmentReplaceableWithOperatorAssignment",
+    "AnonymousInnerClassMayBeStatic"
 )
 interface RemoveUnusedAssignmentsTest : JavaRecipeTest {
     override val recipe: Recipe
@@ -206,6 +207,48 @@ interface RemoveUnusedAssignmentsTest : JavaRecipeTest {
     )
 
     @Test
+    // This shows how there may be unwanted removal of unused assignments in situations
+    // where the assignment is technically "unused", but it's an intentional choice.
+    // https://github.com/apache/drill/blob/958d849144a662a781e4d7d59adbf3300ad3bdea/contrib/format-esri/src/main/java/org/apache/drill/exec/store/esri/ShpBatchReader.java#L298-L316
+    fun removesUnusedAssignmentToNull() = assertChanged(
+        before = """
+            import java.io.IOException;
+            import java.io.InputStream;
+
+            class Test {
+                static void closeStream(InputStream inputStream, String name) {
+                    if (inputStream == null) {
+                        return;
+                    }
+                    try {
+                        inputStream.close();
+                    } catch (IOException e) {
+                        System.out.println(String.format("Error when closing {}: {}", name, e.getMessage()));
+                    }
+                    inputStream = null;
+                }
+            }
+        """,
+        after = """
+            import java.io.IOException;
+            import java.io.InputStream;
+
+            class Test {
+                static void closeStream(InputStream inputStream, String name) {
+                    if (inputStream == null) {
+                        return;
+                    }
+                    try {
+                        inputStream.close();
+                    } catch (IOException e) {
+                        System.out.println(String.format("Error when closing {}: {}", name, e.getMessage()));
+                    }
+                }
+            }
+        """
+    )
+
+    @Test
     fun handleShadowedNameScope() = assertChanged(
         before = """
             class Test {
@@ -292,7 +335,7 @@ interface RemoveUnusedAssignmentsTest : JavaRecipeTest {
     )
 
     @Test
-    fun ignoreFields() = assertUnchanged(
+    fun ignoreFields0() = assertUnchanged(
         before = """
             class Test {
                 int a;
@@ -304,6 +347,41 @@ interface RemoveUnusedAssignmentsTest : JavaRecipeTest {
                     System.out.println(a);
                     a = 3;
                     a = 4;
+                }
+            }
+        """
+    )
+
+    @Test
+    @Disabled
+    // reformation of noticing an issue where "builder" is being removed in:
+    // https://github.com/apache/drill/blob/958d849144a662a781e4d7d59adbf3300ad3bdea/contrib/storage-http/src/main/java/org/apache/drill/exec/store/http/HttpCSVBatchReader.java#L93
+    fun ignoreFields1() = assertUnchanged(
+        before = """
+            class Test {
+                Test builder;
+
+                void addContext(Test builder) {
+                    this.builder = builder;
+                }
+
+                void doWork() {
+                    // nothing
+                }
+
+                void someInitialization() {
+                    Test anotherTest = new Test() {
+                        @Override
+                        void addContext(Test builder) {
+                            this.builder = builder;
+                        }
+                    };
+
+                    builder = new Test();
+                }
+
+                void someUsage() {
+                    builder.doWork();
                 }
             }
         """
