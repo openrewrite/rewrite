@@ -148,6 +148,8 @@ public interface RecipeScheduler {
                     Timer.Builder timer = Timer.builder("rewrite.recipe.visit").tag("recipe", recipe.getDisplayName());
                     Timer.Sample sample = Timer.start();
 
+                    ctx.putMessage("rewrite.src.path", s.getSourcePath().toString());
+
                     if (recipe.getSingleSourceApplicableTest() != null) {
                         if (recipe.getSingleSourceApplicableTest().visit(s, ctx) == s) {
                             sample.stop(MetricsHelper.successTags(timer, s, "skipped").register(Metrics.globalRegistry));
