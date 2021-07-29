@@ -75,6 +75,8 @@ public interface JavaType extends Serializable {
 
         public abstract String getFullyQualifiedName();
 
+        public abstract FullyQualified withFullyQualifiedName(String fullyQualifiedName);
+
         public abstract List<FullyQualified> getAnnotations();
 
         public abstract boolean hasFlags(Flag... test);
@@ -140,6 +142,14 @@ public interface JavaType extends Serializable {
         @Override
         public Class.Kind getKind() {
             return Class.Kind.Class;
+        }
+
+        @Override
+        public ShallowClass withFullyQualifiedName(String fullyQualifiedName) {
+            if(this.fullyQualifiedName.equals(fullyQualifiedName)) {
+                return this;
+            }
+            return new ShallowClass(fullyQualifiedName);
         }
 
         @Override
@@ -238,6 +248,14 @@ public interface JavaType extends Serializable {
             this.supertype = supertype;
             this.owningClass = owningClass;
             this.annotations = annotations;
+        }
+
+        @Override
+        public JavaType.Class withFullyQualifiedName(String fullyQualifiedName) {
+            if(this.fullyQualifiedName.equals(fullyQualifiedName)) {
+                return this;
+            }
+            return JavaType.Class.build(flagsBitMap, fullyQualifiedName, kind, members, interfaces, constructors, supertype, owningClass, annotations);
         }
 
         public boolean hasFlags(Flag... test) {
@@ -512,6 +530,15 @@ public interface JavaType extends Serializable {
         }
 
         @Override
+        public Parameterized withFullyQualifiedName(String fullyQualifiedName) {
+            if(type.getFullyQualifiedName().equals(fullyQualifiedName)) {
+                return this;
+            }
+
+            return build(type.withFullyQualifiedName(fullyQualifiedName), typeParameters);
+        }
+
+        @Override
         public List<FullyQualified> getAnnotations() {
             return type.getAnnotations();
         }
@@ -580,6 +607,14 @@ public interface JavaType extends Serializable {
         @Override
         public Class.Kind getKind() {
             return Class.Kind.Class;
+        }
+
+        @Override
+        public Cyclic withFullyQualifiedName(String fullyQualifiedName) {
+            if(this.fullyQualifiedName.equals(fullyQualifiedName)) {
+                return this;
+            }
+            return new Cyclic(fullyQualifiedName);
         }
 
         @Override
@@ -849,6 +884,14 @@ public interface JavaType extends Serializable {
         @Nullable
         @With
         private final FullyQualified bound;
+
+        @Override
+        public GenericTypeVariable withFullyQualifiedName(String fullyQualifiedName) {
+            if(this.fullyQualifiedName.equals(fullyQualifiedName)) {
+                return this;
+            }
+            return new GenericTypeVariable(fullyQualifiedName, bound);
+        }
 
         @Override
         public List<FullyQualified> getAnnotations() {

@@ -133,6 +133,11 @@ public class ChangePackage extends Recipe {
                 if (c.getImplements() != null) {
                     c = c.withImplements(ListUtils.map(c.getImplements(), this::transformName));
                 }
+
+                JavaType.FullyQualified type = c.getType();
+                if(type != null) {
+                    c = c.withType(type.withFullyQualifiedName(changingTo + "." + newPackageType.getClassName()));
+                }
             }
             return c;
         }

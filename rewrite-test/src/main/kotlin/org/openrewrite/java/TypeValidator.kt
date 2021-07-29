@@ -47,7 +47,7 @@ class TypeValidator : JavaIsoVisitor<MutableList<InvalidTypeResult>>() {
                              |
                         """.trimMargin() }
                         .joinToString("\n")
-                fail("Found missing or invalid types: \n$reportText")
+                fail("AST contains missing or invalid type information: \n$reportText")
             }
         }
 
@@ -56,6 +56,25 @@ class TypeValidator : JavaIsoVisitor<MutableList<InvalidTypeResult>>() {
          * And a convenient place to put a breakpoint if you want to catch an invalid type in the debugger.
          */
         private fun JavaVisitor<*>.invalidTypeResult(message: String) = InvalidTypeResult(cursor, cursor.getValue(), message)
+    }
+
+    override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: MutableList<InvalidTypeResult>): J.ClassDeclaration {
+        val c = super.visitClassDeclaration(classDecl, p)
+        val t = c.type
+        if(t == null) {
+            p.add(invalidTypeResult("J.ClassDeclaration type is null"))
+            return c
+        }
+        if(c.kind.name != t.kind.name) {
+            p.add(invalidTypeResult("J.ClassDeclaration kind \"${c.kind}\" does not match the kind in its type information \"${t.kind}\""))
+        }
+        val cu = cursor.firstEnclosing(J.CompilationUnit::class.java)!!
+        val pack = cu.packageDeclaration
+        if(pack != null && !t.packageName.equals(pack.expression.printTrimmed())) {
+            p.add(invalidTypeResult("J.ClassDeclaration package \"${t.packageName}\" does not match the enclosing J.CompilationUnit's package declaration \"${pack.expression.printTrimmed()}\""))
+        }
+
+        return c;
     }
 
     override fun visitMethodInvocation(method: J.MethodInvocation, p: MutableList<InvalidTypeResult>): J.MethodInvocation {
@@ -73,5 +92,21 @@ class TypeValidator : JavaIsoVisitor<MutableList<InvalidTypeResult>>() {
         }
 
         return m
+    }
+
+    override fun visitMethodDeclaration(method: J.MethodDeclaration, p: MutableList<InvalidTypeResult>): J.MethodDeclaration {
+        val m = super.visitMethodDeclaration(method, p)
+        val mt = m.type
+        if(mt == null) {
+            p.add(invalidTypeResult("J.MethodDeclaration type is null"))
+            return m
+        }
+        if(mt.genericSignature == null) {
+            p.add(invalidTypeResult("J.MethodDeclaration is missing a genericSignature"))
+        }
+        if(!m.simpleName.equals(mt.name)) {
+            p.add(invalidTypeResult("J.MethodDeclaration name \"${m.simpleName}\" does not match the name in its type information \"${mt.name}\""))
+        }
+        return m;
     }
 }

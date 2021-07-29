@@ -45,6 +45,14 @@ interface JavaTemplateTest : JavaRecipeTest {
                 }
                 return super.visitPackage(pkg, p)
             }
+
+            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
+                var cd = super.visitClassDeclaration(classDecl, p);
+                if(classDecl.type!!.packageName == "a") {
+                    cd = cd.withType(cd.type!!.withFullyQualifiedName("b.${cd.simpleName}"))
+                }
+                return cd;
+            }
         }.toRecipe(),
         before = """
             package a;
