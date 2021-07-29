@@ -66,7 +66,12 @@ public class MethodMatcher {
     private Pattern methodNamePattern;
     private Pattern argumentPattern;
 
-    public MethodMatcher(String signature) {
+    /**
+     * Whether to match overridden forms of the method on subclasses of {@link #targetTypePattern}.
+     */
+    private boolean matchOverrides;
+
+    public MethodMatcher(String signature, boolean matchOverrides) {
         MethodSignatureParser parser = new MethodSignatureParser(new CommonTokenStream(new MethodSignatureLexer(
                 CharStreams.fromString(signature))));
 
@@ -84,8 +89,16 @@ public class MethodMatcher {
         }.visit(parser.methodPattern());
     }
 
+    public MethodMatcher(J.MethodDeclaration method, boolean matchOverrides) {
+        this(methodPattern(method), matchOverrides);
+    }
+
+    public MethodMatcher(String signature) {
+        this(signature, false);
+    }
+
     public MethodMatcher(J.MethodDeclaration method) {
-        this(methodPattern(method));
+        this(method, false);
     }
 
     public boolean matches(@Nullable JavaType type) {
@@ -131,6 +144,10 @@ public class MethodMatcher {
                         .collect(joining(","))).matches();
     }
 
+    public boolean matches(Expression maybeMethod) {
+        return maybeMethod instanceof J.MethodInvocation && matches((J.MethodInvocation) maybeMethod);
+    }
+
     public boolean matches(J.MethodInvocation method) {
         if (method.getType() == null || method.getType().getDeclaringType() == null) {
             return false;
@@ -172,9 +189,25 @@ public class MethodMatcher {
     }
 
     boolean matchesTargetType(@Nullable JavaType.FullyQualified type) {
-        return type != null && (targetTypePattern.matcher(type.getFullyQualifiedName()).matches() ||
-                type != JavaType.Class.OBJECT &&
-                        (matchesTargetType(type.getSupertype() == null ? JavaType.Class.OBJECT : type.getSupertype())));
+        if (type == null) {
+            return false;
+        }
+
+        if (targetTypePattern.matcher(type.getFullyQualifiedName()).matches()) {
+            return true;
+        } else if (type != JavaType.Class.OBJECT && (matchesTargetType(type.getSupertype() == null ? JavaType.Class.OBJECT : type.getSupertype()))) {
+            return true;
+        } else if (matchesTargetType(type.getSupertype())) {
+            return true;
+        }
+
+        for (JavaType.FullyQualified anInterface : type.getInterfaces()) {
+            if(matchesTargetType(anInterface)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
