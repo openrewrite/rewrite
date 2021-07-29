@@ -32,7 +32,7 @@ interface MethodMatcherTest {
     @Test
     fun matchesSuperclassType(jp: JavaParser) {
         val listType = (jp.parse("class Test { java.util.List l; }")[0].classes[0].body.statements[0] as J.VariableDeclarations).typeAsFullyQualified
-        assertTrue(MethodMatcher("java.util.Collection size()").matchesTargetType(listType));
+        assertTrue(MethodMatcher("java.util.Collection size()", true).matchesTargetType(listType));
 
         assertTrue(MethodMatcher("Object equals(Object)").matchesTargetType(JavaType.Class.build("java.lang.String")))
         assertFalse(MethodMatcher("String equals(String)").matchesTargetType(JavaType.Class.build("java.lang.Object")))
