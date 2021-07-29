@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.cleanup
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
@@ -350,6 +351,27 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
                     list.forEach(item -> {
                         // do nothing with "item"
                     });
+                }
+            }
+        """
+    )
+
+    @Test
+    @Disabled
+    fun recognizeUsedVariableWithinWhileLoop() = assertUnchanged(
+        before = """
+            class Test {
+                private Test next;
+
+                static void method(Test input) {
+                    Test test = input.next();
+                    while ((test = input.next()) != null) {
+                        // do nothing
+                    }
+                }
+
+                public Test next() {
+                    return this.next;
                 }
             }
         """
