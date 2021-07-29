@@ -43,7 +43,7 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
                 } else if (c.getPadding().getTypeParameters() != null) {
                     c = c.getPadding().withTypeParameters(c.getPadding().getTypeParameters().withBefore(c.getPadding().getTypeParameters().getBefore().withWhitespace("")));
                 } else {
-                    c = c.withName(c.getName().withPrefix(c.getName().getPrefix().withWhitespace("")));
+                    c = c.getAnnotations().withKind(c.getAnnotations().getKind().withPrefix(c.getAnnotations().getKind().getPrefix().withWhitespace("")));
                 }
             } else {
                 List<J.Annotation> newLeadingAnnotations = removeAnnotationOrEmpty(leadingAnnotations, annotationRemoved);

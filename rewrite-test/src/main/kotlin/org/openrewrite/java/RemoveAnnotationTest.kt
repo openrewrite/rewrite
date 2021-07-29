@@ -20,6 +20,20 @@ import org.openrewrite.Issue
 
 interface RemoveAnnotationTest : JavaRecipeTest {
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/861")
+    @Test
+    fun removeLastAnnotationFromClassDeclaration(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = RemoveAnnotation("@java.lang.Deprecated"),
+        before = """
+            @Deprecated
+            interface Test {}
+        """,
+        after = """
+            interface Test {}
+        """
+    )
+
     @Test
     fun removeAnnotation(jp: JavaParser) = assertChanged(
         jp,
