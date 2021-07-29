@@ -29,6 +29,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singleton;
@@ -201,18 +202,32 @@ public interface RecipeScheduler {
         //noinspection unchecked
         List<SourceFile> afterWidened = recipe.visit((List<SourceFile>) after, ctx);
 
-        for (SourceFile maybeGenerated : afterWidened) {
-            //noinspection SuspiciousMethodCalls
-            if (!after.contains(maybeGenerated)) {
-                // a new source file generated
-                recipeThatDeletedSourceFile.put(maybeGenerated.getId(), recipe);
-            }
-        }
+        if (afterWidened != after) {
 
-        for (SourceFile maybeDeleted : after) {
-            if (!afterWidened.contains(maybeDeleted)) {
-                // a source file deleted
-                recipeThatDeletedSourceFile.put(maybeDeleted.getId(), recipe);
+            final Map<UUID, SourceFile> originalMap = after.stream()
+                    .collect(Collectors.toMap(SourceFile::getId, Function.identity()));
+            afterWidened = ListUtils.map(afterWidened, s -> {
+                SourceFile original = originalMap.get(s.getId());
+                if (original == null) {
+                    // a new source file generated
+                    recipeThatDeletedSourceFile.put(s.getId(), recipe);
+                } else if (s != original) {
+                    //Mark the item changed.
+                    return s.withMarkers(s.getMarkers().computeByType(
+                            new Recipe.RecipeThatMadeChanges(recipe),
+                            (r1, r2) -> {
+                                r1.getRecipes().addAll(r2.getRecipes());
+                                return r1;
+                            }));
+                }
+                return s;
+            });
+
+            for (SourceFile maybeDeleted : after) {
+                if (!afterWidened.contains(maybeDeleted)) {
+                    // a source file deleted
+                    recipeThatDeletedSourceFile.put(maybeDeleted.getId(), recipe);
+                }
             }
         }
 
