@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.cleanup
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
@@ -37,8 +36,8 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
     override val recipe: Recipe
         get() = RemoveUnusedLocalVariables()
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/841")
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/841")
     fun ignoreSuppressWarnings() = assertUnchanged(
         before = """
             class Test {
@@ -58,7 +57,7 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
                 static int method(int x) {
                     int a = 0;
                     int b = 0;
-                    return a + 1;
+                    return a;
                 }
             }
         """,
@@ -66,7 +65,7 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
             class Test {
                 static int method(int x) {
                     int a = 0;
-                    return a + 1;
+                    return a;
                 }
             }
         """
@@ -91,6 +90,81 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
                 static int method() {
                     int isRead = -1;
                     return isRead + 1;
+                }
+            }
+        """
+    )
+
+    @Test
+    fun ignoreClassFields() = assertUnchanged(
+        before = """
+            class Test {
+                int a = 0;
+                int b = 1;
+
+                int method(int x) {
+                    b = 2;
+                    return x + 1;
+                }
+            }
+        """
+    )
+
+    @Test
+    fun handleLocalVariablesShadowingClassFields() = assertChanged(
+        before = """
+            class Test {
+                int a = 0;
+                int unused = 1;
+
+                static int method(int x) {
+                    int unused = 2;
+                    return x + 1;
+                }
+            }
+        """,
+        after = """
+            class Test {
+                int a = 0;
+                int unused = 1;
+
+                static int method(int x) {
+                    return x + 1;
+                }
+            }
+        """
+    )
+
+    @Test
+    fun localVariableUnusedIncrementOperation() = assertChanged(
+        before = """
+            class Test {
+                static boolean isTrue() {
+                    return false;
+                }
+
+                static int method(int x) {
+                    int a = 0;
+                    int b = 99;
+                    a++;
+                    for (int i = 0; isTrue(); i++) {
+                        a++;
+                    }
+                    return b++;
+                }
+            }
+        """,
+        after = """
+            class Test {
+                static boolean isTrue() {
+                    return false;
+                }
+
+                static int method(int x) {
+                    int b = 99;
+                    for (int i = 0; isTrue(); i++) {
+                    }
+                    return b++;
                 }
             }
         """
@@ -357,21 +431,55 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
     )
 
     @Test
-    @Disabled
-    fun recognizeUsedVariableWithinWhileLoop() = assertUnchanged(
+    @Issue("https://github.com/txazo/spring-cloud-sourcecode/blob/5ffe615558e76f3bb37f19026ece5cbaff4d0404/eureka-client/src/main/java/com/netflix/discovery/converters/jackson/builder/StringInterningAmazonInfoBuilder.java#L114-L124")
+    fun recognizeUsedVariableWithinWhileLoop() = assertChanged(
         before = """
             class Test {
-                private Test next;
+                TestToken testToken;
 
-                static void method(Test input) {
-                    Test test = input.next();
-                    while ((test = input.next()) != null) {
-                        // do nothing
+                static void method(Test tp) {
+                    int isUsed = 0;
+                    TestToken token = tp.nextToken();
+                    while ((token = tp.nextToken()) != TestToken.END_TOKEN) {
+                        // do anything except read the value of "token"
+                        tp.nextToken();
+                        int unused = 11;
+                        unused = isUsed;
+                        System.out.println(isUsed);
                     }
                 }
 
-                public Test next() {
-                    return this.next;
+                TestToken nextToken() {
+                    return this.testToken;
+                }
+
+                enum TestToken {
+                    START_TOKEN,
+                    END_TOKEN
+                }
+            }
+        """,
+        after = """
+            class Test {
+                TestToken testToken;
+
+                static void method(Test tp) {
+                    int isUsed = 0;
+                    TestToken token = tp.nextToken();
+                    while ((token = tp.nextToken()) != TestToken.END_TOKEN) {
+                        // do anything except read the value of "token"
+                        tp.nextToken();
+                        System.out.println(isUsed);
+                    }
+                }
+
+                TestToken nextToken() {
+                    return this.testToken;
+                }
+
+                enum TestToken {
+                    START_TOKEN,
+                    END_TOKEN
                 }
             }
         """
