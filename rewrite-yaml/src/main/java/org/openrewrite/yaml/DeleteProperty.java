@@ -72,7 +72,7 @@ public class DeleteProperty extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public YamlVisitor<ExecutionContext> getVisitor() {
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {

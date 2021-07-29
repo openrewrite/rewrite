@@ -36,8 +36,9 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
         this.stopAfter = stopAfter;
     }
 
+    @Nullable
     @Override
-    public @Nullable Yaml visit(@Nullable Tree tree, P p, Cursor parent) {
+    public Yaml visit(@Nullable Tree tree, P p, Cursor parent) {
         setCursor(parent);
         for (Cursor c = parent; c != null && c.getValue() instanceof Yaml; c = c.getParent()) {
             Yaml y = c.getValue();
@@ -92,10 +93,19 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
     @Nullable
     @Override
     public Yaml postVisit(Yaml tree, P p) {
-        if (stopAfter != null && stopAfter == tree) {
+        if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(Yaml.Documents.class, "stop", true);
         }
         return super.postVisit(tree, p);
+    }
+
+    @Nullable
+    @Override
+    public Yaml visit(@Nullable Tree tree, P p) {
+        if (getCursor().getNearestMessage("stop") != null) {
+            return (Yaml) tree;
+        }
+        return super.visit(tree, p);
     }
 
     private String indentTo(String prefix, int column) {

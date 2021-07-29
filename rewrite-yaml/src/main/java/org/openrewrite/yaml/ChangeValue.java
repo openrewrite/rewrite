@@ -64,7 +64,7 @@ public class ChangeValue extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public YamlVisitor<ExecutionContext> getVisitor() {
         XPathMatcher xPathMatcher = new XPathMatcher(oldKeyPath);
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override

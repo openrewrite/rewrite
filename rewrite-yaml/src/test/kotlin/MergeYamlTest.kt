@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.yaml.MergeYaml
 import org.openrewrite.yaml.YamlRecipeTest
@@ -21,9 +20,9 @@ import org.openrewrite.yaml.YamlRecipeTest
 class MergeYamlTest : YamlRecipeTest {
 
     @Test
-    fun mustMergeYamlWhenBlockExists() = assertChanged(
+    fun existingBlock() = assertChanged(
         recipe = MergeYaml(
-            "/spec/lifecycleRule",
+            "/spec",
             """
             lifecycleRule:
                 - condition:
@@ -51,15 +50,13 @@ class MergeYamlTest : YamlRecipeTest {
                           type: Delete
                       condition:
                           age: 7
-        """,
-        cycles = 2
+        """
     )
 
-    @Disabled("MergeYaml is incomplete")
     @Test
-    fun mustMergeYamlWhenBlockDoesntExist() = assertChanged(
+    fun nonExistantBlock() = assertChanged(
         recipe = MergeYaml(
-            "/spec/lifecycleRule",
+            "/spec",
             """
               lifecycleRule:
                   - action:
@@ -84,14 +81,13 @@ class MergeYamlTest : YamlRecipeTest {
                           type: Delete
                       condition:
                           age: 7
-        """,
-        cycles = 2
+        """
     )
 
     @Test
-    fun mustMergeYamlForScalar() = assertChanged(
+    fun scalar() = assertChanged(
         recipe = MergeYaml(
-            "/spec/bucketPolicyOnly",
+            "/spec",
             """
               bucketPolicyOnly: true
             """.trimIndent()
@@ -107,8 +103,6 @@ class MergeYamlTest : YamlRecipeTest {
             kind: StorageBucket
             spec:
                 bucketPolicyOnly: true
-        """,
-        cycles = 2
+        """
     )
-
 }

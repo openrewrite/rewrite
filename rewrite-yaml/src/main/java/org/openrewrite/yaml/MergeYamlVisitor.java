@@ -16,81 +16,96 @@
 package org.openrewrite.yaml;
 
 import lombok.RequiredArgsConstructor;
+import org.intellij.lang.annotations.Language;
 import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
 @RequiredArgsConstructor
-public class MergeYamlVisitor extends YamlVisitor<ExecutionContext> {
+public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     final Yaml scope;
     final Yaml incoming;
 
-    @Override
-    public Yaml visitScalar(Yaml.Scalar existingScalar, ExecutionContext executionContext) {
-        if (!scope.isScope(existingScalar)) {
-            return super.visitScalar(existingScalar, executionContext);
-        }
-        return mergeScalar(existingScalar, (Yaml.Scalar) incoming);
+    public MergeYamlVisitor(Yaml scope, @Language("yml") String yamlString) {
+        this(scope, new YamlParser().parse(yamlString).get(0).getDocuments().get(0).getBlock());
     }
 
     @Override
-    public Yaml visitSequence(Yaml.Sequence existingSeq, ExecutionContext ctx) {
-        if (!scope.isScope(existingSeq)) {
-            return super.visitSequence(existingSeq, ctx);
+    public Yaml visitScalar(Yaml.Scalar existingScalar, P p) {
+        if (scope.isScope(existingScalar)) {
+            return mergeScalar(existingScalar, (Yaml.Scalar) incoming);
         }
-        return mergeSequence(existingSeq, (Yaml.Sequence) incoming, ctx, getCursor());
+        return super.visitScalar(existingScalar, p);
     }
 
     @Override
-    public Yaml visitMapping(Yaml.Mapping existingMapping, ExecutionContext ctx) {
-        if (!scope.isScope(existingMapping)) {
-            return super.visitMapping(existingMapping, ctx);
+    public Yaml visitSequence(Yaml.Sequence existingSeq, P p) {
+        if (scope.isScope(existingSeq)) {
+            return mergeSequence(existingSeq, (Yaml.Sequence) incoming, p, getCursor());
         }
+        return super.visitSequence(existingSeq, p);
+    }
 
-        return mergeMapping(existingMapping, (Yaml.Mapping) incoming, ctx, getCursor());
+    @Override
+    public Yaml visitMapping(Yaml.Mapping existingMapping, P p) {
+        if (scope.isScope(existingMapping)) {
+            return mergeMapping(existingMapping, (Yaml.Mapping) incoming, p, getCursor());
+        }
+        return super.visitMapping(existingMapping, p);
     }
 
     private static boolean keyMatches(Yaml.Mapping.Entry e1, Yaml.Mapping.Entry e2) {
         return e1.getKey().getValue().equals(e2.getKey().getValue());
     }
 
-    private static Yaml.Mapping mergeMapping(Yaml.Mapping m1, Yaml.Mapping m2, ExecutionContext ctx, Cursor cursor) {
-        List<Yaml.Mapping.Entry> mutatedEntries = ListUtils.map(m1.getEntries(), existingEntry -> {
-            return m2.getEntries().stream()
-                    .filter(incomingEntry -> keyMatches(existingEntry, incomingEntry))
-                    .findFirst()
-                    .map(incomingEntry -> {
-                        return existingEntry.withValue((Yaml.Block) new MergeYamlVisitor(existingEntry.getValue(), incomingEntry.getValue())
-                                .visit(existingEntry.getValue(), ctx, cursor));
-                    })
-                    .orElse(existingEntry);
-        });
+    private Yaml.Mapping mergeMapping(Yaml.Mapping m1, Yaml.Mapping m2, P p, Cursor cursor) {
+        List<Yaml.Mapping.Entry> mutatedEntries = ListUtils.map(m1.getEntries(), existingEntry ->
+                m2.getEntries().stream()
+                        .filter(incomingEntry -> keyMatches(existingEntry, incomingEntry))
+                        .findFirst()
+                        .map(incomingEntry ->
+                                existingEntry.withValue((Yaml.Block) new MergeYamlVisitor<>(existingEntry.getValue(), incomingEntry.getValue())
+                                        .visit(existingEntry.getValue(), p, cursor)))
+                        .orElse(existingEntry));
+
+        mutatedEntries = ListUtils.concatAll(mutatedEntries, m2.getEntries().stream()
+                .filter(incomingEntry -> {
+                    for (Yaml.Mapping.Entry existingEntry : m1.getEntries()) {
+                        if (keyMatches(existingEntry, incomingEntry)) {
+                            return false;
+                        }
+                    }
+                    return true;
+                })
+                .map(incomingEntry -> autoFormat(incomingEntry, p, getCursor().getParentOrThrow()))
+                .collect(Collectors.toList()));
+
         return m1.withEntries(mutatedEntries);
     }
 
-    private static Yaml.Sequence mergeSequence(Yaml.Sequence existingSeq, Yaml.Sequence incomingSeq, ExecutionContext ctx, Cursor cursor) {
+    private Yaml.Sequence mergeSequence(Yaml.Sequence s1, Yaml.Sequence s2, P p, Cursor cursor) {
         AtomicInteger idx = new AtomicInteger(0);
-        List<Yaml.Sequence.Entry> incomingEntries = incomingSeq.getEntries();
-        List<Yaml.Sequence.Entry> entries = ListUtils.map(existingSeq.getEntries(), existingSeqEntry -> {
+        List<Yaml.Sequence.Entry> incomingEntries = s2.getEntries();
+
+        List<Yaml.Sequence.Entry> mutatedEntries = ListUtils.map(s1.getEntries(), existingSeqEntry -> {
             Yaml.Sequence.Entry incomingEntry = incomingEntries.get(idx.getAndIncrement());
-            Yaml.Block b = (Yaml.Block) new MergeYamlVisitor(existingSeqEntry.getBlock(), incomingEntry.getBlock())
-                    .visit(existingSeqEntry.getBlock(), ctx, cursor);
+            Yaml.Block b = (Yaml.Block) new MergeYamlVisitor<>(existingSeqEntry.getBlock(), incomingEntry.getBlock())
+                    .visit(existingSeqEntry.getBlock(), p, cursor);
             return existingSeqEntry.withBlock(requireNonNull(b));
         });
-        return existingSeq.withEntries(entries);
+
+        return s1.withEntries(mutatedEntries);
     }
 
     private static Yaml.Scalar mergeScalar(Yaml.Scalar y1, Yaml.Scalar y2) {
         String s1 = y1.getValue();
         String s2 = y2.getValue();
         return !s1.equals(s2) ? y1.withValue(s2) : y1;
-
     }
-
 }

@@ -101,6 +101,19 @@ public class InsertYamlVisitor<P> extends YamlIsoVisitor<P> {
     }
 
     @Override
+    public Yaml.Mapping visitMapping(Yaml.Mapping mapping, P p) {
+        Yaml.Mapping m = super.visitMapping(mapping, p);
+
+        if (scope.isScope(mapping)) {
+            Yaml.Block value = m;
+            assert yaml != null;
+            m = (Yaml.Mapping) insertIntoBlock(value, yaml);
+        }
+
+        return m;
+    }
+
+    @Override
     public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, P p) {
         Yaml.Mapping.Entry e = super.visitMappingEntry(entry, p);
 

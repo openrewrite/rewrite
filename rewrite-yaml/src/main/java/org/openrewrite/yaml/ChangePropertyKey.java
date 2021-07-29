@@ -80,7 +80,7 @@ public class ChangePropertyKey extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public YamlVisitor<ExecutionContext> getVisitor() {
         return new ChangePropertyKeyVisitor<>();
     }
 
