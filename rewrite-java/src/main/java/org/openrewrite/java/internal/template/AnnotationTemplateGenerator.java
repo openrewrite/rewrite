@@ -19,6 +19,7 @@ import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.Cursor;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
@@ -61,7 +62,7 @@ public class AnnotationTemplateGenerator {
                         after.append("class $Template {}");
                     }
 
-                    return before + "/*" + TEMPLATE_COMMENT + "*/" + template + "\n" + after;
+                    return before + "@$Placeholder/*" + TEMPLATE_COMMENT + "*/" + template + "\n" + after;
                 });
     }
 
@@ -71,7 +72,17 @@ public class AnnotationTemplateGenerator {
         new JavaIsoVisitor<Integer>() {
             @Override
             public J.Annotation visitAnnotation(J.Annotation annotation, Integer integer) {
-                annotations.add(annotation);
+                if(annotation.getSimpleName().equals("$Placeholder")) {
+                    //noinspection ConstantConditions
+                    return null;
+                }
+                J.Annotation withoutTemplateComment = annotation.withComments(ListUtils.map(annotation.getComments(), it -> {
+                    if(it.getStyle().equals(Comment.Style.BLOCK) && it.getText().equals(TEMPLATE_COMMENT)) {
+                        return null;
+                    }
+                    return it;
+                }));
+                annotations.add(withoutTemplateComment);
                 return annotation;
             }
         }.visit(cu, 0);
@@ -93,6 +104,10 @@ public class AnnotationTemplateGenerator {
 
             if (cu.getPackageDeclaration() != null) {
                 before.insert(0, cu.getPackageDeclaration().withPrefix(Space.EMPTY).printTrimmed() + ";\n");
+            }
+            List<J.ClassDeclaration> classes = cu.getClasses();
+            if(!classes.get(classes.size() - 1).getName().getSimpleName().equals("$Placeholder")) {
+                after.append("@interface $Placeholder {}");
             }
             return;
         }

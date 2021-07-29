@@ -393,7 +393,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     fun replaceSingleStatement(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaVisitor<ExecutionContext>() {
-            val t = JavaTemplate.builder({ cursor }, 
+            val t = JavaTemplate.builder({ cursor },
                 "if(n != 1) {\n" +
                         "  n++;\n" +
                         "}"
@@ -1106,6 +1106,52 @@ interface JavaTemplateTest : JavaRecipeTest {
         after = """
             abstract class Test {
                 void test(){
+                }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/793")
+    @Test
+    fun replaceClassAnnotationsWithAnnotationWithComment(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+                val t = JavaTemplate.builder({ cursor }, """
+                /**
+                 * Do suppress those warnings
+                 */
+                @SuppressWarnings("other")
+            """.trimIndent())
+                        .doBeforeParseTemplate(print)
+                        .build()
+
+                override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
+                    val cd = super.visitClassDeclaration(classDecl, p)
+                    if(cd.leadingAnnotations.size == 0) {
+                        return cd.withTemplate(t, cd.coordinates.replaceAnnotations())
+                    }
+                    return cd;
+                }
+            }.toRecipe(),
+        before = """
+            class Test {
+            
+                class Inner1 {
+                }
+            }
+        """,
+        after = """
+            /**
+             * Do suppress those warnings
+             */
+            @SuppressWarnings("other")
+            class Test {
+            
+                /**
+                 * Do suppress those warnings
+                 */
+                @SuppressWarnings("other")
+                class Inner1 {
                 }
             }
         """

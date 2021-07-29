@@ -27,6 +27,7 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaVisitor
 import org.openrewrite.java.internal.template.AnnotationTemplateGenerator
 import org.openrewrite.java.tree.J
+import org.openrewrite.java.tree.JavaType
 import java.io.ByteArrayOutputStream
 import java.io.OutputStreamWriter
 
@@ -51,11 +52,12 @@ interface AnnotationTemplateGeneratorTest {
             class Outer {
                 class Inner {
                     void test() {
-                        /*__TEMPLATE__*/
-                        assert n == 1;
+                        @${'$'}Placeholder /*__TEMPLATE__*/ String s = "Annotate me";
                     }
                 }
             }
+            
+            @interface ${'$'}Placeholder {}
         """.trimIndent()
 
         assertThat(beforeAssert(cu)).isEqualTo(expected)
@@ -123,12 +125,13 @@ interface AnnotationTemplateGeneratorTest {
                     int n2;
                     new Object() {
                         void inner(int p4) {
-                            /*__TEMPLATE__*/
-                            assert n == 1;
+                            @${'$'}Placeholder /*__TEMPLATE__*/ String s = "Annotate me";
                         }
                     };
                 }
             }
+            
+            @interface ${'$'}Placeholder {}
         """.trimIndent()
 
         assertThat(beforeAssert(cu)).isEqualTo(expected)
@@ -140,7 +143,7 @@ interface AnnotationTemplateGeneratorTest {
             override fun visitAssert(assert: J.Assert, p: StringBuilder): J {
                 p.append(
                     AnnotationTemplateGenerator(emptySet())
-                        .template(cursor, "assert n == 1;")
+                        .template(cursor, "String s = \"Annotate me\";")
                 )
                 return assert
             }
