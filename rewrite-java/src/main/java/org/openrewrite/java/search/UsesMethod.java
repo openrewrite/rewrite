@@ -36,6 +36,10 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
         this(new MethodMatcher(methodPattern));
     }
 
+    public UsesMethod(String methodPattern, boolean matchOverrides) {
+        this(new MethodMatcher(methodPattern, matchOverrides));
+    }
+
     public UsesMethod(MethodMatcher methodMatcher) {
         this.methodMatcher = methodMatcher;
     }

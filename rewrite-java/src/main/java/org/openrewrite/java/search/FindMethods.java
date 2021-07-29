@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -46,6 +47,12 @@ public class FindMethods extends Recipe {
             example = "java.util.List add(..)")
     String methodPattern;
 
+    @Option(displayName = "Match on overrides",
+            description = "When enabled, find methods that are overloads of the method pattern.",
+            required = false)
+    @Nullable
+    Boolean matchOverrides;
+
     @Override
     public String getDisplayName() {
         return "Find methods";
@@ -58,12 +65,12 @@ public class FindMethods extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(methodPattern);
+        return new UsesMethod<>(methodPattern, Boolean.TRUE.equals(matchOverrides));
     }
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
+        MethodMatcher methodMatcher = new MethodMatcher(methodPattern, Boolean.TRUE.equals(matchOverrides));
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {

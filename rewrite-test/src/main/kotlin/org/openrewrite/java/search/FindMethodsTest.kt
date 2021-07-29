@@ -26,7 +26,7 @@ interface FindMethodsTest : JavaRecipeTest {
     @Test
     fun findMethodReferences(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindMethods("A singleArg(String)"),
+        recipe = FindMethods("A singleArg(String)", false),
         before = """
             class Test {
                 void test() {
@@ -49,9 +49,29 @@ interface FindMethodsTest : JavaRecipeTest {
     )
 
     @Test
+    fun findOverriddenMethodReferences(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = FindMethods("java.util.Collection isEmpty()", true),
+        before = """
+            class Test {
+                void test() {
+                    new java.util.ArrayList<String>().isEmpty();
+                }
+            }
+        """,
+        after = """
+            class Test {
+                void test() {
+                    /*~~>*/new java.util.ArrayList<String>().isEmpty();
+                }
+            }
+        """
+    )
+
+    @Test
     fun findStaticMethodCalls(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindMethods("java.util.Collections emptyList()"),
+        recipe = FindMethods("java.util.Collections emptyList()", false),
         before = """
             import java.util.Collections;
             public class A {
@@ -69,7 +89,7 @@ interface FindMethodsTest : JavaRecipeTest {
     @Test
     fun findStaticallyImportedMethodCalls(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindMethods("java.util.Collections emptyList()"),
+        recipe = FindMethods("java.util.Collections emptyList()", false),
         before = """
             import static java.util.Collections.emptyList;
             public class A {
@@ -87,7 +107,7 @@ interface FindMethodsTest : JavaRecipeTest {
     @Test
     fun matchVarargs(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindMethods("A foo(String, Object...)"),
+        recipe = FindMethods("A foo(String, Object...)", false),
         before = """
             public class B {
                public void test() {
@@ -112,7 +132,7 @@ interface FindMethodsTest : JavaRecipeTest {
     @Test
     fun matchOnInnerClass(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindMethods("B.C foo()"),
+        recipe = FindMethods("B.C foo()", false),
         before = """
             public class A {
                void test() {
@@ -139,13 +159,13 @@ interface FindMethodsTest : JavaRecipeTest {
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = FindMethods(null)
+        var recipe = FindMethods(null, false)
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
 
-        recipe = FindMethods("com.foo.Foo bar()")
+        recipe = FindMethods("com.foo.Foo bar()", false)
         valid = recipe.validate()
         assertThat(valid.isValid).isTrue()
     }

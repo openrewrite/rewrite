@@ -69,9 +69,11 @@ public class MethodMatcher {
     /**
      * Whether to match overridden forms of the method on subclasses of {@link #targetTypePattern}.
      */
-    private boolean matchOverrides;
+    private final boolean matchOverrides;
 
     public MethodMatcher(String signature, boolean matchOverrides) {
+        this.matchOverrides = matchOverrides;
+
         MethodSignatureParser parser = new MethodSignatureParser(new CommonTokenStream(new MethodSignatureLexer(
                 CharStreams.fromString(signature))));
 
@@ -197,13 +199,17 @@ public class MethodMatcher {
             return true;
         } else if (type != JavaType.Class.OBJECT && (matchesTargetType(type.getSupertype() == null ? JavaType.Class.OBJECT : type.getSupertype()))) {
             return true;
-        } else if (matchesTargetType(type.getSupertype())) {
-            return true;
         }
 
-        for (JavaType.FullyQualified anInterface : type.getInterfaces()) {
-            if(matchesTargetType(anInterface)) {
+        if (matchOverrides) {
+            if (matchesTargetType(type.getSupertype())) {
                 return true;
+            }
+
+            for (JavaType.FullyQualified anInterface : type.getInterfaces()) {
+                if (matchesTargetType(anInterface)) {
+                    return true;
+                }
             }
         }
 
