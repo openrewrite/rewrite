@@ -168,6 +168,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class IndexOfShouldNotCompareGreaterThanZeroTckTest : IndexOfShouldNotCompareGreaterThanZeroTest
 
     @Nested
+    inner class IsEmptyCallOnCollectionsTckTest : IsEmptyCallOnCollectionsTest
+
+    @Nested
     inner class ImplementInterfaceTck : ImplementInterfaceTest
 
     @Nested

@@ -200,6 +200,10 @@ class Java11IndexOfShouldNotCompareGreaterThanZeroTest : Java11Test, IndexOfShou
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11IsEmptyCallOnCollectionsTest : Java11Test, IsEmptyCallOnCollectionsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11ImplementInterfaceTest : Java11Test, ImplementInterfaceTest
 
 @DebugOnly

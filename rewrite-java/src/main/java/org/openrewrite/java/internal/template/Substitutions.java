@@ -40,107 +40,117 @@ public class Substitutions {
 
     public String substitute() {
         AtomicInteger index = new AtomicInteger(0);
-        return propertyPlaceholderHelper.replacePlaceholders(code, key -> {
-            int i = index.getAndIncrement();
-            Object parameter = parameters[i];
+        String substituted = code;
+        while(true) {
+            String previous = substituted;
+            substituted = propertyPlaceholderHelper.replacePlaceholders(substituted, key -> {
+                int i = index.getAndIncrement();
+                Object parameter = parameters[i];
 
-            String s;
-            if (!key.isEmpty()) {
-                TemplateParameterParser parser = new TemplateParameterParser(new CommonTokenStream(new TemplateParameterLexer(
-                        CharStreams.fromString(key))));
+                String s;
+                if (!key.isEmpty()) {
+                    TemplateParameterParser parser = new TemplateParameterParser(new CommonTokenStream(new TemplateParameterLexer(
+                            CharStreams.fromString(key))));
 
-                parser.removeErrorListeners();
-                parser.addErrorListener(new ThrowingErrorListener());
+                    parser.removeErrorListeners();
+                    parser.addErrorListener(new ThrowingErrorListener());
 
-                TemplateParameterParser.MatcherPatternContext ctx = parser.matcherPattern();
-                String matcherName = ctx.matcherName().Identifier().getText();
-                List<TemplateParameterParser.MatcherParameterContext> params = ctx.matcherParameter();
+                    TemplateParameterParser.MatcherPatternContext ctx = parser.matcherPattern();
+                    String matcherName = ctx.matcherName().Identifier().getText();
+                    List<TemplateParameterParser.MatcherParameterContext> params = ctx.matcherParameter();
 
-                if ("anyArray".equals(matcherName)) {
-                    if (!(parameter instanceof TypedTree)) {
-                        throw new IllegalArgumentException("anyArray can only be used on TypedTree parameters");
-                    }
-
-                    JavaType type = ((TypedTree) parameter).getType();
-                    JavaType.Array arrayType = TypeUtils.asArray(type);
-                    if (arrayType == null) {
-                        JavaType.Method methodType = TypeUtils.asMethod(type);
-                        arrayType = TypeUtils.asArray(methodType == null ? null : methodType.getResolvedSignature().getReturnType());
-                        if (arrayType == null) {
-                            throw new IllegalArgumentException("anyArray can only be used on parameters containing JavaType.Array type attribution");
-                        }
-                    }
-
-                    s = "(/*__p" + i + "__*/new ";
-
-                    StringBuilder extraDim = new StringBuilder();
-                    for (; arrayType.getElemType() instanceof JavaType.Array; arrayType = (JavaType.Array) arrayType.getElemType()) {
-                        extraDim.append("[0]");
-                    }
-
-                    if (arrayType.getElemType() instanceof JavaType.Primitive) {
-                        s += ((JavaType.Primitive) arrayType.getElemType()).getKeyword();
-                    } else if (arrayType.getElemType() instanceof JavaType.FullyQualified) {
-                        s += ((JavaType.FullyQualified) arrayType.getElemType()).getFullyQualifiedName();
-                    }
-
-                    s += "[0]" + extraDim + ")";
-                } else if ("any".equals(matcherName)) {
-                    String fqn;
-
-                    if (params.size() == 1) {
-                        fqn = params.get(0).FullyQualifiedName().getText();
-                    } else {
+                    if ("anyArray".equals(matcherName)) {
                         if (!(parameter instanceof TypedTree)) {
-                            // any should only be used on TypedTree parameters, but will give it a best effort
-                            fqn = "java.lang.Object";
+                            throw new IllegalArgumentException("anyArray can only be used on TypedTree parameters");
+                        }
+
+                        JavaType type = ((TypedTree) parameter).getType();
+                        JavaType.Array arrayType = TypeUtils.asArray(type);
+                        if (arrayType == null) {
+                            JavaType.Method methodType = TypeUtils.asMethod(type);
+                            arrayType = TypeUtils.asArray(methodType == null ? null : methodType.getResolvedSignature().getReturnType());
+                            if (arrayType == null) {
+                                throw new IllegalArgumentException("anyArray can only be used on parameters containing JavaType.Array type attribution");
+                            }
+                        }
+
+                        s = "(/*__p" + i + "__*/new ";
+
+                        StringBuilder extraDim = new StringBuilder();
+                        for (; arrayType.getElemType() instanceof JavaType.Array; arrayType = (JavaType.Array) arrayType.getElemType()) {
+                            extraDim.append("[0]");
+                        }
+
+                        if (arrayType.getElemType() instanceof JavaType.Primitive) {
+                            s += ((JavaType.Primitive) arrayType.getElemType()).getKeyword();
+                        } else if (arrayType.getElemType() instanceof JavaType.FullyQualified) {
+                            s += ((JavaType.FullyQualified) arrayType.getElemType()).getFullyQualifiedName();
+                        }
+
+                        s += "[0]" + extraDim + ")";
+                    } else if ("any".equals(matcherName)) {
+                        String fqn;
+
+                        if (params.size() == 1) {
+                            fqn = params.get(0).FullyQualifiedName().getText();
                         } else {
-                            fqn = getTypeName(((TypedTree) parameter).getType());
+                            if (!(parameter instanceof TypedTree)) {
+                                // any should only be used on TypedTree parameters, but will give it a best effort
+                                fqn = "java.lang.Object";
+                            } else {
+                                fqn = getTypeName(((TypedTree) parameter).getType());
+                            }
                         }
-                    }
 
-                    JavaType.Primitive primitive = JavaType.Primitive.fromKeyword(fqn);
-                    if (primitive != null) {
-                        s = "(/*__p" + i + "__*/";
-                        switch (primitive) {
-                            case Boolean:
-                                s += "true";
-                                break;
-                            case Double:
-                            case Float:
-                            case Int:
-                            case Long:
-                                s += "0";
-                                break;
-                            case Short:
-                                s += "(short)0";
-                                break;
-                            case Byte:
-                                s += "(byte)0";
-                                break;
-                            case Char:
-                                s += "'\0'";
-                                break;
-                            case String:
-                                s += "\"\"";
-                                break;
+                        JavaType.Primitive primitive = JavaType.Primitive.fromKeyword(fqn);
+                        if (primitive != null) {
+                            s = "(/*__p" + i + "__*/";
+                            switch (primitive) {
+                                case Boolean:
+                                    s += "true";
+                                    break;
+                                case Double:
+                                case Float:
+                                case Int:
+                                case Long:
+                                    s += "0";
+                                    break;
+                                case Short:
+                                    s += "(short)0";
+                                    break;
+                                case Byte:
+                                    s += "(byte)0";
+                                    break;
+                                case Char:
+                                    s += "'\0'";
+                                    break;
+                                case String:
+                                    s += "\"\"";
+                                    break;
+                            }
+                            s += ")";
+                        } else if ("Object".equals(fqn)) {
+                            s = "(/*__p" + i + "__*/null)";
+                        } else {
+                            s = "(/*__p" + i + "__*/(" + fqn + ")null)";
                         }
-                        s += ")";
-                    } else if ("Object".equals(fqn)) {
-                        s = "(/*__p" + i + "__*/null)";
+                        parameters[i] = ((J) parameter).withPrefix(Space.EMPTY);
                     } else {
-                        s = "(/*__p" + i + "__*/(" + fqn + ")null)";
+                        throw new IllegalArgumentException("Invalid template matcher '" + key + "'");
                     }
-                    parameters[i] = ((J) parameter).withPrefix(Space.EMPTY);
                 } else {
-                    throw new IllegalArgumentException("Invalid template matcher '" + key + "'");
+                    s = substituteSingle(parameter, i);
                 }
-            } else {
-                s = substituteSingle(parameter, i);
-            }
 
-            return s;
-        });
+                return s;
+            });
+
+            if(previous.equals(substituted)) {
+                break;
+            }
+        }
+
+        return substituted;
     }
 
     private String getTypeName(@Nullable JavaType type) {

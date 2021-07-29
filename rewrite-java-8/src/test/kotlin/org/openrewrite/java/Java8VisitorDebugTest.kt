@@ -200,6 +200,10 @@ class Java8IndexOfShouldNotCompareGreaterThanZeroTest : Java8Test, IndexOfShould
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8IsEmptyCallOnCollectionsTest : Java8Test, IsEmptyCallOnCollectionsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8ImplementInterfaceTest : Java8Test, ImplementInterfaceTest
 
 @DebugOnly
