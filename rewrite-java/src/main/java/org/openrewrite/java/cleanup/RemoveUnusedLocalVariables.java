@@ -19,16 +19,15 @@ import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.DeleteStatement;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.Statement;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
+import java.util.function.Predicate;
 
 @SuppressWarnings({"ConstantConditions", "StatementWithEmptyBody"})
 public class RemoveUnusedLocalVariables extends Recipe {
@@ -86,9 +85,9 @@ public class RemoveUnusedLocalVariables extends Recipe {
                     !(parentScope.getValue() instanceof J.Try.Catch || parentScope.getValue() instanceof J.MultiCatch) &&
                     // skip if defined as a parameter to a lambda expression
                     !(parentScope.getValue() instanceof J.Lambda)) {
-                Set<NameTree> readReferences = FindReadReferencesToVariable.find(parentScope.getValue(), variable);
+                List<J> readReferences = References.findRhsReferences(parentScope.getValue(), variable.getName());
                 if (readReferences.isEmpty()) {
-                    Set<Statement> assignmentReferences = FindAssignmentReferencesToVariable.find(parentScope.getValue(), variable);
+                    List<Statement> assignmentReferences = References.findLhsReferences(parentScope.getValue(), variable);
                     for (Statement ref : assignmentReferences) {
                         doAfterVisit(new DeleteStatement<>(ref));
                     }
@@ -109,102 +108,132 @@ public class RemoveUnusedLocalVariables extends Recipe {
 
     }
 
-    private static class FindReadReferencesToVariable {
-        private FindReadReferencesToVariable() {
+    private static class References {
+        private static final J.Unary.Type[] incrementKinds = {
+                J.Unary.Type.PreIncrement,
+                J.Unary.Type.PreDecrement,
+                J.Unary.Type.PostIncrement,
+                J.Unary.Type.PostDecrement
+        };
+        private static final Predicate<Cursor> isUnaryIncrementKind = t -> t.getValue() instanceof J.Unary && isIncrementKind(t);
+
+        private static boolean isIncrementKind(Cursor tree) {
+            if (tree.getValue() instanceof J.Unary) {
+                J.Unary unary = tree.getValue();
+                return Arrays.stream(incrementKinds).anyMatch(kind -> kind == unary.getOperator());
+            }
+            return false;
+        }
+
+        static @Nullable Cursor dropParentWhile(Predicate<Object> valuePredicate, Cursor cursor) {
+            while (cursor != null && valuePredicate.test(cursor.getValue())) {
+                cursor = cursor.getParent();
+            }
+            return cursor;
+        }
+
+        static @Nullable Cursor dropParentUntil(Predicate<Object> valuePredicate, Cursor cursor) {
+            while (cursor != null && !valuePredicate.test(cursor.getValue())) {
+                cursor = cursor.getParent();
+            }
+            return cursor;
+        }
+
+        static boolean isRhsValue(Cursor tree) {
+            if (!(tree.getValue() instanceof J.Identifier)) {
+                return false;
+            }
+
+            Cursor parent = dropParentWhile(J.Parentheses.class::isInstance, tree.getParent());
+            assert parent != null;
+            if (parent.getValue() instanceof J.Assignment) {
+                if (dropParentUntil(J.ControlParentheses.class::isInstance, parent) != null) {
+                    return true;
+                }
+                J.Assignment assignment = parent.getValue();
+                return assignment.getVariable() != tree.getValue();
+            }
+
+            if (parent.getValue() instanceof J.VariableDeclarations.NamedVariable) {
+                J.VariableDeclarations.NamedVariable namedVariable = parent.getValue();
+                return namedVariable.getName() != tree.getValue();
+            }
+
+            if (parent.getValue() instanceof J.AssignmentOperation) {
+                J.AssignmentOperation assignmentOperation = parent.getValue();
+                if (assignmentOperation.getVariable() == tree.getValue()) {
+                    J grandParent = parent.dropParentUntil(J.class::isInstance).getValue();
+                    return (grandParent instanceof Expression || grandParent instanceof J.Return);
+                }
+            }
+
+            return !(isUnaryIncrementKind.test(parent) && parent.dropParentUntil(J.class::isInstance).getValue() instanceof J.Block);
         }
 
         /**
-         * @param j        The subtree to search.
-         * @param variable A {@link J.VariableDeclarations.NamedVariable} to check for usages.
-         * @return A set of {@link NameTree} locations of "right-hand" read calls.
+         * An identifier is considered a right-hand side ("rhs") read operation if it is not used as the left operand
+         * of an assignment, nor as the operand of a stand-alone increment.
+         *
+         * @param j      The subtree to search.
+         * @param target A {@link J.Identifier} to check for usages.
+         * @return found {@link J} locations of "right-hand" read calls.
          */
-        public static Set<NameTree> find(J j, J.VariableDeclarations.NamedVariable variable) {
-            final Set<NameTree> refs = new HashSet<>();
-            new JavaIsoVisitor<Set<NameTree>>() {
+        static List<J> findRhsReferences(J j, J.Identifier target) {
+            final List<J> refs = new ArrayList<>();
+            new JavaIsoVisitor<List<J>>() {
                 @Override
-                public J.Identifier visitIdentifier(J.Identifier identifier, Set<NameTree> ctx) {
-                    J.Identifier i = super.visitIdentifier(identifier, ctx);
-                    if (i.getSimpleName().equals(variable.getSimpleName())) {
-                        assert getCursor().getParent() != null;
-                        Object parent = getCursor().getParent().getValue();
-                        if (parent instanceof J.Assignment) {
-                            J.Assignment parentTree = (J.Assignment) parent;
-                            if (!parentTree.getVariable().isScope(i)) {
-                                ctx.add(i);
-                            }
-                        } else if (parent instanceof J.AssignmentOperation) {
-                            J.AssignmentOperation parentTree = (J.AssignmentOperation) parent;
-                            if (parentTree.getVariable().isScope(i)) {
-                                Object grandParent = getCursor().getParent().dropParentUntil(J.class::isInstance).getValue();
-                                if (grandParent instanceof Expression || grandParent instanceof J.Return) {
-                                    ctx.add(i);
-                                }
-                            } else {
-                                // implying the identifier is on the "assignment" side of the operation, thus a read
-                                ctx.add(i);
-                            }
-                        } else if (parent instanceof J.VariableDeclarations.NamedVariable) {
-                            // do nothing
-                        } else {
-                            ctx.add(i);
-                        }
+                public J.Identifier visitIdentifier(J.Identifier identifier, List<J> ctx) {
+                    if (identifier.getSimpleName().equals(target.getSimpleName()) && isRhsValue(getCursor())) {
+                        ctx.add(identifier);
                     }
-                    return i;
+                    return super.visitIdentifier(identifier, ctx);
                 }
             }.visit(j, refs);
             return refs;
         }
-    }
-
-    private static class FindAssignmentReferencesToVariable {
-        private FindAssignmentReferencesToVariable() {
-        }
 
         /**
-         * @param j        The subtree to search.
-         * @param variable A {@link J.VariableDeclarations.NamedVariable} to check for usages.
-         * @return A set of {@link Statement} locations of "left-hand" assignment write calls.
+         * @param j      The subtree to search.
+         * @param target A {@link J.VariableDeclarations.NamedVariable} to check for usages.
+         * @return found {@link Statement} locations of "left-hand" assignment write calls.
          */
-        private static Set<Statement> find(J j, J.VariableDeclarations.NamedVariable variable) {
-            JavaIsoVisitor<Set<Statement>> visitor = new JavaIsoVisitor<Set<Statement>>() {
+        static List<Statement> findLhsReferences(J j, J.VariableDeclarations.NamedVariable target) {
+            JavaIsoVisitor<List<Statement>> visitor = new JavaIsoVisitor<List<Statement>>() {
                 @Override
-                public J.Assignment visitAssignment(J.Assignment assignment, Set<Statement> ctx) {
-                    J.Assignment a = super.visitAssignment(assignment, ctx);
-                    if (a.getVariable() instanceof J.Identifier) {
-                        J.Identifier i = ((J.Identifier) a.getVariable());
-                        if (i.getSimpleName().equals(variable.getSimpleName())) {
+                public J.Assignment visitAssignment(J.Assignment assignment, List<Statement> ctx) {
+                    if (assignment.getVariable() instanceof J.Identifier) {
+                        J.Identifier i = ((J.Identifier) assignment.getVariable());
+                        if (i.getSimpleName().equals(target.getSimpleName())) {
                             ctx.add(assignment);
                         }
                     }
-                    return a;
+                    return super.visitAssignment(assignment, ctx);
                 }
 
                 @Override
-                public J.AssignmentOperation visitAssignmentOperation(J.AssignmentOperation assignOp, Set<Statement> ctx) {
-                    J.AssignmentOperation a = super.visitAssignmentOperation(assignOp, ctx);
-                    if (a.getVariable() instanceof J.Identifier) {
-                        J.Identifier i = ((J.Identifier) a.getVariable());
-                        if (i.getSimpleName().equals(variable.getSimpleName())) {
+                public J.AssignmentOperation visitAssignmentOperation(J.AssignmentOperation assignOp, List<Statement> ctx) {
+                    if (assignOp.getVariable() instanceof J.Identifier) {
+                        J.Identifier i = ((J.Identifier) assignOp.getVariable());
+                        if (i.getSimpleName().equals(target.getSimpleName())) {
                             ctx.add(assignOp);
                         }
                     }
-                    return a;
+                    return super.visitAssignmentOperation(assignOp, ctx);
                 }
 
                 @Override
-                public J.Unary visitUnary(J.Unary unary, Set<Statement> ctx) {
-                    J.Unary u = super.visitUnary(unary, ctx);
-                    if (u.getExpression() instanceof J.Identifier) {
-                        J.Identifier i = ((J.Identifier) u.getExpression());
-                        if (i.getSimpleName().equals(variable.getSimpleName())) {
+                public J.Unary visitUnary(J.Unary unary, List<Statement> ctx) {
+                    if (unary.getExpression() instanceof J.Identifier) {
+                        J.Identifier i = ((J.Identifier) unary.getExpression());
+                        if (i.getSimpleName().equals(target.getSimpleName())) {
                             ctx.add(unary);
                         }
                     }
-                    return u;
+                    return super.visitUnary(unary, ctx);
                 }
             };
 
-            Set<Statement> refs = new HashSet<>();
+            List<Statement> refs = new ArrayList<>();
             visitor.visit(j, refs);
             return refs;
         }
