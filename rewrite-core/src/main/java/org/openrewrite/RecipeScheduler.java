@@ -203,9 +203,10 @@ public interface RecipeScheduler {
         List<SourceFile> afterWidened = recipe.visit((List<SourceFile>) after, ctx);
 
         if (afterWidened != after) {
-
-            final Map<UUID, SourceFile> originalMap = after.stream()
-                    .collect(Collectors.toMap(SourceFile::getId, Function.identity()));
+            Map<UUID, SourceFile> originalMap = new HashMap<>(after.size());
+            for (SourceFile file : after) {
+                originalMap.put(file.getId(), file);
+            }
             afterWidened = ListUtils.map(afterWidened, s -> {
                 SourceFile original = originalMap.get(s.getId());
                 if (original == null) {
