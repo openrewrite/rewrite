@@ -792,6 +792,7 @@ class AddProvenanceScopedDependencyTest {
             sourceSet,
             JavaProvenance.BuildTool(JavaProvenance.BuildTool.Type.Maven, ""),
             JavaProvenance.JavaVersion(javaRuntimeVersion, javaVendor,javaRuntimeVersion,javaRuntimeVersion),
+            emptySet(),
             JavaProvenance.Publication(groupId, artifactId, version)
         )
     }

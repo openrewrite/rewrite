@@ -35,13 +35,10 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
-import static org.openrewrite.Tree.randomId;
 
 /**
  * Parse a Maven project on disk into a list of {@link org.openrewrite.SourceFile} including
@@ -83,9 +80,8 @@ public class MavenProjectParser {
         }
 
         for (Maven maven : mavens) {
-            JavaProvenance mainProvenance = getJavaProvenance(maven, projectDirectory, "main");
-            JavaProvenance testProvenance = getJavaProvenance(maven, projectDirectory, "test");
             List<Path> dependencies = downloadArtifacts(maven.getModel().getDependencies(Scope.Compile));
+            JavaProvenance mainProvenance = getJavaProvenance(maven, projectDirectory, "main", dependencies);
             javaParser.setClasspath(dependencies);
             sourceFiles.addAll(
                     ListUtils.map(javaParser.parse(maven.getJavaSources(projectDirectory, ctx), projectDirectory, ctx),
@@ -93,6 +89,7 @@ public class MavenProjectParser {
                     ));
 
             List<Path> testDependencies = downloadArtifacts(maven.getModel().getDependencies(Scope.Test));
+            JavaProvenance testProvenance = getJavaProvenance(maven, projectDirectory, "test", testDependencies);
             javaParser.setClasspath(testDependencies);
             sourceFiles.addAll(
                     ListUtils.map(javaParser.parse(maven.getTestJavaSources(projectDirectory, ctx), projectDirectory, ctx),
@@ -106,7 +103,7 @@ public class MavenProjectParser {
         return ListUtils.map(sourceFiles, s -> s.withMarkers(s.getMarkers().addIfAbsent(gitProvenance)));
     }
 
-    private JavaProvenance getJavaProvenance(Maven maven, Path projectDirectory, String sourceSet) {
+    private JavaProvenance getJavaProvenance(Maven maven, Path projectDirectory, String sourceSet, List<Path> dependencies) {
         Pom mavenModel = maven.getModel();
         String javaRuntimeVersion = System.getProperty("java.runtime.version");
         String javaVendor = System.getProperty("java.vm.vendor");
@@ -155,15 +152,16 @@ public class MavenProjectParser {
                 mavenModel.getVersion()
         );
 
-        return new JavaProvenance(
-                randomId(),
+        return JavaProvenance.build(
                 mavenModel.getName(),
                 sourceSet,
                 buildTool,
                 javaVersion,
+                dependencies,
                 publication
         );
     }
+
     private void parseResources(List<Path> resources, Path projectDirectory, List<SourceFile> sourceFiles, JavaProvenance javaProvenance) {
         sourceFiles.addAll(
                 ListUtils.map(

@@ -20,6 +20,7 @@ dependencies {
     implementation("org.antlr:antlr4:4.9.2")
     compileOnly("com.puppycrawl.tools:checkstyle:latest.release")
     implementation("commons-lang:commons-lang:latest.release")
+    implementation("io.github.classgraph:classgraph:latest.release")
 
     api("com.fasterxml.jackson.core:jackson-annotations:2.12.+")
 
