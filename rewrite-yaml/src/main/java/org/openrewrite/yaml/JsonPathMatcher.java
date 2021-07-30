@@ -46,7 +46,7 @@ public class JsonPathMatcher {
         this.jsonPath = jsonPath;
     }
 
-    public Optional<Object> find(Cursor cursor) {
+    public <T> Optional<T> find(Cursor cursor) {
         LinkedList<Tree> cursorPath = cursor.getPathAsStream()
                 .filter(o -> o instanceof Tree)
                 .map(Tree.class::cast)
@@ -65,7 +65,9 @@ public class JsonPathMatcher {
         @SuppressWarnings("ConstantConditions") JsonPathVisitor<Object> v = new JsonPathYamlVisitor(cursorPath, start);
         JsonPath.JsonpathContext ctx = jsonPath().jsonpath();
         Object result = v.visit(ctx);
-        return Optional.ofNullable(result);
+
+        //noinspection unchecked
+        return Optional.ofNullable((T) result);
     }
 
     public boolean matches(Cursor cursor) {
