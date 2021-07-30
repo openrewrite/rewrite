@@ -144,7 +144,7 @@ class TypeValidator(
 
     override fun visitMethodDeclaration(method: J.MethodDeclaration, p: MutableList<InvalidTypeResult>): J.MethodDeclaration {
         val m = super.visitMethodDeclaration(method, p)
-        if(options.classDeclarations) {
+        if(!options.methodDeclarations) {
             return m
         }
         val mt = m.type
