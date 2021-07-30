@@ -149,6 +149,9 @@ interface JavaTemplateTest : JavaRecipeTest {
                 return m
             }
         }.toRecipe(),
+        typeValidation = {
+            identifiers = false
+        },
         before = """
             import org.openrewrite.Test;
             class A {
@@ -1005,6 +1008,9 @@ interface JavaTemplateTest : JavaRecipeTest {
                 }
             }
         """,
+        typeValidation = {
+            identifiers = false
+        },
         afterConditions = { cu ->
             val type = (cu.classes.first().body.statements.first() as J.MethodDeclaration).type!!
             assertThat(type).isNotNull
@@ -1025,6 +1031,21 @@ interface JavaTemplateTest : JavaRecipeTest {
                     }
         }
     )
+
+    @Test
+    fun foo(jp: JavaParser) {
+        val cu = jp.parse("""
+                        import java.util.List;
+                        
+                        class Test {
+                        
+                            <T, U> void test(List<T> t, U u) {
+                            }
+                        }
+        """.trimIndent()).first()
+        val md = cu.classes[0].body.statements[0]
+        md
+    }
 
     @Test
     fun replaceClassTypeParameters(jp: JavaParser) = assertChanged(

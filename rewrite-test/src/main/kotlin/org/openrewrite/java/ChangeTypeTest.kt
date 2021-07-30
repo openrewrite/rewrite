@@ -69,6 +69,7 @@ interface ChangeTypeTest : JavaRecipeTest {
         """.trimIndent())
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/868")
     @Test
     fun changeInnerClassToOuterClass(jp: JavaParser) = assertChanged(
         jp,

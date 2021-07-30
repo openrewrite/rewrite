@@ -191,8 +191,14 @@ public class ChangeType extends Recipe {
                 JavaType.Class oldType = JavaType.Class.build(oldFullyQualifiedTypeName);
                 if (maybeClass.toString().equals(oldType.getClassName())) {
                     maybeRemoveImport(oldType.getOwningClass());
-                    return updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getClassName())
+                    Expression e = updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getClassName())
                             .withPrefix(fieldAccess.getPrefix()));
+                    // If a FieldAccess like Map.Entry has been replaced with an Identifier, ensure that identifier has the correct type
+                    if(e instanceof J.Identifier && e.getType() == null) {
+                        J.Identifier i = (J.Identifier) e;
+                        e = i.withType(targetType);
+                    }
+                    return e;
                 }
             }
             return super.visitFieldAccess(fieldAccess, ctx);

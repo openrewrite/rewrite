@@ -23,19 +23,60 @@ import org.openrewrite.java.tree.J
 /**
  * Produces a report about missing type attributions within a CompilationUnit.
  */
-class TypeValidator : JavaIsoVisitor<MutableList<InvalidTypeResult>>() {
-    data class InvalidTypeResult(val cursor: Cursor, val astElement: J, val message: String)
+class TypeValidator(
+    val options: ValidationOptions = defaultOptions
+) : JavaIsoVisitor<MutableList<InvalidTypeResult>>() {
+
+    data class InvalidTypeResult(
+        val cursor: Cursor,
+        val message: String
+    )
+
+    data class ValidationOptions(
+        val classDeclarations: Boolean = true,
+        val identifiers: Boolean = true,
+        val methodDeclarations: Boolean = true,
+        val methodInvocations: Boolean = true,
+    ) {
+        companion object {
+            class Builder(
+                var classDeclarations: Boolean = true,
+                var identifiers: Boolean = true,
+                var methodDeclarations: Boolean = true,
+                var methodInvocations: Boolean = true,
+            )
+            fun builder(init: Builder.()->Unit): ValidationOptions {
+                val builder = Builder()
+                init.invoke(builder)
+                return ValidationOptions(
+                    classDeclarations = builder.classDeclarations,
+                    identifiers = builder.identifiers,
+                    methodDeclarations = builder.methodDeclarations,
+                    methodInvocations = builder.methodInvocations
+                )
+            }
+        }
+    }
+
     companion object {
+        val defaultOptions = ValidationOptions()
+
         @JvmStatic
-        fun analyzeTypes(cu: J.CompilationUnit): List<InvalidTypeResult> {
+        fun analyzeTypes(
+            cu: J.CompilationUnit,
+            options: ValidationOptions = defaultOptions
+        ): List<InvalidTypeResult> {
             val report = mutableListOf<InvalidTypeResult>()
-            TypeValidator().visit(cu, report)
+            TypeValidator(options).visit(cu, report)
             return report
         }
 
         @JvmStatic
-        fun assertTypesValid(cu: J.CompilationUnit) {
-            val report = analyzeTypes(cu)
+        fun assertTypesValid(
+            cu: J.CompilationUnit,
+            options: ValidationOptions = defaultOptions
+        ) {
+            val report = analyzeTypes(cu, options)
             if(report.isNotEmpty()) {
 
                 val reportText = report.asSequence()
@@ -43,7 +84,7 @@ class TypeValidator : JavaIsoVisitor<MutableList<InvalidTypeResult>>() {
                              |  ${it.message}
                              |    At : ${it.cursor}
                              |    AST:
-                             ${it.astElement.printTrimmed().prependIndent("|      ")}
+                             ${it.cursor.getValue<J>().printTrimmed().prependIndent("|      ")}
                              |
                         """.trimMargin() }
                         .joinToString("\n")
@@ -55,11 +96,15 @@ class TypeValidator : JavaIsoVisitor<MutableList<InvalidTypeResult>>() {
          * Convenience method for creating an InvalidType result without having to manually specify anything except the message.
          * And a convenient place to put a breakpoint if you want to catch an invalid type in the debugger.
          */
-        private fun JavaVisitor<*>.invalidTypeResult(message: String) = InvalidTypeResult(cursor, cursor.getValue(), message)
+        private fun JavaVisitor<*>.invalidTypeResult(message: String) = InvalidTypeResult(cursor, message)
     }
 
     override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: MutableList<InvalidTypeResult>): J.ClassDeclaration {
         val c = super.visitClassDeclaration(classDecl, p)
+        if(!options.classDeclarations) {
+            return c
+        }
+
         val t = c.type
         if(t == null) {
             p.add(invalidTypeResult("J.ClassDeclaration type is null"))
@@ -79,6 +124,9 @@ class TypeValidator : JavaIsoVisitor<MutableList<InvalidTypeResult>>() {
 
     override fun visitMethodInvocation(method: J.MethodInvocation, p: MutableList<InvalidTypeResult>): J.MethodInvocation {
         val m = super.visitMethodInvocation(method, p)
+        if(!options.methodInvocations) {
+            return m;
+        }
         val mt = method.type
         if(mt == null) {
             p.add(invalidTypeResult("J.MethodInvocation type is null"))
@@ -96,6 +144,9 @@ class TypeValidator : JavaIsoVisitor<MutableList<InvalidTypeResult>>() {
 
     override fun visitMethodDeclaration(method: J.MethodDeclaration, p: MutableList<InvalidTypeResult>): J.MethodDeclaration {
         val m = super.visitMethodDeclaration(method, p)
+        if(options.classDeclarations) {
+            return m
+        }
         val mt = m.type
         if(mt == null) {
             p.add(invalidTypeResult("J.MethodDeclaration type is null"))
@@ -112,6 +163,9 @@ class TypeValidator : JavaIsoVisitor<MutableList<InvalidTypeResult>>() {
 
     override fun visitIdentifier(identifier: J.Identifier, p: MutableList<InvalidTypeResult>): J.Identifier {
         val i = super.visitIdentifier(identifier, p)
+        if(!options.identifiers) {
+            return i
+        }
         val t = i.type
 
         // The non-nullability of J.Identifier.getType() in our AST is a white lie

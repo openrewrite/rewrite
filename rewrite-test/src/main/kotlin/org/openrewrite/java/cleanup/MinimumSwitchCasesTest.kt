@@ -57,7 +57,9 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
                 }
             }
         """,
-        skipEnhancedTypeValidation = true
+        typeValidation = {
+            methodInvocations = false
+        }
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
@@ -91,7 +93,9 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
                 }
             }
         """,
-        skipEnhancedTypeValidation = true
+        typeValidation = {
+            methodInvocations = false
+        }
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
@@ -125,7 +129,9 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
                 }
             }
         """,
-        skipEnhancedTypeValidation = true
+        typeValidation = {
+            methodInvocations = false
+        }
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
@@ -159,7 +165,9 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
                 }
             }
         """,
-        skipEnhancedTypeValidation = true
+        typeValidation = {
+            methodInvocations = false
+        }
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
@@ -188,7 +196,9 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
                 }
             }
         """,
-        skipEnhancedTypeValidation = true
+        typeValidation = {
+            methodInvocations = false
+        }
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
@@ -217,7 +227,9 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
                 }
             }
         """,
-        skipEnhancedTypeValidation = true
+        typeValidation = {
+            methodInvocations = false
+        }
     )
 
     @Suppress("StatementWithEmptyBody")

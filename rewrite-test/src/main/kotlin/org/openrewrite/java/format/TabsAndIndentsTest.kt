@@ -43,27 +43,36 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         jp,
         before = """
             class Test {{
-                if (condition)
+                if (true == false)
                 doTheThing();
             
                 doTheOtherThing();
                 somethingElseEntirely();
             
                 foo();
-            }}
+            }
+                public static void doTheThing() {}
+                public static void doTheOtherThing() {}
+                public static void somethingElseEntirely() {}
+                public static void foo() {}
+            }
         """,
         after = """
             class Test {{
-                if (condition)
+                if (true == false)
                     doTheThing();
             
                 doTheOtherThing();
                 somethingElseEntirely();
             
                 foo();
-            }}
-        """,
-        skipEnhancedTypeValidation = true
+            }
+                public static void doTheThing() {}
+                public static void doTheOtherThing() {}
+                public static void somethingElseEntirely() {}
+                public static void foo() {}
+            }
+        """
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/623")
