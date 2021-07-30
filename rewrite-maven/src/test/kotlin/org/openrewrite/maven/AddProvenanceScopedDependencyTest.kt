@@ -18,21 +18,19 @@ package org.openrewrite.maven
 import org.junit.jupiter.api.fail
 import org.assertj.core.api.Assertions.*
 import org.intellij.lang.annotations.Language
-import org.junit.jupiter.api.Assertions
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.*
 import org.openrewrite.internal.ListUtils
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.marker.JavaProvenance
-import org.openrewrite.maven.tree.Maven
 import org.openrewrite.scheduling.ForkJoinScheduler
 import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ForkJoinPool
 
-class AddTypeMatchedDependencyTest {
+class AddProvenanceScopedDependencyTest {
 
     private val treePrinter: TreePrinter<*>?
         get() = null
@@ -73,8 +71,41 @@ class AddTypeMatchedDependencyTest {
         get() = javaProvenance(groupId = "com.mycompany.app", artifactId = "my-app", version="1", sourceSet= "test")
 
     @Test
+    fun doNotAddIfNotInProvenance() = assertUnchanged(
+        //This should not add the dependency because the default scope is "main", but the type is  in the "test" source
+        //set
+        recipe = AddProvenanceScopedDependency.builder()
+            .groupId("com.google.guava")
+            .artifactId("guava")
+            .version("29.0-jre")
+            .typeMatchExpressions(listOf("com.google.common.math.IntMath")).build(),
+        additionalSources = parseJavaFiles(
+            javaSources = arrayOf(
+                """
+                package org.openrewrite.java.testing;
+                import com.google.common.math.IntMath;
+                public class A {
+                    boolean getMap() {
+                        return IntMath.isPrime(5);
+                    }
+                }
+                """
+            ), javaProvenance = testJavaProvenance
+        ),
+        before = """
+        <project>
+            <groupId>com.mycompany.app</groupId>
+            <artifactId>my-app</artifactId>
+            <version>1</version>
+            <dependencies>
+            </dependencies>
+        </project>
+        """
+    )
+
+    @Test
     fun onlyIfUsing() = assertChanged(
-        recipe = AddTypeMatchedDependency.builder()
+        recipe = AddProvenanceScopedDependency.builder()
             .groupId("com.google.guava")
             .artifactId("guava")
             .version("29.0-jre")
@@ -119,7 +150,7 @@ class AddTypeMatchedDependencyTest {
 
     @Test
     fun onlyIfUsingWildcard() = assertChanged(
-        recipe = AddTypeMatchedDependency.builder()
+        recipe = AddProvenanceScopedDependency.builder()
             .groupId("com.google.guava")
             .artifactId("guava")
             .version("29.0-jre")
@@ -167,7 +198,7 @@ class AddTypeMatchedDependencyTest {
 
     @Test
     fun typeNotFoundNoChange() = assertUnchanged(
-        recipe = AddTypeMatchedDependency.builder()
+        recipe = AddProvenanceScopedDependency.builder()
             .groupId("com.google.guava")
             .artifactId("guava")
             .version("29.0-jre")
@@ -201,7 +232,7 @@ class AddTypeMatchedDependencyTest {
 
     @Test
     fun addToExistingDependencies() = assertChanged(
-            recipe = AddTypeMatchedDependency.builder()
+            recipe = AddProvenanceScopedDependency.builder()
                 .groupId("com.google.guava")
                 .artifactId("guava")
                 .version("29.0-jre")
@@ -256,7 +287,7 @@ class AddTypeMatchedDependencyTest {
 
     @Test
     fun doNotAddBecauseAlreadyTransitive() = assertUnchanged(
-        recipe = AddTypeMatchedDependency.builder()
+        recipe = AddProvenanceScopedDependency.builder()
             .groupId("org.junit.jupiter")
             .artifactId("junit-jupiter-api")
             .version("5.x")
@@ -321,7 +352,7 @@ class AddTypeMatchedDependencyTest {
     @Test
     fun semVersion() {
         assertChanged(
-            recipe = AddTypeMatchedDependency.builder()
+            recipe = AddProvenanceScopedDependency.builder()
                 .groupId("com.google.guava")
                 .artifactId("guava")
                 .version("29.x")
@@ -368,7 +399,7 @@ class AddTypeMatchedDependencyTest {
 
     @Test
     fun addTestDependenciesAfterCompile() = assertChanged(
-        recipe = AddTypeMatchedDependency.builder()
+        recipe = AddProvenanceScopedDependency.builder()
             .groupId("org.junit.jupiter")
             .artifactId("junit-jupiter-api")
             .version("5.7.0")
@@ -428,7 +459,7 @@ class AddTypeMatchedDependencyTest {
 
     @Test
     fun addDependencyDoesntAddWhenExistingDependency() = assertUnchanged(
-        recipe = AddTypeMatchedDependency.builder()
+        recipe = AddProvenanceScopedDependency.builder()
             .groupId("org.junit.jupiter")
             .artifactId("junit-jupiter-api")
             .version("5.7.0")
@@ -474,7 +505,7 @@ class AddTypeMatchedDependencyTest {
 
     @Test
     fun useManagedDependency() = assertChanged(
-        recipe = AddTypeMatchedDependency.builder()
+        recipe = AddProvenanceScopedDependency.builder()
             .groupId("com.fasterxml.jackson.core")
             .artifactId("jackson-databind")
             .version("2.12.4")
@@ -534,7 +565,7 @@ class AddTypeMatchedDependencyTest {
     )
     @Test
     fun useRequestedVersionInUseByOtherMembersOfTheFamily() = assertChanged(
-        recipe = AddTypeMatchedDependency.builder()
+        recipe = AddProvenanceScopedDependency.builder()
             .groupId("com.fasterxml.jackson.module")
             .artifactId("jackson-module-afterburner")
             .version("2.10.5")
@@ -597,7 +628,7 @@ class AddTypeMatchedDependencyTest {
 
     @Test
     fun addOptionalDependency() = assertChanged(
-        recipe = AddTypeMatchedDependency.builder()
+        recipe = AddProvenanceScopedDependency.builder()
             .groupId("com.google.guava")
             .artifactId("guava")
             .version("29.0-jre")
@@ -643,7 +674,7 @@ class AddTypeMatchedDependencyTest {
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = AddTypeMatchedDependency.builder().build()
+        var recipe = AddProvenanceScopedDependency.builder().build()
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(4)
@@ -653,7 +684,7 @@ class AddTypeMatchedDependencyTest {
         assertThat(valid.failures()[2].property).isEqualTo("typeMatchExpressions")
 
 
-        recipe = AddTypeMatchedDependency.builder()
+        recipe = AddProvenanceScopedDependency.builder()
             .groupId("org.openrewrite")
             .artifactId("artifact")
             .version("1.0.0")

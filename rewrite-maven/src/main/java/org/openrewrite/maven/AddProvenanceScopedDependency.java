@@ -48,10 +48,9 @@ import static java.util.Collections.*;
 
 /**
  * This recipe will detect the presence of Java types (in Java ASTs) to determine if a dependency should be added
- * to a maven build file. Java Provenance information MUST be available to allow the recipe to filter the type
- * search to only those java ASTs that have the same coordinates of that of the pom. Additionally, if a scope is
- * specified in this recipe, the dependency will only be added if there are types that are transitively within
- * that scope.
+ * to a maven build file. Java Provenance information is used to filter the type search to only those java ASTs that
+ * have the same coordinates of that of the pom. Additionally, if a "scope" is specified in this recipe, the dependency
+ * will only be added if there are types found in a given source set are transitively within that scope.
  *
  * NOTE: IF PROVENANCE INFORMATION IS NOT PRESENT, THIS RECIPE WILL DO NOTHING.
  */
@@ -61,7 +60,7 @@ import static java.util.Collections.*;
 @RequiredArgsConstructor
 @AllArgsConstructor(onConstructor_ = @JsonCreator)
 @EqualsAndHashCode(callSuper = true)
-public class AddTypeMatchedDependency extends Recipe {
+public class AddProvenanceScopedDependency extends Recipe {
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
@@ -237,7 +236,7 @@ public class AddTypeMatchedDependency extends Recipe {
                         return p.getPublication() != null &&
                                 p.getPublication().getGroupId().equals(model.getGroupId()) &&
                                 p.getPublication().getArtifactId().equals(model.getArtifactId()) &&
-                                (dependencyScope == provenanceScope || dependencyScope.isInClasspathOf(provenanceScope));
+                                (dependencyScope == provenanceScope || provenanceScope.isInClasspathOf(dependencyScope));
                     }
             ).collect(Collectors.toSet());
 
