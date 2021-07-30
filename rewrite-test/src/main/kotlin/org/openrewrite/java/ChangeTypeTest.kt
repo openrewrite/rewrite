@@ -72,7 +72,7 @@ interface ChangeTypeTest : JavaRecipeTest {
     @Test
     fun changeInnerClassToOuterClass(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ChangeType("java.util.Map.Entry", "my.pkg.List"),
+        recipe = ChangeType("java.util.Map.Entry", "java.util.List"),
         before = """
             import java.util.Map;
             import java.util.Map.Entry;
@@ -83,7 +83,7 @@ interface ChangeTypeTest : JavaRecipeTest {
             }
         """,
         after = """
-            import my.pkg.List;
+            import java.util.List;
             
             class Test {
                 List p;

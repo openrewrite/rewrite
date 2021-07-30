@@ -109,4 +109,85 @@ class TypeValidator : JavaIsoVisitor<MutableList<InvalidTypeResult>>() {
         }
         return m;
     }
+
+    override fun visitIdentifier(identifier: J.Identifier, p: MutableList<InvalidTypeResult>): J.Identifier {
+        val i = super.visitIdentifier(identifier, p)
+        val t = i.type
+
+        // The non-nullability of J.Identifier.getType() in our AST is a white lie
+        // J.Identifier.getType() is allowed to be null in places where the containing AST element fully specifies the type
+        @Suppress("SENSELESS_COMPARISON")
+        if(t == null) {
+            if(!i.isAllowedToHaveNullType()) {
+                p.add(invalidTypeResult("J.Identifier type is null"))
+            }
+            return i
+        }
+        return i
+    }
+
+    private fun J.Identifier.isAllowedToHaveNullType() = inPackageDeclaration() || inImport() || isClassName()
+            || isMethodName() || isMethodInvocationName() || isFieldAccess() || isBeingDeclared() || isParameterizedType()
+            || isNewClass() || isTypeParameter() || isMemberReference() || isCaseLabel() || isLabel() || isAnnotationField()
+
+    private fun inPackageDeclaration(): Boolean {
+        return cursor.firstEnclosing(J.Package::class.java) != null
+    }
+
+    private fun inImport(): Boolean {
+        return cursor.firstEnclosing(J.Import::class.java) != null
+    }
+
+    private fun isClassName(): Boolean {
+        return cursor.parent!!.getValue<Any>() is J.ClassDeclaration
+    }
+
+    private fun isMethodName(): Boolean {
+        return cursor.parent!!.getValue<Any>() is J.MethodDeclaration
+    }
+
+    private fun isMethodInvocationName(): Boolean {
+        return cursor.parent!!.getValue<Any>() is J.MethodInvocation
+    }
+
+    private fun J.Identifier.isFieldAccess(): Boolean {
+        val parent = cursor.firstEnclosing(J.FieldAccess::class.java)
+        return parent is J.FieldAccess && (parent.name == this || parent.target == this)
+    }
+
+    private fun J.Identifier.isBeingDeclared(): Boolean {
+        val parent = cursor.firstEnclosing(J.VariableDeclarations.NamedVariable::class.java)
+        return parent is J.VariableDeclarations.NamedVariable && parent.name == this
+    }
+
+    private fun J.Identifier.isParameterizedType(): Boolean {
+        val parent = cursor.firstEnclosing(J.ParameterizedType::class.java)
+        return parent is J.ParameterizedType && parent.clazz == this
+    }
+
+    private fun J.Identifier.isNewClass(): Boolean {
+        val parent = cursor.firstEnclosing(J.NewClass::class.java)
+        return parent is J.NewClass && parent.clazz == this
+    }
+
+    private fun isTypeParameter(): Boolean {
+        return cursor.parent!!.getValue<Any>() is J.TypeParameter
+    }
+
+    private fun isMemberReference(): Boolean {
+        return cursor.firstEnclosing(J.MemberReference::class.java) != null
+    }
+
+    private fun isCaseLabel(): Boolean {
+        return cursor.parent!!.getValue<Any>() is J.Case
+    }
+
+    private fun isLabel(): Boolean {
+        return cursor.firstEnclosing(J.Label::class.java) != null
+    }
+
+    private fun J.Identifier.isAnnotationField(): Boolean {
+        val parent = cursor.parent!!.getValue<Any>()
+        return parent is J.Assignment && parent.variable == this && cursor.firstEnclosing(J.Annotation::class.java) != null;
+    }
 }

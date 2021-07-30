@@ -319,6 +319,12 @@ interface TabsAndIndentsTest : JavaRecipeTest {
     @Test
     fun tabsAndIndents(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(tabsAndIndents()).build(),
+        dependsOn = arrayOf(
+            "public interface I1{}",
+            "public interface I2{}",
+            "public class E1 extends Exception{}",
+            "public class E2 extends Exception{}"
+        ),
         before = """
             public class Test {
             public int[] X = new int[]{1, 3, 5, 7, 9, 11};
@@ -1184,8 +1190,9 @@ interface TabsAndIndentsTest : JavaRecipeTest {
             import java.io.ByteArrayInputStream;
             import java.io.InputStream;
             import java.io.Serializable;
-            @Deprecated
-            (since = "1.0")
+            import java.lang.annotation.Retention;
+            @Retention
+            (value = "1.0")
             public
             class
             Test
@@ -1214,8 +1221,9 @@ interface TabsAndIndentsTest : JavaRecipeTest {
             import java.io.ByteArrayInputStream;
             import java.io.InputStream;
             import java.io.Serializable;
-            @Deprecated
-                    (since = "1.0")
+            import java.lang.annotation.Retention;
+            @Retention
+                    (value = "1.0")
             public
             class
             Test

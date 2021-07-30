@@ -30,6 +30,7 @@ interface BooleanChecksNotInvertedTest : JavaRecipeTest {
         jp,
         before = """
             public class Test {
+                int i;
                 int a;
                 void test() {
                     if ( !(a == 2)) {
@@ -40,6 +41,7 @@ interface BooleanChecksNotInvertedTest : JavaRecipeTest {
         """,
         after = """
             public class Test {
+                int i;
                 int a;
                 void test() {
                     if ( a != 2) {

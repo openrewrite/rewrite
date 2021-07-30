@@ -213,6 +213,7 @@ interface RenameVariableTest : JavaRecipeTest {
             package org.openrewrite;
 
             import java.io.FileInputStream;
+            import java.io.FileDescriptor;
 
             public class A {
                 public int val = 0;
@@ -232,6 +233,7 @@ interface RenameVariableTest : JavaRecipeTest {
             package org.openrewrite;
 
             import java.io.FileInputStream;
+            import java.io.FileDescriptor;
 
             public class A {
                 public int VALUE = 0;
