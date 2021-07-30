@@ -182,7 +182,7 @@ class JsonPathMatcherTest {
             object : YamlVisitor<MutableList<Yaml>>() {
                 override fun visitDocument(document: Yaml.Document, p: MutableList<Yaml>): Yaml {
                     val d = super.visitDocument(document, p)
-                    if (matcher.find(cursor).isPresent) {
+                    if (matcher.find<Yaml>(cursor).isPresent) {
                         p.add(d)
                     }
                     return d

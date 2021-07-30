@@ -35,7 +35,7 @@ import static java.util.stream.StreamSupport.stream;
 @EqualsAndHashCode(callSuper = true)
 public class DeleteProperty extends Recipe {
     @Option(displayName = "Property key",
-            description = "The key to be deleted",
+            description = "The key to be deleted.",
             example = "management.metrics.binders.files.enabled")
     String propertyKey;
 
