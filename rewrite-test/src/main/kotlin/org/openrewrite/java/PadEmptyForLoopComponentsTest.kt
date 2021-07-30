@@ -48,6 +48,8 @@ interface PadEmptyForLoopComponentsTest : JavaRecipeTest {
         before = """
             public class A {
                 {
+                    int i = 0;
+                    int j = 10;
                     for (; i < j; i++, j--) { }
                 }
             }
@@ -55,6 +57,8 @@ interface PadEmptyForLoopComponentsTest : JavaRecipeTest {
         after = """
             public class A {
                 {
+                    int i = 0;
+                    int j = 10;
                     for ( ; i < j; i++, j--) { }
                 }
             }
@@ -72,6 +76,8 @@ interface PadEmptyForLoopComponentsTest : JavaRecipeTest {
         before = """
             public class A {
                 {
+                    int i = 0;
+                    int j = 10;
                     for ( ; i < j; i++, j--) { }
                 }
             }
@@ -79,6 +85,8 @@ interface PadEmptyForLoopComponentsTest : JavaRecipeTest {
         after = """
             public class A {
                 {
+                    int i = 0;
+                    int j = 10;
                     for (; i < j; i++, j--) { }
                 }
             }
@@ -96,6 +104,7 @@ interface PadEmptyForLoopComponentsTest : JavaRecipeTest {
         before = """
             public class A {
                 {
+                    int i = 0;
                     for (int i = 0; i < 10;) { i++; }
                 }
             }
@@ -103,6 +112,7 @@ interface PadEmptyForLoopComponentsTest : JavaRecipeTest {
         after = """
             public class A {
                 {
+                    int i = 0;
                     for (int i = 0; i < 10; ) { i++; }
                 }
             }
@@ -120,6 +130,7 @@ interface PadEmptyForLoopComponentsTest : JavaRecipeTest {
         before = """
             public class A {
                 {
+                    int i = 0;
                     for (int i = 0; i < 10; ) { i++; }
                 }
             }
@@ -127,6 +138,7 @@ interface PadEmptyForLoopComponentsTest : JavaRecipeTest {
         after = """
             public class A {
                 {
+                    int i = 0;
                     for (int i = 0; i < 10;) { i++; }
                 }
             }

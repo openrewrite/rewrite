@@ -48,17 +48,14 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
         @Language("java") after: String,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,
-        skipEnhancedTypeValidation: Boolean = false,
+        typeValidation: TypeValidator.ValidationOptions.Companion.Builder.()->Unit = {},
         afterConditions: (J.CompilationUnit) -> Unit = { }
     ) {
-        val typeValidatingAfterConditions: (J.CompilationUnit) -> Unit = if(skipEnhancedTypeValidation) {
-            afterConditions
-        } else {
-            {
-                TypeValidator.assertTypesValid(it)
-                afterConditions(it)
+        val typeValidatingAfterConditions: (J.CompilationUnit) -> Unit = { cu ->
+                TypeValidator.assertTypesValid(cu, TypeValidator.ValidationOptions.builder(typeValidation))
+                afterConditions(cu)
             }
-        }
+
         super.assertChangedBase(parser, recipe, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, typeValidatingAfterConditions)
     }
 
@@ -71,17 +68,13 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
         @Language("java") after: String,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,
-        skipEnhancedTypeValidation: Boolean = false,
+        typeValidation: TypeValidator.ValidationOptions.Companion.Builder.()->Unit = {},
         afterConditions: (J.CompilationUnit) -> Unit = { }
     ) {
-        val typeValidatingAfterConditions: (J.CompilationUnit) -> Unit = if(skipEnhancedTypeValidation) {
-            afterConditions
-        } else {
-            {
-                TypeValidator.assertTypesValid(it)
-                afterConditions(it)
+        val typeValidatingAfterConditions: (J.CompilationUnit) -> Unit = { cu ->
+                TypeValidator.assertTypesValid(cu, TypeValidator.ValidationOptions.builder(typeValidation))
+                afterConditions(cu)
             }
-        }
         super.assertChangedBase(parser, recipe, before, relativeTo, dependsOn, after, cycles, expectedCyclesThatMakeChanges, typeValidatingAfterConditions)
     }
 

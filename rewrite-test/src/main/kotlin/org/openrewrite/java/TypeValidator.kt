@@ -23,19 +23,60 @@ import org.openrewrite.java.tree.J
 /**
  * Produces a report about missing type attributions within a CompilationUnit.
  */
-class TypeValidator : JavaIsoVisitor<MutableList<InvalidTypeResult>>() {
-    data class InvalidTypeResult(val cursor: Cursor, val astElement: J, val message: String)
+class TypeValidator(
+    val options: ValidationOptions = defaultOptions
+) : JavaIsoVisitor<MutableList<InvalidTypeResult>>() {
+
+    data class InvalidTypeResult(
+        val cursor: Cursor,
+        val message: String
+    )
+
+    data class ValidationOptions(
+        val classDeclarations: Boolean = true,
+        val identifiers: Boolean = true,
+        val methodDeclarations: Boolean = true,
+        val methodInvocations: Boolean = true,
+    ) {
+        companion object {
+            class Builder(
+                var classDeclarations: Boolean = true,
+                var identifiers: Boolean = true,
+                var methodDeclarations: Boolean = true,
+                var methodInvocations: Boolean = true,
+            )
+            fun builder(init: Builder.()->Unit): ValidationOptions {
+                val builder = Builder()
+                init.invoke(builder)
+                return ValidationOptions(
+                    classDeclarations = builder.classDeclarations,
+                    identifiers = builder.identifiers,
+                    methodDeclarations = builder.methodDeclarations,
+                    methodInvocations = builder.methodInvocations
+                )
+            }
+        }
+    }
+
     companion object {
+        val defaultOptions = ValidationOptions()
+
         @JvmStatic
-        fun analyzeTypes(cu: J.CompilationUnit): List<InvalidTypeResult> {
+        fun analyzeTypes(
+            cu: J.CompilationUnit,
+            options: ValidationOptions = defaultOptions
+        ): List<InvalidTypeResult> {
             val report = mutableListOf<InvalidTypeResult>()
-            TypeValidator().visit(cu, report)
+            TypeValidator(options).visit(cu, report)
             return report
         }
 
         @JvmStatic
-        fun assertTypesValid(cu: J.CompilationUnit) {
-            val report = analyzeTypes(cu)
+        fun assertTypesValid(
+            cu: J.CompilationUnit,
+            options: ValidationOptions = defaultOptions
+        ) {
+            val report = analyzeTypes(cu, options)
             if(report.isNotEmpty()) {
 
                 val reportText = report.asSequence()
@@ -43,7 +84,7 @@ class TypeValidator : JavaIsoVisitor<MutableList<InvalidTypeResult>>() {
                              |  ${it.message}
                              |    At : ${it.cursor}
                              |    AST:
-                             ${it.astElement.printTrimmed().prependIndent("|      ")}
+                             ${it.cursor.getValue<J>().printTrimmed().prependIndent("|      ")}
                              |
                         """.trimMargin() }
                         .joinToString("\n")
@@ -55,11 +96,15 @@ class TypeValidator : JavaIsoVisitor<MutableList<InvalidTypeResult>>() {
          * Convenience method for creating an InvalidType result without having to manually specify anything except the message.
          * And a convenient place to put a breakpoint if you want to catch an invalid type in the debugger.
          */
-        private fun JavaVisitor<*>.invalidTypeResult(message: String) = InvalidTypeResult(cursor, cursor.getValue(), message)
+        private fun JavaVisitor<*>.invalidTypeResult(message: String) = InvalidTypeResult(cursor, message)
     }
 
     override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: MutableList<InvalidTypeResult>): J.ClassDeclaration {
         val c = super.visitClassDeclaration(classDecl, p)
+        if(!options.classDeclarations) {
+            return c
+        }
+
         val t = c.type
         if(t == null) {
             p.add(invalidTypeResult("J.ClassDeclaration type is null"))
@@ -79,6 +124,9 @@ class TypeValidator : JavaIsoVisitor<MutableList<InvalidTypeResult>>() {
 
     override fun visitMethodInvocation(method: J.MethodInvocation, p: MutableList<InvalidTypeResult>): J.MethodInvocation {
         val m = super.visitMethodInvocation(method, p)
+        if(!options.methodInvocations) {
+            return m;
+        }
         val mt = method.type
         if(mt == null) {
             p.add(invalidTypeResult("J.MethodInvocation type is null"))
@@ -96,6 +144,9 @@ class TypeValidator : JavaIsoVisitor<MutableList<InvalidTypeResult>>() {
 
     override fun visitMethodDeclaration(method: J.MethodDeclaration, p: MutableList<InvalidTypeResult>): J.MethodDeclaration {
         val m = super.visitMethodDeclaration(method, p)
+        if(options.classDeclarations) {
+            return m
+        }
         val mt = m.type
         if(mt == null) {
             p.add(invalidTypeResult("J.MethodDeclaration type is null"))
@@ -108,5 +159,89 @@ class TypeValidator : JavaIsoVisitor<MutableList<InvalidTypeResult>>() {
             p.add(invalidTypeResult("J.MethodDeclaration name \"${m.simpleName}\" does not match the name in its type information \"${mt.name}\""))
         }
         return m;
+    }
+
+    override fun visitIdentifier(identifier: J.Identifier, p: MutableList<InvalidTypeResult>): J.Identifier {
+        val i = super.visitIdentifier(identifier, p)
+        if(!options.identifiers) {
+            return i
+        }
+        val t = i.type
+
+        // The non-nullability of J.Identifier.getType() in our AST is a white lie
+        // J.Identifier.getType() is allowed to be null in places where the containing AST element fully specifies the type
+        @Suppress("SENSELESS_COMPARISON")
+        if(t == null) {
+            if(!i.isAllowedToHaveNullType()) {
+                p.add(invalidTypeResult("J.Identifier type is null"))
+            }
+            return i
+        }
+        return i
+    }
+
+    private fun J.Identifier.isAllowedToHaveNullType() = inPackageDeclaration() || inImport() || isClassName()
+            || isMethodName() || isMethodInvocationName() || isFieldAccess() || isBeingDeclared() || isParameterizedType()
+            || isNewClass() || isTypeParameter() || isMemberReference() || isCaseLabel() || isLabel() || isAnnotationField()
+
+    private fun inPackageDeclaration(): Boolean {
+        return cursor.firstEnclosing(J.Package::class.java) != null
+    }
+
+    private fun inImport(): Boolean {
+        return cursor.firstEnclosing(J.Import::class.java) != null
+    }
+
+    private fun isClassName(): Boolean {
+        return cursor.parent!!.getValue<Any>() is J.ClassDeclaration
+    }
+
+    private fun isMethodName(): Boolean {
+        return cursor.parent!!.getValue<Any>() is J.MethodDeclaration
+    }
+
+    private fun isMethodInvocationName(): Boolean {
+        return cursor.parent!!.getValue<Any>() is J.MethodInvocation
+    }
+
+    private fun J.Identifier.isFieldAccess(): Boolean {
+        val parent = cursor.firstEnclosing(J.FieldAccess::class.java)
+        return parent is J.FieldAccess && (parent.name == this || parent.target == this)
+    }
+
+    private fun J.Identifier.isBeingDeclared(): Boolean {
+        val parent = cursor.firstEnclosing(J.VariableDeclarations.NamedVariable::class.java)
+        return parent is J.VariableDeclarations.NamedVariable && parent.name == this
+    }
+
+    private fun J.Identifier.isParameterizedType(): Boolean {
+        val parent = cursor.firstEnclosing(J.ParameterizedType::class.java)
+        return parent is J.ParameterizedType && parent.clazz == this
+    }
+
+    private fun J.Identifier.isNewClass(): Boolean {
+        val parent = cursor.firstEnclosing(J.NewClass::class.java)
+        return parent is J.NewClass && parent.clazz == this
+    }
+
+    private fun isTypeParameter(): Boolean {
+        return cursor.parent!!.getValue<Any>() is J.TypeParameter
+    }
+
+    private fun isMemberReference(): Boolean {
+        return cursor.firstEnclosing(J.MemberReference::class.java) != null
+    }
+
+    private fun isCaseLabel(): Boolean {
+        return cursor.parent!!.getValue<Any>() is J.Case
+    }
+
+    private fun isLabel(): Boolean {
+        return cursor.firstEnclosing(J.Label::class.java) != null
+    }
+
+    private fun J.Identifier.isAnnotationField(): Boolean {
+        val parent = cursor.parent!!.getValue<Any>()
+        return parent is J.Assignment && parent.variable == this && cursor.firstEnclosing(J.Annotation::class.java) != null;
     }
 }

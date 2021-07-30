@@ -184,7 +184,7 @@ interface ChangePackageTest: JavaRecipeTest {
     @Test
     fun classDecl(jp: JavaParser) = assertChanged(
         jp,
-        dependsOn = arrayOf(testClass),
+        dependsOn = arrayOf(testClass, "public interface I1 {}"),
         before = """
             public class B extends org.openrewrite.Test implements I1 {}
         """,

@@ -4743,6 +4743,8 @@ interface SpacesTest : JavaRecipeTest {
         before = """
             public class A {
                 {
+                    int i = 0;
+                    int j = 10;
                     for (; i < j; i++, j--) { }
                 }
             }
@@ -4750,6 +4752,8 @@ interface SpacesTest : JavaRecipeTest {
         after = """
             public class A {
                 {
+                    int i = 0;
+                    int j = 10;
                     for ( ; i < j; i++, j--) { }
                 }
             }
@@ -4762,6 +4766,8 @@ interface SpacesTest : JavaRecipeTest {
         before = """
             public class A {
                 {
+                    int i = 0;
+                    int j = 10;
                     for ( ; i < j; i++, j--) { }
                 }
             }
@@ -4769,6 +4775,8 @@ interface SpacesTest : JavaRecipeTest {
         after = """
             public class A {
                 {
+                    int i = 0;
+                    int j = 10;
                     for (; i < j; i++, j--) { }
                 }
             }
