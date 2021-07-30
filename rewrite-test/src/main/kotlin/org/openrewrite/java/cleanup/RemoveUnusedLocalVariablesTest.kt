@@ -30,7 +30,9 @@ import org.openrewrite.java.JavaRecipeTest
     "BooleanMethodNameMustStartWithQuestion",
     "PointlessBooleanExpression",
     "UseOfObsoleteCollectionType",
-    "UnnecessaryLocalVariable"
+    "UnnecessaryLocalVariable",
+    "EmptyFinallyBlock",
+    "ClassInitializerMayBeStatic"
 )
 interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
     override val recipe: Recipe
@@ -105,6 +107,38 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
                 int method(int x) {
                     b = 2;
                     return x + 1;
+                }
+            }
+        """
+    )
+
+    @Test
+    fun removeUnusedLocalVariablesInClassInitializer() = assertChanged(
+        before = """
+            class Test {
+                static {
+                    int unused = 0;
+                    int used = 1;
+                    System.out.println(used);
+                }
+
+                {
+                    int unused = 0;
+                    int used = 1;
+                    System.out.println(used);
+                }
+            }
+        """,
+        after = """
+            class Test {
+                static {
+                    int used = 1;
+                    System.out.println(used);
+                }
+
+                {
+                    int used = 1;
+                    System.out.println(used);
                 }
             }
         """
@@ -371,13 +405,35 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
     )
 
     @Test
-    fun ignoreTryResource() = assertUnchanged(
+    fun removeUnusedLocalVariablesWithinTryCatch() = assertChanged(
         before = """
-            import java.util.stream.Stream;
-
             class Test {
                 static void method() {
-                    try (Stream<Object> unused = Stream.of()) {
+                    try {
+                        int a = 0;
+                        int b = 1;
+                        System.out.println(b);
+                    } catch (Exception e) {
+                        int a = 3;
+                        int b = 4;
+                        System.out.println(a);
+                    } finally {
+                        int a = 5;
+                        int b = 6;
+                    }
+                }
+            }
+        """,
+        after = """
+            class Test {
+                static void method() {
+                    try {
+                        int b = 1;
+                        System.out.println(b);
+                    } catch (Exception e) {
+                        int a = 3;
+                        System.out.println(a);
+                    } finally {
                     }
                 }
             }
@@ -385,12 +441,70 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
     )
 
     @Test
-    fun ignoreTryCatchException() = assertUnchanged(
+    fun ignoreTryWithResourceUnusedVariables() = assertUnchanged(
+        before = """
+            import java.util.stream.Stream;
+
+            class Test {
+                static void method() {
+                    try (Stream<Object> unused = Stream.of()) {
+                        // do nothing
+                    } catch (Exception e) {
+                        // do nothing
+                    }
+                }
+            }
+        """
+    )
+
+    @Test
+    fun handleVariablesReadWithinTry() = assertChanged(
+        before = """
+            class Test {
+                static void assertEquals(Object expected, Object actual) {
+                    // do nothing
+                }
+
+                static void method() {
+                    Object used, unused;
+                    try {
+                        used = new Object();
+                        assertEquals(used, null);
+                        unused = new Object();
+                    } catch (Exception e) {
+                        // do nothing
+                    }
+                }
+            }
+        """,
+        after = """
+            class Test {
+                static void assertEquals(Object expected, Object actual) {
+                    // do nothing
+                }
+
+                static void method() {
+                    Object used;
+                    try {
+                        used = new Object();
+                        assertEquals(used, null);
+                    } catch (Exception e) {
+                        // do nothing
+                    }
+                }
+            }
+        """
+    )
+
+    @Test
+    fun ignoreUnusedTryCatchExceptionVariableDeclaration() = assertUnchanged(
         before = """
             class Test {
                 static void method() {
                     try {
+                        // do nothing
                     } catch (Exception e) {
+                        // do nothing
                     }
                 }
             }

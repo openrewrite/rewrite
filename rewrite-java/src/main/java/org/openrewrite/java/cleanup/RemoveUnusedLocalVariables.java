@@ -29,7 +29,7 @@ import org.openrewrite.java.tree.Statement;
 import java.util.*;
 import java.util.function.Predicate;
 
-@SuppressWarnings({"ConstantConditions", "StatementWithEmptyBody"})
+@SuppressWarnings("ConstantConditions")
 public class RemoveUnusedLocalVariables extends Recipe {
     @Override
     public String getDisplayName() {
