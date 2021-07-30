@@ -59,8 +59,10 @@ public class RemoveUnusedLocalVariables extends Recipe {
                             is instanceof J.ForLoop ||
                             is instanceof J.ForEachLoop ||
                             is instanceof J.ForLoop.Control ||
+                            is instanceof J.ForEachLoop.Control ||
                             is instanceof J.Case ||
                             is instanceof J.Try ||
+                            is instanceof J.Try.Resource ||
                             is instanceof J.Try.Catch ||
                             is instanceof J.MultiCatch ||
                             is instanceof J.Lambda
@@ -70,35 +72,42 @@ public class RemoveUnusedLocalVariables extends Recipe {
         @Override
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
             Cursor parentScope = getCursorToParentScope(getCursor());
-            // skip class instance variables
-            if (!(getCursor().getParent(2).getValue() instanceof J.VariableDeclarations && !((J.VariableDeclarations) getCursor().getParent(2).getValue()).getAllAnnotations().isEmpty()) &&
-                    !(parentScope.getParent() != null && parentScope.getParent().getValue() instanceof J.ClassDeclaration) &&
+            J parent = parentScope.getValue();
+            if (parentScope.getParent() == null ||
+                    // skip class instance variables
+                    parentScope.getParent().getValue() instanceof J.ClassDeclaration ||
                     // skip anonymous class instance variables
-                    !(parentScope.getParent().getValue() instanceof J.NewClass) &&
+                    parentScope.getParent().getValue() instanceof J.NewClass ||
                     // skip if method declaration parameter
-                    !(parentScope.getValue() instanceof J.MethodDeclaration) &&
+                    parent instanceof J.MethodDeclaration ||
                     // skip if defined in an enhanced or standard for loop, since there isn't much we can do about the semantics at that point
-                    !(parentScope.getValue() instanceof J.ForEachLoop || parentScope.getValue() instanceof J.ForLoop.Control) &&
-                    // skip if try resource
-                    !(parentScope.getValue() instanceof J.Try) &&
-                    // skip if defined in a try's catch clause
-                    !(parentScope.getValue() instanceof J.Try.Catch || parentScope.getValue() instanceof J.MultiCatch) &&
+                    parent instanceof J.ForLoop.Control || parent instanceof J.ForEachLoop.Control ||
+                    // skip if defined in a try's catch clause as an Exception variable declaration
+                    parent instanceof J.Try.Resource || parent instanceof J.Try.Catch || parent instanceof J.MultiCatch ||
                     // skip if defined as a parameter to a lambda expression
-                    !(parentScope.getValue() instanceof J.Lambda)) {
-                List<J> readReferences = References.findRhsReferences(parentScope.getValue(), variable.getName());
-                if (readReferences.isEmpty()) {
-                    List<Statement> assignmentReferences = References.findLhsReferences(parentScope.getValue(), variable);
-                    for (Statement ref : assignmentReferences) {
-                        doAfterVisit(new DeleteStatement<>(ref));
-                    }
-                    return null;
-                }
+                    parent instanceof J.Lambda
+            ) {
+                return variable;
             }
+
+            List<J> readReferences = References.findRhsReferences(parentScope.getValue(), variable.getName());
+            if (readReferences.isEmpty()) {
+                List<Statement> assignmentReferences = References.findLhsReferences(parentScope.getValue(), variable.getName());
+                for (Statement ref : assignmentReferences) {
+                    doAfterVisit(new DeleteStatement<>(ref));
+                }
+                return null;
+            }
+
             return super.visitVariable(variable, ctx);
         }
 
         @Override
         public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+            if (!multiVariable.getAllAnnotations().isEmpty()) {
+                return multiVariable;
+            }
+
             J.VariableDeclarations mv = super.visitVariableDeclarations(multiVariable, ctx);
             if (mv.getVariables().isEmpty()) {
                 doAfterVisit(new DeleteStatement<>(mv));
@@ -125,21 +134,21 @@ public class RemoveUnusedLocalVariables extends Recipe {
             return false;
         }
 
-        static @Nullable Cursor dropParentWhile(Predicate<Object> valuePredicate, Cursor cursor) {
+        private static @Nullable Cursor dropParentWhile(Predicate<Object> valuePredicate, Cursor cursor) {
             while (cursor != null && valuePredicate.test(cursor.getValue())) {
                 cursor = cursor.getParent();
             }
             return cursor;
         }
 
-        static @Nullable Cursor dropParentUntil(Predicate<Object> valuePredicate, Cursor cursor) {
+        private static @Nullable Cursor dropParentUntil(Predicate<Object> valuePredicate, Cursor cursor) {
             while (cursor != null && !valuePredicate.test(cursor.getValue())) {
                 cursor = cursor.getParent();
             }
             return cursor;
         }
 
-        static boolean isRhsValue(Cursor tree) {
+        private static boolean isRhsValue(Cursor tree) {
             if (!(tree.getValue() instanceof J.Identifier)) {
                 return false;
             }
@@ -178,7 +187,7 @@ public class RemoveUnusedLocalVariables extends Recipe {
          * @param target A {@link J.Identifier} to check for usages.
          * @return found {@link J} locations of "right-hand" read calls.
          */
-        static List<J> findRhsReferences(J j, J.Identifier target) {
+        private static List<J> findRhsReferences(J j, J.Identifier target) {
             final List<J> refs = new ArrayList<>();
             new JavaIsoVisitor<List<J>>() {
                 @Override
@@ -194,10 +203,10 @@ public class RemoveUnusedLocalVariables extends Recipe {
 
         /**
          * @param j      The subtree to search.
-         * @param target A {@link J.VariableDeclarations.NamedVariable} to check for usages.
+         * @param target A {@link J.Identifier} to check for usages.
          * @return found {@link Statement} locations of "left-hand" assignment write calls.
          */
-        static List<Statement> findLhsReferences(J j, J.VariableDeclarations.NamedVariable target) {
+        private static List<Statement> findLhsReferences(J j, J.Identifier target) {
             JavaIsoVisitor<List<Statement>> visitor = new JavaIsoVisitor<List<Statement>>() {
                 @Override
                 public J.Assignment visitAssignment(J.Assignment assignment, List<Statement> ctx) {
