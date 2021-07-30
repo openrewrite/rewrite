@@ -54,11 +54,10 @@ import static java.util.Collections.*;
  *
  * NOTE: IF PROVENANCE INFORMATION IS NOT PRESENT, THIS RECIPE WILL DO NOTHING.
  */
-@Incubating(since = "7.10.0")
+@Incubating(since = "7.11.0")
 @Getter
 @Builder
-@RequiredArgsConstructor
-@AllArgsConstructor(onConstructor_ = @JsonCreator)
+@AllArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 public class AddProvenanceScopedDependency extends Recipe {
 
@@ -91,6 +90,7 @@ public class AddProvenanceScopedDependency extends Recipe {
             example = "true",
             required = false)
     @With
+    @Builder.Default
     private boolean releasesOnly = true;
 
     @Option(displayName = "Scope",
