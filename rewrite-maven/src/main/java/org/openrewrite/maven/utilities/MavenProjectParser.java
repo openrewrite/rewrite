@@ -71,26 +71,52 @@ public class MavenProjectParser {
         GitProvenance gitProvenance = GitProvenance.fromProjectDirectory(projectDirectory);
         List<Maven> mavens = mavenParser.parse(Maven.getMavenPoms(projectDirectory, ctx), projectDirectory, ctx);
         List<SourceFile> sourceFiles = new ArrayList<>(mavens);
-        Path rootPomPath = Paths.get("pom.xml");
-        Maven rootMaven = sourceFiles.stream().filter(f -> f.getSourcePath().equals(rootPomPath))
-                .map(Maven.class::cast).findAny()
-                .orElseThrow(() -> new RuntimeException("Unable to locate root pom source file"));
-        Pom rootMavenModel = rootMaven.getModel();
 
         mavens = sort(mavens);
 
         JavaParser javaParser = javaParserBuilder
                 .build();
 
+        logger.info("The order in which projects are being parsed is:");
+        for (Maven maven : mavens) {
+            logger.info("  {}:{}", maven.getModel().getGroupId(), maven.getModel().getArtifactId());
+        }
+
+        for (Maven maven : mavens) {
+            JavaProvenance mainProvenance = getJavaProvenance(maven, projectDirectory, "main");
+            JavaProvenance testProvenance = getJavaProvenance(maven, projectDirectory, "test");
+            List<Path> dependencies = downloadArtifacts(maven.getModel().getDependencies(Scope.Compile));
+            javaParser.setClasspath(dependencies);
+            sourceFiles.addAll(
+                    ListUtils.map(javaParser.parse(maven.getJavaSources(projectDirectory, ctx), projectDirectory, ctx),
+                            s -> s.withMarkers(s.getMarkers().addIfAbsent(mainProvenance))
+                    ));
+
+            List<Path> testDependencies = downloadArtifacts(maven.getModel().getDependencies(Scope.Test));
+            javaParser.setClasspath(testDependencies);
+            sourceFiles.addAll(
+                    ListUtils.map(javaParser.parse(maven.getTestJavaSources(projectDirectory, ctx), projectDirectory, ctx),
+                            s -> s.withMarkers(s.getMarkers().addIfAbsent(testProvenance))
+                    ));
+
+            parseResources(maven.getResources(projectDirectory, ctx), projectDirectory, sourceFiles, mainProvenance);
+            parseResources(maven.getTestResources(projectDirectory, ctx), projectDirectory, sourceFiles, testProvenance);
+        }
+
+        return ListUtils.map(sourceFiles, s -> s.withMarkers(s.getMarkers().addIfAbsent(gitProvenance)));
+    }
+
+    private JavaProvenance getJavaProvenance(Maven maven, Path projectDirectory, String sourceSet) {
+        Pom mavenModel = maven.getModel();
         String javaRuntimeVersion = System.getProperty("java.runtime.version");
         String javaVendor = System.getProperty("java.vm.vendor");
         String sourceCompatibility = javaRuntimeVersion;
         String targetCompatibility = javaRuntimeVersion;
-        String propertiesSourceCompatibility = rootMavenModel.getValue(rootMavenModel.getEffectiveProperties().get("maven.compiler.source"));
+        String propertiesSourceCompatibility = mavenModel.getValue(mavenModel.getEffectiveProperties().get("maven.compiler.source"));
         if (propertiesSourceCompatibility != null) {
             sourceCompatibility = propertiesSourceCompatibility;
         }
-        String propertiesTargetCompatibility = rootMavenModel.getValue(rootMavenModel.getEffectiveProperties().get("maven.compiler.target"));
+        String propertiesTargetCompatibility = mavenModel.getValue(mavenModel.getEffectiveProperties().get("maven.compiler.target"));
         if (propertiesTargetCompatibility != null) {
             targetCompatibility = propertiesTargetCompatibility;
         }
@@ -124,56 +150,20 @@ public class MavenProjectParser {
         );
 
         JavaProvenance.Publication publication = new JavaProvenance.Publication(
-                rootMavenModel.getGroupId(),
-                rootMavenModel.getArtifactId(),
-                rootMavenModel.getVersion()
+                mavenModel.getGroupId(),
+                mavenModel.getArtifactId(),
+                mavenModel.getVersion()
         );
 
-        JavaProvenance mainProvenance = new JavaProvenance(
+        return new JavaProvenance(
                 randomId(),
-                rootMavenModel.getName(),
-                "main",
+                mavenModel.getName(),
+                sourceSet,
                 buildTool,
                 javaVersion,
                 publication
         );
-
-        JavaProvenance testProvenance = new JavaProvenance(
-                randomId(),
-                rootMavenModel.getName(),
-                "test",
-                buildTool,
-                javaVersion,
-                publication
-        );
-
-        logger.info("The order in which projects are being parsed is:");
-        for (Maven maven : mavens) {
-            logger.info("  {}:{}", maven.getModel().getGroupId(), maven.getModel().getArtifactId());
-        }
-
-        for (Maven maven : mavens) {
-            List<Path> dependencies = downloadArtifacts(maven.getModel().getDependencies(Scope.Compile));
-            javaParser.setClasspath(dependencies);
-            sourceFiles.addAll(
-                    ListUtils.map(javaParser.parse(maven.getJavaSources(projectDirectory, ctx), projectDirectory, ctx),
-                            s -> s.withMarkers(s.getMarkers().addIfAbsent(mainProvenance))
-                    ));
-
-            List<Path> testDependencies = downloadArtifacts(maven.getModel().getDependencies(Scope.Test));
-            javaParser.setClasspath(testDependencies);
-            sourceFiles.addAll(
-                    ListUtils.map(javaParser.parse(maven.getTestJavaSources(projectDirectory, ctx), projectDirectory, ctx),
-                            s -> s.withMarkers(s.getMarkers().addIfAbsent(testProvenance))
-                    ));
-
-            parseResources(maven.getResources(projectDirectory, ctx), projectDirectory, sourceFiles, mainProvenance);
-            parseResources(maven.getTestResources(projectDirectory, ctx), projectDirectory, sourceFiles, testProvenance);
-        }
-
-        return ListUtils.map(sourceFiles, s -> s.withMarkers(s.getMarkers().addIfAbsent(gitProvenance)));
     }
-
     private void parseResources(List<Path> resources, Path projectDirectory, List<SourceFile> sourceFiles, JavaProvenance javaProvenance) {
         sourceFiles.addAll(
                 ListUtils.map(

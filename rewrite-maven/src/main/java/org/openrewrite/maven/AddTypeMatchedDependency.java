@@ -28,6 +28,7 @@ import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
 import org.openrewrite.maven.internal.MavenMetadata;
 import org.openrewrite.maven.internal.MavenPomDownloader;
+import org.openrewrite.maven.internal.Version;
 import org.openrewrite.maven.search.DependencyInsight;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
@@ -40,6 +41,7 @@ import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.*;
@@ -131,6 +133,17 @@ public class AddTypeMatchedDependency extends Recipe {
     @Nullable
     private Boolean optional;
 
+    /**
+     * A glob expression used to identify other dependencies in the same family as the dependency to be added.
+     */
+    @Option(displayName = "Family pattern",
+            description = "A pattern, applied to groupIds, used to determine which other dependencies should have aligned version numbers. " +
+                    "Accepts '*' as a wildcard character.",
+            example = "com.fasterxml.jackson*",
+            required = false)
+    @Nullable
+    @With
+    private String familyPattern;
 
     @Override
     public Validated validate() {
@@ -184,12 +197,13 @@ public class AddTypeMatchedDependency extends Recipe {
         if (provenanceInfo.isEmpty()) {
             return before;
         }
+        Pattern pattern = this.familyPattern == null ? null : Pattern.compile(this.familyPattern.replace("*", ".*"));
 
         return ListUtils.map(before, s -> {
             if (!(s instanceof Maven)) {
                 return s;
             }
-            return (Maven) new AddDependencyVisitor(provenanceInfo).visit(s, ctx);
+            return (Maven) new AddDependencyVisitor(provenanceInfo, pattern).visit(s, ctx);
         });
     }
 
@@ -197,15 +211,18 @@ public class AddTypeMatchedDependency extends Recipe {
 
     public class AddDependencyVisitor extends MavenVisitor {
 
-
         Set<JavaProvenance> provenanceInfo;
+
         @Nullable
         private VersionComparator versionComparator;
         @Nullable
         private String resolvedVersion;
+        @Nullable
+        private Pattern familyRegex;
 
-        private AddDependencyVisitor(Set<JavaProvenance> provenanceInfo) {
+        private AddDependencyVisitor(Set<JavaProvenance> provenanceInfo, @Nullable Pattern familyRegex) {
             this.provenanceInfo = provenanceInfo;
+            this.familyRegex = familyRegex;
         }
 
         @Override
@@ -214,11 +231,14 @@ public class AddTypeMatchedDependency extends Recipe {
             Maven m = super.visitMaven(maven, ctx);
 
             Scope dependencyScope = Scope.fromName(scope);
-            Set<JavaProvenance> filteredProvenance = provenanceInfo.stream().filter(p ->
-                    p.getPublication() != null &&
-                    p.getPublication().getGroupId().equals(model.getGroupId())
-                    && p.getPublication().getArtifactId().equals(model.getArtifactId())
-                    && dependencyScope.isInClasspathOf("test".equals(p.getSourceSetName()) ? Scope.Test : Scope.Compile)
+            Set<JavaProvenance> filteredProvenance = provenanceInfo.stream().filter(p -> {
+                        Scope provenanceScope = "test".equals(p.getSourceSetName()) ? Scope.Test : Scope.Compile;
+
+                        return p.getPublication() != null &&
+                                p.getPublication().getGroupId().equals(model.getGroupId()) &&
+                                p.getPublication().getArtifactId().equals(model.getArtifactId()) &&
+                                (dependencyScope == provenanceScope || dependencyScope.isInClasspathOf(provenanceScope));
+                    }
             ).collect(Collectors.toSet());
 
 
@@ -277,17 +297,18 @@ public class AddTypeMatchedDependency extends Recipe {
 
                 if (versionComparator == null) {
                     resolvedVersion = version;
+                } else {
+
+                    MavenMetadata mavenMetadata = new MavenPomDownloader(MavenPomCache.NOOP,
+                            emptyMap(), ctx).downloadMetadata(groupId, artifactId, emptyList());
+
+                    LatestRelease latest = new LatestRelease(versionPattern);
+                    resolvedVersion = mavenMetadata.getVersioning().getVersions().stream()
+                            .filter(versionComparator::isValid)
+                            .filter(v -> !releasesOnly || latest.isValid(v))
+                            .max(versionComparator)
+                            .orElse(version);
                 }
-
-                MavenMetadata mavenMetadata = new MavenPomDownloader(MavenPomCache.NOOP,
-                        emptyMap(), ctx).downloadMetadata(groupId, artifactId, emptyList());
-
-                LatestRelease latest = new LatestRelease(versionPattern);
-                resolvedVersion = mavenMetadata.getVersioning().getVersions().stream()
-                        .filter(versionComparator::isValid)
-                        .filter(v -> !releasesOnly || latest.isValid(v))
-                        .max(versionComparator)
-                        .orElse(version);
             }
             return resolvedVersion;
         }
@@ -300,7 +321,15 @@ public class AddTypeMatchedDependency extends Recipe {
                     String versionToUse = null;
 
                     if (model.getManagedVersion(groupId, artifactId) == null) {
-                        versionToUse = findVersionToUse(groupId, artifactId, ctx);
+                        if (familyRegex != null) {
+                            versionToUse = findDependencies(d -> familyRegex.matcher(d.getGroupId()).matches()).stream()
+                                    .max(Comparator.comparing(d -> new Version(d.getVersion())))
+                                    .map(Pom.Dependency::getRequestedVersion)
+                                    .orElse(null);
+                        }
+                        if (versionToUse == null) {
+                            versionToUse = findVersionToUse(groupId, artifactId, ctx);
+                        }
                     }
                     Xml.Tag dependencyTag = Xml.Tag.build(
                             "\n<dependency>\n" +

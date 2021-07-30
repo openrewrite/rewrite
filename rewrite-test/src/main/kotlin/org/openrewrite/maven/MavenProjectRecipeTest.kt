@@ -47,7 +47,7 @@ interface MavenProjectRecipeTest {
         afterConditions: (Maven) -> Unit = { },
     ) {
 
-        val source = mavenParser.parse(before).singleOrNull()
+        val source = mavenParser.parse(before.trimIndent()).singleOrNull()
         Assertions.assertThat(source)
             .`as`("The parser did not return a source file.")
             .isNotNull
