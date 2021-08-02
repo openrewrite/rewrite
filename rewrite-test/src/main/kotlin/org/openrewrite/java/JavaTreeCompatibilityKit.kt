@@ -122,6 +122,9 @@ abstract class JavaTreeCompatibilityKit {
     inner class MethodMatcherTck : MethodMatcherTest
 
     @Nested
+    inner class MethodParamPadTck : MethodParamPadTest
+
+    @Nested
     inner class NewArrayTck : NewArrayTest
 
     @Nested

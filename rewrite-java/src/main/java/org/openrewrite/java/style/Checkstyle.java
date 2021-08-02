@@ -48,6 +48,7 @@ public class Checkstyle extends NamedStyles {
                         fallThrough(),
                         hiddenFieldStyle(),
                         hideUtilityClassConstructorStyle(),
+                        methodParamPadStyle(),
                         unnecessaryParentheses()
                 ));
     }
@@ -107,5 +108,9 @@ public class Checkstyle extends NamedStyles {
 
     public static EmptyForIteratorPadStyle emptyForIteratorPadStyle() {
         return new EmptyForIteratorPadStyle(false);
+    }
+
+    public static MethodParamPadStyle methodParamPadStyle() {
+        return new MethodParamPadStyle(false, false);
     }
 }

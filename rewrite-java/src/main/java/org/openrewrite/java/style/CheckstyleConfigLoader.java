@@ -70,6 +70,7 @@ public class CheckstyleConfigLoader {
                 fallThrough(conf),
                 hiddenFieldStyle(conf),
                 hideUtilityClassConstructorStyle(conf),
+                methodParamPadStyle(conf),
                 unnecessaryParentheses(conf))
             .filter(Objects::nonNull)
             .flatMap(Set::stream)
@@ -206,6 +207,25 @@ public class CheckstyleConfigLoader {
                 module.prop("ignoreAbstractMethods", false)
             ))
             .collect(toSet());
+    }
+
+    @Nullable
+    private static Set<MethodParamPadStyle> methodParamPadStyle(Map<String, List<Module>> conf) {
+        List<Module> moduleList = conf.get("MethodParamPad");
+        if(moduleList == null) {
+            return null;
+        }
+        return moduleList.stream()
+                .map(module -> {
+                    String option = module.properties.get("option");
+                    // nospace is default, so no option means pad is false
+                    boolean pad = option != null && "space".equals(option.trim());
+                    return new MethodParamPadStyle(
+                            pad,
+                            module.prop("allowLineBreaks", false)
+                    );
+                })
+                .collect(toSet());
     }
 
     @SuppressWarnings("DuplicatedCode")

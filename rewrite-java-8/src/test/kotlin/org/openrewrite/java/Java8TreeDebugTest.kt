@@ -145,6 +145,10 @@ class Java8MethodMatcherTest: Java8Test, MethodMatcherTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8MethodParamPadTest: Java8Test, MethodParamPadTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8NewArrayTest: Java8Test, NewArrayTest
 
 @DebugOnly

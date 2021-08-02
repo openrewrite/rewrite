@@ -17,11 +17,7 @@ package org.openrewrite.java.style
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.cleanup.DefaultComesLastStyle
-import org.openrewrite.java.cleanup.EmptyBlockStyle
-import org.openrewrite.java.cleanup.EmptyForInitializerPadStyle
-import org.openrewrite.java.cleanup.EqualsAvoidsNullStyle
-import org.openrewrite.java.cleanup.UnnecessaryParenthesesStyle
+import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.style.CheckstyleConfigLoader.loadCheckstyleConfig
 
 class CheckstyleConfigLoaderTest {
@@ -180,6 +176,30 @@ class CheckstyleConfigLoaderTest {
         val emptyForPadInitializerStyle = checkstyle.styles.first() as EmptyForInitializerPadStyle
 
         assertThat(emptyForPadInitializerStyle.space).isTrue
+    }
+
+    @Test
+    fun methodParamPadStyle() {
+        val checkstyle = loadCheckstyleConfig("""
+            <!DOCTYPE module PUBLIC
+                "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
+                "https://checkstyle.org/dtds/configuration_1_2.dtd">
+            <module name="Checker">
+              <module name="MethodParamPad">
+                <property name="option" value=" space"/>
+                <property name="allowLineBreaks" value="true" />
+              </module>
+            </module>
+        """.trimIndent(), emptyMap())
+
+        assertThat(checkstyle.styles)
+            .hasSize(1)
+
+        assertThat(checkstyle.styles.first()).isExactlyInstanceOf(MethodParamPadStyle::class.java)
+        val methodParamPadStyle = checkstyle.styles.first() as MethodParamPadStyle
+
+        assertThat(methodParamPadStyle.space).isTrue
+        assertThat(methodParamPadStyle.allowLineBreaks).isTrue
     }
 
     @Test
