@@ -22,13 +22,17 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
+import org.openrewrite.java.marker.JavaProvenance;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
+import org.openrewrite.java.tree.JavaType;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * This recipe will group and order the imports for a compilation unit using the rules defined by an {@link ImportLayoutStyle}.
@@ -75,7 +79,13 @@ public class OrderImports extends Recipe {
             ImportLayoutStyle layoutStyle = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
                     .orElse(IntelliJ.importLayout());
 
-            List<JRightPadded<J.Import>> orderedImports = layoutStyle.orderImports(cu.getPadding().getImports());
+            Optional<JavaProvenance> javaProvenance = cu.getMarkers().findFirst(JavaProvenance.class);
+            Set<JavaType.FullyQualified> classpath = new HashSet<>();
+            if (javaProvenance.isPresent()) {
+                classpath = javaProvenance.get().getClasspath();
+            }
+
+            List<JRightPadded<J.Import>> orderedImports = layoutStyle.orderImports(cu.getPadding().getImports(), classpath);
 
             boolean changed = false;
             if (orderedImports.size() != cu.getImports().size()) {

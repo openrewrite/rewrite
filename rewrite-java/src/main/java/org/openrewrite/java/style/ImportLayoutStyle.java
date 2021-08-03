@@ -32,9 +32,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaStyle;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JRightPadded;
-import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.io.IOException;
@@ -116,7 +114,7 @@ public class ImportLayoutStyle implements JavaStyle {
         // the import to add at most. we don't even want to star fold other non-adjacent imports in the same
         // block that should be star folded according to the layout style (minimally invasive change).
         List<JRightPadded<J.Import>> ideallyOrdered = new ImportLayoutStyle(Integer.MAX_VALUE, Integer.MAX_VALUE, layout)
-                .orderImports(ListUtils.concat(originalImports, paddedToAdd));
+                .orderImports(ListUtils.concat(originalImports, paddedToAdd), new HashSet<>());
 
         if (ideallyOrdered.size() == originalImports.size()) {
             Set<String> originalPaths = new HashSet<>();
@@ -283,8 +281,9 @@ public class ImportLayoutStyle implements JavaStyle {
      * @param originalImports A list of potentially unordered imports.
      * @return A list of imports that are grouped and ordered.
      */
-    public List<JRightPadded<J.Import>> orderImports(List<JRightPadded<J.Import>> originalImports) {
+    public List<JRightPadded<J.Import>> orderImports(List<JRightPadded<J.Import>> originalImports, Set<JavaType.FullyQualified> classpath) {
         LayoutState layoutState = new LayoutState();
+        ImportLayoutConflictDetection importLayoutConflictDetection = new ImportLayoutConflictDetection(classpath, originalImports);
         List<JRightPadded<J.Import>> orderedImports = new ArrayList<>();
 
         // Allocate imports to blocks, preferring to put imports into non-catchall blocks
@@ -315,8 +314,8 @@ public class ImportLayoutStyle implements JavaStyle {
                     extraLineSpaceCount += 1;
                 }
             } else {
-                for (JRightPadded<J.Import> orderedImport : block.orderedImports(layoutState,
-                        classCountToUseStarImport, nameCountToUseStarImport)) {
+                for (JRightPadded<J.Import> orderedImport : block.orderedImports(
+                        layoutState, classCountToUseStarImport, nameCountToUseStarImport, importLayoutConflictDetection)) {
 
                     boolean whitespaceContainsCRLF = orderedImport.getElement().getPrefix().getWhitespace().contains("\r\n");
                     Space prefix;
@@ -443,6 +442,93 @@ public class ImportLayoutStyle implements JavaStyle {
         }
     }
 
+    private static class ImportLayoutConflictDetection {
+        private final Set<JavaType.FullyQualified> classpath;
+        private final List<JRightPadded<J.Import>> originalImports;
+        private @Nullable Set<String> containsClassNameConflict = null;
+
+        ImportLayoutConflictDetection(Set<JavaType.FullyQualified> classpath, List<JRightPadded<J.Import>> originalImports) {
+            this.classpath = classpath;
+            this.originalImports = originalImports;
+        }
+
+        /**
+         * Checks if folding the package will create a namespace conflict with any other classes that have already been imported.
+         * @param packageName package that qualifies for folding into a '*'.
+         * @return folding the package will not create any namespace conflicts.
+         */
+        public boolean isPackageFoldable(String packageName) {
+            if (containsClassNameConflict == null) {
+                containsClassNameConflict = new HashSet<>();
+
+                Map<String, Set<String>> classNameInPackage = getMapOfClassNamesInPackages();
+                for (String className : classNameInPackage.keySet()) {
+                    if (classNameInPackage.get(className).size() > 1) {
+                        containsClassNameConflict.addAll(classNameInPackage.get(className));
+                    }
+                }
+            }
+            return !containsClassNameConflict.contains(packageName) || classpath.isEmpty();
+        }
+
+        private Map<String, Set<String>> getMapOfClassNamesInPackages() {
+            Set<String> checkPackageForClasses = new HashSet<>();
+            for (JRightPadded<J.Import> anImport : originalImports) {
+                checkPackageForClasses.add(packageOrOuterClassName(anImport));
+            }
+
+            Map<String, Set<String>> classNameInPackage = new HashMap<>();
+            for (JavaType.FullyQualified fqn : classpath) {
+                // ClassGraph uses a '$' delimited to distinguish inner classes.
+                boolean containsClassGraphStaticDelimiter = fqn.getClassName().contains("$");
+                String packageName;
+                if (containsClassGraphStaticDelimiter) {
+                    // Example: org.foo.Foo$Bar => package name: org.foo.Foo, class name: Bar
+                    packageName = fqn.getPackageName() + "." + fqn.getClassName().substring(0, fqn.getClassName().lastIndexOf("$")).replace("$", ".");
+                } else {
+                    packageName = fqn.getPackageName();
+                }
+
+                if (checkPackageForClasses.contains(packageName)) {
+                    String className;
+                    if (containsClassGraphStaticDelimiter) {
+                        className = fqn.getClassName().substring(fqn.getClassName().lastIndexOf("$") + 1);
+                    } else {
+                        className = fqn.getClassName();
+                    }
+
+                    Set<String> packages = classNameInPackage.getOrDefault(className, new HashSet<>());
+                    packages.add(packageName);
+                    classNameInPackage.put(className, packages);
+                } else if (checkPackageForClasses.contains(fqn.getFullyQualifiedName())) {
+                    packageName = fqn.getFullyQualifiedName();
+                    for (JavaType.Variable member : fqn.getMembers()) {
+                        if (member.getFlags().contains(Flag.Static)) {
+                            Set<String> packages = classNameInPackage.getOrDefault(member.getName(), new HashSet<>());
+                            packages.add(packageName);
+                            classNameInPackage.put(member.getName(), packages);
+                        }
+                    }
+
+                    if (fqn instanceof JavaType.Class) {
+                        List<JavaType.Method> methods = ((JavaType.Class) fqn).getConstructors();
+                        if (methods != null) {
+                            for (JavaType.Method method : methods) {
+                                if (method.getFlags().contains(Flag.Static)) {
+                                    Set<String> packages = classNameInPackage.getOrDefault(method.getName(), new HashSet<>());
+                                    packages.add(packageName);
+                                    classNameInPackage.put(method.getName(), packages);
+                                }
+                            }
+                        }
+                    }
+                }
+
+            }
+            return classNameInPackage;
+        }
+    }
+
     /**
      * A block represents a grouping of imports based on matching rules. The block provides a mechanism for matching
      * and storing J.Imports that belong to the block.
@@ -461,7 +547,7 @@ public class ImportLayoutStyle implements JavaStyle {
         /**
          * @return Imports belonging to this block, folded appropriately.
          */
-        List<JRightPadded<J.Import>> orderedImports(LayoutState layoutState, int classCountToUseStarImport, int nameCountToUseStarImport);
+        List<JRightPadded<J.Import>> orderedImports(LayoutState layoutState, int classCountToUseStarImport, int nameCountToUseStarImport, ImportLayoutConflictDetection importLayoutConflictDetection);
 
         /**
          * A specialized block implementation to act as a blank line separator between import groupings.
@@ -479,7 +565,7 @@ public class ImportLayoutStyle implements JavaStyle {
             }
 
             @Override
-            public List<JRightPadded<J.Import>> orderedImports(LayoutState layoutState, int classCountToUseStarImport, int nameCountToUseStartImport) {
+            public List<JRightPadded<J.Import>> orderedImports(LayoutState layoutState, int classCountToUseStarImport, int nameCountToUseStartImport, ImportLayoutConflictDetection importLayoutConflictDetection) {
                 return emptyList();
             }
 
@@ -535,7 +621,7 @@ public class ImportLayoutStyle implements JavaStyle {
             }
 
             @Override
-            public List<JRightPadded<J.Import>> orderedImports(LayoutState layoutState, int classCountToUseStarImport, int nameCountToUseStarImport) {
+            public List<JRightPadded<J.Import>> orderedImports(LayoutState layoutState, int classCountToUseStarImport, int nameCountToUseStarImport, ImportLayoutConflictDetection importLayoutConflictDetection) {
                 List<JRightPadded<J.Import>> imports = layoutState.getImports(this);
 
                 Map<String, List<JRightPadded<J.Import>>> groupedImports = imports
@@ -556,7 +642,9 @@ public class ImportLayoutStyle implements JavaStyle {
                     boolean starImportExists = importGroup.stream()
                             .anyMatch(it -> it.getElement().getQualid().getSimpleName().equals("*"));
 
-                    if (importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1)) {
+                    if (importLayoutConflictDetection.isPackageFoldable(packageOrOuterClassName(toStar)) &&
+                            (importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1))) {
+
                         J.FieldAccess qualid = toStar.getElement().getQualid();
                         J.Identifier name = qualid.getName();
 
@@ -656,7 +744,7 @@ public class ImportLayoutStyle implements JavaStyle {
         } else {
             String className = anImport.getElement().getClassName();
             if (className.contains(".")) {
-                return anImport.getElement().getPackageName() +
+                return anImport.getElement().getPackageName() + "." +
                         className.substring(0, className.lastIndexOf('.'));
             }
             return anImport.getElement().getPackageName();

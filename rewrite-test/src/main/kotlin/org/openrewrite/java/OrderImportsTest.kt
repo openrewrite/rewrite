@@ -15,10 +15,18 @@
  */
 package org.openrewrite.java
 
+import org.assertj.core.api.Assertions
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.ExecutionContext
+import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.Tree.randomId
+import org.openrewrite.java.marker.JavaProvenance
 import org.openrewrite.java.style.ImportLayoutStyle
+import org.openrewrite.java.tree.Flag
+import org.openrewrite.java.tree.J
+import org.openrewrite.java.tree.JavaType
 import org.openrewrite.style.NamedStyles
 import org.openrewrite.style.Style
 
@@ -225,16 +233,16 @@ interface OrderImportsTest : JavaRecipeTest {
             import java.util.*;
             
             class A {
-                List list;
-                List list2;
+                List<Integer> list;
+                List<Integer> list2;
             }
         """,
         after = """
             import java.util.List;
             
             class A {
-                List list;
-                List list2;
+                List<Integer> list;
+                List<Integer> list2;
             }
         """
     )
@@ -247,9 +255,9 @@ interface OrderImportsTest : JavaRecipeTest {
             import java.util.*;
             
             class A {
-                List list;
-                List list2;
-                Map map;
+                List<Integer> list;
+                List<Integer> list2;
+                Map<Integer, Integer> map;
             }
         """,
         after = """
@@ -257,9 +265,9 @@ interface OrderImportsTest : JavaRecipeTest {
             import java.util.Map;
             
             class A {
-                List list;
-                List list2;
-                Map map;
+                List<Integer> list;
+                List<Integer> list2;
+                Map<Integer, Integer> map;
             }
         """
     )
@@ -290,7 +298,7 @@ interface OrderImportsTest : JavaRecipeTest {
             import static java.util.Collections.*;
             
             class A {
-                List list = emptyList();
+                List<Integer> list = emptyList();
             }
         """,
         after = """
@@ -299,7 +307,7 @@ interface OrderImportsTest : JavaRecipeTest {
             import static java.util.Collections.emptyList;
             
             class A {
-                List list = emptyList();
+                List<Integer> list = emptyList();
             }
         """
     )
@@ -440,7 +448,7 @@ interface OrderImportsTest : JavaRecipeTest {
             import static com.foo.A.*;
             
             class B {
-                void bar() {
+                void barB() {
                     foo();
                     bar();
                     baz();
@@ -786,5 +794,320 @@ interface OrderImportsTest : JavaRecipeTest {
             }
         """
     )
-}
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/860")
+    @Test
+    fun orderAndDoNotFoldImports(jp: JavaParser) {
+        val executionContext: ExecutionContext = InMemoryExecutionContext { t: Throwable ->
+            Assertions.fail<Any>("Failed to run parse sources or recipe", t)
+        }
+
+        val inputs = arrayOf(
+            """
+            package org.test;
+            
+            import org.foo.FooB;
+            import org.bar.BarB;
+            import org.foo.FooD;
+            import org.foo.FooC;
+            import org.bar.BarC;
+            import org.foo.FooA;
+            import org.foo.FooE;
+            import org.bar.BarD;
+            import org.bar.BarA;
+            import org.bar.BarE;
+            
+            public class Test {
+                FooA fooA = new FooA();
+                FooB fooB = new FooB();
+                FooC fooC = new FooC();
+                FooD fooD = new FooD();
+                FooE fooE = new FooE();
+                
+                BarA barA = new BarA();
+                BarB barB = new BarB();
+                BarC barC = new BarC();
+                BarD barD = new BarD();
+                BarE barE = new BarE();
+            }
+            """.trimIndent(),
+            """package org.foo; public class Shared {}""".trimIndent(),
+            """package org.foo; public class FooA {}""".trimIndent(),
+            """package org.foo; public class FooB {}""".trimIndent(),
+            """package org.foo; public class FooC {}""".trimIndent(),
+            """package org.foo; public class FooD {}""".trimIndent(),
+            """package org.foo; public class FooE {}""".trimIndent(),
+            """package org.bar; public class Shared {}""".trimIndent(),
+            """package org.bar; public class BarA {}""".trimIndent(),
+            """package org.bar; public class BarB {}""".trimIndent(),
+            """package org.bar; public class BarC {}""".trimIndent(),
+            """package org.bar; public class BarD {}""".trimIndent(),
+            """package org.bar; public class BarE {}""".trimIndent()
+        )
+
+        val sourceFiles = parser.parse(executionContext, *inputs)
+
+        val classNames = arrayOf(
+            "org.foo.Shared", "org.foo.FooA", "org.foo.FooB", "org.foo.FooC", "org.foo.FooD", "org.foo.FooE",
+            "org.bar.Shared", "org.bar.BarA", "org.bar.BarB", "org.bar.BarC", "org.bar.BarD", "org.bar.BarE")
+
+        val fqns: MutableSet<JavaType.FullyQualified> = mutableSetOf()
+        classNames.forEach { fqns.add(JavaType.Class.build(it)) }
+        val javaProvenance = javaProvenance(fqns)
+
+        val markedFiles: MutableList<J.CompilationUnit> = mutableListOf()
+        sourceFiles.forEach { markedFiles.add(it.withMarkers(it.markers.addIfAbsent(javaProvenance))) }
+
+        val recipe = OrderImports(false).visitor
+        val result = recipe.visit(markedFiles[0], InMemoryExecutionContext())
+        assertThat((result as J.CompilationUnit).imports.size == 10).isTrue
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/860")
+    @Test
+    fun orderAndDoNotFoldStaticClasses(jp: JavaParser) {
+        val executionContext: ExecutionContext = InMemoryExecutionContext { t: Throwable ->
+            Assertions.fail<Any>("Failed to run parse sources or recipe", t)
+        }
+
+        val inputs = arrayOf(
+            """
+            package org.test;
+            
+            import static org.faz.Faz.FooA;
+            import static org.faz.Faz.FooB;
+            import static org.faz.Faz.FooC;
+            import static org.baz.Baz.BarA;
+            import static org.baz.Baz.BarB;
+            import static org.baz.Baz.BarC;
+            
+            public class Test {
+                FooA fooA;
+                FooB fooB;
+                FooC fooC;
+                BarA barA;
+                BarB barB;
+                BarC barC;
+            }
+            """.trimIndent(),
+            """
+            package org.faz;
+            public class Faz {
+                public static class Shared {}
+                public static class FooA {}
+                public static class FooB {}
+                public static class FooC {}
+            }
+            """.trimIndent()
+            ,
+            """
+            package org.baz;
+            public class Baz {
+                public static class Shared {}
+                public static class BarA {}
+                public static class BarB {}
+                public static class BarC {}
+            }
+            """.trimIndent(),
+        )
+
+        val sourceFiles = parser.parse(executionContext, *inputs)
+
+        // The '$' is a ClassGraph Delimiter for inner classes.
+        val classNames = arrayOf(
+            "org.faz.Faz\$Shared",
+            "org.faz.Faz\$FooA",
+            "org.faz.Faz\$FooB",
+            "org.faz.Faz\$FooC",
+            "org.baz.Baz\$Shared",
+            "org.baz.Baz\$BarA",
+            "org.baz.Baz\$BarB",
+            "org.baz.Baz\$BarC")
+
+        val fqns: MutableSet<JavaType.FullyQualified> = mutableSetOf()
+        classNames.forEach { fqns.add(JavaType.Class.build(it)) }
+        val javaProvenance = javaProvenance(fqns)
+
+        val markedFiles: MutableList<J.CompilationUnit> = mutableListOf()
+        sourceFiles.forEach { markedFiles.add(it.withMarkers(it.markers.addIfAbsent(javaProvenance))) }
+
+        val recipe = OrderImports(false).visitor
+        val result = recipe.visit(markedFiles[0], InMemoryExecutionContext())
+        assertThat((result as J.CompilationUnit).imports.size == 6).isTrue
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/860")
+    @Test
+    fun orderAndDoNotFoldStaticConstants(jp: JavaParser) {
+        val executionContext: ExecutionContext = InMemoryExecutionContext { t: Throwable ->
+            Assertions.fail<Any>("Failed to run parse sources or recipe", t)
+        }
+
+        val inputs = arrayOf(
+            """
+            package org.test;
+            
+            import static org.fiz.Fiz.FOO_A;
+            import static org.fiz.Fiz.FOO_B;
+            import static org.fiz.Fiz.FOO_C;
+            import static org.biz.Biz.BAR_A;
+            import static org.biz.Biz.BAR_B;
+            import static org.biz.Biz.BAR_C;
+            
+            public class Test {
+                int fooA = FOO_A;
+                int fooB = FOO_B;
+                int fooC = FOO_C;
+                int barA = BAR_A;
+                int barB = BAR_B;
+                int barC = BAR_C;
+            }
+            """.trimIndent(),
+            """
+            package org.fiz;
+            public class Fiz {
+                public static int SHARED = 1;
+                public static int FOO_A = 2;
+                public static int FOO_B = 3;
+                public static int FOO_C = 4;
+            }
+            """.trimIndent()
+            ,
+            """
+            package org.biz;
+            public class Biz {
+                public static int SHARED = 1;
+                public static int BAR_A = 2;
+                public static int BAR_B = 3;
+                public static int BAR_C = 4;
+            }
+            """.trimIndent(),
+        )
+
+        val sourceFiles = parser.parse(executionContext, *inputs)
+        val classNames = arrayOf("org.fiz.Fiz", "org.biz.Biz")
+        val variableNames = arrayOf(
+            "SHARED", "FOO_A", "FOO_B", "FOO_C",
+            "SHARED", "BAR_A", "BAR_B", "BAR_C")
+
+        val fqns: MutableSet<JavaType.FullyQualified> = mutableSetOf()
+        val flags = setOf(Flag.Public, Flag.Static)
+
+        val variables: MutableList<JavaType.Variable> = mutableListOf()
+        variableNames.forEach { variables.add(JavaType.Variable.build(it, JavaType.buildType("int"), Flag.flagsToBitMap(flags))) }
+
+        classNames.forEach { fqns.add(JavaType.Class.build(flags, it, JavaType.Class.Kind.Class, variables, listOf(), listOf(), null, null)) }
+        val javaProvenance = javaProvenance(fqns)
+
+        val markedFiles: MutableList<J.CompilationUnit> = mutableListOf()
+        sourceFiles.forEach { markedFiles.add(it.withMarkers(it.markers.addIfAbsent(javaProvenance))) }
+
+        val recipe = OrderImports(false).visitor
+        val result = recipe.visit(markedFiles[0], InMemoryExecutionContext())
+        assertThat((result as J.CompilationUnit).imports.size == 6).isTrue
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/860")
+    @Test
+    fun orderAndDoNotFoldStaticMethods(jp: JavaParser) {
+        val executionContext: ExecutionContext = InMemoryExecutionContext { t: Throwable ->
+            Assertions.fail<Any>("Failed to run parse sources or recipe", t)
+        }
+
+        val classNames = arrayOf("org.fuz.Fuz", "org.buz.Buz")
+
+        val fqns: MutableSet<JavaType.FullyQualified> = mutableSetOf()
+        val flags = setOf(Flag.Public, Flag.Static)
+        val methodSignature: JavaType.Method.Signature = JavaType.Method.Signature(JavaType.buildType("boolean"), listOf())
+        val variables: MutableList<JavaType.Variable> = mutableListOf()
+
+        val methodsFoo: MutableList<JavaType.Method> = mutableListOf()
+        val methodNamesFoo = arrayOf("assertShared", "assertA", "assertB", "assertC")
+        methodNamesFoo.forEach { methodsFoo.add(
+            JavaType.Method.build(flags,
+                JavaType.Class.build("declClass"), it, null, methodSignature, listOf(), listOf())) }
+        fqns.add(JavaType.Class.build(Flag.flagsToBitMap(flags), classNames[0], JavaType.Class.Kind.Class, variables,
+            listOf(), methodsFoo, null, null, listOf(), false))
+
+        val methodsBar: MutableList<JavaType.Method> = mutableListOf()
+        val methodNamesBar = arrayOf("assertShared", "assertThatA", "assertThatB", "assertThatC")
+        methodNamesBar.forEach { methodsBar.add(
+            JavaType.Method.build(flags,
+                    JavaType.Class.build("declClass"), it, null, methodSignature, listOf(), listOf())) }
+        fqns.add(JavaType.Class.build(Flag.flagsToBitMap(flags), classNames[1], JavaType.Class.Kind.Class, variables,
+            listOf(), methodsBar, null, null, listOf(), false))
+
+        val javaProvenance = javaProvenance(fqns)
+
+        val markedFiles: MutableList<J.CompilationUnit> = mutableListOf()
+
+        val inputs = arrayOf(
+            """
+            package org.test;
+            
+            import static org.fuz.Fuz.assertA;
+            import static org.fuz.Fuz.assertB;
+            import static org.fuz.Fuz.assertC;
+            import static org.buz.Buz.assertThatA;
+            import static org.buz.Buz.assertThatB;
+            import static org.buz.Buz.assertThatC;
+            
+            public class Test {
+                boolean fooA = assertA();
+                boolean fooB = assertB();
+                boolean fooC = assertC();
+                boolean barA = assertThatA();
+                boolean barB = assertThatB();
+                boolean barC = assertThatC();
+            }
+            """.trimIndent(),
+            """
+            package org.fuz;
+            public class Fuz {
+                public static boolean assertShared() { return true; }
+                public static boolean assertA() { return true; }
+                public static boolean assertB() { return true; }
+                public static boolean assertC() { return true; }
+            }
+            """.trimIndent()
+            ,
+            """
+            package org.buz;
+            public class Buz {
+                public static boolean assertShared() { return true; }
+                public static boolean assertThatA() { return true; }
+                public static boolean assertThatB() { return true; }
+                public static boolean assertThatC() { return true; }
+            }
+            """.trimIndent(),
+        )
+
+        // Inputs are processed last so that fqns are setup properly in flyweights.
+        val sourceFiles = parser.parse(executionContext, *inputs)
+        sourceFiles.forEach { markedFiles.add(it.withMarkers(it.markers.addIfAbsent(javaProvenance))) }
+
+        val recipe = OrderImports(false).visitor
+        val result = recipe.visit(markedFiles[0], InMemoryExecutionContext())
+        assertThat((result as J.CompilationUnit).imports.size == 6).isTrue
+    }
+
+    fun javaProvenance(classpath: Set<JavaType.FullyQualified>) : JavaProvenance {
+
+        val javaRuntimeVersion = System.getProperty("java.runtime.version")
+        val javaVendor = System.getProperty("java.vm.vendor")
+
+        val groupId = "org.openrewrite"
+        val artifactId = "test"
+        val version = "1.0.0"
+
+        return JavaProvenance(
+            randomId(),
+            "${groupId}:${artifactId}:${version}",
+            "main",
+            JavaProvenance.BuildTool(JavaProvenance.BuildTool.Type.Maven, ""),
+            JavaProvenance.JavaVersion(javaRuntimeVersion, javaVendor,javaRuntimeVersion,javaRuntimeVersion),
+            classpath,
+            JavaProvenance.Publication(groupId, artifactId, version)
+        )
+    }
+}

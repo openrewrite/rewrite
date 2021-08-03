@@ -17,20 +17,18 @@ package org.openrewrite.java.marker;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
-import io.github.classgraph.ClassGraph;
-import io.github.classgraph.ClassInfo;
+import io.github.classgraph.*;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Marker;
 
 import java.nio.file.Path;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 @Incubating(since = "7.0.0")
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -57,13 +55,27 @@ public class JavaProvenance implements Marker {
 
         Set<JavaType.FullyQualified> fqns = new HashSet<>();
         if (classpath.iterator().hasNext()) {
-            for (ClassInfo aClass : new ClassGraph()
+            for (ClassInfo classInfo : new ClassGraph()
                     .overrideClasspath(classpath)
                     .enableMemoryMapping()
                     .enableClassInfo()
+                    .enableMethodInfo()
+                    .enableFieldInfo()
                     .scan()
                     .getAllClasses()) {
-                fqns.add(JavaType.Class.build(aClass.getName()));
+                fqns.add(fromClassGraph(classInfo));
+            }
+
+            for (ClassInfo classInfo : new ClassGraph()
+                    .enableMemoryMapping()
+                    .enableClassInfo()
+                    .enableMethodInfo()
+                    .enableFieldInfo()
+                    .enableSystemJarsAndModules()
+                    .acceptPackages("java")
+                    .scan()
+                    .getAllClasses()) {
+                fqns.add(fromClassGraph(classInfo));
             }
         }
 
@@ -75,6 +87,82 @@ public class JavaProvenance implements Marker {
                 javaVersion,
                 fqns,
                 publication);
+    }
+
+    private static JavaType.FullyQualified fromClassGraph(ClassInfo aClass) {
+        Set<Flag> flags = fromClassGraphModifiers(aClass.getModifiersStr());
+
+        JavaType.Class.Kind kind;
+        if (aClass.isInterface()) {
+            kind = JavaType.Class.Kind.Interface;
+        } else if (aClass.isEnum()) {
+            kind = JavaType.Class.Kind.Enum;
+        } else if (aClass.isAnnotation()) {
+            kind = JavaType.Class.Kind.Annotation;
+        } else {
+            kind = JavaType.Class.Kind.Class;
+        }
+
+        List<JavaType.Variable> variables = fromFieldInfo(aClass.getFieldInfo());
+        List<JavaType.Method> methods = fromMethodInfo(aClass.getMethodInfo());
+
+        return JavaType.Class.build(
+                Flag.flagsToBitMap(flags),
+                aClass.getName(),
+                kind,
+                variables,
+                new ArrayList<>(),
+                methods,
+                null,
+                null,
+                new ArrayList<>(),
+                false);
+    }
+
+    private static Set<Flag> fromClassGraphModifiers(String modifiers) {
+        Set<Flag> flags = new HashSet<>();
+        for (String modifier : modifiers.split("\\s+")) {
+            Flag flag = Flag.fromKeyword(modifier);
+            if (flag != null) {
+                flags.add(flag);
+            }
+        }
+        return flags;
+    }
+
+    private static List<JavaType.Variable> fromFieldInfo(@Nullable FieldInfoList fieldInfos) {
+        List<JavaType.Variable> variables = new ArrayList<>();
+        if (fieldInfos != null) {
+            for (FieldInfo fieldInfo : fieldInfos) {
+                Set<Flag> flags = fromClassGraphModifiers(fieldInfo.getModifiersStr());
+                JavaType.Variable variable = JavaType.Variable.build(fieldInfo.getName(), JavaType.buildType(fieldInfo.getTypeDescriptor().toString()), Flag.flagsToBitMap(flags));
+                variables.add(variable);
+            }
+        }
+        return variables;
+    }
+
+    private static List<JavaType.Method> fromMethodInfo(MethodInfoList methodInfos) {
+        List<JavaType.Method> methods = new ArrayList<>();
+        for (MethodInfo methodInfo : methodInfos) {
+            Set<Flag> flags = fromClassGraphModifiers(methodInfo.getModifiersStr());
+            List<JavaType> parameterTypes = new ArrayList<>();
+            for (MethodParameterInfo methodParameterInfo : methodInfo.getParameterInfo()) {
+                parameterTypes.add(JavaType.buildType(methodParameterInfo.getTypeDescriptor().toString()));
+            }
+            JavaType.Method.Signature signature = new JavaType.Method.Signature(JavaType.buildType(methodInfo.getTypeDescriptor().getResultType().toString()), parameterTypes);
+            List<String> methodParams = new ArrayList<>();
+            List<JavaType.FullyQualified> thrownExceptions = new ArrayList<>();
+            methods.add(JavaType.Method.build(
+                    flags,
+                    JavaType.Class.build(methodInfo.getClassName()),
+                    methodInfo.getName(),
+                    null,
+                    signature,
+                    methodParams,
+                    thrownExceptions));
+        }
+        return methods;
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
