@@ -149,6 +149,10 @@ class Java11MethodMatcherTest: Java11Test, MethodMatcherTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11MethodParamPadTest: Java11Test, MethodParamPadTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11NewArrayTest: Java11Test, NewArrayTest
 
 @DebugOnly
