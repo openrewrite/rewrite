@@ -203,6 +203,30 @@ class CheckstyleConfigLoaderTest {
     }
 
     @Test
+    fun needBraces() {
+        val checkstyle = loadCheckstyleConfig("""
+            <!DOCTYPE module PUBLIC
+                "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
+                "https://checkstyle.org/dtds/configuration_1_2.dtd">
+            <module name="Checker">
+              <module name="NeedBraces">
+                <property name="allowSingleLineStatement" value="true"/>
+                <property name="allowEmptyLoopBody" value="true"/>
+              </module>
+            </module>
+        """.trimIndent(), emptyMap())
+
+        assertThat(checkstyle.styles)
+            .hasSize(1)
+
+        assertThat(checkstyle.styles.first()).isExactlyInstanceOf(NeedBracesStyle::class.java)
+        val needBracesStyle = checkstyle.styles.first() as NeedBracesStyle
+
+        assertThat(needBracesStyle.allowSingleLineStatement).isTrue
+        assertThat(needBracesStyle.allowEmptyLoopBody).isTrue
+    }
+
+    @Test
     fun duplicatedModuleNames() {
         val checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC

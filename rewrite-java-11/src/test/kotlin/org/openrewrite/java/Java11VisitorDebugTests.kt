@@ -252,6 +252,10 @@ class Java11MultipleVariableDeclarationsTest : Java11Test, MultipleVariableDecla
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11NeedBracesTest : Java11Test, NeedBracesTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11NoEqualityInForConditionTest : Java11Test, NoEqualityInForConditionTest
 
 @DebugOnly

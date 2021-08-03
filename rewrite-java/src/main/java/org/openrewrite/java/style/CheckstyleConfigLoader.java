@@ -71,6 +71,7 @@ public class CheckstyleConfigLoader {
                 hiddenFieldStyle(conf),
                 hideUtilityClassConstructorStyle(conf),
                 methodParamPadStyle(conf),
+                needBracesStyle(conf),
                 unnecessaryParentheses(conf))
             .filter(Objects::nonNull)
             .flatMap(Set::stream)
@@ -225,6 +226,20 @@ public class CheckstyleConfigLoader {
                             module.prop("allowLineBreaks", false)
                     );
                 })
+                .collect(toSet());
+    }
+
+    @Nullable
+    private static Set<NeedBracesStyle> needBracesStyle(Map<String, List<Module>> conf) {
+        List<Module> moduleList = conf.get("NeedBraces");
+        if(moduleList == null) {
+            return null;
+        }
+        return moduleList.stream()
+                .map(module -> new NeedBracesStyle(
+                        module.prop("allowSingleLineStatement", false),
+                        module.prop("allowEmptyLoopBody", false)
+                ))
                 .collect(toSet());
     }
 
