@@ -91,37 +91,34 @@ public class MergeYaml extends Recipe {
             @Override
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
                 if (key.equals("/")) {
-                    doAfterVisit(new MergeYamlVisitor<>(document.getBlock(), yaml,
-                            Boolean.TRUE.equals(acceptTheirs)));
-                    return document;
+                    return document.withBlock((Yaml.Block) new MergeYamlVisitor<>(document.getBlock(), yaml,
+                            Boolean.TRUE.equals(acceptTheirs)).visit(document.getBlock(), ctx, getCursor()));
                 }
                 return super.visitDocument(document, ctx);
             }
 
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
-                Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
                 if (matcher.matches(getCursor())) {
                     // this tests for an awkward case that will be better handled by JsonPathMatcher.
                     // if it is a sequence, we want to insert into every sequence entry for now.
                     if (!(entry.getValue() instanceof Yaml.Sequence)) {
-                        e = e.withValue((Yaml.Block) new MergeYamlVisitor<>(entry.getValue(), incoming,
+                        return entry.withValue((Yaml.Block) new MergeYamlVisitor<>(entry.getValue(), incoming,
                                 Boolean.TRUE.equals(acceptTheirs)).visit(entry.getValue(), ctx, getCursor()));
                     }
                 }
-                return e;
+                return super.visitMappingEntry(entry, ctx);
             }
 
             @Override
             public Yaml.Sequence visitSequence(Yaml.Sequence sequence, ExecutionContext ctx) {
-                Yaml.Sequence s = super.visitSequence(sequence, ctx);
                 if (matcher.matches(getCursor().getParentOrThrow())) {
-                    return s.withEntries(ListUtils.map(s.getEntries(), entry ->
+                    return sequence.withEntries(ListUtils.map(sequence.getEntries(), entry ->
                             entry.withBlock((Yaml.Block) new MergeYamlVisitor<>(entry.getBlock(), incoming,
                                     Boolean.TRUE.equals(acceptTheirs)).visit(entry.getBlock(), ctx, new Cursor(getCursor(), entry))))
                     );
                 }
-                return s;
+                return super.visitSequence(sequence, ctx);
             }
         };
     }
