@@ -372,6 +372,10 @@ class Java8StringLiteralEqualityTest : Java8Test, StringLiteralEqualityTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8TypecastParenPadTest : Java8Test, TypecastParenPadTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8UnnecessaryExplicitTypeArgumentsTest : Java8Test, UnnecessaryExplicitTypeArgumentsTest
 
 @DebugOnly

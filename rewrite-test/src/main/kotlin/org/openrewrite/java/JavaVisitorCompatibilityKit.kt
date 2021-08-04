@@ -294,6 +294,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class StringLiteralEqualityTestTck : StringLiteralEqualityTest
 
     @Nested
+    inner class TypecastParenPadTestTck : TypecastParenPadTest
+
+    @Nested
     inner class UnnecessaryExplicitTypeArgumentsTck : UnnecessaryExplicitTypeArgumentsTest
 
     @Nested

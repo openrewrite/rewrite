@@ -376,6 +376,10 @@ class Java11StringLiteralEqualityTest : Java11Test, StringLiteralEqualityTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11TypecastParenPadTest : Java11Test, TypecastParenPadTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11UnnecessaryExplicitTypeArgumentsTest : Java11Test, UnnecessaryExplicitTypeArgumentsTest
 
 @DebugOnly
