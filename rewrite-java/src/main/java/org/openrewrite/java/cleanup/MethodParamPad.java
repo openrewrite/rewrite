@@ -17,11 +17,9 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.format.SpacesVisitor;
-import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.tree.J;
@@ -36,19 +34,6 @@ public class MethodParamPad extends Recipe {
     public String getDescription() {
         return "Fixes whitespace padding between the identifier of a method definition or method invocation and the left parenthesis of the parameter list. " +
                 "For example, when configured to remove spacing, `someMethodInvocation (x);` becomes `someMethodInvocation(x)`.";
-    }
-
-    @Override
-    protected @Nullable JavaIsoVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                if (cu.getStyle(MethodParamPadStyle.class) != null) {
-                    return cu.withMarkers(cu.getMarkers().add(new JavaSearchResult(Tree.randomId(), MethodParamPad.this, null)));
-                }
-                return cu;
-            }
-        };
     }
 
     @Override

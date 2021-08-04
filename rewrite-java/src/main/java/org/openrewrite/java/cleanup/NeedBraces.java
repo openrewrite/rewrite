@@ -18,9 +18,7 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
@@ -39,19 +37,6 @@ public class NeedBraces extends Recipe {
     @Override
     public String getDescription() {
         return "Adds missing braces around code such as single-line `if`, `for`, `while`, and `do-while` block bodies.";
-    }
-
-    @Override
-    protected @Nullable JavaIsoVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                if (cu.getStyle(NeedBracesStyle.class) != null) {
-                    return cu.withMarkers(cu.getMarkers().add(new JavaSearchResult(Tree.randomId(), NeedBraces.this, null)));
-                }
-                return cu;
-            }
-        };
     }
 
     @Override
