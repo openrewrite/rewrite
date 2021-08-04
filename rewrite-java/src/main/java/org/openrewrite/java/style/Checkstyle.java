@@ -49,6 +49,7 @@ public class Checkstyle extends NamedStyles {
                         hiddenFieldStyle(),
                         hideUtilityClassConstructorStyle(),
                         methodParamPadStyle(),
+                        needBracesStyle(),
                         unnecessaryParentheses()
                 ));
     }
@@ -93,6 +94,10 @@ public class Checkstyle extends NamedStyles {
                 "@lombok.experimental.UtilityClass",
                 "@lombok.Data"
         ));
+    }
+
+    public static NeedBracesStyle needBracesStyle() {
+        return new NeedBracesStyle(false, false);
     }
 
     public static UnnecessaryParenthesesStyle unnecessaryParentheses() {
