@@ -72,6 +72,7 @@ public class CheckstyleConfigLoader {
                 hideUtilityClassConstructorStyle(conf),
                 methodParamPadStyle(conf),
                 needBracesStyle(conf),
+                typecastParenPadStyle(conf),
                 unnecessaryParentheses(conf))
             .filter(Objects::nonNull)
             .flatMap(Set::stream)
@@ -240,6 +241,22 @@ public class CheckstyleConfigLoader {
                         module.prop("allowSingleLineStatement", false),
                         module.prop("allowEmptyLoopBody", false)
                 ))
+                .collect(toSet());
+    }
+
+    @Nullable
+    private static Set<TypecastParenPadStyle> typecastParenPadStyle(Map<String, List<Module>> conf) {
+        List<Module> moduleList = conf.get("TypecastParenPad");
+        if(moduleList == null) {
+            return null;
+        }
+        return moduleList.stream()
+                .map(module -> {
+                    String option = module.properties.get("option");
+                    // nospace is default, so no option means pad is false
+                    boolean pad = option != null && "space".equals(option.trim());
+                    return new TypecastParenPadStyle(pad);
+                })
                 .collect(toSet());
     }
 

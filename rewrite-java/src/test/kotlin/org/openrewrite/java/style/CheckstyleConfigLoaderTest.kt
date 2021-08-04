@@ -226,6 +226,30 @@ class CheckstyleConfigLoaderTest {
         assertThat(needBracesStyle.allowEmptyLoopBody).isTrue
     }
 
+
+    @Test
+    fun typecastParenPad() {
+        val checkstyle = loadCheckstyleConfig("""
+            <!DOCTYPE module PUBLIC
+                "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
+                "https://checkstyle.org/dtds/configuration_1_2.dtd">
+            <module name="Checker">
+              <module name="TypecastParenPad">
+                <property name="option" value=" space"/>
+              </module>
+            </module>
+        """.trimIndent(), emptyMap())
+
+        assertThat(checkstyle.styles)
+            .hasSize(1)
+
+        assertThat(checkstyle.styles.first()).isExactlyInstanceOf(TypecastParenPadStyle::class.java)
+        val needBracesStyle = checkstyle.styles.first() as TypecastParenPadStyle
+
+        assertThat(needBracesStyle.space).isTrue
+    }
+
+
     @Test
     fun duplicatedModuleNames() {
         val checkstyle = loadCheckstyleConfig("""

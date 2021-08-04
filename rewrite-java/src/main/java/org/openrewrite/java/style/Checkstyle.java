@@ -50,6 +50,7 @@ public class Checkstyle extends NamedStyles {
                         hideUtilityClassConstructorStyle(),
                         methodParamPadStyle(),
                         needBracesStyle(),
+                        typecastParenPadStyle(),
                         unnecessaryParentheses()
                 ));
     }
@@ -98,6 +99,10 @@ public class Checkstyle extends NamedStyles {
 
     public static NeedBracesStyle needBracesStyle() {
         return new NeedBracesStyle(false, false);
+    }
+
+    public static TypecastParenPadStyle typecastParenPadStyle() {
+        return new TypecastParenPadStyle(false);
     }
 
     public static UnnecessaryParenthesesStyle unnecessaryParentheses() {
