@@ -19,6 +19,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.List;
@@ -37,6 +39,20 @@ public class MergeYaml extends Recipe {
             example = "labels: \n\tlabel-one: \"value-one\"")
     @Language("yml")
     String yaml;
+
+    @Option(displayName = "Accept theirs",
+            description = "When the YAML snippet to insert conflicts with an existing key value pair and an existing key has a different value, prefer the original value.",
+            required = false)
+    @Nullable
+    Boolean acceptTheirs;
+
+    @Incubating(since = "7.11.0")
+    @Option(displayName = "Optional file matcher",
+            description = "Matching files will be modified. This is a glob expression.",
+            required = false,
+            example = "**/application-*.yml")
+    @Nullable
+    String fileMatcher;
 
     @Override
     public Validated validate() {
@@ -62,18 +78,50 @@ public class MergeYaml extends Recipe {
     }
 
     @Override
+    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return new HasSourcePath<>(fileMatcher);
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         XPathMatcher matcher = new XPathMatcher(key);
         Yaml incoming = new YamlParser().parse(yaml).get(0).getDocuments().get(0).getBlock();
 
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
+            public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
+                if (key.equals("/")) {
+                    doAfterVisit(new MergeYamlVisitor<>(document.getBlock(), yaml,
+                            Boolean.TRUE.equals(acceptTheirs)));
+                    return document;
+                }
+                return super.visitDocument(document, ctx);
+            }
+
+            @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
                 if (matcher.matches(getCursor())) {
-                    doAfterVisit(new MergeYamlVisitor<>(entry.getValue(), incoming));
+                    // this tests for an awkward case that will be better handled by JsonPathMatcher.
+                    // if it is a sequence, we want to insert into every sequence entry for now.
+                    if (!(entry.getValue() instanceof Yaml.Sequence)) {
+                        e = e.withValue((Yaml.Block) new MergeYamlVisitor<>(entry.getValue(), incoming,
+                                Boolean.TRUE.equals(acceptTheirs)).visit(entry.getValue(), ctx, getCursor()));
+                    }
                 }
                 return e;
+            }
+
+            @Override
+            public Yaml.Sequence visitSequence(Yaml.Sequence sequence, ExecutionContext ctx) {
+                Yaml.Sequence s = super.visitSequence(sequence, ctx);
+                if (matcher.matches(getCursor().getParentOrThrow())) {
+                    return s.withEntries(ListUtils.map(s.getEntries(), entry ->
+                            entry.withBlock((Yaml.Block) new MergeYamlVisitor<>(entry.getBlock(), incoming,
+                                    Boolean.TRUE.equals(acceptTheirs)).visit(entry.getBlock(), ctx, new Cursor(getCursor(), entry))))
+                    );
+                }
+                return s;
             }
         };
     }

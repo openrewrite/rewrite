@@ -50,7 +50,7 @@ class CopyValueTest : YamlRecipeTest {
 
     @Test
     fun insertCopyValueAndRemoveSource() = assertChanged(
-        recipe = InsertYaml("/", "destination: TEMP", null)
+        recipe = MergeYaml("/", "destination: TEMP", true, null)
             .doNext(CopyValue("/source", "/destination", null))
             .doNext(DeleteKey("/source", null)),
         before = """

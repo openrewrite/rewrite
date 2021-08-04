@@ -25,15 +25,15 @@ public class HasSourcePath<P> extends TreeVisitor<Tree, P> {
     private final String syntax;
     private final String filePattern;
 
-    public HasSourcePath(String filePattern) {
+    public HasSourcePath(@Nullable String filePattern) {
         this("glob", filePattern);
     }
 
     /**
-     * @param syntax one of "glob" or "regex".
+     * @param syntax      one of "glob" or "regex".
      * @param filePattern the file pattern.
      */
-    public HasSourcePath(String syntax, String filePattern) {
+    public HasSourcePath(String syntax, @Nullable String filePattern) {
         this.syntax = syntax;
         this.filePattern = filePattern;
     }
@@ -41,10 +41,14 @@ public class HasSourcePath<P> extends TreeVisitor<Tree, P> {
     @Nullable
     @Override
     public Tree visit(@Nullable Tree tree, P p) {
+        if (filePattern == null) {
+            return new RecipeSearchResult(Tree.randomId(), null, "has file");
+        }
+
         if (tree instanceof SourceFile) {
             Path sourcePath = ((SourceFile) tree).getSourcePath();
             PathMatcher pathMatcher = sourcePath.getFileSystem().getPathMatcher(syntax + ":" + filePattern);
-            if(pathMatcher.matches(sourcePath)) {
+            if (pathMatcher.matches(sourcePath)) {
                 return new RecipeSearchResult(Tree.randomId(), null, "has file");
             }
         }

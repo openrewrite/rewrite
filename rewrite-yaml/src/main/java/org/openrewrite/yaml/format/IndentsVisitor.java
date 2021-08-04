@@ -66,28 +66,32 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
         int indent = Optional.ofNullable(getCursor().<Integer>getNearestMessage("lastIndent")).orElse(0);
 
         if (y.getPrefix().contains("\n")) {
-            if (y instanceof Yaml.Mapping.Entry || y instanceof Yaml.Sequence.Entry) {
-                if (!(getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Document)) {
-                    if (!(getCursor().getParentOrThrow(3).getValue() instanceof Yaml.Sequence)) {
-                        indent += style.getIndentSize();
-                    }
+            if(isUnindentedTopLevel()) {
+                if (y instanceof Yaml.Sequence.Entry) {
+                    y = y.withPrefix(indentTo(y.getPrefix(), indent + style.getIndentSize()));
 
-                    y = y.withPrefix(indentTo(y.getPrefix(), indent));
-
-                    setCursor(new Cursor(getCursor().getParent(), y));
-
-                    if (y instanceof Yaml.Sequence.Entry) {
-                        // the +1 is for the '-' character
-                        indent++;
-                        indent += firstIndent(((Yaml.Sequence.Entry) y).getBlock()).length();
-                    }
-
-                    getCursor().putMessage("lastIndent", indent);
+                    // the +1 is for the '-' character
+                    getCursor().getParentOrThrow().putMessage("lastIndent", indent +
+                            firstIndent(((Yaml.Sequence.Entry) y).getBlock()).length() + 1);
+                } else if (y instanceof Yaml.Mapping.Entry) {
+                    y = y.withPrefix(indentTo(y.getPrefix(), indent + style.getIndentSize()));
+                    getCursor().putMessage("lastIndent", indent + style.getIndentSize());
                 }
             }
+        } else if (y instanceof Yaml.Mapping.Entry && getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Sequence.Entry) {
+            // this is a mapping entry that begins a sequence entry and anything below it should be indented further to the right now, e.g.:
+            //
+            // - key:
+            //     value
+            getCursor().putMessage("lastIndent", indent + style.getIndentSize());
         }
 
         return y;
+    }
+
+    private boolean isUnindentedTopLevel() {
+        return !(getCursor().getParentOrThrow().getValue() instanceof Yaml.Document) &&
+                !(getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Document);
     }
 
     @Nullable
@@ -157,7 +161,7 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
             @Override
             public @Nullable Yaml visit(@Nullable Tree tree, AtomicReference<String> indent) {
                 Yaml y = (Yaml) tree;
-                if(indent.get() != null) {
+                if (indent.get() != null) {
                     return y;
                 }
 
