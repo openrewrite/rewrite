@@ -266,4 +266,13 @@ interface MethodParamPadTest : JavaRecipeTest {
         }
     )
 
+    @Test
+    fun initializeStyleWhenOtherwiseNotProvided(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        before = """
+            enum E {
+                E1()
+            }
+        """
+    )
+
 }

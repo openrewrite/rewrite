@@ -241,18 +241,12 @@ interface NeedBracesTest : JavaRecipeTest {
     )
 
     @Test
-    fun doNotSplitElseIf(jp: JavaParser.Builder<*, *>) = assertUnchanged(
-        parser = jp.styles(namedStyles(listOf(NeedBracesStyle(false, false)))).build(),
+    fun initializeStyleWhenOtherwiseNotProvided(jp: JavaParser.Builder<*, *>) = assertUnchanged(
         before = """
             class Test {
-                int n;
-
-                {
-                    if (n == 1) {
-                    }
-                    else if (n == 2) {
-                    }
-                    else {
+                static void method() {
+                    if (true) {
+                        return;
                     }
                 }
             }

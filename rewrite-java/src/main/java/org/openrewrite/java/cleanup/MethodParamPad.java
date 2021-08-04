@@ -20,6 +20,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.format.SpacesVisitor;
+import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.tree.J;
@@ -54,7 +55,7 @@ public class MethodParamPad extends Recipe {
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
             spacesStyle = cu.getStyle(SpacesStyle.class) == null ? IntelliJ.spaces() : cu.getStyle(SpacesStyle.class);
-            methodParamPadStyle = cu.getStyle(MethodParamPadStyle.class);
+            methodParamPadStyle = cu.getStyle(MethodParamPadStyle.class) == null ? Checkstyle.methodParamPadStyle() : cu.getStyle(MethodParamPadStyle.class);
             emptyForInitializerPadStyle = cu.getStyle(EmptyForInitializerPadStyle.class);
             emptyForIteratorPadStyle = cu.getStyle(EmptyForIteratorPadStyle.class);
 
