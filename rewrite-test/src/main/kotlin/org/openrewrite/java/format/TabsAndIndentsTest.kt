@@ -2133,15 +2133,14 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         """.trimIndent()
     )
 
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/663")
     @Test
-    fun preVisitAlignmentConditions(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+    fun alignBlockPrefixes(jp: JavaParser.Builder<*, *>) = assertUnchanged(
         recipe = AutoFormat(),
         before = """
             public class Test {
-                // Practice A.
-                public void methodA()
+            
+                public void practiceA()
                 {
                     for (int i = 0; i < 10; ++i)
                     {
@@ -2150,10 +2149,12 @@ interface TabsAndIndentsTest : JavaRecipeTest {
                             try
                             {
                                 Integer value = Integer.valueOf("100");
-                            } catch (Exception ex)
+                            }
+                            catch (Exception ex)
                             {
                                 throw new RuntimeException();
-                            } finally
+                            }
+                            finally
                             {
                                 System.out.println("out");
                             }
@@ -2161,8 +2162,7 @@ interface TabsAndIndentsTest : JavaRecipeTest {
                     }
                 }
             
-                // Practice B.
-                public void methodB() {
+                public void practiceB() {
                     for (int i = 0; i < 10; ++i) {
                         if (i % 2 == 0) {
                             try {
@@ -2175,28 +2175,10 @@ interface TabsAndIndentsTest : JavaRecipeTest {
                         }
                     }
                 }
-            
-                // How IntelliJ formats arguments on new lines.
-                public void methodB
-                        () { // We do this now, but it'll break after the changes.
-                    for
-                    (int i = 0; i < 10; ++i) {
-                        if
-                        (i % 2 == 0) {
-                            try {
-                                Integer value = Integer.valueOf("123");
-                            } catch
-                            (Exception ex) {
-                                throw new RuntimeException();
-                            } finally {
-                                System.out.println("out");
-                            }
-                        }
-                    }
-                }
             }
         """.trimIndent()
     )
+
     @Test
     fun alignInlineBlockComments() = assertChanged(
         before = """
