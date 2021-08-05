@@ -72,7 +72,10 @@ public class RemoveUnusedImports extends Recipe {
                     }
                 } else if (javaType instanceof JavaType.FullyQualified) {
                     JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) javaType;
-                    typesByPackage.computeIfAbsent(fullyQualified.getPackageName(), f -> new HashSet<>())
+                    String packageName = fullyQualified.getClassName().contains(".") ?
+                            fullyQualified.getPackageName() + "." + fullyQualified.getClassName().substring(0, fullyQualified.getClassName().lastIndexOf('.')) :
+                            fullyQualified.getPackageName();
+                    typesByPackage.computeIfAbsent(packageName, f -> new HashSet<>())
                             .add(fullyQualified);
                 }
             }
@@ -96,23 +99,32 @@ public class RemoveUnusedImports extends Recipe {
 
                 if (elem.isStatic()) {
                     Set<String> methodsAndFields = methodsAndFieldsByTypeName.get(elem.getTypeName());
-                    if (methodsAndFields == null) {
-                        Set<JavaType.FullyQualified> types = typesByPackage.get(elem.getPackageName());
-                        if (types == null || types.stream().noneMatch(c -> qualid.printTrimmed().equals(c.getFullyQualifiedName()))) {
-                            anImport.used = false;
-                            changed = true;
-                        }
+                    Set<JavaType.FullyQualified> staticClasses = typesByPackage.get(elem.getTypeName());
+                    if (methodsAndFields == null && staticClasses == null) {
+                        anImport.used = false;
+                        changed = true;
                     } else if ("*".equals(qualid.getSimpleName())) {
-                        if (methodsAndFields.size() < layoutStyle.getNameCountToUseStarImport()) {
+                        if (((methodsAndFields == null ? 0 : methodsAndFields.size()) +
+                                (staticClasses == null ? 0 : staticClasses.size())) < layoutStyle.getNameCountToUseStarImport()) {
                             // replacing the star with a series of unfolded imports
                             anImport.imports.clear();
 
                             // add each unfolded import
-                            methodsAndFields.stream().sorted().forEach(method ->
-                                    anImport.imports.add(new JRightPadded<>(elem
-                                            .withQualid(qualid.withName(name.withName(method)))
-                                            .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY))
-                            );
+                            if (methodsAndFields != null) {
+                                methodsAndFields.stream().sorted().forEach(method ->
+                                        anImport.imports.add(new JRightPadded<>(elem
+                                                .withQualid(qualid.withName(name.withName(method)))
+                                                .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY))
+                                );
+                            }
+
+                            if (staticClasses != null) {
+                                staticClasses.forEach(fqn ->
+                                        anImport.imports.add(new JRightPadded<>(elem
+                                                .withQualid(qualid.withName(name.withName(fqn.getClassName().contains(".") ? fqn.getClassName().substring(fqn.getClassName().lastIndexOf(".") + 1) : fqn.getClassName())))
+                                                .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY))
+                                );
+                            }
 
                             // move whatever the original prefix of the star import was to the first unfolded import
                             anImport.imports.set(0, anImport.imports.get(0).withElement(anImport.imports.get(0)
@@ -120,7 +132,10 @@ public class RemoveUnusedImports extends Recipe {
 
                             changed = true;
                         }
-                    } else if (!methodsAndFields.contains(qualid.getSimpleName())) {
+                    } else if (staticClasses != null && staticClasses.stream().anyMatch(c -> elem.getQualid().printTrimmed().equals(c.getFullyQualifiedName())) ||
+                            methodsAndFields != null && methodsAndFields.contains(qualid.getSimpleName())) {
+                        anImport.used = true;
+                    } else {
                         anImport.used = false;
                         changed = true;
                     }

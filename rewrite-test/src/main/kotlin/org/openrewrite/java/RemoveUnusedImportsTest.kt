@@ -371,4 +371,73 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/877")
+    @Test
+    fun doNotUnfoldStaticValidWildCard() = assertUnchanged(
+        dependsOn = arrayOf("""
+            package org.openrewrite;
+            public class Foo {
+                public static final int FOO_CONSTANT = 10;
+                public static final class Bar {
+                    private Bar() {}
+                    public static void helper() {}
+                }
+                public static void fooMethod() {}
+            }
+        """),
+        before = """
+            package foo.test;
+            
+            import static org.openrewrite.Foo.*;
+            
+            public class Test {
+                int val = FOO_CONSTANT;
+                private void method() {
+                    fooMethod();
+                    Bar.helper();
+                }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/877")
+    @Test
+    fun unfoldStaticUses() = assertChanged(
+        dependsOn = arrayOf("""
+            package org.openrewrite;
+            public class Foo {
+                public static final int FOO_CONSTANT = 10;
+                public static final class Bar {
+                    private Bar(){}
+                    public static void helper() {}
+                }
+                public static void fooMethod() {}
+            }
+        """),
+        before = """
+            package foo.test;
+            
+            import static org.openrewrite.Foo.*;
+            
+            public class Test {
+                int val = FOO_CONSTANT;
+                private void method() {
+                    Bar.helper();
+                }
+            }
+        """,
+        after = """
+            package foo.test;
+            
+            import static org.openrewrite.Foo.FOO_CONSTANT;
+            import static org.openrewrite.Foo.Bar;
+            
+            public class Test {
+                int val = FOO_CONSTANT;
+                private void method() {
+                    Bar.helper();
+                }
+            }
+        """
+    )
 }
