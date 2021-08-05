@@ -492,7 +492,7 @@ interface OrderImportsTest : JavaRecipeTest {
             import static com.foo.B.*;
             
             class C {
-                void bar() {
+                void method() {
                     foo();
                     bar();
                     baz();
@@ -1109,5 +1109,53 @@ interface OrderImportsTest : JavaRecipeTest {
             classpath,
             JavaProvenance.Publication(groupId, artifactId, version)
         )
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/859")
+    @Test
+    fun doNotWithJavaLangClassName(jp: JavaParser) {
+        val executionContext: ExecutionContext = InMemoryExecutionContext { t: Throwable ->
+            Assertions.fail<Any>("Failed to run parse sources or recipe", t)
+        }
+
+        val inputs = arrayOf(
+            """
+            package org.test;
+            
+            import org.foo.Process;
+            import org.foo.FooD;
+            import org.foo.FooC;
+            import org.foo.Thread;
+            import org.foo.FooE;
+            
+            public class Test {
+                Thread thread = new Thread();
+                Process process = new Process();
+                FooC fooC = new FooC();
+                FooD fooD = new FooD();
+                FooE fooE = new FooE();
+            }
+            """.trimIndent(),
+            """package org.foo; public class Thread {}""".trimIndent(),
+            """package org.foo; public class Process {}""".trimIndent(),
+            """package org.foo; public class FooC {}""".trimIndent(),
+            """package org.foo; public class FooD {}""".trimIndent(),
+            """package org.foo; public class FooE {}""".trimIndent()
+        )
+
+        val sourceFiles = parser.parse(executionContext, *inputs)
+
+        val classNames = arrayOf("java.lang.Thread", "org.foo.Thread", "org.foo.Process", "org.foo.FooC", "org.foo.FooD", "org.foo.FooE")
+
+        val fqns: MutableSet<JavaType.FullyQualified> = mutableSetOf()
+        classNames.forEach { fqns.add(JavaType.Class.build(it)) }
+        val javaProvenance = javaProvenance(fqns)
+
+        val markedFiles: MutableList<J.CompilationUnit> = mutableListOf()
+        sourceFiles.forEach { markedFiles.add(it.withMarkers(it.markers.addIfAbsent(javaProvenance))) }
+
+        val recipe = OrderImports(false).visitor
+        val result = recipe.visit(markedFiles[0], InMemoryExecutionContext())
+        assertThat((result as J.CompilationUnit).imports.size == 5).isTrue
     }
 }

@@ -445,6 +445,7 @@ public class ImportLayoutStyle implements JavaStyle {
     private static class ImportLayoutConflictDetection {
         private final Set<JavaType.FullyQualified> classpath;
         private final List<JRightPadded<J.Import>> originalImports;
+        private final Set<String> jvmClasspathNames = new HashSet<>();
         private @Nullable Set<String> containsClassNameConflict = null;
 
         ImportLayoutConflictDetection(Set<JavaType.FullyQualified> classpath, List<JRightPadded<J.Import>> originalImports) {
@@ -460,15 +461,24 @@ public class ImportLayoutStyle implements JavaStyle {
         public boolean isPackageFoldable(String packageName) {
             if (containsClassNameConflict == null) {
                 containsClassNameConflict = new HashSet<>();
+                setJVMClassNames();
 
                 Map<String, Set<String>> classNameInPackage = getMapOfClassNamesInPackages();
                 for (String className : classNameInPackage.keySet()) {
-                    if (classNameInPackage.get(className).size() > 1) {
+                    if (classNameInPackage.get(className).size() > 1 || jvmClasspathNames.contains(className)) {
                         containsClassNameConflict.addAll(classNameInPackage.get(className));
                     }
                 }
             }
-            return !containsClassNameConflict.contains(packageName) || classpath.isEmpty();
+            return classpath.isEmpty() || !containsClassNameConflict.contains(packageName);
+        }
+
+        private void setJVMClassNames() {
+            for (JavaType.FullyQualified fqn : classpath) {
+                if ("java.lang".equals(fqn.getPackageName())) {
+                    jvmClasspathNames.add(fqn.getClassName());
+                }
+            }
         }
 
         private Map<String, Set<String>> getMapOfClassNamesInPackages() {
