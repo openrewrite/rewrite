@@ -144,6 +144,10 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 loc.equals(Space.Location.TRY_FINALLY) ||
                 loc.equals(Space.Location.ELSE_PREFIX);
 
+        if (loc.equals(Space.Location.EXTENDS) && space.getWhitespace().contains("\n")) {
+            indentType = IndentType.CONTINUATION_INDENT;
+        }
+
         if (alignBlockToParent || alignToAnnotation) {
             indentType = IndentType.ALIGN;
         }

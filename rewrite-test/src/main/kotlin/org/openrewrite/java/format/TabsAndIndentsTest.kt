@@ -2216,4 +2216,17 @@ interface TabsAndIndentsTest : JavaRecipeTest {
             }
         """.trimIndent()
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/709")
+    @Test
+    fun useContinuationIndentExtendsOnNewLine() = assertUnchanged(
+        dependsOn = arrayOf("package org.a; public class A {}"),
+        before = """
+            package org.b;
+            import org.a.A;
+            class B
+                    extends A {
+            }
+        """
+    )
 }
