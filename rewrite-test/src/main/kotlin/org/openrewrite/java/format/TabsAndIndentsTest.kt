@@ -2211,4 +2211,18 @@ interface TabsAndIndentsTest : JavaRecipeTest {
             }
         """
     )
+
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/883")
+    @Test
+    fun test() = assertUnchanged(
+        dependsOn = arrayOf("package org.a; public class A {}"),
+        before = """
+            package org.b;
+            import org.a.A;
+            class B extends
+                    A {
+            }
+        """
+    )
 }
