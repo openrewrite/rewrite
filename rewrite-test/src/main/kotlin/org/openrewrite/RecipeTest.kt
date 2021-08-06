@@ -170,25 +170,22 @@ interface RecipeTest <T: SourceFile> {
     ) {
         assertThat(recipe).`as`("A recipe must be specified").isNotNull
 
-        val recipeSchedulerCheckingExpectedCycles = RecipeSchedulerCheckingExpectedCycles(ForkJoinScheduler.common(), 0)
+        val source = sources.first()
         val results = recipe
-            .run(sources,
-                executionContext,
-                recipeSchedulerCheckingExpectedCycles,
-                2,
-                2
+            .run(
+                sources,
+                executionContext
             )
 
-        results.forEach { result ->
-            if (result.diff(treePrinter ?: TreePrinter.identity<Any>()).isEmpty()) {
-                fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.")
+        results.filter { result -> result.before == source }
+            .forEach { result ->
+                if (result.diff(treePrinter ?: TreePrinter.identity<Any>()).isEmpty()) {
+                    fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.")
+                }
+                assertThat(result.after?.print(treePrinter ?: TreePrinter.identity<Any>(), null))
+                    .`as`("The recipe must not make changes")
+                    .isEqualTo(result.before?.print(treePrinter ?: TreePrinter.identity<Any>(), null))
             }
-            assertThat(result.after?.print(treePrinter ?: TreePrinter.identity<Any>(), null))
-                .`as`("The recipe must not make changes")
-                .isEqualTo(result.before?.print(treePrinter ?: TreePrinter.identity<Any>(), null))
-        }
-
-        recipeSchedulerCheckingExpectedCycles.verify()
     }
 
     fun TreeVisitor<*, ExecutionContext>.toRecipe() = AdHocRecipe(this)
