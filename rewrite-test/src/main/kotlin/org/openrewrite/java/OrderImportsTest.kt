@@ -1113,7 +1113,7 @@ interface OrderImportsTest : JavaRecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/859")
     @Test
-    fun doNotWithJavaLangClassName(jp: JavaParser) {
+    fun doNotFoldPackageWithJavaLangClassNames(jp: JavaParser) {
         val executionContext: ExecutionContext = InMemoryExecutionContext { t: Throwable ->
             Assertions.fail<Any>("Failed to run parse sources or recipe", t)
         }

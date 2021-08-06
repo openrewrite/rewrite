@@ -15,12 +15,14 @@
  */
 package org.openrewrite.java
 
+import org.assertj.core.api.Assertions
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
-import org.openrewrite.ExecutionContext
-import org.openrewrite.Issue
-import org.openrewrite.Recipe
-import org.openrewrite.TreeVisitor
+import org.openrewrite.*
+import org.openrewrite.java.marker.JavaProvenance
+import org.openrewrite.java.tree.Flag
 import org.openrewrite.java.tree.J
+import org.openrewrite.java.tree.JavaType
 
 interface AddImportTest : JavaRecipeTest {
     fun addImports(vararg adds: AddImport<ExecutionContext>): Recipe = adds
@@ -700,6 +702,156 @@ interface AddImportTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/880")
+    @Test
+    fun doNotFoldNormalImportWithNamespaceConflict(jp: JavaParser) {
+        val executionContext: ExecutionContext = InMemoryExecutionContext { t: Throwable ->
+            Assertions.fail<Any>("Failed to run parse sources or recipe", t)
+        }
+
+        val inputs = arrayOf(
+            """
+            package org.test;
+            
+            import org.bar.*;
+            import org.foo.FooA;
+            import org.foo.FooB;
+            import org.foo.FooC;
+            import org.foo.FooD;
+            
+            public class Test {
+                FooA fooA = new FooA();
+                FooB fooB = new FooB();
+                FooC fooC = new FooC();
+                FooD fooD = new FooD();
+                Shared shared = new Shared();
+
+                BarA barA = new BarA();
+                BarB barB = new BarB();
+                BarC barC = new BarC();
+                BarD barD = new BarD();
+                BarE barE = new BarE();
+            }
+            """.trimIndent(),
+            """package org.foo; public class Shared {}""".trimIndent(),
+            """package org.foo; public class FooA {}""".trimIndent(),
+            """package org.foo; public class FooB {}""".trimIndent(),
+            """package org.foo; public class FooC {}""".trimIndent(),
+            """package org.foo; public class FooD {}""".trimIndent(),
+            """package org.foo; public class FooE {}""".trimIndent(),
+            """package org.bar; public class Shared {}""".trimIndent(),
+            """package org.bar; public class BarA {}""".trimIndent(),
+            """package org.bar; public class BarB {}""".trimIndent(),
+            """package org.bar; public class BarC {}""".trimIndent(),
+            """package org.bar; public class BarD {}""".trimIndent(),
+            """package org.bar; public class BarE {}""".trimIndent()
+        )
+
+        val sourceFiles = parser.parse(executionContext, *inputs)
+
+        val classNames = arrayOf(
+            "org.foo.Shared", "org.foo.FooA", "org.foo.FooB", "org.foo.FooC", "org.foo.FooD", "org.foo.FooE",
+            "org.bar.Shared", "org.bar.BarA", "org.bar.BarB", "org.bar.BarC", "org.bar.BarD", "org.bar.BarE")
+
+        val fqns: MutableSet<JavaType.FullyQualified> = mutableSetOf()
+        classNames.forEach { fqns.add(JavaType.Class.build(it)) }
+        val javaProvenance = javaProvenance(fqns)
+
+        val markedFiles: MutableList<J.CompilationUnit> = mutableListOf()
+        sourceFiles.forEach { markedFiles.add(it.withMarkers(it.markers.addIfAbsent(javaProvenance))) }
+
+        val recipe: AddImport<ExecutionContext> = AddImport("org.foo.Shared", null, false)
+        val result = recipe.visit(markedFiles[0], InMemoryExecutionContext())
+        Assertions.assertThat((result as J.CompilationUnit).imports.size == 6).isTrue
+        Assertions.assertThat((result).imports[5].qualid.printTrimmed()).isEqualTo("org.foo.Shared")
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/860")
+    @Test
+    fun doNotFoldStaticsWithNamespaceConflict(jp: JavaParser) {
+        val executionContext: ExecutionContext = InMemoryExecutionContext { t: Throwable ->
+            Assertions.fail<Any>("Failed to run parse sources or recipe", t)
+        }
+
+        val classNames = arrayOf("org.fuz.Fuz", "org.buz.Buz")
+
+        val fqns: MutableSet<JavaType.FullyQualified> = mutableSetOf()
+        val flags = setOf(Flag.Public, Flag.Static)
+        val methodSignature: JavaType.Method.Signature = JavaType.Method.Signature(JavaType.buildType("boolean"), listOf())
+        val variables: MutableList<JavaType.Variable> = mutableListOf()
+
+        val methodsFoo: MutableList<JavaType.Method> = mutableListOf()
+        val methodNamesFoo = arrayOf("assertShared", "assertA", "assertB", "assertC")
+        methodNamesFoo.forEach { methodsFoo.add(
+            JavaType.Method.build(flags,
+                JavaType.Class.build("org.fuz.Fuz"), it, null, methodSignature, listOf(), listOf())) }
+        fqns.add(JavaType.Class.build(
+            Flag.flagsToBitMap(flags), classNames[0], JavaType.Class.Kind.Class, variables,
+            listOf(), methodsFoo, null, null, listOf(), false))
+
+        val methodsBar: MutableList<JavaType.Method> = mutableListOf()
+        val methodNamesBar = arrayOf("assertShared", "assertThatA", "assertThatB", "assertThatC")
+        methodNamesBar.forEach { methodsBar.add(
+            JavaType.Method.build(flags,
+                JavaType.Class.build("org.buz.Buz"), it, null, methodSignature, listOf(), listOf())) }
+        fqns.add(JavaType.Class.build(
+            Flag.flagsToBitMap(flags), classNames[1], JavaType.Class.Kind.Class, variables,
+            listOf(), methodsBar, null, null, listOf(), false))
+
+        val javaProvenance = javaProvenance(fqns)
+
+        val markedFiles: MutableList<J.CompilationUnit> = mutableListOf()
+
+        val inputs = arrayOf(
+            """
+            package org.fuz;
+            public class Fuz {
+                public static boolean assertShared() { return true; }
+                public static boolean assertA() { return true; }
+                public static boolean assertB() { return true; }
+                public static boolean assertC() { return true; }
+            }
+            """.trimIndent()
+            ,
+            """
+            package org.buz;
+            public class Buz {
+                public static boolean assertShared() { return true; }
+                public static boolean assertThatA() { return true; }
+                public static boolean assertThatB() { return true; }
+                public static boolean assertThatC() { return true; }
+            }
+            """.trimIndent(),
+            """
+            package org.test;
+            
+            import static org.fuz.Fuz.assertA;
+            import static org.fuz.Fuz.assertB;
+            import static org.fuz.Fuz.assertC;
+            import static org.buz.Buz.assertThatA;
+            import static org.buz.Buz.assertThatB;
+            
+            public class Test {
+                boolean fooA = assertA();
+                boolean fooB = assertB();
+                boolean fooC = assertC();
+                boolean barA = assertThatA();
+                boolean barB = assertThatB();
+                boolean barC = org.buz.Buz.assertThatC();
+            }
+            """.trimIndent()
+        )
+
+        // Inputs are processed last so that fqns are setup properly in flyweights.
+        val sourceFiles = parser.parse(executionContext, *inputs)
+        sourceFiles.forEach { markedFiles.add(it.withMarkers(it.markers.addIfAbsent(javaProvenance))) }
+
+        val recipe: AddImport<ExecutionContext> = AddImport("org.buz.Buz", "assertThatC", false)
+        val result = recipe.visit(markedFiles[2], InMemoryExecutionContext())
+        Assertions.assertThat((result as J.CompilationUnit).imports.size == 6).isTrue
+        Assertions.assertThat((result).imports[5].qualid.printTrimmed()).isEqualTo("org.buz.Buz.assertThatC")
+    }
+
     /**
      * This visitor removes the "java.util.Collections" receiver from method invocations of "java.util.Collections.emptyList()".
      * This allows us to test that AddImport with setOnlyIfReferenced = true will add a static import when an applicable static method call is present
@@ -723,5 +875,24 @@ interface AddImportTest : JavaRecipeTest {
                 }
             }
         }
+    }
+
+    fun javaProvenance(classpath: Set<JavaType.FullyQualified>) : JavaProvenance {
+        val javaRuntimeVersion = System.getProperty("java.runtime.version")
+        val javaVendor = System.getProperty("java.vm.vendor")
+
+        val groupId = "org.openrewrite"
+        val artifactId = "test"
+        val version = "1.0.0"
+
+        return JavaProvenance(
+            Tree.randomId(),
+            "${groupId}:${artifactId}:${version}",
+            "main",
+            JavaProvenance.BuildTool(JavaProvenance.BuildTool.Type.Maven, ""),
+            JavaProvenance.JavaVersion(javaRuntimeVersion, javaVendor,javaRuntimeVersion,javaRuntimeVersion),
+            classpath,
+            JavaProvenance.Publication(groupId, artifactId, version)
+        )
     }
 }

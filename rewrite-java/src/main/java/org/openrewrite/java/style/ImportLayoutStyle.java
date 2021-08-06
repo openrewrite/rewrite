@@ -100,7 +100,8 @@ public class ImportLayoutStyle implements JavaStyle {
      * @return The import list with a new import added.
      */
     public List<JRightPadded<J.Import>> addImport(List<JRightPadded<J.Import>> originalImports,
-                                                  J.Import toAdd, @Nullable J.Package pkg) {
+                                                  J.Import toAdd, @Nullable J.Package pkg,
+                                                  Set<JavaType.FullyQualified> classpath) {
         JRightPadded<J.Import> paddedToAdd = new JRightPadded<>(toAdd, Space.EMPTY, Markers.EMPTY);
 
         if (originalImports.isEmpty()) {
@@ -187,6 +188,11 @@ public class ImportLayoutStyle implements JavaStyle {
             paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(Space.format("\n")));
         }
 
+        List<JRightPadded<J.Import>> checkConflicts = new ArrayList<>(originalImports);
+        checkConflicts.add(paddedToAdd);
+        boolean isFoldable = new ImportLayoutConflictDetection(classpath, checkConflicts)
+                .isPackageFoldable(packageOrOuterClassName(paddedToAdd));
+
         // Walk both directions from the insertion point, looking for imports that are in the same block and have the
         // same package/outerclassname.
         AtomicInteger starFoldFrom = new AtomicInteger(insertPosition);
@@ -216,8 +222,8 @@ public class ImportLayoutStyle implements JavaStyle {
             }
         }
 
-        if ((paddedToAdd.getElement().isStatic() && nameCountToUseStarImport <= sameCount) ||
-                (!paddedToAdd.getElement().isStatic() && classCountToUseStarImport <= sameCount)) {
+        if (isFoldable && ((paddedToAdd.getElement().isStatic() && nameCountToUseStarImport <= sameCount) ||
+                (!paddedToAdd.getElement().isStatic() && classCountToUseStarImport <= sameCount))) {
             starFold.set(true);
             if (insertPosition != starFoldFrom.get()) {
                 // if we're adding to the middle of a group of imports that are getting star folded,
@@ -463,10 +469,10 @@ public class ImportLayoutStyle implements JavaStyle {
                 containsClassNameConflict = new HashSet<>();
                 setJVMClassNames();
 
-                Map<String, Set<String>> classNameInPackage = getMapOfClassNamesInPackages();
-                for (String className : classNameInPackage.keySet()) {
-                    if (classNameInPackage.get(className).size() > 1 || jvmClasspathNames.contains(className)) {
-                        containsClassNameConflict.addAll(classNameInPackage.get(className));
+                Map<String, Set<String>> nameToPackages = mapNamesInPackageToPackages();
+                for (String className : nameToPackages.keySet()) {
+                    if (nameToPackages.get(className).size() > 1 || jvmClasspathNames.contains(className)) {
+                        containsClassNameConflict.addAll(nameToPackages.get(className));
                     }
                 }
             }
@@ -481,53 +487,59 @@ public class ImportLayoutStyle implements JavaStyle {
             }
         }
 
-        private Map<String, Set<String>> getMapOfClassNamesInPackages() {
+        private Map<String, Set<String>> mapNamesInPackageToPackages() {
             Set<String> checkPackageForClasses = new HashSet<>();
             for (JRightPadded<J.Import> anImport : originalImports) {
                 checkPackageForClasses.add(packageOrOuterClassName(anImport));
             }
 
-            Map<String, Set<String>> classNameInPackage = new HashMap<>();
-            for (JavaType.FullyQualified fqn : classpath) {
+            Map<String, Set<String>> nameToPackages = new HashMap<>();
+            for (JavaType.FullyQualified classGraphFqn : classpath) {
                 // ClassGraph uses a '$' delimited to distinguish inner classes.
-                boolean containsClassGraphStaticDelimiter = fqn.getClassName().contains("$");
+                boolean containsClassGraphStaticDelimiter = classGraphFqn.getClassName().contains("$");
                 String packageName;
                 if (containsClassGraphStaticDelimiter) {
                     // Example: org.foo.Foo$Bar => package name: org.foo.Foo, class name: Bar
-                    packageName = fqn.getPackageName() + "." + fqn.getClassName().substring(0, fqn.getClassName().lastIndexOf("$")).replace("$", ".");
+                    packageName = classGraphFqn.getPackageName() + "." +
+                            classGraphFqn.getClassName().substring(
+                                    0, classGraphFqn.getClassName().lastIndexOf("$")).replace("$", ".");
                 } else {
-                    packageName = fqn.getPackageName();
+                    packageName = classGraphFqn.getPackageName();
                 }
 
                 if (checkPackageForClasses.contains(packageName)) {
                     String className;
                     if (containsClassGraphStaticDelimiter) {
-                        className = fqn.getClassName().substring(fqn.getClassName().lastIndexOf("$") + 1);
+                        className = classGraphFqn.getClassName().substring(
+                                classGraphFqn.getClassName().lastIndexOf("$") + 1);
                     } else {
-                        className = fqn.getClassName();
+                        className = classGraphFqn.getClassName();
                     }
 
-                    Set<String> packages = classNameInPackage.getOrDefault(className, new HashSet<>());
+                    Set<String> packages = nameToPackages.getOrDefault(className, new HashSet<>());
                     packages.add(packageName);
-                    classNameInPackage.put(className, packages);
-                } else if (checkPackageForClasses.contains(fqn.getFullyQualifiedName())) {
-                    packageName = fqn.getFullyQualifiedName();
-                    for (JavaType.Variable member : fqn.getMembers()) {
+                    nameToPackages.put(className, packages);
+                } else if (checkPackageForClasses.contains(containsClassGraphStaticDelimiter ?
+                        classGraphFqn.getFullyQualifiedName().replace("$", ".") :
+                        classGraphFqn.getFullyQualifiedName())) {
+
+                    packageName = classGraphFqn.getFullyQualifiedName();
+                    for (JavaType.Variable member : classGraphFqn.getMembers()) {
                         if (member.getFlags().contains(Flag.Static)) {
-                            Set<String> packages = classNameInPackage.getOrDefault(member.getName(), new HashSet<>());
+                            Set<String> packages = nameToPackages.getOrDefault(member.getName(), new HashSet<>());
                             packages.add(packageName);
-                            classNameInPackage.put(member.getName(), packages);
+                            nameToPackages.put(member.getName(), packages);
                         }
                     }
 
-                    if (fqn instanceof JavaType.Class) {
-                        List<JavaType.Method> methods = ((JavaType.Class) fqn).getConstructors();
+                    if (classGraphFqn instanceof JavaType.Class) {
+                        List<JavaType.Method> methods = ((JavaType.Class) classGraphFqn).getConstructors();
                         if (methods != null) {
                             for (JavaType.Method method : methods) {
                                 if (method.getFlags().contains(Flag.Static)) {
-                                    Set<String> packages = classNameInPackage.getOrDefault(method.getName(), new HashSet<>());
+                                    Set<String> packages = nameToPackages.getOrDefault(method.getName(), new HashSet<>());
                                     packages.add(packageName);
-                                    classNameInPackage.put(method.getName(), packages);
+                                    nameToPackages.put(method.getName(), packages);
                                 }
                             }
                         }
@@ -535,7 +547,7 @@ public class ImportLayoutStyle implements JavaStyle {
                 }
 
             }
-            return classNameInPackage;
+            return nameToPackages;
         }
     }
 
