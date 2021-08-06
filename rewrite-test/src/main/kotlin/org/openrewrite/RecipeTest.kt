@@ -20,7 +20,6 @@ import okhttp3.Request
 import okhttp3.ResponseBody
 import org.assertj.core.api.Assertions.*
 import org.junit.jupiter.api.fail
-import org.openrewrite.java.tree.J
 import org.openrewrite.scheduling.ForkJoinScheduler
 import java.io.File
 import java.io.IOException
@@ -172,28 +171,21 @@ interface RecipeTest <T: SourceFile> {
         assertThat(recipe).`as`("A recipe must be specified").isNotNull
 
         val source = sources.first()
-        val recipeSchedulerCheckingExpectedCycles = RecipeSchedulerCheckingExpectedCycles(ForkJoinScheduler.common(), 0)
         val results = recipe
-            .run(listOf(source),
-                executionContext,
-                recipeSchedulerCheckingExpectedCycles,
-                2,
-                2
+            .run(
+                sources,
+                executionContext
             )
 
-        results.forEach { result ->
-            if (result.diff(treePrinter ?: TreePrinter.identity<Any>()).isEmpty()) {
-                fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.")
+        results.filter { result -> result.before == source }
+            .forEach { result ->
+                if (result.diff(treePrinter ?: TreePrinter.identity<Any>()).isEmpty()) {
+                    fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.")
+                }
+                assertThat(result.after?.print(treePrinter ?: TreePrinter.identity<Any>(), null))
+                    .`as`("The recipe must not make changes")
+                    .isEqualTo(result.before?.print(treePrinter ?: TreePrinter.identity<Any>(), null))
             }
-        }
-
-        for (result in results) {
-            assertThat(result.after?.print(treePrinter ?: TreePrinter.identity<Any>(), null))
-                .`as`("The recipe must not make changes")
-                .isEqualTo(result.before?.print(treePrinter ?: TreePrinter.identity<Any>(), null))
-        }
-
-        recipeSchedulerCheckingExpectedCycles.verify()
     }
 
     fun TreeVisitor<*, ExecutionContext>.toRecipe() = AdHocRecipe(this)
@@ -334,12 +326,14 @@ interface RecipeTest <T: SourceFile> {
                 if (cyclesThatResultedInChanges > expectedCyclesThatMakeChanges &&
                     before.isNotEmpty() && afterList.isNotEmpty()
                 ) {
-                    assertThat(afterList[0]!!.printTrimmed())
-                        .`as`(
-                            "Expected recipe to complete in $expectedCyclesThatMakeChanges cycle${if (expectedCyclesThatMakeChanges == 1) "" else "s"}, " +
-                                    "but took at least one more cycle. Between the last two executed cycles there were changes."
-                        )
-                        .isEqualTo(before[0]!!.printTrimmed())
+                    for (i in before.indices) {
+                        assertThat(afterList[i]!!.printTrimmed())
+                            .`as`(
+                                "Expected recipe to complete in $expectedCyclesThatMakeChanges cycle${if (expectedCyclesThatMakeChanges == 1) "" else "s"}, " +
+                                        "but took at least one more cycle. Between the last two executed cycles there were changes."
+                            )
+                            .isEqualTo(before[i]!!.printTrimmed())
+                    }
                 }
             }
             return afterList
