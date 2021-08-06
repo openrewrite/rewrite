@@ -766,7 +766,7 @@ interface AddImportTest : JavaRecipeTest {
         Assertions.assertThat((result).imports[5].qualid.printTrimmed()).isEqualTo("org.foo.Shared")
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/860")
+    @Issue("https://github.com/openrewrite/rewrite/issues/880")
     @Test
     fun doNotFoldStaticsWithNamespaceConflict(jp: JavaParser) {
         val executionContext: ExecutionContext = InMemoryExecutionContext { t: Throwable ->
