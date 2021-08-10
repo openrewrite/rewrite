@@ -25,6 +25,7 @@ import okhttp3.*;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.CacheResult;
@@ -44,9 +45,9 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 
 public class MavenPomDownloader {
     private static final RetryConfig retryConfig = RetryConfig.custom()
@@ -83,77 +84,66 @@ public class MavenPomDownloader {
     public MavenMetadata downloadMetadata(String groupId, String artifactId, Collection<MavenRepository> repositories) {
         Timer.Sample sample = Timer.start();
 
-        return Stream.concat(repositories.stream().distinct(), Stream.of(SUPER_POM_REPOSITORY))
-                .map(this::normalizeRepository)
-                .distinct()
-                .filter(Objects::nonNull)
-                .map(repo -> {
-                    Timer.Builder timer = Timer.builder("rewrite.maven.download")
-                            .tag("repo.id", repo.getUri().toString())
-                            .tag("group.id", groupId)
-                            .tag("artifact.id", artifactId)
-                            .tag("type", "metadata");
+        MavenMetadata mavenMetadata = MavenMetadata.EMPTY;
+        Set<MavenRepository> repos = getDistinctNormalizedRepositories(repositories);
+        for (MavenRepository repo : repos) {
+            Timer.Builder timer = Timer.builder("rewrite.maven.download")
+                    .tag("repo.id", repo.getUri().toString())
+                    .tag("group.id", groupId)
+                    .tag("artifact.id", artifactId)
+                    .tag("type", "metadata");
 
-                    try {
-                        CacheResult<MavenMetadata> result = mavenPomCache.computeMavenMetadata(repo.getUri(), groupId, artifactId,
-                                () -> downloadMetadata(groupId, artifactId, null, singletonList(repo)));
+            try {
+                CacheResult<MavenMetadata> result = mavenPomCache.computeMavenMetadata(repo.getUri(), groupId, artifactId,
+                        () -> downloadMetadata(groupId, artifactId, null, singletonList(repo)));
 
-                        sample.stop(addTagsByResult(timer, result).register(Metrics.globalRegistry));
-                        return result.getData();
-                    } catch (Exception e) {
-                        sample.stop(timer.tags("outcome", "error", "exception", e.getClass().getName())
-                                .register(Metrics.globalRegistry));
-                        return null;
-                    }
-                })
-                .filter(Objects::nonNull)
-                .reduce(MavenMetadata.EMPTY, (m1, m2) -> {
-                    if (m1 == MavenMetadata.EMPTY) {
-                        if (m2 == MavenMetadata.EMPTY) {
-                            return m1;
-                        } else {
-                            return m2;
+                sample.stop(addTagsByResult(timer, result).register(Metrics.globalRegistry));
+                MavenMetadata currentMetadata = result.getData();
+                if (currentMetadata != null) {
+                    if (mavenMetadata == MavenMetadata.EMPTY) {
+                        if (currentMetadata != MavenMetadata.EMPTY) {
+                            mavenMetadata = currentMetadata;
                         }
-                    } else if (m2 == MavenMetadata.EMPTY) {
-                        return m1;
-                    } else {
-                        return new MavenMetadata(new MavenMetadata.Versioning(
-                                Stream.concat(m1.getVersioning().getVersions().stream(),
-                                        m2.getVersioning().getVersions().stream()).collect(toList()),
-                                emptyList(), // there will never be snapshot versions in metadata at the group:artifact level
-                                null
-                        ));
+                    } else if (currentMetadata != MavenMetadata.EMPTY) {
+                        mavenMetadata = mergeMetadata(mavenMetadata, currentMetadata);
                     }
-                });
+                }
+            } catch (Exception e) {
+                sample.stop(timer.tags("outcome", "error", "exception", e.getClass().getName())
+                        .register(Metrics.globalRegistry));
+            }
+        }
+        return mavenMetadata;
     }
 
     @Nullable
     public MavenMetadata downloadMetadata(String groupId, String artifactId, @Nullable String version,
                                           Collection<MavenRepository> repositories) {
-        return repositories.stream()
-                .map(this::normalizeRepository)
-                .distinct()
-                .filter(Objects::nonNull)
-                .map(repo -> forceDownloadMetadata(groupId, artifactId, version, repo))
-                .filter(Objects::nonNull)
-                .reduce(MavenMetadata.EMPTY, (m1, m2) -> {
-                    if (m1 == MavenMetadata.EMPTY) {
-                        if (m2 == MavenMetadata.EMPTY) {
-                            return m1;
-                        } else {
-                            return m2;
-                        }
-                    } else if (m2 == MavenMetadata.EMPTY) {
-                        return m1;
-                    } else {
-                        return new MavenMetadata(new MavenMetadata.Versioning(
-                                emptyList(),
-                                Stream.concat(m1.getVersioning().getSnapshotVersions() == null ? Stream.empty() : m1.getVersioning().getSnapshotVersions().stream(),
-                                        m2.getVersioning().getSnapshotVersions() == null ? Stream.empty() : m2.getVersioning().getSnapshotVersions().stream()).collect(toList()),
-                                null
-                        ));
+
+        MavenMetadata mavenMetadata = MavenMetadata.EMPTY;
+        for (MavenRepository repo : getDistinctNormalizedRepositories(repositories)) {
+            MavenMetadata currentMetadata = forceDownloadMetadata(groupId, artifactId, version, repo);
+            if (currentMetadata != null) {
+                if (mavenMetadata == MavenMetadata.EMPTY) {
+                    if (currentMetadata != MavenMetadata.EMPTY) {
+                        mavenMetadata = currentMetadata;
                     }
-                });
+                } else if (currentMetadata != MavenMetadata.EMPTY) {
+                    mavenMetadata = mergeMetadata(mavenMetadata, currentMetadata);
+                }
+            }
+        }
+        return mavenMetadata;
+    }
+
+    @NonNull
+    private MavenMetadata mergeMetadata(MavenMetadata m1, MavenMetadata m2) {
+        return new MavenMetadata(new MavenMetadata.Versioning(
+                Stream.concat(m1.getVersioning().getVersions().stream(), m2.getVersioning().getVersions().stream()).collect(toList()),
+                Stream.concat(m1.getVersioning().getSnapshotVersions() == null ? Stream.empty() : m1.getVersioning().getSnapshotVersions().stream(),
+                        m2.getVersioning().getSnapshotVersions() == null ? Stream.empty() : m2.getVersioning().getSnapshotVersions().stream()).collect(toList()),
+                null
+        ));
     }
 
     @Nullable
@@ -247,12 +237,11 @@ public class MavenPomDownloader {
             }
         }
 
-        List<MavenRepository> repos = Stream.concat(repositories.stream(), Stream.of(SUPER_POM_REPOSITORY))
-                .map(this::normalizeRepository)
-                .filter(Objects::nonNull)
-                .distinct()
+        Set<MavenRepository> normalizedRepos = getDistinctNormalizedRepositories(repositories);
+        Set<MavenRepository> repos = normalizedRepos
+                .stream()
                 .filter(repo -> repo.acceptsVersion(version))
-                .collect(toList());
+                .collect(toSet());
         for (MavenRepository repo : repos) {
             Timer.Builder timer = Timer.builder("rewrite.maven.download")
                     .tag("repo.id", repo.getUri().toString())
@@ -326,26 +315,37 @@ public class MavenPomDownloader {
                 }
             }
 
-            MavenMetadata mavenMetadata = repositories.stream()
-                    .map(this::normalizeRepository)
-                    .filter(Objects::nonNull)
-                    .distinct()
-                    .filter(repo -> repo.acceptsVersion(version))
-                    .map(repo -> downloadMetadata(groupId, artifactId, version, singletonList(repo)))
-                    .filter(Objects::nonNull)
-                    .findFirst()
-                    .orElse(null);
-
-            if (mavenMetadata != null) {
-                MavenMetadata.Snapshot snapshot = mavenMetadata.getVersioning().getSnapshot();
-                if (snapshot == null) {
-                    return null;
+            MavenMetadata mavenMetadata;
+            for (MavenRepository normalizedRepo : getDistinctNormalizedRepositories(repositories)) {
+                if (normalizedRepo.acceptsVersion(version)) {
+                    mavenMetadata = downloadMetadata(groupId, artifactId, version, singletonList(normalizedRepo));
+                    if (mavenMetadata != null) {
+                        MavenMetadata.Snapshot snapshot = mavenMetadata.getVersioning().getSnapshot();
+                        if (snapshot == null) {
+                            return null;
+                        } else {
+                            return version.replaceFirst("SNAPSHOT$", snapshot.getTimestamp() + "-" + snapshot.getBuildNumber());
+                        }
+                    }
                 }
-                return version.replaceFirst("SNAPSHOT$", snapshot.getTimestamp() + "-" + snapshot.getBuildNumber());
             }
         }
 
         return version;
+    }
+
+    @NonNull
+    private Set<MavenRepository> getDistinctNormalizedRepositories(Collection<MavenRepository> repositories) {
+        List<MavenRepository> candidates = new ArrayList<>(repositories);
+        candidates.add(SUPER_POM_REPOSITORY);
+        Set<MavenRepository> normalizedRepositories = new HashSet<>();
+        for (MavenRepository repo : candidates) {
+            MavenRepository normalizedRepo = normalizeRepository(repo);
+            if (normalizedRepo != null) {
+                normalizedRepositories.add(normalizedRepo);
+            }
+        }
+        return normalizedRepositories;
     }
 
     @Nullable
