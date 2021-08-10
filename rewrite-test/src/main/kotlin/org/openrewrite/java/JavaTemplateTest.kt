@@ -813,7 +813,7 @@ interface JavaTemplateTest : JavaRecipeTest {
     )
 
     @Test
-    fun addVariableAnnotations(jp: JavaParser) = assertChanged(
+    fun addVariableAnnotationsToVariableAlreadyAnnotated(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
             val t = JavaTemplate.builder({ cursor }, "@Deprecated")
@@ -831,7 +831,7 @@ interface JavaTemplateTest : JavaRecipeTest {
             class Test {
                 void test() {
                     @SuppressWarnings("ALL") int m;
-                    @SuppressWarnings("ALL") final int n;
+                    final int n;
                 }
             }
         """,
@@ -840,8 +840,40 @@ interface JavaTemplateTest : JavaRecipeTest {
                 void test() {
                     @SuppressWarnings("ALL")
                     @Deprecated int m;
-                    @SuppressWarnings("ALL")
-                    @Deprecated final int n;
+                    final int n;
+                }
+            }
+        """
+    )
+
+    @Test
+    fun addVariableAnnotationsToVariableNotAnnotated(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val t = JavaTemplate.builder({ cursor }, "@SuppressWarnings(\"ALL\")")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitVariableDeclarations(multiVariable: J.VariableDeclarations, p: ExecutionContext): J.VariableDeclarations {
+                if(multiVariable.leadingAnnotations.size == 0) {
+                    return multiVariable.withTemplate(t, multiVariable.coordinates.addAnnotation(comparing { it.simpleName }))
+                }
+                return super.visitVariableDeclarations(multiVariable, p)
+            }
+        }.toRecipe(),
+        before = """
+            class Test {
+                void test() {
+                    int m;
+                    final int n;
+                }
+            }
+        """,
+        after = """
+            class Test {
+                void test() {
+                    @SuppressWarnings("ALL") int m;
+                    @SuppressWarnings("ALL") final int n;
                 }
             }
         """
