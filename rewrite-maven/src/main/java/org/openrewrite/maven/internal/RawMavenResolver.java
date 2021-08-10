@@ -360,7 +360,7 @@ public class RawMavenResolver {
 
                     if (download == null) {
                         ctx.getOnError().accept(new MavenParsingException("Unable to download %s:%s:%s. Including POM is at %s",
-                                groupId, artifactId, version, rawMaven.getSourcePath()));
+                                groupId, artifactId, version, rawMaven));
                         return null;
                     }
 

@@ -38,7 +38,6 @@ import static java.util.Collections.singletonList;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
-@RequiredArgsConstructor
 @Getter
 public class RawMaven {
 
@@ -56,14 +55,14 @@ public class RawMaven {
      */
     @With
     @Nullable
-    MavenRepository repository;
+    final MavenRepository repository;
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         RawMaven rawMaven = (RawMaven) o;
-        return getSourcePath().equals(rawMaven.getSourcePath());
+        return getSourceUri().equals(rawMaven.getSourceUri());
     }
 
     public Path getSourcePath() {
@@ -72,7 +71,7 @@ public class RawMaven {
 
     @Override
     public int hashCode() {
-        return Objects.hash(getSourcePath());
+        return Objects.hash(getSourceUri());
     }
 
     public static RawMaven parse(Parser.Input source, @Nullable Path relativeTo, @Nullable String snapshotVersion,
@@ -86,7 +85,7 @@ public class RawMaven {
             if (snapshotVersion != null) {
                 pom.setSnapshotVersion(snapshotVersion);
             }
-            return new RawMaven(document, pom, false);
+            return new RawMaven(document, pom, false, null);
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to parse " + source.getPath(), e);
         }
