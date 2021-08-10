@@ -813,6 +813,41 @@ interface JavaTemplateTest : JavaRecipeTest {
     )
 
     @Test
+    fun addVariableAnnotations(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val t = JavaTemplate.builder({ cursor }, "@Deprecated")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitVariableDeclarations(multiVariable: J.VariableDeclarations, p: ExecutionContext): J.VariableDeclarations {
+                if(multiVariable.leadingAnnotations.size == 1) {
+                    return multiVariable.withTemplate(t, multiVariable.coordinates.addAnnotation(comparing { it.simpleName }))
+                }
+                return super.visitVariableDeclarations(multiVariable, p)
+            }
+        }.toRecipe(),
+        before = """
+            class Test {
+                void test() {
+                    @SuppressWarnings("ALL") int m;
+                    @SuppressWarnings("ALL") final int n;
+                }
+            }
+        """,
+        after = """
+            class Test {
+                void test() {
+                    @SuppressWarnings("ALL")
+                    @Deprecated int m;
+                    @SuppressWarnings("ALL")
+                    @Deprecated final int n;
+                }
+            }
+        """
+    )
+
+    @Test
     fun addMethodAnnotations(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {

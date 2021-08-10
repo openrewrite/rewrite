@@ -58,6 +58,13 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
+    public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
+        J.VariableDeclarations variableDeclarations = super.visitVariableDeclarations(multiVariable, p);
+        variableDeclarations = variableDeclarations.withLeadingAnnotations(withNewlines(variableDeclarations.getLeadingAnnotations()));
+        return variableDeclarations;
+    }
+
+    @Override
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
         // TODO make annotation wrapping configurable

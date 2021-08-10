@@ -410,15 +410,25 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                 return super.visitStatement(statement, p);
             }
 
+
             @Override
             public J visitVariableDeclarations(J.VariableDeclarations multiVariable, Integer p) {
                 if (multiVariable.isScope(insertionPoint)) {
                     if (loc == ANNOTATIONS) {
-                        J.VariableDeclarations v = multiVariable.withLeadingAnnotations(substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate)));
-                        if (v.getTypeExpression() instanceof J.AnnotatedType) {
-                            v = v.withTypeExpression(((J.AnnotatedType) v.getTypeExpression()).getTypeExpression());
+                        J.VariableDeclarations v = multiVariable;
+                        final List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
+                        if(mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
+                            v = v.withLeadingAnnotations(gen);
+                            if (v.getTypeExpression() instanceof J.AnnotatedType) {
+                                v = v.withTypeExpression(((J.AnnotatedType) v.getTypeExpression()).getTypeExpression());
+                            }
+                            v = v.withModifiers(ListUtils.map(v.getModifiers(), m -> m.withAnnotations(emptyList())));
+                        } else {
+                            for (J.Annotation a : gen) {
+                                v = v.withLeadingAnnotations(ListUtils.insertInOrder(v.getLeadingAnnotations(), a,
+                                        coordinates.getComparator()));
+                            }
                         }
-                        v = v.withModifiers(ListUtils.map(v.getModifiers(), m -> m.withAnnotations(emptyList())));
                         return autoFormat(v, v.getLeadingAnnotations().get(v.getLeadingAnnotations().size() - 1), p,
                                 getCursor().getParentOrThrow());
                     }

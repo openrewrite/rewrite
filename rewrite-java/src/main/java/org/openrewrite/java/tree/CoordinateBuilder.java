@@ -186,5 +186,9 @@ public abstract class CoordinateBuilder {
         public JavaCoordinates replaceAnnotations() {
             return replace(Space.Location.ANNOTATIONS);
         }
+
+        public JavaCoordinates addAnnotation(Comparator<J.Annotation> idealOrdering) {
+            return new JavaCoordinates(tree, Space.Location.ANNOTATIONS, JavaCoordinates.Mode.BEFORE, (a1, a2) -> 0);
+        }
     }
 }
