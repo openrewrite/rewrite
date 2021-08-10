@@ -37,7 +37,7 @@ import java.util.Objects;
 import static java.util.Collections.singletonList;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@AllArgsConstructor
 @Getter
 public class RawMaven {
 
