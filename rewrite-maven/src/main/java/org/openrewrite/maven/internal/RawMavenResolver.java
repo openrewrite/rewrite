@@ -617,7 +617,7 @@ public class RawMavenResolver {
                                 rawPom.getName(),
                                 rawPom.getDescription(),
                                 rawPom.getSnapshotVersion(),
-                                rawPom.getPackaging(),
+                                partial.getRequiredValue(rawPom.getPackaging()),
                                 null,
                                 partial.getParent(),
                                 dependencies,
