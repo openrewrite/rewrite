@@ -846,8 +846,6 @@ interface JavaTemplateTest : JavaRecipeTest {
                     @SuppressWarnings("ALL")
                     // comment x, y
                     private Boolean x, y;
-                    @SuppressWarnings("ALL")
-                    var f = 1L;
                 }
             }
         """,
@@ -871,9 +869,6 @@ interface JavaTemplateTest : JavaRecipeTest {
                     @Deprecated
                     // comment x, y
                     private Boolean x, y;
-                    @SuppressWarnings("ALL")
-                    @Deprecated
-                    var f = 1L;
                 }
             }
         """
