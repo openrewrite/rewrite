@@ -701,6 +701,55 @@ interface AddImportTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/867")
+    @Test
+    fun addImportWithCommentOnClassAndNoImportsOrPackageName(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val t = JavaTemplate.builder({ cursor }, """
+                /**
+                 * Do suppress those warnings
+                 */
+                @SuppressWarnings("other")
+            """.trimIndent())
+                //.doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
+                val cd = super.visitClassDeclaration(classDecl, p)
+                if(cd.leadingAnnotations.size == 0) {
+                    maybeAddImport("java.lang.SuppressWarnings");
+                    return cd.withTemplate(t, cd.coordinates.addAnnotation({a1, a2 -> 0}))
+                }
+                return cd;
+            }
+        }.toRecipe(),
+        before = """
+            class Test {
+            
+                class Inner1 {
+                }
+            }
+        """,
+        after = """
+            import java.lang.SuppressWarnings;
+            
+            /**
+             * Do suppress those warnings
+             */
+            @SuppressWarnings("other")
+            class Test {
+            
+                /**
+                 * Do suppress those warnings
+                 */
+                @SuppressWarnings("other")
+                class Inner1 {
+                }
+            }
+        """
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/880")
     @Test
     fun doNotFoldNormalImportWithNamespaceConflict(jp: JavaParser) {

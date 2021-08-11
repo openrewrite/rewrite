@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.marker.JavaProvenance;
@@ -23,6 +24,7 @@ import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
+import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -110,9 +112,19 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         List<JRightPadded<J.Import>> imports = new ArrayList<>(cu.getPadding().getImports());
 
         if (imports.isEmpty()) {
-            importToAdd = cu.getPackageDeclaration() == null ?
-                    importToAdd.withPrefix(cu.getClasses().get(0).getPrefix()) :
-                    importToAdd.withPrefix(Space.format("\n\n"));
+            if (cu.getPackageDeclaration() == null && cu.getClasses().get(0).getPrefix().getComments().isEmpty()) {
+                importToAdd = importToAdd.withPrefix(cu.getClasses().get(0).getPrefix());
+            } else if (cu.getPackageDeclaration() == null) {
+                importToAdd = importToAdd.withPrefix(cu.getClasses().get(0).getPrefix().withComments(new ArrayList<>()));
+                TabsAndIndentsStyle tabsAndIndentsStyle = Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
+                        .orElse(IntelliJ.tabsAndIndents());
+                String addNewLine = tabsAndIndentsStyle.getUseCRLFNewLines() ? "\r\n\r\n" : "\n\n";
+                cu.getClasses().set(0, cu.getClasses().get(0).withPrefix(cu.getClasses().get(0).getPrefix().withWhitespace(addNewLine + cu.getClasses().get(0).getPrefix().getWhitespace())));
+            } else {
+                TabsAndIndentsStyle tabsAndIndentsStyle = Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
+                        .orElse(IntelliJ.tabsAndIndents());
+                importToAdd = importToAdd.withPrefix(Space.format(tabsAndIndentsStyle.getUseCRLFNewLines() ? "\r\n\r\n" : "\n\n"));
+            }
         }
 
         ImportLayoutStyle layoutStyle = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
