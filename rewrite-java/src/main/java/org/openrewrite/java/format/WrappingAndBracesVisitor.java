@@ -20,10 +20,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
-import org.openrewrite.java.tree.Comment;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -55,6 +52,28 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         return j;
+    }
+
+    @Override
+    public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
+
+        J.VariableDeclarations variableDeclarations = super.visitVariableDeclarations(multiVariable, p);
+        if (getCursor().getParent() != null && getCursor().getParent().firstEnclosing(J.class) instanceof J.Block) {
+
+            variableDeclarations = variableDeclarations.withLeadingAnnotations(withNewlines(variableDeclarations.getLeadingAnnotations()));
+
+            if (!variableDeclarations.getLeadingAnnotations().isEmpty()) {
+                if (!variableDeclarations.getModifiers().isEmpty()) {
+                    variableDeclarations = variableDeclarations.withModifiers(withNewline(variableDeclarations.getModifiers()));
+                } else if (variableDeclarations.getTypeExpression() != null &&
+                        !variableDeclarations.getTypeExpression().getPrefix().getWhitespace().contains("\n")) {
+                    variableDeclarations = variableDeclarations.withTypeExpression(
+                            variableDeclarations.getTypeExpression().withPrefix(withNewline(variableDeclarations.getTypeExpression().getPrefix()))
+                    );
+                }
+            }
+        }
+        return variableDeclarations;
     }
 
     @Override

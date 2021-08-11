@@ -31,6 +31,7 @@ import java.io.OutputStreamWriter
 import java.util.Comparator.comparing
 import java.util.function.Consumer
 
+@Suppress("Convert2MethodRef")
 interface JavaTemplateTest : JavaRecipeTest {
 
     @Test
@@ -47,11 +48,11 @@ interface JavaTemplateTest : JavaRecipeTest {
             }
 
             override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
-                var cd = super.visitClassDeclaration(classDecl, p);
+                var cd = super.visitClassDeclaration(classDecl, p)
                 if(classDecl.type!!.packageName == "a") {
                     cd = cd.withType(cd.type!!.withFullyQualifiedName("b.${cd.simpleName}"))
                 }
-                return cd;
+                return cd
             }
         }.toRecipe(),
         before = """
@@ -95,8 +96,8 @@ interface JavaTemplateTest : JavaRecipeTest {
         """,
         afterConditions = { cu ->
             val methodType = (cu.classes.first().body.statements.first() as J.MethodDeclaration).type!!
-            assertThat(methodType.resolvedSignature.returnType).isEqualTo(JavaType.Primitive.Int)
-            assertThat(methodType.resolvedSignature.paramTypes).containsExactly(JavaType.Primitive.Int)
+            assertThat(methodType.resolvedSignature?.returnType).isEqualTo(JavaType.Primitive.Int)
+            assertThat(methodType.resolvedSignature?.paramTypes).containsExactly(JavaType.Primitive.Int)
             assertThat(methodType.genericSignature?.returnType).isEqualTo(JavaType.Primitive.Int)
             assertThat(methodType.genericSignature?.paramTypes).containsExactly(JavaType.Primitive.Int)
         }
@@ -182,7 +183,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 val t = JavaTemplate.builder({ cursor }, "Object::toString").build()
 
             override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J {
-                return method.withTemplate(t, method.coordinates.replace());
+                return method.withTemplate(t, method.coordinates.replace())
             }
 
             }.toRecipe(),
@@ -257,10 +258,10 @@ interface JavaTemplateTest : JavaRecipeTest {
             assertThat(type.paramNames)
                     .`as`("Changing the method's parameters should have also updated its type's parameter names")
                     .containsExactly("m", "n")
-            assertThat(type.resolvedSignature.paramTypes[0])
+            assertThat(type.resolvedSignature!!.paramTypes[0])
                     .`as`("Changing the method's parameters should have resulted in the first parameter's type being 'int'")
                     .isEqualTo(JavaType.Primitive.Int)
-            assertThat(type.resolvedSignature.paramTypes[1])
+            assertThat(type.resolvedSignature!!.paramTypes[1])
                     .`as`("Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'")
                     .matches { it is JavaType.Parameterized
                             && it.type.fullyQualifiedName == "java.util.List"
@@ -317,7 +318,7 @@ interface JavaTemplateTest : JavaRecipeTest {
             assertThat(type.paramNames)
                     .`as`("Changing the method's parameters should have also updated its type's parameter names")
                     .containsExactly("values")
-            assertThat(type.resolvedSignature.paramTypes[0])
+            assertThat(type.resolvedSignature!!.paramTypes[0])
                     .`as`("Changing the method's parameters should have resulted in the first parameter's type being 'Object[]'")
                     .matches {
                         it is JavaType.Array && it.elemType.hasElementType("java.lang.Object")
@@ -339,7 +340,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                                 method.coordinates.replaceParameters(),
                                 method.parameters[0])
                     }
-                    return method;
+                    return method
                 }
             }.toRecipe(),
         before = """
@@ -360,10 +361,10 @@ interface JavaTemplateTest : JavaRecipeTest {
             assertThat(type.paramNames)
                     .`as`("Changing the method's parameters should have also updated its type's parameter names")
                     .containsExactly("n", "s")
-            assertThat(type.resolvedSignature.paramTypes[0])
+            assertThat(type.resolvedSignature!!.paramTypes[0])
                     .`as`("Changing the method's parameters should have resulted in the first parameter's type being 'int'")
                     .isEqualTo(JavaType.Primitive.Int)
-            assertThat(type.resolvedSignature.paramTypes[1])
+            assertThat(type.resolvedSignature!!.paramTypes[1])
                     .`as`("Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'")
                     .matches { it is JavaType.FullyQualified && it.fullyQualifiedName == "java.lang.String" }
         }
@@ -635,6 +636,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("UnnecessaryBoxing")
     @Test
     fun replaceArguments(jp: JavaParser) = assertChanged(
         jp,
@@ -653,8 +655,8 @@ interface JavaTemplateTest : JavaRecipeTest {
         before = """
             abstract class Test {
                 abstract void test();
-            
-                void test(int m, int n, String foo) {
+                abstract void test(int m, int n, String foo);
+                void fred(int m, int n, String foo) {
                     test();
                 }
             }
@@ -662,14 +664,14 @@ interface JavaTemplateTest : JavaRecipeTest {
         after = """
             abstract class Test {
                 abstract void test();
-            
-                void test(int m, int n, String foo) {
+                abstract void test(int m, int n, String foo);
+                void fred(int m, int n, String foo) {
                     test(m, Integer.valueOf(n), "foo");
                 }
             }
         """,
         afterConditions = { cu ->
-            val m = (cu.classes[0].body.statements[1] as J.MethodDeclaration).body!!.statements[0] as J.MethodInvocation
+            val m = (cu.classes[0].body.statements[2] as J.MethodDeclaration).body!!.statements[0] as J.MethodInvocation
             val type = m.type!!
             assertThat(type.genericSignature!!.paramTypes[0]).isEqualTo(JavaType.Primitive.Int)
             assertThat(type.genericSignature!!.paramTypes[1]).isEqualTo(JavaType.Primitive.Int)
@@ -797,6 +799,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         before = """
             class Test {
                 void test() {
+                    // the m
                     int m;
                     final @SuppressWarnings("ALL") int n;
                 }
@@ -805,8 +808,102 @@ interface JavaTemplateTest : JavaRecipeTest {
         after = """
             class Test {
                 void test() {
-                    @SuppressWarnings("other") int m;
-                    @SuppressWarnings("other") final int n;
+                    // the m
+                    @SuppressWarnings("other")
+                    int m;
+                    @SuppressWarnings("other")
+                    final int n;
+                }
+            }
+        """
+    )
+
+    @Test
+    fun addVariableAnnotationsToVariableAlreadyAnnotated(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val t = JavaTemplate.builder({ cursor }, "@Deprecated")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitVariableDeclarations(multiVariable: J.VariableDeclarations, p: ExecutionContext): J.VariableDeclarations {
+                if(multiVariable.leadingAnnotations.size == 1) {
+                    return multiVariable.withTemplate(t, multiVariable.coordinates.addAnnotation(comparing { 0 }))
+                }
+                return super.visitVariableDeclarations(multiVariable, p)
+            }
+        }.toRecipe(),
+        before = """
+            class Test {
+                void test() {
+                    @SuppressWarnings("ALL") /* hello */
+                    Boolean z;
+                    @SuppressWarnings("ALL") private final int m, a;
+                    // comment n
+                    @SuppressWarnings("ALL")
+                    int n;
+                    @SuppressWarnings("ALL") final Boolean b;
+                    @SuppressWarnings("ALL")
+                    // comment x, y
+                    private Boolean x, y;
+                }
+            }
+        """,
+        after = """
+            class Test {
+                void test() {
+                    @SuppressWarnings("ALL")
+                    @Deprecated /* hello */
+                    Boolean z;
+                    @SuppressWarnings("ALL")
+                    @Deprecated
+                    private final int m, a;
+                    // comment n
+                    @SuppressWarnings("ALL")
+                    @Deprecated
+                    int n;
+                    @SuppressWarnings("ALL")
+                    @Deprecated
+                    final Boolean b;
+                    @SuppressWarnings("ALL")
+                    @Deprecated
+                    // comment x, y
+                    private Boolean x, y;
+                }
+            }
+        """
+    )
+
+    @Test
+    fun addVariableAnnotationsToVariableNotAnnotated(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            val t = JavaTemplate.builder({ cursor }, "@SuppressWarnings(\"ALL\")")
+                .doBeforeParseTemplate(print)
+                .build()
+
+            override fun visitVariableDeclarations(multiVariable: J.VariableDeclarations, p: ExecutionContext): J.VariableDeclarations {
+                if(multiVariable.leadingAnnotations.size == 0) {
+                    return multiVariable.withTemplate(t, multiVariable.coordinates.addAnnotation(comparing { it.simpleName }))
+                }
+                return super.visitVariableDeclarations(multiVariable, p)
+            }
+        }.toRecipe(),
+        before = """
+            class Test {
+                void test() {
+                    final int m;
+                    int n;
+                }
+            }
+        """,
+        after = """
+            class Test {
+                void test() {
+                    @SuppressWarnings("ALL")
+                    final int m;
+                    @SuppressWarnings("ALL")
+                    int n;
                 }
             }
         """
@@ -888,8 +985,8 @@ interface JavaTemplateTest : JavaRecipeTest {
 
             override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
                 if(classDecl.implements == null) {
-                    maybeAddImport("java.io.Closeable");
-                    maybeAddImport("java.io.Serializable");
+                    maybeAddImport("java.io.Closeable")
+                    maybeAddImport("java.io.Serializable")
                     return classDecl.withTemplate(t, classDecl.coordinates.replaceImplementsClause())
                 }
                 return super.visitClassDeclaration(classDecl, p)
@@ -919,7 +1016,7 @@ interface JavaTemplateTest : JavaRecipeTest {
 
             override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
                 if(classDecl.extends == null) {
-                    maybeAddImport("java.util.List");
+                    maybeAddImport("java.util.List")
                     return classDecl.withTemplate(t, classDecl.coordinates.replaceExtendsClause())
                 }
                 return super.visitClassDeclaration(classDecl, p)
@@ -937,6 +1034,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("RedundantThrows")
     @Test
     fun replaceThrows(jp: JavaParser) = assertChanged(
         jp,
@@ -1014,7 +1112,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         afterConditions = { cu ->
             val type = (cu.classes.first().body.statements.first() as J.MethodDeclaration).type!!
             assertThat(type).isNotNull
-            val paramTypes = type.genericSignature.paramTypes
+            val paramTypes = type.genericSignature!!.paramTypes
 
             assertThat(paramTypes[0])
                     .`as`("The method declaration's type's genericSignature first argument should have have type 'java.util.List'")
@@ -1031,21 +1129,6 @@ interface JavaTemplateTest : JavaRecipeTest {
                     }
         }
     )
-
-    @Test
-    fun foo(jp: JavaParser) {
-        val cu = jp.parse("""
-                        import java.util.List;
-                        
-                        class Test {
-                        
-                            <T, U> void test(List<T> t, U u) {
-                            }
-                        }
-        """.trimIndent()).first()
-        val md = cu.classes[0].body.statements[0]
-        md
-    }
 
     @Test
     fun replaceClassTypeParameters(jp: JavaParser) = assertChanged(
@@ -1115,16 +1198,16 @@ interface JavaTemplateTest : JavaRecipeTest {
                         .build()
 
                 override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
-                    var m = method;
+                    var m = method
                     if(!m.isAbstract) {
-                        return m;
+                        return m
                     }
                     m = m.withReturnTypeExpression(m.returnTypeExpression!!.withPrefix(Space.EMPTY))
                     m = m.withModifiers(emptyList())
 
                     m = m.withTemplate(t, m.coordinates.replaceBody())
 
-                    return m;
+                    return m
                 }
             }.toRecipe(),
         before = """
@@ -1159,7 +1242,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                     if(cd.leadingAnnotations.size == 0) {
                         return cd.withTemplate(t, cd.coordinates.replaceAnnotations())
                     }
-                    return cd;
+                    return cd
                 }
             }.toRecipe(),
         before = """
