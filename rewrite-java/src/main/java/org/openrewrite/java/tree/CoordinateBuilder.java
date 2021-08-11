@@ -188,7 +188,7 @@ public abstract class CoordinateBuilder {
         }
 
         public JavaCoordinates addAnnotation(Comparator<J.Annotation> idealOrdering) {
-            return new JavaCoordinates(tree, Space.Location.ANNOTATIONS, JavaCoordinates.Mode.BEFORE, (a1, a2) -> 0);
+            return new JavaCoordinates(tree, Space.Location.ANNOTATIONS, JavaCoordinates.Mode.BEFORE, idealOrdering);
         }
     }
 }
