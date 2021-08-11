@@ -429,7 +429,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                         coordinates.getComparator()));
                             }
                         }
-                        return autoFormat(v, v.getLeadingAnnotations().get(v.getLeadingAnnotations().size() - 1), p,
+                        return autoFormat(v, v.getTypeExpression(), p,
                                 getCursor().getParentOrThrow());
                     }
                 }

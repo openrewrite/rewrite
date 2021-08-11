@@ -247,6 +247,66 @@ interface WrappingAndBracesTest : JavaRecipeTest {
         """
     )
 
+    @Test
+    fun annotatedVariableDecl(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class Test {
+                public void doSomething() {
+                    @SuppressWarnings("ALL") int foo;        
+                }
+            }
+        """,
+        after = """
+            public class Test {
+                public void doSomething() {
+                    @SuppressWarnings("ALL")
+             int foo;        
+                }
+            }
+        """
+    )
+
+    @Test
+    fun annotatedVariableAlreadyCorrect(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            public class Test {
+                public void doSomething() {
+                    @SuppressWarnings("ALL")
+                    int foo;        
+                }
+            }
+        """,
+    )
+
+    @Test
+    fun annotatedVariableDeclWithModifier(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class Test {
+                @SuppressWarnings("ALL") private int foo;        
+            }
+        """,
+        after = """
+            public class Test {
+                @SuppressWarnings("ALL")
+             private int foo;        
+            }
+        """
+    )
+
+    @Test
+    fun annotatedVariableDeclInMethodDeclaration(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            public class Test {
+                public void doSomething(@SuppressWarnings("ALL") int foo) {
+                }
+            }
+        """
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/375")
     @Test
     fun retainTrailingComments(jp: JavaParser) = assertChanged(

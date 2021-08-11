@@ -58,17 +58,20 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
 
         J.VariableDeclarations variableDeclarations = super.visitVariableDeclarations(multiVariable, p);
-        variableDeclarations = variableDeclarations.withLeadingAnnotations(withNewlines(variableDeclarations.getLeadingAnnotations()));
+        if (getCursor().getParent() != null && getCursor().getParent().firstEnclosing(J.class) instanceof J.Block) {
 
-        if( ! variableDeclarations.getModifiers().isEmpty() && ! variableDeclarations.getLeadingAnnotations().isEmpty()) {
-            variableDeclarations = variableDeclarations.withModifiers(withNewline(variableDeclarations.getModifiers()));
-        }
-        else if( variableDeclarations.getModifiers().isEmpty() && ! variableDeclarations.getLeadingAnnotations().isEmpty()) {
-            String prefix = multiVariable.getPrefix().getWhitespace();
-            List<TypeTree> l = new ArrayList<>();
-            l.add(variableDeclarations.getTypeExpression());
-            List<TypeTree> typeTrees = Space.formatFirstPrefix(l, Space.format(prefix));
-            variableDeclarations = variableDeclarations.withTypeExpression(typeTrees.get(0));
+            variableDeclarations = variableDeclarations.withLeadingAnnotations(withNewlines(variableDeclarations.getLeadingAnnotations()));
+
+            if (!variableDeclarations.getLeadingAnnotations().isEmpty()) {
+                if (!variableDeclarations.getModifiers().isEmpty()) {
+                    variableDeclarations = variableDeclarations.withModifiers(withNewline(variableDeclarations.getModifiers()));
+                } else if (variableDeclarations.getTypeExpression() != null &&
+                        !variableDeclarations.getTypeExpression().getPrefix().getWhitespace().contains("\n")) {
+                    variableDeclarations = variableDeclarations.withTypeExpression(
+                            variableDeclarations.getTypeExpression().withPrefix(withNewline(variableDeclarations.getTypeExpression().getPrefix()))
+                    );
+                }
+            }
         }
         return variableDeclarations;
     }
