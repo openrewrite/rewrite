@@ -797,6 +797,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         before = """
             class Test {
                 void test() {
+                    // the m
                     int m;
                     final @SuppressWarnings("ALL") int n;
                 }
@@ -805,8 +806,11 @@ interface JavaTemplateTest : JavaRecipeTest {
         after = """
             class Test {
                 void test() {
-                    @SuppressWarnings("other") int m;
-                    @SuppressWarnings("other") final int n;
+                    // the m
+                    @SuppressWarnings("other")
+                    int m;
+                    @SuppressWarnings("other")
+                    final int n;
                 }
             }
         """
@@ -830,8 +834,14 @@ interface JavaTemplateTest : JavaRecipeTest {
         before = """
             class Test {
                 void test() {
-                    @SuppressWarnings("ALL") int m;
-                    final int n;
+                    @SuppressWarnings("ALL") private final int m, a;
+                    // comment n
+                    @SuppressWarnings("ALL")
+                    int n;
+                    @SuppressWarnings("ALL") final Boolean b;
+                    @SuppressWarnings("ALL")
+                    // comment x, y
+                    private Boolean x, y;
                 }
             }
         """,
@@ -839,8 +849,19 @@ interface JavaTemplateTest : JavaRecipeTest {
             class Test {
                 void test() {
                     @SuppressWarnings("ALL")
-                    @Deprecated int m;
-                    final int n;
+                    @Deprecated
+                    private final int m, a;
+                    // comment n
+                    @SuppressWarnings("ALL")
+                    @Deprecated
+                    int n;
+                    @SuppressWarnings("ALL")
+                    @Deprecated
+                    final Boolean b;
+                    @SuppressWarnings("ALL")
+                    @Deprecated
+                    // comment x, y
+                    private Boolean x, y;
                 }
             }
         """
@@ -864,16 +885,18 @@ interface JavaTemplateTest : JavaRecipeTest {
         before = """
             class Test {
                 void test() {
-                    int m;
-                    final int n;
+                    final int m;
+                    int n;
                 }
             }
         """,
         after = """
             class Test {
                 void test() {
-                    @SuppressWarnings("ALL") int m;
-                    @SuppressWarnings("ALL") final int n;
+                    @SuppressWarnings("ALL")
+                    final int m;
+                    @SuppressWarnings("ALL")
+                    int n;
                 }
             }
         """
