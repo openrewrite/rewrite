@@ -798,10 +798,6 @@ interface OrderImportsTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/860")
     @Test
     fun orderAndDoNotFoldImports(jp: JavaParser) {
-        val executionContext: ExecutionContext = InMemoryExecutionContext { t: Throwable ->
-            Assertions.fail<Any>("Failed to run parse sources or recipe", t)
-        }
-
         val inputs = arrayOf(
             """
             package org.test;
@@ -866,10 +862,6 @@ interface OrderImportsTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/860")
     @Test
     fun orderAndDoNotFoldStaticClasses(jp: JavaParser) {
-        val executionContext: ExecutionContext = InMemoryExecutionContext { t: Throwable ->
-            Assertions.fail<Any>("Failed to run parse sources or recipe", t)
-        }
-
         val inputs = arrayOf(
             """
             package org.test;
@@ -939,10 +931,6 @@ interface OrderImportsTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/860")
     @Test
     fun orderAndDoNotFoldStaticConstants(jp: JavaParser) {
-        val executionContext: ExecutionContext = InMemoryExecutionContext { t: Throwable ->
-            Assertions.fail<Any>("Failed to run parse sources or recipe", t)
-        }
-
         val inputs = arrayOf(
             """
             package org.test;
@@ -1010,10 +998,6 @@ interface OrderImportsTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/860")
     @Test
     fun orderAndDoNotFoldStaticMethods(jp: JavaParser) {
-        val executionContext: ExecutionContext = InMemoryExecutionContext { t: Throwable ->
-            Assertions.fail<Any>("Failed to run parse sources or recipe", t)
-        }
-
         val classNames = arrayOf("org.fuz.Fuz", "org.buz.Buz")
 
         val fqns: MutableSet<JavaType.FullyQualified> = mutableSetOf()
@@ -1114,10 +1098,6 @@ interface OrderImportsTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/859")
     @Test
     fun doNotFoldPackageWithJavaLangClassNames(jp: JavaParser) {
-        val executionContext: ExecutionContext = InMemoryExecutionContext { t: Throwable ->
-            Assertions.fail<Any>("Failed to run parse sources or recipe", t)
-        }
-
         val inputs = arrayOf(
             """
             package org.test;

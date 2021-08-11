@@ -16,7 +16,6 @@
 package org.openrewrite.java
 
 import org.assertj.core.api.Assertions
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.*
 import org.openrewrite.java.marker.JavaProvenance
@@ -705,10 +704,6 @@ interface AddImportTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/880")
     @Test
     fun doNotFoldNormalImportWithNamespaceConflict(jp: JavaParser) {
-        val executionContext: ExecutionContext = InMemoryExecutionContext { t: Throwable ->
-            Assertions.fail<Any>("Failed to run parse sources or recipe", t)
-        }
-
         val inputs = arrayOf(
             """
             package org.test;
@@ -769,10 +764,6 @@ interface AddImportTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/880")
     @Test
     fun doNotFoldStaticsWithNamespaceConflict(jp: JavaParser) {
-        val executionContext: ExecutionContext = InMemoryExecutionContext { t: Throwable ->
-            Assertions.fail<Any>("Failed to run parse sources or recipe", t)
-        }
-
         val classNames = arrayOf("org.fuz.Fuz", "org.buz.Buz")
 
         val fqns: MutableSet<JavaType.FullyQualified> = mutableSetOf()
