@@ -826,7 +826,7 @@ interface JavaTemplateTest : JavaRecipeTest {
 
             override fun visitVariableDeclarations(multiVariable: J.VariableDeclarations, p: ExecutionContext): J.VariableDeclarations {
                 if(multiVariable.leadingAnnotations.size == 1) {
-                    return multiVariable.withTemplate(t, multiVariable.coordinates.addAnnotation(comparing { it.simpleName }))
+                    return multiVariable.withTemplate(t, multiVariable.coordinates.addAnnotation(comparing { 0 }))
                 }
                 return super.visitVariableDeclarations(multiVariable, p)
             }
