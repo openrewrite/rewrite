@@ -847,7 +847,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                     // comment x, y
                     private Boolean x, y;
                     @SuppressWarnings("ALL")
-                    var f = 1;
+                    var f = 1L;
                 }
             }
         """,
@@ -873,7 +873,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                     private Boolean x, y;
                     @SuppressWarnings("ALL")
                     @Deprecated
-                    var f = 1;
+                    var f = 1L;
                 }
             }
         """
