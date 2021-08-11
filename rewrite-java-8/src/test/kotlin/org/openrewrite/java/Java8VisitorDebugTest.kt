@@ -272,6 +272,10 @@ class Java8NormalizeFormatTest : Java8Test, NormalizeFormatTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8OperatorWrapTest : Java8Test, OperatorWrapTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8OrderImportsTest : Java8Test, OrderImportsTest
 
 @DebugOnly

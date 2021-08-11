@@ -226,6 +226,27 @@ class CheckstyleConfigLoaderTest {
         assertThat(needBracesStyle.allowEmptyLoopBody).isTrue
     }
 
+    @Test
+    fun operatorWrap() {
+        val checkstyle = loadCheckstyleConfig("""
+            <!DOCTYPE module PUBLIC
+                "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
+                "https://checkstyle.org/dtds/configuration_1_2.dtd">
+            <module name="Checker">
+              <module name="OperatorWrap">
+                <property name="option" value="EOL"/>
+              </module>
+            </module>
+        """.trimIndent(), emptyMap())
+
+        assertThat(checkstyle.styles)
+            .hasSize(1)
+
+        assertThat(checkstyle.styles.first()).isExactlyInstanceOf(OperatorWrapStyle::class.java)
+        val operatorWrapStyle = checkstyle.styles.first() as OperatorWrapStyle
+
+        assertThat(operatorWrapStyle.wrapOption).isEqualTo(OperatorWrapStyle.WrapOption.EOL)
+    }
 
     @Test
     fun typecastParenPad() {

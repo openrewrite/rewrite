@@ -225,6 +225,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class NormalizeFormatTck : NormalizeFormatTest
 
     @Nested
+    inner class OperatorWrapTck : OperatorWrapTest
+
+    @Nested
     inner class OrderImportsTck : OrderImportsTest
 
     @Nested

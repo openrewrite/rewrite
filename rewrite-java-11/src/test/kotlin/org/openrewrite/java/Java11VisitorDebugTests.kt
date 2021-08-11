@@ -276,6 +276,10 @@ class Java11NormalizeFormatTest : Java11Test, NormalizeFormatTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11OperatorWrapTest : Java11Test, OperatorWrapTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11OrderImportsTest : Java11Test, OrderImportsTest
 
 @DebugOnly

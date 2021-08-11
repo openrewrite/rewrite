@@ -18,7 +18,6 @@ package org.openrewrite.java.style;
 import com.puppycrawl.tools.checkstyle.ConfigurationLoader;
 import com.puppycrawl.tools.checkstyle.api.CheckstyleException;
 import com.puppycrawl.tools.checkstyle.api.Configuration;
-import java.util.stream.Collectors;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.cleanup.*;
@@ -30,12 +29,14 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.google.common.base.Charsets.UTF_8;
 import static java.lang.Boolean.parseBoolean;
 import static java.util.stream.Collectors.*;
 import static org.openrewrite.java.style.Checkstyle.defaultBlockPolicy;
+import static org.openrewrite.java.style.Checkstyle.defaultOperatorWrapStyleOption;
 
 public class CheckstyleConfigLoader {
     private CheckstyleConfigLoader() {}
@@ -72,6 +73,7 @@ public class CheckstyleConfigLoader {
                 hideUtilityClassConstructorStyle(conf),
                 methodParamPadStyle(conf),
                 needBracesStyle(conf),
+                operatorWrapStyle(conf),
                 typecastParenPadStyle(conf),
                 unnecessaryParentheses(conf))
             .filter(Objects::nonNull)
@@ -241,6 +243,105 @@ public class CheckstyleConfigLoader {
                         module.prop("allowSingleLineStatement", false),
                         module.prop("allowEmptyLoopBody", false)
                 ))
+                .collect(toSet());
+    }
+
+    @Nullable
+    private static Set<OperatorWrapStyle> operatorWrapStyle(Map<String, List<Module>> conf) {
+        List<Module> moduleList = conf.get("OperatorWrap");
+        if (moduleList == null) {
+            return null;
+        }
+        return moduleList.stream()
+                .map(module -> {
+                    String rawOption = module.properties.get("option");
+                    OperatorWrapStyle.WrapOption wrapOption = defaultOperatorWrapStyleOption;
+                    if (rawOption != null) {
+                        wrapOption = Enum.valueOf(OperatorWrapStyle.WrapOption.class, rawOption.toUpperCase());
+                    }
+                    String rawTokens = module.properties.get("tokens");
+                    boolean question = true;
+                    boolean colon = true;
+                    boolean equal = true;
+                    boolean notEqual = true;
+                    boolean div = true;
+                    boolean plus = true;
+                    boolean minus = true;
+                    boolean star = true;
+                    boolean mod = true;
+                    boolean sr = true;
+                    boolean bsr = true;
+                    boolean ge = true;
+                    boolean gt = true;
+                    boolean sl = true;
+                    boolean le = true;
+                    boolean lt = true;
+                    boolean bxor = true;
+                    boolean bor = true;
+                    boolean lor = true;
+                    boolean band = true;
+                    boolean land = true;
+                    boolean typeExtensionAnd = true;
+                    boolean literalInstanceof = true;
+                    boolean methodRef = false;
+                    boolean assign = false;
+                    boolean plusAssign = false;
+                    boolean minusAssign = false;
+                    boolean starAssign = false;
+                    boolean divAssign = false;
+                    boolean modAssign = false;
+                    boolean srAssign = false;
+                    boolean bsrAssign = false;
+                    boolean slAssign = false;
+                    boolean bandAssign = false;
+                    boolean bxorAssign = false;
+                    boolean borAssign = false;
+                    if (rawTokens != null) {
+                        Set<String> tokens = Arrays.stream(rawTokens.split("\\s*,\\s*"))
+                                .collect(toSet());
+                        question = tokens.contains("QUESTION");
+                        colon = tokens.contains("COLON");
+                        equal = tokens.contains("EQUAL");
+                        notEqual = tokens.contains("NOT_EQUAL");
+                        div = tokens.contains("DIV");
+                        plus = tokens.contains("PLUS");
+                        minus = tokens.contains("MINUS");
+                        star = tokens.contains("STAR");
+                        mod = tokens.contains("MOD");
+                        sr = tokens.contains("SR");
+                        bsr = tokens.contains("BSR");
+                        ge = tokens.contains("GE");
+                        gt = tokens.contains("GT");
+                        sl = tokens.contains("SL");
+                        le = tokens.contains("LE");
+                        lt = tokens.contains("LT");
+                        bxor = tokens.contains("BXOR");
+                        bor = tokens.contains("BOR");
+                        lor = tokens.contains("LOR");
+                        band = tokens.contains("BAND");
+                        land = tokens.contains("LAND");
+                        typeExtensionAnd = tokens.contains("TYPE_EXTENSION_AND");
+                        literalInstanceof = tokens.contains("LITERAL_INSTANCEOF");
+                        methodRef = tokens.contains("METHOD_REF");
+                        assign = tokens.contains("ASSIGN");
+                        plusAssign = tokens.contains("PLUS_ASSIGN");
+                        minusAssign = tokens.contains("MINUS_ASSIGN");
+                        starAssign = tokens.contains("STAR_ASSIGN");
+                        divAssign = tokens.contains("DIV_ASSIGN");
+                        modAssign = tokens.contains("MOD_ASSIGN");
+                        srAssign = tokens.contains("SR_ASSIGN");
+                        bsrAssign = tokens.contains("BSR_ASSIGN");
+                        slAssign = tokens.contains("SL_ASSIGN");
+                        bandAssign = tokens.contains("BAND_ASSIGN");
+                        bxorAssign = tokens.contains("BXOR_ASSIGN");
+                        borAssign = tokens.contains("BOR_ASSIGN");
+                    }
+                    return new OperatorWrapStyle(wrapOption, question, colon, equal, notEqual, div, plus,
+                            minus, star, mod, sr, bsr, ge, gt, sl, le, lt, bxor, bor, lor, band, land,
+                            typeExtensionAnd, literalInstanceof, methodRef, assign,
+                            plusAssign, minusAssign, starAssign, divAssign, modAssign, srAssign,
+                            bsrAssign, slAssign, bandAssign, bxorAssign, borAssign);
+                })
                 .collect(toSet());
     }
 
