@@ -2,6 +2,7 @@ dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-hcl"))
     api(project(":rewrite-java"))
+    api(project(":rewrite-json"))
     api(project(":rewrite-maven"))
     api(project(":rewrite-xml"))
     api(project(":rewrite-yaml"))

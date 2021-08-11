@@ -1,0 +1,381 @@
+/*
+ * Copyright 2021 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.json.tree;
+
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
+import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.TreePrinter;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.json.JsonVisitor;
+import org.openrewrite.json.internal.JsonPrinter;
+import org.openrewrite.marker.Markers;
+
+import java.io.Serializable;
+import java.lang.ref.WeakReference;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.UUID;
+
+@JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
+public interface Json extends Serializable, Tree {
+
+    @SuppressWarnings("unchecked")
+    @Override
+    default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+        return v instanceof JsonVisitor ?
+                (R) acceptJson((JsonVisitor<P>) v, p) : v.defaultValue(this, p);
+    }
+
+    @Nullable
+    default <P> Json acceptJson(JsonVisitor<P> v, P p) {
+        return v.defaultValue(this, p);
+    }
+
+    @Override
+    default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
+        return v instanceof JsonVisitor;
+    }
+
+    default <P> String print(TreePrinter<P> printer, P p) {
+        return new JsonPrinter<>(printer).print(this, p);
+    }
+
+    @Override
+    default <P> String print(P p) {
+        return print(TreePrinter.identity(), p);
+    }
+
+    Space getPrefix();
+
+    <J extends Json> J withId(UUID id);
+
+    <J extends Json> J withPrefix(Space prefix);
+
+    <T extends Json> T withMarkers(Markers markers);
+
+    Markers getMarkers();
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Array implements JsonValue {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        List<JsonRightPadded<JsonValue>> values;
+
+        public List<JsonValue> getValues() {
+            return JsonRightPadded.getElements(values);
+        }
+
+        public Array withValues(List<JsonValue> values) {
+            return getPadding().withParameters(JsonRightPadded.withElements(this.values, values));
+        }
+
+        @Override
+        public <P> Json acceptJson(JsonVisitor<P> v, P p) {
+            return v.visitArray(this, p);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Array t;
+
+            public List<JsonRightPadded<JsonValue>> getValues() {
+                return t.values;
+            }
+
+            public Array withParameters(List<JsonRightPadded<JsonValue>> values) {
+                return t.values == values ? t : new Array(t.id, t.prefix, t.markers, values);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Document implements Json, SourceFile {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Path sourcePath;
+
+        Space prefix;
+
+        Markers markers;
+
+        JsonValue value;
+
+        Space eof;
+
+        @Override
+        public <P> Json acceptJson(JsonVisitor<P> v, P p) {
+            return v.visitDocument(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Empty implements JsonValue {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+
+        Markers markers;
+
+        @Override
+        public <P> Json acceptJson(JsonVisitor<P> v, P p) {
+            return v.visitEmpty(this, p);
+        }
+
+        @Override
+        public String toString() {
+            return "Empty{prefix=" + prefix + "}";
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Identifier implements JsonKey {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+
+        Markers markers;
+
+        String name;
+
+        @Override
+        public <P> Json acceptJson(JsonVisitor<P> v, P p) {
+            return v.visitIdentifier(this, p);
+        }
+
+        @Override
+        public String toString() {
+            return "Identifier{prefix=" + prefix + ",name=" + name + "}";
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Literal implements JsonValue, JsonKey {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+
+        Markers markers;
+
+        String source;
+
+        Object value;
+
+        @Override
+        public <P> Json acceptJson(JsonVisitor<P> v, P p) {
+            return v.visitLiteral(this, p);
+        }
+
+        @Override
+        public String toString() {
+            return "Literal{prefix=" + prefix + ",source=" + source + "}";
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Member implements Json {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        JsonRightPadded<JsonKey> key;
+
+        public JsonKey getKey() {
+            return key.getElement();
+        }
+
+        public Member withKey(JsonKey key) {
+            return getPadding().withKey(this.key.withElement(key));
+        }
+
+        @Getter
+        @With
+        JsonValue value;
+
+        @Override
+        public <P> Json acceptJson(JsonVisitor<P> v, P p) {
+            return v.visitMember(this, p);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Member t;
+
+            public JsonRightPadded<JsonKey> getKey() {
+                return t.key;
+            }
+
+            public Member withKey(JsonRightPadded<JsonKey> key) {
+                return t.key == key ? t : new Member(t.id, t.prefix, t.markers, key, t.value);
+            }
+        }
+
+        @Override
+        public String toString() {
+            return "Member{prefix=" + prefix + ",key=" + key.getElement() + "}";
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class JsonObject implements JsonValue {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        /**
+         * Either {@link Member} or {@link Empty}
+         */
+        List<JsonRightPadded<Json>> members;
+
+        public List<Json> getMembers() {
+            return JsonRightPadded.getElements(members);
+        }
+
+        public JsonObject withMembers(List<Json> members) {
+            return getPadding().withMembers(JsonRightPadded.withElements(this.members, members));
+        }
+
+        @Override
+        public <P> Json acceptJson(JsonVisitor<P> v, P p) {
+            return v.visitObject(this, p);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final JsonObject t;
+
+            public List<JsonRightPadded<Json>> getMembers() {
+                return t.members;
+            }
+
+            public JsonObject withMembers(List<JsonRightPadded<Json>> members) {
+                return t.members == members ? t : new JsonObject(t.id, t.prefix, t.markers, members);
+            }
+        }
+    }
+}

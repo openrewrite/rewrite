@@ -3,8 +3,8 @@ tasks.register<JavaExec>("generateAntlrSources") {
     main = "org.antlr.v4.Tool"
 
     args = listOf(
-            "-o", "src/main/java/org/openrewrite/xml/internal/grammar",
-            "-package", "org.openrewrite.xml.internal.grammar",
+            "-o", "src/main/java/org/openrewrite/json/internal/grammar",
+            "-package", "org.openrewrite.json.internal.grammar",
             "-visitor"
     ) + fileTree("src/main/antlr").matching { include("**/*.g4") }.map { it.path }
 
