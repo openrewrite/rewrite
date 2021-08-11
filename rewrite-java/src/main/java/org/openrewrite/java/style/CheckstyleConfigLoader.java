@@ -35,8 +35,7 @@ import java.util.stream.Stream;
 import static com.google.common.base.Charsets.UTF_8;
 import static java.lang.Boolean.parseBoolean;
 import static java.util.stream.Collectors.*;
-import static org.openrewrite.java.style.Checkstyle.defaultBlockPolicy;
-import static org.openrewrite.java.style.Checkstyle.defaultOperatorWrapStyleOption;
+import static org.openrewrite.java.style.Checkstyle.*;
 
 public class CheckstyleConfigLoader {
     private CheckstyleConfigLoader() {}
@@ -73,6 +72,8 @@ public class CheckstyleConfigLoader {
                 hideUtilityClassConstructorStyle(conf),
                 methodParamPadStyle(conf),
                 needBracesStyle(conf),
+                noWhitespaceAfterStyle(conf),
+                noWhitespaceBeforeStyle(conf),
                 operatorWrapStyle(conf),
                 typecastParenPadStyle(conf),
                 unnecessaryParentheses(conf))
@@ -243,6 +244,110 @@ public class CheckstyleConfigLoader {
                         module.prop("allowSingleLineStatement", false),
                         module.prop("allowEmptyLoopBody", false)
                 ))
+                .collect(toSet());
+    }
+
+    @Nullable
+    private static Set<NoWhitespaceAfterStyle> noWhitespaceAfterStyle(Map<String, List<Module>> conf) {
+        List<Module> moduleList = conf.get("NoWhitespaceAfter");
+        if (moduleList == null) {
+            return null;
+        }
+        return moduleList.stream()
+                .map(module -> {
+                    String rawTokens = module.properties.get("tokens");
+                    boolean typecast = true;
+                    boolean methodRef = false;
+                    boolean arrayDeclarator = true;
+                    boolean annotation = true;
+                    boolean arrayInitializer = true;
+                    boolean indexOperation = true;
+                    boolean dot = false;
+                    boolean inc = true;
+                    boolean dec = true;
+                    boolean bnoc = true;
+                    boolean lnot = true;
+                    boolean unaryPlus = true;
+                    boolean unaryMinus = true;
+                    if (rawTokens != null) {
+                        Set<String> tokens = Arrays.stream(rawTokens.split("\\s*,\\s*"))
+                                .collect(toSet());
+                        typecast = tokens.contains("TYPECAST");
+                        methodRef = tokens.contains("METHOD_REF");
+                        arrayDeclarator = tokens.contains("ARRAY_DECLARATOR");
+                        arrayInitializer = tokens.contains("ARRAY_INIT");
+                        annotation = tokens.contains("AT");
+                        indexOperation = tokens.contains("INDEX_OP");
+                        dot = tokens.contains("INDEX_OP");
+                        inc = tokens.contains("INC");
+                        dec = tokens.contains("DEC");
+                        bnoc = tokens.contains("BNOC");
+                        lnot = tokens.contains("LNOT");
+                        unaryPlus = tokens.contains("UNARY_PLUS");
+                        unaryMinus = tokens.contains("UNARY_MINUS");
+                    }
+                    return new NoWhitespaceAfterStyle(
+                            module.prop("allowLineBreaks", true),
+                            typecast,
+                            methodRef,
+                            arrayDeclarator,
+                            annotation,
+                            arrayInitializer,
+                            indexOperation,
+                            dot,
+                            inc,
+                            dec,
+                            bnoc,
+                            lnot,
+                            unaryPlus,
+                            unaryMinus
+                    );
+                })
+                .collect(toSet());
+    }
+
+    @Nullable
+    private static Set<NoWhitespaceBeforeStyle> noWhitespaceBeforeStyle(Map<String, List<Module>> conf) {
+        List<Module> moduleList = conf.get("NoWhitespaceBefore");
+        if (moduleList == null) {
+            return null;
+        }
+        return moduleList.stream()
+                .map(module -> {
+                    String rawTokens = module.properties.get("tokens");
+                    boolean dot = false;
+                    boolean comma = true;
+                    boolean semi = true;
+                    boolean genericStart = false;
+                    boolean genericEnd = false;
+                    boolean methodRef = false;
+                    boolean postInc = true;
+                    boolean postDec = true;
+                    if (rawTokens != null) {
+                        Set<String> tokens = Arrays.stream(rawTokens.split("\\s*,\\s*"))
+                                .collect(toSet());
+                        dot = tokens.contains("DOT");
+                        comma = tokens.contains("COMMA");
+                        semi = tokens.contains("SEMI");
+                        genericStart = tokens.contains("GENERIC_START");
+                        genericEnd = tokens.contains("GENERIC_END");
+                        methodRef = tokens.contains("METHOD_REF");
+                        postInc = tokens.contains("POST_INC");
+                        postDec = tokens.contains("POST_DEC");
+                    }
+                    return new NoWhitespaceBeforeStyle(
+                            module.prop("allowLineBreaks", false),
+                            dot,
+                            comma,
+                            semi,
+                            genericStart,
+                            genericEnd,
+                            methodRef,
+                            postInc,
+                            postDec
+
+                    );
+                })
                 .collect(toSet());
     }
 

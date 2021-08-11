@@ -50,6 +50,8 @@ public class Checkstyle extends NamedStyles {
                         hideUtilityClassConstructorStyle(),
                         methodParamPadStyle(),
                         needBracesStyle(),
+                        noWhitespaceAfterStyle(),
+                        noWhitespaceBeforeStyle(),
                         operatorWrapStyle(),
                         typecastParenPadStyle(),
                         unnecessaryParentheses()
@@ -100,6 +102,16 @@ public class Checkstyle extends NamedStyles {
 
     public static NeedBracesStyle needBracesStyle() {
         return new NeedBracesStyle(false, false);
+    }
+
+    public static NoWhitespaceAfterStyle noWhitespaceAfterStyle() {
+        return new NoWhitespaceAfterStyle(true, false, false, true, true, true,
+                true, false, true, true, true, true, true, true);
+    }
+
+    public static NoWhitespaceBeforeStyle noWhitespaceBeforeStyle() {
+        return new NoWhitespaceBeforeStyle(false, false, true, true, false, false,
+                false, true, true);
     }
 
     public static final OperatorWrapStyle.WrapOption defaultOperatorWrapStyleOption = OperatorWrapStyle.WrapOption.NL;

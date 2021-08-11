@@ -272,6 +272,14 @@ class Java11NoStaticImport : Java11Test, NoStaticImportTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11NoWhitespaceAfterTest : Java11Test, NoWhitespaceAfterTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11NoWhitespaceBeforeTest : Java11Test, NoWhitespaceBeforeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11NormalizeFormatTest : Java11Test, NormalizeFormatTest
 
 @DebugOnly
