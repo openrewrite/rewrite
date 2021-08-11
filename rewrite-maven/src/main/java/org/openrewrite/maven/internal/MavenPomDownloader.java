@@ -321,9 +321,7 @@ public class MavenPomDownloader {
                     mavenMetadata = downloadMetadata(groupId, artifactId, version, singletonList(normalizedRepo));
                     if (mavenMetadata != null) {
                         MavenMetadata.Snapshot snapshot = mavenMetadata.getVersioning().getSnapshot();
-                        if (snapshot == null) {
-                            return null;
-                        } else {
+                        if (snapshot != null) {
                             return version.replaceFirst("SNAPSHOT$", snapshot.getTimestamp() + "-" + snapshot.getBuildNumber());
                         }
                     }
