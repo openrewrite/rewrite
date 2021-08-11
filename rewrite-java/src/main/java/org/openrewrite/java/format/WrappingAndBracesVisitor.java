@@ -20,10 +20,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
-import org.openrewrite.java.tree.Comment;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -59,8 +56,20 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
+
         J.VariableDeclarations variableDeclarations = super.visitVariableDeclarations(multiVariable, p);
         variableDeclarations = variableDeclarations.withLeadingAnnotations(withNewlines(variableDeclarations.getLeadingAnnotations()));
+
+        if( ! variableDeclarations.getModifiers().isEmpty() && ! variableDeclarations.getLeadingAnnotations().isEmpty()) {
+            variableDeclarations = variableDeclarations.withModifiers(withNewline(variableDeclarations.getModifiers()));
+        }
+        else if( variableDeclarations.getModifiers().isEmpty() && ! variableDeclarations.getLeadingAnnotations().isEmpty()) {
+            String prefix = multiVariable.getPrefix().getWhitespace();
+            List<TypeTree> l = new ArrayList<>();
+            l.add(variableDeclarations.getTypeExpression());
+            List<TypeTree> typeTrees = Space.formatFirstPrefix(l, Space.format(prefix));
+            variableDeclarations = variableDeclarations.withTypeExpression(typeTrees.get(0));
+        }
         return variableDeclarations;
     }
 
