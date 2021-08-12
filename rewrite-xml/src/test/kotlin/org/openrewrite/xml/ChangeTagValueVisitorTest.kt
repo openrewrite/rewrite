@@ -23,12 +23,14 @@ class ChangeTagValueVisitorTest : XmlRecipeTest {
 
     @Test
     fun changeTagValue() = assertChanged(
-        recipe = object : XmlVisitor<ExecutionContext>() {
-            override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
-                doAfterVisit(ChangeTagValueVisitor(x.root.content[0] as Xml.Tag, "2.0"))
-                return super.visitDocument(x, p)
+        recipe = toRecipe {
+            object : XmlVisitor<ExecutionContext>() {
+                override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
+                    doAfterVisit(ChangeTagValueVisitor(x.root.content[0] as Xml.Tag, "2.0"))
+                    return super.visitDocument(x, p)
+                }
             }
-        }.toRecipe(),
+        },
         before = """
             <dependency>
                 <version/>
@@ -43,12 +45,14 @@ class ChangeTagValueVisitorTest : XmlRecipeTest {
 
     @Test
     fun preserveOriginalFormatting() = assertChanged(
-        recipe = object : XmlVisitor<ExecutionContext>() {
-            override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
-                doAfterVisit(ChangeTagValueVisitor(x.root.content[0] as Xml.Tag, "3.0"))
-                return super.visitDocument(x, p)
+        recipe = toRecipe {
+            object : XmlVisitor<ExecutionContext>() {
+                override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
+                    doAfterVisit(ChangeTagValueVisitor(x.root.content[0] as Xml.Tag, "3.0"))
+                    return super.visitDocument(x, p)
+                }
             }
-        }.toRecipe(),
+        },
         before = """
             <dependency>
                 <version>

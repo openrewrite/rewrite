@@ -188,11 +188,13 @@ interface RecipeTest <T: SourceFile> {
             }
     }
 
-    fun TreeVisitor<*, ExecutionContext>.toRecipe() = AdHocRecipe(this)
+    fun toRecipe(supplier : () -> TreeVisitor<*, ExecutionContext>) : Recipe {
+        return AdHocRecipe(supplier)
+    }
 
-    class AdHocRecipe(private val visitor: TreeVisitor<*, ExecutionContext>) : Recipe() {
+    class AdHocRecipe(private val visitor : () -> TreeVisitor<*, ExecutionContext>) : Recipe() {
         override fun getDisplayName(): String = "Ad hoc recipe"
-        override fun getVisitor(): TreeVisitor<*, ExecutionContext> = visitor
+        override fun getVisitor(): TreeVisitor<*, ExecutionContext> = visitor()
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -284,9 +286,9 @@ interface RecipeTest <T: SourceFile> {
                 }
 
                 for (result in results) {
-                    assertThat(result.after?.print(null))
+                    assertThat(result.after?.print())
                         .`as`("The recipe must not make changes")
-                        .isEqualTo(result.before?.print(null))
+                        .isEqualTo(result.before?.print())
                 }
             }
         } catch (e: IOException) {

@@ -25,9 +25,11 @@ import org.openrewrite.java.tree.J
 
 interface NormalizeFormatTest : JavaRecipeTest {
     private val removeAnnotation: Recipe
-        get() = object : JavaIsoVisitor<ExecutionContext>() {
-            override fun visitAnnotation(annotation: J.Annotation, p: ExecutionContext): J.Annotation? = null
-        }.toRecipe()
+        get() = toRecipe {
+            object : JavaIsoVisitor<ExecutionContext>() {
+                override fun visitAnnotation(annotation: J.Annotation, p: ExecutionContext): J.Annotation? = null
+            }
+        }
 
     @Test
     fun removeAnnotationFromMethod(jp: JavaParser) = assertChanged(

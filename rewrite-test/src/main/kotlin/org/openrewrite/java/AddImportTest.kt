@@ -24,16 +24,16 @@ import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 
 interface AddImportTest : JavaRecipeTest {
-    fun addImports(vararg adds: AddImport<ExecutionContext>): Recipe = adds
-        .map { add -> add.toRecipe() }
+    fun addImports(vararg adds: () -> TreeVisitor<*, ExecutionContext>): Recipe = adds
+        .map { add -> toRecipe(add) }
         .reduce { r1, r2 -> return r1.doNext(r2) }
 
     @Test
     fun dontDuplicateImports(jp: JavaParser) = assertChanged(
         jp,
         recipe = addImports(
-            AddImport("org.springframework.http.HttpStatus", null, false),
-            AddImport("org.springframework.http.HttpStatus.Series", null, false)
+            { AddImport("org.springframework.http.HttpStatus", null, false) },
+            { AddImport("org.springframework.http.HttpStatus.Series", null, false) }
         ),
         before = "class A {}",
         after = """
@@ -48,7 +48,7 @@ interface AddImportTest : JavaRecipeTest {
     fun dontDuplicateImports2(jp: JavaParser) = assertChanged(
         jp,
         recipe = addImports(
-            AddImport("org.junit.jupiter.api.Test", null, false)
+            { AddImport("org.junit.jupiter.api.Test", null, false) }
         ),
         before = """
             import org.junit.jupiter.api.AfterEach;
@@ -75,7 +75,7 @@ interface AddImportTest : JavaRecipeTest {
     fun dontDuplicateImports3(jp: JavaParser) = assertChanged(
         jp,
         recipe = addImports(
-            AddImport("org.junit.jupiter.api.Assertions", "assertNull", false)
+            { AddImport("org.junit.jupiter.api.Assertions", "assertNull", false) }
         ),
         before = """
             import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -99,7 +99,7 @@ interface AddImportTest : JavaRecipeTest {
     @Test
     fun dontImportYourself(jp: JavaParser) = assertUnchanged(
         jp,
-        recipe = addImports(AddImport("com.myorg.A", null, false)),
+        recipe = addImports({ AddImport("com.myorg.A", null, false) }),
         before = """
             package com.myorg;
             
@@ -112,7 +112,7 @@ interface AddImportTest : JavaRecipeTest {
     @Test
     fun dontImportFromSamePackage(jp: JavaParser) = assertUnchanged(
         jp,
-        recipe = addImports(AddImport("com.myorg.B", null, false)),
+        recipe = addImports({ AddImport("com.myorg.B", null, false) }),
         dependsOn = arrayOf(
             """
             package com.myorg;
@@ -134,7 +134,7 @@ interface AddImportTest : JavaRecipeTest {
     fun importOrderingIssue(jp: JavaParser) = assertChanged(
         jp,
         recipe = addImports(
-            AddImport("org.springframework.http.HttpHeaders", null, false),
+            { AddImport("org.springframework.http.HttpHeaders", null, false) },
         ),
         before = """
             import javax.ws.rs.core.Response.ResponseBuilder;
@@ -156,8 +156,8 @@ interface AddImportTest : JavaRecipeTest {
     fun addMultipleImports(jp: JavaParser) = assertChanged(
         jp,
         recipe = addImports(
-            AddImport("java.util.List", null, false),
-            AddImport("java.util.Set", null, false)
+            { AddImport("java.util.List", null, false) },
+            { AddImport("java.util.Set", null, false) }
         ),
         before = """
             class A {}
@@ -174,7 +174,7 @@ interface AddImportTest : JavaRecipeTest {
     fun addNamedImport(jp: JavaParser) = assertChanged(
         jp,
         recipe = addImports(
-            AddImport("java.util.List", null, false)
+            { AddImport("java.util.List", null, false) }
         ),
         before = "class A {}",
         after = """
@@ -188,7 +188,7 @@ interface AddImportTest : JavaRecipeTest {
     fun doNotAddImportIfNotReferenced(jp: JavaParser) = assertUnchanged(
         jp,
         recipe = addImports(
-            AddImport("java.util.List", null, true)
+            { AddImport("java.util.List", null, true) }
         ),
         before = """
             package a;
@@ -201,7 +201,7 @@ interface AddImportTest : JavaRecipeTest {
     fun addImportInsertsNewMiddleBlock(jp: JavaParser) = assertChanged(
         jp,
         recipe = addImports(
-            AddImport("java.util.List", null, false)
+            { AddImport("java.util.List", null, false) }
         ),
         before = """
             package a;
@@ -229,7 +229,7 @@ interface AddImportTest : JavaRecipeTest {
     fun addFirstImport(jp: JavaParser) = assertChanged(
         jp,
         recipe = addImports(
-            AddImport("java.util.List", null, false)
+            { AddImport("java.util.List", null, false) }
         ),
         before = """
             package a;
@@ -249,28 +249,30 @@ interface AddImportTest : JavaRecipeTest {
     @Test
     fun addImportIfReferenced(jp: JavaParser) = assertChanged(
         jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            override fun visitClassDeclaration(
-                classDecl: J.ClassDeclaration,
-                ctx: ExecutionContext
-            ): J.ClassDeclaration {
-                val c = super.visitClassDeclaration(classDecl, ctx)
-                var b = c.body
-                if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    val t = JavaTemplate.builder(
-                        { cursor },
-                        "BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);"
-                    )
-                        .imports("java.math.BigDecimal", "java.math.RoundingMode")
-                        .build()
+        recipe = toRecipe {
+            object : JavaIsoVisitor<ExecutionContext>() {
+                override fun visitClassDeclaration(
+                    classDecl: J.ClassDeclaration,
+                    ctx: ExecutionContext
+                ): J.ClassDeclaration {
+                    val c = super.visitClassDeclaration(classDecl, ctx)
+                    var b = c.body
+                    if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                        val t = JavaTemplate.builder(
+                            { cursor },
+                            "BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);"
+                        )
+                            .imports("java.math.BigDecimal", "java.math.RoundingMode")
+                            .build()
 
-                    b = b.withTemplate(t, b.coordinates.lastStatement())
-                    maybeAddImport("java.math.BigDecimal")
-                    maybeAddImport("java.math.RoundingMode")
+                        b = b.withTemplate(t, b.coordinates.lastStatement())
+                        maybeAddImport("java.math.BigDecimal")
+                        maybeAddImport("java.math.RoundingMode")
+                    }
+                    return c.withBody(b)
                 }
-                return c.withBody(b)
             }
-        }.toRecipe(),
+        },
         before = """
             package a;
 
@@ -293,7 +295,7 @@ interface AddImportTest : JavaRecipeTest {
     fun doNotAddWildcardImportIfNotReferenced(jp: JavaParser) = assertUnchanged(
         jp,
         recipe = addImports(
-            AddImport("java.util.*", null, true)
+            { AddImport("java.util.*", null, true) }
         ),
         before = """
             package a;
@@ -306,7 +308,7 @@ interface AddImportTest : JavaRecipeTest {
     fun lastImportWhenFirstClassDeclarationHasJavadoc(jp: JavaParser) = assertChanged(
         jp,
         recipe = addImports(
-            AddImport("java.util.Collections", "*", false)
+            { AddImport("java.util.Collections", "*", false) }
         ),
         before = """
             import java.util.List;
@@ -332,7 +334,7 @@ interface AddImportTest : JavaRecipeTest {
     fun namedImportAddedAfterPackageDeclaration(jp: JavaParser) = assertChanged(
         jp,
         recipe = addImports(
-            AddImport("java.util.List", null, false)
+            { AddImport("java.util.List", null, false) }
         ),
         before = """
             package a;
@@ -370,7 +372,7 @@ interface AddImportTest : JavaRecipeTest {
                         """
                 ),
                 recipe = addImports(
-                    AddImport("$pkg.B", null, false)
+                    { AddImport("$pkg.B", null, false) }
                 ),
                 before = """
                     package a;
@@ -392,7 +394,7 @@ interface AddImportTest : JavaRecipeTest {
     fun doNotAddImportIfAlreadyExists(jp: JavaParser) = assertUnchanged(
         jp,
         recipe = addImports(
-            AddImport("java.util.List", null, false)
+            { AddImport("java.util.List", null, false) }
         ),
         before = """
             package a;
@@ -406,7 +408,7 @@ interface AddImportTest : JavaRecipeTest {
     fun doNotAddImportIfCoveredByStarImport(jp: JavaParser) = assertUnchanged(
         jp,
         recipe = addImports(
-            AddImport("java.util.List", null, false)
+            { AddImport("java.util.List", null, false) }
         ),
         before = """
             package a;
@@ -420,7 +422,7 @@ interface AddImportTest : JavaRecipeTest {
     fun dontAddImportWhenClassHasNoPackage(jp: JavaParser) = assertUnchanged(
         jp,
         recipe = addImports(
-            AddImport("C", null, false)
+            { AddImport("C", null, false) }
         ),
         before = "class A {}"
     )
@@ -429,7 +431,7 @@ interface AddImportTest : JavaRecipeTest {
     fun dontAddImportForPrimitive(jp: JavaParser) = assertUnchanged(
         jp,
         recipe = addImports(
-            AddImport("int", null, false)
+            { AddImport("int", null, false) }
         ),
         before = "class A {}"
     )
@@ -438,7 +440,7 @@ interface AddImportTest : JavaRecipeTest {
     fun addNamedImportIfStarStaticImportExists(jp: JavaParser) = assertChanged(
         jp,
         recipe = addImports(
-            AddImport("java.util.List", null, false)
+            { AddImport("java.util.List", null, false) }
         ),
         before = """
             package a;
@@ -461,7 +463,7 @@ interface AddImportTest : JavaRecipeTest {
     fun addNamedStaticImport(jp: JavaParser) = assertChanged(
         jp,
         recipe = addImports(
-            AddImport("java.util.Collections", "emptyList", false)
+            { AddImport("java.util.Collections", "emptyList", false) }
         ),
         before = """
             import java.util.*;
@@ -481,7 +483,7 @@ interface AddImportTest : JavaRecipeTest {
     fun addStaticImportField(jp: JavaParser) = assertChanged(
         jp,
         recipe = addImports(
-            AddImport("mycompany.Type", "FIELD", false)
+            { AddImport("mycompany.Type", "FIELD", false) }
         ),
         dependsOn = arrayOf(
             """
@@ -503,7 +505,7 @@ interface AddImportTest : JavaRecipeTest {
     fun dontAddStaticWildcardImportIfNotReferenced(jp: JavaParser) = assertUnchanged(
         jp,
         recipe = addImports(
-            AddImport("java.util.Collections", "*", true)
+            { AddImport("java.util.Collections", "*", true) }
         ),
         before = """
             package a;
@@ -528,7 +530,7 @@ interface AddImportTest : JavaRecipeTest {
             }
 
         }.doNext(
-            addImports(AddImport("java.util.Collections", "emptyList", true))
+            addImports({ AddImport("java.util.Collections", "emptyList", true) })
         ),
         before = """
             package a;
@@ -560,7 +562,7 @@ interface AddImportTest : JavaRecipeTest {
     fun doNotAddNamedStaticImportIfNotReferenced(jp: JavaParser) = assertUnchanged(
         jp,
         recipe = addImports(
-            AddImport("java.util.Collections", "emptyList", true)
+            { AddImport("java.util.Collections", "emptyList", true) }
         ),
         before = """
             package a;
@@ -574,7 +576,7 @@ interface AddImportTest : JavaRecipeTest {
         jp,
         recipe = FixEmptyListMethodType().doNext(
             addImports(
-                AddImport("java.util.Collections", "*", true)
+                { AddImport("java.util.Collections", "*", true) }
             )
         ),
         before = """
@@ -607,12 +609,14 @@ interface AddImportTest : JavaRecipeTest {
     @Test
     fun dontAddImportForStaticImportsIndirectlyReferenced(jp: JavaParser.Builder<*, *>) = assertUnchanged(
         jp.classpath("jackson-databind").build(),
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            override fun visitCompilationUnit(cu: J.CompilationUnit, p: ExecutionContext): J.CompilationUnit {
-                maybeAddImport("com.fasterxml.jackson.databind.ObjectMapper")
-                return super.visitCompilationUnit(cu, p)
+        recipe = toRecipe {
+            object : JavaIsoVisitor<ExecutionContext>() {
+                override fun visitCompilationUnit(cu: J.CompilationUnit, p: ExecutionContext): J.CompilationUnit {
+                    maybeAddImport("com.fasterxml.jackson.databind.ObjectMapper")
+                    return super.visitCompilationUnit(cu, p)
+                }
             }
-        }.toRecipe(),
+        },
         dependsOn = arrayOf(
             """
                 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -644,7 +648,7 @@ interface AddImportTest : JavaRecipeTest {
             """
         ),
         recipe = addImports(
-            AddImport("java.util.ArrayList", null, false)
+            { AddImport("java.util.ArrayList", null, false) }
         ),
         before = """
             import foo.B;
@@ -684,7 +688,7 @@ interface AddImportTest : JavaRecipeTest {
     @Test
     fun addImportWhenDuplicatesExist(jp: JavaParser) = assertChanged(
         jp,
-        recipe = addImports(AddImport("org.springframework.http.MediaType", null, false)),
+        recipe = addImports({ AddImport("org.springframework.http.MediaType", null, false) }),
         before = """
             import javax.ws.rs.Path;
             import javax.ws.rs.Path;
@@ -705,25 +709,30 @@ interface AddImportTest : JavaRecipeTest {
     @Test
     fun addImportWithCommentOnClassAndNoImportsOrPackageName(jp: JavaParser) = assertChanged(
         jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = JavaTemplate.builder({ cursor }, """
-                /**
-                 * Do suppress those warnings
-                 */
-                @SuppressWarnings("other")
-            """.trimIndent())
-                //.doBeforeParseTemplate(print)
-                .build()
+        recipe = toRecipe {
+            object : JavaIsoVisitor<ExecutionContext>() {
+                val t = JavaTemplate.builder({ cursor }, """
+                    /**
+                     * Do suppress those warnings
+                     */
+                    @SuppressWarnings("other")
+                """.trimIndent())
+                    //.doBeforeParseTemplate(print)
+                    .build()
 
-            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
-                val cd = super.visitClassDeclaration(classDecl, p)
-                if(cd.leadingAnnotations.size == 0) {
-                    maybeAddImport("java.lang.SuppressWarnings");
-                    return cd.withTemplate(t, cd.coordinates.addAnnotation({a1, a2 -> 0}))
+                override fun visitClassDeclaration(
+                    classDecl: J.ClassDeclaration,
+                    p: ExecutionContext
+                ): J.ClassDeclaration {
+                    val cd = super.visitClassDeclaration(classDecl, p)
+                    if (cd.leadingAnnotations.size == 0) {
+                        maybeAddImport("java.lang.SuppressWarnings")
+                        return cd.withTemplate(t, cd.coordinates.addAnnotation({ a1, a2 -> 0 }))
+                    }
+                    return cd
                 }
-                return cd;
             }
-        }.toRecipe(),
+        },
         before = """
             class Test {
             

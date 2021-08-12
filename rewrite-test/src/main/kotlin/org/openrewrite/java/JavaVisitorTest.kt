@@ -21,26 +21,38 @@ import org.openrewrite.java.tree.J
 
 interface JavaVisitorTest : JavaRecipeTest {
 
+    @Suppress("RedundantThrows")
     @Test
     fun javaVisitorHandlesPaddedWithNullElem() = assertChanged(
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation? {
-                val mi = super.visitMethodInvocation(method, p)
-                if ("removeMethod" == mi.simpleName) {
-                    return null
-                }
-                return mi
-            }
-        }.toRecipe().doNext(
+        recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
-                    var md = super.visitMethodDeclaration(method, p)
-                    if (md.simpleName == "allTheThings") {
-                        md = md.withTemplate(JavaTemplate.builder({ cursor }, "Exception").build(), md.coordinates.replaceThrows())
+                override fun visitMethodInvocation(
+                    method: J.MethodInvocation,
+                    p: ExecutionContext
+                ): J.MethodInvocation? {
+                    val mi = super.visitMethodInvocation(method, p)
+                    if ("removeMethod" == mi.simpleName) {
+                        return null
                     }
-                    return md
+                    return mi
                 }
-            }.toRecipe()
+            }
+        }.doNext(
+            toRecipe {
+                object : JavaIsoVisitor<ExecutionContext>() {
+                    override fun visitMethodDeclaration(
+                        method: J.MethodDeclaration,
+                        p: ExecutionContext
+                    ): J.MethodDeclaration {
+                        var md = super.visitMethodDeclaration(method, p)
+                        if (md.simpleName == "allTheThings") {
+                            md = md.withTemplate(JavaTemplate.builder({ cursor }, "Exception").build(),
+                                md.coordinates.replaceThrows())
+                        }
+                        return md
+                    }
+                }
+            }
         ),
         before = """
             class A {

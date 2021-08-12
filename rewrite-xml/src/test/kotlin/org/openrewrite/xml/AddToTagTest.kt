@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("CheckTagEmptyBody")
+
 package org.openrewrite.xml
 
 import org.junit.jupiter.api.Test
@@ -23,15 +25,18 @@ class AddToTagTest : XmlRecipeTest {
 
     @Test
     fun addElement() = assertChanged(
-        recipe = object : XmlVisitor<ExecutionContext>() {
-            override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
-                val bean2Tag =  x.root.children.find { it.attributes.find { attr -> attr.key.name == "id" && attr.value.value == "myBean2" } != null }
-                if(bean2Tag == null) {
-                    doAfterVisit(AddToTagVisitor(x.root, Xml.Tag.build("""<bean id="myBean2"/>""")))
+        recipe = toRecipe {
+            object : XmlVisitor<ExecutionContext>() {
+                override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
+                    val bean2Tag =
+                        x.root.children.find { it.attributes.find { attr -> attr.key.name == "id" && attr.value.value == "myBean2" } != null }
+                    if (bean2Tag == null) {
+                        doAfterVisit(AddToTagVisitor(x.root, Xml.Tag.build("""<bean id="myBean2"/>""")))
+                    }
+                    return super.visitDocument(x, p)
                 }
-                return super.visitDocument(x, p)
             }
-        }.toRecipe(),
+        },
         before = """
             <beans>
                 <bean id="myBean"/>
@@ -48,19 +53,21 @@ class AddToTagTest : XmlRecipeTest {
 
     @Test
     fun addElementToSlashClosedTag() = assertChanged(
-        recipe = object : XmlVisitor<ExecutionContext>() {
-            override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
-                if(x.root.children.first().children.size == 0) {
-                    doAfterVisit(
+        recipe = toRecipe {
+            object : XmlVisitor<ExecutionContext>() {
+                override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
+                    if (x.root.children.first().children.size == 0) {
+                        doAfterVisit(
                             AddToTagVisitor(
-                                    x.root.content[0] as Xml.Tag,
-                                    Xml.Tag.build("""<property name="myprop" ref="collaborator"/>""")
+                                x.root.content[0] as Xml.Tag,
+                                Xml.Tag.build("""<property name="myprop" ref="collaborator"/>""")
                             )
-                    )
+                        )
+                    }
+                    return super.visitDocument(x, p)
                 }
-                return super.visitDocument(x, p)
             }
-        }.toRecipe(),
+        },
         before = """
             <beans >
                 <bean id="myBean" />
@@ -78,14 +85,16 @@ class AddToTagTest : XmlRecipeTest {
 
     @Test
     fun addElementToEmptyTagOnSameLine() = assertChanged(
-        recipe = object : XmlVisitor<ExecutionContext>() {
-            override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
-                if(x.root.children.isEmpty()) {
-                    doAfterVisit(AddToTagVisitor(x.root, Xml.Tag.build("""<bean id="myBean"/>""")))
+        recipe = toRecipe {
+            object : XmlVisitor<ExecutionContext>() {
+                override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
+                    if (x.root.children.isEmpty()) {
+                        doAfterVisit(AddToTagVisitor(x.root, Xml.Tag.build("""<bean id="myBean"/>""")))
+                    }
+                    return super.visitDocument(x, p)
                 }
-                return super.visitDocument(x, p)
             }
-        }.toRecipe(),
+        },
         before = """
             <beans></beans>
         """,
@@ -99,17 +108,19 @@ class AddToTagTest : XmlRecipeTest {
 
     @Test
     fun addElementInOrder() = assertChanged(
-        recipe = object : XmlVisitor<ExecutionContext>() {
-            override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
-                if(x.root.children.find { it.name == "apple" } == null) {
-                    doAfterVisit(AddToTagVisitor(
+        recipe = toRecipe {
+            object : XmlVisitor<ExecutionContext>() {
+                override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
+                    if (x.root.children.find { it.name == "apple" } == null) {
+                        doAfterVisit(AddToTagVisitor(
                             x.root, Xml.Tag.build("""<apple/>"""),
                             Comparator.comparing(Xml.Tag::getName)
-                    ))
+                        ))
+                    }
+                    return super.visitDocument(x, p)
                 }
-                return super.visitDocument(x, p)
             }
-        }.toRecipe(),
+        },
         before = """
             <beans >
                 <banana/>

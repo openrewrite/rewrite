@@ -32,14 +32,16 @@ import org.openrewrite.java.tree.Space
 @Suppress("StatementWithEmptyBody")
 interface MinimumViableSpacingTest : JavaRecipeTest {
     override val recipe: Recipe
-        get() = object : JavaVisitor<ExecutionContext>() {
-            override fun visitSpace(space: Space, loc: Space.Location, ctx: ExecutionContext): Space {
-                if(ctx.getMessage<Int>("cyclesThatResultedInChanges") == 0) {
-                    return space.withWhitespace("")
+        get() = toRecipe {
+            object : JavaVisitor<ExecutionContext>() {
+                override fun visitSpace(space: Space, loc: Space.Location, ctx: ExecutionContext): Space {
+                    if (ctx.getMessage<Int>("cyclesThatResultedInChanges") == 0) {
+                        return space.withWhitespace("")
+                    }
+                    return space
                 }
-                return space
             }
-        }.toRecipe().doNext(MinimumViableSpacingVisitor<ExecutionContext>(null).toRecipe())
+        }.doNext(toRecipe {MinimumViableSpacingVisitor<ExecutionContext>(null)})
 
     @Test
     fun method(jp: JavaParser) = assertChanged(

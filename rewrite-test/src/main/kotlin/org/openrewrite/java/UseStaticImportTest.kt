@@ -83,23 +83,34 @@ interface UseStaticImportTest : JavaRecipeTest {
                 }
             """
         ),
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
-                val cd = super.visitClassDeclaration(classDecl, p)
-                return cd.withExtends(null)
+        recipe = toRecipe {
+            object : JavaIsoVisitor<ExecutionContext>() {
+                override fun visitClassDeclaration(
+                    classDecl: J.ClassDeclaration,
+                    p: ExecutionContext
+                ): J.ClassDeclaration {
+                    val cd = super.visitClassDeclaration(classDecl, p)
+                    return cd.withExtends(null)
+                }
+
+                override fun visitImport(_import: J.Import, p: ExecutionContext): J.Import? {
+                    return null
+                }
+
+                override fun visitMethodInvocation(
+                    method: J.MethodInvocation,
+                    p: ExecutionContext
+                ): J.MethodInvocation {
+                    val mi = super.visitMethodInvocation(method, p)
+                    return mi.withDeclaringType(JavaType.Class.build("asserts.Assert"))
+                }
+
+                override fun visitCompilationUnit(cu: J.CompilationUnit, p: ExecutionContext): J.CompilationUnit {
+                    doAfterVisit(UseStaticImport("asserts.Assert assert*(..)"))
+                    return super.visitCompilationUnit(cu, p)
+                }
             }
-            override fun visitImport(_import: J.Import, p: ExecutionContext): J.Import? {
-                return null
-            }
-            override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
-                val mi = super.visitMethodInvocation(method, p)
-                return mi.withDeclaringType(JavaType.Class.build("asserts.Assert"))
-            }
-            override fun visitCompilationUnit(cu: J.CompilationUnit, p: ExecutionContext): J.CompilationUnit {
-                doAfterVisit(UseStaticImport("asserts.Assert assert*(..)"))
-                return super.visitCompilationUnit(cu, p)
-            }
-        }.toRecipe(),
+        },
         before = """
             package test;
             

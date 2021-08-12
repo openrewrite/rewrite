@@ -22,11 +22,13 @@ import org.openrewrite.java.tree.J
 
 interface InvertConditionTest : JavaRecipeTest {
     override val recipe: Recipe?
-        get() = object : JavaIsoVisitor<ExecutionContext>() {
-            override fun visitIf(iff: J.If, p: ExecutionContext): J.If {
-                return iff.withIfCondition(InvertCondition.invert(iff.ifCondition, cursor))
+        get() = toRecipe {
+            object : JavaIsoVisitor<ExecutionContext>() {
+                override fun visitIf(iff: J.If, p: ExecutionContext): J.If {
+                    return iff.withIfCondition(InvertCondition.invert(iff.ifCondition, cursor))
+                }
             }
-        }.toRecipe()
+        }
 
     @Suppress("StatementWithEmptyBody", "ConstantConditions", "InfiniteRecursion")
     @Test

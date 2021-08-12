@@ -21,8 +21,9 @@ import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
 
 interface RemoveImportTest : JavaRecipeTest {
-    fun removeImport(type: String, force: Boolean = false) =
-            RemoveImport<ExecutionContext>(type, force).toRecipe()
+    fun removeImport(type: String, force: Boolean = false) = toRecipe {
+        RemoveImport<ExecutionContext>(type, force)
+    }
 
     @Test
     fun removeNamedImport(jp: JavaParser) = assertChanged(

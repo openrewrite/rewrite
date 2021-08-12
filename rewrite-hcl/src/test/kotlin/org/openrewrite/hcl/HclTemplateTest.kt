@@ -24,16 +24,18 @@ class HclTemplateTest : HclRecipeTest {
 
     @Test
     fun lastBodyContentInBlock() = assertChanged(
-        recipe = object : HclVisitor<ExecutionContext>() {
-            val t = HclTemplate.builder({ cursor }, "encrypted = true").build()
+        recipe = toRecipe {
+            object : HclVisitor<ExecutionContext>() {
+                val t = HclTemplate.builder({ cursor }, "encrypted = true").build()
 
-            override fun visitBlock(block: Hcl.Block, p: ExecutionContext): Hcl {
-                if (block.body.size == 1) {
-                    return block.withTemplate(t, block.coordinates.last())
+                override fun visitBlock(block: Hcl.Block, p: ExecutionContext): Hcl {
+                    if (block.body.size == 1) {
+                        return block.withTemplate(t, block.coordinates.last())
+                    }
+                    return super.visitBlock(block, p)
                 }
-                return super.visitBlock(block, p)
             }
-        }.toRecipe(),
+        },
         before = """
             resource "aws_ebs_volume" {
               size = 1
@@ -49,22 +51,24 @@ class HclTemplateTest : HclRecipeTest {
 
     @Test
     fun replaceBlock() = assertChanged(
-        recipe = object : HclVisitor<ExecutionContext>() {
-            val t = HclTemplate.builder(
-                { cursor }, """
+        recipe = toRecipe {
+            object : HclVisitor<ExecutionContext>() {
+                val t = HclTemplate.builder(
+                    { cursor }, """
                 resource "azure_storage_volume" {
                   size = 1
                 }
             """.trimIndent()
-            ).build()
+                ).build()
 
-            override fun visitBlock(block: Hcl.Block, p: ExecutionContext): Hcl {
-                if ((block.labels[0] as Hcl.Literal).valueSource.contains("aws")) {
-                    return block.withTemplate(t, block.coordinates.replace())
+                override fun visitBlock(block: Hcl.Block, p: ExecutionContext): Hcl {
+                    if ((block.labels[0] as Hcl.Literal).valueSource.contains("aws")) {
+                        return block.withTemplate(t, block.coordinates.replace())
+                    }
+                    return super.visitBlock(block, p)
                 }
-                return super.visitBlock(block, p)
             }
-        }.toRecipe(),
+        },
         before = """
             resource "aws_ebs_volume" {
               size = 1
@@ -79,16 +83,18 @@ class HclTemplateTest : HclRecipeTest {
 
     @Test
     fun replaceExpression() = assertChanged(
-        recipe = object : HclVisitor<ExecutionContext>() {
-            val t = HclTemplate.builder({ cursor }, "\"jonathan\"").build()
+        recipe = toRecipe {
+            object : HclVisitor<ExecutionContext>() {
+                val t = HclTemplate.builder({ cursor }, "\"jonathan\"").build()
 
-            override fun visitExpression(expression: Expression, p: ExecutionContext): Hcl {
-                if (expression is Hcl.QuotedTemplate && expression.print().contains("you")) {
-                    return expression.withTemplate(t, expression.coordinates.replace())
+                override fun visitExpression(expression: Expression, p: ExecutionContext): Hcl {
+                    if (expression is Hcl.QuotedTemplate && expression.print().contains("you")) {
+                        return expression.withTemplate(t, expression.coordinates.replace())
+                    }
+                    return super.visitExpression(expression, p)
                 }
-                return super.visitExpression(expression, p)
             }
-        }.toRecipe(),
+        },
         before = """
             hello = "you"
         """,
