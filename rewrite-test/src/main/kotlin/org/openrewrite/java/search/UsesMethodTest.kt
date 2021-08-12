@@ -26,7 +26,9 @@ interface UsesMethodTest : JavaRecipeTest {
     @Test
     fun usesMethodReferences(jp: JavaParser) = assertChanged(
         jp,
-        recipe = UsesMethod<ExecutionContext>("A singleArg(String)").toRecipe(),
+        recipe = toRecipe {
+            UsesMethod<ExecutionContext>("A singleArg(String)")
+        },
         before = """
             class Test {
                 void test() {
@@ -51,7 +53,9 @@ interface UsesMethodTest : JavaRecipeTest {
     @Test
     fun usesStaticMethodCalls(jp: JavaParser) = assertChanged(
         jp,
-        recipe = UsesMethod<ExecutionContext>("java.util.Collections emptyList()").toRecipe(),
+        recipe = toRecipe {
+            UsesMethod<ExecutionContext>("java.util.Collections emptyList()")
+        },
         before = """
             import java.util.Collections;
             public class A {
@@ -69,7 +73,9 @@ interface UsesMethodTest : JavaRecipeTest {
     @Test
     fun usesStaticallyImportedMethodCalls(jp: JavaParser) = assertChanged(
         jp,
-        recipe = UsesMethod<ExecutionContext>("java.util.Collections emptyList()").toRecipe(),
+        recipe = toRecipe {
+            UsesMethod<ExecutionContext>("java.util.Collections emptyList()")
+        },
         before = """
             import static java.util.Collections.emptyList;
             public class A {
@@ -87,7 +93,9 @@ interface UsesMethodTest : JavaRecipeTest {
     @Test
     fun matchVarargs(jp: JavaParser) = assertChanged(
         jp,
-        recipe = UsesMethod<ExecutionContext>("A foo(String, Object...)").toRecipe(),
+        recipe = toRecipe {
+            UsesMethod<ExecutionContext>("A foo(String, Object...)")
+        },
         before = """
             public class B {
                public void test() {
@@ -112,7 +120,9 @@ interface UsesMethodTest : JavaRecipeTest {
     @Test
     fun matchOnInnerClass(jp: JavaParser) = assertChanged(
         jp,
-        recipe = UsesMethod<ExecutionContext>("B.C foo()").toRecipe(),
+        recipe = toRecipe {
+            UsesMethod<ExecutionContext>("B.C foo()")
+        },
         before = """
             public class A {
                void test() {

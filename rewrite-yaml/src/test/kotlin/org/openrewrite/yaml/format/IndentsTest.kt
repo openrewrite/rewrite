@@ -23,11 +23,12 @@ import org.openrewrite.yaml.style.YamlDefaultStyles
 
 class IndentsTest : YamlRecipeTest {
     override val recipe: Recipe
-        get() = IndentsVisitor<ExecutionContext>(
-            YamlDefaultStyles.indents(),
-            null
-        )
-            .toRecipe()
+        get() = toRecipe {
+            IndentsVisitor<ExecutionContext>(
+                YamlDefaultStyles.indents(),
+                null
+            )
+        }
 
     @Test
     fun indentSequence() = assertChanged(

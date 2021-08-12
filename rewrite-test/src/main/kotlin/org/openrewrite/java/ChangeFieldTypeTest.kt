@@ -20,9 +20,11 @@ import org.openrewrite.ExecutionContext
 import org.openrewrite.java.tree.JavaType
 
 interface ChangeFieldTypeTest : JavaRecipeTest {
-    fun changeFieldType(from: String, to: String) =
-        ChangeFieldType<ExecutionContext>(JavaType.Class.build(from, JavaType.Class.Kind.Interface), JavaType.Class.build(to, JavaType.Class.Kind.Interface)).toRecipe()
+    fun changeFieldType(from: String, to: String) = toRecipe {
+        ChangeFieldType<ExecutionContext>(JavaType.Class.build(from, JavaType.Class.Kind.Interface), JavaType.Class.build(to, JavaType.Class.Kind.Interface))
+    }
 
+    @Suppress("rawtypes")
     @Test
     fun changeFieldTypeDeclarative(jp: JavaParser) = assertChanged(
         jp,

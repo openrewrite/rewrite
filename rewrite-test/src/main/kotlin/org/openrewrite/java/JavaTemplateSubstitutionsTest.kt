@@ -21,6 +21,8 @@ import com.google.googlejavaformat.java.Formatter
 import com.google.googlejavaformat.java.JavaFormatterOptions
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
+import org.openrewrite.Recipe
+import org.openrewrite.TreeVisitor
 import org.openrewrite.java.tree.J
 import java.io.ByteArrayOutputStream
 import java.io.OutputStreamWriter
@@ -29,71 +31,98 @@ import java.util.function.Consumer
 
 interface JavaTemplateSubstitutionsTest : JavaRecipeTest {
 
+    @Suppress("InfiniteRecursion")
     @Test
     fun any(jp: JavaParser) = assertChanged(
         jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+        recipe = object : Recipe() {
             val cycle = AtomicInteger(0)
-            val t = JavaTemplate.builder({ cursor }, "test(#{any()})").build()
 
-            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
-                if (cycle.getAndIncrement() == 0) {
-                    val s = method.body!!.statements[0]
-                    return method.withTemplate(
-                        t,
-                        s.coordinates.replace(),
-                        s
-                    )
-                }
-                return method;
+            override fun getDisplayName(): String {
+                return ""
             }
-        }.toRecipe(),
+
+            override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
+                return object : JavaIsoVisitor<ExecutionContext>() {
+                    val t = JavaTemplate.builder({ cursor }, "test(#{any()})").build()
+
+                    override fun visitMethodDeclaration(
+                        method: J.MethodDeclaration,
+                        p: ExecutionContext,
+                    ): J.MethodDeclaration {
+                        if (cycle.getAndIncrement() == 0) {
+                            val s = method.body!!.statements[0]
+                            return method.withTemplate(
+                                t,
+                                s.coordinates.replace(),
+                                s
+                            )
+                        }
+                        return method
+                    }
+                }
+            }
+
+        },
         before = """
-            class Test {
-                void test(int n) {
-                    value();
-                }
-                
-                int value() {
-                    return 0;
-                }
+        class Test {
+            void test(int n) {
+                value();
             }
+            
+            int value() {
+                return 0;
+            }
+        }
         """,
         after = """
-            class Test {
-                void test(int n) {
-                    test(value());
-                }
-                
-                int value() {
-                    return 0;
-                }
+        class Test {
+            void test(int n) {
+                test(value());
             }
+            
+            int value() {
+                return 0;
+            }
+        }
         """
     )
 
+    @Suppress("InfiniteRecursion")
     @Test
     fun array(jp: JavaParser) = assertChanged(
         jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+        recipe = object : Recipe() {
             val cycle = AtomicInteger(0)
-            val t = JavaTemplate.builder({ cursor }, "test(#{anyArray()})").build()
 
-            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
-                if (cycle.getAndIncrement() == 0) {
-                    val s = method.body!!.statements[0]
-                    return method.withTemplate(
-                        t,
-                        s.coordinates.replace(),
-                        s
-                    )
-                }
-                return method;
+            override fun getDisplayName(): String {
+                return ""
             }
-        }.toRecipe(),
+
+            override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
+                return object : JavaIsoVisitor<ExecutionContext>() {
+                    val t = JavaTemplate.builder({ cursor }, "test(#{anyArray()})").build()
+
+                    override fun visitMethodDeclaration(
+                        method: J.MethodDeclaration,
+                        p: ExecutionContext,
+                    ): J.MethodDeclaration {
+                        if (cycle.getAndIncrement() == 0) {
+                            val s = method.body!!.statements[0]
+                            return method.withTemplate(
+                                t,
+                                s.coordinates.replace(),
+                                s
+                            )
+                        }
+                        return method
+                    }
+                }
+            }
+        },
         before = """
             class Test {
-                void test(int n[][]) {
+                void test(int[][] n) {
                     array();
                 }
                 
@@ -104,7 +133,7 @@ interface JavaTemplateSubstitutionsTest : JavaRecipeTest {
         """,
         after = """
             class Test {
-                void test(int n[][]) {
+                void test(int[][] n) {
                     test(array());
                 }
                 
@@ -118,22 +147,27 @@ interface JavaTemplateSubstitutionsTest : JavaRecipeTest {
     @Test
     fun annotation(jp: JavaParser) = assertChanged(
         jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = JavaTemplate.builder({ cursor }, "#{} void test2() {}")
-                .javaParser { JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true).build() }
-                .build()
+        recipe = toRecipe {
+            object : JavaIsoVisitor<ExecutionContext>() {
+                val t = JavaTemplate.builder({ cursor }, "#{} void test2() {}")
+                    .javaParser { JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true).build() }
+                    .build()
 
-            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
-                if (method.simpleName == "test") {
-                    return method.withTemplate(
-                        t,
-                        method.coordinates.replace(),
-                        method.leadingAnnotations[0]
-                    )
+                override fun visitMethodDeclaration(
+                    method: J.MethodDeclaration,
+                    p: ExecutionContext,
+                ): J.MethodDeclaration {
+                    if (method.simpleName == "test") {
+                        return method.withTemplate(
+                            t,
+                            method.coordinates.replace(),
+                            method.leadingAnnotations[0]
+                        )
+                    }
+                    return super.visitMethodDeclaration(method, p)
                 }
-                return super.visitMethodDeclaration(method, p)
             }
-        }.toRecipe(),
+        },
         before = """
             class Test {
                 @SuppressWarnings("ALL") void test() {
@@ -150,26 +184,39 @@ interface JavaTemplateSubstitutionsTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("ResultOfMethodCallIgnored", "InfiniteRecursion")
     @Test
     fun methodInvocation(jp: JavaParser) = assertChanged(
         jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+        recipe = object : Recipe() {
             val cycle = AtomicInteger(0)
-            val t = JavaTemplate.builder({ cursor }, "test(#{any(java.util.Collection)}, #{any(int)})").build()
 
-            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
-                if (cycle.getAndIncrement() == 0) {
-                    val s = method.body!!.statements[0]
-                    return method.withTemplate(
-                        t,
-                        s.coordinates.replace(),
-                        s,
-                        (method.parameters[1] as J.VariableDeclarations).variables[0].name
-                    )
-                }
-                return method;
+            override fun getDisplayName(): String {
+                return ""
             }
-        }.toRecipe(),
+
+            override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
+                return object : JavaIsoVisitor<ExecutionContext>() {
+                    val t = JavaTemplate.builder({ cursor }, "test(#{any(java.util.Collection)}, #{any(int)})").build()
+
+                    override fun visitMethodDeclaration(
+                        method: J.MethodDeclaration,
+                        p: ExecutionContext,
+                    ): J.MethodDeclaration {
+                        if (cycle.getAndIncrement() == 0) {
+                            val s = method.body!!.statements[0]
+                            return method.withTemplate(
+                                t,
+                                s.coordinates.replace(),
+                                s,
+                                (method.parameters[1] as J.VariableDeclarations).variables[0].name
+                            )
+                        }
+                        return method
+                    }
+                }
+            }
+        },
         before = """
             import java.util.*;
             class Test {
@@ -188,24 +235,30 @@ interface JavaTemplateSubstitutionsTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("ConstantConditions")
     @Test
     fun block(jp: JavaParser) = assertChanged(
         jp,
-        recipe = object : JavaIsoVisitor<ExecutionContext>() {
-            val t = JavaTemplate.builder({ cursor }, "if(true) #{}")
-                .doBeforeParseTemplate(print)
-                .build()
+        recipe = toRecipe {
+            object : JavaIsoVisitor<ExecutionContext>() {
+                val t = JavaTemplate.builder({ cursor }, "if(true) #{}")
+                    .doBeforeParseTemplate(print)
+                    .build()
 
-            override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J.MethodDeclaration {
-                if (method.body!!.statements[0] !is J.If) {
-                    return method.withTemplate(t,
-                        method.body!!.statements[0].coordinates.replace(),
-                        method.body
-                    )
+                override fun visitMethodDeclaration(
+                    method: J.MethodDeclaration,
+                    p: ExecutionContext,
+                ): J.MethodDeclaration {
+                    if (method.body!!.statements[0] !is J.If) {
+                        return method.withTemplate(t,
+                            method.body!!.statements[0].coordinates.replace(),
+                            method.body
+                        )
+                    }
+                    return super.visitMethodDeclaration(method, p)
                 }
-                return super.visitMethodDeclaration(method, p)
             }
-        }.toRecipe(),
+        },
         before = """
             class Test {
                 void test() {

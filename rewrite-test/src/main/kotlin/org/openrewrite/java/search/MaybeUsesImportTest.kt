@@ -24,8 +24,9 @@ interface MaybeUsesImportTest : JavaRecipeTest {
     @Test
     fun usesType(jp: JavaParser) = assertChanged(
         jp,
-        recipe = MaybeUsesImport<ExecutionContext>("java.util.Collections")
-            .toRecipe(),
+        recipe = toRecipe {
+            MaybeUsesImport<ExecutionContext>("java.util.Collections")
+        },
         before = """
             import java.io.File;
             import java.util.Collections;
@@ -62,7 +63,9 @@ interface MaybeUsesImportTest : JavaRecipeTest {
     @Test
     fun usesTypeWildcard(jp: JavaParser) = assertChanged(
         jp,
-        recipe = MaybeUsesImport<ExecutionContext>("java.util.*").toRecipe(),
+        recipe = toRecipe {
+            MaybeUsesImport<ExecutionContext>("java.util.*")
+        },
         before = """
             import java.io.File;
             import java.util.Collections;

@@ -23,14 +23,16 @@ class RemoveContentTest : XmlRecipeTest {
 
     @Test
     fun removeContent() = assertChanged(
-        recipe = object : XmlVisitor<ExecutionContext>() {
-            override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
-                if (p.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    doAfterVisit(RemoveContentVisitor(x.root.content[1] as Xml.Tag, false))
+        recipe = toRecipe {
+            object : XmlVisitor<ExecutionContext>() {
+                override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
+                    if (p.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                        doAfterVisit(RemoveContentVisitor(x.root.content[1] as Xml.Tag, false))
+                    }
+                    return super.visitDocument(x, p)
                 }
-                return super.visitDocument(x, p)
             }
-        }.toRecipe(),
+        },
         before = """
             <dependency>
                 <groupId>group</groupId>
@@ -46,15 +48,17 @@ class RemoveContentTest : XmlRecipeTest {
 
     @Test
     fun removeAncestorsThatBecomeEmpty() = assertChanged(
-        recipe = object : XmlVisitor<ExecutionContext>() {
-            override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
-                if (p.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    val groupId = x.root.children[1].children.first().children.first()
-                    doAfterVisit(RemoveContentVisitor(groupId, true))
+        recipe = toRecipe {
+            object : XmlVisitor<ExecutionContext>() {
+                override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
+                    if (p.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                        val groupId = x.root.children[1].children.first().children.first()
+                        doAfterVisit(RemoveContentVisitor(groupId, true))
+                    }
+                    return super.visitDocument(x, p)
                 }
-                return super.visitDocument(x, p)
             }
-        }.toRecipe(),
+        },
         before = """
             <project>
                 <name>my.company</name>
@@ -74,15 +78,17 @@ class RemoveContentTest : XmlRecipeTest {
 
     @Test
     fun rootChangedToEmptyTagIfLastRemainingTag() = assertChanged(
-        recipe = object : XmlVisitor<ExecutionContext>() {
-            override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
-                if (p.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                    val groupId = x.root.children.first().children.first().children.first()
-                    doAfterVisit(RemoveContentVisitor(groupId, true))
+        recipe = toRecipe {
+            object : XmlVisitor<ExecutionContext>() {
+                override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
+                    if (p.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                        val groupId = x.root.children.first().children.first().children.first()
+                        doAfterVisit(RemoveContentVisitor(groupId, true))
+                    }
+                    return super.visitDocument(x, p)
                 }
-                return super.visitDocument(x, p)
             }
-        }.toRecipe(),
+        },
         before = """
             <project>
                 <dependencyManagement>

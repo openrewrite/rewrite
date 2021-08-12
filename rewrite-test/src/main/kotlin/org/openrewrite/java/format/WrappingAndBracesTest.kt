@@ -26,7 +26,7 @@ import org.openrewrite.java.style.WrappingAndBracesStyle
 @Suppress("UnusedAssignment", "ClassInitializerMayBeStatic")
 interface WrappingAndBracesTest : JavaRecipeTest {
     override val recipe: Recipe
-        get() = WrappingAndBracesVisitor<ExecutionContext>(WrappingAndBracesStyle()).toRecipe()
+        get() = toRecipe {WrappingAndBracesVisitor<ExecutionContext>(WrappingAndBracesStyle())}
 
     @Suppress("StatementWithEmptyBody", "ConstantConditions")
     @Issue("https://github.com/openrewrite/rewrite/issues/804")

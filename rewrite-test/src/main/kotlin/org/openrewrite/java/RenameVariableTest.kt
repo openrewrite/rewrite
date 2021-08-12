@@ -23,25 +23,28 @@ import java.util.stream.Collectors.toList
 
 interface RenameVariableTest : JavaRecipeTest {
     fun renameVariableTest(targetClassName: String, hasName: String, toName: String): Recipe =
-        object : JavaVisitor<ExecutionContext>() {
-            override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J {
-                if (classDecl.simpleName.equals(targetClassName)) {
-                    val variableDecls = classDecl.body.statements.stream().filter { s -> s is J.VariableDeclarations }
-                        .map { s -> s as J.VariableDeclarations }
-                        .collect(toList())
+        toRecipe {
+            object : JavaVisitor<ExecutionContext>() {
+                override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J {
+                    if (classDecl.simpleName.equals(targetClassName)) {
+                        val variableDecls =
+                            classDecl.body.statements.stream().filter { s -> s is J.VariableDeclarations }
+                                .map { s -> s as J.VariableDeclarations }
+                                .collect(toList())
 
-                    val namedVariables: MutableList<J.VariableDeclarations.NamedVariable> = mutableListOf()
-                    variableDecls.forEach { namedVariables.addAll(it.variables) }
+                        val namedVariables: MutableList<J.VariableDeclarations.NamedVariable> = mutableListOf()
+                        variableDecls.forEach { namedVariables.addAll(it.variables) }
 
-                    for (namedVariable in namedVariables) {
-                        if (namedVariable.simpleName.equals(hasName)) {
-                            doAfterVisit(RenameVariable(namedVariable, toName))
+                        for (namedVariable in namedVariables) {
+                            if (namedVariable.simpleName.equals(hasName)) {
+                                doAfterVisit(RenameVariable(namedVariable, toName))
+                            }
                         }
                     }
+                    return super.visitClassDeclaration(classDecl, p)
                 }
-                return super.visitClassDeclaration(classDecl, p)
             }
-        }.toRecipe()
+        }
 
     @Test
     fun doNotChangeToJavaKeyword(jp: JavaParser) = assertUnchanged(
@@ -103,6 +106,7 @@ interface RenameVariableTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("UnusedAssignment")
     @Test
     fun renameForLoopVariables(jp: JavaParser) = assertChanged(
         jp,
@@ -345,6 +349,7 @@ interface RenameVariableTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("UnnecessaryLocalVariable")
     @Test
     fun renameVariablesInLambda(jp: JavaParser) = assertChanged(
         jp,
@@ -431,6 +436,7 @@ interface RenameVariableTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("UnusedAssignment")
     @Test
     fun renameSwitchCases(jp: JavaParser) = assertChanged(
         jp,
@@ -487,6 +493,7 @@ interface RenameVariableTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("UnnecessaryLocalVariable")
     @Test
     fun renameMethodVariables(jp: JavaParser) = assertChanged(
         jp,
@@ -529,23 +536,26 @@ interface RenameVariableTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("StatementWithEmptyBody", "ConstantConditions", "UnusedAssignment")
     @Test
     fun renameVariable(jp: JavaParser) = assertChanged(
         jp,
-        recipe = object : JavaVisitor<ExecutionContext>() {
-            override fun visitVariableDeclarations(multiVariable: J.VariableDeclarations, p: ExecutionContext): J {
-                if (cursor.dropParentUntil { it is J }.getValue<J>() is J.MethodDeclaration) {
-                    doAfterVisit(RenameVariable(multiVariable.variables[0], "n2"))
-                } else if (cursor
-                        .dropParentUntil { it is J }
-                        .dropParentUntil { it is J }
-                        .getValue<J>() !is J.ClassDeclaration
-                ) {
-                    doAfterVisit(RenameVariable(multiVariable.variables[0], "n1"))
+        recipe = toRecipe {
+            object : JavaVisitor<ExecutionContext>() {
+                override fun visitVariableDeclarations(multiVariable: J.VariableDeclarations, p: ExecutionContext): J {
+                    if (cursor.dropParentUntil { it is J }.getValue<J>() is J.MethodDeclaration) {
+                        doAfterVisit(RenameVariable(multiVariable.variables[0], "n2"))
+                    } else if (cursor
+                            .dropParentUntil { it is J }
+                            .dropParentUntil { it is J }
+                            .getValue<J>() !is J.ClassDeclaration
+                    ) {
+                        doAfterVisit(RenameVariable(multiVariable.variables[0], "n1"))
+                    }
+                    return super.visitVariableDeclarations(multiVariable, p)
                 }
-                return super.visitVariableDeclarations(multiVariable, p)
             }
-        }.toRecipe(),
+        },
         before = """
             public class B {
                 int n;

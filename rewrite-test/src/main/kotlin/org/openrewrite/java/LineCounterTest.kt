@@ -23,23 +23,26 @@ import org.openrewrite.java.tree.Space
 
 interface LineCounterTest: JavaRecipeTest {
 
+    @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun countLines() = assertChanged(
-        recipe = object: JavaIsoVisitor<ExecutionContext>() {
-            val lineCount = LineCounter()
+        recipe = toRecipe {
+            object : JavaIsoVisitor<ExecutionContext>() {
+                val lineCount = LineCounter()
 
-            override fun visitSpace(space: Space, loc: Space.Location, p: ExecutionContext): Space {
-                lineCount.count(space)
-                return super.visitSpace(space, loc, p)
-            }
-
-            override fun preVisit(tree: J, p: ExecutionContext): J? {
-                if(lineCount.line == 3) {
-                    return tree.withMarkers(tree.markers.addIfAbsent(JavaSearchResult(null)))
+                override fun visitSpace(space: Space, loc: Space.Location, p: ExecutionContext): Space {
+                    lineCount.count(space)
+                    return super.visitSpace(space, loc, p)
                 }
-                return super.preVisit(tree, p)
+
+                override fun preVisit(tree: J, p: ExecutionContext): J? {
+                    if (lineCount.line == 3) {
+                        return tree.withMarkers(tree.markers.addIfAbsent(JavaSearchResult(null)))
+                    }
+                    return super.preVisit(tree, p)
+                }
             }
-        }.toRecipe(),
+        },
         before = """
             class Test {
                 void test() {

@@ -24,8 +24,9 @@ interface UsesTypeTest : JavaRecipeTest {
     @Test
     fun usesTypeFindsImports(jp: JavaParser) = assertChanged(
         jp,
-        recipe = UsesType<ExecutionContext>("java.util.Collections")
-            .toRecipe(),
+        recipe = toRecipe {
+            UsesType<ExecutionContext>("java.util.Collections")
+        },
         before = """
             import java.io.File;
             import java.util.Collections;
@@ -48,7 +49,9 @@ interface UsesTypeTest : JavaRecipeTest {
     @Test
     fun usesTypeWildcardFindsImports(jp: JavaParser) = assertChanged(
         jp,
-        recipe = UsesType<ExecutionContext>("java.util.*").toRecipe(),
+        recipe = toRecipe {
+            UsesType<ExecutionContext>("java.util.*")
+        },
         before = """
             import java.io.File;
             import static java.util.Collections.singleton;
@@ -68,7 +71,9 @@ interface UsesTypeTest : JavaRecipeTest {
     @Test
     fun usesFullyQualifiedReference(jp: JavaParser) = assertChanged(
         jp,
-        recipe = UsesType<ExecutionContext>("java.util.*").toRecipe(),
+        recipe = toRecipe {
+            UsesType<ExecutionContext>("java.util.*")
+        },
         before = """
             import java.util.Set;
             class Test {
@@ -90,8 +95,9 @@ interface UsesTypeTest : JavaRecipeTest {
     @Test
     fun usesTypeFindsInheritedTypes(jp: JavaParser) = assertChanged(
         jp,
-        recipe = UsesType<ExecutionContext>("java.util.Collection")
-            .toRecipe(),
+        recipe = toRecipe {
+            UsesType<ExecutionContext>("java.util.Collection")
+        },
         before = """
             import java.util.List;
             

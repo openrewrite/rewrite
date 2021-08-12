@@ -21,7 +21,9 @@ import org.openrewrite.Recipe
 
 interface SameClassNameTest : JavaRecipeTest {
     override val recipe: Recipe
-        get() = object : JavaIsoVisitor<ExecutionContext>() {}.toRecipe()
+        get() = toRecipe {
+            object : JavaIsoVisitor<ExecutionContext>() {}
+        }
 
     @Test
     fun canParseTheSameJavaClass(jp: JavaParser) = assertUnchanged(

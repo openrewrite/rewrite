@@ -23,14 +23,16 @@ import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 
 interface ChangeFieldNameTest : JavaRecipeTest {
-    fun changeFieldName(enclosingClassFqn: String, from: String, to: String) =
+    fun changeFieldName(enclosingClassFqn: String, from: String, to: String) = toRecipe {
         object : JavaIsoVisitor<ExecutionContext>() {
             override fun visitCompilationUnit(cu: J.CompilationUnit, p: ExecutionContext): J.CompilationUnit {
                 doAfterVisit(ChangeFieldName(JavaType.Class.build(enclosingClassFqn), from, to))
                 return super.visitCompilationUnit(cu, p)
             }
-        }.toRecipe()
+        }
+    }
 
+    @Suppress("rawtypes")
     @Test
     fun changeFieldName(jp: JavaParser) = assertChanged(
         jp,
@@ -49,6 +51,7 @@ interface ChangeFieldNameTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("StatementWithEmptyBody", "ConstantConditions")
     @Test
     fun changeFieldNameReferences(jp: JavaParser) = assertChanged(
         jp,
@@ -151,6 +154,7 @@ interface ChangeFieldNameTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("rawtypes")
     @Test
     fun dontChangeNestedFieldsWithSameName(jp: JavaParser) = assertChanged(
         jp,
