@@ -16,6 +16,7 @@
 package org.openrewrite.maven
 
 import org.assertj.core.api.Assertions
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Issue
@@ -369,6 +370,84 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                   
                   <properties>
                     <guava.version>28.0-jre</guava.version>
+                  </properties>
+                </project>
+            """
+        )
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/891")
+    @Disabled
+    fun upgradeDependencyOnlyTargetsSpecificDependencyProperty(@TempDir tempDir: Path) {
+        val parent = tempDir.resolve("pom.xml")
+        val server = tempDir.resolve("server/pom.xml")
+        server.toFile().parentFile.mkdirs()
+        parent.toFile().writeText(
+            """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <packaging>pom</packaging>
+                  <groupId>org.openrewrite.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                    <guava.version>25.0-jre</guava.version>
+                    <spring.version>5.3.9</spring.version>
+                  </properties>
+                </project>
+            """.trimIndent()
+        )
+        server.toFile().writeText(
+            """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+
+                  <parent>
+                    <groupId>org.openrewrite.example</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                  </parent>
+
+                  <groupId>org.openrewrite.example</groupId>
+                  <artifactId>my-app-server</artifactId>
+                  <version>1</version>
+
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>${"$"}{guava.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.springframework</groupId>
+                        <artifactId>spring-jdbc</artifactId>
+                        <version>${"$"}{spring.version}</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """.trimIndent()
+        )
+        assertChanged(
+            recipe = UpgradeDependencyVersion(
+                "com.google.guava",
+                null,
+                "25-28",
+                "-jre",
+                null
+            ),
+            dependsOn = arrayOf(server.toFile()),
+            before = parent.toFile(),
+            after = """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <packaging>pom</packaging>
+                  <groupId>org.openrewrite.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                    <guava.version>28.0-jre</guava.version>
+                    <spring.version>5.3.9</spring.version>
                   </properties>
                 </project>
             """
