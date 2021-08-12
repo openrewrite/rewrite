@@ -205,7 +205,7 @@ public class UpgradeDependencyVersion extends Recipe {
                 OUTER:
                 for (Pom module : modules) {
                     for (Pom.Dependency dependency : module.getDependencies()) {
-                        if (propertyKeyRef.equals(dependency.getRequestedVersion())) {
+                        if (artifactId.equals(dependency.getArtifactId()) && propertyKeyRef.equals(dependency.getRequestedVersion())) {
                             doAfterVisit(new ChangeTagValueVisitor<>(tag, newVersion));
                             doAfterVisit(new RemoveRedundantDependencyVersions());
                             break OUTER;
