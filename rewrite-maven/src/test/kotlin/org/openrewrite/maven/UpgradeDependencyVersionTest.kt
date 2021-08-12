@@ -16,7 +16,6 @@
 package org.openrewrite.maven
 
 import org.assertj.core.api.Assertions
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Issue
@@ -378,7 +377,6 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/891")
-    @Disabled
     fun upgradeDependencyOnlyTargetsSpecificDependencyProperty(@TempDir tempDir: Path) {
         val parent = tempDir.resolve("pom.xml")
         val server = tempDir.resolve("server/pom.xml")
@@ -394,6 +392,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                   <properties>
                     <guava.version>25.0-jre</guava.version>
                     <spring.version>5.3.9</spring.version>
+                    <spring.artifact-id>spring-jdbc</spring.artifact-id>
                   </properties>
                 </project>
             """.trimIndent()
@@ -421,7 +420,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                     </dependency>
                     <dependency>
                         <groupId>org.springframework</groupId>
-                        <artifactId>spring-jdbc</artifactId>
+                        <artifactId>${"$"}{spring.artifact-id}</artifactId>
                         <version>${"$"}{spring.version}</version>
                     </dependency>
                   </dependencies>
@@ -448,6 +447,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                   <properties>
                     <guava.version>28.0-jre</guava.version>
                     <spring.version>5.3.9</spring.version>
+                    <spring.artifact-id>spring-jdbc</spring.artifact-id>
                   </properties>
                 </project>
             """
