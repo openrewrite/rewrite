@@ -212,6 +212,14 @@ public class UpgradeDependencyVersion extends Recipe {
                         }
                     }
 
+                    for (DependencyManagementDependency dependency : module.getDependencyManagement().getDependencies()) {
+                        if (artifactId.equals(dependency.getArtifactId()) && propertyKeyRef.equals(dependency.getRequestedVersion())) {
+                            doAfterVisit(new ChangeTagValueVisitor<>(tag, newVersion));
+                            doAfterVisit(new RemoveRedundantDependencyVersions());
+                            break OUTER;
+                        }
+                    }
+
                 }
             }
 
