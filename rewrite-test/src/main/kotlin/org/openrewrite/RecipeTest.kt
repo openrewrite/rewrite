@@ -20,15 +20,19 @@ import okhttp3.Request
 import okhttp3.ResponseBody
 import org.assertj.core.api.Assertions.*
 import org.junit.jupiter.api.fail
+import org.openrewrite.internal.StringUtils
 import org.openrewrite.scheduling.ForkJoinScheduler
 import java.io.File
 import java.io.IOException
 import java.io.UncheckedIOException
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ForkJoinPool
+import kotlin.reflect.full.functions
+import kotlin.reflect.full.memberProperties
 
 interface RecipeTest <T: SourceFile> {
     val recipe: Recipe?
@@ -81,6 +85,10 @@ interface RecipeTest <T: SourceFile> {
             relativeTo,
             executionContext
         )
+        val inputSize = 1 + dependsOn.size
+        assertThat(sources.size)
+                .`as`("The parser was provided with $inputSize inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
+                .isEqualTo(inputSize)
 
         assertChangedBase(recipe, sources, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
@@ -115,7 +123,6 @@ interface RecipeTest <T: SourceFile> {
         )
 
         results = results.filter { it.before == sources.first() }
-
         if (results.isEmpty()) {
             fail<Any>("The recipe must make changes")
         }
@@ -130,6 +137,55 @@ interface RecipeTest <T: SourceFile> {
         afterConditions(result.after as T)
 
         recipeSchedulerCheckingExpectedCycles.verify()
+        writeExampleReport(sources, recipe, result)
+    }
+
+    private fun writeExampleReport(sources: List<SourceFile>, recipe: Recipe, result: Result) {
+        // Focus on simple examples by excluding any that require more than a single input source
+        if(sources.size > 1 || recipe.name.contains("$")) {
+            return
+        }
+
+        // This property points to a directory where a report can be placed
+        val exampleOutput = System.getProperty("org.openrewrite.TestExampleOutputDir") ?: return
+        val exampleOutputDir = File(exampleOutput)
+        if(!exampleOutputDir.exists() && !exampleOutputDir.mkdirs()) {
+            return
+        }
+
+        // Figure out which test class+method is producing this example
+        val testFrame = Thread.currentThread().stackTrace.asSequence()
+                .drop(2) // skip the frames for Thread.getStackTrace(), writeExampleReport()
+                .first { !it.methodName.startsWith("assertChanged") }
+                ?: return
+
+        // Tests implemented as default methods on interfaces, such as those in rewrite-test, will be in an inner class called $DefaultImpls
+        val testClassName = testFrame.className.removeSuffix("\$DefaultImpls")
+        val testMethodName = testFrame.methodName
+        val reportProps = Properties().apply {
+            set("testClassName", testClassName)
+            set("testMethodName", testMethodName)
+            set("before", result.before!!.printTrimmed())
+            set("after", result.after!!.printTrimmed())
+            set("recipe", recipe.name)
+            recipe.descriptor.options.forEach { recipeOption ->
+                set("recipeOption.${recipeOption.name}.type", recipeOption.type)
+                // Use reflection to get the actual value
+                val recipeFieldGetter = recipe::class.functions.find {
+                    val capitalRecipeName = StringUtils.capitalize(recipeOption.name)
+                    it.name == "get$capitalRecipeName" || it.name == "is$capitalRecipeName"
+                }
+
+                if(recipeFieldGetter != null) {
+                    val recipeFieldValue = recipeFieldGetter.call(recipe)
+                    set("recipeOption.${recipeOption.name}", recipeFieldValue.toString())
+                }
+            }
+        }
+
+        File(exampleOutputDir, "${recipe.name}.$testMethodName.properties").outputStream().use { reportOutputStream ->
+            reportProps.store(reportOutputStream, null)
+        }
     }
 
     fun assertUnchangedBase(

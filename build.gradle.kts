@@ -156,19 +156,40 @@ subprojects {
         strictCheck = true
     }
 
+    val testReportDir = File(buildDir, "reports/recipe-examples")
     tasks.named<Test>("test").configure {
         useJUnitPlatform {
             excludeTags("debug")
         }
         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
+        // Redundant to produce examples for both rewrite-java-11 and rewrite-java-8
+        if(project.name != "rewrite-java-8") {
+            jvmArgs("-Dorg.openrewrite.TestExampleOutputDir=$testReportDir")
+        }
         javaLauncher.set(javaToolchains.launcherFor {
             languageVersion.set(JavaLanguageVersion.of(11))
         })
+        outputs.dir(testReportDir)
         testLogging {
             showExceptions = true
             exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
             showCauses = true
             showStackTraces = true
+        }
+    }
+    // Tests produce examples which can then be used to generate documentation
+    val releasing = project.hasProperty("releasing")
+    tasks.register<Jar>("jarWithExamples") {
+        archiveClassifier.set("examples")
+        // Only produce these when releasing to avoid slowing down local development
+        // Without this every "publishToMavenLocal" forces tests to run, which would be tedious in most local dev scenarios
+        inputs.property("releasing", releasing)
+        if(releasing) {
+            dependsOn(tasks.named("test"))
+        }
+        enabled = releasing
+        from(testReportDir) {
+            into("META-INF/rewrite")
         }
     }
 
@@ -205,6 +226,11 @@ subprojects {
         configure<PublishingExtension> {
             publications {
                 named("nebula", MavenPublication::class.java) {
+                    val jarWithExamples = tasks.findByName("jarWithExamples")
+                    if(jarWithExamples != null && releasing) {
+                        artifact(jarWithExamples)
+                    }
+
                     suppressPomMetadataWarningsFor("runtimeElements")
                     suppressPomMetadataWarningsFor("checkstyleApiElements")
                     suppressPomMetadataWarningsFor("checkstyleRuntimeElements")
