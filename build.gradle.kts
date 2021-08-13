@@ -156,20 +156,24 @@ subprojects {
         strictCheck = true
     }
 
-    val testReportDir = File(buildDir, "reports/recipe-examples")
-    tasks.named<Test>("test").configure {
+    // Tests produce examples which can then be used to generate documentation
+    val releasing = project.hasProperty("releasing")
+    val exampleOutputDir = File(buildDir, "reports/recipe-examples")
+
+    val test = tasks.named<Test>("test")
+    test.configure {
         useJUnitPlatform {
             excludeTags("debug")
         }
         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
         // Redundant to produce examples for both rewrite-java-11 and rewrite-java-8
         if(project.name != "rewrite-java-8") {
-            jvmArgs("-Dorg.openrewrite.TestExampleOutputDir=$testReportDir")
+            jvmArgs("-Dorg.openrewrite.TestExampleOutputDir=$exampleOutputDir")
         }
         javaLauncher.set(javaToolchains.launcherFor {
             languageVersion.set(JavaLanguageVersion.of(11))
         })
-        outputs.dir(testReportDir)
+        outputs.dir(exampleOutputDir)
         testLogging {
             showExceptions = true
             exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
@@ -178,19 +182,28 @@ subprojects {
         }
     }
 
-    // Tests produce examples which can then be used to generate documentation
-    val releasing = project.hasProperty("releasing")
-    tasks.register<Jar>("jarWithExamples") {
-        archiveClassifier.set("examples")
+    // It's very hard to get outputs from test execution into the main jar
+    // There's always some kind of circular dependency relationship if you do it directly
+    // So this creates a second jar and publishes that as the main one
+    val jar = tasks.named<Jar>("jar")
+    jar.configure {
+        if(releasing) {
+            archiveClassifier.set("noexamples")
+        }
+    }
+    val jarWithExamples = tasks.register<Jar>("jarWithExamples")
+    jarWithExamples.configure {
+        archiveClassifier.set(null as String?)
         // Only produce these when releasing to avoid slowing down local development
         // Without this every "publishToMavenLocal" forces tests to run, which would be tedious in most local dev scenarios
         inputs.property("releasing", releasing)
-        if(releasing) {
-            dependsOn(tasks.named("test"))
-        }
+        dependsOn(test, jar)
         enabled = releasing
-        from(testReportDir) {
+        from(exampleOutputDir) {
             into("META-INF/rewrite")
+        }
+        from(zipTree(jar.get().archiveFile.get().asFile)) {
+            duplicatesStrategy = DuplicatesStrategy.INCLUDE
         }
     }
 
@@ -227,11 +240,10 @@ subprojects {
         configure<PublishingExtension> {
             publications {
                 named("nebula", MavenPublication::class.java) {
-                    val jarWithExamples = tasks.findByName("jarWithExamples")
-                    if(jarWithExamples != null && releasing) {
+                    // rewrite-core has no examples
+                    if(releasing && project.name != "rewrite-core") {
                         artifact(jarWithExamples)
                     }
-
                     suppressPomMetadataWarningsFor("runtimeElements")
                     suppressPomMetadataWarningsFor("checkstyleApiElements")
                     suppressPomMetadataWarningsFor("checkstyleRuntimeElements")

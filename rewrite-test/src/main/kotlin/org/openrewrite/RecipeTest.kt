@@ -188,7 +188,7 @@ interface RecipeTest <T: SourceFile> {
             }
         }.toString()
 
-        File(exampleOutputDir, "${recipe.name}.$testMethodName.yaml")
+        File(exampleOutputDir, "${recipe.name}.$testMethodName.yml")
                 .writeText(report)
     }
 

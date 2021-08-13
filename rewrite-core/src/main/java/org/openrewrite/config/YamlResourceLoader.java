@@ -27,6 +27,7 @@ import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
 import org.openrewrite.Validated;
+import org.openrewrite.config.RecipeExampleDescriptor.RecipeExampleParameterDescriptor;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -306,6 +307,7 @@ public class YamlResourceLoader implements ResourceLoader {
                     String packageName = (String) c.get("packageName");
                     String description = (String) c.get("description");
                     Set<String> tags = Collections.emptySet();
+                    @SuppressWarnings("unchecked")
                     List<String> rawTags = (List<String>) c.get("tags");
                     if (rawTags != null) {
                         tags = new HashSet<>(rawTags);
@@ -324,7 +326,7 @@ public class YamlResourceLoader implements ResourceLoader {
                     String testMethodName = (String) c.get("testMethodName");
                     String before = (String) c.get("before");
                     String after = (String) c.get("after");
-                    List<RecipeExampleDescriptor.RecipeExampleParameterDescriptor> parameters = Collections.emptyList();
+                    List<RecipeExampleParameterDescriptor> parameters = Collections.emptyList();
                     @SuppressWarnings("unchecked")
                     List<Map<String, String>> rawParameters = (List<Map<String, String>>) c.get("parameters");
                     if(rawParameters != null) {
@@ -333,6 +335,7 @@ public class YamlResourceLoader implements ResourceLoader {
                             String name = rawParameter.get("name");
                             String type = rawParameter.get("type");
                             String value = rawParameter.get("value");
+                            parameters.add(new RecipeExampleParameterDescriptor(name, type, value));
                         }
                     }
                     return new RecipeExampleDescriptor(recipe, before, after, testClassName, testMethodName, parameters);
