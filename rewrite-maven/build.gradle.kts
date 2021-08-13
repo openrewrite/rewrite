@@ -15,7 +15,9 @@ dependencies {
     api("com.fasterxml.jackson.core:jackson-annotations:2.12.+")
 
     implementation("org.antlr:antlr4:latest.release")
-    implementation("io.github.resilience4j:resilience4j-retry:latest.release")
+    // FIXME: switch to `latest.release`
+    // when https://github.com/resilience4j/resilience4j/issues/1472 is resolved
+    implementation("io.github.resilience4j:resilience4j-retry:1.7.0")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:2.12.+")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.12.+")
     implementation("com.fasterxml.jackson.module:jackson-module-jaxb-annotations:2.12.+")
