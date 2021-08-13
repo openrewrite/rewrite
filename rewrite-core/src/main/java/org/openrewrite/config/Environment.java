@@ -58,8 +58,6 @@ public class Environment {
 
     public Collection<RecipeExampleDescriptor> listRecipeExamples() {
         return resourceLoaders.stream()
-                .filter(r -> r instanceof ClasspathScanningLoader)
-                .map(ClasspathScanningLoader.class::cast)
                 .flatMap(r -> r.listRecipeExamples().stream())
                 .collect(toList());
     }

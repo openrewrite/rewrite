@@ -15,8 +15,12 @@ public class RecipeExampleDescriptor {
     String recipe;
     String before;
     String after;
+
+    @Nullable
     String testClassName;
+    @Nullable
     String testMethodName;
+
     List<RecipeExampleParameterDescriptor> parameters;
 
     @Value

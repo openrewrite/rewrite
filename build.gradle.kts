@@ -177,6 +177,7 @@ subprojects {
             showStackTraces = true
         }
     }
+
     // Tests produce examples which can then be used to generate documentation
     val releasing = project.hasProperty("releasing")
     tasks.register<Jar>("jarWithExamples") {

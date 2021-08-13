@@ -17,7 +17,6 @@ package org.openrewrite.config;
 
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
-import io.github.classgraph.Resource;
 import io.github.classgraph.ScanResult;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
@@ -26,12 +25,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.file.Path;
-import java.util.*;
-import java.util.regex.Pattern;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Properties;
 
 import static org.openrewrite.internal.RecipeIntrospectionUtils.constructRecipe;
 import static org.openrewrite.internal.RecipeIntrospectionUtils.recipeDescriptorFromRecipe;
@@ -89,6 +88,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 recipes.addAll(resourceLoader.listRecipes());
                 categoryDescriptors.addAll(resourceLoader.listCategoryDescriptors());
                 styles.addAll(resourceLoader.listStyles());
+                recipeExamples.addAll(resourceLoader.listRecipeExamples());
             }
             for(YamlResourceLoader resourceLoader : yamlResourceLoaders) {
                 recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors(recipes));
@@ -100,19 +100,6 @@ public class ClasspathScanningLoader implements ResourceLoader {
         try (ScanResult result = classGraph
                 .ignoreClassVisibility()
                 .scan()) {
-
-            try {
-                for(Resource resource : result.getResourcesMatchingPattern(Pattern.compile("META-INF/rewrite/.*\\.properties"))) {
-                    Properties props = new Properties();
-                    props.load(new ByteArrayInputStream(resource.load()));
-                    RecipeExampleDescriptor ex = RecipeExampleDescriptor.fromProperties(props);
-                    if(ex != null) {
-                        recipeExamples.add(ex);
-                    }
-                }
-            } catch (IOException e) {
-                logger.warn("Unable to load recipe examples", e);
-            }
 
             for (ClassInfo classInfo : result.getSubclasses(Recipe.class.getName())) {
                 Class<?> recipeClass = classInfo.loadClass();
@@ -162,6 +149,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
         return styles;
     }
 
+    @Override
     public Collection<RecipeExampleDescriptor> listRecipeExamples() {
         return recipeExamples;
     }

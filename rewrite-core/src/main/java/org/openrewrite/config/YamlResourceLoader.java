@@ -63,7 +63,8 @@ public class YamlResourceLoader implements ResourceLoader {
     private enum ResourceType {
         Recipe("specs.openrewrite.org/v1beta/recipe"),
         Style("specs.openrewrite.org/v1beta/style"),
-        Category("specs.openrewrite.org/v1beta/category");
+        Category("specs.openrewrite.org/v1beta/category"),
+        Exemplar("specs.openrewrite.org/v1beta/exemplar");
 
         private final String spec;
 
@@ -312,5 +313,29 @@ public class YamlResourceLoader implements ResourceLoader {
                     return new CategoryDescriptor(name, packageName, description, tags);
                 })
                 .collect(toList());
+    }
+
+    @Override
+    public Collection<RecipeExampleDescriptor> listRecipeExamples() {
+        return loadResources(ResourceType.Exemplar).stream()
+                .map(c -> {
+                    String recipe = (String) c.get("type");
+                    String testClassName = (String) c.get("testClassName");
+                    String testMethodName = (String) c.get("testMethodName");
+                    String before = (String) c.get("before");
+                    String after = (String) c.get("after");
+                    List<RecipeExampleDescriptor.RecipeExampleParameterDescriptor> parameters = Collections.emptyList();
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, String>> rawParameters = (List<Map<String, String>>) c.get("parameters");
+                    if(rawParameters != null) {
+                        parameters = new ArrayList<>(rawParameters.size());
+                        for (Map<String, String> rawParameter : rawParameters) {
+                            String name = rawParameter.get("name");
+                            String type = rawParameter.get("type");
+                            String value = rawParameter.get("value");
+                        }
+                    }
+                    return new RecipeExampleDescriptor(recipe, before, after, testClassName, testMethodName, parameters);
+                }).collect(toList());
     }
 }

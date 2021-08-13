@@ -26,13 +26,11 @@ import java.io.File
 import java.io.IOException
 import java.io.UncheckedIOException
 import java.nio.file.Path
-import java.nio.file.Paths
 import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ForkJoinPool
 import kotlin.reflect.full.functions
-import kotlin.reflect.full.memberProperties
 
 interface RecipeTest <T: SourceFile> {
     val recipe: Recipe?
@@ -162,31 +160,40 @@ interface RecipeTest <T: SourceFile> {
         // Tests implemented as default methods on interfaces, such as those in rewrite-test, will be in an inner class called $DefaultImpls
         val testClassName = testFrame.className.removeSuffix("\$DefaultImpls")
         val testMethodName = testFrame.methodName
-        val reportProps = Properties().apply {
-            set("testClassName", testClassName)
-            set("testMethodName", testMethodName)
-            set("before", result.before!!.printTrimmed())
-            set("after", result.after!!.printTrimmed())
-            set("recipe", recipe.name)
-            recipe.descriptor.options.forEach { recipeOption ->
-                set("recipeOption.${recipeOption.name}.type", recipeOption.type)
-                // Use reflection to get the actual value
+
+        val report = StringBuilder().apply {
+            appendLine("""
+                ---
+                type: specs.openrewrite.org/v1beta/exemplar
+                recipe: ${recipe.name}
+                testClassName: $testClassName
+                testMethodName: $testMethodName
+                before: "${ result.before!!.printTrimmed().escapeForYaml() }"
+                after: "${ result.after!!.printTrimmed().escapeForYaml() }"
+            """.trimIndent())
+            if(recipe.descriptor.options.isNotEmpty()) {
+                appendLine("parameters:")
+            }
+            for(recipeOption in recipe.descriptor.options) {
+                appendLine("  - name: ${recipeOption.name}")
+                appendLine("    type: ${recipeOption.type}")
                 val recipeFieldGetter = recipe::class.functions.find {
                     val capitalRecipeName = StringUtils.capitalize(recipeOption.name)
                     it.name == "get$capitalRecipeName" || it.name == "is$capitalRecipeName"
                 }
-
                 if(recipeFieldGetter != null) {
                     val recipeFieldValue = recipeFieldGetter.call(recipe)
-                    set("recipeOption.${recipeOption.name}", recipeFieldValue.toString())
+                    appendLine("    value: \"${recipeFieldValue.toString().escapeForYaml()}\"")
                 }
             }
-        }
+        }.toString()
 
-        File(exampleOutputDir, "${recipe.name}.$testMethodName.properties").outputStream().use { reportOutputStream ->
-            reportProps.store(reportOutputStream, null)
-        }
+        File(exampleOutputDir, "${recipe.name}.$testMethodName.yaml")
+                .writeText(report)
     }
+
+    private fun String.escapeForYaml(): String =
+            replace("\n", "\\n").replace("\"", "\\\"").replace("\r", "\\r")
 
     fun assertUnchangedBase(
         parser: Parser<T> = this.parser!!,
