@@ -75,7 +75,7 @@ public class JsonParser implements Parser<Json.Document> {
 
     @Override
     public boolean accept(Path path) {
-        return path.toString().endsWith(".Json");
+        return path.toString().endsWith(".json");
     }
 
     private static class ForwardingErrorListener extends BaseErrorListener {
