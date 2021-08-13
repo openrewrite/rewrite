@@ -28,4 +28,6 @@ public interface ResourceLoader {
     Collection<NamedStyles> listStyles();
 
     Collection<CategoryDescriptor> listCategoryDescriptors();
+
+    Collection<RecipeExampleDescriptor> listRecipeExamples();
 }

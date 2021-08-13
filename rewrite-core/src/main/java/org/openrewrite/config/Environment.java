@@ -56,6 +56,12 @@ public class Environment {
                 .collect(toList());
     }
 
+    public Collection<RecipeExampleDescriptor> listRecipeExamples() {
+        return resourceLoaders.stream()
+                .flatMap(r -> r.listRecipeExamples().stream())
+                .collect(toList());
+    }
+
     public Recipe activateRecipes(Iterable<String> activeRecipes) {
         Recipe root = new CompositeRecipe();
         Collection<Recipe> recipes = listRecipes();
