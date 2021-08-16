@@ -15,14 +15,13 @@
  */
 package org.openrewrite.text
 
-import org.assertj.core.api.Assertions
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.*
 import org.openrewrite.marker.Markers
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.util.*
 
 class CreateTextFileTest : RecipeTest<PlainText> {
     override val parser: Parser<PlainText>
@@ -33,9 +32,9 @@ class CreateTextFileTest : RecipeTest<PlainText> {
 
     @Test
     fun hasCreatedFile(@TempDir tempDir: Path) {
-        val results = recipe.run(Collections.emptyList());
-        Assertions.assertThat(results).hasSize(1);
-        Assertions.assertThat(results[0].after.print()).isEqualTo("foo");
+        val results = recipe.run(emptyList());
+        assertThat(results).hasSize(1);
+        assertThat(results[0].after.print()).isEqualTo("foo");
 
     }
 
@@ -44,8 +43,8 @@ class CreateTextFileTest : RecipeTest<PlainText> {
         val overwriteRecipe: Recipe = CreateTextFile("foo", ".github/CODEOWNERS", true)
         val results = overwriteRecipe.run(listOf(PlainText(Tree.randomId(), Paths.get(".github/CODEOWNERS"), Markers.EMPTY, "hello")));
 
-        Assertions.assertThat(results).hasSize(1);
-        Assertions.assertThat(results[0].after.print()).isEqualTo("foo");
+        assertThat(results).hasSize(1);
+        assertThat(results[0].after.print()).isEqualTo("foo");
     }
 
     @Test
@@ -53,7 +52,15 @@ class CreateTextFileTest : RecipeTest<PlainText> {
         val overwriteRecipe: Recipe = CreateTextFile("foo", ".github/CODEOWNERS", false)
         val results = overwriteRecipe.run(listOf(PlainText(Tree.randomId(), Paths.get(".github/CODEOWNERS"), Markers.EMPTY, "hello")));
 
-        Assertions.assertThat(results).hasSize(0);
+        assertThat(results).hasSize(0);
+    }
+
+    @Test
+    fun shouldNotChangeExistingFileWhenOverwriteNull(@TempDir tempDir: Path) {
+        val overwriteRecipe: Recipe = CreateTextFile("foo", ".github/CODEOWNERS", null)
+        val results = overwriteRecipe.run(listOf(PlainText(Tree.randomId(), Paths.get(".github/CODEOWNERS"), Markers.EMPTY, "hello")));
+
+        assertThat(results).hasSize(0);
     }
 
     @Test
@@ -61,8 +68,7 @@ class CreateTextFileTest : RecipeTest<PlainText> {
         val overwriteRecipe: Recipe = CreateTextFile("foo", ".github/CODEOWNERSZ", false)
         val results = overwriteRecipe.run(listOf(PlainText(Tree.randomId(), Paths.get(".github/CODEOWNERS"), Markers.EMPTY, "hello")));
 
-        Assertions.assertThat(results).hasSize(1);
-        Assertions.assertThat(results[0].after.print()).isEqualTo("foo");
-
+        assertThat(results).hasSize(1);
+        assertThat(results[0].after.print()).isEqualTo("foo");
     }
 }
