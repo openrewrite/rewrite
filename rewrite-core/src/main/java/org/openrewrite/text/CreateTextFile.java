@@ -79,6 +79,6 @@ public class CreateTextFile extends Recipe {
             brandNewFile = new PlainText(matchingFile.getId(), brandNewFile.getSourcePath(), brandNewFile.getMarkers(), brandNewFile.getText());
         }
 
-        return ListUtils.concat(before,brandNewFile);
+        return ListUtils.concat(before, brandNewFile);
     }
 }
