@@ -268,6 +268,14 @@ class Java8NoStaticImportTest : Java8Test, NoStaticImportTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8NoWhitespaceAfterTest : Java8Test, NoWhitespaceAfterTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8NoWhitespaceBeforeTest : Java8Test, NoWhitespaceBeforeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8NormalizeFormatTest : Java8Test, NormalizeFormatTest
 
 @DebugOnly

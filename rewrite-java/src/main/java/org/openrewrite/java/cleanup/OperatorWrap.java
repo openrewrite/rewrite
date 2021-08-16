@@ -24,9 +24,6 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.TypeTree;
 
-import java.util.Collections;
-import java.util.Set;
-
 public class OperatorWrap extends Recipe {
     @Override
     public String getDisplayName() {
@@ -36,11 +33,6 @@ public class OperatorWrap extends Recipe {
     @Override
     public String getDescription() {
         return "Fixes line wrapping policies on operators.";
-    }
-
-    @Override
-    public Set<String> getTags() {
-        return Collections.singleton("OperatorWrapCheck");
     }
 
     @Override

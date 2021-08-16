@@ -203,6 +203,50 @@ class CheckstyleConfigLoaderTest {
     }
 
     @Test
+    fun noWhitespaceAfterStyle() {
+        val checkstyle = loadCheckstyleConfig("""
+            <!DOCTYPE module PUBLIC
+                "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
+                "https://checkstyle.org/dtds/configuration_1_2.dtd">
+            <module name="Checker">
+              <module name="NoWhitespaceAfter">
+                <property name="allowLineBreaks" value="true"/>
+              </module>
+            </module>
+        """.trimIndent(), emptyMap())
+
+        assertThat(checkstyle.styles)
+            .hasSize(1)
+
+        assertThat(checkstyle.styles.first()).isExactlyInstanceOf(NoWhitespaceAfterStyle::class.java)
+        val noWhitespaceAfterStyle = checkstyle.styles.first() as NoWhitespaceAfterStyle
+
+        assertThat(noWhitespaceAfterStyle.allowLineBreaks).isTrue
+    }
+
+    @Test
+    fun noWhitespaceBeforeStyle() {
+        val checkstyle = loadCheckstyleConfig("""
+            <!DOCTYPE module PUBLIC
+                "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
+                "https://checkstyle.org/dtds/configuration_1_2.dtd">
+            <module name="Checker">
+              <module name="NoWhitespaceBefore">
+                <property name="allowLineBreaks" value="true"/>
+              </module>
+            </module>
+        """.trimIndent(), emptyMap())
+
+        assertThat(checkstyle.styles)
+            .hasSize(1)
+
+        assertThat(checkstyle.styles.first()).isExactlyInstanceOf(NoWhitespaceBeforeStyle::class.java)
+        val noWhitespaceBeforeStyle = checkstyle.styles.first() as NoWhitespaceBeforeStyle
+
+        assertThat(noWhitespaceBeforeStyle.allowLineBreaks).isTrue
+    }
+
+    @Test
     fun needBraces() {
         val checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC

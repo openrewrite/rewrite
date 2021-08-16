@@ -222,6 +222,12 @@ abstract class JavaVisitorCompatibilityKit {
     inner class NoStaticImportTck : NoStaticImportTest
 
     @Nested
+    inner class NoWhitespaceAfterTck : NoWhitespaceAfterTest
+
+    @Nested
+    inner class NoWhitespaceBeforeTck : NoWhitespaceBeforeTest
+
+    @Nested
     inner class NormalizeFormatTck : NormalizeFormatTest
 
     @Nested
