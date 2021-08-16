@@ -69,7 +69,7 @@ public class CreateTextFile extends Recipe {
         }
 
         // return early if file exists and there's no explicit permission to overwrite
-        if (matchingFile != null && (overwriteExisting == null  || Boolean.FALSE.equals(overwriteExisting))) {
+        if (matchingFile != null && !Boolean.TRUE.equals(overwriteExisting)) {
             return before;
         }
 
