@@ -35,7 +35,6 @@ class CreateTextFileTest : RecipeTest<PlainText> {
         val results = recipe.run(emptyList());
         assertThat(results).hasSize(1);
         assertThat(results[0].after.print()).isEqualTo("foo");
-
     }
 
     @Test
