@@ -15,7 +15,6 @@
  */
 package org.openrewrite.yaml
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Issue
@@ -23,7 +22,6 @@ import java.nio.file.Path
 
 class MergeYamlTest : YamlRecipeTest {
 
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/905")
     @Test
     fun existingMultipleEntryBlock() = assertChanged(
@@ -47,7 +45,7 @@ class MergeYamlTest : YamlRecipeTest {
             spring:
               application:
                 name: update
-                description: description
+                description: a description
         """
     )
 
@@ -224,23 +222,21 @@ class MergeYamlTest : YamlRecipeTest {
 
     @Test
     fun changeOnlyMatchingFile(@TempDir tempDir: Path) {
-        val matchingFile = tempDir.resolve("a.yml").apply {
-            toFile().parentFile.mkdirs()
-            toFile().writeText("apiVersion: policy/v1beta1")
-        }.toFile()
-        val nonMatchingFile = tempDir.resolve("b.yml").apply {
-            toFile().parentFile.mkdirs()
-            toFile().writeText("apiVersion: policy/v1beta1")
-        }.toFile()
+        val matchingFile = tempDir.resolve("a.yml").toFile().apply {
+            writeText("apiVersion: policy/v1beta1")
+        }
+        val nonMatchingFile = tempDir.resolve("b.yml").toFile().apply {
+            writeText("apiVersion: policy/v1beta1")
+        }
 
         val recipe = MergeYaml("/", "spec: 0", true, "**/a.yml")
         assertChanged(
             recipe = recipe,
             before = matchingFile,
             after = """
-                    apiVersion: policy/v1beta1
-                    spec: 0
-        """.trimIndent()
+                apiVersion: policy/v1beta1
+                spec: 0
+            """.trimIndent()
         )
         assertUnchanged(recipe = recipe, before = nonMatchingFile)
     }

@@ -48,13 +48,13 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     @Override
     public Yaml visitSequence(Yaml.Sequence existingSeq, P p) {
         if (scope.isScope(existingSeq)) {
-            if(incoming instanceof Yaml.Mapping) {
+            if (incoming instanceof Yaml.Mapping) {
                 return existingSeq.withEntries(ListUtils.map(existingSeq.getEntries(), (i, existingSeqEntry) -> {
                     Yaml.Block b = (Yaml.Block) new MergeYamlVisitor<>(existingSeqEntry.getBlock(),
                             incoming, acceptTheirs).visit(existingSeqEntry.getBlock(), p, getCursor());
                     return existingSeqEntry.withBlock(requireNonNull(b));
                 }));
-            } else if(incoming instanceof Yaml.Sequence) {
+            } else if (incoming instanceof Yaml.Sequence) {
                 return mergeSequence(existingSeq, (Yaml.Sequence) incoming, p, getCursor());
             }
         }
@@ -74,26 +74,24 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     }
 
     private Yaml.Mapping mergeMapping(Yaml.Mapping m1, Yaml.Mapping m2, P p, Cursor cursor) {
-        List<Yaml.Mapping.Entry> mutatedEntries = ListUtils.map(m1.getEntries(), existingEntry ->
-                m2.getEntries().stream()
-                        .filter(incomingEntry -> keyMatches(existingEntry, incomingEntry))
-                        .findFirst()
-                        .map(incomingEntry ->
-                                existingEntry.withValue((Yaml.Block) new MergeYamlVisitor<>(existingEntry.getValue(),
-                                        incomingEntry.getValue(), acceptTheirs).visit(existingEntry.getValue(), p, cursor)))
-                        .orElse(existingEntry));
+        List<Yaml.Mapping.Entry> mutatedEntries = ListUtils.map(m1.getEntries(), existingEntry -> {
+            for (Yaml.Mapping.Entry incomingEntry : m2.getEntries()) {
+                if(keyMatches(existingEntry, incomingEntry)) {
+                    return existingEntry.withValue((Yaml.Block) new MergeYamlVisitor<>(existingEntry.getValue(),
+                            incomingEntry.getValue(), acceptTheirs).visit(existingEntry.getValue(), p, new Cursor(cursor, existingEntry)));
+                }
+            }
+            return existingEntry;
+        });
 
-        mutatedEntries = ListUtils.concatAll(mutatedEntries, m2.getEntries().stream()
-                .filter(incomingEntry -> {
-                    for (Yaml.Mapping.Entry existingEntry : m1.getEntries()) {
-                        if (keyMatches(existingEntry, incomingEntry)) {
-                            return false;
-                        }
-                    }
-                    return true;
-                })
-                .map(incomingEntry -> autoFormat(incomingEntry, p, getCursor().getParentOrThrow()))
-                .collect(Collectors.toList()));
+        mutatedEntries = ListUtils.concatAll(mutatedEntries, ListUtils.map(m2.getEntries(), incomingEntry -> {
+            for (Yaml.Mapping.Entry existingEntry : m1.getEntries()) {
+                if (keyMatches(existingEntry, incomingEntry)) {
+                    return null;
+                }
+            }
+            return autoFormat(incomingEntry, p, cursor);
+        }));
 
         return m1.withEntries(mutatedEntries);
     }

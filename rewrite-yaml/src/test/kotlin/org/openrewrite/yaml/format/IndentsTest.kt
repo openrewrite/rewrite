@@ -16,7 +16,6 @@
 package org.openrewrite.yaml.format
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.yaml.YamlRecipeTest
 import org.openrewrite.yaml.style.YamlDefaultStyles
@@ -24,7 +23,7 @@ import org.openrewrite.yaml.style.YamlDefaultStyles
 class IndentsTest : YamlRecipeTest {
     override val recipe: Recipe
         get() = toRecipe {
-            IndentsVisitor<ExecutionContext>(
+            IndentsVisitor(
                 YamlDefaultStyles.indents(),
                 null
             )

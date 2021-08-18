@@ -22,6 +22,7 @@ import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.style.IndentsStyle;
 import org.openrewrite.yaml.tree.Yaml;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -65,20 +66,19 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
         Yaml y = tree;
         int indent = Optional.ofNullable(getCursor().<Integer>getNearestMessage("lastIndent")).orElse(0);
 
-        if (y.getPrefix().contains("\n")) {
-            if(isUnindentedTopLevel()) {
-                if (y instanceof Yaml.Sequence.Entry) {
-                    y = y.withPrefix(indentTo(y.getPrefix(), indent + style.getIndentSize()));
+        if (y.getPrefix().contains("\n") && !isUnindentedTopLevel()) {
+            if (y instanceof Yaml.Sequence.Entry) {
+                y = y.withPrefix(indentTo(y.getPrefix(), indent + style.getIndentSize()));
 
-                    // the +1 is for the '-' character
-                    getCursor().getParentOrThrow().putMessage("lastIndent", indent +
-                            firstIndent(((Yaml.Sequence.Entry) y).getBlock()).length() + 1);
-                } else if (y instanceof Yaml.Mapping.Entry) {
-                    y = y.withPrefix(indentTo(y.getPrefix(), indent + style.getIndentSize()));
-                    getCursor().putMessage("lastIndent", indent + style.getIndentSize());
-                }
+                // the +1 is for the '-' character
+                getCursor().getParentOrThrow().putMessage("lastIndent", indent +
+                        firstIndent(((Yaml.Sequence.Entry) y).getBlock()).length() + 1);
+            } else if (y instanceof Yaml.Mapping.Entry) {
+                y = y.withPrefix(indentTo(y.getPrefix(), indent + style.getIndentSize()));
+                getCursor().putMessage("lastIndent", indent + style.getIndentSize());
             }
-        } else if (y instanceof Yaml.Mapping.Entry && getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Sequence.Entry) {
+        } else if (y instanceof Yaml.Mapping.Entry &&
+                getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Sequence.Entry) {
             // this is a mapping entry that begins a sequence entry and anything below it should be indented further to the right now, e.g.:
             //
             // - key:
@@ -90,8 +90,8 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
     }
 
     private boolean isUnindentedTopLevel() {
-        return !(getCursor().getParentOrThrow().getValue() instanceof Yaml.Document) &&
-                !(getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Document);
+        return getCursor().getParentOrThrow().getValue() instanceof Yaml.Document ||
+                getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Document;
     }
 
     @Nullable
