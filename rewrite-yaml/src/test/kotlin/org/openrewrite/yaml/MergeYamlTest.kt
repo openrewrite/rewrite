@@ -15,12 +15,42 @@
  */
 package org.openrewrite.yaml
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Issue
 import java.nio.file.Path
 
 class MergeYamlTest : YamlRecipeTest {
+
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/905")
+    @Test
+    fun existingMultipleEntryBlock() = assertChanged(
+        recipe = MergeYaml(
+            "/",
+            """
+                spring:
+                  application:
+                    name: update
+                    description: a description
+            """.trimIndent(),
+            false,
+            null
+        ),
+        before = """
+            spring:
+              application:
+                name: main
+        """,
+        after = """
+            spring:
+              application:
+                name: update
+                description: description
+        """
+    )
+
 
     @Test
     fun existingBlock() = assertChanged(
