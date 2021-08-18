@@ -27,8 +27,8 @@ interface FindDeprecatedMethodsTest : JavaRecipeTest {
         recipe = FindDeprecatedMethods(),
         before = """
             class Test {
-                void test(int n) throws Exception {
-                    Test.class.newInstance();
+                @Deprecated
+                void test(int n) {
                     if(n == 1) {
                         test(n + 1);
                     }
@@ -37,10 +37,10 @@ interface FindDeprecatedMethodsTest : JavaRecipeTest {
         """,
         after = """
             class Test {
-                void test(int n) throws Exception {
-                    /*~~>*/Test.class.newInstance();
+                @Deprecated
+                void test(int n) {
                     if(n == 1) {
-                        test(n + 1);
+                        /*~~>*/test(n + 1);
                     }
                 }
             }
