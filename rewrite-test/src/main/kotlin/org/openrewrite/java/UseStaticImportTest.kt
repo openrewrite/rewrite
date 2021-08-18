@@ -143,7 +143,7 @@ interface UseStaticImportTest : JavaRecipeTest {
     @Test
     fun junit5Assertions(jp: JavaParser.Builder<*, *>) = assertChanged(
         parser = jp
-            .classpath(JavaParser.dependenciesFromClasspath("junit-jupiter-api", "apiguardian-api"))
+            .classpath(JavaParser.dependenciesFromClasspath("junit-jupiter-api"))
             .build(),
         recipe = UseStaticImport("org.junit.jupiter.api.Assertions assert*(..)"),
         before = """
