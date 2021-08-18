@@ -81,6 +81,7 @@ public class StringLiteralEquality extends Recipe {
                             INVOCATION_SIGNATURE,
                             INVOCATION_SIGNATURE,
                             Collections.singletonList("o"),
+                            Collections.emptyList(),
                             Collections.emptyList()
                     )
             );

@@ -164,6 +164,10 @@ class Java11FindAnnotationsTest : Java11Test, FindAnnotationsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11FindDeprecatedMethodsTest : Java11Test, FindDeprecatedMethodsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11FindFieldsTest : Java11Test, FindFieldsTest
 
 @DebugOnly

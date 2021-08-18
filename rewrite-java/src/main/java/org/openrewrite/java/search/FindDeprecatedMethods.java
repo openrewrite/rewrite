@@ -1,0 +1,82 @@
+/*
+ * Copyright 2021 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.java.search;
+
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.marker.JavaSearchResult;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.marker.Marker;
+
+import static org.openrewrite.Tree.randomId;
+
+public class FindDeprecatedMethods extends Recipe {
+
+    @Override
+    public String getDisplayName() {
+        return "Find uses of deprecated methods";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Find uses of deprecated methods in any API.";
+    }
+
+    @Override
+    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
+        //noinspection ConstantConditions
+        return new JavaIsoVisitor<ExecutionContext>() {
+            private final Marker USES_DEPRECATED = new JavaSearchResult(randomId(), null, null);
+
+            @Override
+            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                for (JavaType javaType : cu.getTypesInUse()) {
+                    JavaType.Method method = TypeUtils.asMethod(javaType);
+                    if (method != null) {
+                        for (JavaType.FullyQualified annotation : method.getAnnotations()) {
+                            if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
+                                return cu.withMarkers(cu.getMarkers().addIfAbsent(USES_DEPRECATED));
+                            }
+                        }
+                    }
+                }
+                return cu;
+            }
+        };
+    }
+
+    @Override
+    public JavaVisitor<ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                if (method.getType() != null) {
+                    for (JavaType.FullyQualified annotation : method.getType().getAnnotations()) {
+                        if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
+                            m = m.withMarkers(m.getMarkers().addIfAbsent(new JavaSearchResult(FindDeprecatedMethods.this)));
+                        }
+                    }
+                }
+                return m;
+            }
+        };
+    }
+}

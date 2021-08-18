@@ -832,8 +832,7 @@ interface AddImportTest : JavaRecipeTest {
         val methodsFoo: MutableList<JavaType.Method> = mutableListOf()
         val methodNamesFoo = arrayOf("assertShared", "assertA", "assertB", "assertC")
         methodNamesFoo.forEach { methodsFoo.add(
-            JavaType.Method.build(flags,
-                JavaType.Class.build("org.fuz.Fuz"), it, null, methodSignature, listOf(), listOf())) }
+            JavaType.Method.build(flags, JavaType.Class.build("org.fuz.Fuz"), it, null, methodSignature, listOf(), listOf(), listOf())) }
         fqns.add(JavaType.Class.build(
             Flag.flagsToBitMap(flags), classNames[0], JavaType.Class.Kind.Class, variables,
             listOf(), methodsFoo, null, null, listOf(), false))
@@ -841,8 +840,7 @@ interface AddImportTest : JavaRecipeTest {
         val methodsBar: MutableList<JavaType.Method> = mutableListOf()
         val methodNamesBar = arrayOf("assertShared", "assertThatA", "assertThatB", "assertThatC")
         methodNamesBar.forEach { methodsBar.add(
-            JavaType.Method.build(flags,
-                JavaType.Class.build("org.buz.Buz"), it, null, methodSignature, listOf(), listOf())) }
+            JavaType.Method.build(flags, JavaType.Class.build("org.buz.Buz"), it, null, methodSignature, listOf(), listOf(), listOf())) }
         fqns.add(JavaType.Class.build(
             Flag.flagsToBitMap(flags), classNames[1], JavaType.Class.Kind.Class, variables,
             listOf(), methodsBar, null, null, listOf(), false))

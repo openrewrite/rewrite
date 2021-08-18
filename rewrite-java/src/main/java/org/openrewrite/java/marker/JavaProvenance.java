@@ -151,8 +151,24 @@ public class JavaProvenance implements Marker {
                 parameterTypes.add(JavaType.buildType(methodParameterInfo.getTypeDescriptor().toString()));
             }
             JavaType.Method.Signature signature = new JavaType.Method.Signature(JavaType.buildType(methodInfo.getTypeDescriptor().getResultType().toString()), parameterTypes);
-            List<String> methodParams = new ArrayList<>();
+
+            List<String> methodParams = new ArrayList<>(methodInfo.getParameterInfo().length);
+            for (MethodParameterInfo methodParameterInfo : methodInfo.getParameterInfo()) {
+                methodParams.add(methodParameterInfo.getName());
+            }
+
             List<JavaType.FullyQualified> thrownExceptions = new ArrayList<>();
+            for (ClassRefOrTypeVariableSignature throwsSignature : methodInfo.getTypeDescriptor().getThrowsSignatures()) {
+                if(throwsSignature instanceof ClassRefTypeSignature) {
+                    thrownExceptions.add(fromClassGraph(((ClassRefTypeSignature) throwsSignature).getClassInfo()));
+                }
+            }
+
+            List<JavaType.FullyQualified> annotations = new ArrayList<>();
+            for (AnnotationInfo annotationInfo : methodInfo.getAnnotationInfo()) {
+                annotations.add(fromClassGraph(annotationInfo.getClassInfo()));
+            }
+
             methods.add(JavaType.Method.build(
                     flags,
                     JavaType.Class.build(methodInfo.getClassName()),
@@ -160,7 +176,8 @@ public class JavaProvenance implements Marker {
                     null,
                     signature,
                     methodParams,
-                    thrownExceptions));
+                    thrownExceptions,
+                    annotations));
         }
         return methods;
     }

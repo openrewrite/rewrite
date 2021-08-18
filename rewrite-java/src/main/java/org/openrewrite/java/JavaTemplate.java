@@ -306,7 +306,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                 type = JavaType.Method.build(type.getFlags(), type.getDeclaringType(), type.getName(),
                                         type.getGenericSignature().withParamTypes(paramTypes),
                                         type.getResolvedSignature().withParamTypes(paramTypes),
-                                        paramNames, type.getThrownExceptions());
+                                        paramNames, type.getThrownExceptions(), type.getAnnotations());
                             }
 
                             return method.withParameters(parameters)
@@ -325,7 +325,8 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                     newThrows.add((JavaType.FullyQualified) exceptionIdent.getType());
                                 }
                                 type = JavaType.Method.build(type.getFlags(), type.getDeclaringType(), type.getName(),
-                                        type.getGenericSignature(), type.getResolvedSignature(), type.getParamNames(), newThrows);
+                                        type.getGenericSignature(), type.getResolvedSignature(), type.getParamNames(), newThrows,
+                                        type.getAnnotations());
                             }
 
                             //noinspection ConstantConditions

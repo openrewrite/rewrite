@@ -796,7 +796,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         JavaType referenceType = null;
         if (ref.sym instanceof Symbol.MethodSymbol) {
             Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) ref.sym;
-            referenceType = methodType(methodSymbol.owner.type, methodSymbol, referenceName);
+            referenceType = methodType(methodSymbol.owner.type, methodSymbol, referenceName, new Stack<>());
         }
 
         return new J.MemberReference(randomId(),
@@ -857,7 +857,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         Symbol genericSymbol = (jcSelect instanceof JCFieldAccess) ? ((JCFieldAccess) jcSelect).sym : ((JCIdent) jcSelect).sym;
 
         return new J.MethodInvocation(randomId(), fmt, Markers.EMPTY, select, typeParams, name, args,
-                methodType(jcSelect.type, genericSymbol, name.getSimpleName()));
+                methodType(jcSelect.type, genericSymbol, name.getSimpleName(), new Stack<>()));
     }
 
     @Override
@@ -935,7 +935,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 modifierResults.getLeadingAnnotations(),
                 modifierResults.getModifiers(), typeParams,
                 returnType, name, params, throwss, body, defaultValue,
-                methodType(jcMethod.type, jcMethod.sym, name.getIdentifier().getSimpleName()));
+                methodType(jcMethod.type, jcMethod.sym, name.getIdentifier().getSimpleName(), new Stack<>()));
     }
 
     @Override
@@ -1026,7 +1026,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         JCNewClass jcNewClass = (JCNewClass) node;
-        JavaType.Method constructorType = methodType(jcNewClass.constructorType, jcNewClass.constructor, "<constructor>");
+        JavaType.Method constructorType = methodType(jcNewClass.constructorType, jcNewClass.constructor, "<constructor>", new Stack<>());
 
         return new J.NewClass(randomId(), fmt, Markers.EMPTY, encl, whitespaceBeforeNew,
                 clazz, args, body, constructorType,
@@ -1588,7 +1588,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     @Nullable
-    private JavaType.Method methodType(@Nullable com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol, String methodName) {
+    private JavaType.Method methodType(@Nullable com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol, String methodName, List<Symbol> stack) {
         // if the symbol is not a method symbol, there is a parser error in play
         Symbol.MethodSymbol methodSymbol = symbol instanceof Symbol.MethodSymbol ? (Symbol.MethodSymbol) symbol : null;
 
@@ -1653,6 +1653,17 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 return null;
             }
 
+            List<JavaType.FullyQualified> annotations = emptyList();
+            if (!methodSymbol.getDeclarationAttributes().isEmpty()) {
+                annotations = new ArrayList<>(methodSymbol.getDeclarationAttributes().size());
+                for (Attribute.Compound a : methodSymbol.getDeclarationAttributes()) {
+                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(a.type, stack));
+                    if (fq != null) {
+                        annotations.add(fq);
+                    }
+                }
+            }
+
             return JavaType.Method.build(
                     // currently only the first 16 bits are meaningful
                     (int) methodSymbol.flags_field & 0xFFFF,
@@ -1661,7 +1672,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                     genericSignature,
                     signature.apply(selectType),
                     paramNames,
-                    Collections.unmodifiableList(exceptionTypes)
+                    Collections.unmodifiableList(exceptionTypes),
+                    annotations
             );
         }
 

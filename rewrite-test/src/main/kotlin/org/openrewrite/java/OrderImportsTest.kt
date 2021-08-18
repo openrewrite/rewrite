@@ -15,10 +15,8 @@
  */
 package org.openrewrite.java
 
-import org.assertj.core.api.Assertions
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.Tree.randomId
@@ -708,7 +706,7 @@ interface OrderImportsTest : JavaRecipeTest {
             
             public class C {
                 void c() {
-                    List l = Arrays.asList(new A(), new B(), new C(), new D(), new E(), new F(), new G(), new H(), new H1());
+                    List<?> l = Arrays.asList(new A(), new B(), new C(), new D(), new E(), new F(), new G(), new H(), new H1());
                 }
             }
         """.trimIndent(),
@@ -723,7 +721,7 @@ interface OrderImportsTest : JavaRecipeTest {
             
             public class C {
                 void c() {
-                    List l = Arrays.asList(new A(), new B(), new C(), new D(), new E(), new F(), new G(), new H(), new H1());
+                    List<?> l = Arrays.asList(new A(), new B(), new C(), new D(), new E(), new F(), new G(), new H(), new H1());
                 }
             }
         """.trimIndent()
@@ -1008,16 +1006,14 @@ interface OrderImportsTest : JavaRecipeTest {
         val methodsFoo: MutableList<JavaType.Method> = mutableListOf()
         val methodNamesFoo = arrayOf("assertShared", "assertA", "assertB", "assertC")
         methodNamesFoo.forEach { methodsFoo.add(
-            JavaType.Method.build(flags,
-                JavaType.Class.build("declClass"), it, null, methodSignature, listOf(), listOf())) }
+            JavaType.Method.build(flags, JavaType.Class.build("declClass"), it, null, methodSignature, listOf(), listOf(), listOf())) }
         fqns.add(JavaType.Class.build(Flag.flagsToBitMap(flags), classNames[0], JavaType.Class.Kind.Class, variables,
             listOf(), methodsFoo, null, null, listOf(), false))
 
         val methodsBar: MutableList<JavaType.Method> = mutableListOf()
         val methodNamesBar = arrayOf("assertShared", "assertThatA", "assertThatB", "assertThatC")
         methodNamesBar.forEach { methodsBar.add(
-            JavaType.Method.build(flags,
-                    JavaType.Class.build("declClass"), it, null, methodSignature, listOf(), listOf())) }
+            JavaType.Method.build(flags, JavaType.Class.build("declClass"), it, null, methodSignature, listOf(), listOf(), listOf())) }
         fqns.add(JavaType.Class.build(Flag.flagsToBitMap(flags), classNames[1], JavaType.Class.Kind.Class, variables,
             listOf(), methodsBar, null, null, listOf(), false))
 
