@@ -15,7 +15,9 @@
  */
 package org.openrewrite.java.cleanup
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
@@ -91,6 +93,30 @@ interface PrimitiveWrapperClassConstructorToValueOfTest : JavaRecipeTest {
                 Double d = Double.valueOf(d1);
                 int k = 1;
                 Integer k2 = Integer.valueOf(k);
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/901")
+    @Disabled
+    @Test
+    fun newClassIsArgumentToNewClass() = assertChanged(
+        before = """
+            import java.util.Date;
+            public class A {
+                public static void main(String[] args) {
+                    Date s = new Date();
+                    s = new Date(new Long(0));
+                }
+            }
+        """,
+        after = """
+            import java.util.Date;
+            public class A {
+                public static void main(String[] args) {
+                    Date s = new Date();
+                    s = new Date(Long.valueOf(0));
+                }
             }
         """
     )
