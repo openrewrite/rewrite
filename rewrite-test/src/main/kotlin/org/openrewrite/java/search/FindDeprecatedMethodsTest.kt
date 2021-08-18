@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ interface FindDeprecatedMethodsTest : JavaRecipeTest {
     @Test
     fun findDeprecations(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.logCompilationWarningsAndErrors(true).build(),
-        recipe = FindDeprecatedMethods(),
+        recipe = FindDeprecatedMethods(null),
         before = """
             class Test {
                 @Deprecated
@@ -41,6 +41,48 @@ interface FindDeprecatedMethodsTest : JavaRecipeTest {
                 void test(int n) {
                     if(n == 1) {
                         /*~~>*/test(n + 1);
+                    }
+                }
+            }
+        """
+    )
+
+    @Test
+    fun matchOnMethod(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.logCompilationWarningsAndErrors(true).build(),
+        recipe = FindDeprecatedMethods("java.lang.* *(..)"),
+        before = """
+            class Test {
+                @Deprecated
+                void test(int n) {
+                    if(n == 1) {
+                        test(n + 1);
+                    }
+                }
+            }
+        """,
+        after = """
+            class Test {
+                @Deprecated
+                void test(int n) {
+                    if(n == 1) {
+                        /*~~>*/test(n + 1);
+                    }
+                }
+            }
+        """
+    )
+
+    @Test
+    fun dontMatchWhenMethodDoesntMatch(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.logCompilationWarningsAndErrors(true).build(),
+        recipe = FindDeprecatedMethods("org.junit.jupiter.api.* *(..)"),
+        before = """
+            class Test {
+                @Deprecated
+                void test(int n) {
+                    if(n == 1) {
+                        test(n + 1);
                     }
                 }
             }

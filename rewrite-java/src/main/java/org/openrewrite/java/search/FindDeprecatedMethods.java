@@ -15,10 +15,15 @@
  */
 package org.openrewrite.java.search;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -27,7 +32,19 @@ import org.openrewrite.marker.Marker;
 
 import static org.openrewrite.Tree.randomId;
 
+@Value
+@EqualsAndHashCode(callSuper = true)
 public class FindDeprecatedMethods extends Recipe {
+    /**
+     * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
+     * See {@link MethodMatcher} for details on the expression's syntax.
+     */
+    @Option(displayName = "Method pattern",
+            description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.",
+            example = "java.util.List add(..)",
+            required = false)
+    @Nullable
+    String methodPattern;
 
     @Override
     public String getDisplayName() {
@@ -41,6 +58,8 @@ public class FindDeprecatedMethods extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
+        MethodMatcher methodMatcher = methodPattern == null ? null : new MethodMatcher(methodPattern);
+
         //noinspection ConstantConditions
         return new JavaIsoVisitor<ExecutionContext>() {
             private final Marker USES_DEPRECATED = new JavaSearchResult(randomId(), null, null);
@@ -49,7 +68,7 @@ public class FindDeprecatedMethods extends Recipe {
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
                 for (JavaType javaType : cu.getTypesInUse()) {
                     JavaType.Method method = TypeUtils.asMethod(javaType);
-                    if (method != null) {
+                    if (method != null && (methodMatcher == null || methodMatcher.matches(method))) {
                         for (JavaType.FullyQualified annotation : method.getAnnotations()) {
                             if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
                                 return cu.withMarkers(cu.getMarkers().addIfAbsent(USES_DEPRECATED));
