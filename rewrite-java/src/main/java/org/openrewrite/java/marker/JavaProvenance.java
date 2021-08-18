@@ -30,6 +30,8 @@ import org.openrewrite.marker.Marker;
 import java.nio.file.Path;
 import java.util.*;
 
+import static java.util.Collections.emptyList;
+
 @Incubating(since = "7.0.0")
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Data
@@ -57,17 +59,19 @@ public class JavaProvenance implements Marker {
         if (classpath.iterator().hasNext()) {
             for (ClassInfo classInfo : new ClassGraph()
                     .overrideClasspath(classpath)
+                    .enableAnnotationInfo()
                     .enableMemoryMapping()
                     .enableClassInfo()
                     .enableMethodInfo()
                     .enableFieldInfo()
                     .scan()
                     .getAllClasses()) {
-                fqns.add(fromClassGraph(classInfo));
+                fqns.add(fromClassGraph(classInfo, new Stack<>()));
             }
 
             for (ClassInfo classInfo : new ClassGraph()
                     .enableMemoryMapping()
+                    .enableAnnotationInfo()
                     .enableClassInfo()
                     .enableMethodInfo()
                     .enableFieldInfo()
@@ -75,7 +79,7 @@ public class JavaProvenance implements Marker {
                     .acceptPackages("java")
                     .scan()
                     .getAllClasses()) {
-                fqns.add(fromClassGraph(classInfo));
+                fqns.add(fromClassGraph(classInfo, new Stack<>()));
             }
         }
 
@@ -89,8 +93,19 @@ public class JavaProvenance implements Marker {
                 publication);
     }
 
-    private static JavaType.FullyQualified fromClassGraph(ClassInfo aClass) {
-        Set<Flag> flags = fromClassGraphModifiers(aClass.getModifiersStr());
+    private static JavaType.FullyQualified fromClassGraph(ClassInfo aClass, Stack<ClassInfo> stack) {
+        JavaType.Class existing = JavaType.Class.find(aClass.getName());
+        if (existing != null) {
+            return existing;
+        }
+
+        if (stack.contains(aClass)) {
+            return new JavaType.ShallowClass(aClass.getName());
+        }
+
+        stack.add(aClass);
+
+        Set<Flag> flags = Flag.bitMapToFlags(aClass.getModifiers());
 
         JavaType.Class.Kind kind;
         if (aClass.isInterface()) {
@@ -103,8 +118,8 @@ public class JavaProvenance implements Marker {
             kind = JavaType.Class.Kind.Class;
         }
 
-        List<JavaType.Variable> variables = fromFieldInfo(aClass.getFieldInfo());
-        List<JavaType.Method> methods = fromMethodInfo(aClass.getMethodInfo());
+        List<JavaType.Variable> variables = fromFieldInfo(aClass.getFieldInfo(), stack);
+        List<JavaType.Method> methods = fromMethodInfo(aClass.getMethodInfo(), stack);
 
         return JavaType.Class.build(
                 Flag.flagsToBitMap(flags),
@@ -119,37 +134,28 @@ public class JavaProvenance implements Marker {
                 false);
     }
 
-    private static Set<Flag> fromClassGraphModifiers(String modifiers) {
-        Set<Flag> flags = new HashSet<>();
-        for (String modifier : modifiers.split("\\s+")) {
-            Flag flag = Flag.fromKeyword(modifier);
-            if (flag != null) {
-                flags.add(flag);
-            }
-        }
-        return flags;
-    }
-
-    private static List<JavaType.Variable> fromFieldInfo(@Nullable FieldInfoList fieldInfos) {
-        List<JavaType.Variable> variables = new ArrayList<>();
+    private static List<JavaType.Variable> fromFieldInfo(@Nullable FieldInfoList fieldInfos, Stack<ClassInfo> stack) {
         if (fieldInfos != null) {
+            List<JavaType.Variable> variables = new ArrayList<>(fieldInfos.size());
             for (FieldInfo fieldInfo : fieldInfos) {
-                Set<Flag> flags = fromClassGraphModifiers(fieldInfo.getModifiersStr());
+                Set<Flag> flags = Flag.bitMapToFlags(fieldInfo.getModifiers());
                 JavaType.Variable variable = JavaType.Variable.build(fieldInfo.getName(), JavaType.buildType(fieldInfo.getTypeDescriptor().toString()), Flag.flagsToBitMap(flags));
                 variables.add(variable);
             }
+            return variables;
         }
-        return variables;
+        return emptyList();
     }
 
-    private static List<JavaType.Method> fromMethodInfo(MethodInfoList methodInfos) {
-        List<JavaType.Method> methods = new ArrayList<>();
+    private static List<JavaType.Method> fromMethodInfo(MethodInfoList methodInfos, Stack<ClassInfo> stack) {
+        List<JavaType.Method> methods = new ArrayList<>(methodInfos.size());
         for (MethodInfo methodInfo : methodInfos) {
-            Set<Flag> flags = fromClassGraphModifiers(methodInfo.getModifiersStr());
-            List<JavaType> parameterTypes = new ArrayList<>();
+            Set<Flag> flags = Flag.bitMapToFlags(methodInfo.getModifiers());
+            List<JavaType> parameterTypes = new ArrayList<>(methodInfo.getParameterInfo().length);
             for (MethodParameterInfo methodParameterInfo : methodInfo.getParameterInfo()) {
                 parameterTypes.add(JavaType.buildType(methodParameterInfo.getTypeDescriptor().toString()));
             }
+
             JavaType.Method.Signature signature = new JavaType.Method.Signature(JavaType.buildType(methodInfo.getTypeDescriptor().getResultType().toString()), parameterTypes);
 
             List<String> methodParams = new ArrayList<>(methodInfo.getParameterInfo().length);
@@ -157,16 +163,17 @@ public class JavaProvenance implements Marker {
                 methodParams.add(methodParameterInfo.getName());
             }
 
-            List<JavaType.FullyQualified> thrownExceptions = new ArrayList<>();
+            List<JavaType.FullyQualified> thrownExceptions = new ArrayList<>(methodInfo.getTypeDescriptor()
+                    .getThrowsSignatures().size());
             for (ClassRefOrTypeVariableSignature throwsSignature : methodInfo.getTypeDescriptor().getThrowsSignatures()) {
-                if(throwsSignature instanceof ClassRefTypeSignature) {
-                    thrownExceptions.add(fromClassGraph(((ClassRefTypeSignature) throwsSignature).getClassInfo()));
+                if (throwsSignature instanceof ClassRefTypeSignature) {
+                    thrownExceptions.add(fromClassGraph(((ClassRefTypeSignature) throwsSignature).getClassInfo(), stack));
                 }
             }
 
-            List<JavaType.FullyQualified> annotations = new ArrayList<>();
+            List<JavaType.FullyQualified> annotations = new ArrayList<>(methodInfo.getAnnotationInfo().size());
             for (AnnotationInfo annotationInfo : methodInfo.getAnnotationInfo()) {
-                annotations.add(fromClassGraph(annotationInfo.getClassInfo()));
+                annotations.add(fromClassGraph(annotationInfo.getClassInfo(), stack));
             }
 
             methods.add(JavaType.Method.build(

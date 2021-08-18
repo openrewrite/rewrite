@@ -146,7 +146,7 @@ public interface JavaType extends Serializable {
 
         @Override
         public ShallowClass withFullyQualifiedName(String fullyQualifiedName) {
-            if(this.fullyQualifiedName.equals(fullyQualifiedName)) {
+            if (this.fullyQualifiedName.equals(fullyQualifiedName)) {
                 return this;
             }
             return new ShallowClass(fullyQualifiedName);
@@ -252,7 +252,7 @@ public interface JavaType extends Serializable {
 
         @Override
         public JavaType.Class withFullyQualifiedName(String fullyQualifiedName) {
-            if(this.fullyQualifiedName.equals(fullyQualifiedName)) {
+            if (this.fullyQualifiedName.equals(fullyQualifiedName)) {
                 return this;
             }
             return JavaType.Class.build(flagsBitMap, fullyQualifiedName, kind, members, interfaces, constructors, supertype, owningClass, annotations);
@@ -264,6 +264,19 @@ public interface JavaType extends Serializable {
 
         public Set<Flag> getFlags() {
             return Flag.bitMapToFlags(flagsBitMap);
+        }
+
+        /**
+         * Find an existing type definition if it already exists. This does not create
+         * a shallow type and place it in the flyweight map if it does not already exist.
+         *
+         * @param fullyQualifiedName The fully qualified name to find.
+         * @return The first existing type definition matching this fully qualified name, if any.
+         */
+        @Nullable
+        public static Class find(String fullyQualifiedName) {
+            Set<JavaType.Class> variants = flyweights.get(fullyQualifiedName);
+            return (variants == null || variants.isEmpty()) ? null : variants.iterator().next();
         }
 
         /**
@@ -531,7 +544,7 @@ public interface JavaType extends Serializable {
 
         @Override
         public Parameterized withFullyQualifiedName(String fullyQualifiedName) {
-            if(type.getFullyQualifiedName().equals(fullyQualifiedName)) {
+            if (type.getFullyQualifiedName().equals(fullyQualifiedName)) {
                 return this;
             }
 
@@ -611,7 +624,7 @@ public interface JavaType extends Serializable {
 
         @Override
         public Cyclic withFullyQualifiedName(String fullyQualifiedName) {
-            if(this.fullyQualifiedName.equals(fullyQualifiedName)) {
+            if (this.fullyQualifiedName.equals(fullyQualifiedName)) {
                 return this;
             }
             return new Cyclic(fullyQualifiedName);
@@ -891,7 +904,7 @@ public interface JavaType extends Serializable {
 
         @Override
         public GenericTypeVariable withFullyQualifiedName(String fullyQualifiedName) {
-            if(this.fullyQualifiedName.equals(fullyQualifiedName)) {
+            if (this.fullyQualifiedName.equals(fullyQualifiedName)) {
                 return this;
             }
             return new GenericTypeVariable(fullyQualifiedName, bound);
