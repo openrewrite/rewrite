@@ -16,6 +16,7 @@
 package org.openrewrite.java.tree
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
@@ -156,6 +157,32 @@ interface AnnotationTest : JavaTreeTest {
                 @Repeatable(Yos.class)
                 @interface Yo {
                 }
+            """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/881")
+    @Test
+    @Disabled
+    fun annotationsInFullyQualified() = assertParsePrintAndProcess(
+        JavaParser.fromJavaVersion()
+            .logCompilationWarningsAndErrors(true)
+            .dependsOn("""
+                package annotation.fun;
+                import java.lang.annotation.*;
+            
+                @Target({ElementType.METHOD, ElementType.PARAMETER, ElementType.FIELD, ElementType.TYPE_USE})
+                @Retention(RetentionPolicy.RUNTIME)
+                public @interface Nullable {
+                }                
+            """)
+            .build(),
+        CompilationUnit,
+            """
+            import annotation.fun.Nullable;
+            public class AnnotationFun {
+                public void justBecauseYouCanDoesntMeanYouShould(java.util.@Nullable List myList) {
+                }
+            }
             """
     )
 
