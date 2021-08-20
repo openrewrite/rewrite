@@ -16,12 +16,11 @@
 package org.openrewrite.json;
 
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
-import org.openrewrite.Issue
-import java.nio.file.Path
+import org.openrewrite.Example
 
 class ChangeValueTest : JsonRecipeTest {
 
+    @Example
     @Test
     fun changeNestedValue() = assertChanged(
         recipe = ChangeValue(

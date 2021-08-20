@@ -13,21 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.config;
+package org.openrewrite;
 
-import org.openrewrite.Recipe;
-import org.openrewrite.style.NamedStyles;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-import java.util.Collection;
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface Example {
+    String name() default "";
 
-public interface ResourceLoader {
-    Collection<Recipe> listRecipes();
-
-    Collection<RecipeDescriptor> listRecipeDescriptors();
-
-    Collection<NamedStyles> listStyles();
-
-    Collection<CategoryDescriptor> listCategoryDescriptors();
-
-    Collection<RecipeExample> listRecipeExamples();
+    String description() default "";
 }

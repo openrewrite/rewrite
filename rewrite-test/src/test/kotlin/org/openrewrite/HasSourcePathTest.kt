@@ -32,6 +32,7 @@ class HasSourcePathTest : RecipeTest<PlainText> {
                 HasSourcePath<ExecutionContext>("**/hello.txt")
         }
 
+    @Example
     @Test
     fun hasFileMatch(@TempDir tempDir: Path) = assertChangedBase(
         before = tempDir.resolve("a/b/hello.txt").apply {

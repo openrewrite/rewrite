@@ -27,6 +27,9 @@ dependencies {
 
     implementation("org.slf4j:slf4j-api:1.7.+")
     implementation("ch.qos.logback:logback-classic:1.0.13")
+
+    // configuration generator for service providers
+    implementation("com.google.auto.service:auto-service:latest.release")
 }
 
 tasks.withType<Javadoc> {

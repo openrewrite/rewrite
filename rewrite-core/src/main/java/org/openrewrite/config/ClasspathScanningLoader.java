@@ -43,7 +43,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
     private final List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();
     private final List<CategoryDescriptor> categoryDescriptors = new ArrayList<>();
-    private final List<RecipeExampleDescriptor> recipeExamples = new ArrayList<>();
+    private final List<RecipeExample> recipeExamples = new ArrayList<>();
 
     /**
      * Construct a ClasspathScanningLoader scans the runtime classpath of the current java process for recipes
@@ -150,7 +150,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
     }
 
     @Override
-    public Collection<RecipeExampleDescriptor> listRecipeExamples() {
+    public Collection<RecipeExample> listRecipeExamples() {
         return recipeExamples;
     }
 }

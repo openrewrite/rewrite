@@ -18,25 +18,15 @@ package org.openrewrite.config;
 import lombok.Value;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.List;
-
 @Value
-public class RecipeExampleDescriptor {
+public class RecipeExample {
+    @Nullable
+    String name;
+
+    @Nullable
+    String description;
+
     String recipe;
     String before;
     String after;
-
-    @Nullable
-    String testClassName;
-    @Nullable
-    String testMethodName;
-
-    List<RecipeExampleParameterDescriptor> parameters;
-
-    @Value
-    public static class RecipeExampleParameterDescriptor {
-        String name;
-        String type;
-        String value;
-    }
 }

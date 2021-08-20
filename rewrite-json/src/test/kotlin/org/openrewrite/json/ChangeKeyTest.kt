@@ -16,6 +16,7 @@
 package org.openrewrite.json
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Example
 
 class ChangeKeyTest : JsonRecipeTest {
 
@@ -42,6 +43,7 @@ class ChangeKeyTest : JsonRecipeTest {
         """
     )
 
+    @Example
     @Test
     fun changeNestedKey() = assertChanged(
         recipe = ChangeKey(

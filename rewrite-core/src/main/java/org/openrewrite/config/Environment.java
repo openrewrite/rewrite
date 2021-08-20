@@ -56,7 +56,7 @@ public class Environment {
                 .collect(toList());
     }
 
-    public Collection<RecipeExampleDescriptor> listRecipeExamples() {
+    public Collection<RecipeExample> listRecipeExamples() {
         return resourceLoaders.stream()
                 .flatMap(r -> r.listRecipeExamples().stream())
                 .collect(toList());

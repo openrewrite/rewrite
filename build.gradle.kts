@@ -3,7 +3,6 @@ import nebula.plugin.contacts.Contact
 import nebula.plugin.contacts.ContactsExtension
 import nl.javadude.gradle.plugins.license.LicenseExtension
 import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform.getCurrentOperatingSystem
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.*
 
 plugins {
@@ -16,7 +15,7 @@ plugins {
 
     id("com.github.johnrengelman.shadow") version "6.1.0" apply false
     id("com.github.hierynomus.license") version "0.16.1" apply false
-    id("org.jetbrains.kotlin.jvm") version "1.5.10" apply false
+    id("org.jetbrains.kotlin.jvm") version "1.5.21" apply false
     id("org.gradle.test-retry") version "1.2.1" apply false
     id("com.github.jk1.dependency-license-report") version "1.16" apply false
 
@@ -123,18 +122,6 @@ subprojects {
         "testRuntimeOnly"("ch.qos.logback:logback-classic:1.0.13")
     }
 
-    // This eagerly realizes KotlinCompile tasks, which is undesirable from the perspective of minimizing
-    // time spent during Gradle's configuration phase.
-    // But if we don't proactively make sure the destination dir exists, sometimes JavaCompile can fail with:
-    // '..rewrite-core\build\classes\java\main' specified for property 'compileKotlinOutputClasses' does not exist.
-    tasks.withType<KotlinCompile>() {
-        kotlinOptions {
-            jdkHome = compiler.get().metadata.installationPath.asFile.absolutePath
-            jvmTarget = "1.8"
-        }
-        destinationDir.mkdirs()
-    }
-
     tasks.withType<JavaCompile>().configureEach {
         options.encoding = "UTF-8"
         options.compilerArgs.add("-parameters")
@@ -156,54 +143,19 @@ subprojects {
         strictCheck = true
     }
 
-    // Tests produce examples which can then be used to generate documentation
-    val releasing = project.hasProperty("releasing")
-    val exampleOutputDir = File(buildDir, "reports/recipe-examples")
-
-    val test = tasks.named<Test>("test")
-    test.configure {
+    tasks.named<Test>("test").configure {
         useJUnitPlatform {
             excludeTags("debug")
         }
         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
-        // Redundant to produce examples for both rewrite-java-11 and rewrite-java-8
-        if(project.name != "rewrite-java-8") {
-            jvmArgs("-Dorg.openrewrite.TestExampleOutputDir=$exampleOutputDir")
-        }
         javaLauncher.set(javaToolchains.launcherFor {
             languageVersion.set(JavaLanguageVersion.of(11))
         })
-        outputs.dir(exampleOutputDir)
         testLogging {
             showExceptions = true
             exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
             showCauses = true
             showStackTraces = true
-        }
-    }
-
-    // It's very hard to get outputs from test execution into the main jar
-    // There's always some kind of circular dependency relationship if you do it directly
-    // So this creates a second jar and publishes that as the main one
-    val jar = tasks.named<Jar>("jar")
-    jar.configure {
-        if(releasing) {
-            archiveClassifier.set("noexamples")
-        }
-    }
-    val jarWithExamples = tasks.register<Jar>("jarWithExamples")
-    jarWithExamples.configure {
-        archiveClassifier.set(null as String?)
-        // Only produce these when releasing to avoid slowing down local development
-        // Without this every "publishToMavenLocal" forces tests to run, which would be tedious in most local dev scenarios
-        inputs.property("releasing", releasing)
-        dependsOn(test, jar)
-        enabled = releasing
-        from(exampleOutputDir) {
-            into("META-INF/rewrite")
-        }
-        from(zipTree(jar.get().archiveFile.get().asFile)) {
-            duplicatesStrategy = DuplicatesStrategy.INCLUDE
         }
     }
 
@@ -240,10 +192,6 @@ subprojects {
         configure<PublishingExtension> {
             publications {
                 named("nebula", MavenPublication::class.java) {
-                    // rewrite-core has no examples
-                    if(releasing && project.name != "rewrite-core") {
-                        artifact(jarWithExamples)
-                    }
                     suppressPomMetadataWarningsFor("runtimeElements")
                     suppressPomMetadataWarningsFor("checkstyleApiElements")
                     suppressPomMetadataWarningsFor("checkstyleRuntimeElements")

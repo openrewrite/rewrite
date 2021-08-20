@@ -17,6 +17,7 @@ package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Example
 import org.openrewrite.Issue
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
@@ -102,6 +103,7 @@ interface ChangeMethodNameTest : JavaRecipeTest {
         """
     )
 
+    @Example
     @Test
     fun changeMethodNameForMethodWithSingleArg(jp: JavaParser) = assertChanged(
         jp,

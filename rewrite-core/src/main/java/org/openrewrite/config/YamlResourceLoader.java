@@ -27,7 +27,6 @@ import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
 import org.openrewrite.Validated;
-import org.openrewrite.config.RecipeExampleDescriptor.RecipeExampleParameterDescriptor;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -65,7 +64,7 @@ public class YamlResourceLoader implements ResourceLoader {
         Recipe("specs.openrewrite.org/v1beta/recipe"),
         Style("specs.openrewrite.org/v1beta/style"),
         Category("specs.openrewrite.org/v1beta/category"),
-        Exemplar("specs.openrewrite.org/v1beta/exemplar");
+        Example("specs.openrewrite.org/v1beta/example");
 
         private final String spec;
 
@@ -89,8 +88,8 @@ public class YamlResourceLoader implements ResourceLoader {
     /**
      * Load a declarative recipe using the runtime classloader
      *
-     * @param yamlInput Declarative recipe yaml input stream
-     * @param source Declarative recipe source
+     * @param yamlInput  Declarative recipe yaml input stream
+     * @param source     Declarative recipe source
      * @param properties Placeholder properties
      * @throws UncheckedIOException On unexpected IOException
      */
@@ -101,9 +100,9 @@ public class YamlResourceLoader implements ResourceLoader {
     /**
      * Load a declarative recipe, optionally using the specified classloader
      *
-     * @param yamlInput Declarative recipe yaml input stream
-     * @param source Declarative recipe source
-     * @param properties Placeholder properties
+     * @param yamlInput   Declarative recipe yaml input stream
+     * @param source      Declarative recipe source
+     * @param properties  Placeholder properties
      * @param classLoader Optional classloader to use with jackson. If not specified, the runtime classloader will be used.
      * @throws UncheckedIOException On unexpected IOException
      */
@@ -111,12 +110,12 @@ public class YamlResourceLoader implements ResourceLoader {
         this.source = source;
 
         mapper = JsonMapper.builder()
-            .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
-            .build()
-            .registerModule(new ParameterNamesModule())
-            .registerModule(new KotlinModule())
-            .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
-            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+                .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
+                .build()
+                .registerModule(new ParameterNamesModule())
+                .registerModule(new KotlinModule())
+                .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
         if (classLoader != null) {
             TypeFactory tf = TypeFactory.defaultInstance().withClassLoader(classLoader);
@@ -318,27 +317,14 @@ public class YamlResourceLoader implements ResourceLoader {
     }
 
     @Override
-    public Collection<RecipeExampleDescriptor> listRecipeExamples() {
-        return loadResources(ResourceType.Exemplar).stream()
-                .map(c -> {
-                    String recipe = (String) c.get("type");
-                    String testClassName = (String) c.get("testClassName");
-                    String testMethodName = (String) c.get("testMethodName");
-                    String before = (String) c.get("before");
-                    String after = (String) c.get("after");
-                    List<RecipeExampleParameterDescriptor> parameters = Collections.emptyList();
-                    @SuppressWarnings("unchecked")
-                    List<Map<String, String>> rawParameters = (List<Map<String, String>>) c.get("parameters");
-                    if(rawParameters != null) {
-                        parameters = new ArrayList<>(rawParameters.size());
-                        for (Map<String, String> rawParameter : rawParameters) {
-                            String name = rawParameter.get("name");
-                            String type = rawParameter.get("type");
-                            String value = rawParameter.get("value");
-                            parameters.add(new RecipeExampleParameterDescriptor(name, type, value));
-                        }
-                    }
-                    return new RecipeExampleDescriptor(recipe, before, after, testClassName, testMethodName, parameters);
-                }).collect(toList());
+    public Collection<RecipeExample> listRecipeExamples() {
+        return loadResources(ResourceType.Example).stream()
+                .map(c -> new RecipeExample(
+                        (String) c.get("name"),
+                        (String) c.get("description"),
+                        (String) c.get("recipe"),
+                        (String) c.get("before"),
+                        (String) c.get("after"))
+                ).collect(toList());
     }
 }
