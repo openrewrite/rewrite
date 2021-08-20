@@ -18,6 +18,7 @@ package org.openrewrite.marker;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import lombok.Getter;
 import lombok.With;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
@@ -45,6 +46,7 @@ public class Markers implements Tree {
 
     private final UUID id;
 
+    @Getter
     @With
     private final List<Marker> markers;
 

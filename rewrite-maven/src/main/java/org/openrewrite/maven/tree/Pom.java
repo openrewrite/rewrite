@@ -48,6 +48,7 @@ public class Pom {
 
     @EqualsAndHashCode.Include
     @Nullable
+    @With
     String version;
 
     @Nullable
@@ -75,8 +76,9 @@ public class Pom {
     Pom parent;
 
     @With
-    Collection<Dependency> dependencies;
+    List<Dependency> dependencies;
 
+    @With
     DependencyManagement dependencyManagement;
 
     @With
@@ -298,6 +300,8 @@ public class Pom {
         String type;
 
         boolean optional;
+
+        @With
         Pom model;
 
         @Nullable
@@ -317,7 +321,12 @@ public class Pom {
             return model.getVersion();
         }
 
+        public Dependency withVersion(String version) {
+            return withModel(model.withVersion(version));
+        }
+
         @Nullable
+
         public String getDatedSnapshotVersion() {
             return model.getDatedSnapshotVersion();
         }
@@ -367,7 +376,8 @@ public class Pom {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
     public static class DependencyManagement {
-        Collection<DependencyManagementDependency> dependencies;
+        @With
+        List<DependencyManagementDependency> dependencies;
 
         @Nullable
         public String getManagedVersion(String groupId, String artifactId) {

@@ -18,6 +18,7 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenMetadata;
@@ -119,39 +120,43 @@ public class UpgradeDependencyVersion extends Recipe {
 
         @Override
         public Maven visitMaven(Maven maven, ExecutionContext ctx) {
-            maybeChangeDependencyVersion(maven.getModel(), ctx);
-
-            for (Pom module : maven.getModules()) {
-                maybeChangeDependencyVersion(module, ctx);
-            }
-
-            return super.visitMaven(maven, ctx);
+            return maven
+                    .withMavenModel(maven.getMavenModel().withPom(maybeChangeDependencyVersion(maven.getModel(), ctx)))
+                    .withModules(ListUtils.map(maven.getModules(), module -> maybeChangeDependencyVersion(module, ctx)));
         }
 
-        private void maybeChangeDependencyVersion(Pom model, ExecutionContext ctx) {
-            for (Pom.Dependency dependency : model.getDependencies()) {
-                if (dependency.getGroupId().equals(groupId) && (artifactId == null || dependency.getArtifactId().equals(artifactId))) {
-                    if (model.getParent() != null) {
-                        String managedVersion = model.getParent().getManagedVersion(groupId, dependency.getArtifactId());
-                        if (managedVersion != null) {
-                            continue;
+        private Pom maybeChangeDependencyVersion(Pom model, ExecutionContext ctx) {
+            return model
+                    .withDependencies(ListUtils.map(model.getDependencies(), dependency -> {
+                        if (dependency.getGroupId().equals(groupId) && (artifactId == null || dependency.getArtifactId().equals(artifactId))) {
+                            if (model.getParent() != null) {
+                                String managedVersion = model.getParent().getManagedVersion(groupId, dependency.getArtifactId());
+                                if (managedVersion != null) {
+                                    return dependency;
+                                }
+                            }
+                            return findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion(), ctx)
+                                    .map(newer -> {
+                                        ChangeDependencyVersionVisitor changeDependencyVersion = new ChangeDependencyVersionVisitor(newer, dependency.getArtifactId());
+                                        doAfterVisit(changeDependencyVersion);
+                                        return dependency.withVersion(newer);
+                                    })
+                                    .orElse(dependency);
                         }
-                    }
-                    findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion(), ctx).ifPresent(newer -> {
-                        ChangeDependencyVersionVisitor changeDependencyVersion = new ChangeDependencyVersionVisitor(newer, dependency.getArtifactId());
-                        doAfterVisit(changeDependencyVersion);
-                    });
-                }
-            }
-
-            for (DependencyManagementDependency dependency : model.getDependencyManagement().getDependencies()) {
-                if (dependency.getGroupId().equals(groupId) && (artifactId == null || dependency.getArtifactId().equals(artifactId))) {
-                    findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion(), ctx).ifPresent(newer -> {
-                        ChangeDependencyVersionVisitor changeDependencyVersion = new ChangeDependencyVersionVisitor(newer, dependency.getArtifactId());
-                        doAfterVisit(changeDependencyVersion);
-                    });
-                }
-            }
+                        return dependency;
+                    }))
+                    .withDependencyManagement(model.getDependencyManagement().withDependencies(ListUtils.map(model.getDependencyManagement().getDependencies(), dependency -> {
+                        if (dependency.getGroupId().equals(groupId) && (artifactId == null || dependency.getArtifactId().equals(artifactId))) {
+                            return findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion(), ctx)
+                                    .map(newer -> {
+                                        ChangeDependencyVersionVisitor changeDependencyVersion = new ChangeDependencyVersionVisitor(newer, dependency.getArtifactId());
+                                        doAfterVisit(changeDependencyVersion);
+                                        return (DependencyManagementDependency) dependency.withVersion(newer);
+                                    })
+                                    .orElse(dependency);
+                        }
+                        return dependency;
+                    })));
         }
 
         private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion,

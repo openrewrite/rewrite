@@ -20,6 +20,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.AccessLevel;
 import lombok.Data;
+import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -46,6 +47,7 @@ public interface DependencyManagementDependency {
         String artifactId;
 
         @Nullable
+        @With
         String version;
 
         String requestedVersion;
@@ -74,7 +76,10 @@ public interface DependencyManagementDependency {
     class Imported implements DependencyManagementDependency {
         String groupId;
         String artifactId;
+
+        @With
         String version;
+
         String requestedVersion;
         Pom maven;
 
@@ -108,6 +113,8 @@ public interface DependencyManagementDependency {
     String getArtifactId();
 
     String getVersion();
+
+    <D extends DependencyManagementDependency> D withVersion(String version);
 
     String getRequestedVersion();
 }

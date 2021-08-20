@@ -197,6 +197,57 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     )
 
     @Test
+    fun upgradeVersionSuccessively() = assertChanged(
+        recipe = UpgradeDependencyVersion(
+            "com.google.guava",
+            null,
+            "28.x",
+            "-jre",
+            null
+        ).doNext(UpgradeDependencyVersion(
+            "com.google.guava",
+            null,
+            "29.x",
+            "-jre",
+            null
+        )),
+        before = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>27.0-jre</version>
+                </dependency>
+              </dependencies>
+            </project>
+        """,
+        after = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>29.0-jre</version>
+                </dependency>
+              </dependencies>
+            </project>
+        """
+    )
+
+    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/565")
     fun handlesPropertiesInDependencyGroupIdAndArtifactId() = assertChanged(
         recipe = UpgradeDependencyVersion(

@@ -16,14 +16,18 @@
 package org.openrewrite.maven.tree;
 
 import lombok.Value;
+import lombok.With;
 import org.openrewrite.marker.Marker;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 
 @Value
 public class Modules implements Marker {
+    @With
     UUID id;
 
-    Collection<Pom> modules;
+    @With
+    List<Pom> modules;
 }

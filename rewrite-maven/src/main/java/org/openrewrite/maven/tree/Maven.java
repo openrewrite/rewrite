@@ -21,6 +21,7 @@ import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.maven.MavenVisitor;
@@ -44,7 +45,8 @@ public class Maven extends Xml.Document {
     @Getter
     private final transient MavenModel mavenModel;
 
-    private final transient Collection<Pom> modules;
+    @Getter
+    private final transient List<Pom> modules;
 
     public Maven(Xml.Document document) {
         super(
@@ -74,6 +76,16 @@ public class Maven extends Xml.Document {
         modules = markers.findFirst(Modules.class)
                 .map(Modules::getModules)
                 .orElse(emptyList());
+    }
+
+    public Maven withMavenModel(MavenModel model) {
+        return withMarkers(getMarkers().withMarkers(ListUtils.map(getMarkers().getMarkers(), m ->
+                m instanceof MavenModel ? model : m)));
+    }
+
+    public Maven withModules(List<Pom> modules) {
+        return withMarkers(getMarkers().withMarkers(ListUtils.map(getMarkers().getMarkers(), m ->
+                m instanceof Modules ? ((Modules) m).withModules(modules) : m)));
     }
 
     public static List<Path> getMavenPoms(Path projectDir, ExecutionContext ctx) {
@@ -116,7 +128,7 @@ public class Maven extends Xml.Document {
     }
 
     private static List<Path> getSources(Path srcDir, ExecutionContext ctx, String... fileTypes) {
-        if(!srcDir.toFile().exists()) {
+        if (!srcDir.toFile().exists()) {
             return emptyList();
         }
 
@@ -133,10 +145,6 @@ public class Maven extends Xml.Document {
     @JsonIgnore
     public Pom getModel() {
         return mavenModel.getPom();
-    }
-
-    public Collection<Pom> getModules() {
-        return modules;
     }
 
     @SuppressWarnings("unchecked")

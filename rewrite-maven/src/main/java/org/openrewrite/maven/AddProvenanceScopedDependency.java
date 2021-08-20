@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
@@ -270,7 +269,7 @@ public class AddProvenanceScopedDependency extends Recipe {
 
             doAfterVisit(new InsertDependencyInOrder());
 
-            Collection<Pom.Dependency> dependencies = new ArrayList<>(model.getDependencies());
+            List<Pom.Dependency> dependencies = new ArrayList<>(model.getDependencies());
             String packaging = (type == null) ? "jar" : type;
 
             String dependencyVersion = findVersionToUse(groupId, artifactId, ctx);

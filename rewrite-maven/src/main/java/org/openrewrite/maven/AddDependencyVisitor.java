@@ -39,6 +39,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.List;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.*;
@@ -117,7 +118,7 @@ public class AddDependencyVisitor extends MavenVisitor {
 
         doAfterVisit(new InsertDependencyInOrder());
 
-        Collection<Pom.Dependency> dependencies = new ArrayList<>(model.getDependencies());
+        List<Pom.Dependency> dependencies = new ArrayList<>(model.getDependencies());
         String packaging = (type == null) ? "jar" : type;
 
         String dependencyVersion = findVersionToUse(groupId, artifactId, ctx);
