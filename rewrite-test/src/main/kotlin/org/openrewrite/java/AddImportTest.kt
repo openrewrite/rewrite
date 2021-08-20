@@ -18,7 +18,8 @@ package org.openrewrite.java
 import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 import org.openrewrite.*
-import org.openrewrite.java.marker.JavaProvenance
+import org.openrewrite.Tree.randomId
+import org.openrewrite.java.marker.JavaSourceSet
 import org.openrewrite.java.tree.Flag
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
@@ -727,7 +728,7 @@ interface AddImportTest : JavaRecipeTest {
                     val cd = super.visitClassDeclaration(classDecl, p)
                     if (cd.leadingAnnotations.size == 0) {
                         maybeAddImport("java.lang.SuppressWarnings")
-                        return cd.withTemplate(t, cd.coordinates.addAnnotation({ a1, a2 -> 0 }))
+                        return cd.withTemplate(t, cd.coordinates.addAnnotation { _, _ -> 0 })
                     }
                     return cd
                 }
@@ -808,10 +809,9 @@ interface AddImportTest : JavaRecipeTest {
 
         val fqns: MutableSet<JavaType.FullyQualified> = mutableSetOf()
         classNames.forEach { fqns.add(JavaType.Class.build(it)) }
-        val javaProvenance = javaProvenance(fqns)
-
+        val sourceSet = JavaSourceSet(randomId(),"main", fqns)
         val markedFiles: MutableList<J.CompilationUnit> = mutableListOf()
-        sourceFiles.forEach { markedFiles.add(it.withMarkers(it.markers.addIfAbsent(javaProvenance))) }
+        sourceFiles.forEach { markedFiles.add(it.withMarkers(it.markers.addIfAbsent(sourceSet))) }
 
         val recipe: AddImport<ExecutionContext> = AddImport("org.foo.Shared", null, false)
         val result = recipe.visit(markedFiles[0], InMemoryExecutionContext())
@@ -845,8 +845,7 @@ interface AddImportTest : JavaRecipeTest {
             Flag.flagsToBitMap(flags), classNames[1], JavaType.Class.Kind.Class, variables,
             listOf(), methodsBar, null, null, listOf(), false))
 
-        val javaProvenance = javaProvenance(fqns)
-
+        val sourceSet = JavaSourceSet(randomId(),"main", fqns)
         val markedFiles: MutableList<J.CompilationUnit> = mutableListOf()
 
         val inputs = arrayOf(
@@ -891,7 +890,7 @@ interface AddImportTest : JavaRecipeTest {
 
         // Inputs are processed last so that fqns are setup properly in flyweights.
         val sourceFiles = parser.parse(executionContext, *inputs)
-        sourceFiles.forEach { markedFiles.add(it.withMarkers(it.markers.addIfAbsent(javaProvenance))) }
+        sourceFiles.forEach { markedFiles.add(it.withMarkers(it.markers.addIfAbsent(sourceSet))) }
 
         val recipe: AddImport<ExecutionContext> = AddImport("org.buz.Buz", "assertThatC", false)
         val result = recipe.visit(markedFiles[2], InMemoryExecutionContext())
@@ -922,24 +921,5 @@ interface AddImportTest : JavaRecipeTest {
                 }
             }
         }
-    }
-
-    fun javaProvenance(classpath: Set<JavaType.FullyQualified>) : JavaProvenance {
-        val javaRuntimeVersion = System.getProperty("java.runtime.version")
-        val javaVendor = System.getProperty("java.vm.vendor")
-
-        val groupId = "org.openrewrite"
-        val artifactId = "test"
-        val version = "1.0.0"
-
-        return JavaProvenance(
-            Tree.randomId(),
-            "${groupId}:${artifactId}:${version}",
-            "main",
-            JavaProvenance.BuildTool(JavaProvenance.BuildTool.Type.Maven, ""),
-            JavaProvenance.JavaVersion(javaRuntimeVersion, javaVendor,javaRuntimeVersion,javaRuntimeVersion),
-            classpath,
-            JavaProvenance.Publication(groupId, artifactId, version)
-        )
     }
 }

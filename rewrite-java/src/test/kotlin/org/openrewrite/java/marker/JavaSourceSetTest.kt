@@ -19,19 +19,12 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 
-class JavaProvenanceTest {
+class JavaSourceSetTest {
 
     @Test
     fun typesFromClasspath() {
-        val javaProvenance = JavaProvenance.build(
-            "myproject", "main",
-            JavaProvenance.BuildTool(JavaProvenance.BuildTool.Type.Gradle, "7.1.1"),
-            JavaProvenance.JavaVersion("11", "11", "11", "11"),
-            JavaParser.runtimeClasspath,
-            JavaProvenance.Publication("org.openrewrite", "myproject", "1.0")
-        )
-
-        assertThat(javaProvenance.classpath.map { it.fullyQualifiedName })
+        val javaVersion = JavaSourceSet.build("main", JavaParser.runtimeClasspath)
+        assertThat(javaVersion.classpath.map { it.fullyQualifiedName })
             .contains("org.junit.jupiter.api.Test")
     }
 }

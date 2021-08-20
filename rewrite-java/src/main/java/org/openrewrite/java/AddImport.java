@@ -16,10 +16,9 @@
 package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
-import org.openrewrite.java.marker.JavaProvenance;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.style.ImportLayoutStyle;
@@ -130,10 +129,10 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         ImportLayoutStyle layoutStyle = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
                 .orElse(IntelliJ.importLayout());
 
-        Optional<JavaProvenance> javaProvenance = cu.getMarkers().findFirst(JavaProvenance.class);
+        Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
         Set<JavaType.FullyQualified> classpath = new HashSet<>();
-        if (javaProvenance.isPresent()) {
-            classpath = javaProvenance.get().getClasspath();
+        if (sourceSet.isPresent()) {
+            classpath = sourceSet.get().getClasspath();
         }
 
         cu = cu.getPadding().withImports(layoutStyle.addImport(cu.getPadding().getImports(), importToAdd,

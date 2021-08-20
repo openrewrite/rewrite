@@ -22,7 +22,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
-import org.openrewrite.java.marker.JavaProvenance;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.J;
@@ -79,10 +79,10 @@ public class OrderImports extends Recipe {
             ImportLayoutStyle layoutStyle = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
                     .orElse(IntelliJ.importLayout());
 
-            Optional<JavaProvenance> javaProvenance = cu.getMarkers().findFirst(JavaProvenance.class);
+            Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
             Set<JavaType.FullyQualified> classpath = new HashSet<>();
-            if (javaProvenance.isPresent()) {
-                classpath = javaProvenance.get().getClasspath();
+            if (sourceSet.isPresent()) {
+                classpath = sourceSet.get().getClasspath();
             }
 
             List<JRightPadded<J.Import>> orderedImports = layoutStyle.orderImports(cu.getPadding().getImports(), classpath);

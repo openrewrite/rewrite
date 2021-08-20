@@ -164,40 +164,6 @@ class ExcludeDependencyTest : MavenRecipeTest {
         """
     )
 
-    @Issue("#92")
-    @Test
-    fun playsNiceWithAddDependency() = assertChanged(
-        recipe = recipe.doNext(
-            AddDependency(
-                "org.junit.jupiter",
-                "junit-jupiter-engine",
-                "5.3.0"
-            ).withScope("test")
-        ),
-        before = """
-            <project>
-                <groupId>org.openrewrite.example</groupId>
-                <artifactId>integration-testing</artifactId>
-                <version>1.0</version>
-            </project>
-        """,
-        after =  """
-            <project>
-                <groupId>org.openrewrite.example</groupId>
-                <artifactId>integration-testing</artifactId>
-                <version>1.0</version>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.junit.jupiter</groupId>
-                        <artifactId>junit-jupiter-engine</artifactId>
-                        <version>5.3.0</version>
-                        <scope>test</scope>
-                    </dependency>
-                </dependencies>
-            </project>
-        """
-    )
-
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {

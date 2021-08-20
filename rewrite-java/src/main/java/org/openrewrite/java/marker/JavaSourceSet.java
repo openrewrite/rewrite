@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,10 @@ package org.openrewrite.java.marker;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import io.github.classgraph.*;
-import lombok.AccessLevel;
-import lombok.Data;
-import lombok.experimental.FieldDefaults;
-import org.openrewrite.Incubating;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import lombok.With;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
@@ -32,29 +32,18 @@ import java.util.*;
 
 import static java.util.Collections.emptyList;
 
-@Incubating(since = "7.0.0")
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@Data
+@Value
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-public class JavaProvenance implements Marker {
+@With
+public class JavaSourceSet implements Marker {
+    @EqualsAndHashCode.Include
     UUID id;
-    String projectName;
-    String sourceSetName;
-    BuildTool buildTool;
-    JavaVersion javaVersion;
+
+    String name;
     Set<JavaType.FullyQualified> classpath;
 
-    @Nullable
-    Publication publication;
-
-    public static JavaProvenance build(
-            @Nullable String projectName,
-            String sourceSetName,
-            BuildTool buildTool,
-            JavaVersion javaVersion,
-            Iterable<Path> classpath,
-            Publication publication) {
-
+    public static JavaSourceSet build(String sourceSetName, Iterable<Path> classpath) {
         Set<JavaType.FullyQualified> fqns = new HashSet<>();
         if (classpath.iterator().hasNext()) {
             for (ClassInfo classInfo : new ClassGraph()
@@ -83,14 +72,7 @@ public class JavaProvenance implements Marker {
             }
         }
 
-        return new JavaProvenance(
-                UUID.randomUUID(),
-                projectName,
-                sourceSetName,
-                buildTool,
-                javaVersion,
-                fqns,
-                publication);
+        return new JavaSourceSet(Tree.randomId(), sourceSetName, fqns);
     }
 
     private static JavaType.FullyQualified fromClassGraph(ClassInfo aClass, Stack<ClassInfo> stack) {
@@ -118,7 +100,7 @@ public class JavaProvenance implements Marker {
             kind = JavaType.Class.Kind.Class;
         }
 
-        List<JavaType.Variable> variables = fromFieldInfo(aClass.getFieldInfo(), stack);
+        List<JavaType.Variable> variables = fromFieldInfo(aClass.getFieldInfo());
         List<JavaType.Method> methods = fromMethodInfo(aClass.getMethodInfo(), stack);
 
         return JavaType.Class.build(
@@ -134,7 +116,7 @@ public class JavaProvenance implements Marker {
                 false);
     }
 
-    private static List<JavaType.Variable> fromFieldInfo(@Nullable FieldInfoList fieldInfos, Stack<ClassInfo> stack) {
+    private static List<JavaType.Variable> fromFieldInfo(@Nullable FieldInfoList fieldInfos) {
         if (fieldInfos != null) {
             List<JavaType.Variable> variables = new ArrayList<>(fieldInfos.size());
             for (FieldInfo fieldInfo : fieldInfos) {
@@ -187,34 +169,5 @@ public class JavaProvenance implements Marker {
                     annotations));
         }
         return methods;
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
-    public static class BuildTool {
-        Type type;
-        String version;
-
-        public enum Type {
-            Gradle,
-            Maven
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
-    public static class Publication {
-        String groupId;
-        String artifactId;
-        String version;
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
-    public static class JavaVersion {
-        String createdBy;
-        String vmVendor;
-        String sourceCompatibility;
-        String targetCompatibility;
     }
 }

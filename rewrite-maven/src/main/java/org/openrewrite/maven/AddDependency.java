@@ -15,22 +15,43 @@
  */
 package org.openrewrite.maven;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.marker.JavaProject;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
-import org.openrewrite.java.tree.J;
+import org.openrewrite.maven.cache.MavenPomCache;
+import org.openrewrite.maven.internal.InsertDependencyComparator;
+import org.openrewrite.maven.internal.MavenMetadata;
+import org.openrewrite.maven.internal.MavenPomDownloader;
+import org.openrewrite.maven.internal.Version;
+import org.openrewrite.maven.tree.Maven;
+import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.tree.Scope;
+import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
+import org.openrewrite.xml.AddToTagVisitor;
+import org.openrewrite.xml.XPathMatcher;
+import org.openrewrite.xml.tree.Xml;
 
-import java.util.List;
+import java.util.*;
 import java.util.regex.Pattern;
 
-@Incubating(since = "7.0.0")
+import static java.util.Collections.*;
+
+/**
+ * This recipe will detect the presence of Java types (in Java ASTs) to determine if a dependency should be added
+ * to a maven build file. Java Provenance information is used to filter the type search to only those java ASTs that
+ * have the same coordinates of that of the pom. Additionally, if a "scope" is specified in this recipe, the dependency
+ * will only be added if there are types found in a given source set are transitively within that scope.
+ * <p>
+ * NOTE: IF PROVENANCE INFORMATION IS NOT PRESENT, THIS RECIPE WILL DO NOTHING.
+ */
 @Getter
-@RequiredArgsConstructor
-@AllArgsConstructor(onConstructor_ = @JsonCreator)
+@AllArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 public class AddDependency extends Recipe {
 
@@ -44,13 +65,6 @@ public class AddDependency extends Recipe {
             example = "guava")
     private final String artifactId;
 
-    /**
-     * When other modules exist from the same dependency family, defined as those dependencies whose groupId matches
-     * {@link #familyPattern}, this recipe will ignore the version attribute and attempt to align the new dependency
-     * with the highest version already in use.
-     * <p>
-     * To pull the whole family up to a later version, use {@link UpgradeDependencyVersion}.
-     */
     @Option(displayName = "Version",
             description = "An exact version number, or node-style semver selector used to select the version number.",
             example = "29.X")
@@ -61,33 +75,22 @@ public class AddDependency extends Recipe {
                     "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
-    @Nullable
     @With
+    @Nullable
     private String versionPattern;
 
     @Option(displayName = "Releases only",
-            description = "Whether to exclude snapshots from consideration.",
+            description = "Whether to exclude snapshots from consideration when using a semver selector",
             example = "true",
             required = false)
     @With
-    private boolean releasesOnly = true;
-
-    @Option(displayName = "Classifier",
-            description = "A Maven classifier to add. Most commonly used to select shaded or test variants of a library",
-            example = "test",
-            required = false)
     @Nullable
-    @With
-    private String classifier;
+    private Boolean releasesOnly;
 
-    @Option(displayName = "Scope",
-            description = "The maven dependency scope to add the dependency to.",
-            valid = {"compile", "test", "runtime", "provided"},
-            example = "compile",
-            required = false)
-    @Nullable
-    @With
-    private String scope;
+    @Option(displayName = "Only if using",
+            description = "Used to determine if the dependency will be added and in which scope it should be placed.",
+            example = "org.junit.jupiter.api.*")
+    private String onlyIfUsing;
 
     @Option(displayName = "Type",
             description = "The type of dependency to add. If omitted Maven defaults to assuming the type is \"jar\".",
@@ -97,6 +100,14 @@ public class AddDependency extends Recipe {
     @Nullable
     @With
     private String type;
+
+    @Option(displayName = "Classifier",
+            description = "A Maven classifier to add. Most commonly used to select shaded or test variants of a library",
+            example = "test",
+            required = false)
+    @Nullable
+    @With
+    private String classifier;
 
     @Option(displayName = "Optional",
             description = "Set the value of the `<optional>` tag. No `<optional>` tag will be added when this is `null`.",
@@ -117,13 +128,6 @@ public class AddDependency extends Recipe {
     @With
     private String familyPattern;
 
-    @Option(displayName = "Only if using",
-            description = "Add the dependency only if using one of the supplied types. Types should be identified by fully qualified class name or a glob expression",
-            example = "org.junit.jupiter.api.*",
-            required = false)
-    @Nullable
-    private List<String> onlyIfUsing;
-
     @Override
     public Validated validate() {
         Validated validated = super.validate();
@@ -141,38 +145,178 @@ public class AddDependency extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Add the specified Maven dependency to the pom.xml.";
+        return "Add a maven dependency to a `pom.xml` file in the correct scope based on where it is used.";
     }
 
     @Override
-    protected @Nullable TreeVisitor<?, ExecutionContext> getApplicableTest() {
-        if (onlyIfUsing != null) {
-            return new JavaIsoVisitor<ExecutionContext>() {
-                @Override
-                public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
-                    for (String s : onlyIfUsing) {
-                        doAfterVisit(new UsesType<>(s));
-                    }
-                    return cu;
-                }
-            };
+    protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
+        return new UsesType<>(onlyIfUsing);
+    }
+
+    protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
+        Map<JavaProject, String> scopeByProject = new HashMap<>();
+        for (SourceFile source : before) {
+            source.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
+                    source.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
+                        if (source != new UsesType<>(onlyIfUsing).visit(source, ctx)) {
+                            scopeByProject.compute(javaProject, (jp, scope) -> "compile".equals(scope) ?
+                                    scope /* a compile scope dependency will also be available in test source set */ :
+                                    sourceSet.getName().equals("test") ? "test" : "compile"
+                            );
+                        }
+                    }));
         }
-        return null;
+
+        if (scopeByProject.isEmpty()) {
+            return before;
+        }
+
+        Pattern pattern = this.familyPattern == null ? null : Pattern.compile(this.familyPattern.replace("*", ".*"));
+
+        return ListUtils.map(before, s -> s.getMarkers().findFirst(JavaProject.class)
+                .map(javaProject -> {
+                    if(s instanceof Maven) {
+                        Pom ancestor = ((Maven) s).getMavenModel().getPom();
+                        while (ancestor != null) {
+                            for (Pom.Dependency d : ancestor.getDependencies(Scope.Compile)) {
+                                if (groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                                    return s;
+                                }
+                            }
+                            for (Pom.Dependency d : ancestor.getDependencies(Scope.Test)) {
+                                if (groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                                    return s;
+                                }
+                            }
+                            ancestor = ancestor.getParent();
+                        }
+
+                        String scope = scopeByProject.get(javaProject);
+                        return scope == null ? s : (SourceFile) new AddDependencyVisitor(scope, pattern).visit(s, ctx);
+                    }
+                    return s;
+                })
+                .orElse(s)
+        );
     }
 
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new AddDependencyVisitor(
-                groupId,
-                artifactId,
-                version,
-                versionPattern,
-                releasesOnly,
-                classifier,
-                scope,
-                type,
-                optional,
-                familyPattern == null ? null : Pattern.compile(familyPattern.replace("*", ".*"))
-        );
+    private static final XPathMatcher DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencies");
+
+    @RequiredArgsConstructor
+    private class AddDependencyVisitor extends MavenVisitor {
+        private final String scope;
+
+        @Nullable
+        private final Pattern familyRegex;
+
+        @Nullable
+        private VersionComparator versionComparator;
+
+        @Nullable
+        private String resolvedVersion;
+
+        @Override
+        public Maven visitMaven(Maven maven, ExecutionContext ctx) {
+            Maven m = super.visitMaven(maven, ctx);
+
+            Validated versionValidation = Semver.validate(version, versionPattern);
+            if (versionValidation.isValid()) {
+                versionComparator = versionValidation.getValue();
+            }
+
+            Xml.Tag root = m.getRoot();
+            if (!root.getChild("dependencies").isPresent()) {
+                doAfterVisit(new AddToTagVisitor<>(root, Xml.Tag.build("<dependencies/>"),
+                        new MavenTagInsertionComparator(root.getChildren())));
+            }
+
+            doAfterVisit(new InsertDependencyInOrder(scope));
+
+            List<Pom.Dependency> dependencies = new ArrayList<>(model.getDependencies());
+            String packaging = (type == null) ? "jar" : type;
+
+            String dependencyVersion = findVersionToUse(groupId, artifactId, ctx);
+            dependencies.add(
+                    new Pom.Dependency(
+                            null,
+                            Scope.fromName(scope),
+                            classifier,
+                            type,
+                            optional != null && optional,
+                            new Pom(groupId, artifactId, dependencyVersion, null, null, null, packaging, classifier, null,
+                                    emptyList(), new Pom.DependencyManagement(emptyList()), emptyList(), emptyList(), emptyMap(), emptyMap()),
+                            dependencyVersion,
+                            emptySet()
+                    )
+            );
+
+            return m.withModel(m.getModel().withDependencies(dependencies));
+        }
+
+        private String findVersionToUse(String groupId, String artifactId, ExecutionContext ctx) {
+            if (resolvedVersion == null) {
+
+                if (versionComparator == null) {
+                    resolvedVersion = version;
+                } else {
+
+                    MavenMetadata mavenMetadata = new MavenPomDownloader(MavenPomCache.NOOP,
+                            emptyMap(), ctx).downloadMetadata(groupId, artifactId, emptyList());
+
+                    LatestRelease latest = new LatestRelease(versionPattern);
+                    resolvedVersion = mavenMetadata.getVersioning().getVersions().stream()
+                            .filter(versionComparator::isValid)
+                            .filter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(v))
+                            .max(versionComparator)
+                            .orElse(version);
+                }
+            }
+            return resolvedVersion;
+        }
+
+        @RequiredArgsConstructor
+        private class InsertDependencyInOrder extends MavenVisitor {
+            private final String scope;
+
+            @Override
+            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                if (DEPENDENCIES_MATCHER.matches(getCursor())) {
+                    String versionToUse = null;
+
+                    if (model.getManagedVersion(groupId, artifactId) == null) {
+                        if (familyRegex != null) {
+                            versionToUse = findDependencies(d -> familyRegex.matcher(d.getGroupId()).matches()).stream()
+                                    .max(Comparator.comparing(d -> new Version(d.getVersion())))
+                                    .map(Pom.Dependency::getRequestedVersion)
+                                    .orElse(null);
+                        }
+                        if (versionToUse == null) {
+                            versionToUse = findVersionToUse(groupId, artifactId, ctx);
+                        }
+                    }
+
+                    Xml.Tag dependencyTag = Xml.Tag.build(
+                            "\n<dependency>\n" +
+                                    "<groupId>" + groupId + "</groupId>\n" +
+                                    "<artifactId>" + artifactId + "</artifactId>\n" +
+                                    (versionToUse == null ? "" :
+                                            "<version>" + versionToUse + "</version>\n") +
+                                    (classifier == null ? "" :
+                                            "<classifier>" + classifier + "</classifier>\n") +
+                                    (scope.equals("compile") ? "" :
+                                            "<scope>" + scope + "</scope>\n") +
+                                    (Boolean.TRUE.equals(optional) ? "<optional>true</optional>\n" : "") +
+                                    "</dependency>"
+                    );
+
+                    doAfterVisit(new AddToTagVisitor<>(tag, dependencyTag,
+                            new InsertDependencyComparator(tag.getChildren(), dependencyTag)));
+
+                    return tag;
+                }
+
+                return super.visitTag(tag, ctx);
+            }
+        }
     }
 }

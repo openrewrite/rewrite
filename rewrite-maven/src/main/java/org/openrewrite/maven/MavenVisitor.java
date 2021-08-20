@@ -165,23 +165,4 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
                         .flatMap(d -> d.findDependencies(matcher).stream())
         ).collect(toList());
     }
-
-    public void maybeAddDependency(String groupId, String artifactId, String version,
-                                   @Nullable String classifier, @Nullable String scope, @Nullable String type, @Nullable Boolean optional) {
-        AddDependencyVisitor op = new AddDependencyVisitor(
-                groupId,
-                artifactId,
-                version,
-                null,
-                true,
-                classifier,
-                scope,
-                type,
-                optional,
-                null);
-
-        if (!getAfterVisit().contains(op)) {
-            doAfterVisit(op);
-        }
-    }
 }

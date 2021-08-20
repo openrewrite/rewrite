@@ -19,8 +19,12 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaParser;
-import org.openrewrite.java.marker.JavaProvenance;
+import org.openrewrite.java.marker.JavaProject;
+import org.openrewrite.java.marker.JavaSourceSet;
+import org.openrewrite.java.marker.JavaVersion;
+import org.openrewrite.marker.BuildTool;
 import org.openrewrite.marker.GitProvenance;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
@@ -36,9 +40,12 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import static org.openrewrite.Tree.randomId;
 
 /**
  * Parse a Maven project on disk into a list of {@link org.openrewrite.SourceFile} including
@@ -80,30 +87,28 @@ public class MavenProjectParser {
         }
 
         for (Maven maven : mavens) {
+            List<Marker> projectProvenance = getJavaProvenance(maven, projectDirectory);
+
             List<Path> dependencies = downloadArtifacts(maven.getModel().getDependencies(Scope.Compile));
-            JavaProvenance mainProvenance = getJavaProvenance(maven, projectDirectory, "main", dependencies);
+            JavaSourceSet mainProvenance = JavaSourceSet.build("main", dependencies);
             javaParser.setClasspath(dependencies);
-            sourceFiles.addAll(
-                    ListUtils.map(javaParser.parse(maven.getJavaSources(projectDirectory, ctx), projectDirectory, ctx),
-                            s -> s.withMarkers(s.getMarkers().addIfAbsent(mainProvenance))
-                    ));
+            sourceFiles.addAll(ListUtils.map(javaParser.parse(maven.getJavaSources(projectDirectory, ctx), projectDirectory, ctx),
+                    addProvenance(projectProvenance, mainProvenance)));
 
             List<Path> testDependencies = downloadArtifacts(maven.getModel().getDependencies(Scope.Test));
-            JavaProvenance testProvenance = getJavaProvenance(maven, projectDirectory, "test", testDependencies);
+            JavaSourceSet testProvenance = JavaSourceSet.build("test", testDependencies);
             javaParser.setClasspath(testDependencies);
-            sourceFiles.addAll(
-                    ListUtils.map(javaParser.parse(maven.getTestJavaSources(projectDirectory, ctx), projectDirectory, ctx),
-                            s -> s.withMarkers(s.getMarkers().addIfAbsent(testProvenance))
-                    ));
+            sourceFiles.addAll(ListUtils.map(javaParser.parse(maven.getTestJavaSources(projectDirectory, ctx), projectDirectory, ctx),
+                    addProvenance(projectProvenance, testProvenance)));
 
-            parseResources(maven.getResources(projectDirectory, ctx), projectDirectory, sourceFiles, mainProvenance);
-            parseResources(maven.getTestResources(projectDirectory, ctx), projectDirectory, sourceFiles, testProvenance);
+            parseResources(maven.getResources(projectDirectory, ctx), projectDirectory, sourceFiles, projectProvenance, mainProvenance);
+            parseResources(maven.getTestResources(projectDirectory, ctx), projectDirectory, sourceFiles, projectProvenance, testProvenance);
         }
 
         return ListUtils.map(sourceFiles, s -> s.withMarkers(s.getMarkers().addIfAbsent(gitProvenance)));
     }
 
-    private JavaProvenance getJavaProvenance(Maven maven, Path projectDirectory, String sourceSet, List<Path> dependencies) {
+    private List<Marker> getJavaProvenance(Maven maven, Path projectDirectory) {
         Pom mavenModel = maven.getModel();
         String javaRuntimeVersion = System.getProperty("java.runtime.version");
         String javaVendor = System.getProperty("java.vm.vendor");
@@ -136,63 +141,51 @@ public class MavenProjectParser {
             }
         }
 
-        JavaProvenance.BuildTool buildTool = new JavaProvenance.BuildTool(JavaProvenance.BuildTool.Type.Maven,
-                mavenVersion);
-
-        JavaProvenance.JavaVersion javaVersion = new JavaProvenance.JavaVersion(
-                javaRuntimeVersion,
-                javaVendor,
-                sourceCompatibility,
-                targetCompatibility
-        );
-
-        JavaProvenance.Publication publication = new JavaProvenance.Publication(
-                mavenModel.getGroupId(),
-                mavenModel.getArtifactId(),
-                mavenModel.getVersion()
-        );
-
-        return JavaProvenance.build(
-                mavenModel.getName(),
-                sourceSet,
-                buildTool,
-                javaVersion,
-                dependencies,
-                publication
+        return Arrays.asList(
+                new BuildTool(randomId(), BuildTool.Type.Maven, mavenVersion),
+                new JavaVersion(randomId(), javaRuntimeVersion, javaVendor, sourceCompatibility, targetCompatibility),
+                new JavaProject(randomId(), mavenModel.getName(), new JavaProject.Publication(
+                        mavenModel.getGroupId(),
+                        mavenModel.getArtifactId(),
+                        mavenModel.getVersion()
+                ))
         );
     }
 
-    private void parseResources(List<Path> resources, Path projectDirectory, List<SourceFile> sourceFiles, JavaProvenance javaProvenance) {
-        sourceFiles.addAll(
-                ListUtils.map(
-                        new XmlParser().parse(
-                                resources.stream()
-                                        .filter(p -> p.getFileName().toString().endsWith(".xml"))
-                                        .collect(Collectors.toList()),
-                                projectDirectory,
-                                ctx
-                        ), s -> s.withMarkers(s.getMarkers().addIfAbsent(javaProvenance))
-                ));
+    private void parseResources(List<Path> resources, Path projectDirectory, List<SourceFile> sourceFiles, List<Marker> projectProvenance, JavaSourceSet sourceSet) {
+        sourceFiles.addAll(ListUtils.map(new XmlParser().parse(
+                resources.stream()
+                        .filter(p -> p.getFileName().toString().endsWith(".xml"))
+                        .collect(Collectors.toList()),
+                projectDirectory,
+                ctx
+        ), addProvenance(projectProvenance, sourceSet)));
 
-        sourceFiles.addAll(
-                ListUtils.map(new YamlParser().parse(
-                        resources.stream()
-                                .filter(p -> p.getFileName().toString().endsWith(".yml") || p.getFileName().toString().endsWith(".yaml"))
-                                .collect(Collectors.toList()),
-                        projectDirectory,
-                        ctx
-                        ), s -> s.withMarkers(s.getMarkers().addIfAbsent(javaProvenance))
-                ));
+        sourceFiles.addAll(ListUtils.map(new YamlParser().parse(
+                resources.stream()
+                        .filter(p -> p.getFileName().toString().endsWith(".yml") || p.getFileName().toString().endsWith(".yaml"))
+                        .collect(Collectors.toList()),
+                projectDirectory,
+                ctx
+        ), addProvenance(projectProvenance, sourceSet)));
 
-        sourceFiles.addAll(
-                ListUtils.map(new PropertiesParser().parse(
-                        resources.stream()
-                                .filter(p -> p.getFileName().toString().endsWith(".properties"))
-                                .collect(Collectors.toList()),
-                        projectDirectory,
-                        ctx
-                        ), s -> s.withMarkers(s.getMarkers().addIfAbsent(javaProvenance))
-                ));
+        sourceFiles.addAll(ListUtils.map(new PropertiesParser().parse(
+                resources.stream()
+                        .filter(p -> p.getFileName().toString().endsWith(".properties"))
+                        .collect(Collectors.toList()),
+                projectDirectory,
+                ctx
+        ), addProvenance(projectProvenance, sourceSet)));
+    }
+
+    private <S extends SourceFile> UnaryOperator<S> addProvenance(List<Marker> projectProvenance, JavaSourceSet sourceSet) {
+        return s -> {
+            for (Marker marker : projectProvenance) {
+                s = s.withMarkers(s.getMarkers().addIfAbsent(marker));
+            }
+            s = s.withMarkers(s.getMarkers().addIfAbsent(sourceSet));
+            return s;
+        };
     }
 
     private List<Path> downloadArtifacts(Set<Pom.Dependency> dependencies) {
