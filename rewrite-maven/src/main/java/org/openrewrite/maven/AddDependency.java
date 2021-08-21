@@ -75,15 +75,22 @@ public class AddDependency extends Recipe {
                     "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
-    @With
     @Nullable
     private String versionPattern;
+
+    @Option(displayName = "Scope",
+            description = "A scope to use when it is not what can be inferred from usage. Most of the time this will be left empty, but " +
+                    "is used when adding a runtime, provided, or import dependency.",
+            example = "runtime",
+            valid = {"import", "runtime", "provided"},
+            required = false)
+    @Nullable
+    private final String scope;
 
     @Option(displayName = "Releases only",
             description = "Whether to exclude snapshots from consideration when using a semver selector",
             example = "true",
             required = false)
-    @With
     @Nullable
     private Boolean releasesOnly;
 
@@ -98,7 +105,6 @@ public class AddDependency extends Recipe {
             example = "jar",
             required = false)
     @Nullable
-    @With
     private String type;
 
     @Option(displayName = "Classifier",
@@ -106,7 +112,6 @@ public class AddDependency extends Recipe {
             example = "test",
             required = false)
     @Nullable
-    @With
     private String classifier;
 
     @Option(displayName = "Optional",
@@ -175,7 +180,7 @@ public class AddDependency extends Recipe {
 
         return ListUtils.map(before, s -> s.getMarkers().findFirst(JavaProject.class)
                 .map(javaProject -> {
-                    if(s instanceof Maven) {
+                    if (s instanceof Maven) {
                         Pom ancestor = ((Maven) s).getMavenModel().getPom();
                         while (ancestor != null) {
                             for (Pom.Dependency d : ancestor.getDependencies(Scope.Compile)) {
@@ -191,7 +196,7 @@ public class AddDependency extends Recipe {
                             ancestor = ancestor.getParent();
                         }
 
-                        String scope = scopeByProject.get(javaProject);
+                        String scope = this.scope == null ? scopeByProject.get(javaProject) : this.scope;
                         return scope == null ? s : (SourceFile) new AddDependencyVisitor(scope, pattern).visit(s, ctx);
                     }
                     return s;

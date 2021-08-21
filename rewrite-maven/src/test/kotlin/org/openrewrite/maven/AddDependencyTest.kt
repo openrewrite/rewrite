@@ -206,7 +206,7 @@ class AddDependencyTest {
         assertThat(
             AddDependency(
                 "com.google.guava", "guava", "29.x", "-jre",
-                false, onlyIfUsing, null, null, false, null
+                null, false, onlyIfUsing, null, null, false, null
             ).run(
                 javaParser.parseWithProvenance("main", usingGuavaIntMath) + mavenParser.parseWithProvenance(
                     """
@@ -339,7 +339,7 @@ class AddDependencyTest {
                         </project>
                     """.trimIndent()
                 ).mapIndexed { n, maven ->
-                    if(n == 0) {
+                    if (n == 0) {
                         // give the parent a different java project
                         maven.withMarkers(maven.markers.compute(javaProject) { j, _ -> j.withId(randomId()) })
                     } else maven
@@ -370,14 +370,18 @@ class AddDependencyTest {
     @Test
     fun useRequestedVersionInUseByOtherMembersOfTheFamily() {
         assertThat(
-            AddDependency("com.fasterxml.jackson.module", "jackson-module-afterburner", "2.10.5",
-                null, false, "com.fasterxml.jackson.databind.*",
-            null, null, null, "com.fasterxml.*").run(
-                javaParser.parseWithProvenance("main", """
+            AddDependency(
+                "com.fasterxml.jackson.module", "jackson-module-afterburner", "2.10.5",
+                null, null, false, "com.fasterxml.jackson.databind.*",
+                null, null, null, "com.fasterxml.*"
+            ).run(
+                javaParser.parseWithProvenance(
+                    "main", """
                     public class A {
                         com.fasterxml.jackson.databind.ObjectMapper mapper;
                     }
-                """.trimIndent()) + mavenParser.parseWithProvenance(
+                """.trimIndent()
+                ) + mavenParser.parseWithProvenance(
                     """
                         <project>
                             <groupId>com.mycompany.app</groupId>
@@ -439,7 +443,7 @@ class AddDependencyTest {
     private fun addDependency(gav: String, onlyIfUsing: String): AddDependency {
         val (group, artifact, version) = gav.split(":")
         return AddDependency(
-            group, artifact, version, null, true,
+            group, artifact, version, null, null, true,
             onlyIfUsing, null, null, false, null
         )
     }
