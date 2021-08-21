@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,8 +55,8 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         """
     )
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/739")
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/739")
     fun upgradeVersionWithGroupIdAndArtifactIdDefinedAsProperty() = assertChanged(
         recipe = UpgradeDependencyVersion(
             "io.quarkus",
@@ -204,13 +204,15 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
             "28.x",
             "-jre",
             null
-        ).doNext(UpgradeDependencyVersion(
-            "com.google.guava",
-            null,
-            "29.x",
-            "-jre",
-            null
-        )),
+        ).doNext(
+            UpgradeDependencyVersion(
+                "com.google.guava",
+                null,
+                "29.x",
+                "-jre",
+                null
+            )
+        ),
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>
@@ -401,11 +403,11 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
 
         assertChanged(
             recipe = UpgradeDependencyVersion(
-                    "com.google.guava",
-                    null,
-                    "25-28",
-                    "-jre",
-                    null
+                "com.google.guava",
+                null,
+                "25-28",
+                "-jre",
+                null
             ),
             dependsOn = arrayOf(server.toFile()),
             before = parent.toFile(),
@@ -507,14 +509,14 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
 
     @Test
     fun upgradeDependencyHandlesDependencyManagement() = assertChanged(
-            recipe = UpgradeDependencyVersion(
-                "io.micronaut",
-                "micronaut-bom",
-                "3.0.0-M5",
-                null,
-                null
-            ),
-            before = """
+        recipe = UpgradeDependencyVersion(
+            "io.micronaut",
+            "micronaut-bom",
+            "3.0.0-M5",
+            null,
+            null
+        ),
+        before = """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
                   <packaging>pom</packaging>
@@ -534,7 +536,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                   </dependencyManagement>
                 </project>
             """,
-            after = """
+        after = """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
                   <packaging>pom</packaging>
@@ -693,33 +695,33 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     fun checkValidation() {
         var recipe = UpgradeDependencyVersion(null, null, null, null, null)
         var valid = recipe.validate()
-        Assertions.assertThat(valid.isValid).isFalse()
+        Assertions.assertThat(valid.isValid).isFalse
         Assertions.assertThat(valid.failures()).hasSize(2)
         Assertions.assertThat(valid.failures()[0].property).isEqualTo("groupId")
         Assertions.assertThat(valid.failures()[1].property).isEqualTo("newVersion")
 
         recipe = UpgradeDependencyVersion(null, "rewrite-maven", "latest.release", null, null)
         valid = recipe.validate()
-        Assertions.assertThat(valid.isValid).isFalse()
+        Assertions.assertThat(valid.isValid).isFalse
         Assertions.assertThat(valid.failures()).hasSize(1)
         Assertions.assertThat(valid.failures()[0].property).isEqualTo("groupId")
 
         recipe = UpgradeDependencyVersion("org.openrewrite", null, null, null, null)
         valid = recipe.validate()
-        Assertions.assertThat(valid.isValid).isFalse()
+        Assertions.assertThat(valid.isValid).isFalse
         Assertions.assertThat(valid.failures()).hasSize(1)
         Assertions.assertThat(valid.failures()[0].property).isEqualTo("newVersion")
 
         recipe = UpgradeDependencyVersion("org.openrewrite", "rewrite-maven", "latest.release", null, null)
         valid = recipe.validate()
-        Assertions.assertThat(valid.isValid).isTrue()
+        Assertions.assertThat(valid.isValid).isTrue
 
         recipe = UpgradeDependencyVersion("org.openrewrite", "rewrite-maven", "latest.release", "123", null)
         valid = recipe.validate()
-        Assertions.assertThat(valid.isValid).isTrue()
+        Assertions.assertThat(valid.isValid).isTrue
 
         recipe = UpgradeDependencyVersion("org.openrewrite", "rewrite-maven", "1.0.0", null, null)
         valid = recipe.validate()
-        Assertions.assertThat(valid.isValid).isTrue()
+        Assertions.assertThat(valid.isValid).isTrue
     }
 }
