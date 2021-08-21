@@ -326,7 +326,6 @@ public class Pom {
         }
 
         @Nullable
-
         public String getDatedSnapshotVersion() {
             return model.getDatedSnapshotVersion();
         }

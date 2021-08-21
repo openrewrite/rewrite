@@ -164,6 +164,23 @@ class ExcludeDependencyTest : MavenRecipeTest {
         """
     )
 
+    @Test
+    fun dontExcludeJUnitWhenItIsTransitiveTestDependency() = assertUnchanged(
+        recipe = ExcludeDependency("junit","junit", null),
+        before = """
+            <project>
+                <groupId>com.example</groupId>
+                <artifactId>demo</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <dependency>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot</artifactId>
+                  <version>2.4.10</version>
+                </dependency>
+            </project>
+        """
+    )
+
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {

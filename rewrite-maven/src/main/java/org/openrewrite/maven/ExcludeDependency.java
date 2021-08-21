@@ -90,7 +90,9 @@ public class ExcludeDependency extends Recipe {
                 Pom.Dependency dependency = findDependency(tag);
                 if (dependency != null && (scope == null || scope.equals(dependency.getScope())) &&
                         (!dependency.getGroupId().equals(groupId) || !dependency.getArtifactId().equals(artifactId)) &&
-                        !dependency.findDependencies(groupId, artifactId).isEmpty()) {
+                        dependency.findDependencies(groupId, artifactId).stream().anyMatch(transitive -> transitive.getScope()
+                                .isInClasspathOf(dependency.getScope()))) {
+
                     Optional<Xml.Tag> maybeExclusions = tag.getChild("exclusions");
                     if (maybeExclusions.isPresent()) {
                         Xml.Tag exclusions = maybeExclusions.get();
