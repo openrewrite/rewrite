@@ -27,6 +27,8 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyList;
+
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Getter
@@ -288,6 +290,7 @@ public class Pom {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
+    @With
     public static class Dependency implements DependencyDescriptor {
         MavenRepository repository;
 
@@ -301,7 +304,6 @@ public class Pom {
 
         boolean optional;
 
-        @With
         Pom model;
 
         @Nullable
@@ -322,7 +324,9 @@ public class Pom {
         }
 
         public Dependency withVersion(String version) {
-            return withModel(model.withVersion(version));
+            return withModel(model
+                    .withVersion(version)
+                    .withDependencies(emptyList()));
         }
 
         @Nullable
