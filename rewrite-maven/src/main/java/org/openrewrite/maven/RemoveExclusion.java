@@ -27,7 +27,7 @@ import java.util.Optional;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
-public class RemoveExclusions extends Recipe {
+public class RemoveExclusion extends Recipe {
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
             example = "com.google.guava")
@@ -50,7 +50,7 @@ public class RemoveExclusions extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Remove exclusions";
+        return "Remove exclusion";
     }
 
     @Override

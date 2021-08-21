@@ -17,8 +17,13 @@ package org.openrewrite.maven
 
 import org.junit.jupiter.api.Test
 
-class RemoveExclusionsTest : MavenRecipeTest {
-    override val recipe = RemoveExclusions("com.google.guava", "guava", "commons-lang", "commons-lang")
+class RemoveExclusionTest : MavenRecipeTest {
+    override val recipe = RemoveExclusion(
+        "com.google.guava",
+        "guava",
+        "commons-lang",
+        "commons-lang"
+    )
 
     @Test
     fun removeUnusedExclusions() = assertChanged(
