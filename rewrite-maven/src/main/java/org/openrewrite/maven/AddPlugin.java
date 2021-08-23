@@ -65,6 +65,13 @@ public class AddPlugin extends Recipe {
     @Nullable
     String dependencies;
 
+    @Option(displayName = "Executions",
+            description = "Optional executions provided as raw XML.",
+            example = "<execution><phase>generate-sources</phase><goals><goal>add-source</goal></goals></execution>",
+            required = false)
+    @Nullable
+    String executions;
+
     @Override
     public String getDisplayName() {
         return "Add Maven plugin";
@@ -92,6 +99,7 @@ public class AddPlugin extends Recipe {
                         "<groupId>" + groupId + "</groupId>\n" +
                         "<artifactId>" + artifactId + "</artifactId>\n" +
                         "<version>" + version + "</version>\n" +
+                        (executions != null ? executions.trim() + "\n" : "") +
                         (configuration != null ? configuration.trim() + "\n" : "") +
                         (dependencies != null ? dependencies.trim() + "\n" : "") +
                         "</plugin>\n" +
@@ -133,6 +141,7 @@ public class AddPlugin extends Recipe {
                                 "<groupId>" + groupId + "</groupId>\n" +
                                 "<artifactId>" + artifactId + "</artifactId>\n" +
                                 "<version>" + version + "</version>\n" +
+                                (executions != null ? executions.trim() + "\n" : "") +
                                 (configuration != null ? configuration.trim() + "\n" : "") +
                                 (dependencies != null ? dependencies.trim() + "\n" : "") +
                                 "</plugin>")));
