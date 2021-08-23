@@ -20,6 +20,7 @@ import okhttp3.Request
 import okhttp3.ResponseBody
 import org.assertj.core.api.Assertions.*
 import org.junit.jupiter.api.fail
+import org.openrewrite.scheduling.DirectScheduler
 import org.openrewrite.scheduling.ForkJoinScheduler
 import java.io.File
 import java.io.IOException
@@ -108,7 +109,7 @@ interface RecipeTest <T: SourceFile> {
         }
 
         val recipeSchedulerCheckingExpectedCycles =
-            RecipeSchedulerCheckingExpectedCycles(ForkJoinScheduler(ForkJoinPool(1)), expectedCyclesThatMakeChanges)
+            RecipeSchedulerCheckingExpectedCycles(DirectScheduler.common(), expectedCyclesThatMakeChanges)
 
         var results = recipe.run(
             sources,
