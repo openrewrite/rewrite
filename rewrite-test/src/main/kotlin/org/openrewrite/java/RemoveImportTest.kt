@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
@@ -140,8 +139,7 @@ interface RemoveImportTest : JavaRecipeTest {
         """
     )
 
-    @Disabled
-    @Issue("https://github.com/openrewrite/rewrite/issues/687")
+    @Issue("https://github.com/openrewrite/rewrite/issues/918")
     @Test
     fun leaveStarStaticImportIfReferenceStillExists(jp: JavaParser) = assertChanged(
         jp,
@@ -405,5 +403,75 @@ interface RemoveImportTest : JavaRecipeTest {
         afterConditions = { cu ->
             cu.imports[0].id != cu.imports[1].id
         }
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/918")
+    @Test
+    fun leaveAloneIfThreeOrMoreStaticsAreInUse(jp: JavaParser) = assertUnchanged(
+        jp,
+        dependsOn = arrayOf("""
+            package org.test;
+            public class Example {
+                public static final int VALUE_1 = 1;
+                public static final int VALUE_2 = 2;
+                public static final int VALUE_3 = 3;
+                public static int method1() { return 1; }
+            }
+        """),
+        recipe = removeImport("org.test.Example.VALUE_1"),
+        before = """
+            package org.test.a;
+            
+            import static org.test.Example.*;
+            
+            public class Test {
+                public void method() {
+                    int value2 = VALUE_2;
+                    int value3 = VALUE_3;
+                    int methodValue = method1();
+                }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/918")
+    @Test
+    fun unfoldStaticImportIfTwoOrLessAreUsed(jp: JavaParser) = assertChanged(
+        jp,
+        dependsOn = arrayOf("""
+            package org.test;
+            public class Example {
+                public static final int VALUE_1 = 1;
+                public static final int VALUE_2 = 2;
+                public static final int VALUE_3 = 3;
+                public static int method1() { return 1; }
+            }
+        """),
+        recipe = removeImport("org.test.Example.VALUE_1"),
+        before = """
+            package org.test.a;
+            
+            import static org.test.Example.*;
+            
+            public class Test {
+                public void method() {
+                    int value2 = VALUE_2;
+                    int methodValue = method1();
+                }
+            }
+        """,
+        after = """
+            package org.test.a;
+            
+            import static org.test.Example.method1;
+            import static org.test.Example.VALUE_2;
+            
+            public class Test {
+                public void method() {
+                    int value2 = VALUE_2;
+                    int methodValue = method1();
+                }
+            }
+        """
     )
 }

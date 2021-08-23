@@ -117,26 +117,18 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                     // e.g. remove java.util.Collections.emptySet when type is java.util.Collections.emptySet
                     spaceForNextImport.set(impoort.getPrefix());
                     return null;
-                } else if (typeName.equals(type) && "*".equals(imported)) {
-                    if (methodsAndFieldsUsed.isEmpty() && otherMethodsAndFieldsInTypeUsed.size() < importLayoutStyle.getNameCountToUseStarImport()) {
-                        if (otherMethodsAndFieldsInTypeUsed.isEmpty()) {
-                            spaceForNextImport.set(impoort.getPrefix());
-                            return null;
-                        } else {
-                            return unfoldStarImport(impoort, otherMethodsAndFieldsInTypeUsed);
-                        }
+                } else if ("*".equals(imported) && (typeName.equals(type) || (typeName + type.substring(type.lastIndexOf('.'))).equals(type))) {
+                    if (methodsAndFieldsUsed.isEmpty() && otherMethodsAndFieldsInTypeUsed.isEmpty()) {
+                        spaceForNextImport.set(impoort.getPrefix());
+                        return null;
+                    } else if (methodsAndFieldsUsed.size() + otherMethodsAndFieldsInTypeUsed.size() < importLayoutStyle.getNameCountToUseStarImport()){
+                        methodsAndFieldsUsed.addAll(otherMethodsAndFieldsInTypeUsed);
+                        return unfoldStarImport(impoort, methodsAndFieldsUsed);
                     }
                 } else if (typeName.equals(type) && !methodsAndFieldsUsed.contains(imported)) {
                     // e.g. remove java.util.Collections.emptySet when type is java.util.Collections
                     spaceForNextImport.set(impoort.getPrefix());
                     return null;
-                } else if (imported.equals("*") && (typeName + type.substring(type.lastIndexOf('.'))).equals(type)) {
-                    // e.g. remove java.util.Collections.* when type is java.util.Collections.emptySet
-                    if (otherMethodsAndFieldsInTypeUsed.isEmpty()) {
-                        spaceForNextImport.set(impoort.getPrefix());
-                        return null;
-                    }
-                    return unfoldStarImport(impoort, otherMethodsAndFieldsInTypeUsed);
                 }
             } else if (!keepImport && typeName.equals(type)) {
                 if (impoort.getPrefix().isEmpty() || impoort.getPrefix().getLastWhitespace().chars().filter(s -> s == '\n').count() > 1) {
