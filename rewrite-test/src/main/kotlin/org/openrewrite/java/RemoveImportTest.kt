@@ -79,8 +79,9 @@ interface RemoveImportTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/919")
     @Test
-    fun leaveStarImportInPlaceIfThreeOrMoreTypesStillReferredTo(jp: JavaParser) = assertUnchanged(
+    fun leaveStarImportInPlaceIfFiveOrMoreTypesStillReferredTo(jp: JavaParser) = assertUnchanged(
             jp,
             recipe = removeImport("java.util.List"),
             before = """
@@ -88,6 +89,7 @@ interface RemoveImportTest : JavaRecipeTest {
             class A {
                Collection<Integer> c;
                Set<Integer> s = new HashSet<>();
+               Map<Integer, Integer> m = new HashMap<>();
             }
         """
     )

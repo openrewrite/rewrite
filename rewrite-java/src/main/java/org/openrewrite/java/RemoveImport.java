@@ -118,7 +118,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                     spaceForNextImport.set(impoort.getPrefix());
                     return null;
                 } else if (typeName.equals(type) && "*".equals(imported)) {
-                    if (methodsAndFieldsUsed.isEmpty() && otherMethodsAndFieldsInTypeUsed.size() < importLayoutStyle.getClassCountToUseStarImport()) {
+                    if (methodsAndFieldsUsed.isEmpty() && otherMethodsAndFieldsInTypeUsed.size() < importLayoutStyle.getNameCountToUseStarImport()) {
                         if (otherMethodsAndFieldsInTypeUsed.isEmpty()) {
                             spaceForNextImport.set(impoort.getPrefix());
                             return null;
@@ -145,7 +145,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 return null;
             } else if (!keepImport && impoort.getPackageName().equals(owner) &&
                     "*".equals(impoort.getClassName()) &&
-                    otherTypesInPackageUsed.size() < importLayoutStyle.getNameCountToUseStarImport()) {
+                    otherTypesInPackageUsed.size() < importLayoutStyle.getClassCountToUseStarImport()) {
                 if (otherTypesInPackageUsed.isEmpty()) {
                     spaceForNextImport.set(impoort.getPrefix());
                     return null;
