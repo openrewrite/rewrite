@@ -533,7 +533,7 @@ public class ImportLayoutStyle implements JavaStyle {
                     }
 
                     if (classGraphFqn instanceof JavaType.Class) {
-                        List<JavaType.Method> methods = ((JavaType.Class) classGraphFqn).getConstructors();
+                        List<JavaType.Method> methods = ((JavaType.Class) classGraphFqn).getMethods();
                         if (methods != null) {
                             for (JavaType.Method method : methods) {
                                 if (method.getFlags().contains(Flag.Static)) {

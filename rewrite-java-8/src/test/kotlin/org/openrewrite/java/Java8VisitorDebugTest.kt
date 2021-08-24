@@ -176,6 +176,10 @@ class Java8FindDeprecatedMethodsTest : Java8Test, FindDeprecatedMethodsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8FindMethodsTest : Java8Test, FindMethodsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8FindTextTest : Java8Test, FindTextTest
 
 @DebugOnly
@@ -264,6 +268,14 @@ class Java8NoRedundantJumpStatementsTest : Java8Test, NoRedundantJumpStatementsT
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8NormalizeFormatTest : Java8Test, NormalizeFormatTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8NormalizeTabsOrSpacesTest : Java8Test, NormalizeTabsOrSpacesTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8NoStaticImportTest : Java8Test, NoStaticImportTest
 
 @DebugOnly
@@ -273,10 +285,6 @@ class Java8NoWhitespaceAfterTest : Java8Test, NoWhitespaceAfterTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java8NoWhitespaceBeforeTest : Java8Test, NoWhitespaceBeforeTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
-class Java8NormalizeFormatTest : Java8Test, NormalizeFormatTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

@@ -37,7 +37,9 @@ public interface JavaType extends Serializable {
     static void clearCaches() {
         Class.flyweights.clear();
         Method.flyweights.clear();
-        Parameterized.flyweight.children.clear();
+        if(Parameterized.flyweight.children != null) {
+            Parameterized.flyweight.children.clear();
+        }
         Variable.flyweights.clear();
     }
 
@@ -220,9 +222,7 @@ public interface JavaType extends Serializable {
 
         private final List<Variable> members;
         private final List<FullyQualified> interfaces;
-
-        @Nullable
-        private final List<Method> constructors;
+        private final List<Method> methods;
 
         @Nullable
         private final FullyQualified supertype;
@@ -235,7 +235,7 @@ public interface JavaType extends Serializable {
                       Kind kind,
                       List<Variable> members,
                       List<FullyQualified> interfaces,
-                      @Nullable List<Method> constructors,
+                      List<Method> methods,
                       @Nullable FullyQualified supertype,
                       @Nullable FullyQualified owningClass,
                       List<FullyQualified> annotations) {
@@ -244,7 +244,7 @@ public interface JavaType extends Serializable {
             this.kind = kind;
             this.members = members;
             this.interfaces = interfaces;
-            this.constructors = constructors;
+            this.methods = methods;
             this.supertype = supertype;
             this.owningClass = owningClass;
             this.annotations = annotations;
@@ -255,7 +255,7 @@ public interface JavaType extends Serializable {
             if (this.fullyQualifiedName.equals(fullyQualifiedName)) {
                 return this;
             }
-            return JavaType.Class.build(flagsBitMap, fullyQualifiedName, kind, members, interfaces, constructors, supertype, owningClass, annotations);
+            return JavaType.Class.build(flagsBitMap, fullyQualifiedName, kind, members, interfaces, methods, supertype, owningClass, annotations);
         }
 
         public boolean hasFlags(Flag... test) {
@@ -307,7 +307,7 @@ public interface JavaType extends Serializable {
             }
 
             return build(1, fullyQualifiedName, Kind.Class, emptyList(),
-                    emptyList(), null, null,
+                    emptyList(), emptyList(), null,
                     owningClass, emptyList(), true);
         }
 
@@ -322,7 +322,7 @@ public interface JavaType extends Serializable {
          * @return Any class found in the type cache
          */
         public static Class build(String fullyQualifiedName, Kind kind) {
-            return build(1, fullyQualifiedName, kind, emptyList(), emptyList(), null, null, null, emptyList(), true);
+            return build(1, fullyQualifiedName, kind, emptyList(), emptyList(), emptyList(), null, null, emptyList(), true);
         }
 
         public static Class build(Set<Flag> flags,
@@ -330,10 +330,10 @@ public interface JavaType extends Serializable {
                                   Kind kind,
                                   List<Variable> members,
                                   List<FullyQualified> interfaces,
-                                  List<Method> constructors,
+                                  List<Method> methods,
                                   @Nullable FullyQualified supertype,
                                   @Nullable FullyQualified owningClass) {
-            return build(Flag.flagsToBitMap(flags), fullyQualifiedName, kind, members, interfaces, constructors, supertype, owningClass, emptyList(), false);
+            return build(Flag.flagsToBitMap(flags), fullyQualifiedName, kind, members, interfaces, methods, supertype, owningClass, emptyList(), false);
         }
 
         public static Class build(Set<Flag> flags,
@@ -341,11 +341,11 @@ public interface JavaType extends Serializable {
                                   Kind kind,
                                   List<Variable> members,
                                   List<FullyQualified> interfaces,
-                                  List<Method> constructors,
+                                  List<Method> methods,
                                   @Nullable FullyQualified supertype,
                                   @Nullable FullyQualified owningClass,
                                   List<FullyQualified> annotations) {
-            return build(Flag.flagsToBitMap(flags), fullyQualifiedName, kind, members, interfaces, constructors, supertype, owningClass, annotations, false);
+            return build(Flag.flagsToBitMap(flags), fullyQualifiedName, kind, members, interfaces, methods, supertype, owningClass, annotations, false);
         }
 
         @JsonCreator
@@ -354,11 +354,11 @@ public interface JavaType extends Serializable {
                                      Kind kind,
                                      List<Variable> members,
                                      List<FullyQualified> interfaces,
-                                     @Nullable List<Method> constructors,
+                                     List<Method> methods,
                                      @Nullable FullyQualified supertype,
                                      @Nullable FullyQualified owningClass,
                                      List<FullyQualified> annotations) {
-            return build(flagsBitMap, fullyQualifiedName, kind, members, interfaces, constructors, supertype, owningClass, annotations, false);
+            return build(flagsBitMap, fullyQualifiedName, kind, members, interfaces, methods, supertype, owningClass, annotations, false);
         }
 
         public static Class build(int flagsBitMap,
@@ -366,7 +366,7 @@ public interface JavaType extends Serializable {
                                   Kind kind,
                                   List<Variable> members,
                                   List<FullyQualified> interfaces,
-                                  @Nullable List<Method> constructors,
+                                  List<Method> methods,
                                   @Nullable FullyQualified supertype,
                                   @Nullable FullyQualified owningClass,
                                   List<FullyQualified> annotations,
@@ -383,14 +383,14 @@ public interface JavaType extends Serializable {
                 if (relaxedClassTypeMatching) {
                     if (variants.isEmpty()) {
                         JavaType.Class candidate = buildCandidate(flagsBitMap, fullyQualifiedName,
-                                kind, members, interfaces, constructors, supertype, owningClass, annotations);
+                                kind, members, interfaces, methods, supertype, owningClass, annotations);
                         variants.add(candidate);
                         return candidate;
                     }
                     return variants.iterator().next();
                 } else {
                     JavaType.Class candidate = buildCandidate(flagsBitMap, fullyQualifiedName,
-                            kind, members, interfaces, constructors, supertype, owningClass, annotations);
+                            kind, members, interfaces, methods, supertype, owningClass, annotations);
 
                     for (Class v : variants) {
                         if (v.deepEquals(candidate)) {
@@ -419,7 +419,7 @@ public interface JavaType extends Serializable {
                                                      Kind kind,
                                                      List<Variable> members,
                                                      List<FullyQualified> interfaces,
-                                                     @Nullable List<Method> constructors,
+                                                     @Nullable List<Method> methods,
                                                      @Nullable FullyQualified supertype,
                                                      @Nullable FullyQualified owningClass,
                                                      List<FullyQualified> annotations) {
@@ -443,7 +443,7 @@ public interface JavaType extends Serializable {
                 sortedMembers = members;
             }
 
-            return new Class(flagsBitMap, fullyQualifiedName, kind, sortedMembers, interfaces, constructors, supertype, owningClass, annotations);
+            return new Class(flagsBitMap, fullyQualifiedName, kind, sortedMembers, interfaces, methods, supertype, owningClass, annotations);
         }
 
         public List<Variable> getVisibleSupertypeMembers() {

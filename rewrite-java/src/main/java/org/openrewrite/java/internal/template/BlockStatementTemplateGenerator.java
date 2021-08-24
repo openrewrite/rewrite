@@ -100,10 +100,12 @@ public class BlockStatementTemplateGenerator {
                         return statement;
                     }
 
-                    if (statement.getPrefix().hasComment(TEMPLATE_COMMENT)) {
-                        blockEnclosingTemplateComment = getCursor().firstEnclosing(J.Block.class);
-                        statements.add(statement.withPrefix(Space.EMPTY));
-                        return statement;
+                    for (Comment comment : statement.getPrefix().getComments()) {
+                        if(comment instanceof TextComment && ((TextComment) comment).getText().equals(TEMPLATE_COMMENT)) {
+                            blockEnclosingTemplateComment = getCursor().firstEnclosing(J.Block.class);
+                            statements.add(statement.withPrefix(Space.EMPTY));
+                            return statement;
+                        }
                     }
                 }
 

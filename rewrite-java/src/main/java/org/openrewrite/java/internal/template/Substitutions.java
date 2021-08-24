@@ -27,6 +27,7 @@ import org.openrewrite.java.tree.*;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @RequiredArgsConstructor
@@ -248,9 +249,11 @@ public class Substitutions {
             @Nullable
             private Integer parameterIndex(Space space) {
                 for (Comment comment : space.getComments()) {
-                    java.util.regex.Matcher matcher = PATTERN_COMMENT.matcher(comment.getText());
-                    if (matcher.matches()) {
-                        return Integer.valueOf(matcher.group(1));
+                    if(comment instanceof TextComment) {
+                        Matcher matcher = PATTERN_COMMENT.matcher(((TextComment) comment).getText());
+                        if (matcher.matches()) {
+                            return Integer.valueOf(matcher.group(1));
+                        }
                     }
                 }
                 return null;

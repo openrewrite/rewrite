@@ -234,14 +234,6 @@ class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
         }
 
         if (space.getComments().isEmpty()) {
-            if (!StringUtils.isNullOrEmpty(space.getWhitespace())) {
-                if (style.getUseTabCharacter()) {
-                    space = space.withWhitespace(space.getWhitespace().replaceAll(" ", ""));
-                } else {
-                    space = space.withWhitespace(space.getWhitespace().replaceAll("\t", ""));
-                }
-            }
-
             int indent = findIndent(space);
             if (indent != column) {
                 int shift = column - indent;

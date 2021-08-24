@@ -15,19 +15,12 @@
  */
 package org.openrewrite.java
 
-import com.google.common.io.CharSink
-import com.google.common.io.CharSource
-import com.google.googlejavaformat.java.Formatter
-import com.google.googlejavaformat.java.JavaFormatterOptions
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.TreeVisitor
 import org.openrewrite.java.tree.J
-import java.io.ByteArrayOutputStream
-import java.io.OutputStreamWriter
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.function.Consumer
 
 interface JavaTemplateSubstitutionsTest : JavaRecipeTest {
 
@@ -242,7 +235,6 @@ interface JavaTemplateSubstitutionsTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "if(true) #{}")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitMethodDeclaration(
@@ -276,21 +268,4 @@ interface JavaTemplateSubstitutionsTest : JavaRecipeTest {
             }
         """
     )
-
-    companion object {
-        val print = Consumer<String> { s: String ->
-            try {
-                val bos = ByteArrayOutputStream()
-                Formatter(JavaFormatterOptions.builder().style(JavaFormatterOptions.Style.AOSP).build())
-                    .formatSource(CharSource.wrap(s), object : CharSink() {
-                        override fun openStream() = OutputStreamWriter(bos)
-                    })
-
-//                println(bos.toString(Charsets.UTF_8).trim())
-            } catch (_: Throwable) {
-//                println("Unable to format:")
-//                println(s)
-            }
-        }
-    }
 }

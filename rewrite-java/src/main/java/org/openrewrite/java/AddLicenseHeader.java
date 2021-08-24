@@ -22,8 +22,8 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
-import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.TextComment;
 import org.openrewrite.marker.Markers;
 
 import java.util.Calendar;
@@ -67,7 +67,7 @@ public class AddLicenseHeader extends Recipe {
                             }).replace("\n", "\n * ") + "\n ";
 
                     cu = cu.withComments(Collections.singletonList(
-                            new Comment(Comment.Style.BLOCK, formattedLicenseText, "\n", Markers.EMPTY)
+                            new TextComment(true, formattedLicenseText, "\n", Markers.EMPTY)
                     ));
                 }
                 return cu;

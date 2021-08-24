@@ -80,7 +80,7 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration j = super.visitClassDeclaration(classDecl, p);
-        if(j.getBody() != null) {
+        if (j.getBody() != null) {
             List<JRightPadded<Statement>> statements = j.getBody().getPadding().getStatements();
             j = j.withBody(j.getBody().getPadding().withStatements(ListUtils.map(statements, (i, s) -> {
                 if (i == 0) {
@@ -242,7 +242,10 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private Space minimumLines(Space prefix, int min) {
-        if(prefix.getComments().isEmpty() || prefix.getWhitespace().contains("\n")) {
+        if (prefix.getComments().isEmpty() ||
+                prefix.getWhitespace().contains("\n") ||
+                prefix.getComments().get(0) instanceof Javadoc ||
+                (prefix.getComments().get(0).isMultiline() && prefix.getComments().get(0).printComment().contains("\n"))) {
             return prefix.withWhitespace(minimumLines(prefix.getWhitespace(), min));
         }
 

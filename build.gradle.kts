@@ -147,7 +147,10 @@ subprojects {
         useJUnitPlatform {
             excludeTags("debug")
         }
-        jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
+        jvmArgs = listOf(
+            "-XX:+UnlockDiagnosticVMOptions",
+            "-XX:+ShowHiddenFrames",
+        )
         javaLauncher.set(javaToolchains.launcherFor {
             languageVersion.set(JavaLanguageVersion.of(11))
         })
@@ -160,6 +163,7 @@ subprojects {
     }
 
     configurations.all {
+        exclude("com.google.errorprone", "*")
         resolutionStrategy.cacheDynamicVersionsFor(0, "seconds")
     }
 

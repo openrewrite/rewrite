@@ -15,27 +15,16 @@
  */
 package org.openrewrite.java.internal;
 
-import org.openrewrite.Tree;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JRightPadded;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.marker.Markers;
-
-import java.util.Collections;
 
 public class FormatFirstClassPrefix<P> extends JavaIsoVisitor<P> {
-    private static final J.Block EMPTY_BLOCK = new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-            new JRightPadded<>(false, Space.EMPTY, Markers.EMPTY), Collections.emptyList(), Space.EMPTY);
-
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
-        J.ClassDeclaration c = classDecl;
         J.CompilationUnit cu = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
-        if (c == cu.getClasses().get(0)) {
-            J.ClassDeclaration temp = autoFormat(c.withBody(EMPTY_BLOCK), p);
-            c = c.withPrefix(temp.getPrefix());
+        if (classDecl == cu.getClasses().get(0)) {
+            return autoFormat(classDecl, classDecl.getName(), p, getCursor().getParentOrThrow());
         }
-        return c;
+        return classDecl;
     }
 }

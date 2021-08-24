@@ -40,8 +40,6 @@ class ImportLayoutStyleTest {
             .importStaticAllOthers()
             .build())
 
-        println(style)
-
         val deserialized = mapper.readValue(style, ImportLayoutStyle::class.java)
         assertThat(style).isEqualTo(mapper.writeValueAsString(deserialized))
     }

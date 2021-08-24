@@ -20,7 +20,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 
 import java.io.File;
-import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -82,9 +81,10 @@ public class Java8Parser implements JavaParser {
                 toolsAwareClassLoader = new URLClassLoader(appClassLoader.getURLs(), toolsClassLoader) {
                     @Override
                     protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-                        if (!name.contains("ReloadableJava8Parser") &&
+                        if (!name.contains("ReloadableJava8") &&
                                 !name.startsWith("com.sun.tools") &&
-                                !name.startsWith("com.sun.source")) {
+                                !name.startsWith("com.sun.source") &&
+                                !name.contains("ReloadableTypeMapping")) {
                             return toolsClassLoader.loadClass(name);
                         }
 

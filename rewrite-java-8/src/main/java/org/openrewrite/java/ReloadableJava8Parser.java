@@ -109,8 +109,9 @@ class ReloadableJava8Parser implements JavaParser {
         // for every tree element
         compiler.genEndPos = true;
 
-        // we don't need either of these, so as a minor performance improvement, omit these compiler features
-        compiler.keepComments = false;
+        compiler.keepComments = true;
+
+        // we don't need this, so as a minor performance improvement, omit these compiler features
         compiler.lineDebugInfo = false;
 
         compilerLog.setWriters(new PrintWriter(new Writer() {
@@ -198,7 +199,8 @@ class ReloadableJava8Parser implements JavaParser {
                                 relaxedClassTypeMatching,
                                 styles,
                                 sharedClassTypes,
-                                ctx);
+                                ctx,
+                                context);
                         J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
                         ctxView.increment(JavaExecutionContextView.EVENT_SOURCE_FILE_MAPPED);
                         sample.stop(MetricsHelper.successTags(

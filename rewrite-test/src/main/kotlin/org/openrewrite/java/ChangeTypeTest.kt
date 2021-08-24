@@ -563,6 +563,31 @@ interface ChangeTypeTest : JavaRecipeTest {
         """
     )
 
+    @Test
+    fun javadocs() = assertChanged(
+        recipe = ChangeType("java.util.List", "java.util.Collection"),
+        before = """
+            import java.util.List;
+            
+            /**
+             * {@link List} here
+             */
+            class Test {
+                int n;
+            }
+        """,
+        after = """
+            import java.util.Collection;
+            
+            /**
+             * {@link Collection} here
+             */
+            class Test {
+                int n;
+            }
+        """
+    )
+
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {

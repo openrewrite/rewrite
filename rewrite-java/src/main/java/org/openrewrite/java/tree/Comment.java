@@ -15,29 +15,18 @@
  */
 package org.openrewrite.java.tree;
 
-import lombok.*;
-import lombok.experimental.FieldDefaults;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import org.openrewrite.marker.Markers;
 
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@EqualsAndHashCode
-@Data
-public class Comment {
-    @With
-    Style style;
+@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
+public interface Comment {
+    Markers getMarkers();
+    <C extends Comment> C withMarkers(Markers markers);
 
-    @With
-    String text;
+    String getSuffix();
+    <C extends Comment> C withSuffix(String margin);
 
-    @With
-    String suffix;
+    boolean isMultiline();
 
-    @With
-    Markers markers;
-
-    public enum Style {
-        LINE,
-        BLOCK,
-        JAVADOC
-    }
+    String printComment();
 }

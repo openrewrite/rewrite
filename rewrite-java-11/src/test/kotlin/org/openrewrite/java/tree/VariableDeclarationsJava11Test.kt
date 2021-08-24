@@ -64,12 +64,11 @@ class VariableDeclarationsJava11Test : JavaTreeTest, Java11Test {
         assertThat(TypeUtils.asPrimitive(variableDeclarations.typeExpression!!.type)).isEqualTo(JavaType.Primitive.Long)
         val secondVariable = variableDeclarations.variables[1]
         assertThat(TypeUtils.asPrimitive(secondVariable.type)).isEqualTo(JavaType.Primitive.Long)
-        assertThat(secondVariable.prefix.comments[0].text).isEqualTo(" hello ")
+        assertThat((secondVariable.prefix.comments[0] as TextComment).text).isEqualTo(" hello ")
         assertThat(secondVariable.prefix.comments[0].suffix).isEqualTo("   ")
     }
 
     private fun typeTree(statement : Statement) : J.VarType {
         return (statement as J.VariableDeclarations).typeExpression as J.VarType
     }
-
 }

@@ -101,15 +101,6 @@ public class Space {
         return whitespace == null ? "" : whitespace;
     }
 
-    public boolean hasComment(String comment) {
-        for (Comment c : comments) {
-            if (c.getText().equals(comment)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     public Space withComments(List<Comment> comments) {
         if (comments == this.comments) {
             return this;
@@ -145,7 +136,6 @@ public class Space {
 
         boolean inSingleLineComment = false;
         boolean inMultiLineComment = false;
-        boolean inJavadoc = false;
 
         char last = 0;
 
@@ -155,20 +145,13 @@ public class Space {
                 case '/':
                     if (inSingleLineComment) {
                         comment.append(c);
-                    } else if (last == '/' && !inMultiLineComment && !inJavadoc) {
+                    } else if (last == '/' && !inMultiLineComment) {
                         inSingleLineComment = true;
                         comment = new StringBuilder();
                     } else if (last == '*' && inMultiLineComment && comment.length() > 0) {
                         inMultiLineComment = false;
                         comment.setLength(comment.length() - 1); // trim the last '*'
-                        comments.add(new Comment(Comment.Style.BLOCK, comment.toString(), prefix.toString(), Markers.EMPTY));
-                        prefix = new StringBuilder();
-                        comment = new StringBuilder();
-                        continue;
-                    } else if (last == '*' && inJavadoc && comment.length() > 0) {
-                        inJavadoc = false;
-                        comment.setLength(comment.length() - 1); // trim the last '*'
-                        comments.add(new Comment(Comment.Style.JAVADOC, comment.toString(), prefix.toString(), Markers.EMPTY));
+                        comments.add(new TextComment(true, comment.toString(), prefix.toString(), Markers.EMPTY));
                         prefix = new StringBuilder();
                         comment = new StringBuilder();
                         continue;
@@ -180,11 +163,11 @@ public class Space {
                 case '\n':
                     if (inSingleLineComment) {
                         inSingleLineComment = false;
-                        comments.add(new Comment(Comment.Style.LINE, comment.toString(), prefix.toString(), Markers.EMPTY));
+                        comments.add(new TextComment(false, comment.toString(), prefix.toString(), Markers.EMPTY));
                         prefix = new StringBuilder();
                         comment = new StringBuilder();
                         prefix.append(c);
-                    } else if (!inMultiLineComment && !inJavadoc) {
+                    } else if (!inMultiLineComment) {
                         prefix.append(c);
                     } else {
                         comment.append(c);
@@ -193,19 +176,15 @@ public class Space {
                 case '*':
                     if (inSingleLineComment) {
                         comment.append(c);
-                    } else if (last == '/' && !inMultiLineComment && !inJavadoc) {
+                    } else if (last == '/' && !inMultiLineComment) {
                         inMultiLineComment = true;
-                        comment = new StringBuilder();
-                    } else if (last == '*' && inMultiLineComment && comment.toString().isEmpty()) {
-                        inMultiLineComment = false;
-                        inJavadoc = true;
                         comment = new StringBuilder();
                     } else {
                         comment.append(c);
                     }
                     break;
                 default:
-                    if (inSingleLineComment || inMultiLineComment || inJavadoc) {
+                    if (inSingleLineComment || inMultiLineComment) {
                         comment.append(c);
                     } else {
                         prefix.append(c);
@@ -295,6 +274,7 @@ public class Space {
     }
 
     public enum Location {
+        ANY,
         ANNOTATED_TYPE_PREFIX,
         ANNOTATION_ARGUMENTS,
         ANNOTATION_ARGUMENT_SUFFIX,

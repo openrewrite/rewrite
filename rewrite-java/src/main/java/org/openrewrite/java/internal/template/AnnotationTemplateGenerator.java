@@ -28,13 +28,14 @@ import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
+import java.util.function.UnaryOperator;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.newSetFromMap;
 
 @RequiredArgsConstructor
 public class AnnotationTemplateGenerator {
-    private static final String TEMPLATE_COMMENT = "__TEMPLATE__";
+    private static final String TEMPLATE_COMMENT = "__TEMPLATE_cfcc2025-6662__";
 
     private final Set<String> imports;
 
@@ -57,12 +58,12 @@ public class AnnotationTemplateGenerator {
                         after.insert(0, "static class $Clazz {}");
                     }
 
-                    if(cursor.getParentOrThrow().getValue() instanceof J.ClassDeclaration &&
+                    if (cursor.getParentOrThrow().getValue() instanceof J.ClassDeclaration &&
                             cursor.getParentOrThrow().getParentOrThrow().getValue() instanceof J.CompilationUnit) {
                         after.append("class $Template {}");
                     }
 
-                    return before + "@$Placeholder/*" + TEMPLATE_COMMENT + "*/" + template + "\n" + after;
+                    return before + "/*" + TEMPLATE_COMMENT + "*/" + template + "\n" + after;
                 });
     }
 
@@ -70,18 +71,19 @@ public class AnnotationTemplateGenerator {
         List<J.Annotation> annotations = new ArrayList<>();
 
         new JavaIsoVisitor<Integer>() {
+            @Nullable
+            private Comment filterTemplateComment(Comment comment) {
+                return comment instanceof TextComment && ((TextComment) comment).getText().equals(TEMPLATE_COMMENT) ?
+                        null : comment;
+            }
+
             @Override
             public J.Annotation visitAnnotation(J.Annotation annotation, Integer integer) {
-                if(annotation.getSimpleName().equals("$Placeholder")) {
-                    //noinspection ConstantConditions
-                    return null;
-                }
-                J.Annotation withoutTemplateComment = annotation.withComments(ListUtils.map(annotation.getComments(), it -> {
-                    if(it.getStyle().equals(Comment.Style.BLOCK) && it.getText().equals(TEMPLATE_COMMENT)) {
-                        return null;
-                    }
-                    return it;
-                }));
+                J.Annotation withoutTemplateComment = annotation.withComments(
+                        ListUtils.concatAll(
+                                ListUtils.map(getCursor().getParentOrThrow().<J>getValue().getComments(), this::filterTemplateComment),
+                                ListUtils.map(annotation.getComments(), this::filterTemplateComment)
+                        ));
                 annotations.add(withoutTemplateComment);
                 return annotation;
             }
@@ -106,7 +108,7 @@ public class AnnotationTemplateGenerator {
                 before.insert(0, cu.getPackageDeclaration().withPrefix(Space.EMPTY).printTrimmed() + ";\n");
             }
             List<J.ClassDeclaration> classes = cu.getClasses();
-            if(!classes.get(classes.size() - 1).getName().getSimpleName().equals("$Placeholder")) {
+            if (!classes.get(classes.size() - 1).getName().getSimpleName().equals("$Placeholder")) {
                 after.append("@interface $Placeholder {}");
             }
             return;
@@ -183,7 +185,7 @@ public class AnnotationTemplateGenerator {
     private void classDeclaration(StringBuilder before, J.ClassDeclaration parent, Set<J> templated) {
         J.ClassDeclaration c = parent;
         for (Statement statement : c.getBody().getStatements()) {
-            if(templated.contains(statement)) {
+            if (templated.contains(statement)) {
                 continue;
             }
 

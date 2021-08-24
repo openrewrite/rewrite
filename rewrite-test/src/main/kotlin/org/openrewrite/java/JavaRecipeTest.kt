@@ -16,6 +16,7 @@
 package org.openrewrite.java
 
 import org.intellij.lang.annotations.Language
+import org.junit.jupiter.api.BeforeEach
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.java.tree.J
@@ -27,6 +28,11 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
         get() = JavaParser.fromJavaVersion()
             .logCompilationWarningsAndErrors(true)
             .build()
+
+    @BeforeEach
+    fun beforeRecipe() {
+        J.clearCaches()
+    }
 
     fun assertChanged(
         recipe: Recipe = this.recipe!!,

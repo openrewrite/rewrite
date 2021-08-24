@@ -404,4 +404,65 @@ public class StringUtils {
         return pm.matches(path);
     }
 
+    public static String indent(String text) {
+        StringBuilder indent = new StringBuilder();
+        for (char c : text.toCharArray()) {
+            if (c == '\n' || c == '\r') {
+                return indent.toString();
+            } else if (Character.isWhitespace(c)) {
+                indent.append(c);
+            } else {
+                return indent.toString();
+            }
+        }
+        return indent.toString();
+    }
+
+    /**
+     * Locate the greatest common margin of a multi-line string
+     *
+     * @param multiline A string of one or more lines.
+     * @return The greatest common margin consisting only of whitespace characters.
+     */
+    public static String greatestCommonMargin(String multiline) {
+        String gcm = null;
+        StringBuilder margin = new StringBuilder();
+        boolean skipRestOfLine = false;
+        char[] charArray = multiline.toCharArray();
+        for (int i = 0; i < charArray.length; i++) {
+            char c = charArray[i];
+            if (c == '\n') {
+                if (i < charArray.length - 1 && charArray[i + 1] == '\n') {
+                    i++;
+                    continue;
+                } else if(i > 0) {
+                    if (margin.length() == 0) {
+                        return "";
+                    } else {
+                        gcm = commonMargin(gcm, margin);
+                        margin = new StringBuilder();
+                    }
+                }
+                skipRestOfLine = false;
+            } else if (Character.isWhitespace(c) && !skipRestOfLine) {
+                margin.append(c);
+            } else {
+                skipRestOfLine = true;
+            }
+        }
+        return gcm == null ? "" : gcm;
+    }
+
+    public static String commonMargin(@Nullable CharSequence s1, CharSequence s2) {
+        if (s1 == null) {
+            String s = s2.toString();
+            return s.substring(s.lastIndexOf('\n') + 1);
+        }
+        for (int i = 0; i < s1.length() && i < s2.length(); i++) {
+            if (s1.charAt(i) != s2.charAt(i) || !Character.isWhitespace(s1.charAt(i))) {
+                return s1.toString().substring(0, i);
+            }
+        }
+        return s2.length() < s1.length() ? s2.toString() : s1.toString();
+    }
 }

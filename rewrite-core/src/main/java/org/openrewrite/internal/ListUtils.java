@@ -24,6 +24,7 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
 public final class ListUtils {
@@ -189,15 +190,25 @@ public final class ListUtils {
         return flatMap(ls, (i, t) -> flatMap.apply(t));
     }
 
-    public static <T> List<T> concat(@Nullable List<T> ls, T t) {
+    public static <T> List<T> concat(@Nullable List<T> ls, @Nullable T t) {
+        if(t == null && ls == null) {
+            return emptyList();
+        }
         List<T> newLs = ls == null ? new ArrayList<>(1) : new ArrayList<>(ls);
-        newLs.add(t);
+        if(t != null) {
+            newLs.add(t);
+        }
         return newLs;
     }
 
-    public static <T> List<T> concat(T t, @Nullable List<T> ls) {
+    public static <T> List<T> concat(@Nullable T t, @Nullable List<T> ls) {
+        if(t == null && ls == null) {
+            return emptyList();
+        }
         List<T> newLs = ls == null ? new ArrayList<>(1) : new ArrayList<>(ls.size() + 1);
-        newLs.add(t);
+        if(t != null) {
+            newLs.add(t);
+        }
         if (ls != null) {
             newLs.addAll(ls);
         }

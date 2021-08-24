@@ -16,6 +16,8 @@
 package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
+import org.openrewrite.Cursor;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -73,9 +75,9 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
         // No need to add imports for classes within the same package
         int dotIndex = classType.getFullyQualifiedName().lastIndexOf('.');
-        if(cu.getPackageDeclaration() != null && dotIndex >= 0) {
+        if (cu.getPackageDeclaration() != null && dotIndex >= 0) {
             String packageName = classType.getFullyQualifiedName().substring(0, dotIndex);
-            if(packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed())) {
+            if (packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed())) {
                 return cu;
             }
         }
@@ -110,19 +112,24 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
         List<JRightPadded<J.Import>> imports = new ArrayList<>(cu.getPadding().getImports());
 
-        if (imports.isEmpty()) {
-            if (cu.getPackageDeclaration() == null && cu.getClasses().get(0).getPrefix().getComments().isEmpty()) {
-                importToAdd = importToAdd.withPrefix(cu.getClasses().get(0).getPrefix());
-            } else if (cu.getPackageDeclaration() == null) {
-                importToAdd = importToAdd.withPrefix(cu.getClasses().get(0).getPrefix().withComments(new ArrayList<>()));
-                TabsAndIndentsStyle tabsAndIndentsStyle = Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
-                        .orElse(IntelliJ.tabsAndIndents());
-                String addNewLine = tabsAndIndentsStyle.getUseCRLFNewLines() ? "\r\n\r\n" : "\n\n";
-                cu.getClasses().set(0, cu.getClasses().get(0).withPrefix(cu.getClasses().get(0).getPrefix().withWhitespace(addNewLine + cu.getClasses().get(0).getPrefix().getWhitespace())));
+        if (imports.isEmpty() && !cu.getClasses().isEmpty()) {
+            if (cu.getPackageDeclaration() == null) {
+                // leave javadocs on the class and move other comments up to the import
+                // (which could include license headers and the like)
+                Space firstClassPrefix = cu.getClasses().get(0).getPrefix();
+                importToAdd = importToAdd.withPrefix(firstClassPrefix
+                        .withComments(ListUtils.map(firstClassPrefix.getComments(), comment -> comment instanceof Javadoc ? null : comment))
+                        .withWhitespace(""));
+
+                cu = cu.withClasses(ListUtils.map(cu.getClasses(), (i, clazz) -> {
+                    Space prefix = clazz.getPrefix();
+                    return i == 0 ?
+                            clazz.withPrefix(prefix.withComments(ListUtils.map(prefix.getComments(),
+                                    comment -> comment instanceof Javadoc ? comment : null))) :
+                            clazz;
+                }));
             } else {
-                TabsAndIndentsStyle tabsAndIndentsStyle = Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
-                        .orElse(IntelliJ.tabsAndIndents());
-                importToAdd = importToAdd.withPrefix(Space.format(tabsAndIndentsStyle.getUseCRLFNewLines() ? "\r\n\r\n" : "\n\n"));
+                importToAdd = importToAdd.withPrefix(Space.format("\n\n"));
             }
         }
 
@@ -138,7 +145,9 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         cu = cu.getPadding().withImports(layoutStyle.addImport(cu.getPadding().getImports(), importToAdd,
                 cu.getPackageDeclaration(), classpath));
 
-        doAfterVisit(new FormatFirstClassPrefix<>());
+        J.CompilationUnit c = cu;
+        cu = cu.withClasses(ListUtils.map(cu.getClasses(), (i, clazz) -> i == 0 ?
+                autoFormat(clazz, clazz.getName(), p, new Cursor(null, c)) : clazz));
 
         return cu;
     }
@@ -146,7 +155,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
     private boolean isTypeReference(NameTree t) {
         boolean isTypRef = true;
         if (t instanceof J.FieldAccess) {
-            isTypRef = TypeUtils.isOfClassType(((J.FieldAccess)t).getTarget().getType(), type);
+            isTypRef = TypeUtils.isOfClassType(((J.FieldAccess) t).getTarget().getType(), type);
         }
         return isTypRef;
     }
@@ -176,7 +185,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
         //For static imports, we are either looking for a specific method or a wildcard.
         for (J invocation : FindMethods.find(compilationUnit, type + " *(..)")) {
-            if(invocation instanceof J.MethodInvocation) {
+            if (invocation instanceof J.MethodInvocation) {
                 J.MethodInvocation mi = (J.MethodInvocation) invocation;
                 if (mi.getSelect() == null &&
                         (statik.equals("*") || mi.getName().getSimpleName().equals(statik))) {

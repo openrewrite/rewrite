@@ -15,6 +15,14 @@
  */
 package org.openrewrite.java
 
+import org.junit.jupiter.api.BeforeEach
+import org.openrewrite.java.tree.J
+
 interface Java11Test {
     fun javaParser(): Java11Parser.Builder = Java11Parser.builder()
+
+    @BeforeEach
+    fun before() {
+        J.clearCaches()
+    }
 }

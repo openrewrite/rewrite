@@ -713,13 +713,12 @@ interface AddImportTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, """
-                    /**
-                     * Do suppress those warnings
-                     */
-                    @SuppressWarnings("other")
-                """.trimIndent())
-                    //.doBeforeParseTemplate(print)
-                    .build()
+                        /**
+                         * Do suppress those warnings
+                         */
+                        @SuppressWarnings("other")
+                    """.trimIndent()
+                ).build()
 
                 override fun visitClassDeclaration(
                     classDecl: J.ClassDeclaration,

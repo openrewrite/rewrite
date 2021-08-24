@@ -150,6 +150,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class FindDeprecatedMethodsTck : FindDeprecatedMethodsTest
 
     @Nested
+    inner class FindMethodsTck : FindMethodsTest
+
+    @Nested
     inner class FindTextTck : FindTextTest
 
     @Nested
@@ -222,13 +225,16 @@ abstract class JavaVisitorCompatibilityKit {
     inner class NoStaticImportTck : NoStaticImportTest
 
     @Nested
+    inner class NormalizeFormatTck : NormalizeFormatTest
+
+    @Nested
+    inner class NormalizeTabsOrSpacesTck : NormalizeTabsOrSpacesTest
+
+    @Nested
     inner class NoWhitespaceAfterTck : NoWhitespaceAfterTest
 
     @Nested
     inner class NoWhitespaceBeforeTck : NoWhitespaceBeforeTest
-
-    @Nested
-    inner class NormalizeFormatTck : NormalizeFormatTest
 
     @Nested
     inner class OperatorWrapTck : OperatorWrapTest

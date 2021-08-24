@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java;
 
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -25,14 +27,18 @@ import javax.tools.JavaFileObject;
 import java.io.*;
 import java.net.URI;
 import java.nio.file.Path;
-import java.util.Objects;
 
 /**
  * So that {@link JavaParser} can ingest source files from {@link InputStream} sources
  * other than a file on disk.
  */
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Java8ParserInputFileObject implements JavaFileObject {
-    @Nullable private final Path path;
+    @EqualsAndHashCode.Include
+    @Nullable
+    private final Path path;
+
+    @Getter
     private final Parser.Input input;
 
     public Java8ParserInputFileObject(Parser.Input input) {
@@ -111,21 +117,5 @@ public class Java8ParserInputFileObject implements JavaFileObject {
     @Override
     public Modifier getAccessLevel() {
         return Modifier.PUBLIC;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Java8ParserInputFileObject that = (Java8ParserInputFileObject) o;
-        if (path == null) {
-            return that.path == null;
-        }
-        return path.equals(that.path);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(path);
     }
 }

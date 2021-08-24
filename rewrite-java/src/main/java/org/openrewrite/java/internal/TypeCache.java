@@ -57,36 +57,42 @@ public class TypeCache {
 
             @Override
             public <N extends NameTree> N visitTypeName(N nameTree, Integer p) {
+                visitSpace(nameTree.getPrefix(), Space.Location.ANY, p);
                 types.add(nameTree.getType());
                 return super.visitTypeName(nameTree, p);
             }
 
             @Override
             public J.ArrayAccess visitArrayAccess(J.ArrayAccess arrayAccess, Integer p) {
+                visitSpace(arrayAccess.getPrefix(), Space.Location.ANY, p);
                 types.add(arrayAccess.getType());
                 return super.visitArrayAccess(arrayAccess, p);
             }
 
             @Override
             public J.Assignment visitAssignment(J.Assignment assignment, Integer p) {
+                visitSpace(assignment.getPrefix(), Space.Location.ANY, p);
                 types.add(assignment.getType());
                 return super.visitAssignment(assignment, p);
             }
 
             @Override
             public J.AssignmentOperation visitAssignmentOperation(J.AssignmentOperation assignOp, Integer p) {
+                visitSpace(assignOp.getPrefix(), Space.Location.ANY, p);
                 types.add(assignOp.getType());
                 return super.visitAssignmentOperation(assignOp, p);
             }
 
             @Override
             public J.Binary visitBinary(J.Binary binary, Integer p) {
+                visitSpace(binary.getPrefix(), Space.Location.ANY, p);
                 types.add(binary.getType());
                 return super.visitBinary(binary, p);
             }
 
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration c, Integer p) {
+                visitSpace(c.getPrefix(), Space.Location.ANY, p);
                 for (J.Annotation annotation : c.getAllAnnotations()) {
                     visit(annotation, p);
                 }
@@ -105,6 +111,7 @@ public class TypeCache {
 
             @Override
             public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                visitSpace(identifier.getPrefix(), Space.Location.ANY, p);
                 types.add(identifier.getType());
                 types.add(identifier.getFieldType());
                 return super.visitIdentifier(identifier, p);
@@ -112,11 +119,13 @@ public class TypeCache {
 
             @Override
             public J.Import visitImport(J.Import impoort, Integer p) {
+                visitSpace(impoort.getPrefix(), Space.Location.ANY, p);
                 return impoort;
             }
 
             @Override
             public J.Package visitPackage(J.Package pkg, Integer p) {
+                visitSpace(pkg.getPrefix(), Space.Location.ANY, p);
                 for (J.Annotation annotation : pkg.getAnnotations()) {
                     visit(annotation, p);
                 }
@@ -125,37 +134,43 @@ public class TypeCache {
 
             @Override
             public J.InstanceOf visitInstanceOf(J.InstanceOf instanceOf, Integer p) {
+                visitSpace(instanceOf.getPrefix(), Space.Location.ANY, p);
                 types.add(instanceOf.getType());
                 return super.visitInstanceOf(instanceOf, p);
             }
 
             @Override
             public J.Lambda visitLambda(J.Lambda lambda, Integer p) {
+                visitSpace(lambda.getPrefix(), Space.Location.ANY, p);
                 types.add(lambda.getType());
                 return super.visitLambda(lambda, p);
             }
 
             @Override
             public J.Literal visitLiteral(J.Literal literal, Integer p) {
+                visitSpace(literal.getPrefix(), Space.Location.ANY, p);
                 types.add(literal.getType());
                 return super.visitLiteral(literal, p);
             }
 
             @Override
             public J.MemberReference visitMemberReference(J.MemberReference memberRef, Integer p) {
+                visitSpace(memberRef.getPrefix(), Space.Location.ANY, p);
                 types.add(memberRef.getType());
                 types.add(memberRef.getReferenceType());
                 return super.visitMemberReference(memberRef, p);
             }
 
             @Override
-            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Integer integer) {
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Integer p) {
+                visitSpace(method.getPrefix(), Space.Location.ANY, p);
                 declaredMethods.add(method.getType());
-                return super.visitMethodDeclaration(method, integer);
+                return super.visitMethodDeclaration(method, p);
             }
 
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                visitSpace(method.getPrefix(), Space.Location.ANY, p);
                 types.add(method.getType());
                 types.add(method.getReturnType());
                 return super.visitMethodInvocation(method, p);
@@ -163,54 +178,63 @@ public class TypeCache {
 
             @Override
             public J.MultiCatch visitMultiCatch(J.MultiCatch multiCatch, Integer p) {
+                visitSpace(multiCatch.getPrefix(), Space.Location.ANY, p);
                 types.add(multiCatch.getType());
                 return super.visitMultiCatch(multiCatch, p);
             }
 
             @Override
             public J.NewArray visitNewArray(J.NewArray newArray, Integer p) {
+                visitSpace(newArray.getPrefix(), Space.Location.ANY, p);
                 types.add(newArray.getType());
                 return super.visitNewArray(newArray, p);
             }
 
             @Override
             public J.NewClass visitNewClass(J.NewClass newClass, Integer p) {
+                visitSpace(newClass.getPrefix(), Space.Location.ANY, p);
                 types.add(newClass.getType());
                 return super.visitNewClass(newClass, p);
             }
 
             @Override
             public J.ParameterizedType visitParameterizedType(J.ParameterizedType type, Integer p) {
+                visitSpace(type.getPrefix(), Space.Location.ANY, p);
                 types.add(type.getType());
                 return super.visitParameterizedType(type, p);
             }
 
             @Override
             public J.Primitive visitPrimitive(J.Primitive primitive, Integer p) {
+                visitSpace(primitive.getPrefix(), Space.Location.ANY, p);
                 types.add(primitive.getType());
                 return super.visitPrimitive(primitive, p);
             }
 
             @Override
             public J.Ternary visitTernary(J.Ternary ternary, Integer p) {
+                visitSpace(ternary.getPrefix(), Space.Location.ANY, p);
                 types.add(ternary.getType());
                 return super.visitTernary(ternary, p);
             }
 
             @Override
             public J.TypeCast visitTypeCast(J.TypeCast typeCast, Integer p) {
+                visitSpace(typeCast.getPrefix(), Space.Location.ANY, p);
                 types.add(typeCast.getType());
                 return super.visitTypeCast(typeCast, p);
             }
 
             @Override
             public J.Unary visitUnary(J.Unary unary, Integer p) {
+                visitSpace(unary.getPrefix(), Space.Location.ANY, p);
                 types.add(unary.getType());
                 return super.visitUnary(unary, p);
             }
 
             @Override
             public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                visitSpace(variable.getPrefix(), Space.Location.ANY, p);
                 types.add(variable.getType());
                 return super.visitVariable(variable, p);
             }

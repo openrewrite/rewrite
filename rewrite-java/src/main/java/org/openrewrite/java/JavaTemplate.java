@@ -179,7 +179,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                 }
                             }
                             return autoFormat(c, c.getLeadingAnnotations().get(c.getLeadingAnnotations().size() - 1), p,
-                                    getCursor());
+                                    getCursor().getParentOrThrow());
                         }
                         case EXTENDS: {
                             TypeTree anExtends = substitutions.unsubstitute(templateParser.parseExtends(substitutedTemplate));

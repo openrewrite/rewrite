@@ -22,7 +22,6 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.*;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
@@ -158,7 +157,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     private Space withNewline(Space space) {
         if (space.getComments().isEmpty()) {
             space = space.withWhitespace("\n" + space.getWhitespace());
-        } else if (space.getComments().get(space.getComments().size()-1).getStyle() == Comment.Style.BLOCK) {
+        } else if (space.getComments().get(space.getComments().size()-1).isMultiline()) {
             space = space.withComments(ListUtils.mapLast(space.getComments(), c -> c.withSuffix("\n")));
         }
 

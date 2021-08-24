@@ -15,10 +15,6 @@
  */
 package org.openrewrite.java
 
-import com.google.common.io.CharSink
-import com.google.common.io.CharSource
-import com.google.googlejavaformat.java.Formatter
-import com.google.googlejavaformat.java.JavaFormatterOptions
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
@@ -26,10 +22,7 @@ import org.openrewrite.Issue
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 import org.openrewrite.java.tree.Space
-import java.io.ByteArrayOutputStream
-import java.io.OutputStreamWriter
 import java.util.Comparator.comparing
-import java.util.function.Consumer
 
 @Suppress("Convert2MethodRef")
 interface JavaTemplateTest : JavaRecipeTest {
@@ -144,13 +137,15 @@ interface JavaTemplateTest : JavaRecipeTest {
     @Test
     fun replaceMethodInvocationWithArray(jp: JavaParser) = assertChanged(
         jp,
-        dependsOn = arrayOf("""
+        dependsOn = arrayOf(
+            """
             package org.openrewrite;
             public class Test {
                 public void method(int[] val) {}
                 public void method(int[] val1, String val2) {}
             }
-        """.trimIndent()),
+        """.trimIndent()
+        ),
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "#{anyArray(int)}").build()
@@ -236,7 +231,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "int m, java.util.List<String> n")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitMethodDeclaration(
@@ -302,7 +296,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "Object[]... values")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitMethodDeclaration(
@@ -362,7 +355,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "int n, #{}")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitMethodDeclaration(
@@ -370,9 +362,11 @@ interface JavaTemplateTest : JavaRecipeTest {
                     p: ExecutionContext
                 ): J.MethodDeclaration {
                     if (method.simpleName == "test" && method.parameters.size == 1) {
-                        return method.withTemplate(t,
+                        return method.withTemplate(
+                            t,
                             method.coordinates.replaceParameters(),
-                            method.parameters[0])
+                            method.parameters[0]
+                        )
                     }
                     return method
                 }
@@ -411,7 +405,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "int m, int n")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitLambda(lambda: J.Lambda, p: ExecutionContext): J.Lambda =
@@ -443,12 +436,12 @@ interface JavaTemplateTest : JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor },
+                val t = JavaTemplate.builder(
+                    { cursor },
                     "if(n != 1) {\n" +
                             "  n++;\n" +
                             "}"
                 )
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitAssert(_assert: J.Assert, p: ExecutionContext): J =
@@ -475,13 +468,13 @@ interface JavaTemplateTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("UnusedAssignment")
     @Test
     fun replaceStatementInBlock(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.logCompilationWarningsAndErrors(true).build(),
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "n = 2;\nn = 3;")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
@@ -520,7 +513,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "assert n == 0;")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
@@ -557,7 +549,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "n = 1;")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
@@ -593,7 +584,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "int n;")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J {
@@ -621,7 +611,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "n = 1;")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
@@ -658,7 +647,6 @@ interface JavaTemplateTest : JavaRecipeTest {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "List<String> s = null;")
                     .imports("java.util.List")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitAssert(_assert: J.Assert, p: ExecutionContext): J {
@@ -694,7 +682,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "m, Integer.valueOf(n), \"foo\"")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitMethodInvocation(
@@ -742,7 +729,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "@Deprecated")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitAnnotation(annotation: J.Annotation, p: ExecutionContext): J.Annotation {
@@ -763,7 +749,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "@SuppressWarnings(\"other\")")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitMethodDeclaration(
@@ -816,7 +801,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "@SuppressWarnings(\"other\")")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitClassDeclaration(
@@ -855,7 +839,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "@SuppressWarnings(\"other\")")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitVariableDeclarations(
@@ -897,7 +880,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "@Deprecated")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitVariableDeclarations(
@@ -958,7 +940,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "@SuppressWarnings(\"ALL\")")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitVariableDeclarations(
@@ -966,8 +947,10 @@ interface JavaTemplateTest : JavaRecipeTest {
                     p: ExecutionContext,
                 ): J.VariableDeclarations {
                     if (multiVariable.leadingAnnotations.size == 0) {
-                        return multiVariable.withTemplate(t,
-                            multiVariable.coordinates.addAnnotation(comparing { it.simpleName }))
+                        return multiVariable.withTemplate(
+                            t,
+                            multiVariable.coordinates.addAnnotation(comparing { it.simpleName })
+                        )
                     }
                     return super.visitVariableDeclarations(multiVariable, p)
                 }
@@ -999,7 +982,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "@SuppressWarnings(\"other\")")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitMethodDeclaration(
@@ -1038,7 +1020,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "@SuppressWarnings(\"other\")")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitClassDeclaration(
@@ -1046,8 +1027,10 @@ interface JavaTemplateTest : JavaRecipeTest {
                     p: ExecutionContext
                 ): J.ClassDeclaration {
                     if (classDecl.leadingAnnotations.size == 0 && classDecl.simpleName != "Test") {
-                        return classDecl.withTemplate(t,
-                            classDecl.coordinates.addAnnotation(comparing { it.simpleName }))
+                        return classDecl.withTemplate(
+                            t,
+                            classDecl.coordinates.addAnnotation(comparing { it.simpleName })
+                        )
                     }
                     return super.visitClassDeclaration(classDecl, p)
                 }
@@ -1076,7 +1059,6 @@ interface JavaTemplateTest : JavaRecipeTest {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "Serializable, Closeable")
                     .imports("java.io.*")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitClassDeclaration(
@@ -1112,7 +1094,6 @@ interface JavaTemplateTest : JavaRecipeTest {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "List<String>")
                     .imports("java.util.*")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitClassDeclaration(
@@ -1146,7 +1127,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "Exception")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitMethodDeclaration(
@@ -1183,12 +1163,10 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val typeParamsTemplate = JavaTemplate.builder({ cursor }, "T, U")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 val methodArgsTemplate = JavaTemplate.builder({ cursor }, "List<T> t, U u")
                     .imports("java.util.List")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitMethodDeclaration(
@@ -1196,8 +1174,10 @@ interface JavaTemplateTest : JavaRecipeTest {
                     p: ExecutionContext
                 ): J.MethodDeclaration {
                     if (method.typeParameters == null) {
-                        return method.withTemplate<J.MethodDeclaration>(typeParamsTemplate,
-                            method.coordinates.replaceTypeParameters())
+                        return method.withTemplate<J.MethodDeclaration>(
+                            typeParamsTemplate,
+                            method.coordinates.replaceTypeParameters()
+                        )
                             .withTemplate(methodArgsTemplate, method.coordinates.replaceParameters())
                     }
                     return super.visitMethodDeclaration(method, p)
@@ -1252,7 +1232,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "T, U")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitClassDeclaration(
@@ -1282,7 +1261,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "n = 1;")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
@@ -1318,7 +1296,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "")
-                    .doBeforeParseTemplate(print)
                     .build()
 
                 override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
@@ -1354,14 +1331,14 @@ interface JavaTemplateTest : JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, """
-                /**
-                 * Do suppress those warnings
-                 */
-                @SuppressWarnings("other")
-            """.trimIndent())
-                    .doBeforeParseTemplate(print)
-                    .build()
+                val t = JavaTemplate.builder(
+                    { cursor }, """
+                        /**
+                         * Do suppress those warnings
+                         */
+                        @SuppressWarnings("other")
+                    """.trimIndent()
+                ).build()
 
                 override fun visitClassDeclaration(
                     classDecl: J.ClassDeclaration,
@@ -1398,21 +1375,4 @@ interface JavaTemplateTest : JavaRecipeTest {
             }
         """
     )
-
-    companion object {
-        val print = Consumer<String> { s: String ->
-            try {
-                val bos = ByteArrayOutputStream()
-                Formatter(JavaFormatterOptions.builder().style(JavaFormatterOptions.Style.AOSP).build())
-                    .formatSource(CharSource.wrap(s), object : CharSink() {
-                        override fun openStream() = OutputStreamWriter(bos)
-                    })
-
-//                println(bos.toString(Charsets.UTF_8).trim())
-            } catch (_: Throwable) {
-//                println("Unable to format:")
-//                println(s)
-            }
-        }
-    }
 }

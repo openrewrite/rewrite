@@ -17,11 +17,14 @@ package org.openrewrite.java;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
-import com.sun.tools.javac.code.*;
-import com.sun.tools.javac.code.Type.*;
+import com.sun.tools.javac.code.Flags;
+import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.tree.DCTree;
+import com.sun.tools.javac.tree.DocCommentTable;
 import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
+import com.sun.tools.javac.util.Context;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -61,19 +64,18 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
     private final static int SURR_FIRST = 0xD800;
     private final static int SURR_LAST = 0xDFFF;
 
-    public static final int KIND_BITMASK_INTERFACE = 1 << 9;
-    public static final int KIND_BITMASK_ANNOTATION = 1 << 13;
-    public static final int KIND_BITMASK_ENUM = 1 << 14;
-
     private final Path sourcePath;
     private final String source;
-    private final boolean relaxedClassTypeMatching;
     private final Collection<NamedStyles> styles;
-    private final Map<String, JavaType.Class> sharedClassTypes;
     private final ExecutionContext ctx;
+    private final Context context;
+    private final ReloadableTypeMapping typeMapping;
 
     @SuppressWarnings("NotNullFieldNotInitialized")
     private EndPosTable endPosTable;
+
+    @SuppressWarnings("NotNullFieldNotInitialized")
+    private DocCommentTable docCommentTable;
 
     private int cursor = 0;
 
@@ -82,13 +84,13 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
     public ReloadableJava8ParserVisitor(Path sourcePath, String source, boolean relaxedClassTypeMatching,
                                         Collection<NamedStyles> styles, Map<String, JavaType.Class> sharedClassTypes,
-                                        ExecutionContext ctx) {
+                                        ExecutionContext ctx, Context context) {
         this.sourcePath = sourcePath;
         this.source = source;
-        this.relaxedClassTypeMatching = relaxedClassTypeMatching;
         this.styles = styles;
-        this.sharedClassTypes = sharedClassTypes;
         this.ctx = ctx;
+        this.context = context;
+        this.typeMapping = new ReloadableTypeMapping(relaxedClassTypeMatching, sharedClassTypes);
     }
 
     @Override
@@ -143,7 +145,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 convert(node.getExpression()),
                 new J.ArrayDimension(randomId(), sourceBefore("["), Markers.EMPTY,
                         convert(node.getIndex(), t -> sourceBefore("]"))),
-                type(node)
+                typeMapping.type(node)
         );
     }
 
@@ -187,7 +189,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         return new J.Assignment(randomId(), fmt, Markers.EMPTY,
                 convert(node.getVariable()),
                 padLeft(sourceBefore("="), convert(node.getExpression())),
-                type(node));
+                typeMapping.type(node));
     }
 
     @Override
@@ -278,7 +280,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         return new J.Binary(randomId(), fmt, Markers.EMPTY, left, padLeft(opPrefix, op),
-                convert(node.getRightOperand()), type(node));
+                convert(node.getRightOperand()), typeMapping.type(node));
     }
 
     @Override
@@ -370,7 +372,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         J.Identifier name = J.Identifier.build(randomId(), sourceBefore(node.getSimpleName().toString()),
-                Markers.EMPTY, ((JCClassDecl) node).getSimpleName().toString(), type(node));
+                Markers.EMPTY, ((JCClassDecl) node).getSimpleName().toString(), typeMapping.type(node));
 
         JContainer<J.TypeParameter> typeParams = node.getTypeParameters().isEmpty() ? null : JContainer.build(
                 sourceBefore("<"),
@@ -449,17 +451,22 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         J.Block body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
                 members, sourceBefore("}"));
 
-        return new J.ClassDeclaration(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), kind, name, typeParams, extendings, implementings, body, (JavaType.FullyQualified) type(node));
+        return new J.ClassDeclaration(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), kind, name, typeParams, extendings, implementings, body, (JavaType.FullyQualified) typeMapping.type(node));
     }
 
     @Override
     public J visitCompilationUnit(CompilationUnitTree node, Space fmt) {
-
         JCCompilationUnit cu = (JCCompilationUnit) node;
-        fmt = format(source.substring(0, cu.getStartPosition()));
-        cursor(cu.getStartPosition());
+
+        if (node.getTypeDecls().isEmpty() || cu.getPackageName() != null || !node.getImports().isEmpty()) {
+            // if the package and imports are empty, allow the formatting to apply to the first class declaration.
+            // in this way, javadoc comments are interpreted as javadocs on that class declaration.
+            fmt = format(source.substring(0, cu.getStartPosition()));
+            cursor(cu.getStartPosition());
+        }
 
         endPosTable = cu.endPositions;
+        docCommentTable = cu.docComments;
 
         Map<Integer, JCAnnotation> annotationPosTable = new HashMap<>();
         for (AnnotationTree annotationNode : node.getPackageAnnotations()) {
@@ -543,7 +550,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         return new J.AssignmentOperation(randomId(), fmt, Markers.EMPTY, left,
-                padLeft(opPrefix, op), convert(((JCAssignOp) node).rhs), type(node));
+                padLeft(opPrefix, op), convert(((JCAssignOp) node).rhs), typeMapping.type(node));
     }
 
     @Override
@@ -552,7 +559,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 convert(node.getCondition()),
                 padLeft(sourceBefore("?"), convert(node.getTrueExpression())),
                 padLeft(sourceBefore(":"), convert(node.getFalseExpression())),
-                type(node));
+                typeMapping.type(node));
     }
 
     @Override
@@ -598,7 +605,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             skip(node.getName().toString());
         }
 
-        J.Identifier name = J.Identifier.build(randomId(), nameSpace, Markers.EMPTY, node.getName().toString(), type(node));
+        J.Identifier name = J.Identifier.build(randomId(), nameSpace, Markers.EMPTY, node.getName().toString(), typeMapping.type(node));
 
         J.NewClass initializer = null;
         if (source.charAt(endPos(node) - 1) == ')' || source.charAt(endPos(node) - 1) == '}') {
@@ -614,7 +621,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         Space ctrlPrefix = sourceBefore("(");
 
         List<JRightPadded<Statement>> init = node.getInitializer().isEmpty() ?
-                singletonList(padRight((Statement) new J.Empty(randomId(), sourceBefore(";"), Markers.EMPTY), EMPTY)) :
+                singletonList(padRight(new J.Empty(randomId(), sourceBefore(";"), Markers.EMPTY), EMPTY)) :
                 convertStatements(node.getInitializer(), t ->
                         positionOfNext(",", ';') == -1 ?
                                 semiDelim.apply(t) :
@@ -649,7 +656,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         cursor += name.length();
 
         JCIdent ident = (JCIdent) node;
-        JavaType type = type(node);
+        JavaType type = typeMapping.type(node);
 
         // we don't map all the possible symbol types here, because in many cases they aren't necessary.
         // for method invocations, the J.MethodInvocation will have type attribution, so having the JavaType.Method on the
@@ -658,7 +665,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         JavaType fieldType = null;
         if (ident.sym instanceof Symbol.VarSymbol) {
             // currently only the first 16 bits are meaningful
-            fieldType = JavaType.Variable.build(name, type(ident.sym.owner.type), (int) ident.sym.flags_field & 0xFFFF);
+            fieldType = JavaType.Variable.build(name, typeMapping.type(ident.sym.owner.type), (int) ident.sym.flags_field & 0xFFFF);
         }
 
         return J.Identifier.build(randomId(), fmt, Markers.EMPTY, name, type, fieldType);
@@ -689,7 +696,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         return new J.InstanceOf(randomId(), fmt, Markers.EMPTY,
                 convert(node.getExpression(), t -> sourceBefore("instanceof")),
                 convert(node.getType()),
-                type(node));
+                typeMapping.type(node));
     }
 
     @Override
@@ -725,7 +732,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             body = convert(node.getBody());
         }
 
-        return new J.Lambda(randomId(), fmt, Markers.EMPTY, params, arrow, body, type(node));
+        return new J.Lambda(randomId(), fmt, Markers.EMPTY, params, arrow, body, typeMapping.type(node));
     }
 
     @Override
@@ -733,7 +740,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         cursor(endPos(node));
         Object value = node.getValue();
         String valueSource = source.substring(((JCLiteral) node).getStartPosition(), endPos(node));
-        JavaType.Primitive type = primitive(((JCTree.JCLiteral) node).typetag);
+        JavaType.Primitive type = typeMapping.primitiveType(((JCTree.JCLiteral) node).typetag);
 
         if (value instanceof Character) {
             char c = (Character) value;
@@ -794,7 +801,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         JavaType referenceType = null;
         if (ref.sym instanceof Symbol.MethodSymbol) {
             Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) ref.sym;
-            referenceType = methodType(methodSymbol.owner.type, methodSymbol, referenceName, new Stack<>());
+            referenceType = typeMapping.methodType(methodSymbol.owner.type, methodSymbol, referenceName, new Stack<>());
         }
 
         return new J.MemberReference(randomId(),
@@ -807,7 +814,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                         Markers.EMPTY,
                         referenceName,
                         null)),
-                type(node),
+                typeMapping.type(node),
                 referenceType);
     }
 
@@ -819,7 +826,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 padLeft(sourceBefore("."), J.Identifier.build(randomId(),
                         sourceBefore(fieldAccess.name.toString()), Markers.EMPTY,
                         fieldAccess.name.toString(), null)),
-                type(node));
+                typeMapping.type(node));
     }
 
     @Override
@@ -855,7 +862,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         Symbol genericSymbol = (jcSelect instanceof JCFieldAccess) ? ((JCFieldAccess) jcSelect).sym : ((JCIdent) jcSelect).sym;
 
         return new J.MethodInvocation(randomId(), fmt, Markers.EMPTY, select, typeParams, name, args,
-                methodType(jcSelect.type, genericSymbol, name.getSimpleName(), new Stack<>()));
+                typeMapping.methodType(jcSelect.type, genericSymbol, name.getSimpleName(), new Stack<>()));
     }
 
     @Override
@@ -933,7 +940,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 modifierResults.getLeadingAnnotations(),
                 modifierResults.getModifiers(), typeParams,
                 returnType, name, params, throwss, body, defaultValue,
-                methodType(jcMethod.type, jcMethod.sym, name.getIdentifier().getSimpleName(), new Stack<>()));
+                typeMapping.methodType(jcMethod.type, jcMethod.sym, name.getIdentifier().getSimpleName(), new Stack<>()));
     }
 
     @Override
@@ -952,7 +959,6 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         } else {
             typeExpr = convertOrNull(jcVarType);
         }
-
 
         List<J.ArrayDimension> dimensions = new ArrayList<>();
         List<? extends ExpressionTree> nodeDimensions = node.getDimensions();
@@ -980,7 +986,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                         convertAll(node.getInitializers(), commaDelim, t -> sourceBefore("}")), Markers.EMPTY);
 
         return new J.NewArray(randomId(), fmt, Markers.EMPTY, typeExpr, dimensions,
-                initializer, type(node));
+                initializer, typeMapping.type(node));
     }
 
     @Override
@@ -1024,11 +1030,12 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         JCNewClass jcNewClass = (JCNewClass) node;
-        JavaType.Method constructorType = methodType(jcNewClass.constructorType, jcNewClass.constructor, "<constructor>", new Stack<>());
+        JavaType.Method constructorType = typeMapping.methodType(jcNewClass.constructorType, jcNewClass.constructor, "<constructor>",
+                new Stack<>());
 
         return new J.NewClass(randomId(), fmt, Markers.EMPTY, encl, whitespaceBeforeNew,
                 clazz, args, body, constructorType,
-                type(jcNewClass.type));
+                typeMapping.type(jcNewClass.type));
     }
 
     @Override
@@ -1293,7 +1300,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 throw new IllegalArgumentException("Unexpected unary tag " + tag);
         }
 
-        return new J.Unary(randomId(), fmt, Markers.EMPTY, op, expr, type(node));
+        return new J.Unary(randomId(), fmt, Markers.EMPTY, op, expr, typeMapping.type(node));
     }
 
     @Override
@@ -1364,7 +1371,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             Space namedVarPrefix = sourceBefore(n.getName().toString());
             JCVariableDecl vd = (JCVariableDecl) n;
 
-            J.Identifier name = J.Identifier.build(randomId(), EMPTY, Markers.EMPTY, n.getName().toString(), type(node));
+            J.Identifier name = J.Identifier.build(randomId(), EMPTY, Markers.EMPTY, n.getName().toString(), typeMapping.type(node));
             List<JLeftPadded<Space>> dimensionsAfterName = dimensions.get();
 
             vars.add(
@@ -1373,7 +1380,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                                     name,
                                     dimensionsAfterName,
                                     vd.init != null ? padLeft(sourceBefore("="), convertOrNull(vd.init)) : null,
-                                    type(n)
+                                    typeMapping.type(n)
                             ),
                             i == nodes.size() - 1 ? EMPTY : sourceBefore(",")
                     )
@@ -1423,7 +1430,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         try {
             String prefix = source.substring(cursor, max(((JCTree) t).getStartPosition(), cursor));
             cursor += prefix.length();
-            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, format(prefix));
+            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, docCommentTable.getCommentTree((JCTree) t)));
             return j;
         } catch (Throwable ex) {
             // this SHOULD never happen, but is here simply as a diagnostic measure in the event of unexpected exceptions
@@ -1573,303 +1580,6 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         return converted;
-    }
-
-    @Nullable
-    private JavaType.Method methodType(@Nullable Type selectType, @Nullable Symbol symbol, String methodName, List<Symbol> stack) {
-        // if the symbol is not a method symbol, there is a parser error in play
-        Symbol.MethodSymbol methodSymbol = symbol instanceof Symbol.MethodSymbol ? (Symbol.MethodSymbol) symbol : null;
-
-        if (methodSymbol != null && selectType != null) {
-            Function<com.sun.tools.javac.code.Type, JavaType.Method.Signature> signature = t -> {
-                if (t instanceof MethodType) {
-                    MethodType mt = (MethodType) t;
-
-                    List<JavaType> paramTypes = new ArrayList<>();
-                    for (Type argtype : mt.argtypes) {
-                        if (argtype != null) {
-                            JavaType javaType = type(argtype);
-                            paramTypes.add(javaType);
-                        }
-                    }
-
-                    return new JavaType.Method.Signature(type(mt.restype), paramTypes);
-                }
-                return null;
-            };
-
-            JavaType.Method.Signature genericSignature;
-            if (methodSymbol.type instanceof com.sun.tools.javac.code.Type.ForAll) {
-                genericSignature = signature.apply(((com.sun.tools.javac.code.Type.ForAll) methodSymbol.type).qtype);
-            } else {
-                genericSignature = signature.apply(methodSymbol.type);
-            }
-
-            List<String> paramNames = new ArrayList<>();
-            for (Symbol.VarSymbol p : methodSymbol.params()) {
-                String s = p.name.toString();
-                paramNames.add(s);
-            }
-
-            List<JavaType.FullyQualified> exceptionTypes = new ArrayList<>();
-            if (selectType instanceof MethodType) {
-                for (com.sun.tools.javac.code.Type exceptionType : ((MethodType) selectType).thrown) {
-                    JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(exceptionType));
-                    if (javaType == null) {
-                        //If the type cannot be resolved to a class (it might not be on the classpath or it might have
-                        //been mapped to cyclic, build the class.
-                        if (exceptionType instanceof ClassType) {
-                            Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
-                            javaType = JavaType.Class.build(sym.className());
-                        }
-                    }
-                    if (javaType != null) {
-                        //If the exception type is not resolved, it is not added to the list of exceptions.
-                        exceptionTypes.add(javaType);
-                    }
-                }
-            }
-
-            JavaType.FullyQualified declaringType = null;
-            if (methodSymbol.owner instanceof Symbol.ClassSymbol || methodSymbol.owner instanceof Symbol.TypeVariableSymbol) {
-                declaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner.type));
-            } else if (methodSymbol.owner instanceof Symbol.VarSymbol) {
-                declaringType = new JavaType.GenericTypeVariable(methodSymbol.owner.name.toString(), null);
-            }
-
-            if (declaringType == null) {
-                return null;
-            }
-
-            List<JavaType.FullyQualified> annotations = emptyList();
-            if (!methodSymbol.getDeclarationAttributes().isEmpty()) {
-                annotations = new ArrayList<>(methodSymbol.getDeclarationAttributes().size());
-                for (Attribute.Compound a : methodSymbol.getDeclarationAttributes()) {
-                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(a.type, stack));
-                    if (fq != null) {
-                        annotations.add(fq);
-                    }
-                }
-            }
-
-            return JavaType.Method.build(
-                    // currently only the first 16 bits are meaningful
-                    (int) methodSymbol.flags_field & 0xFFFF,
-                    declaringType,
-                    methodName,
-                    genericSignature,
-                    signature.apply(selectType),
-                    paramNames,
-                    Collections.unmodifiableList(exceptionTypes),
-                    annotations
-            );
-        }
-
-        return null;
-    }
-
-    @Nullable
-    private JavaType type(@Nullable Type type) {
-        return type(type, emptyList());
-    }
-
-    @Nullable
-    private JavaType type(@Nullable com.sun.tools.javac.code.Type type, List<Symbol> stack) {
-        // Word of caution, during attribution, we will likely encounter symbols that have been parsed but are not
-        // on the parser's classpath. Calling a method on the symbol that calls complete() will result in an exception
-        // being thrown. That is why this method uses the symbol's underlying fields directly vs the accessor methods.
-        if (type instanceof ClassType) {
-            if (type instanceof com.sun.tools.javac.code.Type.ErrorType) {
-                return null;
-            }
-
-            ClassType classType = (ClassType) type;
-            Symbol.ClassSymbol sym = (Symbol.ClassSymbol) type.tsym;
-            ClassType symType = (ClassType) sym.type;
-
-            if (stack.contains(sym))
-                return new JavaType.Cyclic(sym.className());
-            else {
-                JavaType.Class clazz = sharedClassTypes.get(sym.className());
-                List<Symbol> stackWithSym = new ArrayList<>(stack);
-                stackWithSym.add(sym);
-                if (clazz == null) {
-
-                    List<JavaType.Variable> fields;
-                    if (sym.members_field == null) {
-                        fields = emptyList();
-                    } else {
-                        fields = new ArrayList<>();
-                        for (Symbol elem : sym.members_field.getElements()) {
-                            if (elem instanceof Symbol.VarSymbol) {
-                                fields.add(JavaType.Variable.build(
-                                        elem.name.toString(),
-                                        type(elem.type, stackWithSym),
-                                        // currently only the first 16 bits are meaningful
-                                        (int) elem.flags_field & 0xFFFF
-                                ));
-                            }
-                        }
-                    }
-
-                    List<JavaType.FullyQualified> interfaces;
-                    if (symType.interfaces_field == null) {
-                        interfaces = emptyList();
-                    } else {
-                        interfaces = new ArrayList<>(symType.interfaces_field.length());
-                        for (com.sun.tools.javac.code.Type iParam : symType.interfaces_field) {
-                            JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(iParam, stackWithSym));
-                            if (javaType != null) {
-                                interfaces.add(javaType);
-                            }
-                        }
-                    }
-                    JavaType.Class.Kind kind;
-                    if ((sym.flags_field & KIND_BITMASK_ENUM) != 0) {
-                        kind = JavaType.Class.Kind.Enum;
-                    } else if ((sym.flags_field & KIND_BITMASK_ANNOTATION) != 0) {
-                        kind = JavaType.Class.Kind.Annotation;
-                    } else if ((sym.flags_field & KIND_BITMASK_INTERFACE) != 0) {
-                        kind = JavaType.Class.Kind.Interface;
-                    } else {
-                        kind = JavaType.Class.Kind.Class;
-                    }
-
-                    JavaType.FullyQualified owner = null;
-                    if (sym.owner instanceof Symbol.ClassSymbol) {
-                        owner = TypeUtils.asFullyQualified(type(sym.owner.type, stackWithSym));
-                    }
-
-                    List<JavaType.FullyQualified> annotations = emptyList();
-                    if (!sym.getDeclarationAttributes().isEmpty()) {
-                        annotations = new ArrayList<>(sym.getDeclarationAttributes().size());
-                        for (Attribute.Compound a : sym.getDeclarationAttributes()) {
-                            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(a.type, stackWithSym));
-                            if (fq != null) {
-                                annotations.add(fq);
-                            }
-                        }
-                    }
-
-                    clazz = JavaType.Class.build(
-                            //Currently only the first 16 bits are meaninful
-                            (int) sym.flags_field & 0xFFFF,
-                            sym.className(),
-                            kind,
-                            fields,
-                            interfaces,
-                            null,
-                            TypeUtils.asFullyQualified(type(classType.supertype_field, stackWithSym)),
-                            owner,
-                            annotations,
-                            relaxedClassTypeMatching);
-                    sharedClassTypes.put(clazz.getFullyQualifiedName(), clazz);
-                }
-
-                List<JavaType> typeParameters;
-                if (classType.typarams_field == null) {
-                    typeParameters = emptyList();
-                } else {
-                    typeParameters = new ArrayList<>(classType.typarams_field.length());
-                    for (com.sun.tools.javac.code.Type tParam : classType.typarams_field) {
-                        JavaType javaType = type(tParam, stackWithSym);
-                        if (javaType != null) {
-                            typeParameters.add(javaType);
-                        }
-                    }
-                }
-
-                if (!typeParameters.isEmpty()) {
-                    return JavaType.Parameterized.build(clazz, typeParameters);
-                } else {
-                    return clazz;
-                }
-            }
-        } else if (type instanceof TypeVar) {
-            return new JavaType.GenericTypeVariable(type.tsym.name.toString(),
-                    TypeUtils.asFullyQualified(type(type.getUpperBound(), stack)));
-        } else if (type instanceof JCPrimitiveType) {
-            return primitive(type.getTag());
-        } else if (type instanceof JCVoidType) {
-            return JavaType.Primitive.Void;
-        } else if (type instanceof ArrayType) {
-            return new JavaType.Array(type(((ArrayType) type).elemtype, stack));
-        } else if (type instanceof WildcardType) {
-            // TODO: For now we are just mapping wildcards into their bound types and we are not accounting for the
-            //       "bound kind"
-            // <?>                --> java.lang.Object
-            // <? extends Number> --> Number
-            // <? super Number>   --> Number
-            // <? super T>        --> GenericTypeVariable
-
-            WildcardType wildcard = (WildcardType) type;
-            if (wildcard.kind == BoundKind.UNBOUND) {
-                return JavaType.Class.OBJECT;
-            } else {
-                return type(wildcard.type, stack);
-            }
-        } else if (com.sun.tools.javac.code.Type.noType.equals(type)) {
-            return null;
-        } else {
-            return null;
-        }
-    }
-
-    private String getFlyweightId(ClassType classType) {
-        StringBuilder id = new StringBuilder();
-        id.append(((Symbol.ClassSymbol) classType.tsym).className());
-        if (classType.typarams_field != null && !classType.typarams_field.isEmpty()) {
-            id.append("<");
-            boolean delimit = false;
-            for (Type type : classType.typarams_field) {
-                if (delimit) id.append(",");
-                delimit = true;
-
-                if (type.tsym instanceof Symbol.ClassSymbol) {
-                    id.append(((Symbol.ClassSymbol) type.tsym).className());
-                } else if (type.tsym != null) {
-                    id.append(type.tsym.name);
-                }
-            }
-            id.append(">");
-        }
-        return id.toString();
-    }
-
-    @Nullable
-    private JavaType type(Tree t) {
-        return type(((JCTree) t).type);
-    }
-
-    private JavaType.Primitive primitive(TypeTag tag) {
-        switch (tag) {
-            case BOOLEAN:
-                return JavaType.Primitive.Boolean;
-            case BYTE:
-                return JavaType.Primitive.Byte;
-            case CHAR:
-                return JavaType.Primitive.Char;
-            case DOUBLE:
-                return JavaType.Primitive.Double;
-            case FLOAT:
-                return JavaType.Primitive.Float;
-            case INT:
-                return JavaType.Primitive.Int;
-            case LONG:
-                return JavaType.Primitive.Long;
-            case SHORT:
-                return JavaType.Primitive.Short;
-            case VOID:
-                return JavaType.Primitive.Void;
-            case NONE:
-                return JavaType.Primitive.None;
-            case CLASS:
-                return JavaType.Primitive.String;
-            case BOT:
-                return JavaType.Primitive.Null;
-            default:
-                throw new IllegalArgumentException("Unknown type tag " + tag);
-        }
     }
 
     /**
@@ -2186,7 +1896,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 }
             }
 
-            if (inMultilineComment && c == '/' && source.charAt(i - 1) == '*') {
+            if (inMultilineComment && c == '/' && i > 0 && source.charAt(i - 1) == '*') {
                 inMultilineComment = false;
             } else if (inComment && c == '\n' || c == '\r') {
                 inComment = false;
@@ -2197,5 +1907,42 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             }
         }
         return annotations;
+    }
+
+    Space formatWithCommentTree(String prefix, @Nullable DCTree.DCDocComment commentTree) {
+        Space fmt = format(prefix);
+        if (commentTree != null) {
+            List<Comment> comments = fmt.getComments();
+            int i;
+            for (i = comments.size() - 1; i >= 0; i--) {
+                Comment comment = comments.get(i);
+                if (comment.isMultiline() && ((TextComment) comment).getText().startsWith("*")) {
+                    break;
+                }
+            }
+
+            AtomicReference<Javadoc.DocComment> javadoc = new AtomicReference<>();
+            int commentCursor = cursor - prefix.length() + fmt.getWhitespace().length();
+            for (int j = 0; j < comments.size(); j++) {
+                Comment comment = comments.get(j);
+                if (i == j) {
+                    javadoc.set((Javadoc.DocComment) new ReloadableJava8JavadocVisitor(
+                            context,
+                            getCurrentPath(),
+                            typeMapping,
+                            source.substring(commentCursor, source.indexOf("*/", commentCursor + 1))
+                    ).scan(commentTree, ""));
+                    break;
+                } else {
+                    commentCursor += comment.printComment().length() + comment.getSuffix().length();
+                }
+            }
+
+            int javadocIndex = i;
+            return fmt.withComments(ListUtils.map(fmt.getComments(), (j, c) ->
+                    j == javadocIndex ? javadoc.get().withSuffix(c.getSuffix()) : c));
+        }
+
+        return fmt;
     }
 }

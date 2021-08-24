@@ -17,11 +17,21 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.Recipe
 
 interface RemoveUnusedImportsTest : JavaRecipeTest {
-
-    override val recipe
+    override val recipe: Recipe
         get() = RemoveUnusedImports()
+
+    @Test
+    fun usedInJavadoc(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            import java.util.List;
+            /** {@link List} */
+            class A {}
+        """
+    )
 
     @Test
     fun removeNamedImport(jp: JavaParser) = assertChanged(

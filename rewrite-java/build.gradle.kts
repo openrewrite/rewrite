@@ -18,7 +18,9 @@ dependencies {
     api("org.jetbrains:annotations:latest.release")
 
     implementation("org.antlr:antlr4:latest.release")
-    compileOnly("com.puppycrawl.tools:checkstyle:latest.release")
+    compileOnly("com.puppycrawl.tools:checkstyle:latest.release") {
+        isTransitive = false
+    }
     implementation("commons-lang:commons-lang:latest.release")
     implementation("io.github.classgraph:classgraph:latest.release")
 
@@ -28,9 +30,9 @@ dependencies {
     implementation("org.ow2.asm:asm-util:latest.release")
 
     testImplementation("org.yaml:snakeyaml:latest.release")
-    testImplementation("com.puppycrawl.tools:checkstyle:latest.release")
-
-    testRuntimeOnly("com.puppycrawl.tools:checkstyle:latest.release")
+    testImplementation("com.puppycrawl.tools:checkstyle:latest.release") {
+        isTransitive = false
+    }
 }
 
 tasks.withType<Javadoc> {

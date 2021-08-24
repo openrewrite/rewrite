@@ -178,4 +178,21 @@ class StringUtilsTest {
         assertThat(matchesGlob("//some/xpath/expression", "**/xpath/*")).isTrue()
     }
 
+    @Test
+    fun greatestCommonMargin() {
+        assertThat(greatestCommonMargin("""
+            |   
+            |  
+            |    
+        """.trimMargin("|"))).isEqualTo("  ")
+
+        assertThat(greatestCommonMargin("""
+            |   
+            |  s 
+            |    
+        """.trimMargin("|"))).isEqualTo("  ")
+
+        assertThat(greatestCommonMargin("")).isEqualTo("")
+        assertThat(greatestCommonMargin("\n\n")).isEqualTo("")
+    }
 }

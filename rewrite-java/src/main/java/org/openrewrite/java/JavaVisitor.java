@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Objects;
 
 public class JavaVisitor<P> extends TreeVisitor<J, P> {
+    protected JavadocVisitor<P> javadocVisitor = new JavadocVisitor<>(this);
 
     @Override
     public String getLanguage() {
@@ -129,7 +130,14 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     @SuppressWarnings("unused")
     public Space visitSpace(Space space, Space.Location loc, P p) {
-        return space;
+        Space s = space;
+        s = s.withComments(ListUtils.map(s.getComments(), comment -> {
+            if(comment instanceof Javadoc) {
+                return (Comment) javadocVisitor.visit((Javadoc) comment, p);
+            }
+            return comment;
+        }));
+        return s;
     }
 
     public <N extends NameTree> N visitTypeName(N nameTree, P p) {

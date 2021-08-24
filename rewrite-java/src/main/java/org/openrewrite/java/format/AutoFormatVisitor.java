@@ -64,6 +64,10 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
                 .orElse(IntelliJ.wrappingAndBraces()), stopAfter)
                 .visit(t, p, cursor.fork());
 
+        t = new NormalizeTabsOrSpacesVisitor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
+                .orElse(IntelliJ.tabsAndIndents()), stopAfter)
+                .visit(t, p, cursor.fork());
+
         t = new TabsAndIndentsVisitor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
                 .orElse(IntelliJ.tabsAndIndents()), stopAfter)
                 .visit(t, p, cursor.fork());
@@ -88,6 +92,10 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
 
         t = (J.CompilationUnit) new WrappingAndBracesVisitor<>(Optional.ofNullable(cu.getStyle(WrappingAndBracesStyle.class))
                 .orElse(IntelliJ.wrappingAndBraces()), stopAfter)
+                .visit(t, p);
+
+        t = (J.CompilationUnit) new NormalizeTabsOrSpacesVisitor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
+                .orElse(IntelliJ.tabsAndIndents()), stopAfter)
                 .visit(t, p);
 
         t = (J.CompilationUnit) new TabsAndIndentsVisitor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))

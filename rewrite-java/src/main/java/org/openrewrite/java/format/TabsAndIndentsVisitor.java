@@ -21,6 +21,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.*;
 
@@ -32,7 +33,6 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     private final Tree stopAfter;
 
     private final TabsAndIndentsStyle style;
-    private final String spacesForTab;
 
     public TabsAndIndentsVisitor(TabsAndIndentsStyle style) {
         this(style, null);
@@ -41,12 +41,6 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     public TabsAndIndentsVisitor(TabsAndIndentsStyle style, @Nullable Tree stopAfter) {
         this.style = style;
         this.stopAfter = stopAfter;
-
-        StringBuilder s = new StringBuilder();
-        for (int i = 0; i < style.getTabSize(); i++) {
-            s.append(' ');
-        }
-        spacesForTab = s.toString();
     }
 
     @Override
@@ -389,349 +383,155 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private Space indentTo(Space space, int column, Space.Location spaceLocation) {
-        if (space.getComments().isEmpty() && !space.getLastWhitespace().contains("\n")) {
-            return space;
+        Space s = space;
+        String whitespace = s.getWhitespace();
+
+        if (spaceLocation == Space.Location.COMPILATION_UNIT_PREFIX && !StringUtils.isNullOrEmpty(whitespace)) {
+            s = s.withWhitespace("");
+        } else if (s.getComments().isEmpty() && !s.getLastWhitespace().contains("\n")) {
+            return s;
         }
 
-        if (space.getComments().isEmpty()) {
-            if (!StringUtils.isNullOrEmpty(space.getWhitespace())) {
-                if (style.getUseTabCharacter()) {
-                    space = space.withWhitespace(space.getWhitespace().replaceAll(" ", ""));
-                } else {
-                    space = space.withWhitespace(space.getWhitespace().replaceAll("\t", ""));
-                }
-            }
-
-            int indent = findIndent(space);
+        if (s.getComments().isEmpty()) {
+            int indent = findIndent(s);
             if (indent != column) {
                 int shift = column - indent;
-                space = space.withWhitespace(indent(space.getWhitespace(), shift));
+                s = s.withWhitespace(indent(whitespace, shift));
             }
         } else {
-            if (!StringUtils.isNullOrEmpty(space.getWhitespace()) &&
-                    (Space.Location.COMPILATION_UNIT_PREFIX.equals(spaceLocation) ||
-                            // Preserve whitespace of trailing line comments.
-                            (!Comment.Style.LINE.equals(space.getComments().get(0).getStyle()) ||
-                                    (Comment.Style.LINE.equals(space.getComments().get(0).getStyle()) &&
-                                            (space.getWhitespace().contains("\n") || space.getWhitespace().contains("\r")))))) {
-                if (style.getUseTabCharacter()) {
-                    space = space.withWhitespace(space.getWhitespace().replaceAll(" ", ""));
-                } else {
-                    space = space.withWhitespace(space.getWhitespace().replaceAll("\t", ""));
-                }
-            }
+            boolean hasFileLeadingComment = !space.getComments().isEmpty() && (
+                    spaceLocation == Space.Location.COMPILATION_UNIT_PREFIX ||
+                            (spaceLocation == Space.Location.CLASS_DECLARATION_PREFIX && space.getComments().get(0).isMultiline())
+            );
 
-            Comment lastElement = space.getComments().get(space.getComments().size() - 1);
-            space = space.withComments(ListUtils.map(space.getComments(), c -> {
-                // The suffix of the last element in the comment list sets the whitespace for the end of the block.
-                // The column for comments that come before the last element are incremented.
-                int incrementBy = spaceLocation.equals(Space.Location.BLOCK_END) && !c.equals(lastElement) ? style.getIndentSize() : 0;
-                switch (c.getStyle()) {
-                    case JAVADOC:
-                    case BLOCK:
-                        return indentMultilineComment(c, column + incrementBy);
-                    default:
-                        return indentSingleLineComment(c, column + incrementBy);
-                }
-            }));
+            int finalColumn = spaceLocation == Space.Location.BLOCK_END ?
+                    column + style.getIndentSize() : column;
+            String lastIndent = space.getWhitespace().substring(space.getWhitespace().lastIndexOf('\n') + 1);
+            int indent = getLengthOfWhitespace(StringUtils.indent(lastIndent));
 
-            // Prevent formatting trailing comments, the whitespace in a trailing comment won't have a new line character.
-            // Compilation unit prefixes are an exception, since they do not exist in a block.
-            if (space.getWhitespace().contains("\n") || Space.Location.COMPILATION_UNIT_PREFIX.equals(spaceLocation)) {
-                int incrementBy = spaceLocation.equals(Space.Location.BLOCK_END) ? style.getIndentSize() : 0;
-                int indent = getLengthOfWhitespace(space.getWhitespace());
-                if (indent != (column + incrementBy)) {
-                    int shift = column + incrementBy - indent;
-                    space = space.withWhitespace(indent(space.getWhitespace(), shift));
+            if (indent != finalColumn) {
+                if (whitespace.contains("\n") || hasFileLeadingComment) {
+                    int shift = finalColumn - indent;
+                    s = s.withWhitespace(whitespace.substring(0, whitespace.lastIndexOf('\n') + 1) +
+                            indent(lastIndent, shift));
                 }
+
+                Space finalSpace = s;
+                s = s.withComments(ListUtils.map(s.getComments(), (i, c) -> {
+                    String priorSuffix = i == 0 ?
+                            space.getWhitespace() :
+                            finalSpace.getComments().get(i - 1).getSuffix();
+
+                    int toColumn = spaceLocation == Space.Location.BLOCK_END && i != finalSpace.getComments().size() - 1 ?
+                            column + style.getIndentSize() :
+                            column;
+
+                    Comment c2 = c;
+                    if (priorSuffix.contains("\n") || hasFileLeadingComment) {
+                        c2 = indentComment(c, priorSuffix, toColumn);
+                    }
+
+                    if (c2.getSuffix().contains("\n")) {
+                        int suffixIndent = getLengthOfWhitespace(c2.getSuffix());
+                        int shift = toColumn - suffixIndent;
+                        c2 = c2.withSuffix(indent(c2.getSuffix(), shift));
+                    }
+
+                    return c2;
+                }));
             }
         }
 
-        return space;
+        return s;
     }
 
-    /**
-     * Normalizes the whitespace to tabs or spaces based on the style.
-     * Preserves the comments if no changes are necessary or sets the indent to the appropriate column.
-     */
-    private Comment indentSingleLineComment(Comment comment, int column) {
-        String normalizedSuffix = null;
-        if (!StringUtils.isNullOrEmpty(comment.getSuffix())) {
-            // This does not attempt to indent each new line following the suffix.
-            if (style.getUseTabCharacter()) {
-                if (comment.getSuffix().contains(" ")) {
-                    normalizedSuffix = comment.getSuffix().replaceAll(" ", "");
+    private Comment indentComment(Comment comment, String priorSuffix, int column) {
+        if (comment instanceof TextComment) {
+            TextComment textComment = (TextComment) comment;
+            if (!textComment.getText().contains("\n")) {
+                return comment;
+            }
+
+            // the margin is the baseline for how much we should shift left or right
+            String margin = StringUtils.commonMargin(null, priorSuffix);
+
+            int indent = getLengthOfWhitespace(margin);
+            int shift = column - indent;
+
+            if (shift > 0) {
+                String newMargin = indent(margin, shift);
+                if (textComment.isMultiline()) {
+                    StringBuilder multiline = new StringBuilder();
+                    char[] chars = textComment.getText().toCharArray();
+                    for (int i = 0; i < chars.length; i++) {
+                        char c = chars[i];
+                        if (c == '\n') {
+                            multiline.append(c).append(newMargin);
+                            i += margin.length();
+                        } else {
+                            multiline.append(c);
+                        }
+                    }
+                    return textComment.withText(multiline.toString());
+                }
+            } else if (shift < 0) {
+                if (textComment.isMultiline()) {
+                    StringBuilder multiline = new StringBuilder();
+                    char[] chars = textComment.getText().toCharArray();
+                    for (int i = 0; i < chars.length; i++) {
+                        char c = chars[i];
+                        if (c == '\n') {
+                            multiline.append(c);
+                            for (int j = 0; j < Math.abs(shift) && (chars[j + i + 1] == ' ' || chars[j + i + 1] == '\t'); j++) {
+                                i++;
+                            }
+                        } else {
+                            multiline.append(c);
+                        }
+                    }
+                    return textComment.withText(multiline.toString());
                 }
             } else {
-                if (comment.getSuffix().contains("\t")) {
-                    normalizedSuffix = comment.getSuffix().replaceAll("\t", spacesForTab);
-                }
+                return textComment;
             }
-        }
+        } else if (comment instanceof Javadoc.DocComment) {
+            String margin = StringUtils.commonMargin(null, priorSuffix);
 
-        String suffix = normalizedSuffix == null ? comment.getSuffix() : normalizedSuffix;
-        int indent = getLengthOfWhitespace(suffix);
-        if (column == indent && normalizedSuffix == null) {
-            return comment;
-        }
-
-        StringBuilder newSuffix = new StringBuilder(suffix);
-        int shift = column - indent;
-        shift(newSuffix, shift);
-        return comment.withSuffix(newSuffix.toString());
-    }
-
-    /**
-     * Normalizes the whitespace in JavaDoc and Block style comments.
-     * Text for a JavaDoc/Block comment is a string delimited by `\n` or `\r'.
-     * Whitespace and text are built separately to apply the appropriate shifts to the whitespace.
-     * The length of the whitespace in a block comment will be preserved if any of the lines do not start with a *.
-     *
-     * indentSize:
-     *  - determines the number of spaces each indent is equivalent to.
-     *
-     * tabSize:
-     *  - is only applicable if useTabCharacter is true.
-     *  - tabSize sets the number of spaces each tab character is equivalent to.
-     */
-    private Comment indentMultilineComment(Comment comment, int column) {
-        StringBuilder newTextBuilder = new StringBuilder();
-        StringBuilder currentText = new StringBuilder();
-        StringBuilder whitespace = new StringBuilder();
-
-        boolean hasChanged = false; // Preserves referential equality if no changes are necessary in the comment.
-        boolean isWhitespace = true; // Determines where whitespace starts and ends.
-        boolean isFirstLine = true;  // Preserves whitespace if it immediately follows the comment prefix /* or /**.
-        int indent = 0; // Track the indent of the current line in the block comment.
-        int tabLength = 0; // Only applies to BLOCK style comments that are not being aligned. Track the current tabLength to normalize and preserve whitespace.
-
-        boolean alignToColumn = (Comment.Style.JAVADOC.equals(comment.getStyle()) || shouldAlignBlockComment(comment));
-        char prev = '$';
-        for (int i = 0; i < comment.getText().length(); ++i) {
-            char c = comment.getText().charAt(i);
-            switch (c) {
-                case '\t':
-                    if (!isFirstLine && isWhitespace) {
-                        // Normalizes the whitespace char to match the `style`.
-                        // The character count is updated appropriately in `shift()` after a new line char is found.
-                        if (style.getUseTabCharacter()) {
-                            whitespace.append(c);
-                            indent += style.getTabSize();
-                        } else {
-                            /* Visualization of conversion for style.getTabSize() == 4:
-                             * s s s t => s s s s
-                             * s s t   => s s s s
-                             * s t     => s s s s
-                             * t       => s s s s
-                             */
-                            for (int j = tabLength % style.getIndentSize(); j < style.getIndentSize(); ++j) {
-                                whitespace.append(' ');
-                                indent ++;
-                                hasChanged = true;
-                            }
-                        }
-                        tabLength = 0;
-                    } else {
-                        currentText.append(c);
-                    }
-                    break;
-
-                case ' ':
-                    if (!isFirstLine && isWhitespace) {
-                        // Normalizes the whitespace char to match the `style`.
-                        // The character count is updated appropriately in `shift()` after a new line char is found.
-                        if (style.getUseTabCharacter()) {
-                            tabLength++;
-                            // Convert the previous spaces to a tab once the tabSize is reached.
-                            if (tabLength == style.getTabSize()) {
-                                if (!alignToColumn || (i + 1 < comment.getText().length() - 1 && comment.getText().charAt(i + 1) != '*')) {
-                                    whitespace.append('\t');
-                                    indent += style.getTabSize();
-                                    tabLength = 0;
-                                    hasChanged = true;
-                                }
-                            }
-                        } else {
-                            whitespace.append(c);
-                            indent++;
-                            tabLength++;
-                        }
-
-                        if (tabLength == (style.getUseTabCharacter() ? style.getTabSize() : style.getIndentSize())) {
-                            tabLength = 0;
-                        }
-                    } else {
-                        currentText.append(c);
-                    }
-                    break;
-
-                case '\r':
-                    // Check for Windows OS CRLF \r\n.
-                    if ((i + 1 <= comment.getText().length() - 1) && comment.getText().charAt(i + 1) == '\n') {
-                        continue;
-                    }
-
-                case '\n':
-                    if (isFirstLine) {
-                        isFirstLine = false;
-                    } else {
-                        if (alignToColumn && indent != column) {
-                            int shift = column - indent;
-                            shift(whitespace, shift);
-                            hasChanged = true;
-                        }
-                    }
-
-                    newTextBuilder.append(whitespace.append(currentText));
-                    whitespace.setLength(0);
-                    currentText.setLength(0);
-                    indent = 0;
-                    tabLength = 0;
-
-                    if ((i - 1 >= 0) && comment.getText().charAt(i - 1) == '\r' && c == '\n') {
-                        whitespace.append(comment.getText().charAt(i - 1));
-                    }
-                    whitespace.append(c);
-                    isWhitespace = true;
-                    break;
-
-                case '*':
-                    if (alignToColumn && !isFirstLine && isWhitespace) {
-                        // Moves a space character from whitespace to the current text,
-                        // so that the '*' in blocks comments are in line with each other.
-                        if (style.getUseTabCharacter()) {
-                            if (prev != ' ') {
-                                hasChanged = true;
-                            }
-                        } else {
-                            if (whitespace.length() <= 1) {
-                                hasChanged = true;
-                            } else {
-                                whitespace.setLength(whitespace.length() - 1);
-                                indent--;
-                            }
-                        }
-                        currentText.append(' ');
-                    }
-
-                default:
-                    if (!isFirstLine && isWhitespace) {
-                        isWhitespace = false;
-                        // Added ' * ' before the first character in the line if it's missing from a JavaDoc.
-                        if (Comment.Style.JAVADOC.equals(comment.getStyle()) && currentText.length() == 0) {
-                            currentText.append(' ');
-                            currentText.append('*');
-                            currentText.append(' ');
-                            hasChanged = true;
-                        }
-                    }
-                    currentText.append(c);
-                    break;
-            }
-            prev = c;
-        }
-
-        // Process the final whitespace in the comment.
-        if (!isFirstLine) {
-            int incrementBy = !style.getUseTabCharacter() && currentText.length() == 0 ? 1 : 0;
-            if (alignToColumn && indent != column + incrementBy) {
-                int shift = column - indent;
-                shift(whitespace, shift);
-                hasChanged = true;
-            }
-            // The currentText will be length 0 if the comment ends with a `*/` on a new line.
-            if (currentText.length() == 0) {
-                // Add a space to the whitespace that precedes the `*/` so that it is aligned to the prefix `*/`.
-                if (style.getUseTabCharacter()) {
-                    if (whitespace.charAt(whitespace.length() - 1) != ' ') {
-                        whitespace.append(' ');
-                        if (!hasChanged && prev != ' ') {
-                            hasChanged = true;
-                        }
-                    }
-                } else {
-                    if (whitespace.length() - 1 == column) {
-                        whitespace.append(' ');
-                        hasChanged = true;
-                    }
-                }
-            }
-        }
-
-        // Normalizes the whitespace in the suffix to match the `style`.
-        // The suffix of the comment is the whitespace that precedes the AST element.
-        String suffix = null;
-        if (style.getUseTabCharacter()) {
-            if (comment.getSuffix().contains(" ")) {
-                suffix = comment.getSuffix().replace(" ", "\t");
-                hasChanged = true;
-            }
-        } else {
-            if (comment.getSuffix().contains("\t")) {
-                suffix = comment.getSuffix().replace("\t", " ");
-                hasChanged = true;
-            }
-        }
-
-        suffix = suffix == null ? comment.getSuffix() : suffix;
-
-        StringBuilder newSuffix = new StringBuilder(suffix);
-        indent = getLengthOfWhitespace(newSuffix.toString());
-        if (indent != column && newSuffix.toString().contains("\n")) {
+            int indent = getLengthOfWhitespace(margin);
             int shift = column - indent;
-            shift(newSuffix, shift);
-            hasChanged = true;
-        }
-
-        if (!hasChanged) {
-            return comment;
-        }
-
-        String newText = newTextBuilder.append(whitespace.append(currentText)).toString();
-        return comment.withText(newText).withSuffix(newSuffix.toString());
-    }
-
-    /* Block comments may be aligned to the column if all the lines start with an asterisk.
-     * Returns false if any line doesn't start with a *.
-     */
-    private boolean shouldAlignBlockComment(Comment comment) {
-        boolean alignComment = true;
-        boolean isFirstLine = true;
-        boolean isWhitespace = true;
-
-        OUTER:
-        for (char c : comment.getText().toCharArray()) {
-            switch (c) {
-                case '\t':
-                case ' ':
-                    break;
-
-                case '\n':
-                case '\r':
-                    if (isFirstLine) {
-                        isFirstLine = false;
-                    }
-                    isWhitespace = true;
-                    break;
-
-                default:
-                    if (!isFirstLine && isWhitespace) {
-                        isWhitespace = false;
-                        if (c != '*') {
-                            alignComment = false;
-                            break OUTER;
+            if (shift != 0) {
+                return (Javadoc.DocComment) new JavadocVisitor<Integer>() {
+                    @Override
+                    public Javadoc visitLineBreak(Javadoc.LineBreak lineBreak, Integer p) {
+                        if (shift < 0) {
+                            StringBuilder margin = new StringBuilder();
+                            char[] charArray = lineBreak.getMargin().toCharArray();
+                            boolean inMargin = true;
+                            for (int i = 0; i < charArray.length; i++) {
+                                char c = charArray[i];
+                                if(i < Math.abs(shift) && inMargin) {
+                                    if(!Character.isWhitespace(c)) {
+                                        inMargin = false;
+                                        margin.append(c);
+                                    }
+                                    continue;
+                                }
+                                margin.append(c);
+                            }
+                            return lineBreak.withMargin(margin.toString());
+                        } else{
+                            return lineBreak.withMargin(indent("", shift) +
+                                    lineBreak.getMargin());
                         }
                     }
-                    break;
+                }.visitNonNull((Javadoc.DocComment) comment, 0);
             }
         }
-        return alignComment;
+
+        return comment;
     }
 
     private String indent(String whitespace, int shift) {
-        if (!style.getUseTabCharacter() && whitespace.contains("\t")) {
-            whitespace = whitespace.replaceAll("\t", spacesForTab);
-        }
         StringBuilder newWhitespace = new StringBuilder(whitespace);
         shift(newWhitespace, shift);
         return newWhitespace.toString();

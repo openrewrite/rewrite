@@ -18,6 +18,9 @@ package org.openrewrite.java.style;
 import com.puppycrawl.tools.checkstyle.ConfigurationLoader;
 import com.puppycrawl.tools.checkstyle.api.CheckstyleException;
 import com.puppycrawl.tools.checkstyle.api.Configuration;
+
+import java.nio.charset.StandardCharsets;
+import java.util.stream.Collectors;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.cleanup.*;
@@ -29,10 +32,8 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.google.common.base.Charsets.UTF_8;
 import static java.lang.Boolean.parseBoolean;
 import static java.util.stream.Collectors.*;
 import static org.openrewrite.java.style.Checkstyle.defaultBlockPolicy;
@@ -51,7 +52,7 @@ public class CheckstyleConfigLoader {
     }
 
     public static Checkstyle loadCheckstyleConfig(@Language("XML") String checkstyleConf, Map<String, Object> properties) throws CheckstyleException {
-        try (InputStream is = new ByteArrayInputStream(checkstyleConf.getBytes(UTF_8))) {
+        try (InputStream is = new ByteArrayInputStream(checkstyleConf.getBytes(StandardCharsets.UTF_8))) {
             return loadCheckstyleConfig(is, properties);
         } catch (IOException e) {
             throw new RuntimeException(e);

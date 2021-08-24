@@ -20,10 +20,7 @@ import lombok.Value;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.Comment;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
@@ -122,7 +119,9 @@ public class FallThroughVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         private static class FindLastLineBreaksOrFallsThroughCommentsVisitor extends JavaIsoVisitor<Set<J>> {
-            private static final Predicate<Comment> HAS_RELIEF_PATTERN_COMMENT = stmt -> FallThroughStyle.RELIEF_PATTERN.matcher(stmt.getText()).find();
+            private static final Predicate<Comment> HAS_RELIEF_PATTERN_COMMENT = comment ->
+                    comment instanceof TextComment &&
+                    FallThroughStyle.RELIEF_PATTERN.matcher(((TextComment) comment).getText()).find();
             private final J.Case scope;
 
             public FindLastLineBreaksOrFallsThroughCommentsVisitor(J.Case scope) {

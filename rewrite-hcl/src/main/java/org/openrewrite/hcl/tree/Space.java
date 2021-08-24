@@ -103,15 +103,6 @@ public class Space {
         return whitespace == null ? "" : whitespace;
     }
 
-    public boolean hasComment(String comment) {
-        for (Comment c : comments) {
-            if (c.getText().equals(comment)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     public Space withComments(List<Comment> comments) {
         if (comments == this.comments) {
             return this;

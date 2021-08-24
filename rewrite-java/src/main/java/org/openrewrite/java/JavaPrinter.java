@@ -109,17 +109,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
 
         for (Comment comment : space.getComments()) {
             visitMarkers(comment.getMarkers(), p);
-            switch (comment.getStyle()) {
-                case LINE:
-                    acc.append("//").append(comment.getText());
-                    break;
-                case BLOCK:
-                    acc.append("/*").append(comment.getText()).append("*/");
-                    break;
-                case JAVADOC:
-                    acc.append("/**").append(comment.getText()).append("*/");
-                    break;
-            }
+            acc.append(comment.printComment());
             acc.append(comment.getSuffix());
         }
         return space;

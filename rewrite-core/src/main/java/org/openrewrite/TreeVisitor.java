@@ -128,6 +128,21 @@ public abstract class TreeVisitor<T extends Tree, P> {
         return visit(tree, p);
     }
 
+    /**
+     * By calling this method, you are asserting that you know that the outcome will be non-null
+     * when the compiler couldn't otherwise prove this to be the case. This method is a shortcut
+     * for having to assert the non-nullability of the returned tree.
+     *
+     * @param tree A non-null tree.
+     * @param p    A state object that passes through the visitor.
+     * @return A non-null tree.
+     */
+    public T visitNonNull(Tree tree, P p) {
+        T t = visit(tree, p);
+        assert t != null;
+        return t;
+    }
+
     @Nullable
     public T visit(@Nullable Tree tree, P p) {
         if (tree == null) {

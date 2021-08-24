@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.TreeSerializer;
@@ -30,6 +31,11 @@ import static org.assertj.core.api.Assertions.fail;
 public interface JavaTreeTest {
     default ExecutionContext getExecutionContext() {
         return new InMemoryExecutionContext(t -> fail("Failed to parse", t));
+    }
+
+    @BeforeEach
+    default void beforeEachJavaTreeTest() {
+        J.clearCaches();
     }
 
     default void assertParsePrintAndProcess(JavaParser parser, NestingLevel nestingLevel, String code,

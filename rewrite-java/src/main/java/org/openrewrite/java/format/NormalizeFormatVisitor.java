@@ -15,13 +15,12 @@
  */
 package org.openrewrite.java.format;
 
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.Comment;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JContainer;
-import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.JavadocVisitor;
+import org.openrewrite.java.tree.*;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -44,7 +43,7 @@ public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
             return c;
         }
 
-        if(!c.getAnnotations().getKind().getPrefix().isEmpty()) {
+        if (!c.getAnnotations().getKind().getPrefix().isEmpty()) {
             c = concatenatePrefix(c, c.getAnnotations().getKind().getPrefix());
             c = c.getAnnotations().withKind(c.getAnnotations().getKind().withPrefix(Space.EMPTY));
             return c;
@@ -78,7 +77,7 @@ public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         if (m.getAnnotations().getTypeParameters() != null) {
-            if(!m.getAnnotations().getTypeParameters().getTypeParameters().isEmpty()) {
+            if (!m.getAnnotations().getTypeParameters().getTypeParameters().isEmpty()) {
                 m = concatenatePrefix(m, m.getAnnotations().getTypeParameters().getPrefix());
                 m = m.getAnnotations().withTypeParameters(m.getAnnotations().getTypeParameters().withPrefix(Space.EMPTY));
             }
@@ -86,7 +85,7 @@ public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         if (m.getReturnTypeExpression() != null) {
-            if(!m.getReturnTypeExpression().getPrefix().getWhitespace().isEmpty()) {
+            if (!m.getReturnTypeExpression().getPrefix().getWhitespace().isEmpty()) {
                 m = concatenatePrefix(m, m.getReturnTypeExpression().getPrefix());
                 m = m.withReturnTypeExpression(m.getReturnTypeExpression().withPrefix(Space.EMPTY));
             }
@@ -125,17 +124,36 @@ public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private <J2 extends J> J2 concatenatePrefix(J2 j, Space prefix) {
-        List<Comment> jComments = j.getComments();
-        List<Comment> pComments = prefix.getComments();
-        List<Comment> comments;
-        if(!jComments.isEmpty() && !pComments.isEmpty()) {
-            comments = new ArrayList<>(jComments);
-            comments.addAll(pComments);
-        } else if(!pComments.isEmpty()) {
-            comments = pComments;
-        } else {
-            comments = jComments;
-        }
+        String shift = StringUtils.commonMargin(null, j.getPrefix().getWhitespace());
+
+        List<Comment> comments = ListUtils.concatAll(
+                j.getComments(),
+                ListUtils.map(prefix.getComments(), comment -> {
+                    Comment c = comment;
+                    if (shift.isEmpty()) {
+                        return c;
+                    }
+
+                    if (comment instanceof TextComment) {
+                        TextComment textComment = (TextComment) c;
+                        c = textComment.withText(textComment.getText().replace("\n", "\n" + shift));
+                    } else if (c instanceof Javadoc) {
+                        c = (Comment) new JavadocVisitor<Integer>() {
+                            @Override
+                            public Javadoc visitLineBreak(Javadoc.LineBreak lineBreak, Integer integer) {
+                                return lineBreak.withMargin(shift + lineBreak.getMargin());
+                            }
+                        }.visitNonNull((Javadoc) c, 0);
+                    }
+
+                    if(c.getSuffix().contains("\n")) {
+                        c = c.withSuffix(c.getSuffix().replace("\n", "\n" + shift));
+                    }
+
+                    return c;
+                })
+        );
+
         return j.withPrefix(j.getPrefix()
                 .withWhitespace(j.getPrefix().getWhitespace() + prefix.getWhitespace())
                 .withComments(comments));
