@@ -27,7 +27,7 @@ interface LiteralTest : JavaTreeTest {
     fun intentionallyBadUnicodeCharacter(jp: JavaParser) {
         assertParsePrintAndProcess(
             jp, Block, """
-                String[] strings = new String[] { "\"\\u{U1}\"", "\"\\u{00U1}\"", "\"\\u{00AUF}\"" };
+                String[] strings = new String[] { "\"\\u{U1}\"", "\"\\u1234\"", "\"\\u{00AUF}\"" };
             """
         )
     }
