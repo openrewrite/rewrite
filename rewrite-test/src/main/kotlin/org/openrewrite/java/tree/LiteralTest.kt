@@ -24,6 +24,15 @@ import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
 interface LiteralTest : JavaTreeTest {
 
     @Test
+    fun intentionallyBadUnicodeCharacter(jp: JavaParser) {
+        assertParsePrintAndProcess(
+            jp, Block, """
+                String[] strings = new String[] { "\"\\u{U1}\"", "\"\\u{00U1}\"", "\"\\u{00AUF}\"" };
+            """
+        )
+    }
+
+    @Test
     fun literalField(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             int n = 0;

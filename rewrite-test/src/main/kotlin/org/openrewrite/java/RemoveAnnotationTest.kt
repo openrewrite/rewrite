@@ -368,7 +368,6 @@ interface RemoveAnnotationTest : JavaRecipeTest {
         """),
         recipe = RemoveAnnotation("@java.lang.Deprecated"),
         before = """
-            import org.a.Test;
             import org.b.ThirdAnnotation;
             
             public class RemoveAnnotation {
@@ -405,7 +404,6 @@ interface RemoveAnnotationTest : JavaRecipeTest {
             }
         """,
         after = """
-            import org.a.Test;
             import org.b.ThirdAnnotation;
             
             public class RemoveAnnotation {

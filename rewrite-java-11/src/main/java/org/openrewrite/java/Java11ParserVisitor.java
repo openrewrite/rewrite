@@ -763,14 +763,18 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 if (c == '\\' && j < valueSourceArr.length - 1) {
                     if (valueSourceArr[j + 1] == 'u' && j < valueSource.length() - 5) {
                         String codePoint = valueSource.substring(j + 2, j + 6);
-                        int codePointNumeric = Integer.parseInt(codePoint, 16);
-                        if (codePointNumeric >= SURR_FIRST && codePointNumeric <= SURR_LAST) {
-                            if (unicodeEscapes == null) {
-                                unicodeEscapes = new ArrayList<>();
+                        try {
+                            int codePointNumeric = Integer.parseInt(codePoint, 16);
+                            if (codePointNumeric >= SURR_FIRST && codePointNumeric <= SURR_LAST) {
+                                if (unicodeEscapes == null) {
+                                    unicodeEscapes = new ArrayList<>();
+                                }
+                                unicodeEscapes.add(new J.Literal.UnicodeEscape(i, codePoint));
+                                j += 5;
+                                continue;
                             }
-                            unicodeEscapes.add(new J.Literal.UnicodeEscape(i, codePoint));
-                            j += 5;
-                            continue;
+                        } catch(NumberFormatException e) {
+                            // a bad unicode character, and that's ok
                         }
                     }
                 }
