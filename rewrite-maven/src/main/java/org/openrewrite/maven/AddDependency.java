@@ -248,8 +248,7 @@ public class AddDependency extends Recipe {
                             classifier,
                             type,
                             optional != null && optional,
-                            new Pom(groupId, artifactId, dependencyVersion, null, null, null, packaging, classifier, null,
-                                    emptyList(), new Pom.DependencyManagement(emptyList()), emptyList(), emptyList(), emptyMap(), emptyMap()),
+                            Pom.build(groupId, artifactId, dependencyVersion, null, packaging, classifier),
                             dependencyVersion,
                             emptySet()
                     )
