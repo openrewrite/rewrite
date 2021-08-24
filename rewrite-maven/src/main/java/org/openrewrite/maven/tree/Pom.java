@@ -383,7 +383,7 @@ public class Pom {
             @Nullable String datedSnapshotVersion) {
 
         return build(groupId, artifactId, version, datedSnapshotVersion, null, null, null, null,
-                null, emptyList(), DependencyManagement.EMPTY, emptyList(), emptyList(), emptyMap(),
+                null, emptyList(), DependencyManagement.empty(), emptyList(), emptyList(), emptyMap(),
                 emptyMap(), true);
     }
 
