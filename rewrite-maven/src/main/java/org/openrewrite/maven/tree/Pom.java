@@ -51,7 +51,6 @@ public class Pom {
 
     @EqualsAndHashCode.Include
     @Nullable
-    @With
     String version;
 
     /**
@@ -77,15 +76,9 @@ public class Pom {
     @Nullable
     Pom parent;
 
-    @With
     List<Dependency> dependencies;
-
-    @With
     DependencyManagement dependencyManagement;
-
-    @With
     Collection<License> licenses;
-
     Collection<MavenRepository> repositories;
 
     /**
@@ -285,6 +278,101 @@ public class Pom {
                 Objects.equals(this.repositories, other.repositories) &&
                 Objects.equals(this.licenses, other.licenses) &&
                 Objects.equals(this.properties, other.properties)
+        );
+    }
+
+    public Pom withVersion(String version) {
+        if (Objects.equals(this.version, version)) {
+            return this;
+        }
+        return Pom.build(
+                this.groupId,
+                this.artifactId,
+                version,
+                this.datedSnapshotVersion,
+                this.name,
+                this.description,
+                this.packaging,
+                this.classifier,
+                this.parent,
+                this.dependencies,
+                this.dependencyManagement,
+                this.licenses,
+                this.repositories,
+                this.properties,
+                this.propertyOverrides,
+                false
+        );
+    }
+    public Pom withDependencies(List<Dependency> dependencies) {
+        if (Objects.equals(this.dependencies, dependencies)) {
+            return this;
+        }
+        return Pom.build(
+                this.groupId,
+                this.artifactId,
+                this.version,
+                this.datedSnapshotVersion,
+                this.name,
+                this.description,
+                this.packaging,
+                this.classifier,
+                this.parent,
+                dependencies,
+                this.dependencyManagement,
+                this.licenses,
+                this.repositories,
+                this.properties,
+                this.propertyOverrides,
+                false
+        );
+    }
+    public Pom withDependencyManagement(DependencyManagement dependencyManagement) {
+        if (Objects.equals(this.dependencyManagement, dependencyManagement)) {
+            return this;
+        }
+
+        return Pom.build(
+                this.groupId,
+                this.artifactId,
+                this.version,
+                this.datedSnapshotVersion,
+                this.name,
+                this.description,
+                this.packaging,
+                this.classifier,
+                this.parent,
+                this.dependencies,
+                dependencyManagement,
+                this.licenses,
+                this.repositories,
+                this.properties,
+                this.propertyOverrides,
+                false
+        );
+    }
+    public Pom withLicenses(List<License> licenses) {
+        if (Objects.equals(this.licenses, licenses)) {
+            return this;
+        }
+
+        return Pom.build(
+                this.groupId,
+                this.artifactId,
+                this.version,
+                this.datedSnapshotVersion,
+                this.name,
+                this.description,
+                this.packaging,
+                this.classifier,
+                this.parent,
+                this.dependencies,
+                this.dependencyManagement,
+                licenses,
+                this.repositories,
+                this.properties,
+                this.propertyOverrides,
+                false
         );
     }
 
