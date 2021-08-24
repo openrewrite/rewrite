@@ -18,12 +18,11 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.Flag;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.tree.*;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class RemoveUnusedPrivateMethods extends Recipe {
 
@@ -54,6 +53,23 @@ public class RemoveUnusedPrivateMethods extends Recipe {
                         !method.isConstructor() &&
                         methodType.getGenericSignature() != null &&
                         method.getAllAnnotations().isEmpty()) {
+
+                    J.ClassDeclaration classDeclaration = getCursor().firstEnclosing(J.ClassDeclaration.class);
+                    if (classDeclaration != null && classDeclaration.getImplements() != null) {
+                        for (TypeTree implement : classDeclaration.getImplements()) {
+                            if (implement instanceof J.Identifier) {
+                                JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(implement.getType());
+                                if (fqn != null && "java.io.Serializable".equals(fqn.getFullyQualifiedName()) &&
+                                        ("readObject".equals(m.getName().getSimpleName()) ||
+                                                "readObjectNoData".equals(m.getName().getSimpleName()) ||
+                                                "readResolve".equals(m.getName().getSimpleName()) ||
+                                                "writeObject".equals(m.getName().getSimpleName()))) {
+                                    return m;
+                                }
+                            }
+                        }
+                    }
+
                     J.CompilationUnit cu = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
                     for (JavaType type : cu.getTypesInUse()) {
                         if(type instanceof JavaType.Method) {
@@ -61,6 +77,10 @@ public class RemoveUnusedPrivateMethods extends Recipe {
                             if(methodType.getName().equals(usedMethodType.getName()) && methodType.getGenericSignature().equals(usedMethodType.getGenericSignature())) {
                                 return m;
                             }
+                        }
+                        if (type instanceof JavaType.Class &&
+                                "org.junit.jupiter.params.provider.MethodSource".equals(((JavaType.Class)type).getFullyQualifiedName())) {
+                            return m;
                         }
                     }
 

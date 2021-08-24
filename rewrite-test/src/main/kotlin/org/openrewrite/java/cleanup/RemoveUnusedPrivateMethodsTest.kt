@@ -17,9 +17,15 @@ package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
+import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 
 interface RemoveUnusedPrivateMethodsTest : JavaRecipeTest {
+    override val parser: JavaParser
+        get() = JavaParser.fromJavaVersion()
+            .classpath("junit-jupiter-params")
+            .logCompilationWarningsAndErrors(true)
+            .build()
     override val recipe: Recipe
         get() = RemoveUnusedPrivateMethods()
 
@@ -46,6 +52,42 @@ interface RemoveUnusedPrivateMethodsTest : JavaRecipeTest {
                 }
                 
                 private void dontRemove2() {
+                }
+            }
+        """
+    )
+
+    @Test
+    fun doNotRemoveCustomizedSerialization() = assertUnchanged(
+        before = """
+            import java.io.Serializable;
+            import java.io.IOException;
+            import java.io.ObjectStreamException;
+
+            class Test implements Serializable {
+                private void writeObject(java.io.ObjectOutputStream out) throws IOException {}
+                private void readObject(java.io.ObjectInputStream in) throws IOException, ClassNotFoundException {}
+                private void readObjectNoData() throws ObjectStreamException {}
+            }
+        """
+    )
+
+    @Test
+    fun doNotRemoveMethodsWithAnnotations() = assertUnchanged(
+        before = """
+
+            import org.junit.jupiter.params.ParameterizedTest;
+            import org.junit.jupiter.params.provider.Arguments;
+            import org.junit.jupiter.params.provider.MethodSource;
+            import java.util.stream.Stream;
+
+            class Test {
+                @ParameterizedTest
+                @MethodSource("sourceExample")
+                public void test(String input) {
+                }
+                private static Stream<Arguments> sourceExample() {
+                    return Stream.of(Arguments.of("value", String.class));
                 }
             }
         """
