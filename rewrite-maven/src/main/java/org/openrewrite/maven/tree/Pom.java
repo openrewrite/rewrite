@@ -380,12 +380,10 @@ public class Pom {
             @Nullable String groupId,
             String artifactId,
             @Nullable String version,
-            @Nullable String datedSnapshotVersion,
-            @Nullable String packaging,
-            @Nullable String classifier) {
+            @Nullable String datedSnapshotVersion) {
 
-        return build(groupId, artifactId, version, datedSnapshotVersion, null, null, packaging, classifier,
-                null, emptyList(), emptyDependencyManagement, emptyList(), emptyList(), emptyMap(),
+        return build(groupId, artifactId, version, datedSnapshotVersion, null, null, null, null,
+                null, emptyList(), DependencyManagement.EMPTY, emptyList(), emptyList(), emptyMap(),
                 emptyMap(), true);
     }
 
@@ -603,11 +601,16 @@ public class Pom {
         }
     }
 
-    private static final DependencyManagement emptyDependencyManagement = new DependencyManagement(emptyList());
-
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
     public static class DependencyManagement {
+
+        private static final DependencyManagement EMPTY = new DependencyManagement(emptyList());
+
+        public static DependencyManagement empty() {
+            return EMPTY;
+        }
+
         @With
         List<DependencyManagementDependency> dependencies;
 
