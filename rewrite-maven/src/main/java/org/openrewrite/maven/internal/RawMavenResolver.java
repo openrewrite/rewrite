@@ -141,6 +141,7 @@ public class RawMavenResolver {
         if (task.getRawMaven().getPom().getProperties() != null) {
             partialMaven.setProperties(task.getRawMaven().getPom().getProperties());
         }
+
         partialMaven.setEffectiveProperties(task.getEffectiveProperties());
     }
 
@@ -619,6 +620,7 @@ public class RawMavenResolver {
                         }
                     });
                 }
+
                 result = Optional.of(
                         Pom.build(
                                 groupId,

@@ -37,6 +37,7 @@ import static java.util.Collections.emptyMap;
 public class Pom {
 
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
+
     private static final Map<Pom, Set<Pom>> flyweights = new WeakHashMap<>();
 
     @EqualsAndHashCode.Include
@@ -319,6 +320,7 @@ public class Pom {
                 false
         );
     }
+
     public Pom withDependencies(List<Dependency> dependencies) {
         if (Objects.equals(this.dependencies, dependencies)) {
             return this;
@@ -342,6 +344,7 @@ public class Pom {
                 false
         );
     }
+
     public Pom withDependencyManagement(DependencyManagement dependencyManagement) {
         if (Objects.equals(this.dependencyManagement, dependencyManagement)) {
             return this;
@@ -366,6 +369,7 @@ public class Pom {
                 false
         );
     }
+
     public Pom withLicenses(List<License> licenses) {
         if (Objects.equals(this.licenses, licenses)) {
             return this;
