@@ -33,11 +33,11 @@ import static java.util.Collections.emptyMap;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@Getter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Pom {
+
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
-    private static final Map<PomKey, Set<Pom>> flyweights = new WeakHashMap<>();
+    private static final Map<Pom, Set<Pom>> flyweights = new WeakHashMap<>();
 
     @EqualsAndHashCode.Include
     @Nullable
@@ -46,6 +46,7 @@ public class Pom {
     /**
      * Cannot be inherited from a parent POM.
      */
+    @Getter
     @EqualsAndHashCode.Include
     String artifactId;
 
@@ -56,40 +57,54 @@ public class Pom {
     /**
      * The timestamp and build numbered version number (the latest snapshot at time dependencies were resolved).
      */
+    @Getter
     @EqualsAndHashCode.Include
     @Nullable
     String datedSnapshotVersion;
 
+    @Getter
     @Nullable
     String name;
 
+    @Getter
     @Nullable
     String description;
 
     @Nullable
     String packaging;
 
+    @Getter
     @EqualsAndHashCode.Include
     @Nullable
     String classifier;
 
+    @Getter
     @Nullable
     Pom parent;
 
+    @Getter
     List<Dependency> dependencies;
+
+    @Getter
     DependencyManagement dependencyManagement;
+
+    @Getter
     Collection<License> licenses;
+
+    @Getter
     Collection<MavenRepository> repositories;
 
     /**
      * The properties parsed directly from this POM. The values may be different than the effective property values.
      */
+    @Getter
     Map<String, String> properties;
 
     /**
      * A pom's property values can be overridden when the pom is a parent and the child defines a different value
      * for that property.
      */
+    @EqualsAndHashCode.Include
     Map<String, String> propertyOverrides;
 
     private Pom(
@@ -264,20 +279,20 @@ public class Pom {
 
     public boolean deepEquals(@Nullable Pom other) {
         return this == other || (other != null &&
-                Objects.equals(this.datedSnapshotVersion, other.datedSnapshotVersion) &&
                 Objects.equals(this.groupId, other.groupId) &&
                 Objects.equals(this.artifactId, other.artifactId) &&
                 Objects.equals(this.version, other.version) &&
+                Objects.equals(this.datedSnapshotVersion, other.datedSnapshotVersion) &&
                 Objects.equals(this.name, other.name) &&
                 Objects.equals(this.description, other.description) &&
                 Objects.equals(this.packaging, other.packaging) &&
-                Objects.equals(this.parent, other.parent) &&
                 Objects.equals(this.propertyOverrides, other.propertyOverrides) &&
-                Objects.equals(this.dependencies, other.dependencies) &&
-                Objects.equals(this.dependencyManagement, other.dependencyManagement) &&
+                Objects.equals(this.properties, other.properties) &&
                 Objects.equals(this.repositories, other.repositories) &&
                 Objects.equals(this.licenses, other.licenses) &&
-                Objects.equals(this.properties, other.properties)
+                Objects.equals(this.dependencyManagement, other.dependencyManagement) &&
+                Objects.equals(this.parent, other.parent) &&
+                Objects.equals(this.dependencies, other.dependencies)
         );
     }
 
@@ -406,28 +421,25 @@ public class Pom {
             Map<String, String> propertyOverrides,
             boolean relaxedMatching) {
 
-        PomKey key = new PomKey(groupId, artifactId, version, datedSnapshotVersion);
-        Set<Pom> variants = flyweights.get(key);
+        Pom candidate = new Pom(groupId, artifactId, version, datedSnapshotVersion, name, description, packaging, classifier,
+                parent, dependencies, dependencyManagement, licenses, repositories, properties, propertyOverrides);
+
+        Set<Pom> variants = flyweights.get(candidate);
         if (relaxedMatching && variants != null && !variants.isEmpty()) {
             // no lock access to existing flyweight when relaxed class type matching is off
             return variants.iterator().next();
         }
 
         synchronized (flyweights) {
-            variants = flyweights.computeIfAbsent(key, k -> new HashSet<>());
+            variants = flyweights.computeIfAbsent(candidate, k -> new HashSet<>());
 
             if (relaxedMatching) {
                 if (variants.isEmpty()) {
-                    Pom candidate = new Pom(groupId, artifactId, version, datedSnapshotVersion, name, description, packaging, classifier,
-                            parent, dependencies, dependencyManagement, licenses, repositories, properties, propertyOverrides);
                     variants.add(candidate);
                     return candidate;
                 }
                 return variants.iterator().next();
             } else {
-                Pom candidate = new Pom(groupId, artifactId, version, datedSnapshotVersion, name, description, packaging, classifier,
-                        parent, dependencies, dependencyManagement, licenses, repositories, properties, propertyOverrides);
-
                 for (Pom v : variants) {
                     if (v.deepEquals(candidate)) {
                         return v;
@@ -437,14 +449,6 @@ public class Pom {
                 return candidate;
             }
         }
-    }
-
-    @Value
-    private static class PomKey {
-        @Nullable String groupId;
-        String artifactId;
-        @Nullable String version;
-        @Nullable String datedSnapshotVersion;
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
