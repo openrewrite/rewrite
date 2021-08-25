@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.*;
@@ -28,14 +29,16 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@Getter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-@RequiredArgsConstructor
 public class Pom {
+
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
+
+    private static final Map<Pom, Set<Pom>> flyweights = new WeakHashMap<>();
 
     @EqualsAndHashCode.Include
     @Nullable
@@ -44,61 +47,100 @@ public class Pom {
     /**
      * Cannot be inherited from a parent POM.
      */
-    @EqualsAndHashCode.Include
     @Getter
+    @EqualsAndHashCode.Include
     String artifactId;
 
     @EqualsAndHashCode.Include
     @Nullable
-    @With
     String version;
-
-    @Nullable
-    String name;
-
-    @Nullable
-    String description;
 
     /**
      * The timestamp and build numbered version number (the latest snapshot at time dependencies were resolved).
      */
+    @Getter
     @EqualsAndHashCode.Include
     @Nullable
     String datedSnapshotVersion;
 
+    @Getter
+    @Nullable
+    String name;
+
+    @Getter
+    @Nullable
+    String description;
+
     @Nullable
     String packaging;
 
-    @EqualsAndHashCode.Include
     @Getter
+    @EqualsAndHashCode.Include
     @Nullable
     String classifier;
 
+    @Getter
     @Nullable
     Pom parent;
 
-    @With
+    @Getter
     List<Dependency> dependencies;
 
-    @With
+    @Getter
     DependencyManagement dependencyManagement;
 
-    @With
+    @Getter
     Collection<License> licenses;
 
+    @Getter
     Collection<MavenRepository> repositories;
 
     /**
      * The properties parsed directly from this POM. The values may be different than the effective property values.
      */
+    @Getter
     Map<String, String> properties;
 
     /**
-     * Effective properties are collected across all pom.xml files that were resolved during a parse. These properties
-     * reflect what the value should be in the context of the entire maven tree and account for property precedence
-     * when the same property key is encountered multiple times.
+     * A pom's property values can be overridden when the pom is a parent and the child defines a different value
+     * for that property.
      */
-    Map<String, String> effectiveProperties;
+    @EqualsAndHashCode.Include
+    Map<String, String> propertyOverrides;
+
+    private Pom(
+            @Nullable String groupId,
+            String artifactId,
+            @Nullable String version,
+            @Nullable String datedSnapshotVersion,
+            @Nullable String name,
+            @Nullable String description,
+            @Nullable String packaging,
+            @Nullable String classifier,
+            @Nullable Pom parent,
+            List<Dependency> dependencies,
+            DependencyManagement dependencyManagement,
+            Collection<License> licenses,
+            Collection<MavenRepository> repositories,
+            Map<String, String> properties,
+            Map<String, String> propertyOverrides) {
+
+        this.groupId = groupId;
+        this.artifactId = artifactId;
+        this.version = version;
+        this.datedSnapshotVersion = datedSnapshotVersion;
+        this.name = name;
+        this.description = description;
+        this.packaging = packaging;
+        this.classifier = classifier;
+        this.parent = parent;
+        this.dependencies = dependencies;
+        this.dependencyManagement = dependencyManagement;
+        this.licenses = licenses;
+        this.repositories = repositories;
+        this.properties = properties;
+        this.propertyOverrides = propertyOverrides;
+    }
 
     public Set<Dependency> getDependencies(Scope scope) {
         Set<Dependency> dependenciesForScope = new TreeSet<>(Comparator.comparing(Dependency::getCoordinates));
@@ -170,7 +212,21 @@ public class Pom {
         }
 
         String key = property.replace("${", "").replace("}", "");
-        return effectiveProperties.get(key);
+        value = propertyOverrides.get(key);
+
+        if (value != null) {
+            return value;
+        }
+        value = properties.get(key);
+        if (value != null) {
+            return value;
+        }
+
+        if (parent != null) {
+            return getValue(key);
+        } else {
+            return null;
+        }
     }
 
     public String getGroupId() {
@@ -220,6 +276,183 @@ public class Pom {
 
     public String getPackaging() {
         return packaging == null ? "jar" : packaging;
+    }
+
+    public boolean deepEquals(@Nullable Pom other) {
+        return this == other || (other != null &&
+                Objects.equals(this.groupId, other.groupId) &&
+                Objects.equals(this.artifactId, other.artifactId) &&
+                Objects.equals(this.version, other.version) &&
+                Objects.equals(this.datedSnapshotVersion, other.datedSnapshotVersion) &&
+                Objects.equals(this.name, other.name) &&
+                Objects.equals(this.description, other.description) &&
+                Objects.equals(this.packaging, other.packaging) &&
+                Objects.equals(this.propertyOverrides, other.propertyOverrides) &&
+                Objects.equals(this.properties, other.properties) &&
+                Objects.equals(this.repositories, other.repositories) &&
+                Objects.equals(this.licenses, other.licenses) &&
+                Objects.equals(this.dependencyManagement, other.dependencyManagement) &&
+                Objects.equals(this.parent, other.parent) &&
+                Objects.equals(this.dependencies, other.dependencies)
+        );
+    }
+
+    public Pom withVersion(String version) {
+        if (Objects.equals(this.version, version)) {
+            return this;
+        }
+        return Pom.build(
+                this.groupId,
+                this.artifactId,
+                version,
+                this.datedSnapshotVersion,
+                this.name,
+                this.description,
+                this.packaging,
+                this.classifier,
+                this.parent,
+                this.dependencies,
+                this.dependencyManagement,
+                this.licenses,
+                this.repositories,
+                this.properties,
+                this.propertyOverrides,
+                false
+        );
+    }
+
+    public Pom withDependencies(List<Dependency> dependencies) {
+        if (Objects.equals(this.dependencies, dependencies)) {
+            return this;
+        }
+        return Pom.build(
+                this.groupId,
+                this.artifactId,
+                this.version,
+                this.datedSnapshotVersion,
+                this.name,
+                this.description,
+                this.packaging,
+                this.classifier,
+                this.parent,
+                dependencies,
+                this.dependencyManagement,
+                this.licenses,
+                this.repositories,
+                this.properties,
+                this.propertyOverrides,
+                false
+        );
+    }
+
+    public Pom withDependencyManagement(DependencyManagement dependencyManagement) {
+        if (Objects.equals(this.dependencyManagement, dependencyManagement)) {
+            return this;
+        }
+
+        return Pom.build(
+                this.groupId,
+                this.artifactId,
+                this.version,
+                this.datedSnapshotVersion,
+                this.name,
+                this.description,
+                this.packaging,
+                this.classifier,
+                this.parent,
+                this.dependencies,
+                dependencyManagement,
+                this.licenses,
+                this.repositories,
+                this.properties,
+                this.propertyOverrides,
+                false
+        );
+    }
+
+    public Pom withLicenses(List<License> licenses) {
+        if (Objects.equals(this.licenses, licenses)) {
+            return this;
+        }
+
+        return Pom.build(
+                this.groupId,
+                this.artifactId,
+                this.version,
+                this.datedSnapshotVersion,
+                this.name,
+                this.description,
+                this.packaging,
+                this.classifier,
+                this.parent,
+                this.dependencies,
+                this.dependencyManagement,
+                licenses,
+                this.repositories,
+                this.properties,
+                this.propertyOverrides,
+                false
+        );
+    }
+
+    public static Pom build(
+            @Nullable String groupId,
+            String artifactId,
+            @Nullable String version,
+            @Nullable String datedSnapshotVersion) {
+
+        return build(groupId, artifactId, version, datedSnapshotVersion, null, null, null, null,
+                null, emptyList(), DependencyManagement.empty(), emptyList(), emptyList(), emptyMap(),
+                emptyMap(), true);
+    }
+
+    @JsonCreator
+    public static Pom build(
+            @Nullable String groupId,
+            String artifactId,
+            @Nullable String version,
+            @Nullable String datedSnapshotVersion,
+            @Nullable String name,
+            @Nullable String description,
+            @Nullable String packaging,
+            @Nullable String classifier,
+            @Nullable Pom parent,
+            List<Dependency> dependencies,
+            DependencyManagement dependencyManagement,
+            Collection<License> licenses,
+            Collection<MavenRepository> repositories,
+            Map<String, String> properties,
+            Map<String, String> propertyOverrides,
+            boolean relaxedMatching) {
+
+        Pom candidate = new Pom(groupId, artifactId, version, datedSnapshotVersion, name, description, packaging, classifier,
+                parent, dependencies, dependencyManagement, licenses, repositories, properties, propertyOverrides);
+
+        Set<Pom> variants = flyweights.get(candidate);
+        if (relaxedMatching && variants != null && !variants.isEmpty()) {
+            // no lock access to existing flyweight when relaxed class type matching is off
+            return variants.iterator().next();
+        }
+
+        synchronized (flyweights) {
+            variants = flyweights.computeIfAbsent(candidate, k -> new HashSet<>());
+
+            if (relaxedMatching) {
+                if (variants.isEmpty()) {
+                    variants.add(candidate);
+                    return candidate;
+                }
+                return variants.iterator().next();
+            } else {
+                for (Pom v : variants) {
+                    if (v.deepEquals(candidate)) {
+                        return v;
+                    }
+                }
+                variants.add(candidate);
+                return candidate;
+            }
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -379,6 +612,13 @@ public class Pom {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
     public static class DependencyManagement {
+
+        private static final DependencyManagement EMPTY = new DependencyManagement(emptyList());
+
+        public static DependencyManagement empty() {
+            return EMPTY;
+        }
+
         @With
         List<DependencyManagementDependency> dependencies;
 

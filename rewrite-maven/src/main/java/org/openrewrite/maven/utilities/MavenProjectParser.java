@@ -114,11 +114,11 @@ public class MavenProjectParser {
         String javaVendor = System.getProperty("java.vm.vendor");
         String sourceCompatibility = javaRuntimeVersion;
         String targetCompatibility = javaRuntimeVersion;
-        String propertiesSourceCompatibility = mavenModel.getValue(mavenModel.getEffectiveProperties().get("maven.compiler.source"));
+        String propertiesSourceCompatibility = mavenModel.getValue(mavenModel.getValue("maven.compiler.source"));
         if (propertiesSourceCompatibility != null) {
             sourceCompatibility = propertiesSourceCompatibility;
         }
-        String propertiesTargetCompatibility = mavenModel.getValue(mavenModel.getEffectiveProperties().get("maven.compiler.target"));
+        String propertiesTargetCompatibility = mavenModel.getValue(mavenModel.getValue("maven.compiler.target"));
         if (propertiesTargetCompatibility != null) {
             targetCompatibility = propertiesTargetCompatibility;
         }

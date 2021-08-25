@@ -138,8 +138,10 @@ public class RawMavenResolver {
     private void processProperties(ResolutionTask task, PartialMaven partialMaven) {
 
         task.getRawMaven().getActiveProperties(activeProfiles).forEach(task.getEffectiveProperties()::putIfAbsent);
+        if (task.getRawMaven().getPom().getProperties() != null) {
+            partialMaven.setProperties(task.getRawMaven().getPom().getProperties());
+        }
 
-        partialMaven.setProperties(task.getRawMaven().getPom().getProperties());
         partialMaven.setEffectiveProperties(task.getEffectiveProperties());
     }
 
@@ -609,14 +611,24 @@ public class RawMavenResolver {
                     version = partial.getParent().getVersion();
                 }
 
+                Map<String, String> propertyOverrides = new HashMap<>();
+
+                if (partial.getProperties() != null) {
+                    partial.getProperties().forEach((k, v) -> {
+                        if (!Objects.equals(v, partial.getEffectiveProperties().get(k))) {
+                            propertyOverrides.put(k, v);
+                        }
+                    });
+                }
+
                 result = Optional.of(
-                        new Pom(
+                        Pom.build(
                                 groupId,
                                 rawPom.getArtifactId(),
                                 version,
+                                rawPom.getSnapshotVersion(),
                                 rawPom.getName(),
                                 rawPom.getDescription(),
-                                rawPom.getSnapshotVersion(),
                                 partial.getRequiredValue(rawPom.getPackaging()),
                                 null,
                                 partial.getParent(),
@@ -625,7 +637,8 @@ public class RawMavenResolver {
                                 partial.getLicenses(),
                                 partial.getRepositories(),
                                 partial.getProperties(),
-                                partial.getEffectiveProperties()
+                                propertyOverrides,
+                                false
                         )
                 );
             } else {
