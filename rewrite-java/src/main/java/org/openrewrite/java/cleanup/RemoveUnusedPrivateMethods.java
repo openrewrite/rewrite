@@ -18,11 +18,9 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.*;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 public class RemoveUnusedPrivateMethods extends Recipe {
 
@@ -54,19 +52,14 @@ public class RemoveUnusedPrivateMethods extends Recipe {
                         methodType.getGenericSignature() != null &&
                         method.getAllAnnotations().isEmpty()) {
 
-                    J.ClassDeclaration classDeclaration = getCursor().firstEnclosing(J.ClassDeclaration.class);
-                    if (classDeclaration != null && classDeclaration.getImplements() != null) {
-                        for (TypeTree implement : classDeclaration.getImplements()) {
-                            if (implement instanceof J.Identifier) {
-                                JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(implement.getType());
-                                if (fqn != null && "java.io.Serializable".equals(fqn.getFullyQualifiedName()) &&
-                                        ("readObject".equals(m.getName().getSimpleName()) ||
-                                                "readObjectNoData".equals(m.getName().getSimpleName()) ||
-                                                "readResolve".equals(m.getName().getSimpleName()) ||
-                                                "writeObject".equals(m.getName().getSimpleName()))) {
-                                    return m;
-                                }
-                            }
+                    J.ClassDeclaration classDeclaration = getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class);
+                    if (TypeUtils.isAssignableTo(JavaType.Class.build("java.io.Serializable"), classDeclaration.getType())) {
+                        switch (m.getSimpleName()) {
+                            case "readObject":
+                            case "readObjectNoData":
+                            case "readResolve":
+                            case "writeObject":
+                                return m;
                         }
                     }
 
@@ -78,8 +71,7 @@ public class RemoveUnusedPrivateMethods extends Recipe {
                                 return m;
                             }
                         }
-                        if (type instanceof JavaType.Class &&
-                                "org.junit.jupiter.params.provider.MethodSource".equals(((JavaType.Class)type).getFullyQualifiedName())) {
+                        if (TypeUtils.isOfClassType(type,  "org.junit.jupiter.params.provider.MethodSource")) {
                             return m;
                         }
                     }
