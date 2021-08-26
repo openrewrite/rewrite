@@ -38,7 +38,7 @@ public class Pom {
 
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
 
-    private static final Map<Pom, Set<Pom>> flyweights = new WeakHashMap<>();
+    private static final Map<Pom, List<Pom>> flyweights = new WeakHashMap<>();
 
     @EqualsAndHashCode.Include
     @Nullable
@@ -291,8 +291,8 @@ public class Pom {
                 Objects.equals(this.properties, other.properties) &&
                 Objects.equals(this.repositories, other.repositories) &&
                 Objects.equals(this.licenses, other.licenses) &&
-                Objects.equals(this.dependencyManagement, other.dependencyManagement) &&
-                Objects.equals(this.parent, other.parent) &&
+                (this.dependencyManagement == other.dependencyManagement || (this.dependencyManagement.deepEquals(other.dependencyManagement))) &&
+                (this.parent == other.parent || (this.parent != null && this.parent.deepEquals(other.parent))) &&
                 Objects.equals(this.dependencies, other.dependencies)
         );
     }
@@ -428,14 +428,14 @@ public class Pom {
         Pom candidate = new Pom(groupId, artifactId, version, datedSnapshotVersion, name, description, packaging, classifier,
                 parent, dependencies, dependencyManagement, licenses, repositories, properties, propertyOverrides);
 
-        Set<Pom> variants = flyweights.get(candidate);
+        List<Pom> variants = flyweights.get(candidate);
         if (relaxedMatching && variants != null && !variants.isEmpty()) {
             // no lock access to existing flyweight when relaxed class type matching is off
             return variants.iterator().next();
         }
 
         synchronized (flyweights) {
-            variants = flyweights.computeIfAbsent(candidate, k -> new HashSet<>());
+            variants = flyweights.computeIfAbsent(candidate, k -> new ArrayList<>());
 
             if (relaxedMatching) {
                 if (variants.isEmpty()) {
@@ -607,6 +607,19 @@ public class Pom {
             }
             return matches;
         }
+
+        public boolean deepEquals(@Nullable Dependency other) {
+
+            return this == other || (other != null &&
+                    Objects.equals(this.repository, other.repository) &&
+                    Objects.equals(this.scope, other.scope) &&
+                    Objects.equals(this.classifier, other.classifier) &&
+                    Objects.equals(this.type, other.type) &&
+                    this.optional == other.optional &&
+                    Objects.equals(this.requestedVersion, other.requestedVersion) &&
+                    Objects.equals(this.exclusions, other.exclusions) &&
+                    (this.model == other.model || (this.model != null && this.model.deepEquals(other.model))));
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -646,6 +659,28 @@ public class Pom {
             }
             return scope == null ? null : scope.name().toLowerCase();
         }
+
+        public boolean deepEquals(@Nullable DependencyManagement other) {
+            if (this == other) {
+                return true;
+            } else if (other == null) {
+                return false;
+            }
+
+            ListIterator<DependencyManagementDependency> e1 = dependencies.listIterator();
+            ListIterator<DependencyManagementDependency> e2 = other.dependencies.listIterator();
+            while (e1.hasNext() && e2.hasNext()) {
+                DependencyManagementDependency o1 = e1.next();
+                DependencyManagementDependency o2 = e2.next();
+                if (!((o1 == o2)
+                        || (o1 instanceof DependencyManagementDependency.Defined && o1.equals(o2))
+                        || (o1 instanceof DependencyManagementDependency.Imported && ((DependencyManagementDependency.Imported)o1).deepEquals(o2)))) {
+                    return false;
+                }
+            }
+            return !(e1.hasNext() || e2.hasNext());
+        }
+
     }
 
     @Override
