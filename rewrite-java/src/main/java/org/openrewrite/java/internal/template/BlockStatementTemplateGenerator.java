@@ -194,9 +194,11 @@ public class BlockStatementTemplateGenerator {
             }
         } else if (j instanceof J.NewClass) {
             J.NewClass n = (J.NewClass) j;
-            n = n.withBody(null).withPrefix(Space.EMPTY);
-            before.insert(0, n.printTrimmed().trim());
-            after.append(';');
+            if (n.getArguments() != null && n.getArguments().stream().noneMatch(arg -> arg==prior)) {
+                n = n.withBody(null).withPrefix(Space.EMPTY);
+                before.insert(0, n.printTrimmed().trim());
+                after.append(';');
+            }
         } else if (j instanceof J.ForLoop) {
             J.ForLoop f = (J.ForLoop) j;
             f = f.withBody(null).withPrefix(Space.EMPTY)
