@@ -15,13 +15,15 @@
  */
 package org.openrewrite.java.cleanup
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 
+@Suppress("UnnecessaryBoxing", "deprecation", "BooleanConstructorCall", "ConstantConditions",
+    "StringOperationCanBeSimplified", "CachedNumberConstructorCall"
+)
 interface PrimitiveWrapperClassConstructorToValueOfTest : JavaRecipeTest {
     override val recipe: Recipe
         get() = PrimitiveWrapperClassConstructorToValueOf()
@@ -98,15 +100,14 @@ interface PrimitiveWrapperClassConstructorToValueOfTest : JavaRecipeTest {
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/901")
-    @Disabled
     @Test
-    fun newClassIsArgumentToNewClass() = assertChanged(
+    fun templateIsNewClassArgumentForNewClass() = assertChanged(
         before = """
             import java.util.Date;
             public class A {
                 public static void main(String[] args) {
-                    Date s = new Date();
-                    s = new Date(new Long(0));
+                    Date d = new Date(new Long(0));
+                    Long l = new Long(new Integer(0));
                 }
             }
         """,
@@ -114,8 +115,8 @@ interface PrimitiveWrapperClassConstructorToValueOfTest : JavaRecipeTest {
             import java.util.Date;
             public class A {
                 public static void main(String[] args) {
-                    Date s = new Date();
-                    s = new Date(Long.valueOf(0));
+                    Date d = new Date(Long.valueOf(0));
+                    Long l = Long.valueOf(Integer.valueOf(0));
                 }
             }
         """
