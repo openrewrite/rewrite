@@ -290,16 +290,20 @@ public interface JavaType extends Serializable {
          */
         public static Class build(String fullyQualifiedName) {
             Class owningClass = null;
+
             int firstClassNameIndex = 0;
             int lastDot = 0;
             char[] fullyQualifiedNameChars = fullyQualifiedName.toCharArray();
+            char prev = ' ';
             for (int i = 0; i < fullyQualifiedNameChars.length; i++) {
                 char c = fullyQualifiedNameChars[i];
-                if (firstClassNameIndex == 0 && Character.isUpperCase(c)) {
+
+                if (firstClassNameIndex == 0 && prev == '.' && Character.isUpperCase(c)) {
                     firstClassNameIndex = i;
                 } else if (c == '.') {
                     lastDot = i;
                 }
+                prev = c;
             }
 
             if (lastDot > firstClassNameIndex) {

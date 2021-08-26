@@ -42,6 +42,7 @@ interface ChangeTypeTest : JavaRecipeTest {
         """.trimIndent()
     }
 
+    @Suppress("InstantiationOfUtilityClass")
     @Issue("https://github.com/openrewrite/rewrite/issues/788")
     @Test
     fun unnecessaryImport(jp: JavaParser) = assertUnchanged(
@@ -69,6 +70,7 @@ interface ChangeTypeTest : JavaRecipeTest {
         """.trimIndent())
     )
 
+    @Suppress("rawtypes")
     @Issue("https://github.com/openrewrite/rewrite/issues/868")
     @Test
     fun changeInnerClassToOuterClass(jp: JavaParser) = assertChanged(
@@ -120,6 +122,7 @@ interface ChangeTypeTest : JavaRecipeTest {
         before = "public class B {}"
     )
 
+    @Suppress("rawtypes")
     @Issue("https://github.com/openrewrite/rewrite/issues/774")
     @Test
     fun replaceWithNestedType(jp: JavaParser) = assertChanged(
@@ -220,6 +223,7 @@ interface ChangeTypeTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("RedundantThrows")
     @Test
     fun method(jp: JavaParser) = assertChanged(
         jp,
@@ -334,6 +338,7 @@ interface ChangeTypeTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("UnnecessaryLocalVariable")
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/704")
     fun updateAssignments(jp: JavaParser) = assertChanged(
@@ -544,6 +549,43 @@ interface ChangeTypeTest : JavaRecipeTest {
             
             public class Foo {
                 List<B> a = new ArrayList<>();
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/925")
+    @Test
+    fun changeTypeWithUppercaseInPackage() = assertChanged(
+        parser = JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true).dependsOn(
+            """
+                package com.acme.product.util.accessDecision;
+                
+                public enum AccessVote {
+                    ABSTAIN;
+                }
+            """
+        ).build(),
+        recipe = ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote"),
+        before = """
+            package de;
+            
+            import com.acme.product.util.accessDecision.AccessVote;
+
+            public class ProjectVoter {
+                public AccessVote vote() {
+                    return AccessVote.ABSTAIN;
+                }
+            }
+        """,
+        after = """
+            package de;
+
+            import com.acme.product.v2.util.accessDecision.AccessVote;
+
+            public class ProjectVoter {
+                public AccessVote vote() {
+                    return AccessVote.ABSTAIN;
+                }
             }
         """
     )
