@@ -24,10 +24,7 @@ import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyMap;
@@ -94,6 +91,21 @@ public interface DependencyManagementDependency {
         public Map<String, String> getProperties() {
             // FIXME should be active properties by profile as well? also parent properties?
             return maven.getProperties();
+        }
+
+        public boolean deepEquals(@Nullable Object other) {
+            if (other instanceof Imported) {
+                Imported i = (Imported) other;
+                return this == other || (
+                        Objects.equals(this.groupId, i.groupId)
+                                && Objects.equals(this.artifactId, i.artifactId)
+                                && Objects.equals(this.version, i.version)
+                                && Objects.equals(this.requestedVersion, i.requestedVersion)
+                                && (this.maven == i.maven || (this.maven != null && this.maven.deepEquals(i.maven))
+                        )
+                );
+            }
+            return false;
         }
     }
 
