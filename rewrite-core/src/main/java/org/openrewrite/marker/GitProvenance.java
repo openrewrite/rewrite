@@ -69,8 +69,7 @@ public class GitProvenance implements Marker {
     }
 
     public static GitProvenance fromProjectDirectory(Path projectDir) {
-        try {
-            Repository repository = new RepositoryBuilder().findGitDir(projectDir.toFile()).build();
+        try (Repository repository = new RepositoryBuilder().findGitDir(projectDir.toFile()).build()) {
             return new GitProvenance(randomId(), getOrigin(repository), repository.getBranch(), getChangeset(repository));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
