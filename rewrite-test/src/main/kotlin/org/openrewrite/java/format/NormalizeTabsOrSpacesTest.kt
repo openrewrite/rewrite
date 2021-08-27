@@ -16,6 +16,7 @@
 package org.openrewrite.java.format
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
@@ -131,4 +132,21 @@ interface NormalizeTabsOrSpacesTest : JavaRecipeTest {
             }
         """
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/929")
+    @Test
+    fun doNotReplaceSpacesBeforeAsterisks(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.styles(tabsAndIndents { withUseTabCharacter(true) }).build(),
+        before = """
+            public class Test {
+            	/*
+            	 * Preserve `*`'s on
+            	 * each new line.
+            	 */
+            	public class Inner {
+            	}
+            }
+        """
+    )
+
 }

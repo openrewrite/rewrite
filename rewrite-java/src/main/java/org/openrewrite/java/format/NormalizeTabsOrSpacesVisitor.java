@@ -91,7 +91,8 @@ public class NormalizeTabsOrSpacesVisitor<P> extends JavaIsoVisitor<P> {
                         textBuilder.append(c);
                     } else if (!inMargin) {
                         textBuilder.append(c);
-                    } else if (style.getUseTabCharacter() && c == ' ') {
+                    } else if (style.getUseTabCharacter() && c == ' '
+                            && i + 1 < charArray.length && charArray[i + 1] != '*') {
                         int j = i + 1;
                         for (; j < charArray.length && j < style.getTabSize(); j++) {
                             if (charArray[j] != ' ') {
