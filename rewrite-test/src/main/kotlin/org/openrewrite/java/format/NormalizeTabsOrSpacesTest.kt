@@ -149,4 +149,25 @@ interface NormalizeTabsOrSpacesTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/928")
+    @Test
+    fun normalizeJavaDocSuffix(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class Test {
+            	/** Test
+            	 */
+            	public class Inner {
+            	}
+            }
+        """,
+        after = """
+            public class Test {
+                /** Test
+                 */
+                public class Inner {
+                }
+            }
+        """
+    )
 }

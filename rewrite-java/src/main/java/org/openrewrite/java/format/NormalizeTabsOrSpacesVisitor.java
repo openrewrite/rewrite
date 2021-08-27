@@ -48,6 +48,7 @@ public class NormalizeTabsOrSpacesVisitor<P> extends JavaIsoVisitor<P> {
             Comment c = comment;
             if (c.isMultiline()) {
                 if (c instanceof Javadoc) {
+                    c = c.withSuffix(normalize(c.getSuffix()));
                     return (Comment) new JavadocVisitor<Integer>() {
                         @Override
                         public Javadoc visitLineBreak(Javadoc.LineBreak lineBreak, Integer integer) {
