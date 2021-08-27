@@ -145,6 +145,12 @@ public class ChangeType extends Recipe {
         }
 
         @Override
+        public J visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
+            J.Assignment a = visitAndCast(assignment, ctx, super::visitAssignment);
+            return updateType(a);
+        }
+
+        @Override
         public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
             J.ClassDeclaration c = visitAndCast(classDecl, ctx, super::visitClassDeclaration);
 
@@ -291,6 +297,12 @@ public class ChangeType extends Recipe {
             J.NewClass n = visitAndCast(newClass, ctx, super::visitNewClass);
             return n.withClazz(transformName(n.getClazz()))
                     .withType(updateType(n.getType()));
+        }
+
+        @Override
+        public J visitTernary(J.Ternary ternary, ExecutionContext ctx) {
+            J.Ternary t = visitAndCast(ternary, ctx, super::visitTernary);
+            return updateType(t);
         }
 
         @Override

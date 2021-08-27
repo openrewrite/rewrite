@@ -384,6 +384,7 @@ interface ChangeTypeTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("RedundantCast")
     @Test
     fun typeCast(jp: JavaParser) = assertChanged(
         jp,
@@ -555,7 +556,7 @@ interface ChangeTypeTest : JavaRecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/925")
     @Test
-    fun changeTypeWithUppercaseInPackage() = assertChanged(
+    fun uppercaseInPackage() = assertChanged(
         parser = JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true).dependsOn(
             """
                 package com.acme.product.util.accessDecision;
@@ -585,6 +586,86 @@ interface ChangeTypeTest : JavaRecipeTest {
             public class ProjectVoter {
                 public AccessVote vote() {
                     return AccessVote.ABSTAIN;
+                }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/932")
+    @Test
+    fun assignment() = assertChanged(
+        parser = JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true).dependsOn(
+            """
+                package com.acme.product.util.accessDecision;
+                
+                public enum AccessVote {
+                    ABSTAIN,
+                    GRANT;
+                }
+            """
+        ).build(),
+        recipe = ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote"),
+        before = """
+            package de;
+            
+            import com.acme.product.util.accessDecision.AccessVote;
+
+            public class ProjectVoter {
+                public AccessVote vote(Object input) {
+                    AccessVote fred;
+                    fred = (AccessVote) input;
+                    return fred;
+                }
+            }
+        """,
+        after = """
+            package de;
+
+            import com.acme.product.v2.util.accessDecision.AccessVote;
+
+            public class ProjectVoter {
+                public AccessVote vote(Object input) {
+                    AccessVote fred;
+                    fred = (AccessVote) input;
+                    return fred;
+                }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/932")
+    @Test
+    fun ternary() = assertChanged(
+        parser = JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true).dependsOn(
+            """
+                package com.acme.product.util.accessDecision;
+                
+                public enum AccessVote {
+                    ABSTAIN,
+                    GRANT;
+                }
+            """
+        ).build(),
+        recipe = ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote"),
+        before = """
+            package de;
+            
+            import com.acme.product.util.accessDecision.AccessVote;
+
+            public class ProjectVoter {
+                public AccessVote vote(Object input) {
+                    return input == null ? AccessVote.GRANT : AccessVote.ABSTAIN;
+                }
+            }
+        """,
+        after = """
+            package de;
+
+            import com.acme.product.v2.util.accessDecision.AccessVote;
+
+            public class ProjectVoter {
+                public AccessVote vote(Object input) {
+                    return input == null ? AccessVote.GRANT : AccessVote.ABSTAIN;
                 }
             }
         """
