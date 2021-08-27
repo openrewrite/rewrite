@@ -241,6 +241,12 @@ public class ChangeType extends Recipe {
         }
 
         @Override
+        public J visitLambda(J.Lambda lambda, ExecutionContext ctx) {
+            J.Lambda l = visitAndCast(lambda, ctx, super::visitLambda);
+            return l.withType(updateType(l.getType()));
+        }
+
+        @Override
         public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
             J.MethodDeclaration m = visitAndCast(method, ctx, super::visitMethodDeclaration);
             m = m.withReturnTypeExpression(transformName(m.getReturnTypeExpression()));

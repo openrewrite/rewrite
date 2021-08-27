@@ -591,6 +591,42 @@ interface ChangeTypeTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/934")
+    @Test
+    fun lambda() = assertChanged(
+        parser = JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true).dependsOn(
+            """
+                package com.acme.product;
+                public interface Procedure {
+                    void execute();
+                }
+            """
+        ).build(),
+        recipe = ChangeType("com.acme.product.Procedure", "com.acme.product.Procedure2"),
+        before = """
+            import com.acme.product.Procedure;
+            
+            public abstract class Worker {
+                void callWorker() {
+                    worker(() -> {
+                    });
+                }
+                abstract void worker(Procedure callback);
+            }
+        """,
+        after = """
+            import com.acme.product.Procedure2;
+            
+            public abstract class Worker {
+                void callWorker() {
+                    worker(() -> {
+                    });
+                }
+                abstract void worker(Procedure2 callback);
+            }
+        """
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/932")
     @Test
     fun assignment() = assertChanged(
