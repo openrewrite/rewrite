@@ -28,6 +28,7 @@ import org.openrewrite.internal.lang.Nullable;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.ref.WeakReference;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -52,6 +53,9 @@ public class Result {
 
     @Getter
     private final Set<Recipe> recipesThatMadeChanges;
+
+    @Nullable
+    private transient WeakReference<String> diff;
 
     public Result(@Nullable SourceFile before, @Nullable SourceFile after, Set<Recipe> recipesThatMadeChanges) {
         this.before = before;
@@ -80,6 +84,21 @@ public class Result {
      * @return Git-style patch diff representing the changes to this compilation unit.
      */
     public String diff(@Nullable Path relativeTo, TreePrinter<?> treePrinter) {
+        String d;
+        if (this.diff == null) {
+            d = computeDiff(relativeTo, treePrinter);
+            this.diff = new WeakReference<>(d);
+        } else {
+            d = this.diff.get();
+            if (d == null) {
+                d = computeDiff(relativeTo, treePrinter);
+                this.diff = new WeakReference<>(d);
+            }
+        }
+        return d;
+    }
+
+    private String computeDiff(@Nullable Path relativeTo, TreePrinter<?> treePrinter) {
         Path sourcePath;
         if (after != null) {
             sourcePath = after.getSourcePath();
@@ -90,19 +109,21 @@ public class Result {
         }
 
         Path originalSourcePath = sourcePath;
-        if(before != null && after != null && !before.getSourcePath().equals(after.getSourcePath())) {
+        if (before != null && after != null && !before.getSourcePath().equals(after.getSourcePath())) {
             originalSourcePath = before.getSourcePath();
         }
 
         //noinspection ConstantConditions
-        return new InMemoryDiffEntry(
+        try (InMemoryDiffEntry diffEntry = new InMemoryDiffEntry(
                 originalSourcePath,
                 sourcePath,
                 relativeTo,
                 before == null ? "" : before.print(),
                 after == null ? "" : after.print(treePrinter, null),
                 recipesThatMadeChanges
-        ).getDiff();
+        )) {
+            return diffEntry.getDiff();
+        }
     }
 
     @Override
@@ -110,7 +131,7 @@ public class Result {
         return diff();
     }
 
-    static class InMemoryDiffEntry extends DiffEntry {
+    static class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
         private final InMemoryRepository repo;
         private final Set<Recipe> recipesThatMadeChanges;
 
@@ -134,7 +155,6 @@ public class Result {
 
                 oldMode = FileMode.REGULAR_FILE;
                 newMode = FileMode.REGULAR_FILE;
-                repo.close();
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -146,9 +166,8 @@ public class Result {
             }
 
             ByteArrayOutputStream patch = new ByteArrayOutputStream();
-            DiffFormatter formatter = new DiffFormatter(patch);
-            formatter.setRepository(repo);
-            try {
+            try (DiffFormatter formatter = new DiffFormatter(patch)) {
+                formatter.setRepository(repo);
                 formatter.format(this);
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
@@ -170,6 +189,11 @@ public class Result {
                         return l;
                     })
                     .collect(Collectors.joining("\n")) + "\n";
+        }
+
+        @Override
+        public void close() {
+            this.repo.close();
         }
     }
 }
