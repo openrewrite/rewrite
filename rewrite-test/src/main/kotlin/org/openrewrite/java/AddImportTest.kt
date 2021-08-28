@@ -759,6 +759,27 @@ interface AddImportTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/933")
+    @Test
+    fun unorderedImportsWithNewBlock(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = addImports({ AddImport("java.time.Duration", null, false) }),
+        before = """
+            import org.foo.B;
+            import org.foo.A;
+            
+            class A {}
+        """,
+        after = """
+            import org.foo.B;
+            import org.foo.A;
+            
+            import java.time.Duration;
+            
+            class A {}
+        """
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/880")
     @Test
     fun doNotFoldNormalImportWithNamespaceConflict(jp: JavaParser) {

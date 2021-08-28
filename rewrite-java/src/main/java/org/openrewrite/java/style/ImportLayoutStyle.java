@@ -170,19 +170,23 @@ public class ImportLayoutStyle implements JavaStyle {
             }
         }
 
+        AtomicBoolean isNewBlock = new AtomicBoolean(false);
         if (before == null) {
             if (pkg != null) {
                 Space prefix = originalImports.get(0).getElement().getPrefix();
                 paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(prefix));
             }
         } else if (block(before) != addToBlock) {
+            boolean isFound = false;
             for (int j = insertPosition; j < originalImports.size(); j++) {
                 if (block(originalImports.get(j)) == addToBlock) {
                     insertPosition = j;
                     after = originalImports.get(j);
+                    isFound = true;
                     break;
                 }
             }
+            isNewBlock.set(!isFound);
             paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(Space.format("\n\n")));
         } else {
             paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(Space.format("\n")));
@@ -247,7 +251,7 @@ public class ImportLayoutStyle implements JavaStyle {
         if (after != null) {
             if (block(after) == addToBlock) {
                 after = after.withElement(after.getElement().withPrefix(Space.format("\n")));
-            } else if (after.getElement().getPrefix().getLastWhitespace().chars()
+            } else if (!isNewBlock.get() && after.getElement().getPrefix().getLastWhitespace().chars()
                     .filter(c -> c == '\n').count() < 2) {
                 after = after.withElement(after.getElement().withPrefix(Space.format("\n\n")));
             }
@@ -261,10 +265,15 @@ public class ImportLayoutStyle implements JavaStyle {
                         finalToAdd /* only add the star import once */ :
                         null;
             } else if (finalAfter != null && anImport.getElement().isScope(finalAfter.getElement())) {
-                return starFold.get() ?
-                        finalAfter :
-                        Arrays.asList(finalToAdd, finalAfter);
-            } else if (i == originalImports.size() - 1 && finalAfter == null) {
+                if (starFold.get()) {
+                    return finalAfter;
+                } else if (isNewBlock.get()) {
+                    return anImport.getElement().isStatic() && !finalToAdd.getElement().isStatic() ?
+                            Arrays.asList(finalToAdd, finalAfter) : Arrays.asList(finalAfter, finalToAdd);
+                } else {
+                    return Arrays.asList(finalToAdd, finalAfter);
+                }
+            } else if (i == originalImports.size() - 1 && (finalAfter == null)) {
                 return Arrays.asList(anImport, finalToAdd);
             }
             return anImport;
