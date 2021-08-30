@@ -35,6 +35,7 @@ import org.openrewrite.java.tree.Javadoc.Attribute.ValueKind;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -187,9 +188,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
     @Override
     public Tree visitAuthor(AuthorTree node, String fmt) {
         String prefix = fmt + sourceBefore("@author");
-        return new Javadoc.Author(randomId(), prefix, Markers.EMPTY, node.getName().stream()
-                .map(desc -> (Javadoc) convert(desc))
-                .collect(toList()));
+        return new Javadoc.Author(randomId(), prefix, Markers.EMPTY, convertMultiline(node.getName()));
     }
 
     @Override
@@ -202,9 +201,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
     @Override
     public Tree visitDeprecated(DeprecatedTree node, String fmt) {
         String prefix = fmt + sourceBefore("@deprecated");
-        return new Javadoc.Deprecated(randomId(), prefix, Markers.EMPTY, node.getBody().stream()
-                .map(desc -> (Javadoc) convert(desc))
-                .collect(toList()));
+        return new Javadoc.Deprecated(randomId(), prefix, Markers.EMPTY, convertMultiline(node.getBody()));
     }
 
     @Override
@@ -238,7 +235,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
         Javadoc.LineBreak lineBreak;
 
         for (DocTree blockTag : node.getBlockTags()) {
-            if ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
+            while ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
                 cursor++;
                 body.add(lineBreak);
             }
@@ -376,9 +373,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
                 prefix,
                 Markers.EMPTY,
                 typeName,
-                param.getDescription().stream()
-                        .map(desc -> (Javadoc) convert(desc))
-                        .collect(toList())
+                convertMultiline(param.getDescription())
         );
     }
 
@@ -502,9 +497,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
     @Override
     public Tree visitReturn(ReturnTree node, String fmt) {
         String prefix = fmt + sourceBefore("@return");
-        return new Javadoc.Return(randomId(), prefix, Markers.EMPTY, node.getDescription().stream()
-                .map(desc -> (Javadoc) convert(desc))
-                .collect(toList()));
+        return new Javadoc.Return(randomId(), prefix, Markers.EMPTY, convertMultiline(node.getDescription()));
     }
 
     @Override
@@ -526,17 +519,13 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
     @Override
     public Tree visitSerial(SerialTree node, String fmt) {
         String prefix = fmt + sourceBefore("@serial");
-        return new Javadoc.Serial(randomId(), prefix, Markers.EMPTY, node.getDescription().stream()
-                .map(desc -> (Javadoc) convert(desc))
-                .collect(toList()));
+        return new Javadoc.Serial(randomId(), prefix, Markers.EMPTY, convertMultiline(node.getDescription()));
     }
 
     @Override
     public Tree visitSerialData(SerialDataTree node, String fmt) {
         String prefix = fmt + sourceBefore("@serialData");
-        return new Javadoc.SerialData(randomId(), prefix, Markers.EMPTY, node.getDescription().stream()
-                .map(desc -> (Javadoc) convert(desc))
-                .collect(toList()));
+        return new Javadoc.SerialData(randomId(), prefix, Markers.EMPTY, convertMultiline(node.getDescription()));
     }
 
     @Override
@@ -545,18 +534,14 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
         return new Javadoc.SerialField(randomId(), prefix, Markers.EMPTY,
                 visitIdentifier(node.getName(), whitespaceBefore()),
                 visitReference(node.getType(), whitespaceBefore()),
-                node.getDescription().stream()
-                        .map(desc -> (Javadoc) convert(desc))
-                        .collect(toList())
+                convertMultiline(node.getDescription())
         );
     }
 
     @Override
     public Tree visitSince(SinceTree node, String fmt) {
         String prefix = fmt + sourceBefore("@since");
-        return new Javadoc.Since(randomId(), prefix, Markers.EMPTY, node.getBody().stream()
-                .map(desc -> (Javadoc) convert(desc))
-                .collect(toList()));
+        return new Javadoc.Since(randomId(), prefix, Markers.EMPTY, convertMultiline(node.getBody()));
     }
 
     @Override
@@ -569,7 +554,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
                 prefix,
                 Markers.EMPTY,
                 name,
-                node.getAttributes().stream().map(a -> (Javadoc) convert(a)).collect(toList()),
+                convertMultiline(node.getAttributes()),
                 node.isSelfClosing(),
                 sourceBefore(">")
         );
@@ -578,9 +563,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
     @Override
     public Tree visitVersion(VersionTree node, String fmt) {
         String prefix = fmt + sourceBefore("@version");
-        return new Javadoc.Version(randomId(), prefix, Markers.EMPTY, node.getBody().stream()
-                .map(b -> (Javadoc) convert(b))
-                .collect(toList()));
+        return new Javadoc.Version(randomId(), prefix, Markers.EMPTY, convertMultiline(node.getBody()));
     }
 
     @Override
@@ -625,9 +608,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
         sourceBefore(throwsKeyword ? "@throws" : "@exception");
         return new Javadoc.Throws(randomId(), fmt, Markers.EMPTY, throwsKeyword,
                 visitReference(node.getExceptionName(), ""),
-                node.getDescription().stream()
-                        .map(desc -> (Javadoc) convert(desc))
-                        .collect(toList())
+                convertMultiline(node.getDescription())
         );
     }
 
@@ -639,9 +620,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
                 prefix,
                 Markers.EMPTY,
                 node.getTagName(),
-                node.getContent().stream()
-                        .map(c -> (Javadoc) convert(c))
-                        .collect(toList())
+                convertMultiline(node.getContent())
         );
     }
 
@@ -703,6 +682,20 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
         String prefix = whitespaceBefore();
         @SuppressWarnings("unchecked") J2 j = (J2) scan(t, prefix);
         return j;
+    }
+
+    private List<Javadoc> convertMultiline(List<? extends DocTree> descriptions) {
+        return descriptions.stream()
+                .flatMap(desc -> {
+                    Stream<Javadoc> ds = Stream.empty();
+                    Javadoc.LineBreak lineBreak;
+                    while ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
+                        cursor++;
+                        ds = Stream.concat(ds, Stream.of(lineBreak));
+                    }
+                    return Stream.concat(ds, Stream.of(convert(desc)));
+                })
+                .collect(toList());
     }
 
     class JavaVisitor extends TreeScanner<J, Space> {

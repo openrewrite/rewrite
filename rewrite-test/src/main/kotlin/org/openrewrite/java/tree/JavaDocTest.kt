@@ -251,4 +251,31 @@ interface JavaDocTest : JavaTreeTest {
             }
         """
     )
+
+    @Test
+    fun descriptionOnNewLine(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+            public class Test {
+                 /**
+                  * @param name
+                  *            a name
+                  */
+                void test(String name) {
+                }
+            }
+        """
+    )
+
+    @Test
+    fun multipleLinesBeforeTag(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        /**
+         * Note
+         *
+         * @see CoreJackson2Module
+         */
+        public class Test {
+        }
+    """
+    )
 }
