@@ -296,7 +296,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitStartElement(Javadoc.StartElement startElement, P p) {
         visitMarkers(startElement.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append('<').append(startElement.getName());
+        acc.append(startElement.getPrefix()).append('<').append(startElement.getName());
         visit(startElement.getAttributes(), p);
         acc.append(startElement.getBeforeEndBracket());
         if(startElement.isSelfClosing()) {
