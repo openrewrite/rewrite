@@ -40,6 +40,10 @@ public class Pom {
 
     private static final Map<Pom, List<Pom>> flyweights = new WeakHashMap<>();
 
+    public static void clearCaches() {
+        flyweights.clear();
+    }
+
     @EqualsAndHashCode.Include
     @Nullable
     String groupId;
