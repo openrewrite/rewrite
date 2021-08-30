@@ -245,6 +245,16 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     }
 
     @Override
+    public Javadoc visitSee(Javadoc.See see, P p) {
+        visitMarkers(see.getMarkers(), p);
+        StringBuilder acc = getPrinter();
+        acc.append(see.getPrefix()).append("@see");
+        javaVisitor.visit(see.getTree(), p);
+        visit(see.getReference(), p);
+        return see;
+    }
+
+    @Override
     public Javadoc visitSerial(Javadoc.Serial serial, P p) {
         visitMarkers(serial.getMarkers(), p);
         StringBuilder acc = getPrinter();

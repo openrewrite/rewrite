@@ -109,6 +109,10 @@ class Java8InstanceOfTest: Java8Test, InstanceOfTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8JavaDocTest: Java8Test, JavaDocTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8JavaParserTest: Java8Test, JavaParserTest
 
 @DebugOnly
