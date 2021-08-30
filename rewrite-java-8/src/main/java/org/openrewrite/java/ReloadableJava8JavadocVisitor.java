@@ -510,15 +510,23 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
     @Override
     public Tree visitSee(SeeTree node, String fmt) {
         String prefix = fmt + sourceBefore("@see");
-        return new Javadoc.Since(randomId(), prefix, Markers.EMPTY, node.getReference().stream()
-                .map(desc -> (Javadoc) convert(desc))
-                .collect(toList()));
+        J ref = null;
+        List<Javadoc> desc = new ArrayList<>();
+        for (DocTree docTree : node.getReference()) {
+            if (docTree instanceof DCTree.DCReference) {
+                ref = visitReference((ReferenceTree) docTree, "");
+            } else {
+                desc.add(convert(docTree));
+            }
+        }
+
+        return new Javadoc.See(randomId(), prefix, Markers.EMPTY, ref, desc);
     }
 
     @Override
     public Tree visitSerial(SerialTree node, String fmt) {
         String prefix = fmt + sourceBefore("@serial");
-        return new Javadoc.Since(randomId(), prefix, Markers.EMPTY, node.getDescription().stream()
+        return new Javadoc.Serial(randomId(), prefix, Markers.EMPTY, node.getDescription().stream()
                 .map(desc -> (Javadoc) convert(desc))
                 .collect(toList()));
     }
@@ -526,7 +534,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
     @Override
     public Tree visitSerialData(SerialDataTree node, String fmt) {
         String prefix = fmt + sourceBefore("@serialData");
-        return new Javadoc.Since(randomId(), prefix, Markers.EMPTY, node.getDescription().stream()
+        return new Javadoc.SerialData(randomId(), prefix, Markers.EMPTY, node.getDescription().stream()
                 .map(desc -> (Javadoc) convert(desc))
                 .collect(toList()));
     }

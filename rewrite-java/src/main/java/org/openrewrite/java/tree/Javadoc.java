@@ -400,6 +400,10 @@ public interface Javadoc extends Serializable, Tree {
 
         String prefix;
         Markers markers;
+
+        @Nullable
+        J tree;
+
         List<Javadoc> reference;
 
         @Override
