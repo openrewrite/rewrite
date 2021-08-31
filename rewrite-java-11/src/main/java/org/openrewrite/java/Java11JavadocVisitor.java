@@ -229,10 +229,34 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
         Javadoc.LineBreak lineBreak;
 
         for (DocTree blockTag : node.getBlockTags()) {
-            while ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
-                cursor++;
-                body.add(lineBreak);
+            spaceBeforeTags:
+            while (true) {
+                if ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
+                    cursor++;
+                    body.add(lineBreak);
+                }
+
+                StringBuilder whitespaceBeforeNewLine = new StringBuilder();
+                for (int j = cursor; j < source.length(); j++) {
+                    char ch = source.charAt(j);
+                    if (ch == '\n') {
+                        body.add(new Javadoc.Text(randomId(), Markers.EMPTY, whitespaceBeforeNewLine.toString(),
+                                null, null));
+                        cursor += whitespaceBeforeNewLine.length();
+                        break;
+                    } else if (Character.isWhitespace(ch)) {
+                        whitespaceBeforeNewLine.append(ch);
+                    } else {
+                        if (whitespaceBeforeNewLine.length() > 0) {
+                            body.add(new Javadoc.Text(randomId(), Markers.EMPTY, whitespaceBeforeNewLine.toString(),
+                                    null, null));
+                            cursor += whitespaceBeforeNewLine.length();
+                        }
+                        break spaceBeforeTags;
+                    }
+                }
             }
+
             String prefix = whitespaceBefore();
             body.add((Javadoc) scan(blockTag, firstPrefix + prefix));
             firstPrefix = "";
@@ -249,7 +273,9 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
             body.addAll(lineBreaks.values());
         }
 
-        return new Javadoc.DocComment(randomId(), Markers.EMPTY, body, "");
+        return new Javadoc.DocComment(
+
+                randomId(), Markers.EMPTY, body, "");
     }
 
     @Override

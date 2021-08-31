@@ -292,14 +292,26 @@ interface JavadocTest : JavaTreeTest {
     )
 
     @Test
-    fun codeOnNextLine(jp: JavaParser) = assertParsePrintAndProcess(
+    fun whitespaceBeforeNonLeadingText(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+            interface Test {
+                /**
+                 * @return <code>true</code>
+                 * <code>false</code> non-leading text.
+                 */
+                boolean test();
+            }
+        """.trimIndent()
+    )
+
+    @Test
+    fun whitespaceOnBlankLineBetweenBodyAndTags(jp: JavaParser) = assertParsePrintAndProcess(
         jp, JavaTreeTest.NestingLevel.CompilationUnit, """
             interface Test {
                 /**
                  * Returns something.
                  * 
-                 * @return <code>true</code>
-                 * <code>false</code> otherwise.
+                 * @return true
                  */
                 boolean test();
             }

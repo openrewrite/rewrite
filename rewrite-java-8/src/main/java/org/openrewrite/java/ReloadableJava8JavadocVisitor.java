@@ -35,7 +35,6 @@ import org.openrewrite.java.tree.Javadoc.Attribute.ValueKind;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
-import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -235,10 +234,34 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
         Javadoc.LineBreak lineBreak;
 
         for (DocTree blockTag : node.getBlockTags()) {
-            while ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
-                cursor++;
-                body.add(lineBreak);
+            spaceBeforeTags:
+            while (true) {
+                if ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
+                    cursor++;
+                    body.add(lineBreak);
+                }
+
+                StringBuilder whitespaceBeforeNewLine = new StringBuilder();
+                for (int j = cursor; j < source.length(); j++) {
+                    char ch = source.charAt(j);
+                    if (ch == '\n') {
+                        body.add(new Javadoc.Text(randomId(), Markers.EMPTY, whitespaceBeforeNewLine.toString(),
+                                null, null));
+                        cursor += whitespaceBeforeNewLine.length();
+                        break;
+                    } else if (Character.isWhitespace(ch)) {
+                        whitespaceBeforeNewLine.append(ch);
+                    } else {
+                        if (whitespaceBeforeNewLine.length() > 0) {
+                            body.add(new Javadoc.Text(randomId(), Markers.EMPTY, whitespaceBeforeNewLine.toString(),
+                                    null, null));
+                            cursor += whitespaceBeforeNewLine.length();
+                        }
+                        break spaceBeforeTags;
+                    }
+                }
             }
+
             String prefix = whitespaceBefore();
             body.add((Javadoc) scan(blockTag, firstPrefix + prefix));
             firstPrefix = "";
