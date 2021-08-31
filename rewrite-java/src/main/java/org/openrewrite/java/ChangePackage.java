@@ -101,7 +101,14 @@ public class ChangePackage extends Recipe {
         private static final String RENAME_FROM_KEY = "renameFrom";
 
         private final JavaType.Class newPackageType = JavaType.Class.build(newPackageName);
-        private final JavaType.Class oldPackageType = JavaType.Class.build(oldPackageName);
+
+        @Override
+        public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext executionContext) {
+            J.Assignment a = super.visitAssignment(assignment, executionContext);
+            a = a.withAssignment(updateType(a.getAssignment()));
+            a = a.withType(updateType(a.getType()));
+            return a;
+        }
 
         @Override
         public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
@@ -160,11 +167,6 @@ public class ChangePackage extends Recipe {
         }
 
         @Override
-        public J.Import visitImport(J.Import impoort, ExecutionContext executionContext) {
-            return super.visitImport(impoort, executionContext);
-        }
-
-        @Override
         public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
             J.FieldAccess f = super.visitFieldAccess(fieldAccess, ctx);
 
@@ -178,6 +180,8 @@ public class ChangePackage extends Recipe {
                     f = TypeTree.build(((JavaType.FullyQualified) newPackageType).getFullyQualifiedName())
                             .withPrefix(f.getPrefix());
                 }
+            } else if (f.getType() != null) {
+                f = f.withType(updateType(f.getType()));
             }
             return f;
         }
@@ -188,20 +192,23 @@ public class ChangePackage extends Recipe {
             // and the classname of the type we're looking for is equal to the J.Identifiers string representation
             // Then transform it, otherwise leave it alone
             J.Identifier i = super.visitIdentifier(ident, ctx);
+            return i.withType(updateType(i.getType()));
+        }
 
-            if (TypeUtils.isOfClassType(i.getType(), oldPackageName)
-                    && i.getSimpleName().equals(oldPackageType.getClassName())) {
-
-                i = i.withName((newPackageType).getClassName())
-                        .withType(newPackageType);
-            }
-            return i;
+        @Override
+        public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext executionContext) {
+            J.Lambda l = super.visitLambda(lambda, executionContext);
+            return l.withType(updateType(l.getType()));
         }
 
         @Override
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
             J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
             m = m.withReturnTypeExpression(transformName(m.getReturnTypeExpression()));
+            if (m.getReturnTypeExpression() != null) {
+                m = m.withReturnTypeExpression(m.getReturnTypeExpression().withType(updateType(m.getReturnTypeExpression().getType())));
+            }
+            m = m.withType(updateType(m.getType()));
             return m.withThrows(m.getThrows() == null ? null : ListUtils.map(m.getThrows(), this::transformName));
         }
 
@@ -216,15 +223,15 @@ public class ChangePackage extends Recipe {
 
             if (m.getSelect() != null) {
                 JavaType.FullyQualified selectType = TypeUtils.asFullyQualified(m.getSelect().getType());
-                if (selectType != null && selectType.getFullyQualifiedName().equals(oldPackageName)) {
-                    m = m.withSelect(m.getSelect()
-                            .withType(newPackageType));
+                if (selectType != null && selectType.getPackageName().equals(oldPackageName)) {
+                    m = m.withSelect(m.getSelect().withType(updateType(m.getSelect().getType())));
                 }
             }
 
             if (m.getType() != null) {
-                if (m.getType().getDeclaringType().getFullyQualifiedName().equals(oldPackageName)) {
-                    m = m.withDeclaringType(newPackageType);
+                if (m.getType().getDeclaringType().getPackageName().equals(oldPackageName)) {
+                    //noinspection ConstantConditions
+                    m = m.withDeclaringType(TypeUtils.asFullyQualified(buildNewType(m.getType().getDeclaringType().getClassName())));
                 }
             }
             return m;
@@ -239,13 +246,23 @@ public class ChangePackage extends Recipe {
         @Override
         public J.NewArray visitNewArray(J.NewArray newArray, ExecutionContext ctx) {
             J.NewArray n = super.visitNewArray(newArray, ctx);
-            return n.withTypeExpression(transformName(n.getTypeExpression()));
+            n = n.withType(updateType(n.getType()));
+            n = n.withTypeExpression(transformName(n.getTypeExpression()));
+            return n;
+        }
+
+        @Override
+        public J.ArrayAccess visitArrayAccess(J.ArrayAccess arrayAccess, ExecutionContext executionContext) {
+            J.ArrayAccess aa = super.visitArrayAccess(arrayAccess, executionContext);
+            aa = aa.withType(updateType(aa.getType()));
+            return aa;
         }
 
         @Override
         public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
             J.NewClass n = super.visitNewClass(newClass, ctx);
-            return n.withClazz(transformName(n.getClazz()));
+            n = n.withClazz(transformName(n.getClazz()));
+            return n.withType(updateType(n.getType()));
         }
 
         @Override
@@ -295,9 +312,9 @@ public class ChangePackage extends Recipe {
             J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, ctx);
 
             JavaType.FullyQualified varType = TypeUtils.asFullyQualified(variable.getType());
-            if (varType != null && varType.getFullyQualifiedName().equals(oldPackageName)) {
-                v = v.withType(newPackageType)
-                        .withName(v.getName().withType(newPackageType));
+            if (varType != null && varType.getPackageName().equals(oldPackageName)) {
+                v = v.withType(updateType(v.getType()))
+                        .withName(v.getName().withType(updateType(v.getName().getType())));
             }
             return v;
         }
@@ -307,6 +324,7 @@ public class ChangePackage extends Recipe {
             J.VariableDeclarations m = super.visitVariableDeclarations(multiVariable, ctx);
             if (!(multiVariable.getTypeExpression() instanceof J.MultiCatch)) {
                 m = m.withTypeExpression(transformName(m.getTypeExpression()));
+                m = m.withType(updateType(m.getType()));
             }
             return m;
         }
@@ -334,5 +352,61 @@ public class ChangePackage extends Recipe {
             }
             return nameField;
         }
+
+        private Expression updateType(@Nullable Expression typeTree) {
+            if (typeTree == null) {
+                // updateType/updateSignature are always used to swap things in-place
+                // The true nullability is that the return has the same nullability as the input
+                // Because it's always an in-place operation it isn't problematic to tell a white lie about the nullability of the return value
+
+                //noinspection ConstantConditions
+                return null;
+            }
+
+            return typeTree.withType(updateType(typeTree.getType()));
+        }
+
+        private JavaType updateType(@Nullable JavaType type) {
+            JavaType.FullyQualified fqt = TypeUtils.asFullyQualified(type);
+            if (fqt != null && fqt.getPackageName().equals(oldPackageName)) {
+                return buildNewType(fqt.getClassName());
+            }
+            JavaType.GenericTypeVariable gtv = TypeUtils.asGeneric(type);
+            if (gtv != null && gtv.getBound() != null
+                    && gtv.getBound().getPackageName().equals(oldPackageName)) {
+                return gtv.withBound(TypeUtils.asFullyQualified(buildNewType(gtv.getBound().getClassName())));
+            }
+            JavaType.Method mt = TypeUtils.asMethod(type);
+            if (mt != null) {
+                return mt.withDeclaringType((JavaType.FullyQualified) updateType(mt.getDeclaringType()))
+                        .withResolvedSignature(updateSignature(mt.getResolvedSignature()))
+                        .withGenericSignature(updateSignature(mt.getGenericSignature()));
+            }
+            JavaType.Array at = TypeUtils.asArray(type);
+            if (at != null && at.getElemType() != null) {
+                fqt = TypeUtils.asFullyQualified(at.getElemType());
+                if (fqt != null && fqt.getPackageName().equals(oldPackageName)) {
+                    return new JavaType.Array(buildNewType(fqt.getClassName()));
+                }
+            }
+            //noinspection ConstantConditions
+            return type;
+        }
+
+        private JavaType.Method.Signature updateSignature(@Nullable JavaType.Method.Signature signature) {
+            if (signature == null) {
+                //noinspection ConstantConditions
+                return signature;
+            }
+
+            return signature.withReturnType(updateType(signature.getReturnType()))
+                    .withParamTypes(ListUtils.map(signature.getParamTypes(), this::updateType));
+        }
+
+        private JavaType buildNewType(String className) {
+            //noinspection ConstantConditions
+            return TypeUtils.asFullyQualified(JavaType.buildType(newPackageName + "." + className));
+        }
+
     }
 }
