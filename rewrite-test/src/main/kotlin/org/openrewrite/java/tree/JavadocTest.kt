@@ -290,4 +290,17 @@ interface JavadocTest : JavaTreeTest {
             }
         """.trimIndent()
     )
+
+    @Test
+    fun codeOnNextLine(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+            interface Test {
+                /**
+                 * @return Test
+                 * <code>false</code> otherwise.
+                 */
+                boolean test();
+            }
+        """.trimIndent()
+    )
 }

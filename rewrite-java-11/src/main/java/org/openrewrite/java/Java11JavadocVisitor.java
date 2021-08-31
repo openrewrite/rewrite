@@ -36,7 +36,6 @@ import org.openrewrite.java.tree.Javadoc.Attribute.ValueKind;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
-import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -773,18 +772,23 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
         return j;
     }
 
-    private List<Javadoc> convertMultiline(List<? extends DocTree> descriptions) {
-        return descriptions.stream()
-                .flatMap(desc -> {
-                    Stream<Javadoc> ds = Stream.empty();
-                    Javadoc.LineBreak lineBreak;
-                    while ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
-                        cursor++;
-                        ds = Stream.concat(ds, Stream.of(lineBreak));
-                    }
-                    return Stream.concat(ds, Stream.of(convert(desc)));
-                })
-                .collect(toList());
+    private List<Javadoc> convertMultiline(List<? extends DocTree> dts) {
+        List<Javadoc> js = new ArrayList<>(dts.size());
+        Javadoc.LineBreak lineBreak;
+        for (int i = 0; i < dts.size(); i++) {
+            DocTree dt = dts.get(i);
+            while ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
+                cursor++;
+                js.add(lineBreak);
+            }
+            if (i > 0 && dt instanceof DCTree.DCText) {
+                // the whitespace is part of the text
+                js.add((Javadoc) scan(dt, ""));
+            } else {
+                js.add(convert(dt));
+            }
+        }
+        return js;
     }
 
     class JavaVisitor extends TreeScanner<J, Space> {
