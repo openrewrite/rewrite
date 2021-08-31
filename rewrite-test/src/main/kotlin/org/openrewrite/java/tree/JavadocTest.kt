@@ -296,7 +296,9 @@ interface JavadocTest : JavaTreeTest {
         jp, JavaTreeTest.NestingLevel.CompilationUnit, """
             interface Test {
                 /**
-                 * @return Test
+                 * Returns something.
+                 * 
+                 * @return <code>true</code>
                  * <code>false</code> otherwise.
                  */
                 boolean test();

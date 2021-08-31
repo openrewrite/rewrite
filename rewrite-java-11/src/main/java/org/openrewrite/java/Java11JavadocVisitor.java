@@ -777,14 +777,14 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
         Javadoc.LineBreak lineBreak;
         for (int i = 0; i < dts.size(); i++) {
             DocTree dt = dts.get(i);
-            while ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
-                cursor++;
-                js.add(lineBreak);
-            }
             if (i > 0 && dt instanceof DCTree.DCText) {
                 // the whitespace is part of the text
-                js.add((Javadoc) scan(dt, ""));
+                js.add((Javadoc) visitText((TextTree) dt, ""));
             } else {
+                while ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
+                    cursor++;
+                    js.add(lineBreak);
+                }
                 js.add(convert(dt));
             }
         }
