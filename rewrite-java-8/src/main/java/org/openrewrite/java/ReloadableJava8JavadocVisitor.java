@@ -416,98 +416,108 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
             sourceBefore("#");
             if (tree.getType() instanceof JavaType.Class) {
                 JavaType.Class classType = (JavaType.Class) tree.getType();
-                nextMethod:
-                for (JavaType.Method method : classType.getMethods()) {
-                    if (method.getName().equals(ref.memberName.toString()) && method.getResolvedSignature() != null) {
-                        for (JCTree param : ref.paramTypes) {
-                            Type paramType = attr.attribType(param, symbol);
-                            for (JavaType testParamType : method.getResolvedSignature().getParamTypes()) {
-                                while (testParamType instanceof JavaType.GenericTypeVariable) {
-                                    testParamType = ((JavaType.GenericTypeVariable) testParamType).getBound();
-                                }
+                if (ref.paramTypes != null) {
+                    nextMethod:
+                    for (JavaType.Method method : classType.getMethods()) {
+                        if (method.getName().equals(ref.memberName.toString()) && method.getResolvedSignature() != null) {
+                            for (JCTree param : ref.paramTypes) {
+                                for (JavaType testParamType : method.getResolvedSignature().getParamTypes()) {
+                                    Type paramType = attr.attribType(param, symbol);
+                                    while (testParamType instanceof JavaType.GenericTypeVariable) {
+                                        testParamType = ((JavaType.GenericTypeVariable) testParamType).getBound();
+                                    }
 
-                                if (paramType instanceof Type.ClassType) {
-                                    JavaType.FullyQualified fqTestParamType = TypeUtils.asFullyQualified(testParamType);
-                                    if (fqTestParamType == null || !fqTestParamType.getFullyQualifiedName().equals(((Symbol.ClassSymbol) paramType.tsym)
-                                            .fullname.toString())) {
-                                        continue nextMethod;
+                                    if (paramType instanceof Type.ClassType) {
+                                        JavaType.FullyQualified fqTestParamType = TypeUtils.asFullyQualified(testParamType);
+                                        if (fqTestParamType == null || !fqTestParamType.getFullyQualifiedName().equals(((Symbol.ClassSymbol) paramType.tsym)
+                                                .fullname.toString())) {
+                                            continue nextMethod;
+                                        }
                                     }
                                 }
                             }
-                        }
 
-                        J.Identifier name = J.Identifier.build(
-                                randomId(),
-                                Space.EMPTY,
-                                Markers.EMPTY,
-                                method.getName(),
-                                method
-                        );
-
-                        cursor += method.getName().length();
-
-                        JContainer<Expression> params;
-                        if (ref.paramTypes.isEmpty()) {
-                            params = JContainer.build(
-                                    Space.build(sourceBefore("("), emptyList()),
-                                    singletonList(JRightPadded.build(new J.Empty(randomId(), Space.build(sourceBefore(")"), emptyList()), Markers.EMPTY))),
-                                    Markers.EMPTY
+                            J.Identifier name = J.Identifier.build(
+                                    randomId(),
+                                    Space.EMPTY,
+                                    Markers.EMPTY,
+                                    method.getName(),
+                                    method
                             );
-                        } else {
-                            params = JContainer.build(
-                                    Space.build(sourceBefore("("), emptyList()),
-                                    ref.paramTypes.stream()
-                                            .map(param -> {
-                                                Expression paramExpr = (Expression) javaVisitor.scan(param, Space.EMPTY);
-                                                Space rightFmt = Space.format(sourceBefore(")", ","));
-                                                return new JRightPadded<>(paramExpr, rightFmt, Markers.EMPTY);
-                                            })
-                                            .collect(toList()),
-                                    Markers.EMPTY
+
+                            cursor += method.getName().length();
+
+                            JContainer<Expression> params;
+                            if (ref.paramTypes.isEmpty()) {
+                                params = JContainer.build(
+                                        Space.build(sourceBefore("("), emptyList()),
+                                        singletonList(JRightPadded.build(new J.Empty(randomId(), Space.build(sourceBefore(")"), emptyList()), Markers.EMPTY))),
+                                        Markers.EMPTY
+                                );
+                            } else {
+                                params = JContainer.build(
+                                        Space.build(sourceBefore("("), emptyList()),
+                                        ref.paramTypes.stream()
+                                                .map(param -> {
+                                                    Expression paramExpr = (Expression) javaVisitor.scan(param, Space.EMPTY);
+                                                    Space rightFmt = Space.format(sourceBefore(")", ","));
+                                                    return new JRightPadded<>(paramExpr, rightFmt, Markers.EMPTY);
+                                                })
+                                                .collect(toList()),
+                                        Markers.EMPTY
+                                );
+                            }
+
+                            return new J.MethodInvocation(
+                                    randomId(),
+                                    tree.getPrefix(),
+                                    Markers.EMPTY,
+                                    JRightPadded.build(tree.withPrefix(Space.EMPTY)),
+                                    null,
+                                    name,
+                                    params,
+                                    method
                             );
                         }
-
-                        tree = new J.MethodInvocation(
-                                randomId(),
-                                tree.getPrefix(),
-                                Markers.EMPTY,
-                                JRightPadded.build(tree.withPrefix(Space.EMPTY)),
-                                null,
-                                name,
-                                params,
-                                method
-                        );
-
-                        break;
                     }
                 }
 
+                J.Identifier name = J.Identifier.build(
+                        randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        ref.memberName.toString(),
+                        null
+                );
+
+                cursor += ref.memberName.toString().length();
+
                 for (JavaType.Variable member : classType.getMembers()) {
                     if (member.getName().equals(ref.memberName.toString())) {
-                        J.Identifier name = J.Identifier.build(
-                                randomId(),
-                                Space.EMPTY,
-                                Markers.EMPTY,
-                                member.getName(),
-                                member
-                        );
-
-                        cursor += member.getName().length();
-
-                        tree = new J.MemberReference(
+                        return new J.MemberReference(
                                 randomId(),
                                 tree.getPrefix(),
                                 Markers.EMPTY,
                                 JRightPadded.build(tree.withPrefix(Space.EMPTY)),
                                 JContainer.empty(),
-                                JLeftPadded.build(name),
+                                JLeftPadded.build(name.withType(member)),
                                 member,
                                 member.getType()
                         );
-
-                        break;
                     }
                 }
+
+                // a member reference, but not matching anything on type attribution
+                return new J.MemberReference(
+                        randomId(),
+                        tree.getPrefix(),
+                        Markers.EMPTY,
+                        JRightPadded.build(tree.withPrefix(Space.EMPTY)),
+                        JContainer.empty(),
+                        JLeftPadded.build(name),
+                        null,
+                        null
+                );
             }
         }
 

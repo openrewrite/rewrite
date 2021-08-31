@@ -317,4 +317,16 @@ interface JavadocTest : JavaTreeTest {
             }
         """.trimIndent()
     )
+
+    @Test
+    fun methodReferenceNoParameters(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+            interface Test {
+                /**
+                 * {@linkplain Thread#interrupt}
+                 */
+                boolean test();
+            }
+        """.trimIndent()
+    )
 }
