@@ -209,7 +209,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitLiteral(Javadoc.Literal literal, P p) {
         visitMarkers(literal.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(literal.getPrefix()).append(literal.isCode() ? "{@code" : "{@link");
+        acc.append(literal.getPrefix()).append(literal.isCode() ? "{@code" : "{@literal");
         visit(literal.getBody(), p);
         acc.append("}");
         return literal;

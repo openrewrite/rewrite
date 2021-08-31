@@ -16,6 +16,7 @@
 package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTreeTest
 
@@ -324,6 +325,19 @@ interface JavadocTest : JavaTreeTest {
             interface Test {
                 /**
                  * {@linkplain Thread#interrupt}
+                 */
+                boolean test();
+            }
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/942")
+    @Test
+    fun nullLiteral(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+            interface Test {
+                /**
+                 * {@literal null}.
                  */
                 boolean test();
             }
