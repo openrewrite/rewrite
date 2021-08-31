@@ -294,9 +294,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
 
     @Override
     public Tree visitErroneous(ErroneousTree node, String fmt) {
-        String body = node.getBody();
-        cursor += body.length();
-        return new Javadoc.Text(randomId(), Markers.EMPTY, fmt + body, null, null);
+        return visitText(node.getBody(), fmt);
     }
 
     @Override
@@ -555,6 +553,11 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
             if (docTree instanceof DCTree.DCReference) {
                 ref = visitReference((ReferenceTree) docTree, "");
             } else {
+                Javadoc.LineBreak lineBreak;
+                while ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
+                    cursor++;
+                    desc.add(lineBreak);
+                }
                 desc.add(convert(docTree));
             }
         }
@@ -641,9 +644,13 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
 
     @Override
     public Tree visitText(TextTree node, String fmt) {
+        return visitText(node.getBody(), fmt);
+    }
+
+    public Tree visitText(String node, String fmt) {
         Stack<Javadoc.Text> texts = new Stack<>();
 
-        char[] textArr = node.getBody().toCharArray();
+        char[] textArr = node.toCharArray();
         int afterLastBreak = 0;
         for (int i = 0; i < textArr.length; i++) {
             char c = textArr[i];

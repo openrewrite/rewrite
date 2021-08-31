@@ -109,7 +109,7 @@ class Java8InstanceOfTest: Java8Test, InstanceOfTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java8JavaDocTest: Java8Test, JavaDocTest
+class Java8JavadocTest: Java8Test, JavadocTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

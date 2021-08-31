@@ -19,10 +19,10 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTreeTest
 
-interface JavaDocTest : JavaTreeTest {
+interface JavadocTest : JavaTreeTest {
 
     @Test
-    fun visitAuthor(jp: JavaParser) = assertParsePrintAndProcess(
+    fun author(jp: JavaParser) = assertParsePrintAndProcess(
         jp, JavaTreeTest.NestingLevel.CompilationUnit, """
             /**
              * @author name
@@ -34,7 +34,7 @@ interface JavaDocTest : JavaTreeTest {
     )
 
     @Test
-    fun visitDeprecated(jp: JavaParser) = assertParsePrintAndProcess(
+    fun deprecated(jp: JavaParser) = assertParsePrintAndProcess(
         jp, JavaTreeTest.NestingLevel.CompilationUnit, """
             /**
              * @deprecated reason
@@ -46,7 +46,7 @@ interface JavaDocTest : JavaTreeTest {
     )
 
     @Test
-    fun visitDocRoot(jp: JavaParser) = assertParsePrintAndProcess(
+    fun docRoot(jp: JavaParser) = assertParsePrintAndProcess(
         jp, JavaTreeTest.NestingLevel.CompilationUnit, """
             /**
              * @docRoot
@@ -58,7 +58,7 @@ interface JavaDocTest : JavaTreeTest {
     )
 
     @Test
-    fun visitException(jp: JavaParser) = assertParsePrintAndProcess(
+    fun exception(jp: JavaParser) = assertParsePrintAndProcess(
         jp, JavaTreeTest.NestingLevel.CompilationUnit, """
             /**
              * @exception ex
@@ -70,7 +70,7 @@ interface JavaDocTest : JavaTreeTest {
     )
 
     @Test
-    fun visitHidden(jp: JavaParser) = assertParsePrintAndProcess(
+    fun hidden(jp: JavaParser) = assertParsePrintAndProcess(
         jp, JavaTreeTest.NestingLevel.CompilationUnit, """
             /**
              * @hidden value
@@ -82,7 +82,7 @@ interface JavaDocTest : JavaTreeTest {
     )
 
     @Test
-    fun visitIndex(jp: JavaParser) = assertParsePrintAndProcess(
+    fun index(jp: JavaParser) = assertParsePrintAndProcess(
         jp, JavaTreeTest.NestingLevel.CompilationUnit, """
             /**
              * {@index}
@@ -94,7 +94,7 @@ interface JavaDocTest : JavaTreeTest {
     )
 
     @Test
-    fun visitInheritDoc(jp: JavaParser) = assertParsePrintAndProcess(
+    fun inheritDoc(jp: JavaParser) = assertParsePrintAndProcess(
         jp, JavaTreeTest.NestingLevel.CompilationUnit, """
             /**
              * {@inheritDoc}
@@ -106,7 +106,7 @@ interface JavaDocTest : JavaTreeTest {
     )
 
     @Test
-    fun visitLiteral(jp: JavaParser) = assertParsePrintAndProcess(
+    fun literal(jp: JavaParser) = assertParsePrintAndProcess(
         jp, JavaTreeTest.NestingLevel.CompilationUnit, """
             public class A {
                 /**
@@ -118,7 +118,7 @@ interface JavaDocTest : JavaTreeTest {
     )
 
     @Test
-    fun visitLink(jp: JavaParser) = assertParsePrintAndProcess(
+    fun link(jp: JavaParser) = assertParsePrintAndProcess(
         jp, JavaTreeTest.NestingLevel.CompilationUnit, """
             /**
              * {@link java.util.List}
@@ -130,7 +130,7 @@ interface JavaDocTest : JavaTreeTest {
     )
 
     @Test
-    fun visitParam(jp: JavaParser) = assertParsePrintAndProcess(
+    fun param(jp: JavaParser) = assertParsePrintAndProcess(
         jp, JavaTreeTest.NestingLevel.CompilationUnit, """
             public class A {
                 /**
@@ -142,7 +142,7 @@ interface JavaDocTest : JavaTreeTest {
     )
 
     @Test
-    fun visitProvide(jp: JavaParser) = assertParsePrintAndProcess(
+    fun provide(jp: JavaParser) = assertParsePrintAndProcess(
         jp, JavaTreeTest.NestingLevel.CompilationUnit, """
             public class A {
                 /**
@@ -154,7 +154,7 @@ interface JavaDocTest : JavaTreeTest {
     )
 
     @Test
-    fun visitReturn(jp: JavaParser) = assertParsePrintAndProcess(
+    fun returnTag(jp: JavaParser) = assertParsePrintAndProcess(
         jp, JavaTreeTest.NestingLevel.CompilationUnit, """
             public class A {
                 /**
@@ -166,7 +166,7 @@ interface JavaDocTest : JavaTreeTest {
     )
 
     @Test
-    fun parseSee(jp: JavaParser) = assertParsePrintAndProcess(
+    fun see(jp: JavaParser) = assertParsePrintAndProcess(
         jp, JavaTreeTest.NestingLevel.CompilationUnit, """
             /**
              * @see "Create link via quotes"
@@ -180,7 +180,7 @@ interface JavaDocTest : JavaTreeTest {
     )
 
     @Test
-    fun parseSerial(jp: JavaParser) = assertParsePrintAndProcess(
+    fun serial(jp: JavaParser) = assertParsePrintAndProcess(
         jp, JavaTreeTest.NestingLevel.CompilationUnit, """
             /**
              * @serial
@@ -193,7 +193,7 @@ interface JavaDocTest : JavaTreeTest {
 
 
     @Test
-    fun parseSerialData(jp: JavaParser) = assertParsePrintAndProcess(
+    fun serialData(jp: JavaParser) = assertParsePrintAndProcess(
         jp, JavaTreeTest.NestingLevel.CompilationUnit, """
             /**
              * @serialData
@@ -205,7 +205,7 @@ interface JavaDocTest : JavaTreeTest {
     )
 
     @Test
-    fun parseSince(jp: JavaParser) = assertParsePrintAndProcess(
+    fun since(jp: JavaParser) = assertParsePrintAndProcess(
         jp, JavaTreeTest.NestingLevel.CompilationUnit, """
             /**
              * @since
@@ -217,7 +217,7 @@ interface JavaDocTest : JavaTreeTest {
     )
 
     @Test
-    fun parseSummary(jp: JavaParser) = assertParsePrintAndProcess(
+    fun summary(jp: JavaParser) = assertParsePrintAndProcess(
         jp, JavaTreeTest.NestingLevel.CompilationUnit, """
             /**
              * {@summary}
@@ -229,7 +229,7 @@ interface JavaDocTest : JavaTreeTest {
     )
 
     @Test
-    fun parseValue(jp: JavaParser) = assertParsePrintAndProcess(
+    fun value(jp: JavaParser) = assertParsePrintAndProcess(
         jp, JavaTreeTest.NestingLevel.CompilationUnit, """
             /**
              * @value
@@ -241,7 +241,7 @@ interface JavaDocTest : JavaTreeTest {
     )
 
     @Test
-    fun parseVersion(jp: JavaParser) = assertParsePrintAndProcess(
+    fun version(jp: JavaParser) = assertParsePrintAndProcess(
         jp, JavaTreeTest.NestingLevel.CompilationUnit, """
             /**
              * @version 1.0.0
@@ -277,5 +277,17 @@ interface JavaDocTest : JavaTreeTest {
         public class Test {
         }
     """
+    )
+
+    @Test
+    fun multipleLineErroneous(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+            /**
+             * @see this
+             * or that
+             */
+            class Test {
+            }
+        """.trimIndent()
     )
 }

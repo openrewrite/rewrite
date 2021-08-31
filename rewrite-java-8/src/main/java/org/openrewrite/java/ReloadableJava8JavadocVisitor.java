@@ -292,9 +292,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
 
     @Override
     public Tree visitErroneous(ErroneousTree node, String fmt) {
-        String body = node.getBody();
-        cursor += body.length();
-        return new Javadoc.Text(randomId(), Markers.EMPTY, fmt + body, null, null);
+        return visitText(node.getBody(), fmt);
     }
 
     @Override
@@ -568,9 +566,13 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
 
     @Override
     public Tree visitText(TextTree node, String fmt) {
+        return visitText(node.getBody(), fmt);
+    }
+
+    public Tree visitText(String node, String fmt) {
         Stack<Javadoc.Text> texts = new Stack<>();
 
-        char[] textArr = node.getBody().toCharArray();
+        char[] textArr = node.toCharArray();
         int afterLastBreak = 0;
         for (int i = 0; i < textArr.length; i++) {
             char c = textArr[i];

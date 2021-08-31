@@ -113,7 +113,7 @@ class Java11InstanceOfTest: Java11Test, InstanceOfTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11JavaDocTest: Java11Test, JavaDocTest
+class Java11JavadocTest: Java11Test, JavadocTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

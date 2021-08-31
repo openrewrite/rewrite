@@ -95,7 +95,7 @@ abstract class JavaTreeCompatibilityKit {
     inner class InstanceOfTck : InstanceOfTest
 
     @Nested
-    inner class JavaDocTck : JavaDocTest
+    inner class JavadocTck : JavadocTest
 
     @Nested
     inner class JavaParserTck : JavaParserTest
