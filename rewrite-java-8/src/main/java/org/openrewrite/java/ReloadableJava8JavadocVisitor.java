@@ -358,7 +358,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
 
     @Override
     public Tree visitLiteral(LiteralTree node, String fmt) {
-        String prefix = fmt + sourceBefore(node.getKind() == DocTree.Kind.CODE ? "{@code" : "{@link");
+        String prefix = fmt + sourceBefore(node.getKind() == DocTree.Kind.CODE ? "{@code" : "{@literal");
         Javadoc.Text body = (Javadoc.Text) visitText(node.getBody(), "");
         body = body.withText(body.getText() + sourceBefore("}"));
         return new Javadoc.Literal(
