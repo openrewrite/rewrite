@@ -18,6 +18,7 @@ package org.openrewrite.java
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
+import org.openrewrite.java.search.FindTypes
 import java.nio.file.Paths
 
 interface ChangePackageTest: JavaRecipeTest {
@@ -72,6 +73,7 @@ interface ChangePackageTest: JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
+            assertThat(FindTypes.find(cu, "org.openrewrite.Test")).isEmpty()
             assertThat(cu.sourcePath)
                 .isEqualTo(Paths.get("org", "openrewrite", "test", "Test.java"))
         }
@@ -93,6 +95,7 @@ interface ChangePackageTest: JavaRecipeTest {
         afterConditions = { cu ->
             assertThat(cu.sourcePath)
                 .isEqualTo(Paths.get("org/openrewrite/test/internal/Test.java"))
+            assertThat(FindTypes.find(cu, "org.openrewrite.Test")).isEmpty()
         }
     )
 
@@ -117,7 +120,10 @@ interface ChangePackageTest: JavaRecipeTest {
             class A<T extends org.openrewrite.test.Test> {
                 Test test;
             }
-        """
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+        }
     )
 
     @Test
@@ -133,7 +139,10 @@ interface ChangePackageTest: JavaRecipeTest {
             import org.openrewrite.test.Test;
 
             public class B extends Test {}
-        """
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+        }
     )
 
     @Test
@@ -145,7 +154,10 @@ interface ChangePackageTest: JavaRecipeTest {
         """,
         after = """
             public class B extends org.openrewrite.test.Test {}
-        """
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+        }
     )
 
     @Test
@@ -161,7 +173,10 @@ interface ChangePackageTest: JavaRecipeTest {
 
         after = """
             @org.openrewrite.test.A public class B {}
-        """
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+        }
     )
 
     // array types and new arrays
@@ -178,7 +193,10 @@ interface ChangePackageTest: JavaRecipeTest {
             public class B {
                org.openrewrite.test.Test[] a = new org.openrewrite.test.Test[0];
             }
-        """
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+        }
     )
 
     @Test
@@ -190,7 +208,41 @@ interface ChangePackageTest: JavaRecipeTest {
         """,
         after = """
             public class B extends org.openrewrite.test.Test implements I1 {}
-        """
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+        }
+    )
+
+    @Test
+    fun lambda(jp: JavaParser) = assertChanged(
+        dependsOn = arrayOf("""
+            package org.openrewrite;
+            public interface Procedure {
+                void execute();
+            }
+        """),
+        before = """
+            import org.openrewrite.Procedure;
+            public abstract class Worker {
+                void callWorker() {
+                    worker(() -> {});
+                }
+                abstract void worker(Procedure procedure);
+            }
+        """,
+        after = """
+            import org.openrewrite.test.Procedure;
+            public abstract class Worker {
+                void callWorker() {
+                    worker(() -> {});
+                }
+                abstract void worker(Procedure procedure);
+            }
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("org.openrewrite.Procedure")).isEmpty()
+        }
     )
 
     @Test
@@ -206,7 +258,10 @@ interface ChangePackageTest: JavaRecipeTest {
             public class B {
                public org.openrewrite.test.Test foo() { return null; }
             }
-        """
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+        }
     )
 
     @Test
@@ -230,7 +285,10 @@ interface ChangePackageTest: JavaRecipeTest {
                    this.<org.openrewrite.test.Test>generic(null, null);
                }
             }
-        """
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+        }
     )
 
     @Test
@@ -252,7 +310,10 @@ interface ChangePackageTest: JavaRecipeTest {
                    catch(org.openrewrite.test.Test | RuntimeException e) {}
                }
             }
-        """
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+        }
     )
 
     @Test
@@ -268,7 +329,34 @@ interface ChangePackageTest: JavaRecipeTest {
             public class B {
                org.openrewrite.test.Test f1, f2;
             }
-        """
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+        }
+    )
+
+    @Test
+    fun assignment(jp: JavaParser) = assertChanged(
+        dependsOn = arrayOf(testClass),
+        before = """
+            public class B {
+               org.openrewrite.Test t;
+               void method(org.openrewrite.Test param) {
+                   t = param;
+               }
+            }
+        """,
+        after = """
+            public class B {
+               org.openrewrite.test.Test t;
+               void method(org.openrewrite.test.Test param) {
+                   t = param;
+               }
+            }
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+        }
     )
 
     @Test
@@ -284,7 +372,10 @@ interface ChangePackageTest: JavaRecipeTest {
             public class B {
                org.openrewrite.test.Test test = new org.openrewrite.test.Test();
             }
-        """
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+        }
     )
 
     @Test
@@ -300,7 +391,10 @@ interface ChangePackageTest: JavaRecipeTest {
             public class B {
                Map<org.openrewrite.test.Test, org.openrewrite.test.Test> m;
             }
-        """
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+        }
     )
 
     @Test
@@ -316,7 +410,10 @@ interface ChangePackageTest: JavaRecipeTest {
             public class B {
                org.openrewrite.test.Test a = (org.openrewrite.test.Test) null;
             }
-        """
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+        }
     )
 
     @Test
@@ -332,7 +429,10 @@ interface ChangePackageTest: JavaRecipeTest {
             public class Test {
                 Class<?> clazz = org.openrewrite.test.Test.class;
             }
-        """
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+        }
     )
 
     @Test
@@ -350,7 +450,10 @@ interface ChangePackageTest: JavaRecipeTest {
                org.openrewrite.test.Test test = null;
                public void getFoo() { test.foo(); }
             }
-        """
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+        }
     )
 
     @Test
@@ -374,7 +477,10 @@ interface ChangePackageTest: JavaRecipeTest {
                     stat();
                 }
             }
-        """
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+        }
     )
 
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
@@ -382,20 +488,20 @@ interface ChangePackageTest: JavaRecipeTest {
     fun checkValidation() {
         var recipe = ChangePackage(null, null, null)
         var valid = recipe.validate()
-        assertThat(valid.isValid).isFalse()
+        assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("newPackageName")
         assertThat(valid.failures()[1].property).isEqualTo("oldPackageName")
 
         recipe = ChangePackage(null, "java.lang.String", null)
         valid = recipe.validate()
-        assertThat(valid.isValid).isFalse()
+        assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("oldPackageName")
 
         recipe = ChangePackage("java.lang.String", null, null)
         valid = recipe.validate()
-        assertThat(valid.isValid).isFalse()
+        assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("newPackageName")
     }
