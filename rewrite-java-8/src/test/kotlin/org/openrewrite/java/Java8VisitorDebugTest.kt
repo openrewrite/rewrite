@@ -172,6 +172,10 @@ class Java8FindInheritedFieldsTest : Java8Test, FindInheritedFieldsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8FindDeprecatedClassesTest : Java8Test, FindDeprecatedClassesTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8FindDeprecatedMethodsTest : Java8Test, FindDeprecatedMethodsTest
 
 @DebugOnly

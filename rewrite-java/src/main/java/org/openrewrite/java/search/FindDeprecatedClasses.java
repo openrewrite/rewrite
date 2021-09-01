@@ -1,0 +1,142 @@
+/*
+ * Copyright 2021 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.java.search;
+
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.TypeMatcher;
+import org.openrewrite.java.marker.JavaSearchResult;
+import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Marker;
+
+import java.util.Iterator;
+import java.util.List;
+
+import static org.openrewrite.Tree.randomId;
+
+@Value
+@EqualsAndHashCode(callSuper = true)
+public class FindDeprecatedClasses extends Recipe {
+    /**
+     * A type pattern, expressed as a pointcut expression, that is used to find matching method invocations.
+     * See {@link MethodMatcher} for details on the expression's syntax.
+     */
+    @Option(displayName = "Type pattern",
+            description = "A type pattern that is used to find matching classes.",
+            example = "org.springframework..*",
+            required = false)
+    @Nullable
+    String typePattern;
+
+    @Option(displayName = "Match inherited",
+            description = "When enabled, find types that inherit from a deprecated type.",
+            required = false)
+    @Nullable
+    Boolean matchInherited;
+
+    @Option(displayName = "Ignore deprecated scopes",
+            description = "When a deprecated type is used in a deprecated method or class, ignore it.",
+            required = false)
+    @Nullable
+    Boolean ignoreDeprecatedScopes;
+
+    @Override
+    public String getDisplayName() {
+        return "Find uses of deprecated classes";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Find uses of deprecated classes, optionally ignoring those classes that are inside of deprecated scopes.";
+    }
+
+    @Override
+    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
+        TypeMatcher typeMatcher = typePattern == null ? null : new TypeMatcher(typePattern);
+
+        //noinspection ConstantConditions
+        return new JavaIsoVisitor<ExecutionContext>() {
+            private final Marker USES_DEPRECATED = new JavaSearchResult(randomId(), null, null);
+
+            @Override
+            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                for (JavaType javaType : cu.getTypesInUse()) {
+                    JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(javaType);
+                    if (fqn != null && (typeMatcher == null || typeMatcher.matches(fqn))) {
+                        for (JavaType.FullyQualified annotation : fqn.getAnnotations()) {
+                            if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
+                                return cu.withMarkers(cu.getMarkers().addIfAbsent(USES_DEPRECATED));
+                            }
+                        }
+                    }
+                }
+                return cu;
+            }
+        };
+    }
+
+    @Override
+    public JavaVisitor<ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public <N extends NameTree> N visitTypeName(N nameTree, ExecutionContext executionContext) {
+                if (getCursor().firstEnclosing(J.Import.class) == null) {
+                    JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(nameTree.getType());
+                    if (fqn != null) {
+                        for (JavaType.FullyQualified annotation : fqn.getAnnotations()) {
+                            if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
+                                if (Boolean.TRUE.equals(ignoreDeprecatedScopes)) {
+                                    Iterator<Object> cursorPath = getCursor().getPath();
+                                    while (cursorPath.hasNext()) {
+                                        Object ancestor = cursorPath.next();
+                                        if (ancestor instanceof J.MethodDeclaration &&
+                                                isDeprecated(((J.MethodDeclaration) ancestor).getAllAnnotations())) {
+                                            return nameTree;
+                                        }
+                                        if (ancestor instanceof J.ClassDeclaration &&
+                                                isDeprecated(((J.ClassDeclaration) ancestor).getAllAnnotations())) {
+                                            return nameTree;
+                                        }
+                                    }
+                                }
+
+                                return nameTree.withMarkers(nameTree.getMarkers().addIfAbsent(new JavaSearchResult(FindDeprecatedClasses.this)));
+                            }
+                        }
+                    }
+                }
+
+                return nameTree;
+            }
+
+            private boolean isDeprecated(List<J.Annotation> annotations) {
+                for (J.Annotation annotation : annotations) {
+                    if (TypeUtils.isOfClassType(annotation.getType(), "java.lang.Deprecated")) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        };
+    }
+}
