@@ -53,6 +53,7 @@ interface FindDeprecatedClassesTest : JavaRecipeTest {
     fun ignoreDeprecationsInDeprecatedClass(jp: JavaParser.Builder<*, *>) = assertUnchanged(
         jp.logCompilationWarningsAndErrors(true).build(),
         recipe = FindDeprecatedClasses("org.old..*", false, true),
+        dependsOn = deprecations,
         before = """
             import org.old.types.D;
             @Deprecated
