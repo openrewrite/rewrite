@@ -168,6 +168,10 @@ class Java11FindDeprecatedClassesTest : Java11Test, FindDeprecatedClassesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11FindDeprecatedFieldsTest : Java11Test, FindDeprecatedFieldsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11FindDeprecatedMethodsTest : Java11Test, FindDeprecatedMethodsTest
 
 @DebugOnly

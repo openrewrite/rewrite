@@ -55,7 +55,7 @@ public class JavaSourceSet implements Marker {
                     .enableFieldInfo()
                     .scan()
                     .getAllClasses()) {
-                fqns.add(fromClassGraph(classInfo, new Stack<>()));
+                fqns.add(fromClassInfo(classInfo, new Stack<>()));
             }
 
             for (ClassInfo classInfo : new ClassGraph()
@@ -68,14 +68,14 @@ public class JavaSourceSet implements Marker {
                     .acceptPackages("java")
                     .scan()
                     .getAllClasses()) {
-                fqns.add(fromClassGraph(classInfo, new Stack<>()));
+                fqns.add(fromClassInfo(classInfo, new Stack<>()));
             }
         }
 
         return new JavaSourceSet(Tree.randomId(), sourceSetName, fqns);
     }
 
-    private static JavaType.FullyQualified fromClassGraph(ClassInfo aClass, Stack<ClassInfo> stack) {
+    private static JavaType.FullyQualified fromClassInfo(ClassInfo aClass, Stack<ClassInfo> stack) {
         JavaType.Class existing = JavaType.Class.find(aClass.getName());
         if (existing != null) {
             return existing;
@@ -100,7 +100,7 @@ public class JavaSourceSet implements Marker {
             kind = JavaType.Class.Kind.Class;
         }
 
-        List<JavaType.Variable> variables = fromFieldInfo(aClass.getFieldInfo());
+        List<JavaType.Variable> variables = fromFieldInfo(aClass.getFieldInfo(), stack);
         List<JavaType.Method> methods = fromMethodInfo(aClass.getMethodInfo(), stack);
 
         return JavaType.Class.build(
@@ -116,12 +116,20 @@ public class JavaSourceSet implements Marker {
                 false);
     }
 
-    private static List<JavaType.Variable> fromFieldInfo(@Nullable FieldInfoList fieldInfos) {
+    private static List<JavaType.Variable> fromFieldInfo(@Nullable FieldInfoList fieldInfos, Stack<ClassInfo> stack) {
         if (fieldInfos != null) {
             List<JavaType.Variable> variables = new ArrayList<>(fieldInfos.size());
             for (FieldInfo fieldInfo : fieldInfos) {
+                JavaType.FullyQualified owner = fromClassInfo(fieldInfo.getClassInfo(), stack);
+
+                List<JavaType.FullyQualified> annotations = new ArrayList<>(fieldInfo.getAnnotationInfo().size());
+                for (AnnotationInfo annotationInfo : fieldInfo.getAnnotationInfo()) {
+                    annotations.add(fromClassInfo(annotationInfo.getClassInfo(), stack));
+                }
+
                 Set<Flag> flags = Flag.bitMapToFlags(fieldInfo.getModifiers());
-                JavaType.Variable variable = JavaType.Variable.build(fieldInfo.getName(), JavaType.buildType(fieldInfo.getTypeDescriptor().toString()), Flag.flagsToBitMap(flags));
+                JavaType.Variable variable = JavaType.Variable.build(fieldInfo.getName(), owner,
+                        JavaType.buildType(fieldInfo.getTypeDescriptor().toString()), annotations, Flag.flagsToBitMap(flags));
                 variables.add(variable);
             }
             return variables;
@@ -149,13 +157,13 @@ public class JavaSourceSet implements Marker {
                     .getThrowsSignatures().size());
             for (ClassRefOrTypeVariableSignature throwsSignature : methodInfo.getTypeDescriptor().getThrowsSignatures()) {
                 if (throwsSignature instanceof ClassRefTypeSignature) {
-                    thrownExceptions.add(fromClassGraph(((ClassRefTypeSignature) throwsSignature).getClassInfo(), stack));
+                    thrownExceptions.add(fromClassInfo(((ClassRefTypeSignature) throwsSignature).getClassInfo(), stack));
                 }
             }
 
             List<JavaType.FullyQualified> annotations = new ArrayList<>(methodInfo.getAnnotationInfo().size());
             for (AnnotationInfo annotationInfo : methodInfo.getAnnotationInfo()) {
-                annotations.add(fromClassGraph(annotationInfo.getClassInfo(), stack));
+                annotations.add(fromClassInfo(annotationInfo.getClassInfo(), stack));
             }
 
             methods.add(JavaType.Method.build(

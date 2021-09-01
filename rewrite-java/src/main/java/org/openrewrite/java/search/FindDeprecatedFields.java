@@ -23,7 +23,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.TypeMatcher;
 import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -37,13 +37,13 @@ import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
-public class FindDeprecatedMethods extends Recipe {
-    @Option(displayName = "Method pattern",
-            description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.",
-            example = "java.util.List add(..)",
+public class FindDeprecatedFields extends Recipe {
+    @Option(displayName = "Type pattern",
+            description = "A type pattern that is used to find matching field uses.",
+            example = "org.springframework..*",
             required = false)
     @Nullable
-    String methodPattern;
+    String typePattern;
 
     @Option(displayName = "Ignore deprecated scopes",
             description = "When a deprecated method is used in a deprecated method or class, ignore it.",
@@ -53,17 +53,17 @@ public class FindDeprecatedMethods extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Find uses of deprecated methods";
+        return "Find uses of deprecated fields";
     }
 
     @Override
     public String getDescription() {
-        return "Find uses of deprecated methods in any API.";
+        return "Find uses of deprecated fields in any API.";
     }
 
     @Override
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        MethodMatcher methodMatcher = methodPattern == null ? null : new MethodMatcher(methodPattern);
+        TypeMatcher typeMatcher = typePattern == null ? null : new TypeMatcher(typePattern);
 
         //noinspection ConstantConditions
         return new JavaIsoVisitor<ExecutionContext>() {
@@ -72,9 +72,9 @@ public class FindDeprecatedMethods extends Recipe {
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
                 for (JavaType javaType : cu.getTypesInUse()) {
-                    JavaType.Method method = TypeUtils.asMethod(javaType);
-                    if (method != null && (methodMatcher == null || methodMatcher.matches(method))) {
-                        for (JavaType.FullyQualified annotation : method.getAnnotations()) {
+                    JavaType.Variable variable = TypeUtils.asVariable(javaType);
+                    if (variable != null && (typeMatcher == null || typeMatcher.matches(variable.getOwner()))) {
+                        for (JavaType.FullyQualified annotation : variable.getAnnotations()) {
                             if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
                                 return cu.withMarkers(cu.getMarkers().addIfAbsent(USES_DEPRECATED));
                             }
@@ -88,12 +88,15 @@ public class FindDeprecatedMethods extends Recipe {
 
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
+        TypeMatcher typeMatcher = typePattern == null ? null : new TypeMatcher(typePattern);
+
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                if (method.getType() != null) {
-                    for (JavaType.FullyQualified annotation : method.getType().getAnnotations()) {
+            public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+                J.Identifier i = super.visitIdentifier(identifier, ctx);
+                JavaType.Variable varType = TypeUtils.asVariable(identifier.getType());
+                if (varType != null && (typeMatcher == null || typeMatcher.matches(varType.getOwner()))) {
+                    for (JavaType.FullyQualified annotation : varType.getAnnotations()) {
                         if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
                             if (Boolean.TRUE.equals(ignoreDeprecatedScopes)) {
                                 Iterator<Object> cursorPath = getCursor().getPath();
@@ -101,20 +104,21 @@ public class FindDeprecatedMethods extends Recipe {
                                     Object ancestor = cursorPath.next();
                                     if (ancestor instanceof J.MethodDeclaration &&
                                             isDeprecated(((J.MethodDeclaration) ancestor).getAllAnnotations())) {
-                                        return m;
+                                        return i;
                                     }
                                     if (ancestor instanceof J.ClassDeclaration &&
                                             isDeprecated(((J.ClassDeclaration) ancestor).getAllAnnotations())) {
-                                        return m;
+                                        return i;
                                     }
                                 }
                             }
 
-                            m = m.withMarkers(m.getMarkers().addIfAbsent(new JavaSearchResult(FindDeprecatedMethods.this)));
+                            i = i.withMarkers(i.getMarkers().addIfAbsent(new JavaSearchResult(FindDeprecatedFields.this)));
                         }
                     }
                 }
-                return m;
+
+                return i;
             }
 
             private boolean isDeprecated(List<J.Annotation> annotations) {

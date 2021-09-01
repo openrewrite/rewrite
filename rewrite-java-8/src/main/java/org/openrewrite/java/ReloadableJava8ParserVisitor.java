@@ -657,18 +657,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
         JCIdent ident = (JCIdent) node;
         JavaType type = typeMapping.type(node);
-
-        // we don't map all the possible symbol types here, because in many cases they aren't necessary.
-        // for method invocations, the J.MethodInvocation will have type attribution, so having the JavaType.Method on the
-        // method invocation select is not needed. for fields, this symbol is the only way to determine an identifier represents
-        // a field.
-        JavaType fieldType = null;
-        if (ident.sym instanceof Symbol.VarSymbol) {
-            // currently only the first 16 bits are meaningful
-            fieldType = JavaType.Variable.build(name, typeMapping.type(ident.sym.owner.type), (int) ident.sym.flags_field & 0xFFFF);
-        }
-
-        return J.Identifier.build(randomId(), fmt, Markers.EMPTY, name, type, fieldType);
+        return J.Identifier.build(randomId(), fmt, Markers.EMPTY, name, type, typeMapping.variableType(ident.sym, new Stack<>()));
     }
 
     @Override
@@ -825,7 +814,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 convert(fieldAccess.selected),
                 padLeft(sourceBefore("."), J.Identifier.build(randomId(),
                         sourceBefore(fieldAccess.name.toString()), Markers.EMPTY,
-                        fieldAccess.name.toString(), null)),
+                        fieldAccess.name.toString(), typeMapping.variableType(fieldAccess.sym, new Stack<>()))),
                 typeMapping.type(node));
     }
 

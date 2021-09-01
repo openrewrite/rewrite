@@ -106,6 +106,11 @@ public class TypeUtils {
     }
 
     @Nullable
+    public static JavaType.Variable asVariable(@Nullable JavaType type) {
+        return type instanceof JavaType.Variable ? (JavaType.Variable) type : null;
+    }
+
+    @Nullable
     public static JavaType.Primitive asPrimitive(@Nullable JavaType type) {
         return type instanceof JavaType.Primitive ? (JavaType.Primitive) type : null;
     }

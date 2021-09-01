@@ -978,7 +978,7 @@ interface OrderImportsTest : JavaRecipeTest {
         val flags = setOf(Flag.Public, Flag.Static)
 
         val variables: MutableList<JavaType.Variable> = mutableListOf()
-        variableNames.forEach { variables.add(JavaType.Variable.build(it, JavaType.buildType("int"), Flag.flagsToBitMap(flags))) }
+        variableNames.forEach { variables.add(JavaType.Variable.build(it, null, JavaType.buildType("int"), emptyList(), Flag.flagsToBitMap(flags))) }
 
         classNames.forEach { fqns.add(JavaType.Class.build(flags, it, JavaType.Class.Kind.Class, variables, listOf(), listOf(), null, null)) }
         val sourceSet = JavaSourceSet(randomId(),"main", fqns)

@@ -22,8 +22,8 @@ import org.openrewrite.java.JavaRecipeTest
 interface FindDeprecatedMethodsTest : JavaRecipeTest {
 
     @Test
-    fun ignoreDeprecationsInDeprecatedMethod(jp: JavaParser.Builder<*, *>) = assertUnchanged(
-        jp.logCompilationWarningsAndErrors(true).build(),
+    fun ignoreDeprecationsInDeprecatedMethod(jp: JavaParser) = assertUnchanged(
+        jp,
         recipe = FindDeprecatedMethods(null, true),
         before = """
             class Test {
@@ -38,8 +38,8 @@ interface FindDeprecatedMethodsTest : JavaRecipeTest {
     )
 
     @Test
-    fun ignoreDeprecationsInDeprecatedClass(jp: JavaParser.Builder<*, *>) = assertUnchanged(
-        jp.logCompilationWarningsAndErrors(true).build(),
+    fun ignoreDeprecationsInDeprecatedClass(jp: JavaParser) = assertUnchanged(
+        jp,
         recipe = FindDeprecatedMethods(null, true),
         before = """
             @Deprecated
@@ -58,8 +58,8 @@ interface FindDeprecatedMethodsTest : JavaRecipeTest {
     )
 
     @Test
-    fun findDeprecations(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.logCompilationWarningsAndErrors(true).build(),
+    fun findDeprecations(jp: JavaParser) = assertChanged(
+        jp,
         recipe = FindDeprecatedMethods(null, false),
         before = """
             class Test {
@@ -84,8 +84,8 @@ interface FindDeprecatedMethodsTest : JavaRecipeTest {
     )
 
     @Test
-    fun matchOnMethod(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.logCompilationWarningsAndErrors(true).build(),
+    fun matchOnMethod(jp: JavaParser) = assertChanged(
+        jp,
         recipe = FindDeprecatedMethods("java.lang.* *(..)", false),
         before = """
             class Test {
@@ -110,8 +110,8 @@ interface FindDeprecatedMethodsTest : JavaRecipeTest {
     )
 
     @Test
-    fun dontMatchWhenMethodDoesntMatch(jp: JavaParser.Builder<*, *>) = assertUnchanged(
-        jp.logCompilationWarningsAndErrors(true).build(),
+    fun dontMatchWhenMethodDoesntMatch(jp: JavaParser) = assertUnchanged(
+        jp,
         recipe = FindDeprecatedMethods("org.junit.jupiter.api.* *(..)", false),
         before = """
             class Test {

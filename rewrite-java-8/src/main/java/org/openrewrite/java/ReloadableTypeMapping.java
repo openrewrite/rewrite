@@ -77,12 +77,7 @@ class ReloadableTypeMapping {
                         methods = new ArrayList<>();
                         for (Symbol elem : sym.members_field.getElements()) {
                             if (elem instanceof Symbol.VarSymbol) {
-                                fields.add(JavaType.Variable.build(
-                                        elem.name.toString(),
-                                        type(elem.type, stackWithSym),
-                                        // currently only the first 16 bits are meaningful
-                                        (int) elem.flags_field & 0xFFFF
-                                ));
+                                fields.add(variableType(elem, stackWithSym));
                             } else if (elem instanceof Symbol.MethodSymbol) {
                                 methods.add(methodType(elem.type, elem, elem.getSimpleName().toString(), stackWithSym));
                             }
@@ -227,6 +222,38 @@ class ReloadableTypeMapping {
             default:
                 throw new IllegalArgumentException("Unknown type tag " + tag);
         }
+    }
+
+    @Nullable
+    public JavaType.Variable variableType(@Nullable Symbol symbol, List<Symbol> stack) {
+        if(!(symbol instanceof Symbol.VarSymbol)) {
+            return null;
+        }
+
+        JavaType.FullyQualified owner = TypeUtils.asFullyQualified(type(symbol.owner.type, stack));
+        if(owner == null) {
+            return null;
+        }
+
+        List<JavaType.FullyQualified> annotations = emptyList();
+        if (!symbol.getDeclarationAttributes().isEmpty()) {
+            annotations = new ArrayList<>(symbol.getDeclarationAttributes().size());
+            for (Attribute.Compound a : symbol.getDeclarationAttributes()) {
+                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(a.type, stack));
+                if (fq != null) {
+                    annotations.add(fq);
+                }
+            }
+        }
+
+        return JavaType.Variable.build(
+                symbol.name.toString(),
+                owner,
+                type(symbol.type, stack),
+                annotations,
+                // currently only the first 16 bits are meaningful
+                (int) symbol.flags_field & 0xFFFF
+        );
     }
 
     @Nullable

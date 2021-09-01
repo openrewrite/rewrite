@@ -97,12 +97,14 @@ public class FindDeprecatedClasses extends Recipe {
 
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
+        TypeMatcher typeMatcher = typePattern == null ? null : new TypeMatcher(typePattern);
+
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public <N extends NameTree> N visitTypeName(N nameTree, ExecutionContext executionContext) {
                 if (getCursor().firstEnclosing(J.Import.class) == null) {
                     JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(nameTree.getType());
-                    if (fqn != null) {
+                    if (fqn != null && (typeMatcher == null || typeMatcher.matches(fqn))) {
                         for (JavaType.FullyQualified annotation : fqn.getAnnotations()) {
                             if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
                                 if (Boolean.TRUE.equals(ignoreDeprecatedScopes)) {

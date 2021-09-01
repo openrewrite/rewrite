@@ -693,21 +693,29 @@ public interface JavaType extends Serializable {
 
         private final String name;
 
+        private final JavaType.FullyQualified owner;
+
         @Nullable
         private final JavaType type;
+
+        private final List<FullyQualified> annotations;
 
         @Getter(AccessLevel.NONE)
         private final int flagsBitMap;
 
-        private Variable(String name, @Nullable JavaType type, int flagsBitMap) {
+        private Variable(String name, JavaType.FullyQualified owner, @Nullable JavaType type,
+                         List<FullyQualified> annotations, int flagsBitMap) {
             this.name = name;
             this.type = type;
+            this.owner = owner;
+            this.annotations = annotations;
             this.flagsBitMap = flagsBitMap;
         }
 
         @JsonCreator
-        public static Variable build(String name, @Nullable JavaType type, int flagsBitMap) {
-            Variable test = new Variable(name, type, flagsBitMap);
+        public static Variable build(String name, JavaType.FullyQualified owner, @Nullable JavaType type,
+                                     List<FullyQualified> annotations, int flagsBitMap) {
+            Variable test = new Variable(name, owner, type, annotations, flagsBitMap);
 
             synchronized (flyweights) {
                 Set<Variable> variables = flyweights
@@ -742,7 +750,9 @@ public interface JavaType extends Serializable {
             Variable v = (Variable) type;
             return this == v || (name.equals(v.name) &&
                     flagsBitMap == v.flagsBitMap &&
-                    TypeUtils.deepEquals(this.type, v.type));
+                    TypeUtils.deepEquals(this.owner, v.owner) &&
+                    TypeUtils.deepEquals(this.type, v.type) &&
+                    TypeUtils.deepEquals(annotations, v.annotations));
         }
     }
 
