@@ -15,8 +15,11 @@
  */
 package org.openrewrite.java.format;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.tree.*;
@@ -27,6 +30,18 @@ import java.util.List;
  * Ensures that whitespace is on the outermost AST element possible.
  */
 public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
+    @Nullable
+    private final Tree stopAfter;
+
+    @JsonCreator
+    public NormalizeFormatVisitor(@Nullable Tree stopAfter) {
+        this.stopAfter = stopAfter;
+    }
+
+    public NormalizeFormatVisitor() {
+        this(null);
+    }
+
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
@@ -157,5 +172,23 @@ public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
         return j.withPrefix(j.getPrefix()
                 .withWhitespace(j.getPrefix().getWhitespace() + prefix.getWhitespace())
                 .withComments(comments));
+    }
+
+    @Nullable
+    @Override
+    public J postVisit(J tree, P p) {
+        if (stopAfter != null && stopAfter.isScope(tree)) {
+            getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "stop", true);
+        }
+        return super.postVisit(tree, p);
+    }
+
+    @Nullable
+    @Override
+    public J visit(@Nullable Tree tree, P p) {
+        if (getCursor().getNearestMessage("stop") != null) {
+            return (J) tree;
+        }
+        return super.visit(tree, p);
     }
 }

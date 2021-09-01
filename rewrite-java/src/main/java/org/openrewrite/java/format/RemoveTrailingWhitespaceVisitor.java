@@ -15,11 +15,26 @@
  */
 package org.openrewrite.java.format;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import org.openrewrite.Tree;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 
 public class RemoveTrailingWhitespaceVisitor<P> extends JavaIsoVisitor<P> {
+    @Nullable
+    private final Tree stopAfter;
+
+    @JsonCreator
+    public RemoveTrailingWhitespaceVisitor(@Nullable Tree stopAfter) {
+        this.stopAfter = stopAfter;
+    }
+
+    public RemoveTrailingWhitespaceVisitor() {
+        this(null);
+    }
+
     @Override
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
         String eof = cu.getEof().getWhitespace();
@@ -50,5 +65,23 @@ public class RemoveTrailingWhitespaceVisitor<P> extends JavaIsoVisitor<P> {
             s = s.withWhitespace(ws.toString());
         }
         return s;
+    }
+
+    @Nullable
+    @Override
+    public J postVisit(J tree, P p) {
+        if (stopAfter != null && stopAfter.isScope(tree)) {
+            getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "stop", true);
+        }
+        return super.postVisit(tree, p);
+    }
+
+    @Nullable
+    @Override
+    public J visit(@Nullable Tree tree, P p) {
+        if (getCursor().getNearestMessage("stop") != null) {
+            return (J) tree;
+        }
+        return super.visit(tree, p);
     }
 }

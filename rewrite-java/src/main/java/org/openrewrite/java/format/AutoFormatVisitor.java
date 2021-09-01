@@ -42,11 +42,11 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
     public J visit(@Nullable Tree tree, P p, Cursor cursor) {
         J.CompilationUnit cu = cursor.firstEnclosingOrThrow(J.CompilationUnit.class);
 
-        J t = new NormalizeFormatVisitor<>().visit(tree, p, cursor.fork());
+        J t = new NormalizeFormatVisitor<>(stopAfter).visit(tree, p, cursor.fork());
 
         t = new MinimumViableSpacingVisitor<>(stopAfter).visit(t, p, cursor.fork());
 
-        t = new RemoveTrailingWhitespaceVisitor<>().visit(t, p, cursor.fork());
+        t = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(t, p, cursor.fork());
 
         t = new BlankLinesVisitor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
                 .orElse(IntelliJ.blankLines()), stopAfter)
@@ -57,8 +57,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
                 cu.getStyle(EmptyForInitializerPadStyle.class),
                 cu.getStyle(EmptyForIteratorPadStyle.class),
                 stopAfter
-        )
-                .visit(t, p, cursor.fork());
+        ).visit(t, p, cursor.fork());
 
         t = new WrappingAndBracesVisitor<>(Optional.ofNullable(cu.getStyle(WrappingAndBracesStyle.class))
                 .orElse(IntelliJ.wrappingAndBraces()), stopAfter)
@@ -77,7 +76,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
-        J.CompilationUnit t = (J.CompilationUnit) new RemoveTrailingWhitespaceVisitor<>().visit(cu, p);
+        J.CompilationUnit t = (J.CompilationUnit) new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(cu, p);
 
         t = (J.CompilationUnit) new BlankLinesVisitor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
                 .orElse(IntelliJ.blankLines()), stopAfter)

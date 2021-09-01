@@ -24,6 +24,11 @@ interface BigDecimalRoundingConstantsToEnumsTest : JavaRecipeTest {
         get() = BigDecimalRoundingConstantsToEnums()
 
     @Test
+    fun alibabaDruid() = assertUnchanged(
+        moderneAstLink = "https://api.moderne.io/worker/cmVjaXBld29ya2VyLXByb2QtdjExNi1mZDU3/ast/file/alibaba%3Adruid/056645ef88735137f2d063a643304501cb02fba3/c3JjL21haW4vamF2YS9jb20vYWxpYmFiYS9kcnVpZC91dGlsL015U3FsVXRpbHMuamF2YQ=="
+    )
+
+    @Test
     fun bigDecimalRoundingNoChange() = assertUnchanged(
         before = """
             import java.math.BigDecimal;import java.math.RoundingMode;class A {

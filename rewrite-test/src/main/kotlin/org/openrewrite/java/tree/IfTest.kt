@@ -53,4 +53,15 @@ interface IfTest : JavaTreeTest {
             else n++;
         """
     )
+
+    @Test
+    fun elseWithTrailingSpace(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, Block, """
+            if (true) {
+            }
+            else{ 
+                System.out.println("test");
+            }
+        """
+    )
 }

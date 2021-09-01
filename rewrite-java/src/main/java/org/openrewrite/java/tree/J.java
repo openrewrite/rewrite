@@ -3475,6 +3475,10 @@ public interface J extends Serializable, Tree {
             return initializer == null ? null : initializer.getElements();
         }
 
+        public NewArray withInitializer(List<Expression> initializer) {
+            return getPadding().withInitializer(JContainer.withElementsNullable(this.initializer, initializer));
+        }
+
         @With
         @Nullable
         @Getter
