@@ -42,6 +42,14 @@ interface ChangeTypeTest : JavaRecipeTest {
         """.trimIndent()
     }
 
+    @Test
+    fun doNotAddJavaLangImports(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = ChangeType("java.lang.Integer","java.lang.Long"),
+        before = "public class ThinkPositive { private Integer fred = 1;}",
+        after = "public class ThinkPositive { private Long fred = 1;}"
+    )
+
     @Suppress("InstantiationOfUtilityClass")
     @Issue("https://github.com/openrewrite/rewrite/issues/788")
     @Test
