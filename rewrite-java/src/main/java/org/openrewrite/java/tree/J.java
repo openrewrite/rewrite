@@ -32,6 +32,7 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.template.SourceTemplate;
 
 import java.io.Serializable;
+import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.nio.file.Path;
 import java.util.*;
@@ -1094,7 +1095,7 @@ public interface J extends Serializable, Tree {
     final class CompilationUnit implements J, SourceFile {
         @Nullable
         @NonFinal
-        transient WeakReference<TypeCache> typesInUse;
+        transient SoftReference<TypeCache> typesInUse;
 
         @Nullable
         @NonFinal
@@ -1168,12 +1169,12 @@ public interface J extends Serializable, Tree {
             TypeCache cache;
             if (this.typesInUse == null) {
                 cache = TypeCache.build(this);
-                this.typesInUse = new WeakReference<>(cache);
+                this.typesInUse = new SoftReference<>(cache);
             } else {
                 cache = this.typesInUse.get();
                 if (cache == null || cache.getCu() != this) {
                     cache = TypeCache.build(this);
-                    this.typesInUse = new WeakReference<>(cache);
+                    this.typesInUse = new SoftReference<>(cache);
                 }
             }
             return cache;
