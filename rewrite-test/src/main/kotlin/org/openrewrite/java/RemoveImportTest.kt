@@ -16,12 +16,11 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
 
 interface RemoveImportTest : JavaRecipeTest {
     fun removeImport(type: String, force: Boolean = false) = toRecipe {
-        RemoveImport<ExecutionContext>(type, force)
+        RemoveImport(type, force)
     }
 
     @Test

@@ -70,7 +70,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         for (JavaType javaType : cu.getTypesInUse()) {
             if (javaType instanceof JavaType.Variable) {
                 JavaType.Variable variable = (JavaType.Variable) javaType;
-                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getType());
+                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
                 if (fq != null && (fq.getFullyQualifiedName().equals(type) || fq.getFullyQualifiedName().equals(owner))) {
                     methodsAndFieldsUsed.add(variable.getName());
                 }
