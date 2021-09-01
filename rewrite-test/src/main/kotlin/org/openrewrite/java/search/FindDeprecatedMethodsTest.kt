@@ -22,9 +22,45 @@ import org.openrewrite.java.JavaRecipeTest
 interface FindDeprecatedMethodsTest : JavaRecipeTest {
 
     @Test
+    fun ignoreDeprecationsInDeprecatedMethod(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.logCompilationWarningsAndErrors(true).build(),
+        recipe = FindDeprecatedMethods(null, true),
+        before = """
+            class Test {
+                @Deprecated
+                void test(int n) {
+                    if(n == 1) {
+                        test(n + 1);
+                    }
+                }
+            }
+        """
+    )
+
+    @Test
+    fun ignoreDeprecationsInDeprecatedClass(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.logCompilationWarningsAndErrors(true).build(),
+        recipe = FindDeprecatedMethods(null, true),
+        before = """
+            @Deprecated
+            class Test {
+                @Deprecated
+                void test(int n) {
+                }
+                
+                Test() {
+                    if(n == 1) {
+                        test(n + 1);
+                    }
+                }
+            }
+        """
+    )
+
+    @Test
     fun findDeprecations(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.logCompilationWarningsAndErrors(true).build(),
-        recipe = FindDeprecatedMethods(null),
+        recipe = FindDeprecatedMethods(null, false),
         before = """
             class Test {
                 @Deprecated
@@ -50,7 +86,7 @@ interface FindDeprecatedMethodsTest : JavaRecipeTest {
     @Test
     fun matchOnMethod(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.logCompilationWarningsAndErrors(true).build(),
-        recipe = FindDeprecatedMethods("java.lang.* *(..)"),
+        recipe = FindDeprecatedMethods("java.lang.* *(..)", false),
         before = """
             class Test {
                 @Deprecated
@@ -76,7 +112,7 @@ interface FindDeprecatedMethodsTest : JavaRecipeTest {
     @Test
     fun dontMatchWhenMethodDoesntMatch(jp: JavaParser.Builder<*, *>) = assertUnchanged(
         jp.logCompilationWarningsAndErrors(true).build(),
-        recipe = FindDeprecatedMethods("org.junit.jupiter.api.* *(..)"),
+        recipe = FindDeprecatedMethods("org.junit.jupiter.api.* *(..)", false),
         before = """
             class Test {
                 @Deprecated

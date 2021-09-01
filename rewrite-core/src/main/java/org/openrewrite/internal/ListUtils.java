@@ -215,11 +215,11 @@ public final class ListUtils {
         return newLs;
     }
 
-    public static <T> List<T> concatAll(@Nullable List<T> ls, List<T> t) {
+    public static <T> List<T> concatAll(@Nullable List<T> ls, @Nullable List<T> t) {
         if (ls == null) {
             return t;
         }
-        if (t.isEmpty()) {
+        if (t == null || t.isEmpty()) {
             return ls;
         }
         List<T> newLs = new ArrayList<>(ls);

@@ -30,6 +30,9 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Marker;
 
+import java.util.Iterator;
+import java.util.List;
+
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -45,6 +48,12 @@ public class FindDeprecatedMethods extends Recipe {
             required = false)
     @Nullable
     String methodPattern;
+
+    @Option(displayName = "Ignore deprecated scopes",
+            description = "When a deprecated method is used in a deprecated method or class, ignore it.",
+            required = false)
+    @Nullable
+    Boolean ignoreDeprecatedScopes;
 
     @Override
     public String getDisplayName() {
@@ -90,11 +99,35 @@ public class FindDeprecatedMethods extends Recipe {
                 if (method.getType() != null) {
                     for (JavaType.FullyQualified annotation : method.getType().getAnnotations()) {
                         if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
+                            if (Boolean.TRUE.equals(ignoreDeprecatedScopes)) {
+                                Iterator<Object> cursorPath = getCursor().getPath();
+                                while (cursorPath.hasNext()) {
+                                    Object ancestor = cursorPath.next();
+                                    if (ancestor instanceof J.MethodDeclaration &&
+                                            isDeprecated(((J.MethodDeclaration) ancestor).getAllAnnotations())) {
+                                        return m;
+                                    }
+                                    if (ancestor instanceof J.ClassDeclaration &&
+                                            isDeprecated(((J.ClassDeclaration) ancestor).getAllAnnotations())) {
+                                        return m;
+                                    }
+                                }
+                            }
+
                             m = m.withMarkers(m.getMarkers().addIfAbsent(new JavaSearchResult(FindDeprecatedMethods.this)));
                         }
                     }
                 }
                 return m;
+            }
+
+            private boolean isDeprecated(List<J.Annotation> annotations) {
+                for (J.Annotation annotation : annotations) {
+                    if (TypeUtils.isOfClassType(annotation.getType(), "java.lang.Deprecated")) {
+                        return true;
+                    }
+                }
+                return false;
             }
         };
     }
