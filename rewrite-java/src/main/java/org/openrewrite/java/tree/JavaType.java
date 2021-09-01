@@ -423,7 +423,7 @@ public interface JavaType extends Serializable {
                                                      Kind kind,
                                                      List<Variable> members,
                                                      List<FullyQualified> interfaces,
-                                                     @Nullable List<Method> methods,
+                                                     List<Method> methods,
                                                      @Nullable FullyQualified supertype,
                                                      @Nullable FullyQualified owningClass,
                                                      List<FullyQualified> annotations) {

@@ -359,6 +359,18 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
+    @Test
+    fun methodFound(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+            interface Test {
+                /**
+                 * @see java.io.ByteArrayOutputStream#toString(String)
+                 */
+                boolean test();
+            }
+        """.trimIndent()
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/945")
     @Test
     fun methodNotFound(jp: JavaParser) = assertParsePrintAndProcess(
@@ -366,7 +378,6 @@ interface JavadocTest : JavaTreeTest {
             interface Test {
                 /**
                  * @see Math#cosine(double)
-                 * @see String#startsWith(String)
                  */
                 boolean test();
             }
