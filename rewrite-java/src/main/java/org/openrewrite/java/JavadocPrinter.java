@@ -71,23 +71,12 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
         visitMarkers(attribute.getMarkers(), p);
         StringBuilder acc = getPrinter();
         acc.append(attribute.getPrefix()).append(attribute.getName());
-        switch (attribute.getKind()) {
-            case Empty:
-                break;
-            case Unquoted:
+        if(attribute.getBeforeEqual() != null) {
+            visit(attribute.getBeforeEqual(), p);
+            if(attribute.getValue() != null) {
                 acc.append('=');
                 visit(attribute.getValue(), p);
-                break;
-            case SingleQuoted:
-                acc.append('=').append("'");
-                visit(attribute.getValue(), p);
-                acc.append("'");
-                break;
-            case DoubleQuoted:
-                acc.append('=').append('"');
-                visit(attribute.getValue(), p);
-                acc.append('"');
-                break;
+            }
         }
         return attribute;
     }

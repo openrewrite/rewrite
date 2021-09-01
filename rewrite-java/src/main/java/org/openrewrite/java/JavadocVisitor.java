@@ -33,6 +33,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
 
     public Javadoc visitAttribute(Javadoc.Attribute attribute, P p) {
         Javadoc.Attribute a = attribute;
+        a = a.withBeforeEqual(ListUtils.map(a.getBeforeEqual(), v -> visit(v, p)));
         a = a.withValue(ListUtils.map(a.getValue(), v -> visit(v, p)));
         return a;
     }

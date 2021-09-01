@@ -67,15 +67,12 @@ public interface Javadoc extends Serializable, Tree {
         String prefix;
         Markers markers;
         String name;
-        ValueKind kind;
-        List<Javadoc> value;
 
-        public enum ValueKind {
-            Empty,
-            Unquoted,
-            SingleQuoted,
-            DoubleQuoted
-        }
+        @Nullable
+        List<Javadoc> beforeEqual;
+
+        @Nullable
+        List<Javadoc> value;
 
         @Override
         public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {

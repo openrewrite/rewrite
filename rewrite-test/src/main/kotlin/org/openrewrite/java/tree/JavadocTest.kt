@@ -343,4 +343,19 @@ interface JavadocTest : JavaTreeTest {
             }
         """.trimIndent()
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/941")
+    @Test
+    fun paramWithMultilineHtmlAttribute(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+            interface Test {
+                /**
+                 * @param contentType <a href=
+                 *                    "https://www...">
+                 *                    label</a>
+                 */
+                boolean test(int contentType);
+            }
+        """.trimIndent()
+    )
 }

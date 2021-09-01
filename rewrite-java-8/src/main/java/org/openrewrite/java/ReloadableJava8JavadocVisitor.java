@@ -31,7 +31,6 @@ import com.sun.tools.javac.util.Context;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.java.tree.Javadoc.Attribute.ValueKind;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
@@ -147,31 +146,43 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
     public Tree visitAttribute(AttributeTree node, String fmt) {
         String name = node.getName().toString();
         cursor += name.length();
-        ValueKind kind;
+        List<Javadoc> beforeEqual;
         List<Javadoc> value;
-        switch (node.getValueKind()) {
-            case EMPTY:
-                kind = ValueKind.Empty;
-                value = emptyList();
-                break;
-            case UNQUOTED:
-                kind = ValueKind.Unquoted;
-                sourceBefore("=");
-                value = node.getValue().stream().map(v -> (Javadoc) convert(v)).collect(toList());
-                break;
-            case SINGLE:
-                kind = ValueKind.SingleQuoted;
-                sourceBefore("='");
-                value = node.getValue().stream().map(v -> (Javadoc) convert(v)).collect(toList());
-                sourceBefore("'");
-                break;
-            case DOUBLE:
-            default:
-                kind = ValueKind.DoubleQuoted;
-                sourceBefore("=\"");
-                value = node.getValue().stream().map(v -> (Javadoc) convert(v)).collect(toList());
-                sourceBefore("\"");
-                break;
+
+        if(node.getValueKind() == AttributeTree.ValueKind.EMPTY) {
+            beforeEqual = emptyList();
+            value = emptyList();
+        } else {
+            beforeEqual = new ArrayList<>();
+            value = new ArrayList<>();
+            Javadoc.LineBreak lineBreak;
+            while ((lineBreak = lineBreaks.remove(cursor)) != null) {
+                cursor++;
+                beforeEqual.add(lineBreak);
+            }
+            sourceBefore("=");
+
+            while ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
+                cursor++;
+                value.add(lineBreak);
+            }
+
+            switch (node.getValueKind()) {
+                case UNQUOTED:
+                    value.addAll(convertMultiline(node.getValue()));
+                    break;
+                case SINGLE:
+                    value.add(new Javadoc.Text(randomId(), Markers.EMPTY, sourceBefore("'") + "'", null, null));
+                    value.addAll(convertMultiline(node.getValue()));
+                    value.add(new Javadoc.Text(randomId(), Markers.EMPTY, sourceBefore("'") + "'", null, null));
+                    break;
+                case DOUBLE:
+                default:
+                    value.add(new Javadoc.Text(randomId(), Markers.EMPTY, sourceBefore("\"") + "\"", null, null));
+                    value.addAll(convertMultiline(node.getValue()));
+                    value.add(new Javadoc.Text(randomId(), Markers.EMPTY, sourceBefore("\"") + "\"", null, null));
+                    break;
+            }
         }
 
         return new Javadoc.Attribute(
@@ -179,7 +190,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
                 fmt,
                 Markers.EMPTY,
                 name,
-                kind,
+                beforeEqual,
                 value
         );
     }
