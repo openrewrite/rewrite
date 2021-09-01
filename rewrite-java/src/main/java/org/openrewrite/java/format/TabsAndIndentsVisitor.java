@@ -112,6 +112,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public Space visitSpace(Space space, Space.Location loc, P p) {
+        getCursor().putMessage("lastLocation", loc);
         boolean alignToAnnotation = false;
         Cursor parent = getCursor().getParent();
         if (parent != null && parent.getValue() instanceof J.Annotation) {
@@ -142,7 +143,8 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 loc.equals(Space.Location.TRY_FINALLY) ||
                 loc.equals(Space.Location.ELSE_PREFIX);
 
-        if (loc.equals(Space.Location.EXTENDS) && space.getWhitespace().contains("\n")) {
+        if ((loc.equals(Space.Location.EXTENDS) && space.getWhitespace().contains("\n")) ||
+                Space.Location.EXTENDS.equals(getCursor().getParent().getMessage("lastLocation"))) {
             indentType = IndentType.CONTINUATION_INDENT;
         }
 
@@ -165,6 +167,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         if (!(getCursor().getValue() instanceof JLeftPadded) && !(getCursor().getValue() instanceof J.EnumValueSet)) {
             getCursor().putMessage("lastIndent", indent);
         }
+
         return s;
     }
 

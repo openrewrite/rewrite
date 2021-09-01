@@ -1778,7 +1778,6 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         """
     )
 
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/883")
     @Test
     fun alignIdentifierOnNewLine() = assertUnchanged(
