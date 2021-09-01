@@ -110,6 +110,9 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
                     firstPrefix = firstPrefixBuilder.toString();
                     inFirstPrefix = false;
                 } else {
+                    if (i > 0 && sourceArr[i - 1] == '\n') {
+                        lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), "", Markers.EMPTY));
+                    }
                     javadocContent.append(c);
                 }
                 marginBuilder = new StringBuilder();
@@ -268,8 +271,10 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
                 for (int j = cursor; j < source.length(); j++) {
                     char ch = source.charAt(j);
                     if (ch == '\n') {
-                        body.add(new Javadoc.Text(randomId(), Markers.EMPTY, whitespaceBeforeNewLine.toString(),
-                                null, null));
+                        if (whitespaceBeforeNewLine.length() > 0) {
+                            body.add(new Javadoc.Text(randomId(), Markers.EMPTY, whitespaceBeforeNewLine.toString(),
+                                    null, null));
+                        }
                         cursor += whitespaceBeforeNewLine.length();
                         break;
                     } else if (Character.isWhitespace(ch)) {
@@ -282,6 +287,10 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
                         }
                         break spaceBeforeTags;
                     }
+                }
+
+                if (lineBreak == null) {
+                    break;
                 }
             }
 

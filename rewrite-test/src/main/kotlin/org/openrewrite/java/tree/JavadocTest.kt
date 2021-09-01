@@ -424,4 +424,19 @@ interface JavadocTest : JavaTreeTest {
             }
         """.trimIndent()
     )
+
+    @Test
+    fun consecutiveLineBreaks(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+            class Test {
+                /** 
+                 * @param oboFile the file to be parsed
+            
+                 * @return the ontology represented as a BioJava ontology file
+                 */
+                void test() {
+                }
+            }
+        """.trimIndent()
+    )
 }
