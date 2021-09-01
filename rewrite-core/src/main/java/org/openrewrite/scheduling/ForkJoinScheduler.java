@@ -51,4 +51,10 @@ public class ForkJoinScheduler implements RecipeScheduler {
         return forkJoinPool;
     }
 
+    /**
+     * Used to shut down the common fork/join pool.
+     */
+    public static void shutdown() {
+        COMMON_SCHEDULER.getForkJoinPool().shutdown();
+    }
 }
