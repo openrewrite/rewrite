@@ -19,6 +19,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 import org.openrewrite.java.search.FindTypes
+import org.openrewrite.java.tree.TypeUtils
 import java.nio.file.Paths
 
 interface ChangePackageTest: JavaRecipeTest {
@@ -213,6 +214,63 @@ interface ChangePackageTest: JavaRecipeTest {
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
         }
     )
+
+    @Test
+    fun updatesImplements(jp: JavaParser) = assertChanged(
+        dependsOn = arrayOf(
+            """
+                package org.openrewrite;
+                public interface Oi{}
+            """
+        ),
+        before = """
+            package org.openrewrite;
+            
+            public class Mi implements org.openrewrite.Oi {
+            }
+        """,
+        after = """
+            package org.openrewrite.test;
+            
+            public class Mi implements org.openrewrite.test.Oi {
+            }
+        """
+    )
+
+    @Test
+    fun moveToSubPackageRemoveImport() = assertChanged(
+        recipe = ChangePackage("com.acme.project", "com.acme.product", null),
+        dependsOn = arrayOf("""
+            package com.acme.product;
+
+            public class RunnableFactory {
+                public static Runnable getRunnable() {
+                    return null;
+                }
+            }
+        """),
+        before = """
+            package com.acme.project;
+
+            import com.acme.product.RunnableFactory;
+            
+            public class StaticImportWorker {
+                public void work() {
+                    RunnableFactory.getRunnable().run();
+                }
+            }
+        """,
+        after = """
+            package com.acme.product;
+            
+            public class StaticImportWorker {
+                public void work() {
+                    RunnableFactory.getRunnable().run();
+                }
+            }
+        """
+    )
+
 
     @Test
     fun lambda(jp: JavaParser) = assertChanged(
@@ -481,6 +539,54 @@ interface ChangePackageTest: JavaRecipeTest {
         afterConditions = { cu ->
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
         }
+    )
+
+    @Test
+    fun changeTypeWithInnerClass(jp: JavaParser) = assertChanged(
+        recipe = ChangePackage("com.acme.product", "com.acme.product.v2", null),
+        dependsOn = arrayOf(
+            """
+                package com.acme.product;
+                
+                public class OuterClass {
+                    public static class InnerClass {
+                
+                    }
+                }
+            """
+        ),
+        before = """
+            package de;
+            
+            import com.acme.product.OuterClass.InnerClass;
+            import com.acme.product.OuterClass;
+            
+            public class UseInnerClass {
+                public String work() {
+                    return new InnerClass().toString();
+                }
+            
+                public String work2() {
+                    return new OuterClass().toString();
+                }
+            }
+        """,
+        after = """
+            package de;
+
+            import com.acme.product.v2.OuterClass.InnerClass;
+            import com.acme.product.v2.OuterClass;
+            
+            public class UseInnerClass {
+                public String work() {
+                    return new InnerClass().toString();
+                }
+            
+                public String work2() {
+                    return new OuterClass().toString();
+                }
+            }
+        """
     )
 
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
