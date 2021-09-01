@@ -377,9 +377,8 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
             visitSpace(method.getPrefix(), Space.Location.IDENTIFIER_PREFIX, p);
             StringBuilder acc = getPrinter();
             visit(method.getSelect(), p);
-            acc.append('#').append(method.getSimpleName()).append('(');
-            visitContainer(method.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, p);
-            acc.append(')');
+            acc.append('#').append(method.getSimpleName());
+            visitContainer("(", method.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, ",", ")", p);
             return method;
         }
 
@@ -435,6 +434,29 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
                     acc.append(prefix);
                 }
                 visit(leftPadded.getElement(), p);
+            }
+        }
+
+        private void visitContainer(String before, @Nullable JContainer<? extends J> container, JContainer.Location location, String suffixBetween, @Nullable String after, P p) {
+            if (container == null) {
+                return;
+            }
+            StringBuilder acc = getPrinter();
+            visitSpace(container.getBefore(), location.getBeforeLocation(), p);
+            acc.append(before);
+            visitRightPadded(container.getPadding().getElements(), location.getElementLocation(), suffixBetween, p);
+            acc.append(after == null ? "" : after);
+        }
+
+        private void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, JRightPadded.Location location, String suffixBetween, P p) {
+            StringBuilder acc = getPrinter();
+            for (int i = 0; i < nodes.size(); i++) {
+                JRightPadded<? extends J> node = nodes.get(i);
+                visit(node.getElement(), p);
+                visitSpace(node.getAfter(), location.getAfterLocation(), p);
+                if (i < nodes.size() - 1) {
+                    acc.append(suffixBetween);
+                }
             }
         }
     }

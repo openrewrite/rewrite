@@ -397,4 +397,17 @@ interface JavadocTest : JavaTreeTest {
             }
         """.trimIndent()
     )
+
+    @Test
+    fun multipleReferenceParameters(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+            class Test {
+                /**
+                 * {@link ListenerUtils#getExceptionFromHeader(ConsumerRecord, String, LogAccessor)}
+                 */
+                void test() {
+                }
+            }
+        """.trimIndent()
+    )
 }

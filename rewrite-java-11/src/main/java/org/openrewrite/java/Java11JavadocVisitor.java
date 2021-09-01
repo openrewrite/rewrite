@@ -38,7 +38,6 @@ import java.util.*;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
-import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
@@ -485,23 +484,27 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
             JavaType refType = referenceType(ref, tree.getType());
 
             if (ref.paramTypes != null) {
-                JContainer<Expression> params;
+                JContainer<Expression> paramContainer;
+                Space beforeParen = Space.build(sourceBefore("("), emptyList());
                 if (ref.paramTypes.isEmpty()) {
-                    params = JContainer.build(
-                            Space.build(sourceBefore("("), emptyList()),
+                    paramContainer = JContainer.build(
+                            beforeParen,
                             singletonList(JRightPadded.build(new J.Empty(randomId(), Space.build(sourceBefore(")"), emptyList()), Markers.EMPTY))),
                             Markers.EMPTY
                     );
                 } else {
-                    params = JContainer.build(
-                            Space.build(sourceBefore("("), emptyList()),
-                            ref.paramTypes.stream()
-                                    .map(param -> {
-                                        Expression paramExpr = (Expression) javaVisitor.scan(param, Space.EMPTY);
-                                        Space rightFmt = Space.format(sourceBefore(")", ","));
-                                        return new JRightPadded<>(paramExpr, rightFmt, Markers.EMPTY);
-                                    })
-                                    .collect(toList()),
+                    List<JRightPadded<Expression>> parameters = new ArrayList<>(ref.paramTypes.size());
+                    List<JCTree> paramTypes = ref.paramTypes;
+                    for (int i = 0; i < paramTypes.size(); i++) {
+                        JCTree param = paramTypes.get(i);
+                        Expression paramExpr = (Expression) javaVisitor.scan(param, Space.build(whitespaceBefore(), emptyList()));
+                        Space rightFmt = Space.format(i == paramTypes.size() - 1 ?
+                                sourceBefore(")") : sourceBefore(","));
+                        parameters.add(new JRightPadded<>(paramExpr, rightFmt, Markers.EMPTY));
+                    }
+                    paramContainer = JContainer.build(
+                            beforeParen,
+                            parameters,
                             Markers.EMPTY
                     );
                 }
@@ -513,7 +516,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
                         JRightPadded.build(tree.withPrefix(Space.EMPTY)),
                         null,
                         name,
-                        params,
+                        paramContainer,
                         TypeUtils.asMethod(refType)
                 );
             } else {
@@ -778,16 +781,9 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
     }
 
     private String sourceBefore(String delim) {
-        return sourceBefore(delim, null);
-    }
-
-    private String sourceBefore(String delim, @Nullable String orElse) {
         int endIndex = source.indexOf(delim, cursor);
-        if (endIndex < 0 && orElse != null) {
-            endIndex = source.indexOf(orElse, cursor);
-        }
         if (endIndex < 0) {
-            throw new IllegalStateException("Expected to be able to find one of [" + delim + "," + orElse + "]");
+            throw new IllegalStateException("Expected to be able to find " + delim);
         }
         String prefix = source.substring(cursor, endIndex);
         cursor = endIndex + delim.length();
