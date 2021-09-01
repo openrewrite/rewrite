@@ -171,12 +171,51 @@ interface ChangeTypeTest : JavaRecipeTest {
     @Test
     fun annotation(jp: JavaParser) = assertChanged(
         jp,
+        recipe = ChangeType("a.b.c.A1","a.b.d.A2"),
         dependsOn = arrayOf(
-            "package a;\npublic @interface A1 {}",
-            "package a;\npublic @interface A2 {}"
+            "package a.b.c;\npublic @interface A1 {}",
+            "package a.b.d;\npublic @interface A2 {}"
         ),
-        before = "@a.A1 public class B {}",
-        after = "@a.A2 public class B {}"
+        before = "@a.b.c.A1 public class B {}",
+        after = "@a.b.d.A2 public class B {}"
+    )
+
+    @Test
+    fun array2(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = ChangeType("com.acme.product.Pojo","com.acme.product.v2.Pojo"),
+        dependsOn = arrayOf("""
+            package com.acme.product;
+            
+            public class Pojo {
+            }
+        """),
+        before = """
+            package com.acme.project.impl;
+            
+            import com.acme.product.Pojo;
+            
+            public class UsePojo2 {
+                Pojo[] p;
+            
+                void run() {
+                    p[0] = null;
+                }
+            }
+        """,
+        after = """
+            package com.acme.project.impl;
+            
+            import com.acme.product.v2.Pojo;
+            
+            public class UsePojo2 {
+                Pojo[] p;
+            
+                void run() {
+                    p[0] = null;
+                }
+            }
+        """
     )
 
     // array types and new arrays
@@ -471,6 +510,78 @@ interface ChangeTypeTest : JavaRecipeTest {
         """
     )
 
+    @Test
+    fun staticImports2(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = ChangeType("com.acme.product.RunnableFactory","com.acme.product.v2.RunnableFactory"),
+        dependsOn = arrayOf("""
+            package com.acme.product;
+            
+            public class RunnableFactory {
+                public static String getString() {
+                    return "hello";
+                }
+            }
+        """),
+        before = """
+            package com.acme.project.impl;
+            
+            import static com.acme.product.RunnableFactory.getString;
+            
+            public class StaticImportWorker {
+                public void work() {
+                    getString().toLowerCase();
+                }
+            }
+        """,
+        after = """
+            package com.acme.project.impl;
+            
+            import static com.acme.product.v2.RunnableFactory.getString;
+            
+            public class StaticImportWorker {
+                public void work() {
+                    getString().toLowerCase();
+                }
+            }
+        """
+    )
+
+    @Test
+    fun staticConstant(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = ChangeType("com.acme.product.RunnableFactory","com.acme.product.v2.RunnableFactory"),
+        dependsOn = arrayOf("""
+            package com.acme.product;
+            
+            public class RunnableFactory {
+                public static final String CONSTANT = "hello";
+            }
+        """),
+        before = """
+            package com.acme.project.impl;
+            
+            import static com.acme.product.RunnableFactory.CONSTANT;
+            
+            public class StaticImportWorker {
+                public void work() {
+                    System.out.println(CONSTANT + " fred.");
+                }
+            }
+        """,
+        after = """
+            package com.acme.project.impl;
+            
+            import static com.acme.product.v2.RunnableFactory.CONSTANT;
+            
+            public class StaticImportWorker {
+                public void work() {
+                    System.out.println(CONSTANT + " fred.");
+                }
+            }
+        """
+    )
+
     @Disabled("https://github.com/openrewrite/rewrite/issues/62")
     @Test
     fun primitiveToClass(jp: JavaParser) = assertChanged(
@@ -554,18 +665,68 @@ interface ChangeTypeTest : JavaRecipeTest {
         """
     )
 
+    @Test
+    fun changeTypeWithInnerClass(jp: JavaParser) = assertChanged(
+        jp,
+        dependsOn = arrayOf(
+            """
+                package com.acme.product;
+                
+                public class OuterClass {
+                    public static class InnerClass {
+                
+                    }
+                }
+            """
+        ),
+        recipe = ChangeType("com.acme.product.OuterClass", "com.acme.product.v2.OuterClass"),
+        before = """
+            package de;
+            
+            import com.acme.product.OuterClass.InnerClass;
+            import com.acme.product.OuterClass;
+            
+            public class UseInnerClass {
+                public String work() {
+                    return new InnerClass().toString();
+                }
+            
+                public String work2() {
+                    return new OuterClass().toString();
+                }
+            }
+        """,
+        after = """
+            package de;
+
+            import com.acme.product.v2.OuterClass.InnerClass;
+            import com.acme.product.v2.OuterClass;
+            
+            public class UseInnerClass {
+                public String work() {
+                    return new InnerClass().toString();
+                }
+            
+                public String work2() {
+                    return new OuterClass().toString();
+                }
+            }
+        """
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/925")
     @Test
-    fun uppercaseInPackage() = assertChanged(
-        parser = JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true).dependsOn(
+    fun uppercaseInPackage(jp: JavaParser) = assertChanged(
+        jp,
+        dependsOn = arrayOf(
             """
                 package com.acme.product.util.accessDecision;
                 
                 public enum AccessVote {
-                    ABSTAIN;
+                    ABSTAIN
                 }
             """
-        ).build(),
+        ),
         recipe = ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote"),
         before = """
             package de;
@@ -593,15 +754,16 @@ interface ChangeTypeTest : JavaRecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/934")
     @Test
-    fun lambda() = assertChanged(
-        parser = JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true).dependsOn(
+    fun lambda(jp: JavaParser) = assertChanged(
+        jp,
+        dependsOn = arrayOf(
             """
                 package com.acme.product;
                 public interface Procedure {
                     void execute();
                 }
             """
-        ).build(),
+        ),
         recipe = ChangeType("com.acme.product.Procedure", "com.acme.product.Procedure2"),
         before = """
             import com.acme.product.Procedure;
@@ -629,17 +791,18 @@ interface ChangeTypeTest : JavaRecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/932")
     @Test
-    fun assignment() = assertChanged(
-        parser = JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true).dependsOn(
+    fun assignment(jp: JavaParser) = assertChanged(
+        jp,
+        dependsOn = arrayOf(
             """
                 package com.acme.product.util.accessDecision;
                 
                 public enum AccessVote {
                     ABSTAIN,
-                    GRANT;
+                    GRANT
                 }
             """
-        ).build(),
+        ),
         recipe = ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote"),
         before = """
             package de;
@@ -671,17 +834,18 @@ interface ChangeTypeTest : JavaRecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/932")
     @Test
-    fun ternary() = assertChanged(
-        parser = JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true).dependsOn(
+    fun ternary(jp: JavaParser) = assertChanged(
+        jp,
+        dependsOn = arrayOf(
             """
                 package com.acme.product.util.accessDecision;
                 
                 public enum AccessVote {
                     ABSTAIN,
-                    GRANT;
+                    GRANT
                 }
             """
-        ).build(),
+        ),
         recipe = ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote"),
         before = """
             package de;

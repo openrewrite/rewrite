@@ -105,17 +105,27 @@ public class ChangeType extends Recipe {
             this.targetType = JavaType.buildType(targetType);
         }
 
+        @SuppressWarnings({"unchecked", "rawtypes", "ConstantConditions"})
         @Override
         public J visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-            maybeRemoveImport(oldFullyQualifiedTypeName);
-            if (targetType instanceof JavaType.FullyQualified) {
-                if (((JavaType.FullyQualified) targetType).getOwningClass() != null) {
-                    maybeAddImport(((JavaType.FullyQualified) targetType).getOwningClass());
+
+            J.CompilationUnit c = visitAndCast(cu, ctx, super::visitCompilationUnit);
+            c = (J.CompilationUnit) new RemoveImport<>(oldFullyQualifiedTypeName).visit(c, ctx);
+            if (originalType.getOwningClass() != null) {
+                c = (J.CompilationUnit) new RemoveImport(originalType.getOwningClass().getFullyQualifiedName()).visit(c, ctx);
+            }
+            JavaType.FullyQualified fullyQualifiedTarget = TypeUtils.asFullyQualified(targetType);
+            if (fullyQualifiedTarget != null) {
+                if (fullyQualifiedTarget.getOwningClass() != null) {
+                    c = (J.CompilationUnit)  new AddImport(fullyQualifiedTarget.getOwningClass().getFullyQualifiedName(), null, true).visit(c, ctx);
                 } else {
-                    maybeAddImport((JavaType.FullyQualified) targetType);
+                    c = (J.CompilationUnit) new AddImport(fullyQualifiedTarget.getFullyQualifiedName(), null, true).visit(c, ctx);
                 }
             }
-            return super.visitCompilationUnit(cu, ctx);
+            if (c != null) {
+                c = c.withImports(ListUtils.map(c.getImports(), i -> visitAndCast(i, ctx, super::visitImport)));
+            }
+            return c;
         }
 
         @Override
@@ -127,42 +137,11 @@ public class ChangeType extends Recipe {
         }
 
         @Override
-        public <N extends NameTree> N visitTypeName(N name, ExecutionContext ctx) {
-            N n = visitAndCast(name, ctx, super::visitTypeName);
-            return n.withType(updateType(n.getType()));
-        }
-
-        @Override
-        public J visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
-            J.Annotation a = visitAndCast(annotation, ctx, super::visitAnnotation);
-            return a.withAnnotationType(transformName(a.getAnnotationType()));
-        }
-
-        @Override
-        public J visitArrayType(J.ArrayType arrayType, ExecutionContext ctx) {
-            J.ArrayType a = visitAndCast(arrayType, ctx, super::visitArrayType);
-            return a.withElementType(transformName(a.getElementType()));
-        }
-
-        @Override
-        public J visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
-            J.Assignment a = visitAndCast(assignment, ctx, super::visitAssignment);
-            return updateType(a);
-        }
-
-        @Override
-        public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-            J.ClassDeclaration c = visitAndCast(classDecl, ctx, super::visitClassDeclaration);
-
-            if (c.getExtends() != null) {
-                c = c.withExtends(transformName(c.getExtends()));
+        public @Nullable J postVisit(J tree, ExecutionContext executionContext) {
+            if (tree instanceof TypedTree) {
+                return ((TypedTree) tree).withType(updateType(((TypedTree) tree).getType()));
             }
-
-            if (c.getImplements() != null) {
-                c = c.withImplements(ListUtils.map(c.getImplements(), this::transformName));
-            }
-
-            return c;
+            return tree;
         }
 
         @Override
@@ -241,115 +220,13 @@ public class ChangeType extends Recipe {
         }
 
         @Override
-        public J visitLambda(J.Lambda lambda, ExecutionContext ctx) {
-            J.Lambda l = visitAndCast(lambda, ctx, super::visitLambda);
-            return l.withType(updateType(l.getType()));
-        }
-
-        @Override
-        public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-            J.MethodDeclaration m = visitAndCast(method, ctx, super::visitMethodDeclaration);
-            m = m.withReturnTypeExpression(transformName(m.getReturnTypeExpression()));
-            return m.withThrows(m.getThrows() == null ? null : ListUtils.map(m.getThrows(), this::transformName));
-        }
-
-        @Override
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            J.MethodInvocation m = method;
-            boolean isStatic = m.getType() != null && m.getType().hasFlags(Flag.Static);
-            if (m.getSelect() instanceof NameTree && isStatic) {
-                m = m.withSelect(transformName(m.getSelect()));
-            }
-
-            Expression select = updateType(m.getSelect());
-            m = m.withSelect(select).withType(updateType(method.getType()));
-
-            if (m != method && isStatic && targetType instanceof JavaType.FullyQualified) {
-                maybeAddImport(((JavaType.FullyQualified) targetType).getFullyQualifiedName(), m.getName().getSimpleName());
-            }
-            return super.visitMethodInvocation(m, ctx);
-        }
-
-        @Override
-        public J visitMultiCatch(J.MultiCatch multiCatch, ExecutionContext ctx) {
-            J.MultiCatch m = visitAndCast(multiCatch, ctx, super::visitMultiCatch);
-            return m.withAlternatives(ListUtils.map(m.getAlternatives(), this::transformName));
-        }
-
-        @Override
-        public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-            J.VariableDeclarations m = visitAndCast(multiVariable, ctx, super::visitVariableDeclarations);
-            if (!(m.getTypeExpression() instanceof J.MultiCatch)) {
-                m = m.withTypeExpression(transformName(m.getTypeExpression()));
-            }
-            return m;
-        }
-
-        @Override
-        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
-            J.VariableDeclarations.NamedVariable v = visitAndCast(variable, ctx, super::visitVariable);
-            return v.withType(updateType(v.getType()))
-                    .withName(v.getName().withType(updateType(v.getName().getType())));
-        }
-
-        @Override
-        public J visitNewArray(J.NewArray newArray, ExecutionContext ctx) {
-            J.NewArray n = visitAndCast(newArray, ctx, super::visitNewArray);
-            return n.withTypeExpression(transformName(n.getTypeExpression()));
-        }
-
-        @Override
-        public J visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
-            J.NewClass n = visitAndCast(newClass, ctx, super::visitNewClass);
-            return n.withClazz(transformName(n.getClazz()))
-                    .withType(updateType(n.getType()));
-        }
-
-        @Override
-        public J visitTernary(J.Ternary ternary, ExecutionContext ctx) {
-            J.Ternary t = visitAndCast(ternary, ctx, super::visitTernary);
-            return updateType(t);
-        }
-
-        @Override
-        public J visitTypeCast(J.TypeCast typeCast, ExecutionContext ctx) {
-            J.TypeCast t = visitAndCast(typeCast, ctx, super::visitTypeCast);
-            return t.withClazz(t.getClazz().withTree(transformName(t.getClazz().getTree())));
-        }
-
-        @Override
-        public J visitTypeParameter(J.TypeParameter typeParam, ExecutionContext ctx) {
-            J.TypeParameter t = visitAndCast(typeParam, ctx, super::visitTypeParameter);
-            t = t.withBounds(t.getBounds() == null ? null : ListUtils.map(t.getBounds(), this::transformName));
-            return t.withName(transformName(t.getName()));
-        }
-
-        @Override
-        public J visitWildcard(J.Wildcard wildcard, ExecutionContext ctx) {
-            J.Wildcard w = visitAndCast(wildcard, ctx, super::visitWildcard);
-            return w.withBoundedType(transformName(w.getBoundedType()));
-        }
-
-        @SuppressWarnings({"unchecked", "ConstantConditions"})
-        private <T extends J> T transformName(@Nullable T nameField) {
-            if (nameField instanceof NameTree) {
-                JavaType.FullyQualified nameTreeClass = TypeUtils.asFullyQualified(((NameTree) nameField).getType());
-                String name;
-                if (targetType instanceof JavaType.FullyQualified) {
-                    name = ((JavaType.FullyQualified) targetType).getClassName();
-                } else {
-                    name = ((JavaType.Primitive) targetType).getKeyword();
-                }
-                if (nameTreeClass != null && nameTreeClass.getFullyQualifiedName().equals(oldFullyQualifiedTypeName)) {
-                    return (T) J.Identifier.build(randomId(),
-                            nameField.getPrefix(),
-                            nameField.getMarkers(),
-                            name,
-                            targetType
-                    );
+            if (method.getType() != null && method.getType().hasFlags(Flag.Static)) {
+                if (method.getType().getDeclaringType().isAssignableFrom(originalType)) {
+                    maybeAddImport(((JavaType.FullyQualified) targetType).getFullyQualifiedName(), method.getName().getSimpleName());
                 }
             }
-            return nameField;
+            return super.visitMethodInvocation(method, ctx);
         }
 
         private Expression updateOuterClassTypes(Expression typeTree) {
@@ -413,30 +290,20 @@ public class ChangeType extends Recipe {
             return typeTree;
         }
 
-        private Expression updateType(@Nullable Expression typeTree) {
-            if (typeTree == null) {
-                // updateType/updateSignature are always used to swap things in-place
-                // The true nullability is that the return has the same nullability as the input
-                // Because it's always an in-place operation it isn't problematic to tell a white lie about the nullability of the return value
-
-                //noinspection ConstantConditions
-                return null;
-            }
-
-            return typeTree.withType(updateType(typeTree.getType()));
-        }
-
         private JavaType updateType(@Nullable JavaType type) {
-            JavaType.FullyQualified fqt = TypeUtils.asFullyQualified(type);
-            if (fqt != null && fqt.getFullyQualifiedName().equals(oldFullyQualifiedTypeName)) {
-                return targetType;
-            }
+
             JavaType.GenericTypeVariable gtv = TypeUtils.asGeneric(type);
             if (gtv != null && gtv.getBound() != null
                     && gtv.getBound().getFullyQualifiedName().equals(oldFullyQualifiedTypeName)
                     && targetType instanceof JavaType.FullyQualified) {
                 return gtv.withBound((JavaType.FullyQualified) targetType);
             }
+
+            JavaType.FullyQualified fqt = TypeUtils.asFullyQualified(type);
+            if (fqt != null && fqt.getFullyQualifiedName().equals(oldFullyQualifiedTypeName)) {
+                    return targetType;
+            }
+
             JavaType.Method mt = TypeUtils.asMethod(type);
             if (mt != null) {
                 return mt.withDeclaringType((JavaType.FullyQualified) updateType(mt.getDeclaringType()))
