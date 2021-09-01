@@ -358,4 +358,32 @@ interface JavadocTest : JavaTreeTest {
             }
         """.trimIndent()
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/945")
+    @Test
+    fun methodNotFound(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+            interface Test {
+                /**
+                 * @see Math#cosine(double)
+                 * @see String#startsWith(String)
+                 */
+                boolean test();
+            }
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/944")
+    @Test
+    fun typeNotFound(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+            interface Test {
+                /**
+                 * {@link SymbolThatCannotBeFound}
+                 * @see Mathy#cos(double)
+                 */
+                boolean test();
+            }
+        """.trimIndent()
+    )
 }

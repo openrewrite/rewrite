@@ -80,11 +80,7 @@ public class TypeUtils {
                 classFrom.getInterfaces().stream().anyMatch(i -> isAssignableTo(to, i));
     }
 
-    /**
-     * @deprecated This method is being deprecated, please use asFullyQualified() instead.
-     */
     @Nullable
-    @Deprecated
     public static JavaType.Class asClass(@Nullable JavaType type) {
         return type instanceof JavaType.Class ? (JavaType.Class) type : null;
     }
