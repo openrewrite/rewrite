@@ -37,10 +37,6 @@ import static org.openrewrite.Tree.randomId;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindDeprecatedClasses extends Recipe {
-    /**
-     * A type pattern, expressed as a pointcut expression, that is used to find matching method invocations.
-     * See {@link MethodMatcher} for details on the expression's syntax.
-     */
     @Option(displayName = "Type pattern",
             description = "A type pattern that is used to find matching classes.",
             example = "org.springframework..*",
