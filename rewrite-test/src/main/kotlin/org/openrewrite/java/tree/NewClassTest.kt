@@ -56,4 +56,19 @@ interface NewClassTest : JavaTreeTest {
             List<String> l = new ArrayList < > ();
         """, "java.util.*"
     )
+
+    @Test
+    fun anonymousClass(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, CompilationUnit, """
+            class Test {
+                List<Integer> l = new ArrayList<Integer>() {
+                    /** Javadoc */
+                    @Override
+                    public boolean isEmpty() {
+                        return false;
+                    }
+                };
+            }
+        """.trimIndent()
+    )
 }

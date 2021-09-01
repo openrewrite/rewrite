@@ -42,8 +42,13 @@ import static org.openrewrite.Tree.randomId;
 
 public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
     private final Attr attr;
+
+    @Nullable
     private final Symbol.TypeSymbol symbol;
+
+    @Nullable
     private final Type enclosingClassType;
+
     private final TypeMapping typeMapping;
     private final TreeScanner<J, Space> javaVisitor = new JavaVisitor();
     private final Map<Integer, Javadoc.LineBreak> lineBreaks = new HashMap<>();
@@ -66,9 +71,17 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
             this.enclosingClassType = cu.defs.get(0).type;
             this.symbol = cu.packge;
         } else {
-            JCTree.JCClassDecl classDecl = (JCTree.JCClassDecl) scope.getLeaf();
-            this.enclosingClassType = classDecl.type;
-            this.symbol = classDecl.sym;
+            com.sun.source.tree.Tree classDecl = scope.getLeaf();
+            if(classDecl instanceof JCTree.JCClassDecl) {
+                this.enclosingClassType = ((JCTree.JCClassDecl) classDecl).type;
+                this.symbol = ((JCTree.JCClassDecl) classDecl).sym;
+            } else if(classDecl instanceof JCTree.JCNewClass) {
+                this.enclosingClassType = ((JCTree.JCNewClass) classDecl).def.type;
+                this.symbol = ((JCTree.JCNewClass) classDecl).def.sym;
+            } else {
+                this.enclosingClassType = null;
+                this.symbol = null;
+            }
         }
     }
 
