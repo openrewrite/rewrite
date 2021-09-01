@@ -603,21 +603,15 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
     public Tree visitSee(SeeTree node, String fmt) {
         String prefix = fmt + sourceBefore("@see");
         J ref = null;
-        List<Javadoc> desc = new ArrayList<>();
-        for (DocTree docTree : node.getReference()) {
-            if (docTree instanceof DCTree.DCReference) {
-                ref = visitReference((ReferenceTree) docTree, "");
-            } else {
-                Javadoc.LineBreak lineBreak;
-                while ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
-                    cursor++;
-                    desc.add(lineBreak);
-                }
-                desc.add(convert(docTree));
-            }
+        List<Javadoc> docs;
+        if (node.getReference().get(0) instanceof DCTree.DCReference) {
+            ref = visitReference((ReferenceTree) node.getReference().get(0), "");
+            docs = convertMultiline(node.getReference().subList(1, node.getReference().size()));
+        } else {
+            docs = convertMultiline(node.getReference());
         }
 
-        return new Javadoc.See(randomId(), prefix, Markers.EMPTY, ref, desc);
+        return new Javadoc.See(randomId(), prefix, Markers.EMPTY, ref, docs);
     }
 
     @Override

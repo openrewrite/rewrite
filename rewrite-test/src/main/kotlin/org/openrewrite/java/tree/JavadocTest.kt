@@ -410,4 +410,18 @@ interface JavadocTest : JavaTreeTest {
             }
         """.trimIndent()
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/941")
+    @Test
+    fun seeWithMultilineAttribute(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+            interface Test {
+                /**
+                 * @see <a href="https://www...">
+                 *            label</a>
+                 */
+                boolean test();
+            }
+        """.trimIndent()
+    )
 }
