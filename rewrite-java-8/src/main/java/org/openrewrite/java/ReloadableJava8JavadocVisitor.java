@@ -33,7 +33,10 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -71,10 +74,10 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
             this.symbol = cu.packge;
         } else {
             com.sun.source.tree.Tree classDecl = scope.getLeaf();
-            if(classDecl instanceof JCTree.JCClassDecl) {
+            if (classDecl instanceof JCTree.JCClassDecl) {
                 this.enclosingClassType = ((JCTree.JCClassDecl) classDecl).type;
                 this.symbol = ((JCTree.JCClassDecl) classDecl).sym;
-            } else if(classDecl instanceof JCTree.JCNewClass) {
+            } else if (classDecl instanceof JCTree.JCNewClass) {
                 this.enclosingClassType = ((JCTree.JCNewClass) classDecl).def.type;
                 this.symbol = ((JCTree.JCNewClass) classDecl).def.sym;
             } else {
@@ -127,8 +130,9 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
                                 marginBuilder.toString(), Markers.EMPTY));
                         javadocContent.append(c);
                     } else {
-                        cursor = 1;
-                        javadocContent.append('\n').append(marginBuilder).append(c);
+                        lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(),
+                                "", Markers.EMPTY));
+                        javadocContent.append(marginBuilder).append(c);
                     }
                     marginBuilder = null;
                 } else {
@@ -164,7 +168,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
         List<Javadoc> beforeEqual;
         List<Javadoc> value;
 
-        if(node.getValueKind() == AttributeTree.ValueKind.EMPTY) {
+        if (node.getValueKind() == AttributeTree.ValueKind.EMPTY) {
             beforeEqual = emptyList();
             value = emptyList();
         } else {
@@ -187,15 +191,15 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
                     value.addAll(convertMultiline(node.getValue()));
                     break;
                 case SINGLE:
-                    value.add(new Javadoc.Text(randomId(), Markers.EMPTY, sourceBefore("'") + "'", null, null));
+                    value.add(new Javadoc.Text(randomId(), Markers.EMPTY, sourceBefore("'") + "'"));
                     value.addAll(convertMultiline(node.getValue()));
-                    value.add(new Javadoc.Text(randomId(), Markers.EMPTY, sourceBefore("'") + "'", null, null));
+                    value.add(new Javadoc.Text(randomId(), Markers.EMPTY, sourceBefore("'") + "'"));
                     break;
                 case DOUBLE:
                 default:
-                    value.add(new Javadoc.Text(randomId(), Markers.EMPTY, sourceBefore("\"") + "\"", null, null));
+                    value.add(new Javadoc.Text(randomId(), Markers.EMPTY, sourceBefore("\"") + "\""));
                     value.addAll(convertMultiline(node.getValue()));
-                    value.add(new Javadoc.Text(randomId(), Markers.EMPTY, sourceBefore("\"") + "\"", null, null));
+                    value.add(new Javadoc.Text(randomId(), Markers.EMPTY, sourceBefore("\"") + "\""));
                     break;
             }
         }
@@ -220,7 +224,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
     public Tree visitComment(CommentTree node, String fmt) {
         String text = fmt + node.getBody();
         cursor += node.getBody().length();
-        return new Javadoc.Text(randomId(), Markers.EMPTY, text, null, null);
+        return new Javadoc.Text(randomId(), Markers.EMPTY, text);
     }
 
     @Override
@@ -237,7 +241,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
         Javadoc.LineBreak leadingLineBreak = lineBreaks.remove(0);
         if (leadingLineBreak != null) {
             if (!firstPrefix.isEmpty()) {
-                body.add(new Javadoc.Text(randomId(), Markers.EMPTY, firstPrefix.substring(0, firstPrefix.length() - 1), null, null));
+                body.add(new Javadoc.Text(randomId(), Markers.EMPTY, firstPrefix.substring(0, firstPrefix.length() - 1)));
                 firstPrefix = "";
             }
             body.add(leadingLineBreak);
@@ -247,14 +251,26 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
         for (int i = 0; i < firstSentence.size(); i++) {
             DocTree docTree = firstSentence.get(i);
             String prefix = docTree instanceof DCTree.DCText && i > 0 ? "" : whitespaceBefore();
-            body.add((Javadoc) scan(docTree, firstPrefix + prefix));
+            if (docTree instanceof DCTree.DCText) {
+                body.addAll(visitText(((DCTree.DCText) docTree).getBody(), firstPrefix + prefix));
+            } else {
+                body.add((Javadoc) scan(docTree, firstPrefix + prefix));
+            }
             firstPrefix = "";
         }
 
         List<? extends DocTree> restOfBody = node.getBody();
         for (DocTree docTree : restOfBody) {
-            String prefix = docTree instanceof DCTree.DCText ? "" : whitespaceBefore();
-            body.add((Javadoc) scan(docTree, prefix));
+            Javadoc.LineBreak lineBreak;
+            while ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
+                cursor++;
+                body.add(lineBreak);
+            }
+            if (docTree instanceof DCTree.DCText) {
+                body.addAll(visitText(((DCTree.DCText) docTree).getBody(), whitespaceBefore()));
+            } else {
+                body.add((Javadoc) scan(docTree, whitespaceBefore()));
+            }
         }
 
         Javadoc.LineBreak lineBreak;
@@ -272,8 +288,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
                     char ch = source.charAt(j);
                     if (ch == '\n') {
                         if (whitespaceBeforeNewLine.length() > 0) {
-                            body.add(new Javadoc.Text(randomId(), Markers.EMPTY, whitespaceBeforeNewLine.toString(),
-                                    null, null));
+                            body.add(new Javadoc.Text(randomId(), Markers.EMPTY, whitespaceBeforeNewLine.toString()));
                         }
                         cursor += whitespaceBeforeNewLine.length();
                         break;
@@ -281,8 +296,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
                         whitespaceBeforeNewLine.append(ch);
                     } else {
                         if (whitespaceBeforeNewLine.length() > 0) {
-                            body.add(new Javadoc.Text(randomId(), Markers.EMPTY, whitespaceBeforeNewLine.toString(),
-                                    null, null));
+                            body.add(new Javadoc.Text(randomId(), Markers.EMPTY, whitespaceBeforeNewLine.toString()));
                             cursor += whitespaceBeforeNewLine.length();
                         }
                         break spaceBeforeTags;
@@ -303,7 +317,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
             if (cursor < source.length()) {
                 String trailingWhitespace = source.substring(cursor);
                 if (!trailingWhitespace.isEmpty()) {
-                    body.add(new Javadoc.Text(randomId(), Markers.EMPTY, trailingWhitespace, null, null));
+                    body.add(new Javadoc.Text(randomId(), Markers.EMPTY, trailingWhitespace));
                 }
             }
         } else {
@@ -342,12 +356,12 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
     public Tree visitEntity(EntityTree node, String fmt) {
         String text = fmt + sourceBefore("&") + "&" + node.getName().toString() + ";";
         cursor += node.getName().length() + 1;
-        return new Javadoc.Text(randomId(), Markers.EMPTY, text, null, null);
+        return new Javadoc.Text(randomId(), Markers.EMPTY, text);
     }
 
     @Override
     public Tree visitErroneous(ErroneousTree node, String fmt) {
-        return visitText(node.getBody(), fmt);
+        return new Javadoc.Erroneous(randomId(), fmt, Markers.EMPTY, visitText(node.getBody(), ""));
     }
 
     @Override
@@ -391,14 +405,19 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
     @Override
     public Tree visitLiteral(LiteralTree node, String fmt) {
         String prefix = fmt + sourceBefore(node.getKind() == DocTree.Kind.CODE ? "{@code" : "{@literal");
-        Javadoc.Text body = (Javadoc.Text) visitText(node.getBody(), "");
-        body = body.withText(body.getText() + sourceBefore("}"));
+
+        List<Javadoc> description = visitText(node.getBody().getBody(), whitespaceBefore());
+        String suffix = sourceBefore("}");
+        if (!suffix.isEmpty()) {
+            description.add(new Javadoc.Text(randomId(), Markers.EMPTY, suffix));
+        }
+
         return new Javadoc.Literal(
                 randomId(),
                 prefix,
                 Markers.EMPTY,
                 node.getKind() == DocTree.Kind.CODE,
-                body
+                description
         );
     }
 
@@ -627,42 +646,36 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
 
     @Override
     public Tree visitText(TextTree node, String fmt) {
-        return visitText(node.getBody(), fmt);
+        throw new UnsupportedOperationException("Anywhere text can occur, we need to call the visitText override that " +
+                "returns a list of Javadoc elements.");
     }
 
-    public Tree visitText(String node, String fmt) {
-        Stack<Javadoc.Text> texts = new Stack<>();
+    public List<Javadoc> visitText(String node, String fmt) {
+        List<Javadoc> texts = new ArrayList<>();
 
         char[] textArr = node.toCharArray();
-        int afterLastBreak = 0;
-        for (int i = 0; i < textArr.length; i++) {
-            char c = textArr[i];
+        StringBuilder text = new StringBuilder(fmt);
+        for (char c : textArr) {
+            cursor++;
             if (c == '\n') {
-                texts.add(new Javadoc.Text(
-                        randomId(),
-                        Markers.EMPTY,
-                        fmt + source.substring(cursor + afterLastBreak, cursor + i),
-                        lineBreaks.remove(cursor + i + 1),
-                        null
-                ));
-                fmt = "";
-                afterLastBreak = i + 1;
+                if (text.length() > 0) {
+                    texts.add(new Javadoc.Text(randomId(), Markers.EMPTY, text.toString()));
+                    text = new StringBuilder();
+                }
+
+                Javadoc.LineBreak lineBreak = lineBreaks.remove(cursor);
+                assert lineBreak != null;
+                texts.add(lineBreak);
+            } else {
+                text.append(c);
             }
         }
 
-        String last = fmt + source.substring(cursor + afterLastBreak, cursor + textArr.length);
-        if (!last.isEmpty()) {
-            texts.add(new Javadoc.Text(randomId(), Markers.EMPTY, last, null, null));
+        if (text.length() > 0) {
+            texts.add(new Javadoc.Text(randomId(), Markers.EMPTY, text.toString()));
         }
 
-        cursor += textArr.length;
-
-        Javadoc.Text head = texts.pop();
-        while (!texts.isEmpty()) {
-            head = texts.pop().withNext(head);
-        }
-
-        return head;
+        return texts;
     }
 
     @Override
@@ -747,13 +760,18 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
             DocTree dt = dts.get(i);
             if (i > 0 && dt instanceof DCTree.DCText) {
                 // the whitespace is part of the text
-                js.add((Javadoc) visitText((TextTree) dt, ""));
+                js.addAll(visitText(((DCTree.DCText) dt).getBody(), ""));
             } else {
                 while ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
                     cursor++;
                     js.add(lineBreak);
                 }
-                js.add(convert(dt));
+
+                if (dt instanceof DCTree.DCText) {
+                    js.addAll(visitText(((DCTree.DCText) dt).getBody(), whitespaceBefore()));
+                } else {
+                    js.add(convert(dt));
+                }
             }
         }
         return js;

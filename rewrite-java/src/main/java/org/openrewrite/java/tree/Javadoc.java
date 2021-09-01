@@ -208,6 +208,23 @@ public interface Javadoc extends Serializable, Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
+    class Erroneous implements Javadoc {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        String prefix;
+        Markers markers;
+        List<Javadoc> text;
+
+        @Override
+        public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
+            return v.visitErroneous(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
     class InheritDoc implements Javadoc {
         @EqualsAndHashCode.Include
         UUID id;
@@ -327,7 +344,7 @@ public interface Javadoc extends Serializable, Tree {
         String prefix;
         Markers markers;
         boolean code;
-        Text body;
+        List<Javadoc> description;
 
         @Override
         public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
@@ -525,12 +542,6 @@ public interface Javadoc extends Serializable, Tree {
 
         Markers markers;
         String text;
-
-        @Nullable
-        LineBreak lineBreak;
-
-        @Nullable
-        Text next;
 
         @Override
         public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {

@@ -71,6 +71,13 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
         return endElement;
     }
 
+    public Javadoc visitErroneous(Javadoc.Erroneous erroneous, P p) {
+        Javadoc.Erroneous e = erroneous;
+        e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        e = e.withText(ListUtils.map(e.getText(), b -> visit(b, p)));
+        return e;
+    }
+
     public Javadoc visitHidden(Javadoc.Hidden hidden, P p) {
         Javadoc.Hidden h = hidden;
         h = h.withMarkers(visitMarkers(h.getMarkers(), p));
@@ -111,7 +118,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
     public Javadoc visitLiteral(Javadoc.Literal literal, P p) {
         Javadoc.Literal l = literal;
         l = l.withMarkers(visitMarkers(l.getMarkers(), p));
-        l = l.withBody((Javadoc.Text) visit(l.getBody(), p));
+        l = l.withDescription(ListUtils.map(l.getDescription(), desc -> visit(desc, p)));
         return l;
     }
 
@@ -190,8 +197,6 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
     public Javadoc visitText(Javadoc.Text text, P p) {
         Javadoc.Text t = text;
         t = t.withMarkers(visitMarkers(t.getMarkers(), p));
-        t = t.withLineBreak((Javadoc.LineBreak) visit(t.getLineBreak(), p));
-        t = t.withNext((Javadoc.Text) visit(t.getNext(), p));
         return t;
     }
 

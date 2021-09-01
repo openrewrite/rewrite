@@ -137,6 +137,15 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     }
 
     @Override
+    public Javadoc visitErroneous(Javadoc.Erroneous erroneous, P p) {
+        visitMarkers(erroneous.getMarkers(), p);
+        StringBuilder acc = getPrinter();
+        acc.append(erroneous.getPrefix());
+        visit(erroneous.getText(), p);
+        return erroneous;
+    }
+
+    @Override
     public Javadoc visitHidden(Javadoc.Hidden hidden, P p) {
         visitMarkers(hidden.getMarkers(), p);
         StringBuilder acc = getPrinter();
@@ -199,7 +208,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
         visitMarkers(literal.getMarkers(), p);
         StringBuilder acc = getPrinter();
         acc.append(literal.getPrefix()).append(literal.isCode() ? "{@code" : "{@literal");
-        visit(literal.getBody(), p);
+        visit(literal.getDescription(), p);
         acc.append("}");
         return literal;
     }
@@ -310,8 +319,6 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
         visitMarkers(text.getMarkers(), p);
         StringBuilder acc = getPrinter();
         acc.append(text.getText());
-        visit(text.getLineBreak(), p);
-        visit(text.getNext(), p);
         return text;
     }
 

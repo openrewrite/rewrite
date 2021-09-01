@@ -439,4 +439,21 @@ interface JavadocTest : JavaTreeTest {
             }
         """.trimIndent()
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/957")
+    @Test
+    fun commentMissingMultipleAsterisks(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+            class Test {
+                /** 
+                 * JavaDoc
+                    1st new line.
+                    2nd new line.
+                 * text
+                 */
+                void test() {
+                }
+            }
+        """.trimIndent()
+    )
 }
