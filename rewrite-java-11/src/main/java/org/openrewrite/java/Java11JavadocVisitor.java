@@ -377,7 +377,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
     @Override
     public Tree visitIndex(IndexTree node, String fmt) {
         String prefix = fmt + sourceBefore("{@index");
-        Javadoc searchTerm = convert(node.getSearchTerm());
+        List<Javadoc> searchTerm = convertMultiline(Collections.singletonList(node.getSearchTerm()));
 
         List<Javadoc> description = convertMultiline(node.getDescription());
 
@@ -398,8 +398,9 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
                 randomId(),
                 prefix,
                 Markers.EMPTY,
-                searchTerm,
-                paddedDescription
+                searchTerm.get(0),
+                paddedDescription,
+                paddedDescription.size() == 0 ? sourceBefore("}") : null
         );
     }
 

@@ -268,6 +268,9 @@ public interface Javadoc extends Serializable, Tree {
         Javadoc searchTerm;
         List<Javadoc> description;
 
+        @Nullable
+        String beforeEndBrace;
+
         @Override
         public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
             return v.visitIndex(this, p);

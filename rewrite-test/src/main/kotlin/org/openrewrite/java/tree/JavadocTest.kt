@@ -19,12 +19,14 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit;
 
 interface JavadocTest : JavaTreeTest {
 
     @Test
     fun author(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             /**
              * @author name
              */
@@ -36,7 +38,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun deprecated(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             /**
              * @deprecated reason
              */
@@ -48,7 +51,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun docRoot(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             /**
              * @docRoot
              */
@@ -60,7 +64,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun exception(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             /**
              * @exception ex
              */
@@ -72,7 +77,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun hidden(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             /**
              * @hidden value
              */
@@ -82,9 +88,11 @@ interface JavadocTest : JavaTreeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/971")
     @Test
     fun index(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             /**
              * {@index}
              */
@@ -94,9 +102,34 @@ interface JavadocTest : JavaTreeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/971")
+    @Test
+    fun indexNoDescription(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /** {@index term} */
+            class Test {
+            }
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/971")
+    @Test
+    fun indexTermAndDescription(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /** {@index term description} */
+            class Test {
+            }
+        """.trimIndent()
+    )
+
     @Test
     fun inheritDoc(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             /**
              * {@inheritDoc}
              */
@@ -108,7 +141,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun literal(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             public class A {
                 /**
                  * @literal
@@ -120,7 +154,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun link(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             /**
              * {@link java.util.List}
              */
@@ -132,7 +167,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun param(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             public class A {
                 /**
                  * @param val
@@ -144,7 +180,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun provide(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             public class A {
                 /**
                  * @provides
@@ -156,7 +193,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun returnTag(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             public class A {
                 /**
                  * @return id
@@ -168,7 +206,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun see(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             /**
              * @see "Create link via quotes"
              * @see java.lang.Comparable#compareTo(Object) label
@@ -182,7 +221,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun serial(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             /**
              * @serial
              */
@@ -195,7 +235,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun serialData(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             /**
              * @serialData
              */
@@ -207,7 +248,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun since(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             /**
              * @since
              */
@@ -219,7 +261,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun summary(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             /**
              * {@summary}
              */
@@ -231,7 +274,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun value(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             /**
              * @value
              */
@@ -243,7 +287,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun version(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             /**
              * @version 1.0.0
              */
@@ -255,7 +300,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun descriptionOnNewLine(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             public class Test {
                  /**
                   * @param name
@@ -269,7 +315,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun multipleLinesBeforeTag(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
         /**
          * Note
          *
@@ -282,7 +329,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun multipleLineErroneous(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             /**
              * @see this
              * or that
@@ -294,7 +342,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun whitespaceBeforeNonLeadingText(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             interface Test {
                 /**
                  * @return <code>true</code>
@@ -307,7 +356,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun whitespaceOnBlankLineBetweenBodyAndTags(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             interface Test {
                 /**
                  * Returns something.
@@ -321,7 +371,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun methodReferenceNoParameters(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             interface Test {
                 /**
                  * {@linkplain Thread#interrupt}
@@ -334,7 +385,8 @@ interface JavadocTest : JavaTreeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/942")
     @Test
     fun nullLiteral(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             interface Test {
                 /**
                  * {@literal null}.
@@ -347,7 +399,8 @@ interface JavadocTest : JavaTreeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/941")
     @Test
     fun paramWithMultilineHtmlAttribute(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             interface Test {
                 /**
                  * @param contentType <a href=
@@ -361,7 +414,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun methodFound(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             interface Test {
                 /**
                  * @see java.io.ByteArrayOutputStream#toString(String)
@@ -374,7 +428,8 @@ interface JavadocTest : JavaTreeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/945")
     @Test
     fun methodNotFound(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             interface Test {
                 /**
                  * @see Math#cosine(double)
@@ -387,7 +442,8 @@ interface JavadocTest : JavaTreeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/944")
     @Test
     fun typeNotFound(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             interface Test {
                 /**
                  * {@link SymbolThatCannotBeFound}
@@ -400,7 +456,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun multipleReferenceParameters(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             class Test {
                 /**
                  * {@link ListenerUtils#getExceptionFromHeader(ConsumerRecord, String, LogAccessor)}
@@ -414,7 +471,8 @@ interface JavadocTest : JavaTreeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/941")
     @Test
     fun seeWithMultilineAttribute(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             interface Test {
                 /**
                  * @see <a href="https://www...">
@@ -427,7 +485,8 @@ interface JavadocTest : JavaTreeTest {
 
     @Test
     fun consecutiveLineBreaks(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             class Test {
                 /** 
                  * @param oboFile the file to be parsed
@@ -443,7 +502,8 @@ interface JavadocTest : JavaTreeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/957")
     @Test
     fun commentMissingMultipleAsterisks(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             class Test {
                 /** 
                  * JavaDoc
@@ -460,7 +520,8 @@ interface JavadocTest : JavaTreeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/963")
     @Test
     fun blankLink(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+        jp,
+        CompilationUnit, """
             /**
              * {@link}
              */
