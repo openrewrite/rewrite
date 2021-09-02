@@ -77,10 +77,7 @@ public class RemoveUnusedImports extends Recipe {
                     }
                 } else if (javaType instanceof JavaType.FullyQualified) {
                     JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) javaType;
-                    String packageName = fullyQualified.getClassName().contains(".") ?
-                            fullyQualified.getPackageName() + "." + fullyQualified.getClassName().substring(0, fullyQualified.getClassName().lastIndexOf('.')) :
-                            fullyQualified.getPackageName();
-                    typesByPackage.computeIfAbsent(packageName, f -> new HashSet<>())
+                    typesByPackage.computeIfAbsent(packageKey(fullyQualified.getPackageName(), fullyQualified.getClassName()), f -> new HashSet<>())
                             .add(fullyQualified);
                 }
             }
@@ -145,7 +142,7 @@ public class RemoveUnusedImports extends Recipe {
                         changed = true;
                     }
                 } else {
-                    Set<JavaType.FullyQualified> types = typesByPackage.get(elem.getPackageName());
+                    Set<JavaType.FullyQualified> types = typesByPackage.get(packageKey(elem.getPackageName(), elem.getClassName()));
                     if (types == null) {
                         anImport.used = false;
                         changed = true;
@@ -202,6 +199,12 @@ public class RemoveUnusedImports extends Recipe {
 
             return cu;
         }
+    }
+
+    private static String packageKey(String packageName, String className) {
+        return className.contains(".") ?
+                packageName + "." + className.substring(0, className.lastIndexOf('.')) :
+                packageName;
     }
 
     private static class ImportUsage {

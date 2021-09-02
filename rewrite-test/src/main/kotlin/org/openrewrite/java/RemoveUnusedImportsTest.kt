@@ -23,6 +23,18 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
     override val recipe: Recipe
         get() = RemoveUnusedImports()
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/969")
+    @Test
+    fun doNotRemoveInnerClassImport(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            import java.util.Map.Entry;
+
+            public abstract class MyMapEntry<K, V> implements Entry<K, V> {
+            }
+        """
+    )
+
     @Test
     fun usedInJavadoc(jp: JavaParser) = assertUnchanged(
         jp,
