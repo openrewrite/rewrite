@@ -385,21 +385,25 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
             if (i == description.size() - 1) {
                 if (desc instanceof Javadoc.Text) {
                     Javadoc.Text text = (Javadoc.Text) desc;
-                    return text.withText(text.getText() + sourceBefore("}"));
+                    return text.withText(text.getText());
                 } else {
                     return Arrays.asList(desc, new Javadoc.Text(randomId(),
-                            Markers.EMPTY, sourceBefore("}")));
+                            Markers.EMPTY, ""));
                 }
             }
             return desc;
         });
+
+        boolean isErroneous = !paddedDescription.isEmpty() && paddedDescription.stream().filter(l -> !(l instanceof Javadoc.LineBreak)).findAny()
+                .map(l -> l instanceof Javadoc.Erroneous).orElse(false);
 
         return new Javadoc.Index(
                 randomId(),
                 prefix,
                 Markers.EMPTY,
                 searchTerm,
-                paddedDescription
+                paddedDescription,
+                !isErroneous ? sourceBefore("}") + "}" : ""
         );
     }
 
@@ -429,7 +433,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
                 node.getKind() != DocTree.Kind.LINK,
                 ref,
                 label,
-                !isErroneous ?sourceBefore("}") + "}" :""
+                !isErroneous ? sourceBefore("}") + "}" : ""
         );
     }
 

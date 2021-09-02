@@ -267,6 +267,7 @@ public interface Javadoc extends Serializable, Tree {
         Markers markers;
         Javadoc searchTerm;
         List<Javadoc> description;
+        String beforeEndBrace;
 
         @Override
         public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {

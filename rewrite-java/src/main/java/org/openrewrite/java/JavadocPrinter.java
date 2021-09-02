@@ -161,11 +161,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
         acc.append(index.getPrefix()).append("{@index");
         visit(index.getSearchTerm(), p);
         visit(index.getDescription(), p);
-        // Index requires a description not to be malformed.
-        // If no description is provided the trailing "}" will be represented and printed as a Javadoc.Text
-        if(index.getDescription().size() > 0) {
-            acc.append('}');
-        }
+        acc.append(index.getBeforeEndBrace());
         return index;
     }
 

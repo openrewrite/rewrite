@@ -83,10 +83,11 @@ interface JavadocTest : JavaTreeTest {
     )
 
     @Test
-    fun index(jp: JavaParser) = assertParsePrintAndProcess(
+    fun indexOnly(jp: JavaParser) = assertParsePrintAndProcess(
         jp, JavaTreeTest.NestingLevel.CompilationUnit, """
             /**
              * {@index}
+             * {@index
              */
             public class A {
                 void method() {}
@@ -99,7 +100,10 @@ interface JavadocTest : JavaTreeTest {
     fun indexNoDescription(jp: JavaParser) = assertParsePrintAndProcess(
         jp, JavaTreeTest.NestingLevel.CompilationUnit,
         """
-            /** {@index term} */
+            /**
+             * {@index term}
+             * {@index term
+             */
             class Test {
             }
         """.trimIndent()
@@ -110,7 +114,10 @@ interface JavadocTest : JavaTreeTest {
     fun indexTermAndDescription(jp: JavaParser) = assertParsePrintAndProcess(
         jp, JavaTreeTest.NestingLevel.CompilationUnit,
         """
-            /** {@index term description} */
+            /**
+             * {@index term description}
+             * {@index term description
+             */
             class Test {
             }
         """.trimIndent()
