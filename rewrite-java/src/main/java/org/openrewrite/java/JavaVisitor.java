@@ -323,13 +323,13 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         J.Block b = block;
         b = b.withPrefix(visitSpace(b.getPrefix(), Space.Location.BLOCK_PREFIX, p));
         b = b.withMarkers(visitMarkers(b.getMarkers(), p));
-        b = b.getPadding().withStatic(visitRightPadded(b.getPadding().getStatic(), JRightPadded.Location.STATIC_INIT, p));
         Statement temp = (Statement) visitStatement(b, p);
         if (!(temp instanceof J.Block)) {
             return temp;
         } else {
             b = (J.Block) temp;
         }
+        b = b.getPadding().withStatic(visitRightPadded(b.getPadding().getStatic(), JRightPadded.Location.STATIC_INIT, p));
         b = b.getPadding().withStatements(ListUtils.map(b.getPadding().getStatements(), t ->
                 visitRightPadded(t, JRightPadded.Location.BLOCK_STATEMENT, p)));
         b = b.withEnd(visitSpace(b.getEnd(), Space.Location.BLOCK_END, p));

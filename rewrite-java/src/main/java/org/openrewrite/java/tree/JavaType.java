@@ -59,6 +59,7 @@ public interface JavaType extends Serializable {
     }
 
     @Data
+    @With
     class MultiCatch implements JavaType {
         private final List<JavaType> throwableTypes;
 
@@ -219,7 +220,6 @@ public interface JavaType extends Serializable {
         private final int flagsBitMap;
         private final Kind kind;
         private final List<FullyQualified> annotations;
-
         private final List<Variable> members;
         private final List<FullyQualified> interfaces;
         private final List<Method> methods;
@@ -253,6 +253,48 @@ public interface JavaType extends Serializable {
         @Override
         public JavaType.Class withFullyQualifiedName(String fullyQualifiedName) {
             if (this.fullyQualifiedName.equals(fullyQualifiedName)) {
+                return this;
+            }
+            return JavaType.Class.build(flagsBitMap, fullyQualifiedName, kind, members, interfaces, methods, supertype, owningClass, annotations);
+        }
+
+        public JavaType.Class withAnnotations(List<FullyQualified> annotations) {
+            if(this.annotations == annotations) {
+                return this;
+            }
+            return JavaType.Class.build(flagsBitMap, fullyQualifiedName, kind, members, interfaces, methods, supertype, owningClass, annotations);
+        }
+
+        public JavaType.Class withInterfaces(List<FullyQualified> interfaces) {
+            if(this.interfaces == interfaces) {
+                return this;
+            }
+            return JavaType.Class.build(flagsBitMap, fullyQualifiedName, kind, members, interfaces, methods, supertype, owningClass, annotations);
+        }
+
+        public JavaType.Class withMembers(List<Variable> members) {
+            if(this.members == members) {
+                return this;
+            }
+            return JavaType.Class.build(flagsBitMap, fullyQualifiedName, kind, members, interfaces, methods, supertype, owningClass, annotations);
+        }
+
+        public JavaType.Class withMethods(List<Method> methods) {
+            if(this.methods == methods) {
+                return this;
+            }
+            return JavaType.Class.build(flagsBitMap, fullyQualifiedName, kind, members, interfaces, methods, supertype, owningClass, annotations);
+        }
+
+        public JavaType.Class withSupertype(@Nullable FullyQualified supertype) {
+            if(this.supertype == supertype) {
+                return this;
+            }
+            return JavaType.Class.build(flagsBitMap, fullyQualifiedName, kind, members, interfaces, methods, supertype, owningClass, annotations);
+        }
+
+        public JavaType.Class withOwningClass(@Nullable FullyQualified owningClass) {
+            if(this.owningClass == owningClass) {
                 return this;
             }
             return JavaType.Class.build(flagsBitMap, fullyQualifiedName, kind, members, interfaces, methods, supertype, owningClass, annotations);
@@ -555,6 +597,20 @@ public interface JavaType extends Serializable {
             return build(type.withFullyQualifiedName(fullyQualifiedName), typeParameters);
         }
 
+        public JavaType.Parameterized withType(FullyQualified type) {
+            if(this.type == type) {
+                return this;
+            }
+            return JavaType.Parameterized.build(type, typeParameters);
+        }
+
+        public JavaType.Parameterized withTypeParameters(List<JavaType> typeParameters) {
+            if(this.typeParameters == typeParameters) {
+                return this;
+            }
+            return JavaType.Parameterized.build(type, typeParameters);
+        }
+
         @Override
         public List<FullyQualified> getAnnotations() {
             return type.getAnnotations();
@@ -741,6 +797,27 @@ public interface JavaType extends Serializable {
             return Flag.bitMapToFlags(flagsBitMap);
         }
 
+        public JavaType.Variable withOwner(FullyQualified owner) {
+            if(this.owner == owner) {
+                return this;
+            }
+            return JavaType.Variable.build(name, owner, type, annotations, flagsBitMap);
+        }
+
+        public JavaType.Variable withType(@Nullable JavaType type) {
+            if(this.type == type) {
+                return this;
+            }
+            return JavaType.Variable.build(name, owner, type, annotations, flagsBitMap);
+        }
+
+        public JavaType.Variable withAnnotations(List<FullyQualified> annotations) {
+            if(this.annotations == annotations) {
+                return this;
+            }
+            return JavaType.Variable.build(name, owner, type, annotations, flagsBitMap);
+        }
+
         @Override
         public boolean deepEquals(@Nullable JavaType type) {
             if (!(type instanceof Variable)) {
@@ -775,7 +852,6 @@ public interface JavaType extends Serializable {
 
         private final List<String> paramNames;
         private final List<FullyQualified> thrownExceptions;
-
         private final List<FullyQualified> annotations;
 
         private Method(int flagsBitMap, FullyQualified declaringType, String name,
@@ -859,6 +935,13 @@ public interface JavaType extends Serializable {
             return Method.build(flagsBitMap, declaringType, name, genericSignature, resolvedSignature, paramNames, thrownExceptions, annotations);
         }
 
+        public Method withAnnotations(List<FullyQualified> annotations) {
+            if(this.annotations == annotations) {
+                return this;
+            }
+            return Method.build(flagsBitMap, declaringType, name, genericSignature, resolvedSignature, paramNames, thrownExceptions, annotations);
+        }
+
         public Method withDeclaringType(FullyQualified declaringType) {
             if (this.declaringType.equals(declaringType)) {
                 return this;
@@ -877,6 +960,13 @@ public interface JavaType extends Serializable {
         public Method withResolvedSignature(@Nullable Signature resolvedSignature) {
             if ((resolvedSignature == null && this.resolvedSignature == null) ||
                     (resolvedSignature != null && resolvedSignature.equals(this.resolvedSignature))) {
+                return this;
+            }
+            return Method.build(flagsBitMap, declaringType, name, genericSignature, resolvedSignature, paramNames, thrownExceptions, annotations);
+        }
+
+        public Method withThrownExceptions(List<FullyQualified> thrownExceptions) {
+            if(this.thrownExceptions == thrownExceptions) {
                 return this;
             }
             return Method.build(flagsBitMap, declaringType, name, genericSignature, resolvedSignature, paramNames, thrownExceptions, annotations);

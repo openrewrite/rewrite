@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.tree;
 
-import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 
 /**
