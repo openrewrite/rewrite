@@ -116,10 +116,10 @@ public class ChangeType extends Recipe {
             }
             JavaType.FullyQualified fullyQualifiedTarget = TypeUtils.asFullyQualified(targetType);
             if (fullyQualifiedTarget != null) {
-                if (fullyQualifiedTarget.getOwningClass() != null && !fullyQualifiedTarget.getPackageName().startsWith("java.lang")) {
+                if (fullyQualifiedTarget.getOwningClass() != null && !fullyQualifiedTarget.getPackageName().equals("java.lang")) {
                     c = (J.CompilationUnit)  new AddImport(fullyQualifiedTarget.getOwningClass().getFullyQualifiedName(), null, true).visit(c, ctx);
                 }
-                if (!fullyQualifiedTarget.getFullyQualifiedName().startsWith("java.lang")) {
+                if (!fullyQualifiedTarget.getPackageName().equals("java.lang")) {
                     c = (J.CompilationUnit) new AddImport(fullyQualifiedTarget.getFullyQualifiedName(), null, true).visit(c, ctx);
                 }
             }
