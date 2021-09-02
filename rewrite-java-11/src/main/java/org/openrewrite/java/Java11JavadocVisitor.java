@@ -485,8 +485,12 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
     }
 
     @Override
-    public J visitReference(ReferenceTree node, String fmt) {
+    public J visitReference(@Nullable ReferenceTree node, String fmt) {
         DCTree.DCReference ref = (DCTree.DCReference) node;
+        if (node == null) {
+            //noinspection ConstantConditions
+            return null;
+        }
 
         TypedTree tree;
         if (ref.qualifierExpression != null) {

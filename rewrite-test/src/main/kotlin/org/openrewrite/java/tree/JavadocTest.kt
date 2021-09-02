@@ -456,4 +456,16 @@ interface JavadocTest : JavaTreeTest {
             }
         """.trimIndent()
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/963")
+    @Test
+    fun blankLink(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+            /**
+             * {@link}
+             */
+            class Test {
+            }
+        """.trimIndent()
+    )
 }

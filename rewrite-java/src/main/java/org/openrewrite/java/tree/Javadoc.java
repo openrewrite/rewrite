@@ -325,7 +325,10 @@ public interface Javadoc extends Serializable, Tree {
         String prefix;
         Markers markers;
         boolean plain;
+
+        @Nullable
         J tree;
+
         String beforeEndBrace;
 
         @Override
