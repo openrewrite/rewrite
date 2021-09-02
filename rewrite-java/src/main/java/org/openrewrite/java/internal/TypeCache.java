@@ -68,7 +68,6 @@ public class TypeCache {
 
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration c, Integer p) {
-                visitSpace(c.getPrefix(), Space.Location.ANY, p);
                 for (J.Annotation annotation : c.getAllAnnotations()) {
                     visit(annotation, p);
                 }
