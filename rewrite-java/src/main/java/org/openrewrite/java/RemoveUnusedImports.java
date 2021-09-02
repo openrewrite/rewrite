@@ -42,6 +42,11 @@ public class RemoveUnusedImports extends Recipe {
     }
 
     @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-1128");
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new RemoveUnusedImportsVisitor();
     }

@@ -22,6 +22,9 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.J;
 
+import java.util.Collections;
+import java.util.Set;
+
 public class FallThrough extends Recipe {
     @Override
     public String getDisplayName() {
@@ -31,6 +34,11 @@ public class FallThrough extends Recipe {
     @Override
     public String getDescription() {
         return "Checks for fall-through in switch statements, adding `break` statements in locations where a case contains Java code but does not have a `break`, `return`, `throw`, or `continue` statement.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-128");
     }
 
     @Override

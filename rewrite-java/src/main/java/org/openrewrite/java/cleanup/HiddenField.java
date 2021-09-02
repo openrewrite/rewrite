@@ -23,6 +23,9 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.J;
 
+import java.util.Collections;
+import java.util.Set;
+
 @Incubating(since = "7.6.0")
 public class HiddenField extends Recipe {
     @Override
@@ -33,6 +36,11 @@ public class HiddenField extends Recipe {
     @Override
     public String getDescription() {
         return "Refactor local variables or parameters which shadow a field defined in the same class.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-1117");
     }
 
     @Override

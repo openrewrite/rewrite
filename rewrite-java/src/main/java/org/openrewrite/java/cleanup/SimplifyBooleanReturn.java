@@ -20,6 +20,9 @@ import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 
+import java.util.Collections;
+import java.util.Set;
+
 @Incubating(since = "7.0.0")
 public class SimplifyBooleanReturn extends Recipe {
 
@@ -31,6 +34,11 @@ public class SimplifyBooleanReturn extends Recipe {
     @Override
     public String getDescription() {
         return "Simplifies Boolean expressions by removing redundancies, e.g.: `a && true` simplifies to `a`.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-1126");
     }
 
     @Override

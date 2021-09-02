@@ -20,6 +20,9 @@ import org.openrewrite.Recipe;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 
+import java.util.Collections;
+import java.util.Set;
+
 public class WriteOctalValuesAsDecimal extends Recipe {
     @Override
     public String getDisplayName() {
@@ -29,6 +32,11 @@ public class WriteOctalValuesAsDecimal extends Recipe {
     @Override
     public String getDescription() {
         return "Developers may not recognize octal values as such, mistaking them instead for decimal values.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-1314");
     }
 
     @Override

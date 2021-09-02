@@ -22,6 +22,9 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.J;
 
+import java.util.Collections;
+import java.util.Set;
+
 public class UnnecessaryParentheses extends Recipe {
 
     @Override
@@ -32,6 +35,11 @@ public class UnnecessaryParentheses extends Recipe {
     @Override
     public String getDescription() {
         return "Removes unnecessary parentheses from code where extra parentheses pairs are redundant.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-1110");
     }
 
     @Override
