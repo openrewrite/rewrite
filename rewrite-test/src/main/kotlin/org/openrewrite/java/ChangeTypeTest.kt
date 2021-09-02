@@ -43,11 +43,36 @@ interface ChangeTypeTest : JavaRecipeTest {
     }
 
     @Test
-    fun doNotAddJavaLangImports(jp: JavaParser) = assertChanged(
+    fun doNotAddJavaLangWrapperImports(jp: JavaParser) = assertChanged(
         jp,
         recipe = ChangeType("java.lang.Integer","java.lang.Long"),
         before = "public class ThinkPositive { private Integer fred = 1;}",
         after = "public class ThinkPositive { private Long fred = 1;}"
+    )
+
+    @Test
+    @Suppress("deprecation")
+    fun allowJavaLangSubpackages(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = ChangeType("java.util.logging.LoggingMXBean","java.lang.management.PlatformLoggingMXBean"),
+        before = """
+            import java.util.logging.LoggingMXBean;
+
+            class Test {
+                static void method() {
+                    LoggingMXBean loggingBean = null;
+                }
+            }
+        """,
+        after = """
+            import java.lang.management.PlatformLoggingMXBean;
+
+            class Test {
+                static void method() {
+                    PlatformLoggingMXBean loggingBean = null;
+                }
+            }
+        """
     )
 
     @Suppress("InstantiationOfUtilityClass")
