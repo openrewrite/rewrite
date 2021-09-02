@@ -745,6 +745,10 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
     }
 
     private String whitespaceBefore() {
+        if (cursor >= source.length()) {
+            return "";
+        }
+
         int i = cursor;
         for (; i < source.length(); i++) {
             if (!Character.isWhitespace(source.charAt(i))) {
