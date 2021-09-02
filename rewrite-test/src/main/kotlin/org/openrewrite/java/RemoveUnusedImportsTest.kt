@@ -40,8 +40,13 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
         jp,
         before = """
             import java.util.List;
+            import java.util.Collection;
+            
             /** {@link List} */
-            class A {}
+            class A {
+                /** {@link Collection} */
+                void foo() {}
+            }
         """
     )
 
