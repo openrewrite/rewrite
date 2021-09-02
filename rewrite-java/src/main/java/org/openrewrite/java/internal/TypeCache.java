@@ -57,7 +57,11 @@ public class TypeCache {
             @Override
             public J preVisit(J tree, Integer integer) {
                 if (tree instanceof TypedTree) {
-                    types.add(((TypedTree) tree).getType());
+                    if (!(tree instanceof J.ClassDeclaration) &&
+                            !(tree instanceof J.MethodDeclaration) &&
+                            !(tree instanceof J.VariableDeclarations)) {
+                        types.add(((TypedTree) tree).getType());
+                    }
                 }
                 return tree;
             }
