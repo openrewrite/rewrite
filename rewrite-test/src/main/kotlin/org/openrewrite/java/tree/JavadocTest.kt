@@ -94,6 +94,28 @@ interface JavadocTest : JavaTreeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/971")
+    @Test
+    fun indexNoDescription(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.CompilationUnit,
+        """
+            /** {@index term} */
+            class Test {
+            }
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/971")
+    @Test
+    fun indexTermAndDescription(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.CompilationUnit,
+        """
+            /** {@index term description} */
+            class Test {
+            }
+        """.trimIndent()
+    )
+
     @Test
     fun inheritDoc(jp: JavaParser) = assertParsePrintAndProcess(
         jp, JavaTreeTest.NestingLevel.CompilationUnit, """
