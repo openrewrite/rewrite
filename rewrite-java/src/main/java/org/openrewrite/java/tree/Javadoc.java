@@ -329,6 +329,8 @@ public interface Javadoc extends Serializable, Tree {
         @Nullable
         J tree;
 
+        List<Javadoc> label;
+
         String beforeEndBrace;
 
         @Override

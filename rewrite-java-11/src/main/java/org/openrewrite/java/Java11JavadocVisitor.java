@@ -418,13 +418,18 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
     public Tree visitLink(LinkTree node, String fmt) {
         String prefix = fmt + sourceBefore(node.getKind() == DocTree.Kind.LINK ? "{@link" : "{@linkplain");
         J ref = visitReference(node.getReference(), "");
+        List<Javadoc> label = convertMultiline(node.getLabel());
+        boolean isErroneous = !label.isEmpty() && label.stream().filter(l -> !(l instanceof Javadoc.LineBreak)).findAny()
+                .map(l -> l instanceof Javadoc.Erroneous).orElse(false);
+
         return new Javadoc.Link(
                 randomId(),
                 prefix,
                 Markers.EMPTY,
                 node.getKind() != DocTree.Kind.LINK,
                 ref,
-                sourceBefore("}")
+                label,
+                !isErroneous ?sourceBefore("}") + "}" :""
         );
     }
 
@@ -811,6 +816,10 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
     }
 
     private String whitespaceBefore() {
+        if (cursor >= source.length()) {
+            return "";
+        }
+
         int i = cursor;
         for (; i < source.length(); i++) {
             if (!Character.isWhitespace(source.charAt(i))) {

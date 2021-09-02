@@ -199,7 +199,8 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
         acc.append(link.getPrefix());
         acc.append(link.isPlain() ? "{@linkplain" : "{@link");
         javaVisitor.visit(link.getTree(), p);
-        acc.append(link.getBeforeEndBrace()).append('}');
+        visit(link.getLabel(), p);
+        acc.append(link.getBeforeEndBrace());
         return link;
     }
 

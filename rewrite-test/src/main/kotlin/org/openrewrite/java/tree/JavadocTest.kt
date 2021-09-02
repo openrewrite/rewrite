@@ -468,4 +468,16 @@ interface JavadocTest : JavaTreeTest {
             }
         """.trimIndent()
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/968")
+    @Test
+    fun missingBracket(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+            /**
+             * {@link missing.bracket
+             */
+            class Test {
+            }
+        """.trimIndent()
+    )
 }

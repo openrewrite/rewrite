@@ -112,6 +112,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
         Javadoc.Link l = link;
         l = l.withMarkers(visitMarkers(l.getMarkers(), p));
         l = l.withTree(javaVisitor.visit(l.getTree(), p));
+        l = l.withLabel(ListUtils.map(l.getLabel(), la -> visit(la, p)));
         return l;
     }
 

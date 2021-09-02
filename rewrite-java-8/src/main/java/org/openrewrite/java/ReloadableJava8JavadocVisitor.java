@@ -392,13 +392,18 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, String> 
     public Tree visitLink(LinkTree node, String fmt) {
         String prefix = fmt + sourceBefore(node.getKind() == DocTree.Kind.LINK ? "{@link" : "{@linkplain");
         J ref = visitReference(node.getReference(), "");
+        List<Javadoc> label = convertMultiline(node.getLabel());
+        boolean isErroneous = !label.isEmpty() && label.stream().filter(l -> !(l instanceof Javadoc.LineBreak)).findAny()
+                .map(l -> l instanceof Javadoc.Erroneous).orElse(false);
+
         return new Javadoc.Link(
                 randomId(),
                 prefix,
                 Markers.EMPTY,
                 node.getKind() != DocTree.Kind.LINK,
                 ref,
-                sourceBefore("}")
+                label,
+                !isErroneous ?sourceBefore("}") + "}" :""
         );
     }
 
