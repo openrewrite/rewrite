@@ -32,7 +32,7 @@ public class NormalizeLineBreaksVisitor<P> extends JavaIsoVisitor<P> {
     private final JavadocVisitor<Integer> lineBreakJavadocVisitor = new JavadocVisitor<Integer>() {
         @Override
         public Javadoc visitLineBreak(Javadoc.LineBreak lineBreak, Integer integer) {
-            return lineBreak.withMargin(normalizeNewLines(lineBreak.getMargin(), style.getUseCRLFNewLines()));
+            return lineBreak.withMargin(normalizeNewLines(lineBreak.getMargin(), style.isUseCRLFNewLines()));
         }
     };
 
@@ -47,49 +47,47 @@ public class NormalizeLineBreaksVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public Space visitSpace(Space space, Space.Location loc, P p) {
-        Space s = space.withWhitespace(normalizeNewLines(space.getWhitespace(), style.getUseCRLFNewLines()));
+        Space s = space.withWhitespace(normalizeNewLines(space.getWhitespace(), style.isUseCRLFNewLines()));
 
         return s.withComments(ListUtils.map(s.getComments(), comment -> {
             Comment c = comment;
             if (c.isMultiline()) {
                 if (c instanceof Javadoc) {
-                    c = c.withSuffix(normalizeNewLines(c.getSuffix(), style.getUseCRLFNewLines()));
+                    c = c.withSuffix(normalizeNewLines(c.getSuffix(), style.isUseCRLFNewLines()));
                     return (Comment) lineBreakJavadocVisitor.visitNonNull((Javadoc) c, 0);
                 } else {
                     TextComment textComment = (TextComment) c;
-                    c = textComment.withText(normalizeNewLines(textComment.getText(), style.getUseCRLFNewLines()));
+                    c = textComment.withText(normalizeNewLines(textComment.getText(), style.isUseCRLFNewLines()));
                 }
             }
 
-            return c.withSuffix(normalizeNewLines(c.getSuffix(), style.getUseCRLFNewLines()));
+            return c.withSuffix(normalizeNewLines(c.getSuffix(), style.isUseCRLFNewLines()));
         }));
     }
 
-    private static String normalizeNewLines(String text, boolean useClrf){
+    private static String normalizeNewLines(String text, boolean useCrlf) {
         if (!text.contains("\n")) {
             return text;
         }
-        StringBuilder stringBuilder = new StringBuilder();
+        StringBuilder normalized = new StringBuilder();
         char[] charArray = text.toCharArray();
         for (int i = 0; i < charArray.length; i++) {
             char c = charArray[i];
-            if (useClrf && c == '\n' && (i == 0 || text.charAt(i-1) != '\r')) {
-                stringBuilder.append('\r');
-            } else if (!useClrf && c == '\r') {
-                continue;
+            if (useCrlf && c == '\n' && (i == 0 || text.charAt(i - 1) != '\r')) {
+                normalized.append('\r').append('\n');
+            } else if (useCrlf || c != '\r') {
+                normalized.append(c);
             }
-            stringBuilder.append(c);
         }
-        return text.equals(stringBuilder.toString()) ? text : stringBuilder.toString();
+        return normalized.toString();
     }
 
-    @Nullable
     @Override
     public J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "stop", true);
         }
-        return super.postVisit(tree, p);
+        return tree;
     }
 
     @Nullable

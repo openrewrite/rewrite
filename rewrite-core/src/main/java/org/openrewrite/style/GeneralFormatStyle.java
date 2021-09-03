@@ -23,6 +23,5 @@ public class GeneralFormatStyle implements Style{
             System.lineSeparator().equals("\r\n")
     );
 
-    Boolean useCRLFNewLines;
-
+    boolean useCRLFNewLines;
 }

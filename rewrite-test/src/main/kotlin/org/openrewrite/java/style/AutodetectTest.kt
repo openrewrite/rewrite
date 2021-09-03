@@ -276,7 +276,7 @@ interface AutodetectTest {
         val styles = Autodetect.detect(cus)
         val lineFormatStyle = NamedStyles.merge(GeneralFormatStyle::class.java, listOf(styles))
 
-        assertThat(lineFormatStyle!!.useCRLFNewLines).isTrue
+        assertThat(lineFormatStyle!!.isUseCRLFNewLines).isTrue
     }
 
     @Test
@@ -293,6 +293,6 @@ interface AutodetectTest {
         val styles = Autodetect.detect(cus)
         val lineFormatStyle = NamedStyles.merge(GeneralFormatStyle::class.java, listOf(styles))
 
-        assertThat(lineFormatStyle!!.useCRLFNewLines).isFalse
+        assertThat(lineFormatStyle!!.isUseCRLFNewLines).isFalse
     }
 }

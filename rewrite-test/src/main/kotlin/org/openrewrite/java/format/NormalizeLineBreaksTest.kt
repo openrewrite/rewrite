@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java.format
 
-import org.assertj.core.api.Assertions
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
@@ -42,7 +42,7 @@ interface NormalizeLineBreaksTest {
                     "    }\n" +
                     "}\n"
         val after = NormalizeLineBreaksVisitor<ExecutionContext>(style).visit(jp.parse(before)[0], InMemoryExecutionContext())!!.print()
-        Assertions.assertThat(after.toCharArray()).isEqualTo(expected.toCharArray())
+        assertThat(after).isEqualTo(expected)
     }
 
     @Test
@@ -64,6 +64,6 @@ interface NormalizeLineBreaksTest {
                     "}\r\n"
 
         val after = NormalizeLineBreaksVisitor<ExecutionContext>(style).visit(jp.parse(before)[0], InMemoryExecutionContext())!!.print()
-        Assertions.assertThat(after.toCharArray()).isEqualTo(expected.toCharArray())
+        assertThat(after).isEqualTo(expected)
     }
 }
