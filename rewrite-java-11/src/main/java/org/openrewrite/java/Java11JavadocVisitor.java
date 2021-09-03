@@ -34,13 +34,16 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
-public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
+public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     private final Attr attr;
 
     @Nullable
@@ -160,7 +163,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
     }
 
     @Override
-    public Tree visitAttribute(AttributeTree node, String fmt) {
+    public Tree visitAttribute(AttributeTree node, List<Javadoc> body) {
         String name = node.getName().toString();
         cursor += name.length();
         List<Javadoc> beforeEqual;
@@ -189,22 +192,25 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
                     value.addAll(convertMultiline(node.getValue()));
                     break;
                 case SINGLE:
-                    value.add(new Javadoc.Text(randomId(), Markers.EMPTY, sourceBefore("'") + "'"));
+                    value.addAll(sourceBefore("'"));
+                    value.add(new Javadoc.Text(randomId(), Markers.EMPTY, "'"));
                     value.addAll(convertMultiline(node.getValue()));
-                    value.add(new Javadoc.Text(randomId(), Markers.EMPTY, sourceBefore("'") + "'"));
+                    value.addAll(sourceBefore("'"));
+                    value.add(new Javadoc.Text(randomId(), Markers.EMPTY, "'"));
                     break;
                 case DOUBLE:
                 default:
-                    value.add(new Javadoc.Text(randomId(), Markers.EMPTY, sourceBefore("\"") + "\""));
+                    value.addAll(sourceBefore("\""));
+                    value.add(new Javadoc.Text(randomId(), Markers.EMPTY, "\""));
                     value.addAll(convertMultiline(node.getValue()));
-                    value.add(new Javadoc.Text(randomId(), Markers.EMPTY, sourceBefore("\"") + "\""));
+                    value.addAll(sourceBefore("\""));
+                    value.add(new Javadoc.Text(randomId(), Markers.EMPTY, "\""));
                     break;
             }
         }
 
         return new Javadoc.Attribute(
                 randomId(),
-                fmt,
                 Markers.EMPTY,
                 name,
                 beforeEqual,
@@ -213,28 +219,26 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
     }
 
     @Override
-    public Tree visitAuthor(AuthorTree node, String fmt) {
-        String prefix = fmt + sourceBefore("@author");
-        return new Javadoc.Author(randomId(), prefix, Markers.EMPTY, convertMultiline(node.getName()));
+    public Tree visitAuthor(AuthorTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("@author"));
+        return new Javadoc.Author(randomId(), Markers.EMPTY, convertMultiline(node.getName()));
     }
 
     @Override
-    public Tree visitComment(CommentTree node, String fmt) {
-        String text = fmt + node.getBody();
+    public Tree visitComment(CommentTree node, List<Javadoc> body) {
         cursor += node.getBody().length();
-        return new Javadoc.Text(randomId(), Markers.EMPTY, text);
+        return new Javadoc.Text(randomId(), Markers.EMPTY, node.getBody());
     }
 
     @Override
-    public Tree visitDeprecated(DeprecatedTree node, String fmt) {
-        String prefix = fmt + sourceBefore("@deprecated");
-        return new Javadoc.Deprecated(randomId(), prefix, Markers.EMPTY, convertMultiline(node.getBody()));
+    public Tree visitDeprecated(DeprecatedTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("@deprecated"));
+        return new Javadoc.Deprecated(randomId(), Markers.EMPTY, convertMultiline(node.getBody()));
     }
 
     @Override
-    public Tree visitDocComment(DocCommentTree node, String fmt) {
+    public Tree visitDocComment(DocCommentTree node, List<Javadoc> body) {
         init();
-        List<Javadoc> body = new ArrayList<>();
 
         Javadoc.LineBreak leadingLineBreak = lineBreaks.remove(0);
         if (leadingLineBreak != null) {
@@ -245,16 +249,21 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
             body.add(leadingLineBreak);
         }
 
+        if (!firstPrefix.isEmpty()) {
+            body.add(new Javadoc.Text(randomId(), Markers.EMPTY, firstPrefix));
+        }
+
         List<? extends DocTree> fullBody = node.getFullBody();
         for (int i = 0; i < fullBody.size(); i++) {
             DocTree docTree = fullBody.get(i);
-            String prefix = docTree instanceof DCTree.DCText && i > 0 ? "" : whitespaceBefore();
-            if (docTree instanceof DCTree.DCText) {
-                body.addAll(visitText(((DCTree.DCText) docTree).getBody(), firstPrefix + prefix));
-            } else {
-                body.add((Javadoc) scan(docTree, firstPrefix + prefix));
+            if (!(docTree instanceof DCTree.DCText && i > 0)) {
+                body.addAll(whitespaceBefore());
             }
-            firstPrefix = "";
+            if (docTree instanceof DCTree.DCText) {
+                body.addAll(visitText(((DCTree.DCText) docTree).getBody()));
+            } else {
+                body.add((Javadoc) scan(docTree, body));
+            }
         }
 
         Javadoc.LineBreak lineBreak;
@@ -292,9 +301,8 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
                 }
             }
 
-            String prefix = whitespaceBefore();
-            body.add((Javadoc) scan(blockTag, firstPrefix + prefix));
-            firstPrefix = "";
+            body.addAll(whitespaceBefore());
+            body.add((Javadoc) scan(blockTag, body));
         }
 
         if (lineBreaks.isEmpty()) {
@@ -312,31 +320,33 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
     }
 
     @Override
-    public Tree visitDocRoot(DocRootTree node, String fmt) {
-        String prefix = fmt + sourceBefore("{@docRoot");
+    public Tree visitDocRoot(DocRootTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("{@docRoot"));
         return new Javadoc.DocRoot(
                 randomId(),
-                prefix,
                 Markers.EMPTY,
                 sourceBefore("}")
         );
     }
 
     @Override
-    public Tree visitDocType(DocTypeTree node, String fmt) {
-        String prefix = fmt + sourceBefore("<!doctype");
-        return new Javadoc.DocType(randomId(), prefix, Markers.EMPTY,
-                sourceBefore(node.getText()) + node.getText() + sourceBefore(">"));
+    public Tree visitDocType(DocTypeTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("<!doctype"));
+        return new Javadoc.DocType(randomId(), Markers.EMPTY,
+                ListUtils.concatAll(
+                        ListUtils.concat(sourceBefore(node.getText()), new Javadoc.Text(randomId(), Markers.EMPTY, node.getText())),
+                        sourceBefore(">")
+                )
+        );
     }
 
     @Override
-    public Tree visitEndElement(EndElementTree node, String fmt) {
-        String prefix = fmt + sourceBefore("</");
+    public Tree visitEndElement(EndElementTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("</"));
         String name = node.getName().toString();
         cursor += name.length();
         return new Javadoc.EndElement(
                 randomId(),
-                prefix,
                 Markers.EMPTY,
                 name,
                 sourceBefore(">")
@@ -344,30 +354,30 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
     }
 
     @Override
-    public Tree visitEntity(EntityTree node, String fmt) {
-        String text = fmt + sourceBefore("&") + "&" + node.getName().toString() + ";";
+    public Tree visitEntity(EntityTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("&"));
         cursor += node.getName().length() + 1;
-        return new Javadoc.Text(randomId(), Markers.EMPTY, text);
+        return new Javadoc.Text(randomId(), Markers.EMPTY, "&" + node.getName().toString() + ";");
     }
 
     @Override
-    public Tree visitErroneous(ErroneousTree node, String fmt) {
-        return new Javadoc.Erroneous(randomId(), fmt, Markers.EMPTY, visitText(node.getBody(), ""));
+    public Tree visitErroneous(ErroneousTree node, List<Javadoc> body) {
+        return new Javadoc.Erroneous(randomId(), Markers.EMPTY, visitText(node.getBody()));
     }
 
     @Override
-    public Tree visitHidden(HiddenTree node, String fmt) {
-        String prefix = fmt + sourceBefore("@hidden");
-        return new Javadoc.Hidden(randomId(), prefix, Markers.EMPTY, convertMultiline(node.getBody()));
+    public Tree visitHidden(HiddenTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("@hidden"));
+        return new Javadoc.Hidden(randomId(), Markers.EMPTY, convertMultiline(node.getBody()));
     }
 
     @Override
-    public J.Identifier visitIdentifier(com.sun.source.doctree.IdentifierTree node, String fmt) {
+    public J.Identifier visitIdentifier(com.sun.source.doctree.IdentifierTree node, List<Javadoc> body) {
         String name = node.getName().toString();
         sourceBefore(name);
         return J.Identifier.build(
                 randomId(),
-                Space.build(fmt, emptyList()),
+                Space.EMPTY,
                 Markers.EMPTY,
                 name,
                 null
@@ -375,20 +385,17 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
     }
 
     @Override
-    public Tree visitIndex(IndexTree node, String fmt) {
-        String prefix = fmt + sourceBefore("{@index");
-        Javadoc searchTerm = convertMultiline(singletonList(node.getSearchTerm())).get(0);
-
+    public Tree visitIndex(IndexTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("{@index"));
+        List<Javadoc> searchTerm = ListUtils.concat(whitespaceBefore(), (Javadoc) scan(node.getSearchTerm(), emptyList()));
         List<Javadoc> description = convertMultiline(node.getDescription());
-
         List<Javadoc> paddedDescription = ListUtils.flatMap(description, (i, desc) -> {
             if (i == description.size() - 1) {
                 if (desc instanceof Javadoc.Text) {
                     Javadoc.Text text = (Javadoc.Text) desc;
                     return text.withText(text.getText());
                 } else {
-                    return Arrays.asList(desc, new Javadoc.Text(randomId(),
-                            Markers.EMPTY, ""));
+                    return ListUtils.concat(desc, sourceBefore("}"));
                 }
             }
             return desc;
@@ -399,7 +406,6 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
 
         return new Javadoc.Index(
                 randomId(),
-                prefix,
                 Markers.EMPTY,
                 searchTerm,
                 paddedDescription,
@@ -408,48 +414,47 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
     }
 
     @Override
-    public Tree visitInheritDoc(InheritDocTree node, String fmt) {
-        String prefix = fmt + sourceBefore("{@inheritDoc");
+    public Tree visitInheritDoc(InheritDocTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("{@inheritDoc"));
         return new Javadoc.InheritDoc(
                 randomId(),
-                prefix,
                 Markers.EMPTY,
                 sourceBefore("}")
         );
     }
 
     @Override
-    public Tree visitLink(LinkTree node, String fmt) {
-        String prefix = fmt + sourceBefore(node.getKind() == DocTree.Kind.LINK ? "{@link" : "{@linkplain");
-        J ref = visitReference(node.getReference(), "");
+    public Tree visitLink(LinkTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore(node.getKind() == DocTree.Kind.LINK ? "{@link" : "{@linkplain"));
+
+        List<Javadoc> spaceBeforeRef = whitespaceBefore();
+        J ref = visitReference(node.getReference(), body);
         List<Javadoc> label = convertMultiline(node.getLabel());
         boolean isErroneous = !label.isEmpty() && label.stream().filter(l -> !(l instanceof Javadoc.LineBreak)).findAny()
                 .map(l -> l instanceof Javadoc.Erroneous).orElse(false);
 
         return new Javadoc.Link(
                 randomId(),
-                prefix,
                 Markers.EMPTY,
                 node.getKind() != DocTree.Kind.LINK,
+                spaceBeforeRef,
                 ref,
                 label,
-                !isErroneous ? sourceBefore("}") + "}" : ""
+                !isErroneous ? ListUtils.concat(sourceBefore("}"),
+                        new Javadoc.Text(randomId(), Markers.EMPTY, "}")) : emptyList()
         );
     }
 
     @Override
-    public Tree visitLiteral(LiteralTree node, String fmt) {
-        String prefix = fmt + sourceBefore(node.getKind() == DocTree.Kind.CODE ? "{@code" : "{@literal");
+    public Tree visitLiteral(LiteralTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore(node.getKind() == DocTree.Kind.CODE ? "{@code" : "{@literal"));
 
-        List<Javadoc> description = visitText(node.getBody().getBody(), whitespaceBefore());
-        String suffix = sourceBefore("}");
-        if (!suffix.isEmpty()) {
-            description.add(new Javadoc.Text(randomId(), Markers.EMPTY, suffix));
-        }
+        List<Javadoc> description = whitespaceBefore();
+        description.addAll(visitText(node.getBody().getBody()));
+        description.addAll(sourceBefore("}"));
 
         return new Javadoc.Literal(
                 randomId(),
-                prefix,
                 Markers.EMPTY,
                 node.getKind() == DocTree.Kind.CODE,
                 description
@@ -457,61 +462,76 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
     }
 
     @Override
-    public Tree visitParam(ParamTree node, String fmt) {
-        String prefix = fmt + sourceBefore("@param");
+    public Tree visitParam(ParamTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("@param"));
         DCTree.DCParam param = (DCTree.DCParam) node;
         J typeName;
+
+        List<Javadoc> beforeName;
         if (param.isTypeParameter) {
+            beforeName = sourceBefore("<");
             typeName = new J.TypeParameter(
                     randomId(),
-                    Space.build(sourceBefore("<"), emptyList()),
+                    Space.EMPTY,
                     Markers.EMPTY,
                     emptyList(),
                     visitIdentifier(node.getName(), whitespaceBefore()),
                     null
             );
+
+            // FIXME could be space here
             sourceBefore(">");
         } else {
-            typeName = convert(node.getName());
+            beforeName = whitespaceBefore();
+            typeName = (J) scan(node.getName(), body);
         }
 
         return new Javadoc.Parameter(
                 randomId(),
-                prefix,
                 Markers.EMPTY,
+                beforeName,
                 typeName,
                 convertMultiline(param.getDescription())
         );
     }
 
     @Override
-    public Tree visitProvides(ProvidesTree node, String fmt) {
-        String prefix = fmt + sourceBefore("@provides");
-        return new Javadoc.Provides(randomId(), prefix, Markers.EMPTY,
-                visitReference(node.getServiceType(), ""),
+    public Tree visitProvides(ProvidesTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("@provides"));
+        return new Javadoc.Provides(randomId(), Markers.EMPTY,
+                whitespaceBefore(),
+                visitReference(node.getServiceType(), body),
                 convertMultiline(node.getDescription())
         );
     }
 
     @Override
-    public J visitReference(@Nullable ReferenceTree node, String fmt) {
+    public J visitReference(@Nullable ReferenceTree node, List<Javadoc> body) {
         DCTree.DCReference ref = (DCTree.DCReference) node;
         if (node == null) {
             //noinspection ConstantConditions
             return null;
         }
 
-        TypedTree tree;
+        JavaType qualifierType;
+        TypedTree qualifier;
+
         if (ref.qualifierExpression != null) {
             attr.attribType(ref.qualifierExpression, symbol);
-            tree = (TypedTree) javaVisitor.scan(ref.qualifierExpression, Space.build(whitespaceBefore(), emptyList()));
+            qualifier = (TypedTree) javaVisitor.scan(ref.qualifierExpression, Space.EMPTY);
+            qualifierType = qualifier.getType();
         } else {
-            tree = J.Identifier.build(randomId(), Space.build(whitespaceBefore(), emptyList()),
-                    Markers.EMPTY, "", typeMapping.type(enclosingClassType));
+            qualifierType = typeMapping.type(enclosingClassType);
+            if (source.charAt(cursor) == '#') {
+                qualifier = J.Identifier.build(randomId(), Space.EMPTY, Markers.EMPTY, "", qualifierType);
+                cursor++;
+            } else {
+                qualifier = null;
+            }
+
         }
 
         if (ref.memberName != null) {
-            sourceBefore("#");
             J.Identifier name = J.Identifier.build(
                     randomId(),
                     Space.EMPTY,
@@ -522,15 +542,16 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
 
             cursor += ref.memberName.toString().length();
 
-            JavaType refType = referenceType(ref, tree.getType());
+            JavaType refType = referenceType(ref, qualifierType);
 
             if (ref.paramTypes != null) {
                 JContainer<Expression> paramContainer;
-                Space beforeParen = Space.build(sourceBefore("("), emptyList());
+                sourceBeforeAsString("(");
                 if (ref.paramTypes.isEmpty()) {
                     paramContainer = JContainer.build(
-                            beforeParen,
-                            singletonList(JRightPadded.build(new J.Empty(randomId(), Space.build(sourceBefore(")"), emptyList()), Markers.EMPTY))),
+                            Space.EMPTY,
+                            singletonList(JRightPadded.build(new J.Empty(randomId(),
+                                    Space.build(sourceBeforeAsString(")"), emptyList()), Markers.EMPTY))),
                             Markers.EMPTY
                     );
                 } else {
@@ -538,13 +559,13 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
                     List<JCTree> paramTypes = ref.paramTypes;
                     for (int i = 0; i < paramTypes.size(); i++) {
                         JCTree param = paramTypes.get(i);
-                        Expression paramExpr = (Expression) javaVisitor.scan(param, Space.build(whitespaceBefore(), emptyList()));
+                        Expression paramExpr = (Expression) javaVisitor.scan(param, Space.build(whitespaceBeforeAsString(), emptyList()));
                         Space rightFmt = Space.format(i == paramTypes.size() - 1 ?
-                                sourceBefore(")") : sourceBefore(","));
+                                sourceBeforeAsString(")") : sourceBeforeAsString(","));
                         parameters.add(new JRightPadded<>(paramExpr, rightFmt, Markers.EMPTY));
                     }
                     paramContainer = JContainer.build(
-                            beforeParen,
+                            Space.EMPTY,
                             parameters,
                             Markers.EMPTY
                     );
@@ -552,9 +573,9 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
 
                 return new J.MethodInvocation(
                         randomId(),
-                        tree.getPrefix(),
+                        qualifier == null ? Space.EMPTY : qualifier.getPrefix(),
                         Markers.EMPTY,
-                        JRightPadded.build(tree.withPrefix(Space.EMPTY)),
+                        qualifier == null ? null : JRightPadded.build(qualifier.withPrefix(Space.EMPTY)),
                         null,
                         name,
                         paramContainer,
@@ -563,9 +584,9 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
             } else {
                 return new J.MemberReference(
                         randomId(),
-                        tree.getPrefix(),
+                        qualifier == null ? Space.EMPTY : qualifier.getPrefix(),
                         Markers.EMPTY,
-                        JRightPadded.build(tree.withPrefix(Space.EMPTY)),
+                        qualifier == null ? null : JRightPadded.build(qualifier.withPrefix(Space.EMPTY)),
                         JContainer.empty(),
                         JLeftPadded.build(name),
                         null,
@@ -574,8 +595,8 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
             }
         }
 
-        assert tree != null;
-        return tree;
+        assert qualifier != null;
+        return qualifier;
     }
 
     @Nullable
@@ -622,42 +643,43 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
     }
 
     @Override
-    public Tree visitReturn(ReturnTree node, String fmt) {
-        String prefix = fmt + sourceBefore("@return");
-        return new Javadoc.Return(randomId(), prefix, Markers.EMPTY, convertMultiline(node.getDescription()));
+    public Tree visitReturn(ReturnTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("@return"));
+        return new Javadoc.Return(randomId(), Markers.EMPTY, convertMultiline(node.getDescription()));
     }
 
     @Override
-    public Tree visitSee(SeeTree node, String fmt) {
-        String prefix = fmt + sourceBefore("@see");
+    public Tree visitSee(SeeTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("@see"));
         J ref = null;
+        List<Javadoc> spaceBeforeTree = whitespaceBefore();
         List<Javadoc> docs;
         if (node.getReference().get(0) instanceof DCTree.DCReference) {
-            ref = visitReference((ReferenceTree) node.getReference().get(0), "");
+            ref = visitReference((ReferenceTree) node.getReference().get(0), body);
             docs = convertMultiline(node.getReference().subList(1, node.getReference().size()));
         } else {
             docs = convertMultiline(node.getReference());
         }
 
-        return new Javadoc.See(randomId(), prefix, Markers.EMPTY, ref, docs);
+        return new Javadoc.See(randomId(), Markers.EMPTY, spaceBeforeTree, ref, docs);
     }
 
     @Override
-    public Tree visitSerial(SerialTree node, String fmt) {
-        String prefix = fmt + sourceBefore("@serial");
-        return new Javadoc.Serial(randomId(), prefix, Markers.EMPTY, convertMultiline(node.getDescription()));
+    public Tree visitSerial(SerialTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("@serial"));
+        return new Javadoc.Serial(randomId(), Markers.EMPTY, convertMultiline(node.getDescription()));
     }
 
     @Override
-    public Tree visitSerialData(SerialDataTree node, String fmt) {
-        String prefix = fmt + sourceBefore("@serialData");
-        return new Javadoc.SerialData(randomId(), prefix, Markers.EMPTY, convertMultiline(node.getDescription()));
+    public Tree visitSerialData(SerialDataTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("@serialData"));
+        return new Javadoc.SerialData(randomId(), Markers.EMPTY, convertMultiline(node.getDescription()));
     }
 
     @Override
-    public Tree visitSerialField(SerialFieldTree node, String fmt) {
-        String prefix = fmt + sourceBefore("@serialField");
-        return new Javadoc.SerialField(randomId(), prefix, Markers.EMPTY,
+    public Tree visitSerialField(SerialFieldTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("@serialField"));
+        return new Javadoc.SerialField(randomId(), Markers.EMPTY,
                 visitIdentifier(node.getName(), whitespaceBefore()),
                 visitReference(node.getType(), whitespaceBefore()),
                 convertMultiline(node.getDescription())
@@ -665,19 +687,18 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
     }
 
     @Override
-    public Tree visitSince(SinceTree node, String fmt) {
-        String prefix = fmt + sourceBefore("@since");
-        return new Javadoc.Since(randomId(), prefix, Markers.EMPTY, convertMultiline(node.getBody()));
+    public Tree visitSince(SinceTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("@since"));
+        return new Javadoc.Since(randomId(), Markers.EMPTY, convertMultiline(node.getBody()));
     }
 
     @Override
-    public Tree visitStartElement(StartElementTree node, String fmt) {
-        String prefix = fmt + sourceBefore("<");
+    public Tree visitStartElement(StartElementTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("<"));
         String name = node.getName().toString();
         cursor += name.length();
         return new Javadoc.StartElement(
                 randomId(),
-                prefix,
                 Markers.EMPTY,
                 name,
                 convertMultiline(node.getAttributes()),
@@ -687,8 +708,8 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
     }
 
     @Override
-    public Tree visitSummary(SummaryTree node, String fmt) {
-        String prefix = fmt + sourceBefore("{@summary");
+    public Tree visitSummary(SummaryTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("{@summary"));
 
         List<Javadoc> summary = convertMultiline(node.getSummary());
 
@@ -698,8 +719,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
                     Javadoc.Text text = (Javadoc.Text) sum;
                     return text.withText(text.getText() + sourceBefore("}"));
                 } else {
-                    return Arrays.asList(sum, new Javadoc.Text(randomId(),
-                            Markers.EMPTY, sourceBefore("}")));
+                    return ListUtils.concat(sum, sourceBefore("}"));
                 }
             }
             return sum;
@@ -707,29 +727,28 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
 
         return new Javadoc.Summary(
                 randomId(),
-                prefix,
                 Markers.EMPTY,
                 paddedSummary
         );
     }
 
     @Override
-    public Tree visitVersion(VersionTree node, String fmt) {
-        String prefix = fmt + sourceBefore("@version");
-        return new Javadoc.Version(randomId(), prefix, Markers.EMPTY, convertMultiline(node.getBody()));
+    public Tree visitVersion(VersionTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("@version"));
+        return new Javadoc.Version(randomId(), Markers.EMPTY, convertMultiline(node.getBody()));
     }
 
     @Override
-    public Tree visitText(TextTree node, String fmt) {
+    public Tree visitText(TextTree node, List<Javadoc> body) {
         throw new UnsupportedOperationException("Anywhere text can occur, we need to call the visitText override that " +
                 "returns a list of Javadoc elements.");
     }
 
-    public List<Javadoc> visitText(String node, String fmt) {
+    public List<Javadoc> visitText(String node) {
         List<Javadoc> texts = new ArrayList<>();
 
         char[] textArr = node.toCharArray();
-        StringBuilder text = new StringBuilder(fmt);
+        StringBuilder text = new StringBuilder();
         for (char c : textArr) {
             cursor++;
             if (c == '\n') {
@@ -754,21 +773,25 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
     }
 
     @Override
-    public Tree visitThrows(ThrowsTree node, String fmt) {
+    public Tree visitThrows(ThrowsTree node, List<Javadoc> body) {
         boolean throwsKeyword = source.startsWith("@throws", cursor);
         sourceBefore(throwsKeyword ? "@throws" : "@exception");
-        return new Javadoc.Throws(randomId(), fmt, Markers.EMPTY, throwsKeyword,
-                visitReference(node.getExceptionName(), ""),
+        List<Javadoc> spaceBeforeExceptionName = whitespaceBefore();
+        return new Javadoc.Throws(
+                randomId(),
+                Markers.EMPTY,
+                throwsKeyword,
+                spaceBeforeExceptionName,
+                visitReference(node.getExceptionName(), body),
                 convertMultiline(node.getDescription())
         );
     }
 
     @Override
-    public Tree visitUnknownBlockTag(UnknownBlockTagTree node, String fmt) {
-        String prefix = fmt + sourceBefore("@" + node.getTagName());
+    public Tree visitUnknownBlockTag(UnknownBlockTagTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("@" + node.getTagName()));
         return new Javadoc.UnknownBlock(
                 randomId(),
-                prefix,
                 Markers.EMPTY,
                 node.getTagName(),
                 convertMultiline(node.getContent())
@@ -776,11 +799,10 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
     }
 
     @Override
-    public Tree visitUnknownInlineTag(UnknownInlineTagTree node, String fmt) {
-        String prefix = fmt + sourceBefore("{@" + node.getTagName());
+    public Tree visitUnknownInlineTag(UnknownInlineTagTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("{@" + node.getTagName()));
         return new Javadoc.UnknownInline(
                 randomId(),
-                prefix,
                 Markers.EMPTY,
                 node.getTagName(),
                 sourceBefore("}")
@@ -788,28 +810,27 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
     }
 
     @Override
-    public Tree visitUses(UsesTree node, String fmt) {
-        String prefix = fmt + sourceBefore("@uses");
-        return new Javadoc.Uses(randomId(), prefix, Markers.EMPTY,
-                visitReference(node.getServiceType(), ""),
+    public Tree visitUses(UsesTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("@uses"));
+        return new Javadoc.Uses(randomId(), Markers.EMPTY,
+                visitReference(node.getServiceType(), body),
                 convertMultiline(node.getDescription())
         );
     }
 
     @Override
-    public Tree visitValue(ValueTree node, String fmt) {
-        String prefix = fmt + sourceBefore("{@value");
-        J ref = node.getReference() == null ? null : visitReference(node.getReference(), "");
+    public Tree visitValue(ValueTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("{@value"));
         return new Javadoc.InlinedValue(
                 randomId(),
-                prefix,
                 Markers.EMPTY,
-                ref,
+                whitespaceBefore(),
+                node.getReference() == null ? null : visitReference(node.getReference(), body),
                 sourceBefore("}")
         );
     }
 
-    private String sourceBefore(String delim) {
+    private String sourceBeforeAsString(String delim) {
         int endIndex = source.indexOf(delim, cursor);
         if (endIndex < 0) {
             throw new IllegalStateException("Expected to be able to find " + delim);
@@ -819,7 +840,17 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
         return prefix;
     }
 
-    private String whitespaceBefore() {
+    private List<Javadoc> sourceBefore(String delim) {
+        int endIndex = source.indexOf(delim, cursor);
+        if (endIndex < 0) {
+            throw new IllegalStateException("Expected to be able to find " + delim);
+        }
+        List<Javadoc> before = whitespaceBefore();
+        cursor += delim.length();
+        return before;
+    }
+
+    private String whitespaceBeforeAsString() {
         if (cursor >= source.length()) {
             return "";
         }
@@ -835,10 +866,34 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
         return fmt;
     }
 
-    private <J2 extends Tree> J2 convert(DocTree t) {
-        String prefix = whitespaceBefore();
-        @SuppressWarnings("unchecked") J2 j = (J2) scan(t, prefix);
-        return j;
+    private List<Javadoc> whitespaceBefore() {
+        if (cursor >= source.length()) {
+            return emptyList();
+        }
+
+        List<Javadoc> whitespace = new ArrayList<>();
+        StringBuilder space = new StringBuilder();
+        for (; cursor < source.length() && Character.isWhitespace(source.charAt(cursor)); cursor++) {
+            char c = source.charAt(cursor);
+            if (c == '\n') {
+                if (space.length() > 0) {
+                    whitespace.add(new Javadoc.Text(randomId(), Markers.EMPTY, space.toString()));
+                }
+                space = new StringBuilder();
+
+                Javadoc.LineBreak lineBreak = lineBreaks.remove(cursor);
+                assert lineBreak != null;
+                whitespace.add(lineBreak);
+            } else {
+                space.append(c);
+            }
+        }
+
+        if (space.length() > 0) {
+            whitespace.add(new Javadoc.Text(randomId(), Markers.EMPTY, space.toString()));
+        }
+
+        return whitespace;
     }
 
     private List<Javadoc> convertMultiline(List<? extends DocTree> dts) {
@@ -848,17 +903,18 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
             DocTree dt = dts.get(i);
             if (i > 0 && dt instanceof DCTree.DCText) {
                 // the whitespace is part of the text
-                js.addAll(visitText(((DCTree.DCText) dt).getBody(), ""));
+                js.addAll(visitText(((DCTree.DCText) dt).getBody()));
             } else {
                 while ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
                     cursor++;
                     js.add(lineBreak);
                 }
 
+                js.addAll(whitespaceBefore());
                 if (dt instanceof DCTree.DCText) {
-                    js.addAll(visitText(((DCTree.DCText) dt).getBody(), whitespaceBefore()));
+                    js.addAll(visitText(((DCTree.DCText) dt).getBody()));
                 } else {
-                    js.add(convert(dt));
+                    js.add((Javadoc) scan(dt, emptyList()));
                 }
             }
         }
@@ -872,10 +928,11 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, String> {
             JCTree.JCFieldAccess fieldAccess = (JCTree.JCFieldAccess) node;
             Expression selected = (Expression) scan(fieldAccess.selected, Space.EMPTY);
             sourceBefore(".");
+            cursor += fieldAccess.name.toString().length();
             return new J.FieldAccess(randomId(), fmt, Markers.EMPTY,
                     selected,
                     JLeftPadded.build(J.Identifier.build(randomId(),
-                            Space.build(sourceBefore(fieldAccess.name.toString()), emptyList()),
+                            Space.EMPTY,
                             Markers.EMPTY,
                             fieldAccess.name.toString(), null)),
                     typeMapping.type(node));

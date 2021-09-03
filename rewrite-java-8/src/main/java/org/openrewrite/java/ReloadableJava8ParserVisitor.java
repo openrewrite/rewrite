@@ -1921,7 +1921,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                             getCurrentPath(),
                             typeMapping,
                             source.substring(commentCursor, source.indexOf("*/", commentCursor + 1))
-                    ).scan(commentTree, ""));
+                    ).scan(commentTree, new ArrayList<>()));
                     break;
                 } else {
                     commentCursor += comment.printComment().length() + comment.getSuffix().length();

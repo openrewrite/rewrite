@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.tree
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
@@ -176,7 +177,7 @@ interface JavadocTest : JavaTreeTest {
         jp, JavaTreeTest.NestingLevel.CompilationUnit, """
             public class A {
                 /**
-                 * @provides
+                 * @provides int
                  */
                 void method(int val) {}
             }
@@ -506,6 +507,34 @@ interface JavadocTest : JavaTreeTest {
              * {@link missing.bracket
              */
             class Test {
+            }
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/964")
+    @Test
+    fun constructorLink(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+            class Test {
+                /**
+                 * {@link Constructor()}
+                 */
+                void test() {
+                }
+            }
+        """.trimIndent()
+    )
+
+    @Disabled
+    @Test
+    fun lineBreakInParam(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+            interface Test {
+                /**
+                 * @param <
+                 *   T> t hi
+                 */
+                <T> boolean test();
             }
         """.trimIndent()
     )

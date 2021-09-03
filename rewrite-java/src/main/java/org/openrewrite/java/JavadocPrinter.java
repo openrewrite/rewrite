@@ -70,10 +70,10 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitAttribute(Javadoc.Attribute attribute, P p) {
         visitMarkers(attribute.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(attribute.getPrefix()).append(attribute.getName());
-        if(attribute.getBeforeEqual() != null) {
-            visit(attribute.getBeforeEqual(), p);
-            if(attribute.getValue() != null) {
+        acc.append(attribute.getName());
+        if (attribute.getSpaceBeforeEqual() != null) {
+            visit(attribute.getSpaceBeforeEqual(), p);
+            if (attribute.getValue() != null) {
                 acc.append('=');
                 visit(attribute.getValue(), p);
             }
@@ -85,7 +85,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitAuthor(Javadoc.Author author, P p) {
         visitMarkers(author.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(author.getPrefix()).append("@author");
+        acc.append("@author");
         visit(author.getName(), p);
         return author;
     }
@@ -94,7 +94,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitDeprecated(Javadoc.Deprecated deprecated, P p) {
         visitMarkers(deprecated.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(deprecated.getPrefix()).append("@deprecated");
+        acc.append("@deprecated");
         visit(deprecated.getDescription(), p);
         return deprecated;
     }
@@ -113,8 +113,9 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitDocRoot(Javadoc.DocRoot docRoot, P p) {
         visitMarkers(docRoot.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(docRoot.getPrefix()).append("{@docRoot")
-                .append(docRoot.getBeforeEndBrace()).append('}');
+        acc.append("{@docRoot");
+        visit(docRoot.getSpaceBeforeEndBrace(), p);
+        acc.append('}');
         return docRoot;
     }
 
@@ -122,8 +123,9 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitDocType(Javadoc.DocType docType, P p) {
         visitMarkers(docType.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(docType.getPrefix()).append("<!doctype")
-                .append(docType.getText()).append('>');
+        acc.append("<!doctype");
+        visit(docType.getText(), p);
+        acc.append('>');
         return docType;
     }
 
@@ -131,16 +133,15 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitEndElement(Javadoc.EndElement endElement, P p) {
         visitMarkers(endElement.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(endElement.getPrefix()).append("</").append(endElement.getName())
-                .append(endElement.getBeforeEndBracket()).append('>');
+        acc.append("</").append(endElement.getName());
+        visit(endElement.getSpaceBeforeEndBracket(), p);
+        acc.append('>');
         return endElement;
     }
 
     @Override
     public Javadoc visitErroneous(Javadoc.Erroneous erroneous, P p) {
         visitMarkers(erroneous.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append(erroneous.getPrefix());
         visit(erroneous.getText(), p);
         return erroneous;
     }
@@ -149,7 +150,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitHidden(Javadoc.Hidden hidden, P p) {
         visitMarkers(hidden.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(hidden.getPrefix()).append("@hidden");
+        acc.append("@hidden");
         visit(hidden.getBody(), p);
         return hidden;
     }
@@ -158,7 +159,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitIndex(Javadoc.Index index, P p) {
         visitMarkers(index.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(index.getPrefix()).append("{@index");
+        acc.append("{@index");
         visit(index.getSearchTerm(), p);
         visit(index.getDescription(), p);
         acc.append(index.getBeforeEndBrace());
@@ -169,8 +170,9 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitInheritDoc(Javadoc.InheritDoc inheritDoc, P p) {
         visitMarkers(inheritDoc.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(inheritDoc.getPrefix()).append("{@inheritDoc")
-                .append(inheritDoc.getBeforeEndBrace()).append('}');
+        acc.append("{@inheritDoc");
+        visit(inheritDoc.getSpaceBeforeEndBrace(), p);
+        acc.append('}');
         return inheritDoc;
     }
 
@@ -178,9 +180,10 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitInlinedValue(Javadoc.InlinedValue value, P p) {
         visitMarkers(value.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(value.getPrefix()).append("{@value");
+        acc.append("{@value");
         javaVisitor.visit(value.getTree(), p);
-        acc.append(value.getBeforeEndBrace()).append('}');
+        visit(value.getSpaceBeforeEndBrace(), p);
+        acc.append('}');
         return value;
     }
 
@@ -196,11 +199,11 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitLink(Javadoc.Link link, P p) {
         visitMarkers(link.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(link.getPrefix());
         acc.append(link.isPlain() ? "{@linkplain" : "{@link");
+        visit(link.getSpaceBeforeTree(), p);
         javaVisitor.visit(link.getTree(), p);
         visit(link.getLabel(), p);
-        acc.append(link.getBeforeEndBrace());
+        visit(link.getSpaceBeforeEndBrace(), p);
         return link;
     }
 
@@ -208,7 +211,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitLiteral(Javadoc.Literal literal, P p) {
         visitMarkers(literal.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(literal.getPrefix()).append(literal.isCode() ? "{@code" : "{@literal");
+        acc.append(literal.isCode() ? "{@code" : "{@literal");
         visit(literal.getDescription(), p);
         acc.append("}");
         return literal;
@@ -218,7 +221,8 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitParameter(Javadoc.Parameter parameter, P p) {
         visitMarkers(parameter.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(parameter.getPrefix()).append("@param");
+        acc.append("@param");
+        visit(parameter.getSpaceBeforeName(), p);
         javaVisitor.visit(parameter.getName(), p);
         visit(parameter.getDescription(), p);
         return parameter;
@@ -228,7 +232,8 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitProvides(Javadoc.Provides provides, P p) {
         visitMarkers(provides.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(provides.getPrefix()).append("@provides");
+        acc.append("@provides");
+        visit(provides.getSpaceBeforeServiceType(), p);
         javaVisitor.visit(provides.getServiceType(), p);
         visit(provides.getDescription(), p);
         return provides;
@@ -238,7 +243,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitReturn(Javadoc.Return aReturn, P p) {
         visitMarkers(aReturn.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(aReturn.getPrefix()).append("@return");
+        acc.append("@return");
         visit(aReturn.getDescription(), p);
         return aReturn;
     }
@@ -247,7 +252,8 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitSee(Javadoc.See see, P p) {
         visitMarkers(see.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(see.getPrefix()).append("@see");
+        acc.append("@see");
+        visit(see.getSpaceBeforeTree(), p);
         javaVisitor.visit(see.getTree(), p);
         visit(see.getReference(), p);
         return see;
@@ -257,7 +263,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitSerial(Javadoc.Serial serial, P p) {
         visitMarkers(serial.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(serial.getPrefix()).append("@serial");
+        acc.append("@serial");
         visit(serial.getDescription(), p);
         return serial;
     }
@@ -266,7 +272,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitSerialData(Javadoc.SerialData serialData, P p) {
         visitMarkers(serialData.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(serialData.getPrefix()).append("@serialData");
+        acc.append("@serialData");
         visit(serialData.getDescription(), p);
         return serialData;
     }
@@ -275,7 +281,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitSerialField(Javadoc.SerialField serialField, P p) {
         visitMarkers(serialField.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(serialField.getPrefix()).append("@serialField");
+        acc.append("@serialField");
         javaVisitor.visit(serialField.getName(), p);
         javaVisitor.visit(serialField.getType(), p);
         visit(serialField.getDescription(), p);
@@ -286,7 +292,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitSince(Javadoc.Since since, P p) {
         visitMarkers(since.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(since.getPrefix()).append("@since");
+        acc.append("@since");
         visit(since.getDescription(), p);
         return since;
     }
@@ -295,10 +301,10 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitStartElement(Javadoc.StartElement startElement, P p) {
         visitMarkers(startElement.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(startElement.getPrefix()).append('<').append(startElement.getName());
+        acc.append('<').append(startElement.getName());
         visit(startElement.getAttributes(), p);
-        acc.append(startElement.getBeforeEndBracket());
-        if(startElement.isSelfClosing()) {
+        visit(startElement.getSpaceBeforeEndBracket(), p);
+        if (startElement.isSelfClosing()) {
             acc.append('/');
         }
         acc.append('>');
@@ -309,7 +315,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitSummary(Javadoc.Summary summary, P p) {
         visitMarkers(summary.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(summary.getPrefix()).append("{@summary");
+        acc.append("{@summary");
         visit(summary.getSummary(), p);
         acc.append('}');
         return summary;
@@ -327,7 +333,8 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitThrows(Javadoc.Throws aThrows, P p) {
         visitMarkers(aThrows.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(aThrows.getPrefix()).append(aThrows.isThrowsKeyword() ? "@throws" : "@exception");
+        acc.append(aThrows.isThrowsKeyword() ? "@throws" : "@exception");
+        visit(aThrows.getSpaceBeforeExceptionName(), p);
         javaVisitor.visit(aThrows.getExceptionName(), p);
         visit(aThrows.getDescription(), p);
         return aThrows;
@@ -337,7 +344,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitUnknownBlock(Javadoc.UnknownBlock unknownBlock, P p) {
         visitMarkers(unknownBlock.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(unknownBlock.getPrefix()).append("@").append(unknownBlock.getName());
+        acc.append("@").append(unknownBlock.getName());
         visit(unknownBlock.getContent(), p);
         return unknownBlock;
     }
@@ -346,8 +353,9 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitUnknownInline(Javadoc.UnknownInline unknownInline, P p) {
         visitMarkers(unknownInline.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(unknownInline.getPrefix()).append("{@").append(unknownInline.getName())
-                .append(unknownInline.getBeforeEndBrace()).append('}');
+        acc.append("{@").append(unknownInline.getName());
+        visit(unknownInline.getSpaceBeforeEndBrace(), p);
+        acc.append('}');
         return unknownInline;
     }
 
@@ -355,7 +363,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitUses(Javadoc.Uses uses, P p) {
         visitMarkers(uses.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(uses.getPrefix()).append("@uses");
+        acc.append("@uses");
         javaVisitor.visit(uses.getServiceType(), p);
         visit(uses.getDescription(), p);
         return uses;
@@ -365,7 +373,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitVersion(Javadoc.Version since, P p) {
         visitMarkers(since.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append(since.getPrefix()).append("@version");
+        acc.append("@version");
         visit(since.getBody(), p);
         return since;
     }
@@ -385,7 +393,10 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
             visitSpace(method.getPrefix(), Space.Location.IDENTIFIER_PREFIX, p);
             StringBuilder acc = getPrinter();
             visit(method.getSelect(), p);
-            acc.append('#').append(method.getSimpleName());
+            if (method.getSelect() != null) {
+                acc.append('#');
+            }
+            acc.append(method.getSimpleName());
             visitContainer("(", method.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, ",", ")", p);
             return method;
         }
@@ -445,6 +456,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
             }
         }
 
+        @SuppressWarnings("SameParameterValue")
         private void visitContainer(String before, @Nullable JContainer<? extends J> container, JContainer.Location location, String suffixBetween, @Nullable String after, P p) {
             if (container == null) {
                 return;

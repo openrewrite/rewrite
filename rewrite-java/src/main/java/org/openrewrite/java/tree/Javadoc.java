@@ -64,12 +64,11 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
         String name;
 
         @Nullable
-        List<Javadoc> beforeEqual;
+        List<Javadoc> spaceBeforeEqual;
 
         @Nullable
         List<Javadoc> value;
@@ -87,7 +86,6 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
         List<Javadoc> name;
 
@@ -104,7 +102,6 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
         List<Javadoc> description;
 
@@ -121,10 +118,9 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
         String name;
-        String beforeEndBracket;
+        List<Javadoc> spaceBeforeEndBracket;
 
         @Override
         public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
@@ -178,9 +174,8 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
-        String beforeEndBrace;
+        List<Javadoc> spaceBeforeEndBrace;
 
         @Override
         public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
@@ -195,9 +190,8 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
-        String text;
+        List<Javadoc> text;
 
         @Override
         public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
@@ -212,7 +206,6 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
         List<Javadoc> text;
 
@@ -229,9 +222,8 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
-        String beforeEndBrace;
+        List<Javadoc> spaceBeforeEndBrace;
 
         @Override
         public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
@@ -246,7 +238,6 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
         List<Javadoc> body;
 
@@ -263,9 +254,8 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
-        Javadoc searchTerm;
+        List<Javadoc> searchTerm;
         List<Javadoc> description;
         String beforeEndBrace;
 
@@ -282,13 +272,13 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
+        List<Javadoc> spaceBeforeTree;
 
         @Nullable
         J tree;
 
-        String beforeEndBrace;
+        List<Javadoc> spaceBeforeEndBrace;
 
         @Override
         public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
@@ -323,16 +313,16 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
         boolean plain;
+        List<Javadoc> spaceBeforeTree;
 
         @Nullable
         J tree;
 
         List<Javadoc> label;
 
-        String beforeEndBrace;
+        List<Javadoc> spaceBeforeEndBrace;
 
         @Override
         public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
@@ -347,7 +337,6 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
         boolean code;
         List<Javadoc> description;
@@ -365,8 +354,8 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
+        List<Javadoc> spaceBeforeName;
         J name;
         List<Javadoc> description;
 
@@ -383,8 +372,8 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
+        List<Javadoc> spaceBeforeServiceType;
         J serviceType;
         List<Javadoc> description;
 
@@ -401,7 +390,6 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
         List<Javadoc> description;
 
@@ -418,8 +406,8 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
+        List<Javadoc> spaceBeforeTree;
 
         @Nullable
         J tree;
@@ -439,7 +427,6 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
         List<Javadoc> description;
 
@@ -456,7 +443,6 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
         List<Javadoc> description;
 
@@ -473,7 +459,6 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
         J.Identifier name;
         J type;
@@ -492,7 +477,6 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
         List<Javadoc> description;
 
@@ -509,12 +493,11 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
         String name;
         List<Javadoc> attributes;
         boolean selfClosing;
-        String beforeEndBracket;
+        List<Javadoc> spaceBeforeEndBracket;
 
         @Override
         public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
@@ -529,7 +512,6 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
         List<Javadoc> summary;
 
@@ -562,7 +544,6 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
 
         /**
@@ -570,6 +551,7 @@ public interface Javadoc extends Serializable, Tree {
          */
         boolean throwsKeyword;
 
+        List<Javadoc> spaceBeforeExceptionName;
         J exceptionName;
         List<Javadoc> description;
 
@@ -586,7 +568,6 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
         String name;
         List<Javadoc> content;
@@ -604,10 +585,9 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
         String name;
-        String beforeEndBrace;
+        List<Javadoc> spaceBeforeEndBrace;
 
         @Override
         public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
@@ -622,7 +602,6 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
         J serviceType;
         List<Javadoc> description;
@@ -640,7 +619,6 @@ public interface Javadoc extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String prefix;
         Markers markers;
         List<Javadoc> body;
 
