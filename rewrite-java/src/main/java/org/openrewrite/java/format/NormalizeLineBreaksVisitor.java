@@ -57,9 +57,7 @@ public class NormalizeLineBreaksVisitor<P> extends JavaIsoVisitor<P> {
                     return (Comment) lineBreakJavadocVisitor.visitNonNull((Javadoc) c, 0);
                 } else {
                     TextComment textComment = (TextComment) c;
-                    if (textComment.getText().contains("\n")) {
-                        c = textComment.withText(normalizeNewLines(textComment.getText(), style.getUseCRLFNewLines()));
-                    }
+                    c = textComment.withText(normalizeNewLines(textComment.getText(), style.getUseCRLFNewLines()));
                 }
             }
 
@@ -68,6 +66,9 @@ public class NormalizeLineBreaksVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private static String normalizeNewLines(String text, boolean useClrf){
+        if (!text.contains("\n")) {
+            return text;
+        }
         StringBuilder stringBuilder = new StringBuilder();
         char[] charArray = text.toCharArray();
         for (int i = 0; i < charArray.length; i++) {
