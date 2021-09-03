@@ -80,7 +80,7 @@ public class NormalizeLineBreaksVisitor<P> extends JavaIsoVisitor<P> {
             }
             stringBuilder.append(c);
         }
-        return stringBuilder.toString();
+        return text.equals(stringBuilder.toString()) ? text : stringBuilder.toString();
     }
 
     @Nullable
