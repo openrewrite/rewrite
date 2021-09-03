@@ -18,6 +18,7 @@ package org.openrewrite.java.style
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
+import org.openrewrite.style.GeneralFormatStyle
 import org.openrewrite.style.NamedStyles
 
 interface AutodetectTest {
@@ -259,5 +260,39 @@ interface AutodetectTest {
 
         assertThat(importLayout.classCountToUseStarImport).isEqualTo(2147483647)
         assertThat(importLayout.nameCountToUseStarImport).isEqualTo(2147483647)
+    }
+
+    @Test
+    fun detectClrfLineFormat(jp: JavaParser) {
+        val cus = jp.parse(
+            "class Test {\r\n" +
+                    "    // some comment\r\n" +
+                    "    public void test() {\n" +
+                    "        System.out.println();\n" +
+                    "    }\r\n" +
+                    "}\r\n"
+        )
+
+        val styles = Autodetect.detect(cus)
+        val lineFormatStyle = NamedStyles.merge(GeneralFormatStyle::class.java, listOf(styles))
+
+        assertThat(lineFormatStyle!!.useCRLFNewLines).isTrue
+    }
+
+    @Test
+    fun detectLfLineFormat(jp: JavaParser) {
+        val cus = jp.parse(
+            "class Test {\n" +
+                    "    // some comment\r\n" +
+                    "    public void test() {\n" +
+                    "        System.out.println();\n" +
+                    "    }\n" +
+                    "}\r\n"
+        )
+
+        val styles = Autodetect.detect(cus)
+        val lineFormatStyle = NamedStyles.merge(GeneralFormatStyle::class.java, listOf(styles))
+
+        assertThat(lineFormatStyle!!.useCRLFNewLines).isFalse
     }
 }

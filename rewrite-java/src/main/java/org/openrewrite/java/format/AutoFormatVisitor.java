@@ -23,6 +23,7 @@ import org.openrewrite.java.cleanup.EmptyForInitializerPadStyle;
 import org.openrewrite.java.cleanup.EmptyForIteratorPadStyle;
 import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.style.GeneralFormatStyle;
 
 import java.util.Optional;
 
@@ -69,6 +70,10 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
 
         t = new TabsAndIndentsVisitor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
                 .orElse(IntelliJ.tabsAndIndents()), stopAfter)
+                .visit(t, p, cursor.fork());
+
+        t = new NormalizeLineBreaksVisitor<>(Optional.ofNullable(cu.getStyle(GeneralFormatStyle.class))
+                .orElse(GeneralFormatStyle.DEFAULT), stopAfter)
                 .visit(t, p, cursor.fork());
 
         return t;

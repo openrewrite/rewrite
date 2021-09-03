@@ -32,7 +32,6 @@ public class TabsAndIndentsStyle implements JavaStyle {
     private Integer indentSize;
     private Integer continuationIndent;
     private Boolean indentsRelativeToExpressionStart;
-    private Boolean useCRLFNewLines;
 
     @Override
     public Style applyDefaults() {
