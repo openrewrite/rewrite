@@ -175,7 +175,7 @@ public interface Javadoc extends Serializable, Tree {
         UUID id;
 
         Markers markers;
-        List<Javadoc> spaceBeforeEndBrace;
+        List<Javadoc> endBrace;
 
         @Override
         public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
@@ -223,7 +223,7 @@ public interface Javadoc extends Serializable, Tree {
         UUID id;
 
         Markers markers;
-        List<Javadoc> spaceBeforeEndBrace;
+        List<Javadoc> endBrace;
 
         @Override
         public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
@@ -257,7 +257,7 @@ public interface Javadoc extends Serializable, Tree {
         Markers markers;
         List<Javadoc> searchTerm;
         List<Javadoc> description;
-        String beforeEndBrace;
+        List<Javadoc> endBrace;
 
         @Override
         public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
@@ -278,7 +278,7 @@ public interface Javadoc extends Serializable, Tree {
         @Nullable
         J tree;
 
-        List<Javadoc> spaceBeforeEndBrace;
+        List<Javadoc> endBrace;
 
         @Override
         public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
@@ -322,7 +322,7 @@ public interface Javadoc extends Serializable, Tree {
 
         List<Javadoc> label;
 
-        List<Javadoc> spaceBeforeEndBrace;
+        List<Javadoc> endBrace;
 
         @Override
         public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
@@ -340,6 +340,7 @@ public interface Javadoc extends Serializable, Tree {
         Markers markers;
         boolean code;
         List<Javadoc> description;
+        List<Javadoc> endBrace;
 
         @Override
         public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
@@ -514,6 +515,7 @@ public interface Javadoc extends Serializable, Tree {
 
         Markers markers;
         List<Javadoc> summary;
+        List<Javadoc> beforeBrace;
 
         @Override
         public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
@@ -587,7 +589,7 @@ public interface Javadoc extends Serializable, Tree {
 
         Markers markers;
         String name;
-        List<Javadoc> spaceBeforeEndBrace;
+        List<Javadoc> endBrace;
 
         @Override
         public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {

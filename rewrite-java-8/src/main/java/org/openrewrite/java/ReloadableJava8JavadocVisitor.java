@@ -317,7 +317,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
             }
 
             body.addAll(whitespaceBefore());
-            body.add((Javadoc) scan(blockTag, body));
+            body.addAll(convertMultiline(singletonList(blockTag)));
         }
 
         if (lineBreaks.isEmpty()) {
@@ -388,7 +388,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         return new Javadoc.InheritDoc(
                 randomId(),
                 Markers.EMPTY,
-                sourceBefore("}")
+                endBrace()
         );
     }
 
@@ -399,8 +399,6 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         List<Javadoc> spaceBeforeRef = whitespaceBefore();
         J ref = visitReference(node.getReference(), body);
         List<Javadoc> label = convertMultiline(node.getLabel());
-        boolean isErroneous = !label.isEmpty() && label.stream().filter(l -> !(l instanceof Javadoc.LineBreak)).findAny()
-                .map(l -> l instanceof Javadoc.Erroneous).orElse(false);
 
         return new Javadoc.Link(
                 randomId(),
@@ -409,8 +407,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                 spaceBeforeRef,
                 ref,
                 label,
-                !isErroneous ? ListUtils.concat(sourceBefore("}"),
-                        new Javadoc.Text(randomId(), Markers.EMPTY, "}")) : emptyList()
+                endBrace()
         );
     }
 
@@ -420,13 +417,13 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
 
         List<Javadoc> description = whitespaceBefore();
         description.addAll(visitText(node.getBody().getBody()));
-        description.addAll(sourceBefore("}"));
 
         return new Javadoc.Literal(
                 randomId(),
                 Markers.EMPTY,
                 node.getKind() == DocTree.Kind.CODE,
-                description
+                description,
+                endBrace()
         );
     }
 
@@ -479,6 +476,9 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
             attr.attribType(ref.qualifierExpression, symbol);
             qualifier = (TypedTree) javaVisitor.scan(ref.qualifierExpression, Space.EMPTY);
             qualifierType = qualifier.getType();
+            if(ref.memberName != null) {
+                cursor++; // skip #
+            }
         } else {
             qualifierType = typeMapping.type(enclosingClassType);
             if (source.charAt(cursor) == '#') {
@@ -667,6 +667,12 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
     }
 
     @Override
+    public Tree visitVersion(VersionTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("@version"));
+        return new Javadoc.Version(randomId(), Markers.EMPTY, convertMultiline(node.getBody()));
+    }
+
+    @Override
     public Tree visitText(TextTree node, List<Javadoc> body) {
         throw new UnsupportedOperationException("Anywhere text can occur, we need to call the visitText override that " +
                 "returns a list of Javadoc elements.");
@@ -733,7 +739,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                 randomId(),
                 Markers.EMPTY,
                 node.getTagName(),
-                sourceBefore("}")
+                endBrace()
         );
     }
 
@@ -745,11 +751,15 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                 Markers.EMPTY,
                 whitespaceBefore(),
                 node.getReference() == null ? null : visitReference(node.getReference(), body),
-                sourceBefore("}")
+                endBrace()
         );
     }
 
     private String sourceBeforeAsString(String delim) {
+        if (cursor >= source.length()) {
+            return "";
+        }
+
         int endIndex = source.indexOf(delim, cursor);
         if (endIndex < 0) {
             throw new IllegalStateException("Expected to be able to find " + delim);
@@ -760,6 +770,10 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
     }
 
     private List<Javadoc> sourceBefore(String delim) {
+        if (cursor >= source.length()) {
+            return emptyList();
+        }
+
         int endIndex = source.indexOf(delim, cursor);
         if (endIndex < 0) {
             throw new IllegalStateException("Expected to be able to find " + delim);
@@ -813,6 +827,14 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         }
 
         return whitespace;
+    }
+
+    private List<Javadoc> endBrace() {
+        if (cursor < source.length() && source.charAt(cursor) == '}') {
+            cursor++;
+            return singletonList(new Javadoc.Text(randomId(), Markers.EMPTY, "}"));
+        }
+        return emptyList();
     }
 
     private List<Javadoc> convertMultiline(List<? extends DocTree> dts) {

@@ -325,7 +325,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
         return new Javadoc.DocRoot(
                 randomId(),
                 Markers.EMPTY,
-                sourceBefore("}")
+                endBrace()
         );
     }
 
@@ -387,7 +387,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     @Override
     public Tree visitIndex(IndexTree node, List<Javadoc> body) {
         body.addAll(sourceBefore("{@index"));
-        List<Javadoc> searchTerm = ListUtils.concat(whitespaceBefore(), (Javadoc) scan(node.getSearchTerm(), emptyList()));
+        List<Javadoc> searchTerm = ListUtils.concatAll(whitespaceBefore(), convertMultiline(singletonList(node.getSearchTerm())));
         List<Javadoc> description = convertMultiline(node.getDescription());
         List<Javadoc> paddedDescription = ListUtils.flatMap(description, (i, desc) -> {
             if (i == description.size() - 1) {
@@ -401,15 +401,12 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
             return desc;
         });
 
-        boolean isErroneous = !paddedDescription.isEmpty() && paddedDescription.stream().filter(l -> !(l instanceof Javadoc.LineBreak)).findAny()
-                .map(l -> l instanceof Javadoc.Erroneous).orElse(false);
-
         return new Javadoc.Index(
                 randomId(),
                 Markers.EMPTY,
                 searchTerm,
                 paddedDescription,
-                !isErroneous ? sourceBefore("}") + "}" : ""
+                endBrace()
         );
     }
 
@@ -419,7 +416,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
         return new Javadoc.InheritDoc(
                 randomId(),
                 Markers.EMPTY,
-                sourceBefore("}")
+                endBrace()
         );
     }
 
@@ -430,8 +427,6 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
         List<Javadoc> spaceBeforeRef = whitespaceBefore();
         J ref = visitReference(node.getReference(), body);
         List<Javadoc> label = convertMultiline(node.getLabel());
-        boolean isErroneous = !label.isEmpty() && label.stream().filter(l -> !(l instanceof Javadoc.LineBreak)).findAny()
-                .map(l -> l instanceof Javadoc.Erroneous).orElse(false);
 
         return new Javadoc.Link(
                 randomId(),
@@ -440,8 +435,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
                 spaceBeforeRef,
                 ref,
                 label,
-                !isErroneous ? ListUtils.concat(sourceBefore("}"),
-                        new Javadoc.Text(randomId(), Markers.EMPTY, "}")) : emptyList()
+                endBrace()
         );
     }
 
@@ -451,13 +445,13 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
 
         List<Javadoc> description = whitespaceBefore();
         description.addAll(visitText(node.getBody().getBody()));
-        description.addAll(sourceBefore("}"));
 
         return new Javadoc.Literal(
                 randomId(),
                 Markers.EMPTY,
                 node.getKind() == DocTree.Kind.CODE,
-                description
+                description,
+                endBrace()
         );
     }
 
@@ -520,6 +514,9 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
             attr.attribType(ref.qualifierExpression, symbol);
             qualifier = (TypedTree) javaVisitor.scan(ref.qualifierExpression, Space.EMPTY);
             qualifierType = qualifier.getType();
+            if(ref.memberName != null) {
+                cursor++; // skip #
+            }
         } else {
             qualifierType = typeMapping.type(enclosingClassType);
             if (source.charAt(cursor) == '#') {
@@ -728,7 +725,8 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
         return new Javadoc.Summary(
                 randomId(),
                 Markers.EMPTY,
-                paddedSummary
+                paddedSummary,
+                endBrace()
         );
     }
 
@@ -805,7 +803,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
                 randomId(),
                 Markers.EMPTY,
                 node.getTagName(),
-                sourceBefore("}")
+                endBrace()
         );
     }
 
@@ -826,11 +824,15 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
                 Markers.EMPTY,
                 whitespaceBefore(),
                 node.getReference() == null ? null : visitReference(node.getReference(), body),
-                sourceBefore("}")
+                endBrace()
         );
     }
 
     private String sourceBeforeAsString(String delim) {
+        if (cursor >= source.length()) {
+            return "";
+        }
+
         int endIndex = source.indexOf(delim, cursor);
         if (endIndex < 0) {
             throw new IllegalStateException("Expected to be able to find " + delim);
@@ -841,6 +843,10 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     }
 
     private List<Javadoc> sourceBefore(String delim) {
+        if (cursor >= source.length()) {
+            return emptyList();
+        }
+
         int endIndex = source.indexOf(delim, cursor);
         if (endIndex < 0) {
             throw new IllegalStateException("Expected to be able to find " + delim);
@@ -894,6 +900,14 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
         }
 
         return whitespace;
+    }
+
+    private List<Javadoc> endBrace() {
+        if (cursor < source.length() && source.charAt(cursor) == '}') {
+            cursor++;
+            return singletonList(new Javadoc.Text(randomId(), Markers.EMPTY, "}"));
+        }
+        return emptyList();
     }
 
     private List<Javadoc> convertMultiline(List<? extends DocTree> dts) {

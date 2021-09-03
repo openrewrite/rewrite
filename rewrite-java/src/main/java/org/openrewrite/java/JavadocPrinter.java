@@ -114,8 +114,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
         visitMarkers(docRoot.getMarkers(), p);
         StringBuilder acc = getPrinter();
         acc.append("{@docRoot");
-        visit(docRoot.getSpaceBeforeEndBrace(), p);
-        acc.append('}');
+        visit(docRoot.getEndBrace(), p);
         return docRoot;
     }
 
@@ -162,7 +161,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
         acc.append("{@index");
         visit(index.getSearchTerm(), p);
         visit(index.getDescription(), p);
-        acc.append(index.getBeforeEndBrace());
+        visit(index.getEndBrace(), p);
         return index;
     }
 
@@ -171,8 +170,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
         visitMarkers(inheritDoc.getMarkers(), p);
         StringBuilder acc = getPrinter();
         acc.append("{@inheritDoc");
-        visit(inheritDoc.getSpaceBeforeEndBrace(), p);
-        acc.append('}');
+        visit(inheritDoc.getEndBrace(), p);
         return inheritDoc;
     }
 
@@ -182,8 +180,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
         StringBuilder acc = getPrinter();
         acc.append("{@value");
         javaVisitor.visit(value.getTree(), p);
-        visit(value.getSpaceBeforeEndBrace(), p);
-        acc.append('}');
+        visit(value.getEndBrace(), p);
         return value;
     }
 
@@ -203,7 +200,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
         visit(link.getSpaceBeforeTree(), p);
         javaVisitor.visit(link.getTree(), p);
         visit(link.getLabel(), p);
-        visit(link.getSpaceBeforeEndBrace(), p);
+        visit(link.getEndBrace(), p);
         return link;
     }
 
@@ -213,7 +210,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
         StringBuilder acc = getPrinter();
         acc.append(literal.isCode() ? "{@code" : "{@literal");
         visit(literal.getDescription(), p);
-        acc.append("}");
+        visit(literal.getEndBrace(), p);
         return literal;
     }
 
@@ -317,7 +314,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
         StringBuilder acc = getPrinter();
         acc.append("{@summary");
         visit(summary.getSummary(), p);
-        acc.append('}');
+        visit(summary.getBeforeBrace(), p);
         return summary;
     }
 
@@ -354,8 +351,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
         visitMarkers(unknownInline.getMarkers(), p);
         StringBuilder acc = getPrinter();
         acc.append("{@").append(unknownInline.getName());
-        visit(unknownInline.getSpaceBeforeEndBrace(), p);
-        acc.append('}');
+        visit(unknownInline.getEndBrace(), p);
         return unknownInline;
     }
 

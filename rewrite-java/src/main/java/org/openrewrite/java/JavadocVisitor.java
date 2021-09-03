@@ -61,7 +61,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
 
     public Javadoc visitDocRoot(Javadoc.DocRoot docRoot, P p) {
         Javadoc.DocRoot d = docRoot;
-        d = d.withSpaceBeforeEndBrace(ListUtils.map(d.getSpaceBeforeEndBrace(), s -> visit(s, p)));
+        d = d.withEndBrace(ListUtils.map(d.getEndBrace(), s -> visit(s, p)));
         return d;
     }
 
@@ -95,12 +95,13 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
         Javadoc.Index i = index;
         i = i.withSearchTerm(ListUtils.map(i.getSearchTerm(), s -> visit(s, p)));
         i = i.withDescription(ListUtils.map(i.getDescription(), desc -> visit(desc, p)));
+        i = i.withEndBrace(ListUtils.map(i.getEndBrace(), b -> visit(b, p)));
         return i;
     }
 
     public Javadoc visitInheritDoc(Javadoc.InheritDoc inheritDoc, P p) {
         Javadoc.InheritDoc i = inheritDoc;
-        i = i.withSpaceBeforeEndBrace(ListUtils.map(i.getSpaceBeforeEndBrace(), b -> visit(b, p)));
+        i = i.withEndBrace(ListUtils.map(i.getEndBrace(), b -> visit(b, p)));
         return i;
     }
 
@@ -108,7 +109,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
         Javadoc.InlinedValue i = inlinedValue;
         i = i.withSpaceBeforeTree(ListUtils.map(i.getSpaceBeforeTree(), s -> visit(s, p)));
         i = i.withTree(javaVisitor.visit(i.getTree(), p));
-        i = i.withSpaceBeforeEndBrace(ListUtils.map(i.getSpaceBeforeEndBrace(), b -> visit(b, p)));
+        i = i.withEndBrace(ListUtils.map(i.getEndBrace(), b -> visit(b, p)));
         return i;
     }
 
@@ -124,6 +125,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
         l = l.withSpaceBeforeTree(ListUtils.map(l.getSpaceBeforeTree(), s -> visit(s, p)));
         l = l.withTree(javaVisitor.visit(l.getTree(), p));
         l = l.withLabel(ListUtils.map(l.getLabel(), la -> visit(la, p)));
+        l = l.withEndBrace(ListUtils.map(l.getEndBrace(), s -> visit(s, p)));
         return l;
     }
 
@@ -207,6 +209,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
     public Javadoc visitSummary(Javadoc.Summary summary, P p) {
         Javadoc.Summary s = summary;
         s = s.withSummary(ListUtils.map(s.getSummary(), sum -> visit(sum, p)));
+        s = s.withBeforeBrace(ListUtils.map(s.getBeforeBrace(), b -> visit(b, p)));
         return s;
     }
 
@@ -232,7 +235,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
 
     public Javadoc visitUnknownInline(Javadoc.UnknownInline unknownInline, P p) {
         Javadoc.UnknownInline u = unknownInline;
-        u = u.withSpaceBeforeEndBrace(ListUtils.map(u.getSpaceBeforeEndBrace(), b -> visit(b, p)));
+        u = u.withEndBrace(ListUtils.map(u.getEndBrace(), b -> visit(b, p)));
         return u;
     }
 
