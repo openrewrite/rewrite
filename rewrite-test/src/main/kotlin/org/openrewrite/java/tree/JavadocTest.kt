@@ -525,6 +525,20 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/965")
+    @Test
+    fun emptyJavadoc(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+            /***/
+            class Test {
+                /**
+                 */
+                void test() {
+                }
+            }
+        """.trimIndent()
+    )
+
     @Disabled
     @Test
     fun lineBreakInParam(jp: JavaParser) = assertParsePrintAndProcess(
