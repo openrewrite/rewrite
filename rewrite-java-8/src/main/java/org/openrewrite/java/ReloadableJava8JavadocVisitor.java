@@ -29,6 +29,7 @@ import com.sun.tools.javac.tree.DCTree;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -848,18 +849,10 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
     }
 
     private List<Javadoc> endBrace() {
-        if (cursor < source.length()) {
-            for (int i = cursor; i < source.length(); i++) {
-                char c = source.charAt(i);
-                if (!Character.isWhitespace(c)) {
-                    if (c == '}') {
-                        String postFix = source.substring(cursor, i + 1);
-                        cursor += postFix.length();
-                        return singletonList(new Javadoc.Text(randomId(), Markers.EMPTY, postFix));
-                    }
-                    break;
-                }
-            }
+        if (cursor < source.length() && source.charAt(cursor) == '}') {
+            List<Javadoc> end = ListUtils.concat(whitespaceBefore(), new Javadoc.Text(randomId(), Markers.EMPTY, "}"));
+            cursor++;
+            return end;
         }
         return emptyList();
     }
