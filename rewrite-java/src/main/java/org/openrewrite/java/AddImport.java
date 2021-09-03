@@ -19,13 +19,11 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
