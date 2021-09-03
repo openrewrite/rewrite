@@ -589,6 +589,7 @@ public interface Javadoc extends Serializable, Tree {
 
         Markers markers;
         String name;
+        List<Javadoc> content;
         List<Javadoc> endBrace;
 
         @Override

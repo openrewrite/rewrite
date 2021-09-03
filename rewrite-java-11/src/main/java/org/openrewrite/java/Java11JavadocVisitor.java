@@ -803,6 +803,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
                 randomId(),
                 Markers.EMPTY,
                 node.getTagName(),
+                convertMultiline(node.getContent()),
                 endBrace()
         );
     }

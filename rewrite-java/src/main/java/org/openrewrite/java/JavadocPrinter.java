@@ -351,6 +351,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
         visitMarkers(unknownInline.getMarkers(), p);
         StringBuilder acc = getPrinter();
         acc.append("{@").append(unknownInline.getName());
+        visit(unknownInline.getContent(), p);
         visit(unknownInline.getEndBrace(), p);
         return unknownInline;
     }

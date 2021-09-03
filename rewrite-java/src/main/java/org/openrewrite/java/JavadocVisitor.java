@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.abego.treelayout.internal.util.java.util.ListUtil;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.J;
@@ -235,6 +236,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
 
     public Javadoc visitUnknownInline(Javadoc.UnknownInline unknownInline, P p) {
         Javadoc.UnknownInline u = unknownInline;
+        u = u.withContent(ListUtils.map(u.getContent(), c -> visit(c, p)));
         u = u.withEndBrace(ListUtils.map(u.getEndBrace(), b -> visit(b, p)));
         return u;
     }
