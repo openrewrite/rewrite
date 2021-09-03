@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
@@ -50,38 +51,49 @@ public class Autodetect extends NamedStyles {
         IndentStatistics indentStatistics = new IndentStatistics();
         ImportLayoutStatistics importLayoutStatistics = new ImportLayoutStatistics();
         SpacesStatistics spacesStatistics = new SpacesStatistics();
+        GeneralFormatStatistics generalFormatStatistics = new GeneralFormatStatistics();
 
         importLayoutStatistics.mapBlockPatterns(cus);
         for (J.CompilationUnit cu : cus) {
             new FindIndentJavaVisitor().visit(cu, indentStatistics);
             new FindImportLayout().visit(cu, importLayoutStatistics);
             new FindSpacesStyle().visit(cu, spacesStatistics);
+            new FindLineFormatJavaVisitor().visit(cu, generalFormatStatistics);
         }
 
         return new Autodetect(Tree.randomId(), Arrays.asList(
                 indentStatistics.getTabsAndIndentsStyle(),
                 importLayoutStatistics.getImportLayoutStyle(),
-                spacesStatistics.getSpacesStyle()));
+                spacesStatistics.getSpacesStyle(),
+                generalFormatStatistics.getFormatStyle()));
+    }
+
+    private static class GeneralFormatStatistics {
+        private int linesWithCRLFNewLines = 0;
+        private int linesWithLFNewLines = 0;
+
+        public boolean isIndentedWithLFNewLines() {
+            return linesWithLFNewLines >= linesWithCRLFNewLines;
+        }
+
+        public GeneralFormatStyle getFormatStyle() {
+            boolean useCRLF = !isIndentedWithLFNewLines();
+
+            return new GeneralFormatStyle(useCRLF);
+        }
     }
 
     private static class IndentStatistics {
         private final Map<Integer, Long> indentFrequencies = new HashMap<>();
         private int linesWithSpaceIndents = 0;
         private int linesWithTabIndents = 0;
-        private int linesWithCRLFNewLines = 0;
-        private int linesWithLFNewLines = 0;
 
         public boolean isIndentedWithSpaces() {
             return linesWithSpaceIndents >= linesWithTabIndents;
         }
 
-        public boolean isIndentedWithLFNewLines() {
-            return linesWithLFNewLines >= linesWithCRLFNewLines;
-        }
-
         public TabsAndIndentsStyle getTabsAndIndentsStyle() {
             boolean useTabs = !isIndentedWithSpaces();
-            boolean useCRLF = !isIndentedWithLFNewLines();
 
             Map.Entry<Integer, Long> i1 = null;
             Map.Entry<Integer, Long> i2 = null;
@@ -108,9 +120,30 @@ public class Autodetect extends NamedStyles {
                     useTabs ? indent : 1,
                     useTabs ? 1 : indent,
                     continuationIndent,
-                    false,
-                    useCRLF
+                    false
             );
+        }
+    }
+
+    private static class FindLineFormatJavaVisitor extends JavaIsoVisitor<GeneralFormatStatistics> {
+        @Override
+        public Space visitSpace(Space space, Space.Location loc, GeneralFormatStatistics stats) {
+            String prefix = space.getWhitespace();
+            char[] chars = prefix.toCharArray();
+
+            for (int i = 0; i < chars.length; i++) {
+                char c = chars[i];
+                if (c == '\n' || c == '\r') {
+                    if (c == '\n') {
+                        if (i == 0 || chars[i - 1] != '\r') {
+                            stats.linesWithLFNewLines++;
+                        } else {
+                            stats.linesWithCRLFNewLines++;
+                        }
+                    }
+                }
+            }
+            return space;
         }
     }
 
@@ -130,14 +163,6 @@ public class Autodetect extends NamedStyles {
             for (int i = 0; i < chars.length; i++) {
                 char c = chars[i];
                 if (c == '\n' || c == '\r') {
-                    if (c == '\n') {
-                        if (i == 0 || chars[i - 1] != '\r') {
-                            stats.linesWithLFNewLines++;
-                        } else {
-                            stats.linesWithCRLFNewLines++;
-                        }
-                    }
-
                     indent = 0;
                     continue;
                 }

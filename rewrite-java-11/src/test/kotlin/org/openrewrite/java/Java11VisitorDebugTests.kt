@@ -288,6 +288,10 @@ class Java11NormalizeFormatTest : Java11Test, NormalizeFormatTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11NormalizeLineBreaksTest : Java11Test, NormalizeLineBreaksTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11NormalizeTabsOrSpacesTest : Java11Test, NormalizeTabsOrSpacesTest
 
 @DebugOnly

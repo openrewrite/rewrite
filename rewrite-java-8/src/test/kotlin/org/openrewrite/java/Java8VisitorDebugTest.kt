@@ -280,6 +280,10 @@ class Java8NormalizeFormatTest : Java8Test, NormalizeFormatTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8NormalizeLineBreaksTest : Java8Test, NormalizeLineBreaksTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8NormalizeTabsOrSpacesTest : Java8Test, NormalizeTabsOrSpacesTest
 
 @DebugOnly
