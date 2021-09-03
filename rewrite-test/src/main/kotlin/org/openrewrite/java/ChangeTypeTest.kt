@@ -944,6 +944,65 @@ interface ChangeTypeTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/978")
+    @Test
+    fun onlyUpdateApplicableImport(jp: JavaParser) = assertChanged(
+        jp,
+        dependsOn = arrayOf("""
+            package com.acme.product.factory;
+
+            public class V1Factory {
+                public static String getItem() {
+                    return "V1Factory";
+                }
+            }
+        """,
+            """
+            package com.acme.product.factory;
+
+            public class V2Factory {
+                public static String getItem() {
+                    return "V2Factory";
+                }
+            }
+        """),
+        recipe = ChangeType("com.acme.product.factory.V1Factory","com.acme.product.factory.V1FactoryA"),
+        before = """
+            import com.acme.product.factory.V1Factory;
+
+            import static com.acme.product.factory.V2Factory.getItem;
+
+            public class UseFactories {
+                static class MyV1Factory extends V1Factory {
+                    static String getMyItemInherited() {
+                        return getItem();
+                    }
+                }
+
+                static String getMyItemStaticImport() {
+                    return getItem();
+                }
+            }
+        """,
+        after = """
+            import com.acme.product.factory.V1FactoryA;
+
+            import static com.acme.product.factory.V2Factory.getItem;
+
+            public class UseFactories {
+                static class MyV1Factory extends V1FactoryA {
+                    static String getMyItemInherited() {
+                        return getItem();
+                    }
+                }
+
+                static String getMyItemStaticImport() {
+                    return getItem();
+                }
+            }
+        """
+    )
+
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {

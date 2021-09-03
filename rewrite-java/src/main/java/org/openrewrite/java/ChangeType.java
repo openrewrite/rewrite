@@ -29,6 +29,7 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
 import java.util.Stack;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -224,7 +225,22 @@ public class ChangeType extends Recipe {
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             if (method.getType() != null && method.getType().hasFlags(Flag.Static)) {
                 if (method.getType().getDeclaringType().isAssignableFrom(originalType)) {
-                    maybeAddImport(((JavaType.FullyQualified) targetType).getFullyQualifiedName(), method.getName().getSimpleName());
+                    J.CompilationUnit cu = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
+                    AtomicBoolean importStatic = new AtomicBoolean(false);
+
+                    for (J.Import anImport : cu.getImports()) {
+                        if (anImport.isStatic() && anImport.getQualid().getTarget().getType() != null) {
+                            JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(anImport.getQualid().getTarget().getType());
+                            if (fqn != null && TypeUtils.isOfClassType(fqn, originalType.getFullyQualifiedName()) &&
+                                    method.getSimpleName().equals(anImport.getQualid().getSimpleName())) {
+                                importStatic.set(true);
+                            }
+                        }
+                    }
+
+                    if (importStatic.get()) {
+                        maybeAddImport(((JavaType.FullyQualified) targetType).getFullyQualifiedName(), method.getName().getSimpleName());
+                    }
                 }
             }
             return super.visitMethodInvocation(method, ctx);
