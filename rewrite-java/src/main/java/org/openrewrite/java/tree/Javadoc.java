@@ -606,6 +606,7 @@ public interface Javadoc extends Serializable, Tree {
         UUID id;
 
         Markers markers;
+        List<Javadoc> beforeServiceType;
         J serviceType;
         List<Javadoc> description;
 

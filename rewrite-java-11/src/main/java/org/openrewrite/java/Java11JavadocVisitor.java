@@ -395,7 +395,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
                     Javadoc.Text text = (Javadoc.Text) desc;
                     return text.withText(text.getText());
                 } else {
-                    return ListUtils.concat(desc, sourceBefore("}"));
+                    return ListUtils.concat(desc, endBrace());
                 }
             }
             return desc;
@@ -714,9 +714,9 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
             if (i == summary.size() - 1) {
                 if (sum instanceof Javadoc.Text) {
                     Javadoc.Text text = (Javadoc.Text) sum;
-                    return text.withText(text.getText() + sourceBefore("}"));
+                    return ListUtils.concat(text.withText(text.getText()), endBrace());
                 } else {
-                    return ListUtils.concat(sum, sourceBefore("}"));
+                    return ListUtils.concat(sum, endBrace());
                 }
             }
             return sum;
@@ -745,7 +745,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     public List<Javadoc> visitText(String node) {
         List<Javadoc> texts = new ArrayList<>();
 
-        if(!node.isEmpty() && Character.isWhitespace(node.charAt(0)) &&
+        if (!node.isEmpty() && Character.isWhitespace(node.charAt(0)) &&
                 !Character.isWhitespace(source.charAt(cursor))) {
             node = node.stripLeading();
         }
@@ -817,6 +817,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     public Tree visitUses(UsesTree node, List<Javadoc> body) {
         body.addAll(sourceBefore("@uses"));
         return new Javadoc.Uses(randomId(), Markers.EMPTY,
+                whitespaceBefore(),
                 visitReference(node.getServiceType(), body),
                 convertMultiline(node.getDescription())
         );
@@ -916,10 +917,16 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     }
 
     private List<Javadoc> endBrace() {
-        if (cursor < source.length() && source.charAt(cursor) == '}') {
-            List<Javadoc> end = ListUtils.concat(whitespaceBefore(), new Javadoc.Text(randomId(), Markers.EMPTY, "}"));
-            cursor++;
-            return end;
+        if (cursor < source.length()) {
+            int tempCursor = cursor;
+            List<Javadoc> end = whitespaceBefore();
+            if (cursor < source.length() && source.charAt(cursor) == '}') {
+                end = ListUtils.concat(end, new Javadoc.Text(randomId(), Markers.EMPTY, "}"));
+                cursor++;
+                return end;
+            } else {
+                cursor = tempCursor;
+            }
         }
         return emptyList();
     }

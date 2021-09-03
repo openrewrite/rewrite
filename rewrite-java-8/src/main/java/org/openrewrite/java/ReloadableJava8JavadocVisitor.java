@@ -476,7 +476,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
             attr.attribType(ref.qualifierExpression, symbol);
             qualifier = (TypedTree) javaVisitor.scan(ref.qualifierExpression, Space.EMPTY);
             qualifierType = qualifier.getType();
-            if(ref.memberName != null) {
+            if (ref.memberName != null) {
                 cursor++; // skip #
             }
         } else {
@@ -681,7 +681,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
     public List<Javadoc> visitText(String node) {
         List<Javadoc> texts = new ArrayList<>();
 
-        if(!node.isEmpty() && Character.isWhitespace(node.charAt(0)) &&
+        if (!node.isEmpty() && Character.isWhitespace(node.charAt(0)) &&
                 !Character.isWhitespace(source.charAt(cursor))) {
             char[] charArray = node.toCharArray();
 
@@ -819,7 +819,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         List<Javadoc> whitespace = new ArrayList<>();
 
         Javadoc.LineBreak lineBreak;
-        while((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
+        while ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
             cursor++;
             whitespace.add(lineBreak);
         }
@@ -849,10 +849,16 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
     }
 
     private List<Javadoc> endBrace() {
-        if (cursor < source.length() && source.charAt(cursor) == '}') {
-            List<Javadoc> end = ListUtils.concat(whitespaceBefore(), new Javadoc.Text(randomId(), Markers.EMPTY, "}"));
-            cursor++;
-            return end;
+        if (cursor < source.length()) {
+            int tempCursor = cursor;
+            List<Javadoc> end = whitespaceBefore();
+            if (cursor < source.length() && source.charAt(cursor) == '}') {
+                end = ListUtils.concat(end, new Javadoc.Text(randomId(), Markers.EMPTY, "}"));
+                cursor++;
+                return end;
+            } else {
+                cursor = tempCursor;
+            }
         }
         return emptyList();
     }

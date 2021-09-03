@@ -179,6 +179,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
         visitMarkers(value.getMarkers(), p);
         StringBuilder acc = getPrinter();
         acc.append("{@value");
+        visit(value.getSpaceBeforeTree(), p);
         javaVisitor.visit(value.getTree(), p);
         visit(value.getEndBrace(), p);
         return value;
@@ -361,6 +362,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
         visitMarkers(uses.getMarkers(), p);
         StringBuilder acc = getPrinter();
         acc.append("@uses");
+        visit(uses.getBeforeServiceType(), p);
         javaVisitor.visit(uses.getServiceType(), p);
         visit(uses.getDescription(), p);
         return uses;

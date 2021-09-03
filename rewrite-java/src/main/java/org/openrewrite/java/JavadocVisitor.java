@@ -243,6 +243,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
 
     public Javadoc visitUses(Javadoc.Uses uses, P p) {
         Javadoc.Uses u = uses;
+        u = u.withBeforeServiceType(ListUtils.map(u.getBeforeServiceType(), b -> visit(b, p)));
         u = u.withServiceType(javaVisitor.visit(u.getServiceType(), p));
         u = u.withDescription(ListUtils.map(u.getDescription(), d -> visit(d, p)));
         return u;
