@@ -339,7 +339,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         return new Javadoc.DocRoot(
                 randomId(),
                 Markers.EMPTY,
-                sourceBefore("}")
+                endBrace()
         );
     }
 
@@ -848,9 +848,18 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
     }
 
     private List<Javadoc> endBrace() {
-        if (cursor < source.length() && source.charAt(cursor) == '}') {
-            cursor++;
-            return singletonList(new Javadoc.Text(randomId(), Markers.EMPTY, "}"));
+        if (cursor < source.length()) {
+            for (int i = cursor; i < source.length(); i++) {
+                char c = source.charAt(i);
+                if (!Character.isWhitespace(c)) {
+                    if (c == '}') {
+                        String postFix = source.substring(cursor, i + 1);
+                        cursor += postFix.length();
+                        return singletonList(new Javadoc.Text(randomId(), Markers.EMPTY, postFix));
+                    }
+                    break;
+                }
+            }
         }
         return emptyList();
     }

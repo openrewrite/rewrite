@@ -916,9 +916,18 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     }
 
     private List<Javadoc> endBrace() {
-        if (cursor < source.length() && source.charAt(cursor) == '}') {
-            cursor++;
-            return singletonList(new Javadoc.Text(randomId(), Markers.EMPTY, "}"));
+        if (cursor < source.length()) {
+            for (int i = cursor; i < source.length(); i++) {
+                char c = source.charAt(i);
+                if (!Character.isWhitespace(c)) {
+                    if (c == '}') {
+                        String postFix = source.substring(cursor, i + 1);
+                        cursor += postFix.length();
+                        return singletonList(new Javadoc.Text(randomId(), Markers.EMPTY, postFix));
+                    }
+                    break;
+                }
+            }
         }
         return emptyList();
     }
