@@ -514,7 +514,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
             attr.attribType(ref.qualifierExpression, symbol);
             qualifier = (TypedTree) javaVisitor.scan(ref.qualifierExpression, Space.EMPTY);
             qualifierType = qualifier.getType();
-            if(ref.memberName != null) {
+            if (ref.memberName != null) {
                 cursor++; // skip #
             }
         } else {
@@ -745,6 +745,11 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     public List<Javadoc> visitText(String node) {
         List<Javadoc> texts = new ArrayList<>();
 
+        if(!node.isEmpty() && Character.isWhitespace(node.charAt(0)) &&
+                !Character.isWhitespace(source.charAt(cursor))) {
+            node = node.stripLeading();
+        }
+
         char[] textArr = node.toCharArray();
         StringBuilder text = new StringBuilder();
         for (char c : textArr) {
@@ -881,7 +886,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
         List<Javadoc> whitespace = new ArrayList<>();
 
         Javadoc.LineBreak lineBreak;
-        while((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
+        while ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
             cursor++;
             whitespace.add(lineBreak);
         }
@@ -921,6 +926,11 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     private List<Javadoc> convertMultiline(List<? extends DocTree> dts) {
         List<Javadoc> js = new ArrayList<>(dts.size());
         Javadoc.LineBreak lineBreak;
+        while ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
+            cursor++;
+            js.add(lineBreak);
+        }
+
         for (int i = 0; i < dts.size(); i++) {
             DocTree dt = dts.get(i);
             if (i > 0 && dt instanceof DCTree.DCText) {

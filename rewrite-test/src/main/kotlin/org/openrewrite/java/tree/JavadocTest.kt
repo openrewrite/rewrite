@@ -552,6 +552,19 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
+    @Test
+    fun multilineAttribute(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+            /**
+             * <a href="
+             * https://...html">
+             * label</a>.
+             */
+            class Test {
+            }
+        """.trimIndent()
+    )
+
     @Disabled
     @Test
     fun lineBreakInParam(jp: JavaParser) = assertParsePrintAndProcess(
