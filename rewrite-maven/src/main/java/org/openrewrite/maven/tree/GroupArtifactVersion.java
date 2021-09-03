@@ -16,6 +16,7 @@
 
 package org.openrewrite.maven.tree;
 
+import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -23,6 +24,8 @@ import org.openrewrite.internal.lang.Nullable;
 public class GroupArtifactVersion {
     String groupId;
     String artifactId;
+
+    @EqualsAndHashCode.Exclude
     String requestedVersion;
     String version;
 
