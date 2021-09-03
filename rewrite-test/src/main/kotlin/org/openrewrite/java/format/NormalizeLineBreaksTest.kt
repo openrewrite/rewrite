@@ -16,54 +16,78 @@
 package org.openrewrite.java.format
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
-import org.openrewrite.ExecutionContext
-import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.style.GeneralFormatStyle
 
-interface NormalizeLineBreaksTest {
+interface NormalizeLineBreaksTest: JavaRecipeTest {
+    companion object {
+        const val windows = "" +
+                "class Test {\r\n" +
+                "    // some comment\r\n" +
+                "    public void test() {\r\n" +
+                "        System.out.println();\r\n" +
+                "    }\r\n" +
+                "}"
 
-    @Test
-    fun simpleFileToLinuxLineFeed(jp: JavaParser) {
-        val style = GeneralFormatStyle(false)
-        val before =
-            "class Test {\r\n" +
-                    "    // some comment\r\n" +
-                    "    public void test() {\n" +
-                    "        System.out.println();\n" +
-                    "    }\r\n" +
-                    "}\n"
-        val expected =
-            "class Test {\n" +
-                    "    // some comment\n" +
-                    "    public void test() {\n" +
-                    "        System.out.println();\n" +
-                    "    }\n" +
-                    "}\n"
-        val after = NormalizeLineBreaksVisitor<ExecutionContext>(style).visit(jp.parse(before)[0], InMemoryExecutionContext())!!.print()
-        assertThat(after).isEqualTo(expected)
+        const val linux = "" +
+                "class Test {\n" +
+                "    // some comment\n" +
+                "    public void test() {\n" +
+                "        System.out.println();\n" +
+                "    }\n" +
+                "}"
+
+        const val windowsJavadoc = "" +
+                "/**\r\n" +
+                " *\r\n" +
+                " */\r\n" +
+                "class Test {\r\n" +
+                "}"
+
+        const val linuxJavadoc = "" +
+                "/**\n" +
+                " *\n" +
+                " */\n" +
+                "class Test {\n" +
+                "}"
     }
 
     @Test
-    fun simpleFileToWindowsLineEnd(jp: JavaParser) {
-        val style = GeneralFormatStyle(true)
-        val before =
-            "class Test {\r\n" +
-                    "    // some comment\r\n" +
-                    "    public void test() {\n" +
-                    "        System.out.println();\n" +
-                    "    }\r\n" +
-                    "}\n"
-        val expected =
-            "class Test {\r\n" +
-                    "    // some comment\r\n" +
-                    "    public void test() {\r\n" +
-                    "        System.out.println();\r\n" +
-                    "    }\r\n" +
-                    "}\r\n"
-
-        val after = NormalizeLineBreaksVisitor<ExecutionContext>(style).visit(jp.parse(before)[0], InMemoryExecutionContext())!!.print()
-        assertThat(after).isEqualTo(expected)
+    fun trimKeepCRLF() {
+        assertThat("\n  test\r\n  test".replace('\r', '⏎').trimIndent()
+            .replace('⏎', '\r')).isEqualTo("test\r\ntest")
     }
+
+    @Test
+    fun windowsToLinux(jp: JavaParser) = assertChanged(
+        recipe = toRecipe { NormalizeLineBreaksVisitor(GeneralFormatStyle(false)) },
+        before = windows,
+        after = linux
+    )
+
+    @Test
+    fun linuxToWindows(jp: JavaParser) = assertChanged(
+        recipe = toRecipe { NormalizeLineBreaksVisitor(GeneralFormatStyle(true)) },
+        before = linux,
+        after = windows
+    )
+
+    @Disabled
+    @Test
+    fun windowsToLinuxJavadoc(jp: JavaParser) = assertChanged(
+        recipe = toRecipe { NormalizeLineBreaksVisitor(GeneralFormatStyle(false)) },
+        before = windowsJavadoc,
+        after = linuxJavadoc
+    )
+
+    @Disabled
+    @Test
+    fun linuxToWindowsJavadoc(jp: JavaParser) = assertChanged(
+        recipe = toRecipe { NormalizeLineBreaksVisitor(GeneralFormatStyle(true)) },
+        before = linuxJavadoc,
+        after = windowsJavadoc
+    )
 }

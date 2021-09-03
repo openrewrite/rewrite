@@ -55,7 +55,7 @@ interface RecipeTest <T: SourceFile> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (T) -> Unit = { }
     ) {
-        val inputs = arrayOf(before.trimIndent()) + dependsOn.map(String::trimIndent)
+        val inputs = arrayOf(before.trimIndentPreserveCRLF()) + dependsOn.map { s -> s.trimIndentPreserveCRLF() }
         val sources = parser.parse(executionContext, *inputs )
 
         assertThat(sources.size)
@@ -129,7 +129,7 @@ interface RecipeTest <T: SourceFile> {
         assertThat(result).`as`("The recipe must make changes").isNotNull
         assertThat(result!!.after).isNotNull
         val actual = result.after!!.print(treePrinter ?: TreePrinter.identity<Any>(), null)
-        val expected = after.trimIndent()
+        val expected = after.trimIndentPreserveCRLF()
         assertThat(actual).isEqualTo(expected)
         afterConditions(result.after as T)
 
@@ -142,7 +142,7 @@ interface RecipeTest <T: SourceFile> {
         before: String,
         dependsOn: Array<String> = emptyArray()
     ) {
-        val inputs = arrayOf(before.trimIndent()) + dependsOn.map(String::trimIndent)
+        val inputs = arrayOf(before.trimIndentPreserveCRLF()) + dependsOn.map { s -> s.trimIndentPreserveCRLF() }
         val sources = parser.parse(executionContext, *inputs)
 
         assertThat(sources.size)
@@ -247,7 +247,7 @@ interface RecipeTest <T: SourceFile> {
                 assertThat(result).`as`("The recipe must make changes").isNotNull
                 assertThat(result!!.after).isNotNull
                 assertThat(result.after!!.print(treePrinter ?: TreePrinter.identity<Any>(), null))
-                    .isEqualTo(after.trimIndent())
+                    .isEqualTo(after.trimIndentPreserveCRLF())
                 afterConditions(result.after as T)
 
                 recipeSchedulerCheckingExpectedCycles.verify()
@@ -351,4 +351,6 @@ interface RecipeTest <T: SourceFile> {
             }
         }
     }
+
+    private fun String.trimIndentPreserveCRLF() = replace('\r', '⏎').trimIndent().replace('⏎', '\r')
 }
