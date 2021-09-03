@@ -150,7 +150,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         source = javadocContent.toString();
 
         if (marginBuilder != null && marginBuilder.length() > 0) {
-            if (javadocContent.charAt(0) != '\n') {
+            if (javadocContent.length() > 0 && javadocContent.charAt(0) != '\n') {
                 lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(),
                         marginBuilder.toString(), Markers.EMPTY));
                 source = source.substring(0, source.length() - 1); // strip trailing newline
@@ -805,6 +805,13 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         }
 
         List<Javadoc> whitespace = new ArrayList<>();
+
+        Javadoc.LineBreak lineBreak;
+        while((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
+            cursor++;
+            whitespace.add(lineBreak);
+        }
+
         StringBuilder space = new StringBuilder();
         for (; cursor < source.length() && Character.isWhitespace(source.charAt(cursor)); cursor++) {
             char c = source.charAt(cursor);
@@ -814,7 +821,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                 }
                 space = new StringBuilder();
 
-                Javadoc.LineBreak lineBreak = lineBreaks.remove(cursor);
+                lineBreak = lineBreaks.remove(cursor);
                 assert lineBreak != null;
                 whitespace.add(lineBreak);
             } else {

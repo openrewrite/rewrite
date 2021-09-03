@@ -879,6 +879,13 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
         }
 
         List<Javadoc> whitespace = new ArrayList<>();
+
+        Javadoc.LineBreak lineBreak;
+        while((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
+            cursor++;
+            whitespace.add(lineBreak);
+        }
+
         StringBuilder space = new StringBuilder();
         for (; cursor < source.length() && Character.isWhitespace(source.charAt(cursor)); cursor++) {
             char c = source.charAt(cursor);
@@ -888,7 +895,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
                 }
                 space = new StringBuilder();
 
-                Javadoc.LineBreak lineBreak = lineBreaks.remove(cursor);
+                lineBreak = lineBreaks.remove(cursor);
                 assert lineBreak != null;
                 whitespace.add(lineBreak);
             } else {
