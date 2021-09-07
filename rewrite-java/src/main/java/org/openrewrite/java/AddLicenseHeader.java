@@ -33,7 +33,7 @@ import java.util.Collections;
 @EqualsAndHashCode(callSuper = true)
 public class AddLicenseHeader extends Recipe {
     /**
-     * A method pattern, expressed as a pointcut expression, that is used to find matching method declarations/invocations.
+     * A method pattern that is used to find matching method declarations/invocations.
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
     @Option(displayName = "License text",

@@ -38,8 +38,8 @@ import java.util.regex.Pattern;
 import static java.util.stream.Collectors.joining;
 
 /**
- * This class accepts an AspectJ pointcut expression and is used to identify methods that match the expression. The
- * format of the pointcut expression is as follows:
+ * This class accepts an AspectJ method pattern and is used to identify methods that match the expression. The
+ * format of the method pattern is as follows:
  * <P><P><B>
  * #declaring class# #method name#(#argument list#)
  * </B><P>

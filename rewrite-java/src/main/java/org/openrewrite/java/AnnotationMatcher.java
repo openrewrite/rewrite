@@ -27,7 +27,7 @@ import org.openrewrite.java.tree.TypeUtils;
 /**
  * This matcher will find all annotations matching the annotation pattern
  * <p>
- * The annotation pattern, expressed as a pointcut expression, is used to find matching annotations. The format of the
+ * The annotation pattern, expressed as a method pattern, is used to find matching annotations. The format of the
  * expression is as follows:
  * <P><P><B>
  * {@literal @}#annotationClass#(#parameterName#=#parameterValue#, #parameterName#=#parameterValue#...)

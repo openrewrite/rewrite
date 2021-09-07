@@ -38,7 +38,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
     @Option(displayName = "Method pattern",
-            description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations. " +
+            description = "A method pattern that is used to find matching method invocations. " +
                     "The original method call may or may not be a static method invocation.",
             example = "com.google.common.collect.ImmutableSet of(..)")
     String methodPattern;

@@ -29,7 +29,7 @@ import org.openrewrite.java.tree.*;
 public class ChangeMethodName extends Recipe {
 
     @Option(displayName = "Method pattern",
-            description = "A method pattern, expressed as a pointcut expression, that is used to find matching method declarations/invocations.",
+            description = "A method pattern that is used to find matching method declarations/invocations.",
             example = "org.mockito.Matchers anyVararg()")
     String methodPattern;
 

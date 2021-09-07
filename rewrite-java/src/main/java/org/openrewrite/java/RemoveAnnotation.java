@@ -24,7 +24,7 @@ import org.openrewrite.Recipe;
 @Value
 public class RemoveAnnotation extends Recipe {
     @Option(displayName = "Annotation pattern",
-            description = "An annotation pattern, expressed as a pointcut expression.",
+            description = "An annotation pattern, expressed as a method pattern.",
             example = "@java.lang.SuppressWarnings(\"deprecation\")")
     String annotationPattern;
 

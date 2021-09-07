@@ -39,7 +39,7 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(callSuper = true)
 public class FindDeprecatedMethods extends Recipe {
     @Option(displayName = "Method pattern",
-            description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.",
+            description = "A method pattern that is used to find matching method invocations.",
             example = "java.util.List add(..)",
             required = false)
     @Nullable

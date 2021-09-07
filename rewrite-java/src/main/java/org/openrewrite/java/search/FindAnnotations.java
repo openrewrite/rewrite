@@ -34,11 +34,11 @@ import java.util.Set;
 @Value
 public class FindAnnotations extends Recipe {
     /**
-     * An annotation pattern, expressed as a pointcut expression.
+     * An annotation pattern, expressed as a method pattern.
      * See {@link AnnotationMatcher} for syntax.
      */
     @Option(displayName = "Annotation pattern",
-            description = "An annotation pattern, expressed as a pointcut expression.",
+            description = "An annotation pattern, expressed as a method pattern.",
             example = "@java.lang.SuppressWarnings(\"deprecation\")")
     String annotationPattern;
 

@@ -32,11 +32,11 @@ import org.openrewrite.java.tree.JavaType;
 public class UseStaticImport extends Recipe {
 
     /**
-     * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
+     * A method pattern that is used to find matching method invocations.
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
     @Option(displayName = "Method pattern",
-            description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.",
+            description = "A method pattern that is used to find matching method invocations.",
             example = "java.util.Collections emptyList()")
     String methodPattern;
 

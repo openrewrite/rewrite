@@ -30,11 +30,11 @@ import org.openrewrite.java.tree.J;
 @EqualsAndHashCode(callSuper = true)
 public class ResultOfMethodCallIgnored extends Recipe {
     /**
-     * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
+     * A method pattern that is used to find matching method invocations.
      * See {@link MethodMatcher} for details on the expression's syntax.
      */
     @Option(displayName = "Method pattern",
-            description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.",
+            description = "A method pattern that is used to find matching method invocations.",
             example = "java.io.File mkdir*()")
     String methodPattern;
 

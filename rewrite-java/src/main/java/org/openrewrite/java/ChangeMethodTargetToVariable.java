@@ -37,11 +37,11 @@ import static org.openrewrite.Tree.randomId;
 public class ChangeMethodTargetToVariable extends Recipe {
 
     /**
-     * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
+     * A method pattern that is used to find matching method invocations.
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
     @Option(displayName = "Method pattern",
-            description = "A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.",
+            description = "A method pattern that is used to find matching method invocations.",
             example = "org.mycorp.A method(..)")
     String methodPattern;
 
