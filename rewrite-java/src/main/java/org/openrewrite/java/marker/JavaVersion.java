@@ -17,19 +17,10 @@ package org.openrewrite.java.marker;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
-import io.github.classgraph.*;
 import lombok.*;
-import lombok.experimental.FieldDefaults;
-import org.openrewrite.Incubating;
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.tree.Flag;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Marker;
 
-import java.nio.file.Path;
 import java.util.*;
-
-import static java.util.Collections.emptyList;
 
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -43,4 +34,25 @@ public class JavaVersion implements Marker {
     String vmVendor;
     String sourceCompatibility;
     String targetCompatibility;
+
+    public int getMajorVersion() {
+        try {
+            return Integer.parseInt(normalize(sourceCompatibility));
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    private String normalize(String version) {
+        if (!version.contains(".")) {
+            return version;
+        }
+
+        if (version.startsWith("1.")) {
+            String removePrefix = version.substring(version.indexOf(".") + 1);
+            return removePrefix.substring(0, version.indexOf("."));
+        } else {
+            return version.substring(0, version.indexOf("."));
+        }
+    }
 }
