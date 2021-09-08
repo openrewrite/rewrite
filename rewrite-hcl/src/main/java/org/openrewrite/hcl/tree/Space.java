@@ -117,10 +117,11 @@ public class Space {
         if (comments.isEmpty() && whitespace.isEmpty()) {
             return Space.EMPTY;
         }
-        if (!whitespace.equals(this.whitespace)) {
-            return build(whitespace, comments);
+
+        if ((whitespace.isEmpty() && this.whitespace == null) || whitespace.equals(this.whitespace)) {
+            return this;
         }
-        return this;
+        return build(whitespace, comments);
     }
 
     public boolean isEmpty() {
