@@ -117,6 +117,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class ExplicitInitializationTck : ExplicitInitializationTest
 
     @Nested
+    inner class ExplicitLambdaArgumentTypesTck : ExplicitLambdaArgumentTypesTest
+
+    @Nested
     inner class FallThroughTck : FallThroughTest
 
     @Nested

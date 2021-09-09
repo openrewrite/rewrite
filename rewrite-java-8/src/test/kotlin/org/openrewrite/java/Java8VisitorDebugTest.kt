@@ -140,6 +140,10 @@ class Java8ExplicitInitializationTest : Java8Test, ExplicitInitializationTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8ExplicitLambdaArgumentTypesTest : Java8Test, ExplicitLambdaArgumentTypesTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8FallThroughTest : Java8Test, FallThroughTest
 
 @DebugOnly
