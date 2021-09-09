@@ -30,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class NpmRegistryModuleLoaderTest {
 
     @Test
-    void must_load_module_from_npmjs_org() {
+    void mustLoadModuleFromNpmjsOrg() {
         NpmRegistryModuleLoader loader = new NpmRegistryModuleLoader("https://registry.npmjs.org/", "@openrewrite/ts-recipes");
         assertThat(loader.listRecipes()).isNotEmpty();
 
@@ -42,7 +42,7 @@ class NpmRegistryModuleLoaderTest {
 
     @Disabled
     @Test
-    void must_load_module_from_local() {
+    void mustLoadModuleFromLocal() {
         String registry = Paths.get("src", "test", "resources").toString();
         NpmRegistryModuleLoader loader = new NpmRegistryModuleLoader(registry, "ts-recipes");
         assertThat(loader.listRecipes()).isNotEmpty();
