@@ -81,7 +81,8 @@ public class RecipeIntrospectionUtils {
             recipeList.add(recipeDescriptorFromRecipe(childRecipe));
         }
         return new RecipeDescriptor(recipe.getName(), recipe.getDisplayName(), recipe.getDescription(),
-                recipe.getTags(), emptyList(), recipe.getLanguages(), recipeList, source);
+                recipe.getTags(), recipe.getEstimatedEffortPerOccurrence(),
+                emptyList(), recipe.getLanguages(), recipeList, source);
     }
 
     public static Constructor<?> getPrimaryConstructor(Class<?> recipeClass) {
@@ -124,8 +125,9 @@ public class RecipeIntrospectionUtils {
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
-        return new RecipeDescriptor(recipe.getName(), recipe.getDisplayName(), recipe.getDescription(),
-                recipe.getTags(), options, recipe.getLanguages(), recipeList, recipeSource);
+        return new RecipeDescriptor(recipe.getName(), recipe.getDisplayName(),
+                recipe.getDescription(), recipe.getTags(), recipe.getEstimatedEffortPerOccurrence(),
+                options, recipe.getLanguages(), recipeList, recipeSource);
     }
 
     public static Recipe constructRecipe(Class<?> recipeClass) {

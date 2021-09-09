@@ -16,19 +16,27 @@
 package org.openrewrite.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import lombok.RequiredArgsConstructor;
 import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.net.URI;
+import java.time.Duration;
 import java.util.*;
 
 import static org.openrewrite.Validated.invalid;
 
+@RequiredArgsConstructor
 public class DeclarativeRecipe extends Recipe {
     private final String name;
     private final String displayName;
     private final String description;
     private final Set<String> tags;
+
+    @Nullable
+    private final Duration estimatedEffortPerOccurrence;
+
     private final URI source;
     private final List<String> lazyNext = new ArrayList<>();
 
@@ -46,14 +54,6 @@ public class DeclarativeRecipe extends Recipe {
     private Validated validation = Validated.test("initialization",
             "initialize(..) must be called on DeclarativeRecipe prior to use.",
             this, r -> lazyNext.isEmpty());
-
-    public DeclarativeRecipe(String name, String displayName, String description, Set<String> tags, URI source) {
-        this.name = name;
-        this.displayName = displayName;
-        this.description = description;
-        this.tags = tags;
-        this.source = source;
-    }
 
     @Override
     public Set<String> getTags() {

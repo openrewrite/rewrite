@@ -40,6 +40,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -169,7 +170,14 @@ public class YamlResourceLoader implements ResourceLoader {
                     if (rawTags != null) {
                         tags = new HashSet<>(rawTags);
                     }
-                    DeclarativeRecipe recipe = new DeclarativeRecipe(name, displayName, description, tags, source);
+
+                    String estimatedEffortPerOccurrenceStr = (String) r.get("estimatedEffortPerOccurrence");
+                    Duration estimatedEffortPerOccurrence = null;
+                    if(estimatedEffortPerOccurrenceStr != null) {
+                        estimatedEffortPerOccurrence = Duration.parse(estimatedEffortPerOccurrenceStr);
+                    }
+
+                    DeclarativeRecipe recipe = new DeclarativeRecipe(name, displayName, description, tags, estimatedEffortPerOccurrence, source);
                     List<Object> recipeList = (List<Object>) r.get("recipeList");
                     if (recipeList == null) {
                         throw new RecipeException("Invalid Recipe [" + name + "] recipeList is null");

@@ -30,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
+import java.time.Duration;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
@@ -125,6 +126,14 @@ public abstract class Recipe {
      */
     public Set<String> getTags() {
         return Collections.emptySet();
+    }
+
+    /**
+     * @return An estimated effort were a developer to fix manually instead of using this recipe.
+     */
+    @Nullable
+    public Duration getEstimatedEffortPerOccurrence() {
+        return null;
     }
 
     public final RecipeDescriptor getDescriptor() {

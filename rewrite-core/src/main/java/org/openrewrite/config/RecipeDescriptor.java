@@ -18,8 +18,10 @@ package org.openrewrite.config;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.net.URI;
+import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 
@@ -34,6 +36,9 @@ public class RecipeDescriptor {
     String description;
 
     Set<String> tags;
+
+    @Nullable
+    Duration estimatedEffortPerOccurrence;
 
     List<OptionDescriptor> options;
 
