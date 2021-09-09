@@ -21,6 +21,7 @@ import io.github.classgraph.*;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.Flag;
@@ -43,7 +44,7 @@ public class JavaSourceSet implements Marker {
     String name;
     Set<JavaType.FullyQualified> classpath;
 
-    public static JavaSourceSet build(String sourceSetName, Iterable<Path> classpath) {
+    public static JavaSourceSet build(String sourceSetName, Iterable<Path> classpath, ExecutionContext ctx) {
         Set<JavaType.FullyQualified> fqns = new HashSet<>();
         if (classpath.iterator().hasNext()) {
             for (ClassInfo classInfo : new ClassGraph()
@@ -55,7 +56,11 @@ public class JavaSourceSet implements Marker {
                     .enableFieldInfo()
                     .scan()
                     .getAllClasses()) {
-                fqns.add(fromClassInfo(classInfo, new Stack<>()));
+                try {
+                    fqns.add(fromClassInfo(classInfo, new Stack<>(), ctx));
+                } catch (Exception e) {
+                    ctx.getOnError().accept(e);
+                }
             }
 
             for (ClassInfo classInfo : new ClassGraph()
@@ -68,14 +73,18 @@ public class JavaSourceSet implements Marker {
                     .acceptPackages("java")
                     .scan()
                     .getAllClasses()) {
-                fqns.add(fromClassInfo(classInfo, new Stack<>()));
+                try {
+                    fqns.add(fromClassInfo(classInfo, new Stack<>(), ctx));
+                } catch (Exception e) {
+                    ctx.getOnError().accept(e);
+                }
             }
         }
 
         return new JavaSourceSet(Tree.randomId(), sourceSetName, fqns);
     }
 
-    private static JavaType.FullyQualified fromClassInfo(ClassInfo aClass, Stack<ClassInfo> stack) {
+    private static JavaType.FullyQualified fromClassInfo(ClassInfo aClass, Stack<ClassInfo> stack, ExecutionContext ctx) {
         JavaType.Class existing = JavaType.Class.find(aClass.getName());
         if (existing != null) {
             return existing;
@@ -100,8 +109,8 @@ public class JavaSourceSet implements Marker {
             kind = JavaType.Class.Kind.Class;
         }
 
-        List<JavaType.Variable> variables = fromFieldInfo(aClass.getFieldInfo(), stack);
-        List<JavaType.Method> methods = fromMethodInfo(aClass.getMethodInfo(), stack);
+        List<JavaType.Variable> variables = fromFieldInfo(aClass.getFieldInfo(), stack, ctx);
+        List<JavaType.Method> methods = fromMethodInfo(aClass.getMethodInfo(), stack, ctx);
 
         return JavaType.Class.build(
                 Flag.flagsToBitMap(flags),
@@ -116,15 +125,15 @@ public class JavaSourceSet implements Marker {
                 false);
     }
 
-    private static List<JavaType.Variable> fromFieldInfo(@Nullable FieldInfoList fieldInfos, Stack<ClassInfo> stack) {
+    private static List<JavaType.Variable> fromFieldInfo(@Nullable FieldInfoList fieldInfos, Stack<ClassInfo> stack, ExecutionContext ctx) {
         if (fieldInfos != null) {
             List<JavaType.Variable> variables = new ArrayList<>(fieldInfos.size());
             for (FieldInfo fieldInfo : fieldInfos) {
-                JavaType.FullyQualified owner = fromClassInfo(fieldInfo.getClassInfo(), stack);
+                JavaType.FullyQualified owner = fromClassInfo(fieldInfo.getClassInfo(), stack, ctx);
 
                 List<JavaType.FullyQualified> annotations = new ArrayList<>(fieldInfo.getAnnotationInfo().size());
                 for (AnnotationInfo annotationInfo : fieldInfo.getAnnotationInfo()) {
-                    annotations.add(fromClassInfo(annotationInfo.getClassInfo(), stack));
+                    annotations.add(fromClassInfo(annotationInfo.getClassInfo(), stack, ctx));
                 }
 
                 Set<Flag> flags = Flag.bitMapToFlags(fieldInfo.getModifiers());
@@ -137,44 +146,55 @@ public class JavaSourceSet implements Marker {
         return emptyList();
     }
 
-    private static List<JavaType.Method> fromMethodInfo(MethodInfoList methodInfos, Stack<ClassInfo> stack) {
+    private static List<JavaType.Method> fromMethodInfo(MethodInfoList methodInfos, Stack<ClassInfo> stack, ExecutionContext ctx) {
         List<JavaType.Method> methods = new ArrayList<>(methodInfos.size());
         for (MethodInfo methodInfo : methodInfos) {
-            Set<Flag> flags = Flag.bitMapToFlags(methodInfo.getModifiers());
-            List<JavaType> parameterTypes = new ArrayList<>(methodInfo.getParameterInfo().length);
-            for (MethodParameterInfo methodParameterInfo : methodInfo.getParameterInfo()) {
-                parameterTypes.add(JavaType.buildType(methodParameterInfo.getTypeDescriptor().toString()));
-            }
-
-            JavaType.Method.Signature signature = new JavaType.Method.Signature(JavaType.buildType(methodInfo.getTypeDescriptor().getResultType().toString()), parameterTypes);
-
-            List<String> methodParams = new ArrayList<>(methodInfo.getParameterInfo().length);
-            for (MethodParameterInfo methodParameterInfo : methodInfo.getParameterInfo()) {
-                methodParams.add(methodParameterInfo.getName());
-            }
-
-            List<JavaType.FullyQualified> thrownExceptions = new ArrayList<>(methodInfo.getTypeDescriptor()
-                    .getThrowsSignatures().size());
-            for (ClassRefOrTypeVariableSignature throwsSignature : methodInfo.getTypeDescriptor().getThrowsSignatures()) {
-                if (throwsSignature instanceof ClassRefTypeSignature) {
-                    thrownExceptions.add(fromClassInfo(((ClassRefTypeSignature) throwsSignature).getClassInfo(), stack));
+            try {
+                Set<Flag> flags = Flag.bitMapToFlags(methodInfo.getModifiers());
+                // The field access modifier "volatile" corresponds to the "bridge" modifier on methods.
+                // We don't represent "bridge" because it is a compiler internal that cannot appear in source code.
+                // See https://github.com/openrewrite/rewrite/issues/995
+                if(flags.contains(Flag.Volatile)) {
+                    continue;
                 }
-            }
 
-            List<JavaType.FullyQualified> annotations = new ArrayList<>(methodInfo.getAnnotationInfo().size());
-            for (AnnotationInfo annotationInfo : methodInfo.getAnnotationInfo()) {
-                annotations.add(fromClassInfo(annotationInfo.getClassInfo(), stack));
-            }
+                List<JavaType> parameterTypes = new ArrayList<>(methodInfo.getParameterInfo().length);
+                for (MethodParameterInfo methodParameterInfo : methodInfo.getParameterInfo()) {
+                    parameterTypes.add(JavaType.buildType(methodParameterInfo.getTypeDescriptor().toString()));
+                }
 
-            methods.add(JavaType.Method.build(
-                    flags,
-                    JavaType.Class.build(methodInfo.getClassName()),
-                    methodInfo.getName(),
-                    null,
-                    signature,
-                    methodParams,
-                    thrownExceptions,
-                    annotations));
+                JavaType.Method.Signature signature = new JavaType.Method.Signature(JavaType.buildType(methodInfo.getTypeDescriptor().getResultType().toString()), parameterTypes);
+
+                List<String> methodParams = new ArrayList<>(methodInfo.getParameterInfo().length);
+                for (MethodParameterInfo methodParameterInfo : methodInfo.getParameterInfo()) {
+                    methodParams.add(methodParameterInfo.getName());
+                }
+
+                List<JavaType.FullyQualified> thrownExceptions = new ArrayList<>(methodInfo.getTypeDescriptor()
+                        .getThrowsSignatures().size());
+                for (ClassRefOrTypeVariableSignature throwsSignature : methodInfo.getTypeDescriptor().getThrowsSignatures()) {
+                    if (throwsSignature instanceof ClassRefTypeSignature) {
+                        thrownExceptions.add(fromClassInfo(((ClassRefTypeSignature) throwsSignature).getClassInfo(), stack, ctx));
+                    }
+                }
+
+                List<JavaType.FullyQualified> annotations = new ArrayList<>(methodInfo.getAnnotationInfo().size());
+                for (AnnotationInfo annotationInfo : methodInfo.getAnnotationInfo()) {
+                    annotations.add(fromClassInfo(annotationInfo.getClassInfo(), stack, ctx));
+                }
+
+                methods.add(JavaType.Method.build(
+                        flags,
+                        JavaType.Class.build(methodInfo.getClassName()),
+                        methodInfo.getName(),
+                        null,
+                        signature,
+                        methodParams,
+                        thrownExceptions,
+                        annotations));
+            } catch(Exception e) {
+                ctx.getOnError().accept(e);
+            }
         }
         return methods;
     }

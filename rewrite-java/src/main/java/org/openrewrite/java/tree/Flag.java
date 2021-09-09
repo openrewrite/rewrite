@@ -25,6 +25,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public enum Flag {
 
     // The bitmasks in the flags are mapped to their values defined in the Java Language Specification. For references:
+    // Field access flags: https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.5-200-A.1
+    // Method access flags: https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.6-200-A.1
 
     // 0000 0000 0000 0001 public
     // 0000 0000 0000 0010 private
@@ -32,9 +34,11 @@ public enum Flag {
     // 0000 0000 0000 1000 static
     // 0000 0000 0001 0000 final
     // 0000 0000 0010 0000 super
+    // 0000 0000 0100 0000 bridge (on methods) or volatile (on fields)
+    // 0000 0000 1000 0000 synchronized
     // 0000 0010 0000 0000 interface
     // 0000 0100 0000 0000 abstract
-    // 0001 0000 0000 0000 sythetic
+    // 0001 0000 0000 0000 synthetic
     // 0010 0000 0000 0000 annotation
     // 0100 0000 0000 0000 enum
 

@@ -90,13 +90,13 @@ public class MavenProjectParser {
             List<Marker> projectProvenance = getJavaProvenance(maven, projectDirectory);
 
             List<Path> dependencies = downloadArtifacts(maven.getModel().getDependencies(Scope.Compile));
-            JavaSourceSet mainProvenance = JavaSourceSet.build("main", dependencies);
+            JavaSourceSet mainProvenance = JavaSourceSet.build("main", dependencies, ctx);
             javaParser.setClasspath(dependencies);
             sourceFiles.addAll(ListUtils.map(javaParser.parse(maven.getJavaSources(projectDirectory, ctx), projectDirectory, ctx),
                     addProvenance(projectProvenance, mainProvenance)));
 
             List<Path> testDependencies = downloadArtifacts(maven.getModel().getDependencies(Scope.Test));
-            JavaSourceSet testProvenance = JavaSourceSet.build("test", testDependencies);
+            JavaSourceSet testProvenance = JavaSourceSet.build("test", testDependencies, ctx);
             javaParser.setClasspath(testDependencies);
             sourceFiles.addAll(ListUtils.map(javaParser.parse(maven.getTestJavaSources(projectDirectory, ctx), projectDirectory, ctx),
                     addProvenance(projectProvenance, testProvenance)));

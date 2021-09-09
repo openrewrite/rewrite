@@ -17,13 +17,15 @@ package org.openrewrite.java.marker
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.java.JavaParser
 
 class JavaSourceSetTest {
 
     @Test
     fun typesFromClasspath() {
-        val javaVersion = JavaSourceSet.build("main", JavaParser.runtimeClasspath)
+        val ctx = InMemoryExecutionContext { e -> throw e }
+        val javaVersion = JavaSourceSet.build("main", JavaParser.runtimeClasspath, ctx)
         assertThat(javaVersion.classpath.map { it.fullyQualifiedName })
             .contains("org.junit.jupiter.api.Test")
     }
