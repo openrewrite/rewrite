@@ -35,7 +35,7 @@ interface UsesJavaVersionTest : JavaRecipeTest {
         val recipe = toRecipe { UsesJavaVersion(-1, Int.MAX_VALUE) }
         val result = recipe.run(sourceFiles, executionContext)
         Assertions.assertThat(result).isNotNull
-        Assertions.assertThat(result.size == 0).isTrue
+        Assertions.assertThat(result.isEmpty()).isTrue
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/983")
