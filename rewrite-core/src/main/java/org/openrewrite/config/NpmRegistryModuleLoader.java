@@ -16,10 +16,10 @@
 
 package org.openrewrite.config;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Data;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.graalvm.polyglot.Context;
@@ -70,7 +70,6 @@ public class NpmRegistryModuleLoader implements ResourceLoader {
             try {
                 if (!registry.startsWith("http")) {
                     Path path = Paths.get(registry, module, "package.json");
-                    System.out.println("Loading package.json: " + path);
                     PackageDescriptor packageDescriptor = mapper.readValue(path.toFile(), PackageDescriptor.class);
                     String main = packageDescriptor.getMain();
 
@@ -173,51 +172,22 @@ public class NpmRegistryModuleLoader implements ResourceLoader {
         recipeDescriptors.add(descriptor);
     }
 
+    @Data
     private static class PackagesDescriptor {
-        private final Map<String, String> distTags;
-        private final Map<String, PackageDescriptor> versions;
-
-        @JsonCreator
-        public PackagesDescriptor(@JsonProperty("dist-tags") Map<String, String> distTags,
-                                  @JsonProperty("versions") Map<String, PackageDescriptor> versions) {
-            this.distTags = distTags;
-            this.versions = versions;
-        }
-
-        public Map<String, String> getDistTags() {
-            return distTags;
-        }
-
-        public Map<String, PackageDescriptor> getVersions() {
-            return versions;
-        }
+        @JsonProperty("dist-tags")
+        Map<String, String> distTags;
+        @JsonProperty("versions")
+        Map<String, PackageDescriptor> versions;
     }
 
+    @Data
     private static class PackageDescriptor {
-        private final String description;
-        private final Map<String, Object> dist;
-        private final String main;
-
-        @JsonCreator
-        public PackageDescriptor(@JsonProperty("description") String description,
-                                 @JsonProperty("dist") Map<String, Object> dist,
-                                 @JsonProperty("main") String main) {
-            this.description = description;
-            this.dist = dist;
-            this.main = main;
-        }
-
-        public String getDescription() {
-            return description;
-        }
-
-        public Map<String, Object> getDist() {
-            return dist;
-        }
-
-        public String getMain() {
-            return main;
-        }
+        @JsonProperty("description")
+        String description;
+        @JsonProperty("dist")
+        Map<String, Object> dist;
+        @JsonProperty("main")
+        String main;
     }
 
 }
