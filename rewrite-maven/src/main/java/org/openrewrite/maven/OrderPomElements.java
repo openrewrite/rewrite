@@ -68,6 +68,11 @@ public class OrderPomElements extends Recipe {
     }
 
     @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-3423");
+    }
+
+    @Override
     protected MavenVisitor getVisitor() {
         return new MavenVisitor() {
             @Override
