@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("UnnecessaryLocalVariable")
+
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
@@ -111,8 +113,10 @@ interface HiddenFieldTest : JavaRecipeTest {
     )
 
     @Test
-    fun constructorParameter(jp: JavaParser) = assertChanged(
-        jp,
+    fun constructorParameter(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(hiddenFieldStyle {
+            withIgnoreConstructorParameter(false)
+        }).build(),
         before = """
             package org.openrewrite;
 
@@ -247,6 +251,7 @@ interface HiddenFieldTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("Convert2MethodRef", "ResultOfMethodCallIgnored")
     @Test
     fun lambdaWithTypedParameterHides(jp: JavaParser) = assertChanged(
         jp,
@@ -318,7 +323,7 @@ interface HiddenFieldTest : JavaRecipeTest {
                         int inner1 = 0;
                     }
 
-                    public Inner(int inner1) {
+                    public Inner(int inner) {
                     }
 
                     public void method() {
@@ -417,6 +422,7 @@ interface HiddenFieldTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("UnusedAssignment")
     @Test
     fun ignoreStaticMethodsAndInitializers(jp: JavaParser) = assertUnchanged(
         jp,
@@ -467,8 +473,10 @@ interface HiddenFieldTest : JavaRecipeTest {
     )
 
     @Test
-    fun renamesSetters(jp: JavaParser) = assertChanged(
-        jp,
+    fun renamesSetters(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(hiddenFieldStyle {
+            withIgnoreSetter(false)
+        }).build(),
         before = """
             package org.openrewrite;
 

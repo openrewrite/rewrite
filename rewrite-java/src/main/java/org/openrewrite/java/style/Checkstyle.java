@@ -91,7 +91,7 @@ public class Checkstyle extends NamedStyles {
     }
 
     public static HiddenFieldStyle hiddenFieldStyle() {
-        return new HiddenFieldStyle(false, false, false, false);
+        return new HiddenFieldStyle(true, true, false, false);
     }
 
     public static HideUtilityClassConstructorStyle hideUtilityClassConstructorStyle() {
