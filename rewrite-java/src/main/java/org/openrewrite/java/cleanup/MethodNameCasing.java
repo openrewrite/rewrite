@@ -23,6 +23,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -41,6 +42,11 @@ public class MethodNameCasing extends Recipe {
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-100");
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(5);
     }
 
     @Override

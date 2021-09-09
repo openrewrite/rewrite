@@ -24,6 +24,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Set;
@@ -44,6 +45,11 @@ public class UnnecessaryThrows extends Recipe {
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-1130");
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(5);
     }
 
     @Override

@@ -26,6 +26,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Loop;
 import org.openrewrite.java.tree.Statement;
 
+import java.time.Duration;
 import java.util.Set;
 
 import static java.util.Collections.singleton;
@@ -49,9 +50,15 @@ public class ControlFlowIndentation extends Recipe {
     }
 
     @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(5);
+    }
+
+    @Override
     protected JavaIsoVisitor<ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             TabsAndIndentsStyle tabsAndIndentsStyle;
+
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
                 TabsAndIndentsStyle style = cu.getStyle(TabsAndIndentsStyle.class);
@@ -65,17 +72,17 @@ public class ControlFlowIndentation extends Recipe {
             @Override
             public J.Block visitBlock(J.Block block, ExecutionContext executionContext) {
                 J.Block b = super.visitBlock(block, executionContext);
-                for(Statement s : b.getStatements()) {
-                    if(s instanceof J.If) {
+                for (Statement s : b.getStatements()) {
+                    if (s instanceof J.If) {
                         J.If ifs = (J.If) s;
-                        if(shouldReformat(ifs)) {
+                        if (shouldReformat(ifs)) {
                             doAfterVisit(new TabsAndIndentsVisitor<>(tabsAndIndentsStyle, b));
                             return b;
                         }
-                    } else if(s instanceof Loop) {
-                        Loop loop = (Loop)s;
+                    } else if (s instanceof Loop) {
+                        Loop loop = (Loop) s;
                         Statement body = loop.getBody();
-                        if(!(body instanceof J.Block)) {
+                        if (!(body instanceof J.Block)) {
                             doAfterVisit(new TabsAndIndentsVisitor<>(tabsAndIndentsStyle, b));
                             return b;
                         }
@@ -87,7 +94,7 @@ public class ControlFlowIndentation extends Recipe {
             boolean shouldReformat(J.If s) {
                 Statement thenPart = s.getThenPart();
 
-                if(!(thenPart instanceof J.Block)) {
+                if (!(thenPart instanceof J.Block)) {
                     return true;
                 }
 
@@ -95,11 +102,11 @@ public class ControlFlowIndentation extends Recipe {
             }
 
             boolean shouldReformat(@Nullable J.If.Else s) {
-                if(s == null) {
+                if (s == null) {
                     return false;
                 }
                 Statement body = s.getBody();
-                if(body instanceof J.If) {
+                if (body instanceof J.If) {
                     return shouldReformat(((J.If) body));
                 }
                 return !(body instanceof J.Block);

@@ -26,6 +26,7 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.Markers;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.Set;
 
@@ -43,6 +44,11 @@ public class NeedBraces extends Recipe {
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-121");
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(15);
     }
 
     @Override

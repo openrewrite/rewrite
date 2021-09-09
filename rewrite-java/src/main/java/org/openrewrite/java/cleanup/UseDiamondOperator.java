@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.Set;
 
@@ -45,6 +46,11 @@ public class UseDiamondOperator extends Recipe {
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-2293");
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(1);
     }
 
     @Override

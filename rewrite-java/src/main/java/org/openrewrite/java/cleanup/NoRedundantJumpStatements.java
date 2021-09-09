@@ -21,8 +21,12 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.InvertCondition;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Loop;
+import org.openrewrite.java.tree.TypeUtils;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.Set;
 
@@ -41,6 +45,11 @@ public class NoRedundantJumpStatements extends Recipe {
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-3626");
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(1);
     }
 
     @Override

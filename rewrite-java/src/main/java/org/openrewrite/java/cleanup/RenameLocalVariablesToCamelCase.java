@@ -15,11 +15,15 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.*;
+import org.openrewrite.Cursor;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.RenameVariable;
 import org.openrewrite.java.tree.J;
 
+import java.time.Duration;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -56,6 +60,11 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-117");
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(2);
     }
 
     @Override

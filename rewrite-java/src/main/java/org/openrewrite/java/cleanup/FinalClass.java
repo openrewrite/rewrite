@@ -19,6 +19,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.JavaIsoVisitor;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.Set;
 
@@ -36,6 +37,11 @@ public class FinalClass extends Recipe {
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-2974");
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(5);
     }
 
     @Override

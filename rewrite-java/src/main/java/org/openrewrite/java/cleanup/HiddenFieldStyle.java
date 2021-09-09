@@ -18,8 +18,8 @@ package org.openrewrite.java.cleanup;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.Incubating;
-import org.openrewrite.style.StyleHelper;
 import org.openrewrite.style.Style;
+import org.openrewrite.style.StyleHelper;
 
 import static org.openrewrite.java.style.Checkstyle.hiddenFieldStyle;
 

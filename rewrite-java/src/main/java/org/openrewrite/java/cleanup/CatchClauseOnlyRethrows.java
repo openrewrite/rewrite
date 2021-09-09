@@ -18,7 +18,6 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -45,13 +44,13 @@ public class CatchClauseOnlyRethrows extends Recipe {
     }
 
     @Override
-    public @Nullable Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(5);
+    public Set<String> getTags() {
+        return singleton("RSPEC-2737");
     }
 
     @Override
-    public Set<String> getTags() {
-        return singleton("RSPEC-2737");
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(5);
     }
 
     @Override
@@ -101,11 +100,11 @@ public class CatchClauseOnlyRethrows extends Recipe {
 
                 Expression exception = ((J.Throw) aCatch.getBody().getStatements().get(0)).getException();
                 JavaType.FullyQualified catchType = TypeUtils.asFullyQualified(aCatch.getParameter().getType());
-                if(catchType == null || !catchType.equals(exception.getType())) {
+                if (catchType == null || !catchType.equals(exception.getType())) {
                     return false;
                 }
 
-                if(exception instanceof J.Identifier) {
+                if (exception instanceof J.Identifier) {
                     return ((J.Identifier) exception).getSimpleName().equals(aCatch.getParameter().getTree().getVariables().get(0).getSimpleName());
                 }
 

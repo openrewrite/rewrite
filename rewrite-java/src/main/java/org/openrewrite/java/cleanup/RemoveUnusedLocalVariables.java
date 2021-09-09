@@ -26,6 +26,7 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 
+import java.time.Duration;
 import java.util.*;
 import java.util.function.Predicate;
 
@@ -44,6 +45,11 @@ public class RemoveUnusedLocalVariables extends Recipe {
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-1481");
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(5);
     }
 
     @Override

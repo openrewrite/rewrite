@@ -24,6 +24,7 @@ import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.Objects;
 import java.util.Set;
@@ -45,6 +46,11 @@ public class StringLiteralEquality extends Recipe {
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-4973");
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(5);
     }
 
     @Override

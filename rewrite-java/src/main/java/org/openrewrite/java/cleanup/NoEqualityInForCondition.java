@@ -21,6 +21,7 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.Set;
 
@@ -38,6 +39,11 @@ public class NoEqualityInForCondition extends Recipe {
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-888");
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(2);
     }
 
     @Override

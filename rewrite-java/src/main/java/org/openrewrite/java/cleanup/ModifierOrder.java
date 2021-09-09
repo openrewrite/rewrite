@@ -22,6 +22,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -43,6 +44,11 @@ public class ModifierOrder extends Recipe {
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-1124");
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(2);
     }
 
     @Override

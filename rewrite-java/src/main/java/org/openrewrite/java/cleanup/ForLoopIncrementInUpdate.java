@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -45,6 +46,11 @@ public class ForLoopIncrementInUpdate extends Recipe {
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-1994");
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(20);
     }
 
     @Override

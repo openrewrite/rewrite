@@ -20,8 +20,12 @@ import org.openrewrite.Recipe;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.TypeUtils;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.Set;
 
@@ -39,6 +43,11 @@ public class MinimumSwitchCases extends Recipe {
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-1301");
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(5);
     }
 
     @Override

@@ -18,9 +18,14 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Flag;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 
-import java.util.*;
+import java.time.Duration;
+import java.util.Collections;
+import java.util.Set;
 
 public class RemoveUnusedPrivateMethods extends Recipe {
 
@@ -37,6 +42,11 @@ public class RemoveUnusedPrivateMethods extends Recipe {
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-1144");
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(5);
     }
 
     @Override

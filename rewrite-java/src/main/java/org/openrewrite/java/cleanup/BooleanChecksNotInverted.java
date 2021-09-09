@@ -17,7 +17,6 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 
@@ -43,7 +42,7 @@ public class BooleanChecksNotInverted extends Recipe {
     }
 
     @Override
-    public @Nullable Duration getEstimatedEffortPerOccurrence() {
+    public Duration getEstimatedEffortPerOccurrence() {
         return Duration.ofMinutes(2);
     }
 
@@ -54,9 +53,9 @@ public class BooleanChecksNotInverted extends Recipe {
             @SuppressWarnings("ConstantConditions")
             @Override
             public J visitUnary(J.Unary unary, ExecutionContext ctx) {
-                if(unary.getOperator() == J.Unary.Type.Not && unary.getExpression() instanceof J.Parentheses) {
+                if (unary.getOperator() == J.Unary.Type.Not && unary.getExpression() instanceof J.Parentheses) {
                     J.Parentheses<?> expr = (J.Parentheses<?>) unary.getExpression();
-                    if(expr.getTree() instanceof J.Binary) {
+                    if (expr.getTree() instanceof J.Binary) {
                         J.Binary binary = (J.Binary) expr.getTree();
                         switch (binary.getOperator()) {
                             case LessThan:

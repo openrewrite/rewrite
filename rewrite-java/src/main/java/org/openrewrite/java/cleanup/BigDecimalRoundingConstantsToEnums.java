@@ -29,7 +29,6 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.time.Duration;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
 
@@ -49,13 +48,13 @@ public class BigDecimalRoundingConstantsToEnums extends Recipe {
     }
 
     @Override
-    public @Nullable Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(5);
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-2111");
     }
 
     @Override
-    public Set<String> getTags() {
-        return Collections.singleton("RSPEC-2111");
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(5);
     }
 
     @Override
@@ -83,7 +82,7 @@ public class BigDecimalRoundingConstantsToEnums extends Recipe {
                 if (BIG_DECIMAL_DIVIDE.matches(m) &&
                         isConvertibleBigDecimalConstant(m.getArguments().get(1))) {
                     String roundingModeEnum = getTemplateText(m.getArguments().get(1));
-                    if(roundingModeEnum == null) {
+                    if (roundingModeEnum == null) {
                         return m;
                     }
                     J roundingMode = m.withTemplate(JavaTemplate.builder(this::getCursor, roundingModeEnum)
@@ -95,7 +94,7 @@ public class BigDecimalRoundingConstantsToEnums extends Recipe {
                     maybeAddImport("java.math.RoundingMode");
                 } else if (BIG_DECIMAL_SET_SCALE.matches(m) && isConvertibleBigDecimalConstant(m.getArguments().get(1))) {
                     String roundingModeEnum = getTemplateText(m.getArguments().get(1));
-                    if(roundingModeEnum == null) {
+                    if (roundingModeEnum == null) {
                         return m;
                     }
                     J roundingMode = m.withTemplate(JavaTemplate.builder(this::getCursor, roundingModeEnum)
@@ -105,11 +104,10 @@ public class BigDecimalRoundingConstantsToEnums extends Recipe {
                     m = m.withTemplate(twoArgScale, m.getCoordinates().replaceArguments(),
                             m.getArguments().get(0), roundingMode);
                     maybeAddImport("java.math.RoundingMode");
-                }
-                else if (BIG_DECIMAL_DIVIDE_WITH_SCALE.matches(m) &&
+                } else if (BIG_DECIMAL_DIVIDE_WITH_SCALE.matches(m) &&
                         isConvertibleBigDecimalConstant(m.getArguments().get(2))) {
                     String roundingModeEnum = getTemplateText(m.getArguments().get(2));
-                    if(roundingModeEnum == null) {
+                    if (roundingModeEnum == null) {
                         return m;
                     }
                     J roundingMode = m.withTemplate(JavaTemplate.builder(this::getCursor, roundingModeEnum)
