@@ -140,6 +140,10 @@ class Java11ExplicitInitializationTest : Java11Test, ExplicitInitializationTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11ExplicitLambdaArgumentTypesTest : Java11Test, ExplicitLambdaArgumentTypesTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11FallThroughTest : Java11Test, FallThroughTest
 
 @DebugOnly
