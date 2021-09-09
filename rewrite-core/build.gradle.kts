@@ -14,6 +14,10 @@ dependencies {
     api("com.fasterxml.jackson.module:jackson-module-parameter-names:2.12.+")
     api("com.fasterxml.jackson.module:jackson-module-kotlin:2.12.+")
 
+    compileOnly("org.graalvm.sdk:graal-sdk:latest.release")
+    implementation("org.apache.commons:commons-io:latest.release")
+    implementation("org.apache.commons:commons-compress:latest.release")
+
     implementation("io.micrometer:micrometer-core:latest.release")
     implementation("io.github.classgraph:classgraph:latest.release")
     implementation("org.yaml:snakeyaml:latest.release")

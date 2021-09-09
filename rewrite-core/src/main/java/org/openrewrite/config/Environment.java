@@ -155,6 +155,11 @@ public class Environment {
             return load(new ClasspathScanningLoader(jar, properties, classLoader));
         }
 
+        public Builder scanNpmModules(String registry, String... modules) {
+            return load(new NpmRegistryModuleLoader(registry, modules));
+        }
+
+
         public Builder scanUserHome() {
             File userHomeRewriteConfig = new File(System.getProperty("user.home") + "/.rewrite/rewrite.yml");
             if (userHomeRewriteConfig.exists()) {
