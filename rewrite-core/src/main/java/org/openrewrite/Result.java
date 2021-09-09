@@ -31,6 +31,7 @@ import java.io.UncheckedIOException;
 import java.lang.ref.WeakReference;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -54,6 +55,10 @@ public class Result {
     @Getter
     private final Set<Recipe> recipesThatMadeChanges;
 
+    @Getter
+    @Nullable
+    private final Duration timeSavings;
+
     @Nullable
     private transient WeakReference<String> diff;
 
@@ -61,6 +66,16 @@ public class Result {
         this.before = before;
         this.after = after;
         this.recipesThatMadeChanges = recipesThatMadeChanges;
+
+        Duration timeSavings = null;
+        for (Recipe recipesThatMadeChange : recipesThatMadeChanges) {
+            Duration perOccurrence = recipesThatMadeChange.getEstimatedEffortPerOccurrence();
+            if(perOccurrence != null) {
+                timeSavings = timeSavings == null ? perOccurrence : timeSavings.plus(perOccurrence);
+            }
+        }
+
+        this.timeSavings = timeSavings;
     }
 
     /**
