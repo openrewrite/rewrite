@@ -16,6 +16,7 @@
 
 package org.openrewrite.json;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Recipe;
 import org.openrewrite.Result;
@@ -39,6 +40,7 @@ class NpmRegistryModuleLoaderTest {
         System.out.println("results: " + results);
     }
 
+    @Disabled
     @Test
     void must_load_module_from_local() {
         String registry = Paths.get("src", "test", "resources").toString();
