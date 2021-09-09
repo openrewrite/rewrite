@@ -14,7 +14,7 @@ dependencies {
     api("com.fasterxml.jackson.module:jackson-module-parameter-names:2.12.+")
     api("com.fasterxml.jackson.module:jackson-module-kotlin:2.12.+")
 
-    compileOnly("org.graalvm.sdk:graal-sdk:latest.release")
+    implementation("org.graalvm.sdk:graal-sdk:latest.release")
     implementation("org.apache.commons:commons-io:latest.release")
     implementation("org.apache.commons:commons-compress:latest.release")
 
