@@ -78,93 +78,83 @@ public class OrderPomElements extends Recipe {
             @Override
             public Maven visitMaven(Maven maven, ExecutionContext ctx) {
                 Maven mvn = super.visitMaven(maven, ctx);
-                mvn = (Maven) new OrderVisitor().visit(mvn, ctx);
-                assert mvn != null;
-                return mvn;
-            }
-        };
-    }
-
-    private static class OrderVisitor extends XmlVisitor<ExecutionContext> {
-        @Override
-        public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
-            Xml.Document doc = (Xml.Document) super.visitDocument(document, executionContext);
-            Xml.Tag root = doc.getRoot();
-            if (root.getContent() != null) {
-                List<Content> content = new ArrayList<>(root.getContent());
-                List<Content> updatedOrder = new ArrayList<>();
-                for (String order : REQUIRED_ORDER) {
-                    for (Iterator<? extends Content> iterator = content.iterator(); iterator.hasNext(); ) {
-                        Content c = iterator.next();
-                        if (c instanceof Xml.Tag) {
-                            Xml.Tag tag = (Xml.Tag) c;
-                            if (tag.getName().equals(order)) {
-                                updatedOrder.add(c);
-                                iterator.remove();
-                                break;
+                Xml.Tag root = mvn.getRoot();
+                if (root.getContent() != null) {
+                    List<Content> content = new ArrayList<>(root.getContent());
+                    List<Content> updatedOrder = new ArrayList<>();
+                    for (String order : REQUIRED_ORDER) {
+                        for (Iterator<? extends Content> iterator = content.iterator(); iterator.hasNext(); ) {
+                            Content c = iterator.next();
+                            if (c instanceof Xml.Tag) {
+                                Xml.Tag tag = (Xml.Tag) c;
+                                if (tag.getName().equals(order)) {
+                                    updatedOrder.add(c);
+                                    iterator.remove();
+                                    break;
+                                }
                             }
                         }
                     }
-                }
-                updatedOrder.addAll(content);
-                boolean foundChange = false;
-                for (int i = 0; i < root.getContent().size(); i++) {
-                    if (root.getContent().get(i) != updatedOrder.get(i)) {
-                        foundChange = true;
-                        break;
+                    updatedOrder.addAll(content);
+                    boolean foundChange = false;
+                    for (int i = 0; i < root.getContent().size(); i++) {
+                        if (root.getContent().get(i) != updatedOrder.get(i)) {
+                            foundChange = true;
+                            break;
+                        }
+                    }
+
+                    if (foundChange) {
+                        root = root.withContent(updatedOrder);
+                        mvn = mvn.withRoot(root);
+                        doAfterVisit(new AutoFormat());
                     }
                 }
+                return mvn;
+            }
 
-                if (foundChange) {
-                    root = root.withContent(updatedOrder);
-                    doc = doc.withRoot(root);
-                    doAfterVisit(new AutoFormat());
+            @Override
+            public Xml visitTag(Xml.Tag tag, ExecutionContext executionContext) {
+                Xml.Tag tg = (Xml.Tag) super.visitTag(tag, executionContext);
+                if ("dependency".equals(tg.getName()) || "parent".equals(tg.getName())) {
+                    tg = orderGav(tg);
                 }
+                return tg;
             }
-            return doc;
-        }
 
-        @Override
-        public Xml visitTag(Xml.Tag tag, ExecutionContext executionContext) {
-            Xml.Tag tg = (Xml.Tag) super.visitTag(tag, executionContext);
-            if ("dependency".equals(tg.getName()) || "parent".equals(tg.getName())) {
-                tg = orderGav(tg);
-            }
-            return tg;
-        }
-
-        private Xml.Tag orderGav(Xml.Tag gavParent) {
-            List<? extends Content> gavParentContent = gavParent.getChildren();
-            int groupPos = -1;
-            int artifactPos = -1;
-            int versionPos = -1;
-            Map<String, Content> gavGroups = new HashMap<>();
-            for (int i = 0; i < gavParentContent.size(); i++) {
-                Content content = gavParentContent.get(i);
-                Xml.Tag tag = (Xml.Tag) content;
-                if ("groupId".equals(tag.getName())) {
-                    gavGroups.put("group", tag);
-                    groupPos = i;
-                } else if ("artifactId".equals(tag.getName())) {
-                    gavGroups.put("artifact", tag);
-                    artifactPos = i;
-                } else if ("version".equals(tag.getName())) {
-                    gavGroups.put("version", tag);
-                    versionPos = i;
-                }
-            }
-            if ((groupPos > artifactPos ||
-                    (versionPos > -1 && (artifactPos > versionPos)))) {
-                List<Content> orderedContents = new ArrayList<>();
-                for (String type : new String[]{"group", "artifact", "version"}) {
-                    Content gavContent = gavGroups.get(type);
-                    if(gavContent != null) {
-                        orderedContents.add(gavContent);
+            private Xml.Tag orderGav(Xml.Tag gavParent) {
+                List<? extends Content> gavParentContent = gavParent.getChildren();
+                int groupPos = -1;
+                int artifactPos = -1;
+                int versionPos = -1;
+                Map<String, Content> gavGroups = new HashMap<>();
+                for (int i = 0; i < gavParentContent.size(); i++) {
+                    Content content = gavParentContent.get(i);
+                    Xml.Tag tag = (Xml.Tag) content;
+                    if ("groupId".equals(tag.getName())) {
+                        gavGroups.put("group", tag);
+                        groupPos = i;
+                    } else if ("artifactId".equals(tag.getName())) {
+                        gavGroups.put("artifact", tag);
+                        artifactPos = i;
+                    } else if ("version".equals(tag.getName())) {
+                        gavGroups.put("version", tag);
+                        versionPos = i;
                     }
                 }
-                gavParent = gavParent.withContent(orderedContents);
+                if ((groupPos > artifactPos ||
+                        (versionPos > -1 && (artifactPos > versionPos)))) {
+                    List<Content> orderedContents = new ArrayList<>();
+                    for (String type : new String[]{"group", "artifact", "version"}) {
+                        Content gavContent = gavGroups.get(type);
+                        if(gavContent != null) {
+                            orderedContents.add(gavContent);
+                        }
+                    }
+                    gavParent = gavParent.withContent(orderedContents);
+                }
+                return gavParent;
             }
-            return gavParent;
-        }
+        };
     }
 }
