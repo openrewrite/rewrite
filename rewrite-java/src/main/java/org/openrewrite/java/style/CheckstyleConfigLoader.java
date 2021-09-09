@@ -209,8 +209,8 @@ public class CheckstyleConfigLoader {
         }
         return moduleList.stream()
                 .map(module -> new HiddenFieldStyle(
-                        module.prop("ignoreConstructorParameter", false),
-                        module.prop("ignoreSetter", false),
+                        module.prop("ignoreConstructorParameter", true),
+                        module.prop("ignoreSetter", true),
                         module.prop("setterCanReturnItsClass", false),
                         module.prop("ignoreAbstractMethods", false)
                 ))
