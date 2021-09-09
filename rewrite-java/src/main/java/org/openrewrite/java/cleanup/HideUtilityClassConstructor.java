@@ -23,6 +23,9 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.J;
 
+import java.util.Collections;
+import java.util.Set;
+
 @Incubating(since = "7.0.0")
 public class HideUtilityClassConstructor extends Recipe {
 
@@ -34,6 +37,11 @@ public class HideUtilityClassConstructor extends Recipe {
     @Override
     public String getDescription() {
         return "Ensures utility classes (classes containing only static methods or fields in their API) do not have a public constructor.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-1118");
     }
 
     @Override

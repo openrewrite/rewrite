@@ -23,6 +23,8 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 
+import java.util.Collections;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 public class MethodNameCasing extends Recipe {
@@ -34,6 +36,11 @@ public class MethodNameCasing extends Recipe {
     @Override
     public String getDescription() {
         return "Method names should comply with a naming convention.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-100");
     }
 
     @Override

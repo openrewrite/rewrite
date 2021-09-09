@@ -22,6 +22,9 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 
+import java.util.Collections;
+import java.util.Set;
+
 public class StaticMethodNotFinal extends Recipe {
     @Override
     public String getDisplayName() {
@@ -31,6 +34,11 @@ public class StaticMethodNotFinal extends Recipe {
     @Override
     public String getDescription() {
         return "Static methods do not need to be declared final because they cannot be overridden.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-2333");
     }
 
     @Override

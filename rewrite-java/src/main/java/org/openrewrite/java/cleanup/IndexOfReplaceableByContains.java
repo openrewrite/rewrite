@@ -26,6 +26,9 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
 
+import java.util.Collections;
+import java.util.Set;
+
 @Incubating(since = "7.10.0")
 public class IndexOfReplaceableByContains extends Recipe {
     private static final MethodMatcher STRING_INDEX_MATCHER = new MethodMatcher("java.lang.String indexOf(String)");
@@ -39,6 +42,11 @@ public class IndexOfReplaceableByContains extends Recipe {
     @Override
     public String getDescription() {
         return "Checking if a value is included in a `String` or `List` using `indexOf(value)>-1` or `indexOf(value)>=0` can be replaced with `contains(value)`.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-2692");
     }
 
     @Override

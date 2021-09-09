@@ -24,6 +24,9 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
+import java.util.Collections;
+import java.util.Set;
+
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
@@ -37,6 +40,11 @@ public class UseDiamondOperator extends Recipe {
     @Override
     public String getDescription() {
         return "The diamond operator (`<>`) should be used. Java 7 introduced the diamond operator (<>) to reduce the verbosity of generics code. For instance, instead of having to declare a List's type in both its declaration and its constructor, you can now simplify the constructor declaration with `<>`, and the compiler will infer the type.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-2293");
     }
 
     @Override

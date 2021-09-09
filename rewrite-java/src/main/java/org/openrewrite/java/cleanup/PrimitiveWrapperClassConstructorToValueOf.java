@@ -26,6 +26,9 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
+import java.util.Collections;
+import java.util.Set;
+
 public class PrimitiveWrapperClassConstructorToValueOf extends Recipe {
 
     @Override
@@ -36,6 +39,11 @@ public class PrimitiveWrapperClassConstructorToValueOf extends Recipe {
     @Override
     public String getDescription() {
         return "The constructor of all primitive types has been deprecated in favor of using the static factory method `valueOf` available for each of the primitive type wrappers.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-2129");
     }
 
     @Override

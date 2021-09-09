@@ -28,6 +28,10 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Set;
+
 public class BigDecimalRoundingConstantsToEnums extends Recipe {
     private static final MethodMatcher BIG_DECIMAL_DIVIDE = new MethodMatcher("java.math.BigDecimal divide(java.math.BigDecimal, int)");
     private static final MethodMatcher BIG_DECIMAL_DIVIDE_WITH_SCALE = new MethodMatcher("java.math.BigDecimal divide(java.math.BigDecimal, int, int)");
@@ -41,6 +45,11 @@ public class BigDecimalRoundingConstantsToEnums extends Recipe {
     @Override
     public String getDescription() {
         return "Convert `BigDecimal` rounding constants to the equivalent `RoundingMode` enum.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-2111");
     }
 
     @Override

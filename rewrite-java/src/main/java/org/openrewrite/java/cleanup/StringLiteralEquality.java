@@ -26,6 +26,7 @@ import org.openrewrite.marker.Markers;
 
 import java.util.Collections;
 import java.util.Objects;
+import java.util.Set;
 
 public class StringLiteralEquality extends Recipe {
     @Override
@@ -39,6 +40,11 @@ public class StringLiteralEquality extends Recipe {
                 "Using `==` or `!=` compares object references, not the actual value of the Strings. " +
                 "This only modifies code where at least one side of the binary operation (`==` or `!=`) is a String literal, such as `\"someString\" == someVariable;`. " +
                 "This is to prevent inadvertently changing code where referential equality is the user's intent.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-4973");
     }
 
     @Override

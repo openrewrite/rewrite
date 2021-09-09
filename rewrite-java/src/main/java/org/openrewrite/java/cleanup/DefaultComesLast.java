@@ -22,6 +22,9 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.J;
 
+import java.util.Collections;
+import java.util.Set;
+
 public class DefaultComesLast extends Recipe {
 
     @Override
@@ -32,6 +35,11 @@ public class DefaultComesLast extends Recipe {
     @Override
     public String getDescription() {
         return "Ensure the `default` case comes last after all the cases in a switch statement.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-4524");
     }
 
     @Override
