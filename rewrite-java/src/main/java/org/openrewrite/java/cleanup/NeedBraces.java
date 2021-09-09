@@ -27,6 +27,7 @@ import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.Markers;
 
 import java.util.Collections;
+import java.util.Set;
 
 public class NeedBraces extends Recipe {
     @Override
@@ -37,6 +38,11 @@ public class NeedBraces extends Recipe {
     @Override
     public String getDescription() {
         return "Adds missing braces around code such as single-line `if`, `for`, `while`, and `do-while` block bodies.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-121");
     }
 
     @Override

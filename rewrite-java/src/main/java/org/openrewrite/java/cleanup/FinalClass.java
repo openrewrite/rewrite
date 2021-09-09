@@ -19,6 +19,9 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.JavaIsoVisitor;
 
+import java.util.Collections;
+import java.util.Set;
+
 public class FinalClass extends Recipe {
     @Override
     public String getDisplayName() {
@@ -28,6 +31,11 @@ public class FinalClass extends Recipe {
     @Override
     public String getDescription() {
         return "Adds the `final` modifier to classes that expose no public or package-private constructors.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-2974");
     }
 
     @Override

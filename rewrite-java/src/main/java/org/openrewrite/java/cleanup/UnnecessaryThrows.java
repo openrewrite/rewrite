@@ -24,6 +24,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Set;
 import java.util.TreeSet;
@@ -38,6 +39,11 @@ public class UnnecessaryThrows extends Recipe {
     @Override
     public String getDescription() {
         return "Remove unnecessary `throws` declarations.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-1130");
     }
 
     @Override

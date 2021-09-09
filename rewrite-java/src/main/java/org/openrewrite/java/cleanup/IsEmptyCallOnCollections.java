@@ -25,6 +25,9 @@ import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
+import java.util.Collections;
+import java.util.Set;
+
 public class IsEmptyCallOnCollections extends Recipe {
     private static final MethodMatcher COLLECTION_SIZE = new MethodMatcher("java.util.Collection size()", true);
 
@@ -36,6 +39,11 @@ public class IsEmptyCallOnCollections extends Recipe {
     @Override
     public String getDescription() {
         return "Also check for _not_ `isEmpty()` when testing for not equal to zero size.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-3981");
     }
 
     @Override

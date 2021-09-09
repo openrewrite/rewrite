@@ -22,6 +22,9 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.J;
 
+import java.util.Collections;
+import java.util.Set;
+
 public class EqualsAvoidsNull extends Recipe {
 
     @Override
@@ -32,6 +35,11 @@ public class EqualsAvoidsNull extends Recipe {
     @Override
     public String getDescription() {
         return "Checks that any combination of String literals is on the left side of an `equals()` comparison. Also checks for String literals assigned to some field (such as `someString.equals(anotherString = \"text\"))`.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-1132");
     }
 
     @Override

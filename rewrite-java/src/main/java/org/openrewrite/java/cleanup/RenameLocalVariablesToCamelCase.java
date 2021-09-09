@@ -54,6 +54,11 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
     }
 
     @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-117");
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new RenameNonCompliantNames();
     }

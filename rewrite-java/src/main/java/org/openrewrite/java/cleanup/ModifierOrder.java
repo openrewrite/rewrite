@@ -22,8 +22,10 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 
 import static java.util.stream.Collectors.toList;
 
@@ -36,6 +38,11 @@ public class ModifierOrder extends Recipe {
     @Override
     public String getDescription() {
         return "Modifiers should be declared in the correct order as recommended by the JLS.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-1124");
     }
 
     @Override

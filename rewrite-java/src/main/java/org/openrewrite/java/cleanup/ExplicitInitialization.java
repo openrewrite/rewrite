@@ -22,6 +22,9 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.J;
 
+import java.util.Collections;
+import java.util.Set;
+
 public class ExplicitInitialization extends Recipe {
 
     @Override
@@ -32,6 +35,11 @@ public class ExplicitInitialization extends Recipe {
     @Override
     public String getDescription() {
         return "Checks if any class or object member is explicitly initialized to default for its type value (`null` for object references, zero for numeric types and `char` and `false` for `boolean`.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-3052");
     }
 
     @Override
