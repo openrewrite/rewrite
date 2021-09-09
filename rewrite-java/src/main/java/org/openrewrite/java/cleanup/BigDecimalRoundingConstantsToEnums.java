@@ -28,6 +28,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
+import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
@@ -45,6 +46,11 @@ public class BigDecimalRoundingConstantsToEnums extends Recipe {
     @Override
     public String getDescription() {
         return "Convert `BigDecimal` rounding constants to the equivalent `RoundingMode` enum.";
+    }
+
+    @Override
+    public @Nullable Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(5);
     }
 
     @Override

@@ -18,6 +18,7 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -25,6 +26,7 @@ import org.openrewrite.java.tree.J.Try.Catch;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
+import java.time.Duration;
 import java.util.Set;
 
 import static java.util.Collections.singleton;
@@ -40,6 +42,11 @@ public class CatchClauseOnlyRethrows extends Recipe {
     public String getDescription() {
         return "A `catch` clause that only rethrows the caught exception is unnecessary. " +
                 "Letting the exception bubble up as normal achieves the same result with less code.";
+    }
+
+    @Override
+    public @Nullable Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(5);
     }
 
     @Override

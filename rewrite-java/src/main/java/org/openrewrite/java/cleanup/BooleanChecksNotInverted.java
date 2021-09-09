@@ -17,9 +17,11 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.Set;
 
@@ -38,6 +40,11 @@ public class BooleanChecksNotInverted extends Recipe {
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-1940");
+    }
+
+    @Override
+    public @Nullable Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(2);
     }
 
     @Override
