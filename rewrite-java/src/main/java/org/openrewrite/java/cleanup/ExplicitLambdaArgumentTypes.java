@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -58,36 +59,56 @@ public class ExplicitLambdaArgumentTypes extends Recipe {
     private static class ExplicitLambdaArgumentTypesVisitor extends JavaIsoVisitor<ExecutionContext> {
         private static final String ADDED_EXPLICIT_TYPE_KEY = "ADDED_EXPLICIT_TYPE";
 
+        @Nullable
+        private static String buildName(@Nullable JavaType type) {
+            if (type != null) {
+                if (type instanceof JavaType.FullyQualified) {
+                    JavaType.FullyQualified asFQN = TypeUtils.asFullyQualified(type);
+                    assert asFQN != null;
+                    return asFQN.getClassName();
+                } else if (type instanceof JavaType.Primitive) {
+                    JavaType.Primitive asPrimitive = TypeUtils.asPrimitive(type);
+                    assert asPrimitive != null;
+                    return asPrimitive.getKeyword();
+                } else if (type instanceof JavaType.Array) {
+                    JavaType.Array arrayType = TypeUtils.asArray(type);
+                    assert arrayType != null;
+                    StringBuilder typeAsString = new StringBuilder();
+                    JavaType elemType = arrayType.getElemType();
+                    if (elemType instanceof JavaType.Primitive) {
+                        typeAsString.append(buildName(elemType));
+                    } else if (elemType instanceof JavaType.FullyQualified) {
+                        typeAsString.append(buildName(elemType));
+                    } else if (elemType instanceof JavaType.Array) {
+                        JavaType typeOfArray = ((JavaType.Array) elemType).getElemType();
+                        typeAsString.append(buildName(typeOfArray));
+                        for (; arrayType.getElemType() instanceof JavaType.Array; arrayType = (JavaType.Array) arrayType.getElemType()) {
+                            typeAsString.append("[]");
+                        }
+                    }
+                    typeAsString.append("[]");
+                    return typeAsString.toString();
+                }
+            }
+            return null;
+        }
+
         @Override
         public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
             // if the type expression is null, it implies the types on the lambda arguments are implicit.
             if (multiVariable.getTypeExpression() == null && getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.Lambda) {
                 J.VariableDeclarations.NamedVariable nv = multiVariable.getVariables().get(0);
-                if (nv.getType() instanceof JavaType.FullyQualified) {
-                    JavaType.FullyQualified asFQN = TypeUtils.asFullyQualified(nv.getType());
-                    assert asFQN != null;
-                    multiVariable = multiVariable.withTypeExpression(
-                            J.Identifier.build(Tree.randomId(),
-                                    Space.EMPTY,
-                                    Markers.EMPTY,
-                                    asFQN.getClassName(),
-                                    nv.getType()
-                            )
-                    );
-                    getCursor().dropParentUntil(J.Lambda.class::isInstance).putMessage(ADDED_EXPLICIT_TYPE_KEY, true);
-                } else if (nv.getType() instanceof JavaType.Primitive) {
-                    JavaType.Primitive asPrimitive = TypeUtils.asPrimitive(nv.getType());
-                    assert asPrimitive != null;
-                    multiVariable = multiVariable.withTypeExpression(
-                            J.Identifier.build(Tree.randomId(),
-                                    Space.EMPTY,
-                                    Markers.EMPTY,
-                                    asPrimitive.getKeyword(),
-                                    nv.getType()
-                            )
-                    );
-                    getCursor().dropParentUntil(J.Lambda.class::isInstance).putMessage(ADDED_EXPLICIT_TYPE_KEY, true);
-                }
+                String name = buildName(nv.getType());
+                assert name != null;
+                multiVariable = multiVariable.withTypeExpression(
+                        J.Identifier.build(Tree.randomId(),
+                                Space.EMPTY,
+                                Markers.EMPTY,
+                                name,
+                                nv.getType()
+                        )
+                );
+                getCursor().dropParentUntil(J.Lambda.class::isInstance).putMessage(ADDED_EXPLICIT_TYPE_KEY, true);
             }
             return super.visitVariableDeclarations(multiVariable, ctx);
         }

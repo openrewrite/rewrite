@@ -132,6 +132,75 @@ interface ExplicitLambdaArgumentTypesTest : JavaRecipeTest {
     )
 
     @Test
+    fun handlePrimitiveArrays(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import java.util.function.BiFunction;
+
+            class Test {
+                private final BiFunction<Integer, byte[], byte[]> func = (a, b) -> {
+                    return null;
+                };
+            }
+        """,
+        after = """
+            import java.util.function.BiFunction;
+
+            class Test {
+                private final BiFunction<Integer, byte[], byte[]> func = (Integer a, byte[] b) -> {
+                    return null;
+                };
+            }
+        """
+    )
+
+    @Test
+    fun handleMultiDimensionalPrimitiveArrays(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import java.util.function.BiFunction;
+
+            class Test {
+                private final BiFunction<Integer, byte[][], byte[][]> func = (a, b) -> {
+                    return null;
+                };
+            }
+        """,
+        after = """
+            import java.util.function.BiFunction;
+
+            class Test {
+                private final BiFunction<Integer, byte[][], byte[][]> func = (Integer a, byte[][] b) -> {
+                    return null;
+                };
+            }
+        """
+    )
+
+    @Test
+    fun handleMultiDimensionalFullyQualifiedArrays(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import java.util.function.BiFunction;
+
+            class Test {
+                private final BiFunction<Integer, Integer[][], Integer[][]> func = (a, b) -> {
+                    return null;
+                };
+            }
+        """,
+        after = """
+            import java.util.function.BiFunction;
+
+            class Test {
+                private final BiFunction<Integer, Integer[][], Integer[][]> func = (Integer a, Integer[][] b) -> {
+                    return null;
+                };
+            }
+        """
+    )
+
+    @Test
     fun oneArgumentWithBlock(jp: JavaParser) = assertChanged(
         jp,
         before = """
