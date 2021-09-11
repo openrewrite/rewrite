@@ -29,10 +29,18 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FallThroughVisitor<P> extends JavaIsoVisitor<P> {
+    /**
+     * Ignores any fall-through commented with a text matching the regex pattern.
+     * This is currently non-user-configurable, though held within {@link FallThroughStyle}.
+     */
+    private static final Pattern RELIEF_PATTERN = Pattern.compile("falls?[ -]?thr(u|ough)");
+
+
     FallThroughStyle style;
 
     private static boolean isLastCase(J.Case caze, J.Switch switzh) {
@@ -107,7 +115,7 @@ public class FallThroughVisitor<P> extends JavaIsoVisitor<P> {
         /**
          * If no results are found, it means we should append a {@link J.Break} to the provided {@link J.Case}.
          * A result is added to the set when the last line of the provided {@link J.Case} scope is either an acceptable "break"-able type,
-         * specifically {@link J.Return}, {@link J.Break}, {@link J.Continue}, or {@link J.Throw}, or a "fallthrough" {@link Comment} matching the {@link FallThroughStyle#RELIEF_PATTERN} regular expression.
+         * specifically {@link J.Return}, {@link J.Break}, {@link J.Continue}, or {@link J.Throw}, or a "fallthrough" {@link Comment} matching a regular expression.
          *
          * @param enclosingSwitch The enclosing {@link J.Switch} subtree to search.
          * @param scope           the {@link J.Case} to use as a target.
@@ -122,7 +130,7 @@ public class FallThroughVisitor<P> extends JavaIsoVisitor<P> {
         private static class FindLastLineBreaksOrFallsThroughCommentsVisitor extends JavaIsoVisitor<Set<J>> {
             private static final Predicate<Comment> HAS_RELIEF_PATTERN_COMMENT = comment ->
                     comment instanceof TextComment &&
-                    FallThroughStyle.RELIEF_PATTERN.matcher(((TextComment) comment).getText()).find();
+                    RELIEF_PATTERN.matcher(((TextComment) comment).getText()).find();
             private final J.Case scope;
 
             public FindLastLineBreaksOrFallsThroughCommentsVisitor(J.Case scope) {
@@ -146,7 +154,7 @@ public class FallThroughVisitor<P> extends JavaIsoVisitor<P> {
                 List<Statement> statements = s.getCases().getStatements();
                 for (int i = 0; i < statements.size() - 1; i++) {
                     J.Case caze = (J.Case) statements.get(i);
-                    /**
+                    /*
                      * {@code i + 1} because a last-line comment for a J.Case gets attached as a prefix comment in the next case
                      *
                      * <pre>
@@ -158,7 +166,7 @@ public class FallThroughVisitor<P> extends JavaIsoVisitor<P> {
                      * }
                      * </pre>
                      * <p>
-                     * In order to know whether or not "CASE 1" ended with the comment "fallthrough", we have to check
+                     * In order to know whether "CASE 1" ended with the comment "fallthrough", we have to check
                      * the "prefix" of CASE 2, because the CASE 2 prefix is what has the comments associated for CASE 1.
                      **/
                     if (caze == scope && statements.get(i + 1).getPrefix().getComments().stream().anyMatch(HAS_RELIEF_PATTERN_COMMENT)) {

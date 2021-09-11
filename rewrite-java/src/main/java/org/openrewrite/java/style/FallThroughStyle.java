@@ -30,12 +30,6 @@ public class FallThroughStyle implements Style {
      */
     Boolean checkLastCaseGroup;
 
-    /**
-     * Ignores any fall-through commented with a text matching the regex pattern.
-     * This is currently non-user-configurable, though held within {@link FallThroughStyle}.
-     */
-    static final Pattern RELIEF_PATTERN = Pattern.compile("falls?[ -]?thr(u|ough)");
-
     @Override
     public Style applyDefaults() {
         return StyleHelper.merge(Checkstyle.fallThrough(), this);
