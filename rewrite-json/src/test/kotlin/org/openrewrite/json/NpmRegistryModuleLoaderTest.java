@@ -47,7 +47,7 @@ class NpmRegistryModuleLoaderTest {
 
     @Disabled
     @Test
-    void must_load_module_from_local() {
+    void mustLoadModuleFromLocal() {
         String registry = Paths.get(System.getProperty("user.home"), "src", "github.com", "openrewrite").toString();
         Environment env = Environment.builder()
                 .scanNpmModules(registry, "ts-recipes")
