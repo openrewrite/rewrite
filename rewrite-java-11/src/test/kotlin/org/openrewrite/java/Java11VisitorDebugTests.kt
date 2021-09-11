@@ -308,6 +308,10 @@ class Java11NoWhitespaceBeforeTest : Java11Test, NoWhitespaceBeforeTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11NoEmptyCollectionWithRawTypeTest : Java11Test, NoEmptyCollectionWithRawTypeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11OperatorWrapTest : Java11Test, OperatorWrapTest
 
 @DebugOnly

@@ -246,6 +246,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class NoWhitespaceBeforeTck : NoWhitespaceBeforeTest
 
     @Nested
+    inner class NoEmptyCollectionWithRawTypeTck : NoEmptyCollectionWithRawTypeTest
+
+    @Nested
     inner class OperatorWrapTck : OperatorWrapTest
 
     @Nested
