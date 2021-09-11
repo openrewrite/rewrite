@@ -50,12 +50,11 @@ class NpmRegistryModuleLoaderTest {
     void must_load_module_from_local() {
         String registry = Paths.get(System.getProperty("user.home"), "src", "github.com", "openrewrite").toString();
         Environment env = Environment.builder()
-                .scanNpmModules(registry, "@openrewrite/ts-recipes")
+                .scanNpmModules(registry, "ts-recipes")
                 .build();
-        NpmRegistryModuleLoader loader = new NpmRegistryModuleLoader(registry, "ts-recipes");
-        assertThat(loader.listRecipes()).isNotEmpty();
+        assertThat(env.listRecipes()).isNotEmpty();
 
-        Recipe r = loader.listRecipes().iterator().next();
+        Recipe r = env.listRecipes().iterator().next();
         List<Result> results = r.run(new JsonParser().parse("{}"));
 
         System.out.println("results: " + results);
