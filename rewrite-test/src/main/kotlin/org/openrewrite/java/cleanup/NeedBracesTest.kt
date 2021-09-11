@@ -20,6 +20,7 @@ import org.openrewrite.Recipe
 import org.openrewrite.Tree
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.java.style.NeedBracesStyle
 import org.openrewrite.style.NamedStyles
 import org.openrewrite.style.Style
 
@@ -43,7 +44,12 @@ interface NeedBracesTest : JavaRecipeTest {
 
     @Test
     fun addBraces(jp: JavaParser.Builder<*, *>) = assertChanged(
-        parser = jp.styles(namedStyles(listOf(NeedBracesStyle(false, false)))).build(),
+        parser = jp.styles(namedStyles(listOf(
+            NeedBracesStyle(
+                false,
+                false
+            )
+        ))).build(),
         before = """
             class Test {
                 static void addToWhile() {
@@ -135,7 +141,12 @@ interface NeedBracesTest : JavaRecipeTest {
 
     @Test
     fun allowEmptyLoopBody(jp: JavaParser.Builder<*, *>) = assertUnchanged(
-        parser = jp.styles(namedStyles(listOf(NeedBracesStyle(false, true)))).build(),
+        parser = jp.styles(namedStyles(listOf(
+            NeedBracesStyle(
+                false,
+                true
+            )
+        ))).build(),
         before = """
             class Test {
                 static void emptyWhile() {
@@ -151,7 +162,12 @@ interface NeedBracesTest : JavaRecipeTest {
 
     @Test
     fun allowSingleLineStatement(jp: JavaParser.Builder<*, *>) = assertUnchanged(
-        parser = jp.styles(namedStyles(listOf(NeedBracesStyle(true, false)))).build(),
+        parser = jp.styles(namedStyles(listOf(
+            NeedBracesStyle(
+                true,
+                false
+            )
+        ))).build(),
         before = """
             class Test {
                 static void allowIf(int n) {
@@ -186,7 +202,12 @@ interface NeedBracesTest : JavaRecipeTest {
 
     @Test
     fun doNotAllowLoopsWithEmptyBodyWhenSingleLineStatementAreAllowed(jp: JavaParser.Builder<*, *>) = assertChanged(
-        parser = jp.styles(namedStyles(listOf(NeedBracesStyle(true, false)))).build(),
+        parser = jp.styles(namedStyles(listOf(
+            NeedBracesStyle(
+                true,
+                false
+            )
+        ))).build(),
         before = """
             class Test {
                 static void doNotAllowWhileWithEmptyBody() {
@@ -224,7 +245,12 @@ interface NeedBracesTest : JavaRecipeTest {
 
     @Test
     fun allowSingleLineStatementInSwitch(jp: JavaParser.Builder<*, *>) = assertUnchanged(
-        parser = jp.styles(namedStyles(listOf(NeedBracesStyle(true, false)))).build(),
+        parser = jp.styles(namedStyles(listOf(
+            NeedBracesStyle(
+                true,
+                false
+            )
+        ))).build(),
         before = """
             class Test {
                 {

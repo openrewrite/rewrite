@@ -23,6 +23,7 @@ import org.openrewrite.Tree
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.java.style.Checkstyle
+import org.openrewrite.java.style.HiddenFieldStyle
 import org.openrewrite.style.NamedStyles
 
 interface HiddenFieldTest : JavaRecipeTest {

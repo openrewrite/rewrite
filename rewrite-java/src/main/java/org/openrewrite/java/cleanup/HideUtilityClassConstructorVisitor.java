@@ -17,6 +17,7 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.Incubating;
 import org.openrewrite.java.*;
+import org.openrewrite.java.style.HideUtilityClassConstructorStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;

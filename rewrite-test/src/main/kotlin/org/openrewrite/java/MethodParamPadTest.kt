@@ -22,7 +22,7 @@ import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.Tree
 import org.openrewrite.java.cleanup.MethodParamPad
-import org.openrewrite.java.cleanup.MethodParamPadStyle
+import org.openrewrite.java.style.MethodParamPadStyle
 import org.openrewrite.java.format.AutoFormatVisitor
 import org.openrewrite.style.NamedStyles
 import org.openrewrite.style.Style
@@ -38,7 +38,12 @@ interface MethodParamPadTest : JavaRecipeTest {
 
     @Test
     fun addSpacePadding(jp: JavaParser.Builder<*, *>) = assertChanged(
-        parser = jp.styles(namedStyles(listOf(MethodParamPadStyle(true, false)))).build(),
+        parser = jp.styles(namedStyles(listOf(
+            MethodParamPadStyle(
+                true,
+                false
+            )
+        ))).build(),
         before = """
             enum E {
                 E1()
@@ -85,7 +90,12 @@ interface MethodParamPadTest : JavaRecipeTest {
 
     @Test
     fun removeSpacePadding(jp: JavaParser.Builder<*, *>) = assertChanged(
-        parser = jp.styles(namedStyles(listOf(MethodParamPadStyle(false, false)))).build(),
+        parser = jp.styles(namedStyles(listOf(
+            MethodParamPadStyle(
+                false,
+                false
+            )
+        ))).build(),
         before = """
             enum E {
                 E1 ()
@@ -132,7 +142,12 @@ interface MethodParamPadTest : JavaRecipeTest {
 
     @Test
     fun allowLineBreaks(jp: JavaParser.Builder<*, *>) = assertUnchanged(
-        parser = jp.styles(namedStyles(listOf(MethodParamPadStyle(true, true)))).build(),
+        parser = jp.styles(namedStyles(listOf(
+            MethodParamPadStyle(
+                true,
+                true
+            )
+        ))).build(),
         before = """
             enum E {
                 E1
@@ -162,7 +177,12 @@ interface MethodParamPadTest : JavaRecipeTest {
 
     @Test
     fun removeLineBreaks(jp: JavaParser.Builder<*, *>) = assertChanged(
-        parser = jp.styles(namedStyles(listOf(MethodParamPadStyle(false, false)))).build(),
+        parser = jp.styles(namedStyles(listOf(
+            MethodParamPadStyle(
+                false,
+                false
+            )
+        ))).build(),
         before = """
             enum E {
                 E1
@@ -215,7 +235,12 @@ interface MethodParamPadTest : JavaRecipeTest {
 
     @Test
     fun removeLineBreaksAndAddSpaces(jp: JavaParser.Builder<*, *>) = assertChanged(
-        parser = jp.styles(namedStyles(listOf(MethodParamPadStyle(true, false)))).build(),
+        parser = jp.styles(namedStyles(listOf(
+            MethodParamPadStyle(
+                true,
+                false
+            )
+        ))).build(),
         before = """
             enum E {
                 E1

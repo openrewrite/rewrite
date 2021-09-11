@@ -13,21 +13,44 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.cleanup;
+package org.openrewrite.java.style;
 
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
-@With
 @Value
-public class EqualsAvoidsNullStyle implements Style {
-    Boolean ignoreEqualsIgnoreCase;
+@With
+public class UnnecessaryParenthesesStyle implements JavaStyle {
+    Boolean expr;
+    Boolean ident;
+    Boolean numDouble;
+    Boolean numFloat;
+    Boolean numInt;
+    Boolean numLong;
+    Boolean stringLiteral;
+    Boolean literalNull;
+    Boolean literalFalse;
+    Boolean literalTrue;
+    Boolean assign;
+    Boolean bitAndAssign;
+    Boolean bitOrAssign;
+    Boolean bitShiftRightAssign;
+    Boolean bitXorAssign;
+    Boolean divAssign;
+    Boolean minusAssign;
+    Boolean modAssign;
+    Boolean plusAssign;
+    Boolean shiftLeftAssign;
+    Boolean shiftRightAssign;
+    Boolean starAssign;
+    Boolean lambda;
 
     @Override
     public Style applyDefaults() {
-        return StyleHelper.merge(Checkstyle.equalsAvoidsNull(), this);
+        return StyleHelper.merge(Checkstyle.unnecessaryParentheses(), this);
     }
 }

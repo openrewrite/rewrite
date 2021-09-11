@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.cleanup;
+package org.openrewrite.java.style;
 
 import lombok.Value;
 import lombok.With;
@@ -23,22 +23,14 @@ import org.openrewrite.style.StyleHelper;
 
 @Value
 @With
-public class TypecastParenPadStyle implements Style {
+public class DefaultComesLastStyle implements Style {
     /**
-     * Whether to add spacing between the typecast identifier and both the left and right parenthesis.
-     * <p>
-     * When true:
-     * <p>
-     * {@code ( int ) m;}
-     * <p>
-     * When false:
-     * <p>
-     * {@code (int) m;}
+     * Whether to allow the default label to be not last if its evaluation is shared with a case.
      */
-    Boolean space;
+    Boolean skipIfLastAndSharedWithCase;
 
     @Override
     public Style applyDefaults() {
-        return StyleHelper.merge(Checkstyle.typecastParenPadStyle(), this);
+        return StyleHelper.merge(Checkstyle.defaultComesLast(), this);
     }
 }

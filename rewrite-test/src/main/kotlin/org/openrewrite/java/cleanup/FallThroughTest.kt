@@ -20,6 +20,7 @@ import org.openrewrite.Recipe
 import org.openrewrite.Tree
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.java.style.FallThroughStyle
 import org.openrewrite.style.NamedStyles
 
 interface FallThroughTest : JavaRecipeTest {

@@ -17,7 +17,6 @@ package org.openrewrite.java.style
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.style.CheckstyleConfigLoader.loadCheckstyleConfig
 
 class CheckstyleConfigLoaderTest {

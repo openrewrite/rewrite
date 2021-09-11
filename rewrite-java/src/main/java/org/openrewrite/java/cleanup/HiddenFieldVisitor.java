@@ -22,6 +22,7 @@ import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.RenameVariable;
+import org.openrewrite.java.style.HiddenFieldStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 

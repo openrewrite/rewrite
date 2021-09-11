@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.cleanup;
+package org.openrewrite.java.style;
 
 import lombok.Value;
 import lombok.With;
@@ -21,24 +21,24 @@ import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
-import java.util.regex.Pattern;
-
 @Value
 @With
-public class FallThroughStyle implements Style {
+public class TypecastParenPadStyle implements Style {
     /**
-     * Control whether the last case group should be checked.
+     * Whether to add spacing between the typecast identifier and both the left and right parenthesis.
+     * <p>
+     * When true:
+     * <p>
+     * {@code ( int ) m;}
+     * <p>
+     * When false:
+     * <p>
+     * {@code (int) m;}
      */
-    Boolean checkLastCaseGroup;
-
-    /**
-     * Ignores any fall-through commented with a text matching the regex pattern.
-     * This is currently non-user-configurable, though held within {@link FallThroughStyle}.
-     */
-    static final Pattern RELIEF_PATTERN = Pattern.compile("falls?[ -]?thr(u|ough)");
+    Boolean space;
 
     @Override
     public Style applyDefaults() {
-        return StyleHelper.merge(Checkstyle.fallThrough(), this);
+        return StyleHelper.merge(Checkstyle.typecastParenPadStyle(), this);
     }
 }

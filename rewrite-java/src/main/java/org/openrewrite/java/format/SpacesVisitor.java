@@ -20,8 +20,8 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.cleanup.EmptyForInitializerPadStyle;
-import org.openrewrite.java.cleanup.EmptyForIteratorPadStyle;
+import org.openrewrite.java.style.EmptyForInitializerPadStyle;
+import org.openrewrite.java.style.EmptyForIteratorPadStyle;
 import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.tree.*;
 

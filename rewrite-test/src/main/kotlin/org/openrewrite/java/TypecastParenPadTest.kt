@@ -22,7 +22,7 @@ import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.Tree
 import org.openrewrite.java.cleanup.TypecastParenPad
-import org.openrewrite.java.cleanup.TypecastParenPadStyle
+import org.openrewrite.java.style.TypecastParenPadStyle
 import org.openrewrite.java.format.AutoFormatVisitor
 import org.openrewrite.style.NamedStyles
 import org.openrewrite.style.Style

@@ -20,6 +20,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.Checkstyle;
+import org.openrewrite.java.style.DefaultComesLastStyle;
 import org.openrewrite.java.tree.J;
 
 import java.time.Duration;

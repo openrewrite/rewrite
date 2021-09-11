@@ -20,9 +20,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.format.SpacesVisitor;
-import org.openrewrite.java.style.Checkstyle;
-import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.style.SpacesStyle;
+import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
 
 public class MethodParamPad extends Recipe {

@@ -22,8 +22,8 @@ import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.Tree
 import org.openrewrite.java.format.SpacesVisitor
-import org.openrewrite.java.cleanup.EmptyForInitializerPadStyle
-import org.openrewrite.java.cleanup.EmptyForIteratorPadStyle
+import org.openrewrite.java.style.EmptyForInitializerPadStyle
+import org.openrewrite.java.style.EmptyForIteratorPadStyle
 import org.openrewrite.java.cleanup.PadEmptyForLoopComponents
 import org.openrewrite.java.style.IntelliJ
 import org.openrewrite.style.NamedStyles
@@ -44,7 +44,11 @@ interface PadEmptyForLoopComponentsTest : JavaRecipeTest {
 
     @Test
     fun addSpaceToEmptyInitializer(jp: JavaParser.Builder<*, *>) = assertChanged(
-        parser = jp.styles(namedStyles(listOf(EmptyForInitializerPadStyle(true)))).build(),
+        parser = jp.styles(namedStyles(listOf(
+            EmptyForInitializerPadStyle(
+                true
+            )
+        ))).build(),
         before = """
             public class A {
                 {
@@ -64,7 +68,8 @@ interface PadEmptyForLoopComponentsTest : JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            val nucu = SpacesVisitor<ExecutionContext>(IntelliJ.spaces(), EmptyForInitializerPadStyle(true), null)
+            val nucu = SpacesVisitor<ExecutionContext>(IntelliJ.spaces(),
+                EmptyForInitializerPadStyle(true), null)
                     .visit(cu, InMemoryExecutionContext{})
             assertThat(nucu).isEqualTo(cu)
         }
@@ -72,7 +77,11 @@ interface PadEmptyForLoopComponentsTest : JavaRecipeTest {
 
     @Test
     fun removeSpaceFromEmptyInitializer(jp: JavaParser.Builder<*, *>) = assertChanged(
-        parser = jp.styles(namedStyles(listOf(EmptyForInitializerPadStyle(false)))).build(),
+        parser = jp.styles(namedStyles(listOf(
+            EmptyForInitializerPadStyle(
+                false
+            )
+        ))).build(),
         before = """
             public class A {
                 {
@@ -92,7 +101,8 @@ interface PadEmptyForLoopComponentsTest : JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            val nucu = SpacesVisitor<ExecutionContext>(IntelliJ.spaces(), EmptyForInitializerPadStyle(false), null)
+            val nucu = SpacesVisitor<ExecutionContext>(IntelliJ.spaces(),
+                EmptyForInitializerPadStyle(false), null)
                     .visit(cu, InMemoryExecutionContext{})
             assertThat(nucu).isEqualTo(cu)
         }
@@ -100,7 +110,11 @@ interface PadEmptyForLoopComponentsTest : JavaRecipeTest {
 
     @Test
     fun addSpaceToEmptyIterator(jp: JavaParser.Builder<*, *>) = assertChanged(
-        parser = jp.styles(namedStyles(listOf(EmptyForIteratorPadStyle(true)))).build(),
+        parser = jp.styles(namedStyles(listOf(
+            EmptyForIteratorPadStyle(
+                true
+            )
+        ))).build(),
         before = """
             public class A {
                 {
@@ -118,7 +132,9 @@ interface PadEmptyForLoopComponentsTest : JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            val nucu = SpacesVisitor<ExecutionContext>(IntelliJ.spaces(), null, EmptyForIteratorPadStyle(true))
+            val nucu = SpacesVisitor<ExecutionContext>(IntelliJ.spaces(), null,
+                EmptyForIteratorPadStyle(true)
+            )
                     .visit(cu, InMemoryExecutionContext{})
             assertThat(nucu).isEqualTo(cu)
         }
@@ -126,7 +142,11 @@ interface PadEmptyForLoopComponentsTest : JavaRecipeTest {
 
     @Test
     fun removeSpaceFromEmptyIterator(jp: JavaParser.Builder<*, *>) = assertChanged(
-        parser = jp.styles(namedStyles(listOf(EmptyForIteratorPadStyle(false)))).build(),
+        parser = jp.styles(namedStyles(listOf(
+            EmptyForIteratorPadStyle(
+                false
+            )
+        ))).build(),
         before = """
             public class A {
                 {
@@ -144,7 +164,9 @@ interface PadEmptyForLoopComponentsTest : JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            val nucu = SpacesVisitor<ExecutionContext>(IntelliJ.spaces(), null, EmptyForIteratorPadStyle(false))
+            val nucu = SpacesVisitor<ExecutionContext>(IntelliJ.spaces(), null,
+                EmptyForIteratorPadStyle(false)
+            )
                     .visit(cu, InMemoryExecutionContext{})
             assertThat(nucu).isEqualTo(cu)
         }

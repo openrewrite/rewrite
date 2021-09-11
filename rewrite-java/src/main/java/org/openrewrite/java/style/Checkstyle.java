@@ -16,7 +16,6 @@
 package org.openrewrite.java.style;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import org.openrewrite.java.cleanup.*;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 

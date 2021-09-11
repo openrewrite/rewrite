@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.cleanup;
+package org.openrewrite.java.style;
 
 import lombok.Value;
 import lombok.With;
@@ -23,16 +23,16 @@ import org.openrewrite.style.StyleHelper;
 
 @Value
 @With
-public class EmptyForIteratorPadStyle implements Style {
+public class EmptyForInitializerPadStyle implements Style {
     /**
-     * Track whether empty for loop iterators should have a space or not.
-     * When true: for (int i = 0; i < 10; )
-     * When false: for(int i = 0; i < 10;)
+     * Track whether empty for loop initializers should have a space or not.
+     * When true: for ( ; i < 10; i++)
+     * When false: for(; i < 10; i++)
      */
     Boolean space;
 
     @Override
     public Style applyDefaults() {
-        return StyleHelper.merge(Checkstyle.emptyForIteratorPadStyle(), this);
+        return StyleHelper.merge(Checkstyle.emptyForInitializerPadStyle(), this);
     }
 }

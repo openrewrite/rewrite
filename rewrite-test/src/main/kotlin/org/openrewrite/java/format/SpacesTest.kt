@@ -22,8 +22,8 @@ import org.openrewrite.Recipe
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
-import org.openrewrite.java.cleanup.EmptyForInitializerPadStyle
-import org.openrewrite.java.cleanup.EmptyForIteratorPadStyle
+import org.openrewrite.java.style.EmptyForInitializerPadStyle
+import org.openrewrite.java.style.EmptyForIteratorPadStyle
 import org.openrewrite.java.style.IntelliJ
 import org.openrewrite.style.NamedStyles
 import org.openrewrite.style.Style
@@ -4739,7 +4739,11 @@ interface SpacesTest : JavaRecipeTest {
 
     @Test
     fun addSpaceToEmptyInitializer(jp: JavaParser.Builder<*, *>) = assertChanged(
-        parser = jp.styles(namedStyles(listOf(EmptyForInitializerPadStyle(true)))).build(),
+        parser = jp.styles(namedStyles(listOf(
+            EmptyForInitializerPadStyle(
+                true
+            )
+        ))).build(),
         before = """
             public class A {
                 {
@@ -4762,7 +4766,11 @@ interface SpacesTest : JavaRecipeTest {
 
     @Test
     fun removeSpaceFromEmptyInitializer(jp: JavaParser.Builder<*, *>) = assertChanged(
-        parser = jp.styles(namedStyles(listOf(EmptyForInitializerPadStyle(false)))).build(),
+        parser = jp.styles(namedStyles(listOf(
+            EmptyForInitializerPadStyle(
+                false
+            )
+        ))).build(),
         before = """
             public class A {
                 {
@@ -4785,7 +4793,11 @@ interface SpacesTest : JavaRecipeTest {
 
     @Test
     fun addSpaceToEmptyIterator(jp: JavaParser.Builder<*, *>) = assertChanged(
-        parser = jp.styles(namedStyles(listOf(EmptyForIteratorPadStyle(true)))).build(),
+        parser = jp.styles(namedStyles(listOf(
+            EmptyForIteratorPadStyle(
+                true
+            )
+        ))).build(),
         before = """
             public class A {
                 {
@@ -4804,7 +4816,11 @@ interface SpacesTest : JavaRecipeTest {
 
     @Test
     fun removeSpaceFromEmptyIterator(jp: JavaParser.Builder<*, *>) = assertChanged(
-        parser = jp.styles(namedStyles(listOf(EmptyForIteratorPadStyle(false)))).build(),
+        parser = jp.styles(namedStyles(listOf(
+            EmptyForIteratorPadStyle(
+                false
+            )
+        ))).build(),
         before = """
             public class A {
                 {

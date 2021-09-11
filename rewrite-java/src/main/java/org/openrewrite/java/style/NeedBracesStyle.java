@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.cleanup;
+package org.openrewrite.java.style;
 
 import lombok.Value;
 import lombok.With;
@@ -21,13 +21,22 @@ import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
-@With
 @Value
-public class ExplicitInitializationStyle implements Style {
-    Boolean onlyObjectReferences;
+@With
+public class NeedBracesStyle implements Style {
+    /**
+     * Allow single-line statements without braces.
+     */
+    Boolean allowSingleLineStatement;
+
+    /**
+     * Allow loops with empty bodies.
+     */
+    Boolean allowEmptyLoopBody;
 
     @Override
     public Style applyDefaults() {
-        return StyleHelper.merge(Checkstyle.explicitInitialization(), this);
+        return StyleHelper.merge(Checkstyle.needBracesStyle(), this);
     }
+
 }

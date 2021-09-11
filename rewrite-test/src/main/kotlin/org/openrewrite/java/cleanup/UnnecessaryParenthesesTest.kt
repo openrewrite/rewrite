@@ -23,6 +23,7 @@ import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.java.style.Checkstyle
+import org.openrewrite.java.style.UnnecessaryParenthesesStyle
 import org.openrewrite.style.NamedStyles
 
 @Suppress(

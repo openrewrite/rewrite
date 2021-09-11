@@ -23,7 +23,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.stream.Collectors;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.cleanup.*;
 import org.xml.sax.InputSource;
 
 import java.io.ByteArrayInputStream;

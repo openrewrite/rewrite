@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.cleanup;
+package org.openrewrite.java.style;
 
 import lombok.Value;
 import lombok.With;
@@ -21,16 +21,13 @@ import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
-@Value
 @With
-public class DefaultComesLastStyle implements Style {
-    /**
-     * Whether to allow the default label to be not last if its evaluation is shared with a case.
-     */
-    Boolean skipIfLastAndSharedWithCase;
+@Value
+public class EqualsAvoidsNullStyle implements Style {
+    Boolean ignoreEqualsIgnoreCase;
 
     @Override
     public Style applyDefaults() {
-        return StyleHelper.merge(Checkstyle.defaultComesLast(), this);
+        return StyleHelper.merge(Checkstyle.equalsAvoidsNull(), this);
     }
 }

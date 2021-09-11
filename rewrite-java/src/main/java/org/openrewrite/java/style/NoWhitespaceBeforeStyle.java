@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.cleanup;
+package org.openrewrite.java.style;
 
 import lombok.Value;
 import lombok.With;
@@ -23,41 +23,11 @@ import org.openrewrite.style.StyleHelper;
 
 @Value
 @With
-public class NoWhitespaceAfterStyle implements Style {
+public class NoWhitespaceBeforeStyle implements Style {
     /**
      * Whether whitespace is allowed if the token is at a linebreak.
      */
     Boolean allowLineBreaks;
-
-    /**
-     * A type-cast. For example: {@code (String) itr.next()}
-     */
-    Boolean typecast;
-
-    /**
-     * A :: reference to a method or constructor.
-     */
-    Boolean methodRef;
-
-    /**
-     * An array declaration.
-     */
-    Boolean arrayDeclarator;
-
-    /**
-     * An @ annotation symbol.
-     */
-    Boolean annotation;
-
-    /**
-     * An array initialization.
-     */
-    Boolean arrayInitializer;
-
-    /**
-     * The array index operator.
-     */
-    Boolean indexOperation;
 
     /**
      * The . (dot) operator.
@@ -65,38 +35,43 @@ public class NoWhitespaceAfterStyle implements Style {
     Boolean dot;
 
     /**
-     * The ++ (prefix increment) operator.
+     * The , (comma) operator.
      */
-    Boolean inc;
+    Boolean comma;
 
     /**
-     * The -- (prefix decrement) operator.
+     * The statement terminator ({@code ;}).
      */
-    Boolean dec;
+    Boolean semi;
 
     /**
-     * The ~ (bitwise complement) operator.
+     * A < symbol signifying the start of type arguments or type parameters.
      */
-    Boolean bnoc;
+    Boolean genericStart;
 
     /**
-     * The ! (logical complement) operator.
+     * A > symbol signifying the end of type arguments or type parameters.
      */
-    Boolean lnot;
+    Boolean genericEnd;
 
     /**
-     * The - (unary minus) operator.
+     * A :: reference to a method or constructor.
      */
-    Boolean unaryPlus;
+    Boolean methodRef;
 
     /**
-     * The + (unary plus) operator.
+     * The ++ (postfix increment) operator.
      */
-    Boolean unaryMinus;
+    Boolean postInc;
+
+    /**
+     * The -- (postfix decrement) operator.
+     */
+    Boolean postDec;
 
     @Override
     public Style applyDefaults() {
-        return StyleHelper.merge(Checkstyle.noWhitespaceAfterStyle(), this);
+        return StyleHelper.merge(Checkstyle.noWhitespaceBeforeStyle(), this);
     }
 
 }
