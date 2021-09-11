@@ -22,10 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
-import org.graalvm.polyglot.Context;
-import org.graalvm.polyglot.Source;
-import org.graalvm.polyglot.TypeLiteral;
-import org.graalvm.polyglot.Value;
+import org.graalvm.polyglot.*;
 import org.openrewrite.Recipe;
 import org.openrewrite.polyglot.PolyglotRecipe;
 import org.openrewrite.style.NamedStyles;
@@ -61,6 +58,7 @@ public class NpmRegistryModuleLoader implements ResourceLoader {
 
         Context context = Context.newBuilder(JS)
                 .allowAllAccess(true)
+                .allowHostAccess(HostAccess.ALL)
                 .build();
 
         ObjectMapper mapper = new ObjectMapper();
@@ -73,11 +71,12 @@ public class NpmRegistryModuleLoader implements ResourceLoader {
                     PackageDescriptor packageDescriptor = mapper.readValue(path.toFile(), PackageDescriptor.class);
                     String main = packageDescriptor.getMain();
 
+                    Path jsPath = Paths.get(registry, module, main);
                     evalRecipe(context,
                             module + "@latest",
                             packageDescriptor.getDescription(),
-                            path.toString(),
-                            path.toUri(),
+                            jsPath.toString(),
+                            jsPath.toUri(),
                             Files.readAllBytes(Paths.get(registry, module, main)));
                 } else {
                     URI srcUri = URI.create(registry + module);
@@ -154,7 +153,7 @@ public class NpmRegistryModuleLoader implements ResourceLoader {
         Value recipeVal = bindings.getMember(recipeName);
         Value opts = recipeVal.getMember("Options").newInstance();
 
-        Recipe r = new PolyglotRecipe(opts, recipeVal.getMember("default"));
+        Recipe r = new PolyglotRecipe(moduleName, opts, recipeVal.getMember("default"));
 
         recipes.add(r);
         RecipeDescriptor descriptor = new RecipeDescriptor(

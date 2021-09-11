@@ -20,9 +20,11 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Recipe;
 import org.openrewrite.Result;
+import org.openrewrite.config.Environment;
 import org.openrewrite.config.NpmRegistryModuleLoader;
 
 import java.nio.file.Paths;
+import java.util.Collection;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,10 +33,13 @@ class NpmRegistryModuleLoaderTest {
 
     @Test
     void mustLoadModuleFromNpmjsOrg() {
-        NpmRegistryModuleLoader loader = new NpmRegistryModuleLoader("https://registry.npmjs.org/", "@openrewrite/ts-recipes");
-        assertThat(loader.listRecipes()).isNotEmpty();
+        Environment env = Environment.builder()
+                .scanNpmModules("https://registry.npmjs.org/", "@openrewrite/ts-recipes")
+                .build();
+        Collection<Recipe> recipes = env.listRecipes();
+        assertThat(recipes).isNotEmpty();
 
-        Recipe r = loader.listRecipes().iterator().next();
+        Recipe r = recipes.iterator().next();
         List<Result> results = r.run(new JsonParser().parse("{}"));
 
         System.out.println("results: " + results);
@@ -42,8 +47,11 @@ class NpmRegistryModuleLoaderTest {
 
     @Disabled
     @Test
-    void mustLoadModuleFromLocal() {
-        String registry = Paths.get("src", "test", "resources").toString();
+    void must_load_module_from_local() {
+        String registry = Paths.get(System.getProperty("user.home"), "src", "github.com", "openrewrite").toString();
+        Environment env = Environment.builder()
+                .scanNpmModules(registry, "@openrewrite/ts-recipes")
+                .build();
         NpmRegistryModuleLoader loader = new NpmRegistryModuleLoader(registry, "ts-recipes");
         assertThat(loader.listRecipes()).isNotEmpty();
 

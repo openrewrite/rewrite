@@ -19,8 +19,11 @@ package org.openrewrite.polyglot;
 import org.graalvm.polyglot.Value;
 
 import java.util.Optional;
+import java.util.Set;
 
 public class PolyglotUtils {
+
+    public static final String JS = "js";
 
     public static Optional<Value> getOption(Value value, String memberKey) {
         return getValue(value, "options")
@@ -42,6 +45,18 @@ public class PolyglotUtils {
                 .filter(Value::canExecute)
                 .map(v -> v.execute(args))
                 .orElse(orElse);
+    }
+
+    public static Optional<Value> jsExtendConstructor(Value value, String memberKey, Object obj) {
+        Value bindings = value.getContext().getBindings(JS);
+        Set<String> members = bindings.getMemberKeys();
+        if (members == null || members.isEmpty()) {
+            return Optional.empty();
+        }
+        String thisName = members.iterator().next();
+        Value prototype = value.getContext().eval(JS, "this." + thisName + ".default.prototype");
+        prototype.putMember(memberKey, Value.asValue(obj));
+        return Optional.of(value);
     }
 
 }

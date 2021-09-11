@@ -21,9 +21,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 
-import static org.openrewrite.polyglot.PolyglotUtils.invokeMember;
-
-public class PolyglotVisitor<T> extends TreeVisitor<PolyglotTree, T> {
+public class PolyglotVisitor<T> extends TreeVisitor<Tree, T> {
 
     private final Value value;
     private final TreeVisitor<? extends Tree, T> delegate;
@@ -34,10 +32,8 @@ public class PolyglotVisitor<T> extends TreeVisitor<PolyglotTree, T> {
     }
 
     @Override
-    public @Nullable PolyglotTree visit(@Nullable Tree tree, T ctx) {
-        return invokeMember(value, "visit", new PolyglotTree(tree), ctx)
-                .map(v -> v.as(PolyglotTree.class))
-                .orElseGet(() -> new PolyglotTree(delegate.visit(tree, ctx)));
+    public @Nullable Tree visit(@Nullable Tree tree, T ctx) {
+        return value.execute(tree, ctx).as(Tree.class);
     }
 
 }

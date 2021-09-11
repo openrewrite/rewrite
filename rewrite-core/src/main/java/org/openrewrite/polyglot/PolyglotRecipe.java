@@ -18,18 +18,19 @@ package org.openrewrite.polyglot;
 
 import lombok.experimental.NonFinal;
 import org.graalvm.polyglot.Value;
+import org.graalvm.polyglot.proxy.ProxyExecutable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.List;
-
 import static org.graalvm.polyglot.Value.asValue;
+import static org.openrewrite.polyglot.PolyglotUtils.invokeMember;
 import static org.openrewrite.polyglot.PolyglotUtils.invokeMemberOrElse;
 
 public class PolyglotRecipe extends Recipe {
 
+    private final String name;
     private final Value options;
     private final Value constructor;
 
@@ -37,9 +38,15 @@ public class PolyglotRecipe extends Recipe {
     @NonFinal
     private volatile Value instance;
 
-    public PolyglotRecipe(Value options, Value constructor) {
+    public PolyglotRecipe(String name, Value options, Value constructor) {
+        this.name=name;
         this.options = options;
         this.constructor = constructor;
+    }
+
+    @Override
+    public String getName() {
+        return name;
     }
 
     @Override
@@ -55,24 +62,33 @@ public class PolyglotRecipe extends Recipe {
     }
 
     @Override
-    public List<Recipe> getRecipeList() {
-        return super.getRecipeList();
-    }
-
-    @Override
-    public Recipe doNext(Recipe recipe) {
-        return super.doNext(recipe);
-    }
-
-    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new PolyglotVisitor<>(getInstance(), super.getVisitor());
+        return invokeMember(getInstance(), "getVisitor")
+                .map(v -> new PolyglotVisitor<>(v.getMember("visit"), super.getVisitor()))
+                .orElseThrow(() -> new IllegalStateException("Must provide a visit function"));
     }
 
     private synchronized Value getInstance() {
         if (instance == null) {
+            constructor.getContext().eval("js", "this.default.OpenRewrite.Recipe.prototype.doNext")
+                    .putMember("doNext", Value.asValue(new DoNextProxy()));
             instance = constructor.newInstance(options);
         }
         return instance;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof PolyglotRecipe)) {
+            return false;
+        }
+        return ((PolyglotRecipe) o).getName().equals(getName());
+    }
+
+    private class DoNextProxy implements ProxyExecutable {
+        @Override
+        public Object execute(Value... arguments) {
+            return doNext(arguments[0].as(Recipe.class));
+        }
     }
 }
