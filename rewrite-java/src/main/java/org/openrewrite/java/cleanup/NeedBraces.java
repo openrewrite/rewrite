@@ -48,7 +48,7 @@ public class NeedBraces extends Recipe {
 
     @Override
     public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(15);
+        return Duration.ofMinutes(2);
     }
 
     @Override

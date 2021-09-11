@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -42,6 +43,11 @@ public class EmptyNewlineAtEndOfFile extends Recipe {
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-113");
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(1);
     }
 
     @Override
