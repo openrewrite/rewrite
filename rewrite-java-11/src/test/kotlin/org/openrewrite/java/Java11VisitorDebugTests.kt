@@ -184,6 +184,10 @@ class Java11FindFieldsTest : Java11Test, FindFieldsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11FindFieldsOfTypeTest : Java11Test, FindFieldsOfTypeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11FindInheritedFieldsTest : Java11Test, FindInheritedFieldsTest
 
 @DebugOnly

@@ -168,14 +168,6 @@ class Java8FindAnnotationsTest : Java8Test, FindAnnotationsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java8FindFieldsTest : Java8Test, FindFieldsTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
-class Java8FindInheritedFieldsTest : Java8Test, FindInheritedFieldsTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
 class Java8FindDeprecatedClassesTest : Java8Test, FindDeprecatedClassesTest
 
 @DebugOnly
@@ -185,6 +177,18 @@ class Java8FindDeprecatedFieldsTest : Java8Test, FindDeprecatedFieldsTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java8FindDeprecatedMethodsTest : Java8Test, FindDeprecatedMethodsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8FindFieldsTest : Java8Test, FindFieldsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8FindFieldsOfTypeTest : Java8Test, FindFieldsOfTypeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8FindInheritedFieldsTest : Java8Test, FindInheritedFieldsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

@@ -15,91 +15,66 @@
  */
 package org.openrewrite.java.search
 
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.TreePrinter
+import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
-import org.openrewrite.marker.SearchResult
 
 interface FindFieldsTest : JavaRecipeTest {
+    override val parser: JavaParser
+        get() = JavaParser.fromJavaVersion()
+            .logCompilationWarningsAndErrors(true)
+            .build()
+
+    override val recipe: Recipe
+        get() = FindFields("java.nio.charset.StandardCharsets", "UTF_8")
 
     @Test
-    fun findPrivateNonInheritedField(jp: JavaParser) = assertChanged(
+    fun findFullyQualifiedFields(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindFields("java.util.List"),
         before = """
-            import java.util.*;
-            public class A {
-               private List list;
-               private Set set;
+            class Test {
+                Object o = java.nio.charset.StandardCharsets.UTF_8;
             }
         """,
         after = """
-            import java.util.*;
-            public class A {
-               /*~~>*/private List list;
-               private Set set;
+            class Test {
+                Object o = /*~~>*/java.nio.charset.StandardCharsets.UTF_8;
             }
-        """,
+        """
     )
 
     @Test
-    fun findArrayOfType(jp: JavaParser) = assertChanged(
+    fun findImported(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindFields("java.lang.String"),
         before = """
-            import java.util.*;
-            public class A {
-               private String[] s;
+            import java.nio.charset.StandardCharsets;
+            class Test {
+                Object o = StandardCharsets.UTF_8;
             }
         """,
         after = """
-            import java.util.*;
-            public class A {
-               /*~~>*/private String[] s;
+            import java.nio.charset.StandardCharsets;
+            class Test {
+                Object o = /*~~>*/StandardCharsets.UTF_8;
             }
-        """,
+        """
     )
 
     @Test
-    fun skipsMultiCatches(jp: JavaParser) = assertChanged(
+    fun findStaticallyImported(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindFields("java.io.File"),
         before = """
-            import java.io.*;
-            public class A {
-                File f;
-                public void test() {
-                    try(FileInputStream fis = new FileInputStream(f)) {}
-                    catch(FileNotFoundException | RuntimeException e) {}
-                }
+            import static java.nio.charset.StandardCharsets.*;
+            class Test {
+                Object o = UTF_8;
             }
         """,
         after = """
-            import java.io.*;
-            public class A {
-                /*~~>*/File f;
-                public void test() {
-                    try(FileInputStream fis = new FileInputStream(f)) {}
-                    catch(FileNotFoundException | RuntimeException e) {}
-                }
+            import static java.nio.charset.StandardCharsets.*;
+            class Test {
+                Object o = /*~~>*/UTF_8;
             }
-        """,
+        """
     )
-
-    @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
-    @Test
-    fun checkValidation() {
-        var recipe = FindFields(null)
-        var valid = recipe.validate()
-        assertThat(valid.isValid).isFalse()
-        assertThat(valid.failures()).hasSize(1)
-        assertThat(valid.failures()[0].property).isEqualTo("fullyQualifiedTypeName")
-
-        recipe = FindFields("com.foo.Foo")
-        valid = recipe.validate()
-        assertThat(valid.isValid).isTrue()
-    }
-
 }

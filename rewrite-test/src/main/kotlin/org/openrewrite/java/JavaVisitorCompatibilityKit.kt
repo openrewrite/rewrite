@@ -144,16 +144,20 @@ abstract class JavaVisitorCompatibilityKit {
     inner class FindAnnotationsTck : FindAnnotationsTest
 
     @Nested
-    inner class FindFieldsTck : FindFieldsTest
-
-    @Nested
-    inner class FindInheritedFieldsTck : FindInheritedFieldsTest
-
-    @Nested
     inner class FindDeprecatedClassesTck : FindDeprecatedClassesTest
 
     @Nested
     inner class FindDeprecatedFieldsTck : FindDeprecatedFieldsTest
+
+    @Nested
+    inner class FindFieldsTck : FindFieldsTest
+
+    @Nested
+    inner class FindFieldsOfTypeTck : FindFieldsOfTypeTest
+
+    @Nested
+    inner class FindInheritedFieldsTck : FindInheritedFieldsTest
+
 
     @Nested
     inner class FindDeprecatedMethodsTck : FindDeprecatedMethodsTest

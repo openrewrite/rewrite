@@ -31,9 +31,10 @@ import static org.openrewrite.Tree.randomId;
 @RequiredArgsConstructor
 @Incubating(since = "7.7.0")
 public class UsesField<P> extends JavaIsoVisitor<P> {
+    @SuppressWarnings("ConstantConditions")
     private static final Marker FOUND_TYPE = new JavaSearchResult(randomId(), null, null);
 
-    private final String fullyQualifiedType;
+    private final String owner;
     private final String field;
 
     @Override
@@ -42,7 +43,7 @@ public class UsesField<P> extends JavaIsoVisitor<P> {
         for (JavaType type : types) {
             if (type instanceof JavaType.Variable) {
                 JavaType.Variable variable = (JavaType.Variable) type;
-                if (variable.getName().equals(field) && TypeUtils.isOfClassType(variable.getType(), fullyQualifiedType)) {
+                if (variable.getName().equals(field) && TypeUtils.isOfClassType(variable.getOwner(), owner)) {
                     return cu.withMarkers(cu.getMarkers().addIfAbsent(FOUND_TYPE));
                 }
             }

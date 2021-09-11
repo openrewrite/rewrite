@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,24 +22,27 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.HashSet;
 import java.util.Set;
 
-/**
- * Finds fields that have a matching type.
- */
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindFields extends Recipe {
-
     @Option(displayName = "Fully-qualified type name",
             description = "A fully-qualified Java type name, that is used to find matching fields.",
-            example = "org.slf4j.api.Logger")
+            example = "com.fasterxml.jackson.core.json.JsonWriteFeature")
     String fullyQualifiedTypeName;
+
+    @Option(displayName = "Field name",
+            description = "The name of a field on the type.",
+            example = "QUOTE_FIELD_NAMES")
+    String fieldName;
 
     @Override
     public String getDisplayName() {
@@ -48,42 +51,88 @@ public class FindFields extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Finds declared fields matching a particular class name.";
+        return "Find uses of a field.";
+    }
+
+    @Override
+    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return new UsesField<>(fullyQualifiedTypeName, fieldName);
     }
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                if (multiVariable.getTypeExpression() instanceof J.MultiCatch) {
-                    return multiVariable;
+            public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext executionContext) {
+                JavaType.Variable varType = TypeUtils.asVariable(fieldAccess.getName().getType());
+                if (varType != null && varType.getOwner().getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
+                        varType.getName().equals(fieldName)) {
+                    return fieldAccess.withMarkers(fieldAccess.getMarkers().addIfAbsent(new JavaSearchResult(FindFields.this)));
                 }
-                if (multiVariable.getTypeExpression() != null && TypeUtils.hasElementType(multiVariable.getTypeExpression()
-                        .getType(), fullyQualifiedTypeName)) {
-                    return multiVariable.withMarkers(multiVariable.getMarkers().addIfAbsent(new JavaSearchResult(FindFields.this)));
+                return super.visitFieldAccess(fieldAccess, executionContext);
+            }
+
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext executionContext) {
+                J.Identifier i = super.visitIdentifier(identifier, executionContext);
+                JavaType.Variable varType = TypeUtils.asVariable(identifier.getFieldType());
+                if (varType != null && varType.getOwner().getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
+                        varType.getName().equals(fieldName)) {
+                    i = i.withMarkers(i.getMarkers().addIfAbsent(new JavaSearchResult(FindFields.this)));
                 }
-                return multiVariable;
+                return i;
+            }
+
+            @Override
+            public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
+                J.MemberReference m = super.visitMemberReference(memberRef, ctx);
+                JavaType.Variable varType = TypeUtils.asVariable(memberRef.getReferenceType());
+                if (varType != null && varType.getOwner().getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
+                        varType.getName().equals(fieldName)) {
+                    m = m.withReference(m.getReference().withMarkers(m.getReference().getMarkers().addIfAbsent(new JavaSearchResult(FindFields.this))));
+                }
+                return m;
             }
         };
     }
 
-    public static Set<J.VariableDeclarations> find(J j, String fullyQualifiedTypeName) {
-        JavaIsoVisitor<Set<J.VariableDeclarations>> findVisitor = new JavaIsoVisitor<Set<J.VariableDeclarations>>() {
+    public static Set<J> find(J j, String fullyQualifiedTypeName, String fieldName) {
+        JavaVisitor<Set<J>> findVisitor = new JavaIsoVisitor<Set<J>>() {
             @Override
-            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Set<J.VariableDeclarations> vs) {
-                if (multiVariable.getTypeExpression() instanceof J.MultiCatch) {
-                    return multiVariable;
+            public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Set<J> vs) {
+                J.FieldAccess f = super.visitFieldAccess(fieldAccess, vs);
+                JavaType.Variable varType = TypeUtils.asVariable(fieldAccess.getName().getFieldType());
+                if (varType != null && varType.getOwner().getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
+                        varType.getName().equals(fieldName)) {
+                    vs.add(f);
                 }
-                if (multiVariable.getTypeExpression() != null && TypeUtils.hasElementType(multiVariable.getTypeExpression()
-                        .getType(), fullyQualifiedTypeName)) {
-                    vs.add(multiVariable);
+                return f;
+            }
+
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, Set<J> vs) {
+                J.Identifier i = super.visitIdentifier(identifier, vs);
+                JavaType.Variable varType = TypeUtils.asVariable(identifier.getFieldType());
+                if (varType != null && varType.getOwner().getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
+                        varType.getName().equals(fieldName)) {
+                    vs.add(i);
                 }
-                return multiVariable;
+                return i;
+            }
+
+            @Override
+            public J.MemberReference visitMemberReference(J.MemberReference memberRef, Set<J> vs) {
+                J.MemberReference m = super.visitMemberReference(memberRef, vs);
+                JavaType.Variable varType = TypeUtils.asVariable(memberRef.getReferenceType());
+                if (varType != null && varType.getOwner().getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
+                        varType.getName().equals(fieldName)) {
+                    vs.add(m);
+                }
+                return m;
             }
         };
 
-        Set<J.VariableDeclarations> vs = new HashSet<>();
+        Set<J> vs = new HashSet<>();
         findVisitor.visit(j, vs);
         return vs;
     }
