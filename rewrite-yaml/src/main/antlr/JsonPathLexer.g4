@@ -62,7 +62,7 @@ RPAREN : ')';
 QUESTION : '?';
 
 Identifier
-   : [_A-Za-z] [_A-Za-z0-9]*
+   : [_A-Za-z] [_A-Za-z0-9-]*
    ;
 
 WS : [ \t\n\r\u000C] + -> skip;
