@@ -23,6 +23,7 @@ import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
+import java.time.Duration;
 import java.util.*;
 
 public class OrderPomElements extends Recipe {
@@ -70,6 +71,11 @@ public class OrderPomElements extends Recipe {
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-3423");
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(10);
     }
 
     @Override

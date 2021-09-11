@@ -23,6 +23,7 @@ import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
+import java.time.Duration;
 import java.util.*;
 
 /**
@@ -44,6 +45,11 @@ public class RemoveUnusedImports extends Recipe {
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-1128");
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(5);
     }
 
     @Override
