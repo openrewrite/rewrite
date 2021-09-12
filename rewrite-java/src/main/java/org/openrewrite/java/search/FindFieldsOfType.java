@@ -43,7 +43,7 @@ public class FindFieldsOfType extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Find fields";
+        return "Find fields of type";
     }
 
     @Override
