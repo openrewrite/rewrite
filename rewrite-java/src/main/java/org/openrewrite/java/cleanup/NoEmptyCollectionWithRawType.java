@@ -15,27 +15,27 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.search.UsesType;
-
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
-
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 public class NoEmptyCollectionWithRawType extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Use `Collections#` `emptyList()`, `emptyMap()`, and `emptySet()`";
+        return "Use `Collections#emptyList()`, `emptyMap()`, and `emptySet()`";
     }
 
     @Override
@@ -61,78 +61,56 @@ public class NoEmptyCollectionWithRawType extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getVisitor() {
+        Map<String, String> updateFields = new HashMap<>();
+        updateFields.put("EMPTY_LIST", "emptyList");
+        updateFields.put("EMPTY_MAP", "emptyMap");
+        updateFields.put("EMPTY_SET", "emptySet");
 
         return new JavaVisitor<ExecutionContext>() {
-            private final JavaType.FullyQualified COLLECTIONS_FQN =
-                    JavaType.Class.build("java.util.Collections");
-
-            private final Map<String, String> updateFields = new HashMap<>();
-            {
-                updateFields.put("EMPTY_LIST", "emptyList");
-                updateFields.put("EMPTY_MAP", "emptyMap");
-                updateFields.put("EMPTY_SET", "emptySet");
-            }
-
             @Override
-            public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
-                J.FieldAccess fa = (J.FieldAccess) super.visitFieldAccess(fieldAccess, ctx);
-                if (TypeUtils.isOfType(COLLECTIONS_FQN, fa.getTarget().getType()) &&
-                        updateFields.containsKey(fa.getName().getSimpleName())) {
-
-                    boolean isImport = getCursor().dropParentUntil(is ->
-                            is instanceof J.CompilationUnit ||
-                            is instanceof J.ClassDeclaration).getValue() instanceof J.CompilationUnit;
-                    String postFix = isImport ? "" : "()";
-
-                    String fieldAccessName = fa.getTarget() instanceof J.FieldAccess ?
-                            COLLECTIONS_FQN.getFullyQualifiedName() : COLLECTIONS_FQN.getClassName();
-
-                    return TypeTree.build(fieldAccessName + "." + updateFields.get(fieldAccess.getName().getSimpleName()) + postFix)
-                            .withPrefix(fa.getPrefix());
+            public J visitImport(J.Import anImport, ExecutionContext executionContext) {
+                J.Identifier name = anImport.getQualid().getName();
+                if (anImport.isStatic() && name.getSimpleName().startsWith("EMPTY_") &&
+                        TypeUtils.isOfClassType(anImport.getQualid().getTarget().getType(), "java.util.Collections")) {
+                    return anImport.withQualid(anImport.getQualid().withName(name.withName(updateFields.get(name.getSimpleName()))));
                 }
-                return fa;
+                return super.visitImport(anImport, executionContext);
             }
 
             @Override
             public J visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
                 J.Identifier id = (J.Identifier) super.visitIdentifier(identifier, ctx);
-                if (isTargetFieldType(id) && updateFields.containsKey(id.getSimpleName())) {
-                    JavaType.Class type = TypeUtils.asClass(JavaType.buildType("java.util.Collections"));
-                    if (type != null) {
-                        JavaType.Method method =
-                                type.getMethods().stream()
-                                        .filter(m -> m.getName().equals(updateFields.get(id.getSimpleName())))
-                                        .collect(Collectors.toList()).get(0);
+                JavaType.Variable varType = TypeUtils.asVariable(id.getFieldType());
+                if (varType != null && varType.getOwner().getFullyQualifiedName().equals("java.util.Collections") &&
+                        varType.getName().startsWith("EMPTY_")) {
 
-                        J.Identifier methodId = J.Identifier.build(
-                                Tree.randomId(),
-                                Space.EMPTY,
-                                Markers.EMPTY,
-                                updateFields.get(id.getSimpleName()),
-                                null,
-                                null);
+                    J.Identifier methodId = J.Identifier.build(
+                            Tree.randomId(),
+                            Space.EMPTY,
+                            Markers.EMPTY,
+                            updateFields.get(varType.getName()),
+                            null,
+                            null);
 
-                        return new J.MethodInvocation(
-                                Tree.randomId(),
-                                id.getPrefix(),
-                                id.getMarkers(),
-                                null,
-                                null,
-                                methodId,
-                                JContainer.build(Collections.emptyList()),
-                                method
-                        );
-                    }
+                    JavaType.Class ownerClass = TypeUtils.asClass(varType.getOwner());
+
+                    return new J.MethodInvocation(
+                            Tree.randomId(),
+                            id.getPrefix(),
+                            id.getMarkers(),
+                            null,
+                            null,
+                            methodId,
+                            JContainer.build(Collections.emptyList()),
+                            ownerClass == null ?
+                                    null :
+                                    ownerClass.getMethods().stream()
+                                            .filter(m -> m.getName().equals(updateFields.get(id.getSimpleName())))
+                                            .findAny()
+                                            .orElse(null)
+                    );
                 }
                 return id;
-            }
-
-            private boolean isTargetFieldType(J.Identifier identifier) {
-                if (identifier.getFieldType() != null && identifier.getFieldType() instanceof JavaType.Variable) {
-                    JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(((JavaType.Variable) identifier.getFieldType()).getOwner());
-                    return fqn != null && COLLECTIONS_FQN.getFullyQualifiedName().equals(fqn.getFullyQualifiedName());
-                }
-                return false;
             }
         };
     }
