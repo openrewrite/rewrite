@@ -291,7 +291,7 @@ interface FindTypesTest : JavaRecipeTest {
             after = """
                 import a.A1;
                 class B {
-                    Class<?> clazz = /*~~>*//*~~>*/A1.class;
+                    Class<?> clazz = /*~~>*/A1.class;
                 }
             """,
             dependsOn = arrayOf(a1)

@@ -94,7 +94,7 @@ public class FindDeprecatedFields extends Recipe {
             @Override
             public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
                 J.Identifier i = super.visitIdentifier(identifier, ctx);
-                JavaType.Variable varType = TypeUtils.asVariable(identifier.getType());
+                JavaType.Variable varType = TypeUtils.asVariable(identifier.getFieldType());
                 if (varType != null && (typeMatcher == null || typeMatcher.matches(varType.getOwner()))) {
                     for (JavaType.FullyQualified annotation : varType.getAnnotations()) {
                         if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {

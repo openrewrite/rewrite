@@ -70,7 +70,8 @@ public class FindTypes extends Recipe {
         return new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitIdentifier(J.Identifier ident, ExecutionContext executionContext) {
-                if (ident.getType() != null) {
+                if (ident.getType() != null && getCursor().firstEnclosing(J.Import.class) == null &&
+                    getCursor().firstEnclosing(J.FieldAccess.class) == null) {
                     JavaType.FullyQualified type = TypeUtils.asFullyQualified(ident.getType());
                     if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
                             ident.getSimpleName().equals(type.getClassName())) {
