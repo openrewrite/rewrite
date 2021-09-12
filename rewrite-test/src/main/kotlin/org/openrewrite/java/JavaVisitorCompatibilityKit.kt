@@ -21,8 +21,6 @@ import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.format.*
 import org.openrewrite.java.internal.TypeCacheTest
 import org.openrewrite.java.search.*
-import org.openrewrite.java.security.SecureTempFileCreationTest
-import org.openrewrite.java.security.XmlParserXXEVulnerabilityTest
 import org.openrewrite.java.style.AutodetectTest
 import org.openrewrite.java.tree.TypeTreeTest
 
@@ -298,9 +296,6 @@ abstract class JavaVisitorCompatibilityKit {
     inner class ResultOfMethodCallIgnoredTck : ResultOfMethodCallIgnoredTest
 
     @Nested
-    inner class SecureTempFileCreationTck : SecureTempFileCreationTest
-
-    @Nested
     inner class SemanticallyEqualTck : SemanticallyEqualTest
 
     @Nested
@@ -362,7 +357,4 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class WriteOctalValuesAsDecimalTck : WriteOctalValuesAsDecimalTest
-
-    @Nested
-    inner class XmlParserXXEVulnerabilityTck : XmlParserXXEVulnerabilityTest
 }

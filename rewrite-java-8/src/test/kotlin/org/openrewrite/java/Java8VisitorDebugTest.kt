@@ -21,8 +21,6 @@ import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.format.*
 import org.openrewrite.java.internal.TypeCacheTest
 import org.openrewrite.java.search.*
-import org.openrewrite.java.security.SecureTempFileCreationTest
-import org.openrewrite.java.security.XmlParserXXEVulnerabilityTest
 import org.openrewrite.java.style.AutodetectTest
 import org.openrewrite.java.tree.TypeTreeTest
 
@@ -372,10 +370,6 @@ class Java8ResultOfMethodCallIgnoredTest : Java8Test, ResultOfMethodCallIgnoredT
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java8SecureTempFileCreationTest : Java8Test, SecureTempFileCreationTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
 class Java8SemanticallyEqualTest : Java8Test, SemanticallyEqualTest
 
 @DebugOnly
@@ -464,10 +458,6 @@ class Java8WriteOctalValuesAsDecimalTest : Java8Test, WriteOctalValuesAsDecimalT
 
 @ExtendWith(JavaParserResolver::class)
 class Java8WrappingAndBracesTest : Java8Test, WrappingAndBracesTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
-class Java8XmlParserXXEVulnerabilityTest : Java8Test, XmlParserXXEVulnerabilityTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
