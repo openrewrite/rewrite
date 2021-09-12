@@ -37,8 +37,8 @@ interface ChangeMethodTargetToStaticTest : JavaRecipeTest {
                 }
             """
         ),
-        recipe = ChangeMethodTargetToStatic("a.A nonStatic()", "b.B", null)
-            .doNext(ChangeMethodName("b.B nonStatic()", "foo")),
+        recipe = ChangeMethodTargetToStatic("a.A nonStatic()", "b.B", null, null)
+            .doNext(ChangeMethodName("b.B nonStatic()", "foo", null)),
         before = """
             import a.*;
             class C {
@@ -75,7 +75,7 @@ interface ChangeMethodTargetToStaticTest : JavaRecipeTest {
                 }
             """
         ),
-        recipe = ChangeMethodTargetToStatic("a.A foo()","b.B", null),
+        recipe = ChangeMethodTargetToStatic("a.A foo()","b.B", null, null),
         before = """
             import static a.A.foo;
             
@@ -107,7 +107,7 @@ interface ChangeMethodTargetToStaticTest : JavaRecipeTest {
                 }
             """
         ),
-        recipe = ChangeMethodTargetToStatic("a.A method()", "a.A", null),
+        recipe = ChangeMethodTargetToStatic("a.A method()", "a.A", null, null),
         before = """
             import a.A;
             class Test {
@@ -129,20 +129,20 @@ interface ChangeMethodTargetToStaticTest : JavaRecipeTest {
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = ChangeMethodTargetToStatic(null, null, null)
+        var recipe = ChangeMethodTargetToStatic(null, null, null, null)
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("fullyQualifiedTargetTypeName")
         assertThat(valid.failures()[1].property).isEqualTo("methodPattern")
 
-        recipe = ChangeMethodTargetToStatic(null, "java.lang.String", null)
+        recipe = ChangeMethodTargetToStatic(null, "java.lang.String", null, null)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
 
-        recipe = ChangeMethodTargetToStatic("java.lang.String emptyString(..)", null, null)
+        recipe = ChangeMethodTargetToStatic("java.lang.String emptyString(..)", null, null, null)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)

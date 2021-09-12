@@ -37,7 +37,7 @@ interface ChangeMethodTargetToVariableTest : JavaRecipeTest {
                 }
             """
         ),
-        recipe = ChangeMethodTargetToVariable("b.B foo()", "a", "a.A"),
+        recipe = ChangeMethodTargetToVariable("b.B foo()", "a", "a.A", null),
         before = """
             import a.*;
             
@@ -77,7 +77,7 @@ interface ChangeMethodTargetToVariableTest : JavaRecipeTest {
                 }
             """
         ),
-        recipe = ChangeMethodTargetToVariable("b.B foo()", "a", "a.A"),
+        recipe = ChangeMethodTargetToVariable("b.B foo()", "a", "a.A", null),
         before = """
             import a.*;
             import static b.B.*;
@@ -102,7 +102,7 @@ interface ChangeMethodTargetToVariableTest : JavaRecipeTest {
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = ChangeMethodTargetToVariable(null, null, null)
+        var recipe = ChangeMethodTargetToVariable(null, null, null, null)
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(3)
@@ -110,21 +110,21 @@ interface ChangeMethodTargetToVariableTest : JavaRecipeTest {
         assertThat(valid.failures()[1].property).isEqualTo("variableName")
         assertThat(valid.failures()[2].property).isEqualTo("variableType")
 
-        recipe = ChangeMethodTargetToVariable(null, null,"a.A")
+        recipe = ChangeMethodTargetToVariable(null, null,"a.A", null)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
         assertThat(valid.failures()[1].property).isEqualTo("variableName")
 
-        recipe = ChangeMethodTargetToVariable(null, "a",null)
+        recipe = ChangeMethodTargetToVariable(null, "a",null, null)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
         assertThat(valid.failures()[1].property).isEqualTo("variableType")
 
-        recipe = ChangeMethodTargetToVariable("b.B foo()", null,null)
+        recipe = ChangeMethodTargetToVariable("b.B foo()", null,null, null)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(2)

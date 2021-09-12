@@ -23,7 +23,7 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
     @Test
     fun changeMethodAccessLevelFromPublicToPrivate(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "private"),
+        recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "private", null),
         before = """
             package com.abc;
             class A {
@@ -71,7 +71,7 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
     @Test
     fun changeMethodAccessLevelFromPackagePrivateToProtected(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected"),
+        recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", null),
         before = """
             package com.abc;
             class A {
@@ -119,7 +119,7 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
     @Test
     fun changeMethodAccessLevelFromPublicToPackagePrivate(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "package"),
+        recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "package", null),
         before = """
             package com.abc;
             class A {
@@ -168,7 +168,7 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
     @Test
     fun changeMethodAccessLevelOnMethodWithAlreadyCorrectAccessLevel(jp: JavaParser) = assertUnchanged(
         jp,
-        recipe = ChangeMethodAccessLevel("com.abc.A aMethod(String)", "public"),
+        recipe = ChangeMethodAccessLevel("com.abc.A aMethod(String)", "public", null),
         before = """
             package com.abc;
             class A {
@@ -182,7 +182,7 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
     @Test
     fun fromPackagePrivateToProtectedWithOtherModifier(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected"),
+        recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", null),
         before = """
             package com.abc;
             class A {
@@ -206,7 +206,7 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
     @Test
     fun fromPackagePrivateToProtectedWithConstructor(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ChangeMethodAccessLevel("com.abc.A A(..)", "protected"),
+        recipe = ChangeMethodAccessLevel("com.abc.A A(..)", "protected", null),
         before = """
             package com.abc;
             class A {
@@ -233,7 +233,7 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
     @Test
     fun fromPublicToPackagePrivate(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ChangeMethodAccessLevel("com.abc.A *(..)", "package"),
+        recipe = ChangeMethodAccessLevel("com.abc.A *(..)", "package", null),
         before = """
             package com.abc;
             class A {

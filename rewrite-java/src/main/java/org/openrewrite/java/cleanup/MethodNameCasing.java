@@ -81,7 +81,7 @@ public class MethodNameCasing extends Recipe {
                         }
                     }
 
-                    doNext(new ChangeMethodName(MethodMatcher.methodPattern(method), standardized.toString()));
+                    doNext(new ChangeMethodName(MethodMatcher.methodPattern(method), standardized.toString(), null));
                 }
 
                 return super.visitMethodDeclaration(method, executionContext);

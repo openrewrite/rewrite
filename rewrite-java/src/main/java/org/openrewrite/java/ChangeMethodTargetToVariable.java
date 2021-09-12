@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
@@ -55,6 +56,12 @@ public class ChangeMethodTargetToVariable extends Recipe {
             example = "java.lang.String")
     String variableType;
 
+    @Option(displayName = "Match on overrides",
+            description = "When enabled, find methods that are overloads of the method pattern.",
+            required = false)
+    @Nullable
+    Boolean matchOverrides;
+
     @Override
     public String getDisplayName() {
         return "Change method target to variable";
@@ -66,13 +73,13 @@ public class ChangeMethodTargetToVariable extends Recipe {
     }
 
     @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        return new ChangeMethodTargetToVariableVisitor(new MethodMatcher(methodPattern), JavaType.Class.build(variableType));
+    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
+        return new UsesMethod<>(methodPattern, matchOverrides);
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(methodPattern);
+    public JavaVisitor<ExecutionContext> getVisitor() {
+        return new ChangeMethodTargetToVariableVisitor(new MethodMatcher(methodPattern, matchOverrides), JavaType.Class.build(variableType));
     }
 
     private class ChangeMethodTargetToVariableVisitor extends JavaIsoVisitor<ExecutionContext> {

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.search;
 
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.JavaSearchResult;
@@ -38,6 +39,10 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
 
     public UsesMethod(String methodPattern, boolean matchOverrides) {
         this(new MethodMatcher(methodPattern, matchOverrides));
+    }
+
+    public UsesMethod(String methodPattern, @Nullable Boolean matchOverrides) {
+        this(new MethodMatcher(methodPattern, Boolean.TRUE.equals(matchOverrides)));
     }
 
     public UsesMethod(MethodMatcher methodMatcher) {

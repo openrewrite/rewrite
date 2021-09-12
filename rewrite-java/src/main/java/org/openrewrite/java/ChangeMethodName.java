@@ -16,10 +16,12 @@
 package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
@@ -38,6 +40,12 @@ public class ChangeMethodName extends Recipe {
             example = "any")
     String newMethodName;
 
+    @Option(displayName = "Match on overrides",
+            description = "When enabled, find methods that are overloads of the method pattern.",
+            required = false)
+    @Nullable
+    Boolean matchOverrides;
+
     @Override
     public String getDisplayName() {
         return "Change method name";
@@ -53,7 +61,7 @@ public class ChangeMethodName extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
-                doAfterVisit(new UsesMethod<>(methodPattern));
+                doAfterVisit(new UsesMethod<>(methodPattern, matchOverrides));
                 doAfterVisit(new DeclaresMethod<>(methodPattern));
                 return cu;
             }
@@ -67,7 +75,7 @@ public class ChangeMethodName extends Recipe {
 
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
-        return new ChangeMethodNameVisitor(new MethodMatcher(methodPattern));
+        return new ChangeMethodNameVisitor(new MethodMatcher(methodPattern, matchOverrides));
     }
 
     private class ChangeMethodNameVisitor extends JavaIsoVisitor<ExecutionContext> {

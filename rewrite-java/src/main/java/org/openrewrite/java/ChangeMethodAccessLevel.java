@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.tree.J;
 
@@ -38,6 +39,12 @@ public class ChangeMethodAccessLevel extends Recipe {
             example = "public",
             valid = {"private", "protected", "package", "public"})
     String newAccessLevel;
+
+    @Option(displayName = "Match on overrides",
+            description = "When enabled, find methods that are overloads of the method pattern.",
+            required = false)
+    @Nullable
+    Boolean matchOverrides;
 
     @Override
     public String getDisplayName() {
@@ -57,7 +64,7 @@ public class ChangeMethodAccessLevel extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new DeclaresMethod<>(methodPattern);
+        return new DeclaresMethod<>(methodPattern, matchOverrides);
     }
 
     @Override

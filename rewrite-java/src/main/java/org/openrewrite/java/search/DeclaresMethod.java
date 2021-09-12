@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.search;
 
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.JavaSearchResult;
@@ -33,7 +34,15 @@ public class DeclaresMethod<P> extends JavaIsoVisitor<P> {
     private final MethodMatcher methodMatcher;
 
     public DeclaresMethod(String methodPattern) {
-        this(new MethodMatcher(methodPattern));
+        this(methodPattern, false);
+    }
+
+    public DeclaresMethod(String methodPattern, @Nullable Boolean matchesOverrides) {
+        this(new MethodMatcher(methodPattern, Boolean.TRUE.equals(matchesOverrides)));
+    }
+
+    public DeclaresMethod(String methodPattern, boolean matchesOverrides) {
+        this(new MethodMatcher(methodPattern, matchesOverrides));
     }
 
     public DeclaresMethod(MethodMatcher methodMatcher) {

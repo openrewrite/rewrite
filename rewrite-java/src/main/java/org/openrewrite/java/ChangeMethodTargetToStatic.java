@@ -55,6 +55,12 @@ public class ChangeMethodTargetToStatic extends Recipe {
     @Nullable
     String returnType;
 
+    @Option(displayName = "Match on overrides",
+            description = "When enabled, find methods that are overloads of the method pattern.",
+            required = false)
+    @Nullable
+    Boolean matchOverrides;
+
     @Override
     public String getDisplayName() {
         return "Change method target to static";
@@ -67,12 +73,12 @@ public class ChangeMethodTargetToStatic extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(methodPattern);
+        return new UsesMethod<>(methodPattern, matchOverrides);
     }
 
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
-        return new ChangeMethodTargetToStaticVisitor(new MethodMatcher(methodPattern));
+        return new ChangeMethodTargetToStaticVisitor(new MethodMatcher(methodPattern, matchOverrides));
     }
 
     private class ChangeMethodTargetToStaticVisitor extends JavaIsoVisitor<ExecutionContext> {

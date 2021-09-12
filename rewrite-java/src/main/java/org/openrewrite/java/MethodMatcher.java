@@ -70,7 +70,11 @@ public class MethodMatcher {
      * Whether to match overridden forms of the method on subclasses of {@link #targetTypePattern}.
      */
     private final boolean matchOverrides;
-
+    
+    public MethodMatcher(String signature, @Nullable Boolean matchOverrides) {
+        this(signature, Boolean.TRUE.equals(matchOverrides));
+    }
+    
     public MethodMatcher(String signature, boolean matchOverrides) {
         this.matchOverrides = matchOverrides;
 
