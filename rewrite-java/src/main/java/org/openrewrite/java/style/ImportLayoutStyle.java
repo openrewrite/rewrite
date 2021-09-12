@@ -470,6 +470,7 @@ public class ImportLayoutStyle implements JavaStyle {
 
         /**
          * Checks if folding the package will create a namespace conflict with any other classes that have already been imported.
+         *
          * @param packageName package that qualifies for folding into a '*'.
          * @return folding the package will not create any namespace conflicts.
          */
@@ -542,14 +543,12 @@ public class ImportLayoutStyle implements JavaStyle {
                     }
 
                     if (classGraphFqn instanceof JavaType.Class) {
-                        List<JavaType.Method> methods = ((JavaType.Class) classGraphFqn).getMethods();
-                        if (methods != null) {
-                            for (JavaType.Method method : methods) {
-                                if (method.getFlags().contains(Flag.Static)) {
-                                    Set<String> packages = nameToPackages.getOrDefault(method.getName(), new HashSet<>());
-                                    packages.add(packageName);
-                                    nameToPackages.put(method.getName(), packages);
-                                }
+                        List<JavaType.Method> methods = classGraphFqn.getMethods();
+                        for (JavaType.Method method : methods) {
+                            if (method.getFlags().contains(Flag.Static)) {
+                                Set<String> packages = nameToPackages.getOrDefault(method.getName(), new HashSet<>());
+                                packages.add(packageName);
+                                nameToPackages.put(method.getName(), packages);
                             }
                         }
                     }

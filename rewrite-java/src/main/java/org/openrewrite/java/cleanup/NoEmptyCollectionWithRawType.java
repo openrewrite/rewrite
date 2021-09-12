@@ -92,8 +92,6 @@ public class NoEmptyCollectionWithRawType extends Recipe {
                             null,
                             null);
 
-                    JavaType.Class ownerClass = TypeUtils.asClass(varType.getOwner());
-
                     return new J.MethodInvocation(
                             Tree.randomId(),
                             id.getPrefix(),
@@ -102,12 +100,10 @@ public class NoEmptyCollectionWithRawType extends Recipe {
                             null,
                             methodId,
                             JContainer.build(Collections.emptyList()),
-                            ownerClass == null ?
-                                    null :
-                                    ownerClass.getMethods().stream()
-                                            .filter(m -> m.getName().equals(updateFields.get(id.getSimpleName())))
-                                            .findAny()
-                                            .orElse(null)
+                            varType.getOwner().getMethods().stream()
+                                    .filter(m -> m.getName().equals(updateFields.get(id.getSimpleName())))
+                                    .findAny()
+                                    .orElse(null)
                     );
                 }
                 return id;

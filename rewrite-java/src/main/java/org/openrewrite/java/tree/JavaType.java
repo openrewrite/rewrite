@@ -37,7 +37,7 @@ public interface JavaType extends Serializable {
     static void clearCaches() {
         Class.flyweights.clear();
         Method.flyweights.clear();
-        if(Parameterized.flyweight.children != null) {
+        if (Parameterized.flyweight.children != null) {
             Parameterized.flyweight.children.clear();
         }
         Variable.flyweights.clear();
@@ -91,6 +91,8 @@ public interface JavaType extends Serializable {
         public abstract Class.Kind getKind();
 
         public abstract List<Variable> getMembers();
+
+        public abstract List<Method> getMethods();
 
         @Nullable
         public abstract FullyQualified getOwningClass();
@@ -181,6 +183,11 @@ public interface JavaType extends Serializable {
         }
 
         @Override
+        public List<Method> getMethods() {
+            return emptyList();
+        }
+
+        @Override
         public FullyQualified getOwningClass() {
             return null;
         }
@@ -259,42 +266,42 @@ public interface JavaType extends Serializable {
         }
 
         public JavaType.Class withAnnotations(List<FullyQualified> annotations) {
-            if(this.annotations == annotations) {
+            if (this.annotations == annotations) {
                 return this;
             }
             return JavaType.Class.build(flagsBitMap, fullyQualifiedName, kind, members, interfaces, methods, supertype, owningClass, annotations);
         }
 
         public JavaType.Class withInterfaces(List<FullyQualified> interfaces) {
-            if(this.interfaces == interfaces) {
+            if (this.interfaces == interfaces) {
                 return this;
             }
             return JavaType.Class.build(flagsBitMap, fullyQualifiedName, kind, members, interfaces, methods, supertype, owningClass, annotations);
         }
 
         public JavaType.Class withMembers(List<Variable> members) {
-            if(this.members == members) {
+            if (this.members == members) {
                 return this;
             }
             return JavaType.Class.build(flagsBitMap, fullyQualifiedName, kind, members, interfaces, methods, supertype, owningClass, annotations);
         }
 
         public JavaType.Class withMethods(List<Method> methods) {
-            if(this.methods == methods) {
+            if (this.methods == methods) {
                 return this;
             }
             return JavaType.Class.build(flagsBitMap, fullyQualifiedName, kind, members, interfaces, methods, supertype, owningClass, annotations);
         }
 
         public JavaType.Class withSupertype(@Nullable FullyQualified supertype) {
-            if(this.supertype == supertype) {
+            if (this.supertype == supertype) {
                 return this;
             }
             return JavaType.Class.build(flagsBitMap, fullyQualifiedName, kind, members, interfaces, methods, supertype, owningClass, annotations);
         }
 
         public JavaType.Class withOwningClass(@Nullable FullyQualified owningClass) {
-            if(this.owningClass == owningClass) {
+            if (this.owningClass == owningClass) {
                 return this;
             }
             return JavaType.Class.build(flagsBitMap, fullyQualifiedName, kind, members, interfaces, methods, supertype, owningClass, annotations);
@@ -598,14 +605,14 @@ public interface JavaType extends Serializable {
         }
 
         public JavaType.Parameterized withType(FullyQualified type) {
-            if(this.type == type) {
+            if (this.type == type) {
                 return this;
             }
             return JavaType.Parameterized.build(type, typeParameters);
         }
 
         public JavaType.Parameterized withTypeParameters(List<JavaType> typeParameters) {
-            if(this.typeParameters == typeParameters) {
+            if (this.typeParameters == typeParameters) {
                 return this;
             }
             return JavaType.Parameterized.build(type, typeParameters);
@@ -639,6 +646,11 @@ public interface JavaType extends Serializable {
         @Override
         public List<Variable> getMembers() {
             return type.getMembers();
+        }
+
+        @Override
+        public List<Method> getMethods() {
+            return type.getMethods();
         }
 
         @Override
@@ -712,6 +724,11 @@ public interface JavaType extends Serializable {
 
         @Override
         public List<Variable> getMembers() {
+            return emptyList();
+        }
+
+        @Override
+        public List<Method> getMethods() {
             return emptyList();
         }
 
@@ -798,21 +815,21 @@ public interface JavaType extends Serializable {
         }
 
         public JavaType.Variable withOwner(FullyQualified owner) {
-            if(this.owner == owner) {
+            if (this.owner == owner) {
                 return this;
             }
             return JavaType.Variable.build(name, owner, type, annotations, flagsBitMap);
         }
 
         public JavaType.Variable withType(@Nullable JavaType type) {
-            if(this.type == type) {
+            if (this.type == type) {
                 return this;
             }
             return JavaType.Variable.build(name, owner, type, annotations, flagsBitMap);
         }
 
         public JavaType.Variable withAnnotations(List<FullyQualified> annotations) {
-            if(this.annotations == annotations) {
+            if (this.annotations == annotations) {
                 return this;
             }
             return JavaType.Variable.build(name, owner, type, annotations, flagsBitMap);
@@ -936,7 +953,7 @@ public interface JavaType extends Serializable {
         }
 
         public Method withAnnotations(List<FullyQualified> annotations) {
-            if(this.annotations == annotations) {
+            if (this.annotations == annotations) {
                 return this;
             }
             return Method.build(flagsBitMap, declaringType, name, genericSignature, resolvedSignature, paramNames, thrownExceptions, annotations);
@@ -966,7 +983,7 @@ public interface JavaType extends Serializable {
         }
 
         public Method withThrownExceptions(List<FullyQualified> thrownExceptions) {
-            if(this.thrownExceptions == thrownExceptions) {
+            if (this.thrownExceptions == thrownExceptions) {
                 return this;
             }
             return Method.build(flagsBitMap, declaringType, name, genericSignature, resolvedSignature, paramNames, thrownExceptions, annotations);
@@ -1042,6 +1059,11 @@ public interface JavaType extends Serializable {
         @Override
         public List<Variable> getMembers() {
             return bound == null ? emptyList() : bound.getMembers();
+        }
+
+        @Override
+        public List<Method> getMethods() {
+            return bound == null ? emptyList() : bound.getMethods();
         }
 
         @Override
