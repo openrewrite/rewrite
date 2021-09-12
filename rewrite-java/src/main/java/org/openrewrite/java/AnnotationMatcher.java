@@ -106,15 +106,22 @@ public class AnnotationMatcher {
                 String valueSource = ((J.Literal) arg).getValueSource();
                 return valueSource != null && valueSource.equals(matchText);
             }
-            if (arg instanceof J.FieldAccess && ((J.FieldAccess) arg).getSimpleName().equals("class") &&
-                    matchText.endsWith(".class")) {
-                JavaType argType = ((J.FieldAccess) arg).getTarget().getType();
-                if(argType instanceof JavaType.FullyQualified) {
-                    String queryTypeFqn = JavaType.Class.build(matchText.replaceAll("\\.class$", "")).getFullyQualifiedName();
-                    String targetTypeFqn = ((JavaType.FullyQualified) argType).getFullyQualifiedName();
-                    return queryTypeFqn.equals(targetTypeFqn);
+            if (arg instanceof J.FieldAccess) {
+                J.FieldAccess fa = (J.FieldAccess) arg;
+                if (fa.getSimpleName().equals("class") && matchText.endsWith(".class")) {
+                    JavaType argType = fa.getTarget().getType();
+                    if (argType instanceof JavaType.FullyQualified) {
+                        String queryTypeFqn = JavaType.Class.build(matchText.replaceAll("\\.class$", "")).getFullyQualifiedName();
+                        String targetTypeFqn = ((JavaType.FullyQualified) argType).getFullyQualifiedName();
+                        return queryTypeFqn.equals(targetTypeFqn);
+                    }
+                    return false;
                 }
-                return false;
+
+                JavaType.Variable varType = TypeUtils.asVariable(fa.getName().getFieldType());
+                if (varType != null && matchText.equals(varType.getOwner().getFullyQualifiedName() + "." + varType.getName())) {
+                    return true;
+                }
             }
             if (arg instanceof J.NewArray) {
                 J.NewArray na = (J.NewArray) arg;

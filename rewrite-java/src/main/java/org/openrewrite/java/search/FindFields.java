@@ -64,7 +64,7 @@ public class FindFields extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext executionContext) {
-                JavaType.Variable varType = TypeUtils.asVariable(fieldAccess.getName().getType());
+                JavaType.Variable varType = TypeUtils.asVariable(fieldAccess.getName().getFieldType());
                 if (varType != null && varType.getOwner().getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         varType.getName().equals(fieldName)) {
                     return fieldAccess.withMarkers(fieldAccess.getMarkers().addIfAbsent(new JavaSearchResult(FindFields.this)));

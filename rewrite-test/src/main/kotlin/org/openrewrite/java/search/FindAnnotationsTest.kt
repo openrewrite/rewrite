@@ -233,4 +233,28 @@ interface FindAnnotationsTest : JavaRecipeTest {
         val maybeExample = FindAnnotations.find(fooClass, "@com.foo.Example(com.foo.Foo.class)")
         assertThat(maybeExample).hasSize(1)
     }
+
+    @Test
+    fun enumArgument(jp: JavaParser.Builder<*, *>) = assertChanged(
+        parser = jp.classpath("jackson-annotations").build(),
+        recipe = FindAnnotations("@com.fasterxml.jackson.annotation.JsonTypeInfo(use=com.fasterxml.jackson.annotation.JsonTypeInfo.Id.CLASS)"),
+        before = """
+            import com.fasterxml.jackson.annotation.JsonTypeInfo;
+            import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
+            
+            class PenetrationTesting {
+                @JsonTypeInfo(use = Id.CLASS)
+                Object name;
+            }
+        """,
+        after = """
+            import com.fasterxml.jackson.annotation.JsonTypeInfo;
+            import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
+            
+            class PenetrationTesting {
+                /*~~>*/@JsonTypeInfo(use = Id.CLASS)
+                Object name;
+            }
+        """
+    )
 }

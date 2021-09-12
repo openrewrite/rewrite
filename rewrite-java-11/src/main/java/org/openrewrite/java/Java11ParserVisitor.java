@@ -813,12 +813,13 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     @Override
     public J visitMemberSelect(MemberSelectTree node, Space fmt) {
         JCFieldAccess fieldAccess = (JCFieldAccess) node;
+        JavaType type = typeMapping.type(node);
         return new J.FieldAccess(randomId(), fmt, Markers.EMPTY,
                 convert(fieldAccess.selected),
                 padLeft(sourceBefore("."), J.Identifier.build(randomId(),
                         sourceBefore(fieldAccess.name.toString()), Markers.EMPTY,
-                        fieldAccess.name.toString(), typeMapping.variableType(fieldAccess.sym, new Stack<>()))),
-                typeMapping.type(node));
+                        fieldAccess.name.toString(), type, typeMapping.variableType(fieldAccess.sym, new Stack<>()))),
+                type);
     }
 
     @Override
