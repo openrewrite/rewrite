@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2020 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,33 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.json.search
+package org.openrewrite.yaml.search
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.json.JsonRecipeTest
+import org.openrewrite.yaml.YamlRecipeTest
 
-class FindKeyTest: JsonRecipeTest {
+class FindKeyByXPathTest: YamlRecipeTest {
 
     @Test
     fun findKey() = assertChanged(
-        recipe = FindKey("$.metadata.name"),
+        recipe = FindKeyByXPath("metadata/name"),
         before = """
-            {
-              "apiVersion": "v1",
-              "metadata": {
-                "name": "monitoring-tools",
-                "namespace": "monitoring-tools"
-              }
-            }
+            apiVersion: v1
+            metadata:
+              name: monitoring-tools
+              namespace: monitoring-tools
         """,
         after = """
-            {
-              "apiVersion": "v1",
-              "metadata": {
-                /*~~>*/"name": "monitoring-tools",
-                "namespace": "monitoring-tools"
-              }
-            }
+            apiVersion: v1
+            metadata:
+              ~~>name: monitoring-tools
+              namespace: monitoring-tools
         """
     )
 }

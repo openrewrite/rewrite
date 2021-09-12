@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2020 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,25 +21,31 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.yaml.JsonPathMatcher;
+import org.openrewrite.yaml.XPathMatcher;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.HashSet;
 import java.util.Set;
 
+/**
+ * @deprecated Use {@link FindKey} instead. {@link XPathMatcher} is being replaced
+ * by {@link org.openrewrite.yaml.JsonPathMatcher}.
+ */
+@SuppressWarnings("DeprecatedIsStillUsed")
 @Value
 @EqualsAndHashCode(callSuper = true)
-public class FindKey extends Recipe {
+@Deprecated
+public class FindKeyByXPath extends Recipe {
 
-    @Option(displayName = "Path",
-            description = "JsonPath expression used to find matching keys.",
-            example = "$.subjects.kind")
+    @Option(displayName = "Key path",
+            description = "XPath expression used to find matching keys.",
+            example = "/subjects/kind")
     String key;
 
     @Override
     public String getDisplayName() {
-        return "Find YAML entries";
+        return "Find YAML entries by XPath (deprecated)";
     }
 
     @Override
@@ -49,26 +55,26 @@ public class FindKey extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        JsonPathMatcher pathMatcher = new JsonPathMatcher(key);
+        XPathMatcher xPathMatcher = new XPathMatcher(key);
         return new YamlVisitor<ExecutionContext>() {
             @Override
             public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry e = (Yaml.Mapping.Entry) super.visitMappingEntry(entry, ctx);
-                if (pathMatcher.matches(getCursor())) {
-                    e = e.withMarkers(e.getMarkers().addIfAbsent(new YamlSearchResult(FindKey.this)));
+                if (xPathMatcher.matches(getCursor())) {
+                    e = e.withMarkers(e.getMarkers().addIfAbsent(new YamlSearchResult(FindKeyByXPath.this)));
                 }
                 return e;
             }
         };
     }
 
-    public static Set<Yaml.Mapping.Entry> find(Yaml y, String jsonPath) {
-        JsonPathMatcher pathMatcher = new JsonPathMatcher(jsonPath);
+    public static Set<Yaml.Mapping.Entry> find(Yaml y, String xPath) {
+        XPathMatcher xPathMatcher = new XPathMatcher(xPath);
         YamlVisitor<Set<Yaml.Mapping.Entry>> findVisitor = new YamlVisitor<Set<Yaml.Mapping.Entry>>() {
             @Override
             public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, Set<Yaml.Mapping.Entry> es) {
                 Yaml.Mapping.Entry e = (Yaml.Mapping.Entry) super.visitMappingEntry(entry, es);
-                if (pathMatcher.matches(getCursor())) {
+                if (xPathMatcher.matches(getCursor())) {
                     es.add(e);
                 }
                 return e;
