@@ -9,3 +9,4 @@ bin/
 .classpath
 .settings/
 .DS_Store
+**/node_modules/

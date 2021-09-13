@@ -155,6 +155,15 @@ public class Environment {
             return load(new ClasspathScanningLoader(jar, properties, classLoader));
         }
 
+        public Builder scanNpmModules(String registry, String... modules) {
+            return load(new NpmRegistryModuleLoader(registry, modules));
+        }
+
+        public Builder scanPolyglotModule(String language, Map<String, Object>... sources) {
+            return load(new PolyglotResourceLoader(language, sources));
+        }
+
+
         public Builder scanUserHome() {
             File userHomeRewriteConfig = new File(System.getProperty("user.home") + "/.rewrite/rewrite.yml");
             if (userHomeRewriteConfig.exists()) {
