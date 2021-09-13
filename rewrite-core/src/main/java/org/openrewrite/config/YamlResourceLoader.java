@@ -33,6 +33,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -140,7 +141,7 @@ public class YamlResourceLoader implements ResourceLoader {
     private Collection<Map<String, Object>> loadResources(ResourceType resourceType) {
         Collection<Map<String, Object>> resources = new ArrayList<>();
 
-        Yaml yaml = new Yaml();
+        Yaml yaml = new Yaml(new SafeConstructor());
         for (Object resource : yaml.loadAll(yamlSource)) {
             if (resource instanceof Map) {
                 @SuppressWarnings("unchecked") Map<String, Object> resourceMap = (Map<String, Object>) resource;
