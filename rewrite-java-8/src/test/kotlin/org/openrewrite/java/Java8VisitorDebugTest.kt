@@ -142,6 +142,10 @@ class Java8ExplicitLambdaArgumentTypesTest : Java8Test, ExplicitLambdaArgumentTy
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8ExternalizableHasNoArgConstructorTest : Java8Test, ExternalizableHasNoArgConstructorTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8FallThroughTest : Java8Test, FallThroughTest
 
 @DebugOnly
