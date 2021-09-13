@@ -121,6 +121,12 @@ public class TypeCache {
                 types.add(method.getReturnType());
                 return super.visitMethodInvocation(method, p);
             }
+
+            @Override
+            public J.NewClass visitNewClass(J.NewClass newClass, Integer integer) {
+                types.add(newClass.getConstructorType());
+                return super.visitNewClass(newClass, integer);
+            }
         }.visit(cu, 0);
 
         return new TypeCache(cu, types, declaredMethods);

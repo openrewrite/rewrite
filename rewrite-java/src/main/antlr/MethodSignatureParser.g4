@@ -51,4 +51,5 @@ classNameOrInterface
 simpleNamePattern
     :    Identifier (WILDCARD Identifier)* WILDCARD?
     |    WILDCARD (Identifier WILDCARD)* Identifier?
+    |    CONSTRUCTOR
     ;

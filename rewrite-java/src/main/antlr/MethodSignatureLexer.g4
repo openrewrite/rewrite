@@ -2,6 +2,8 @@ lexer grammar MethodSignatureLexer;
 
 // §3.11 Separators
 
+CONSTRUCTOR     : '<constructor>';
+
 LPAREN          : '(';
 RPAREN          : ')';
 LBRACK          : '[';

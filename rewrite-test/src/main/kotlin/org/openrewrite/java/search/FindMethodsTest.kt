@@ -24,6 +24,27 @@ import org.openrewrite.java.JavaRecipeTest
 interface FindMethodsTest : JavaRecipeTest {
 
     @Test
+    fun findConstructors(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = FindMethods("A <constructor>(String)", false),
+        before = """
+            class Test {
+                A a = new A("test");
+            }
+        """,
+        after = """
+            class Test {
+                A a = /*~~>*/new A("test");
+            }
+        """,
+        dependsOn = arrayOf("""
+            class A {
+                public A(String s) {}
+            }
+        """)
+    )
+
+    @Test
     fun findMethodReferences(jp: JavaParser) = assertChanged(
         jp,
         recipe = FindMethods("A singleArg(String)", false),

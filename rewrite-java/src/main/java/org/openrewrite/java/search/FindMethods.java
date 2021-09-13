@@ -65,12 +65,12 @@ public class FindMethods extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(methodPattern, Boolean.TRUE.equals(matchOverrides));
+        return new UsesMethod<>(methodPattern, matchOverrides);
     }
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        MethodMatcher methodMatcher = new MethodMatcher(methodPattern, Boolean.TRUE.equals(matchOverrides));
+        MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -88,6 +88,15 @@ public class FindMethods extends Recipe {
                     m = m.withReference(m.getReference().withMarkers(m.getReference().getMarkers().addIfAbsent(new JavaSearchResult(FindMethods.this))));
                 }
                 return m;
+            }
+
+            @Override
+            public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+                J.NewClass n = super.visitNewClass(newClass, ctx);
+                if (methodMatcher.matches(newClass)) {
+                    n = n.withMarkers(n.getMarkers().addIfAbsent(new JavaSearchResult(FindMethods.this)));
+                }
+                return n;
             }
         };
     }

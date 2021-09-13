@@ -33,9 +33,6 @@ import org.openrewrite.java.tree.TypeUtils;
 import java.util.HashSet;
 import java.util.Set;
 
-/**
- * This recipe finds all explicit references to a type.
- */
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindTypes extends Recipe {

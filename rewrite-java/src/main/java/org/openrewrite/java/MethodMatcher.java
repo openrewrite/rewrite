@@ -33,6 +33,7 @@ import org.openrewrite.java.tree.TypeUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.StringJoiner;
 import java.util.regex.Pattern;
 
 import static java.util.stream.Collectors.joining;
@@ -70,11 +71,11 @@ public class MethodMatcher {
      * Whether to match overridden forms of the method on subclasses of {@link #targetTypePattern}.
      */
     private final boolean matchOverrides;
-    
+
     public MethodMatcher(String signature, @Nullable Boolean matchOverrides) {
         this(signature, Boolean.TRUE.equals(matchOverrides));
     }
-    
+
     public MethodMatcher(String signature, boolean matchOverrides) {
         this.matchOverrides = matchOverrides;
 
@@ -116,6 +117,7 @@ public class MethodMatcher {
 
         return matchesTargetType(methodType.getDeclaringType()) &&
                 methodNamePattern.matcher(methodType.getName()).matches() &&
+                methodType.getGenericSignature() != null &&
                 argumentPattern.matcher(methodType.getGenericSignature().getParamTypes().stream()
                         .map(MethodMatcher::typePattern)
                         .filter(Objects::nonNull)
@@ -173,25 +175,19 @@ public class MethodMatcher {
     }
 
     public boolean matches(J.NewClass constructor) {
-        if (constructor.getType() == null) {
+        if (constructor.getType() == null || constructor.getConstructorType() == null) {
             return false;
-        }
-        List<Expression> args = constructor.getArguments();
-        String signaturePattern = "";
-        if (args != null) {
-            signaturePattern = args.stream()
-                    .map(Expression::getType)
-                    .filter(Objects::nonNull)
-                    .map(MethodMatcher::typePattern)
-                    .filter(Objects::nonNull)
-                    .collect(joining(","));
         }
 
         JavaType.FullyQualified type = TypeUtils.asFullyQualified(constructor.getType());
         assert type != null;
         return matchesTargetType(type) &&
-                methodNamePattern.matcher(type.getClassName()).matches() &&
-                argumentPattern.matcher(signaturePattern).matches();
+                methodNamePattern.matcher("<constructor>").matches() &&
+                constructor.getConstructorType().getResolvedSignature() != null &&
+                argumentPattern.matcher(constructor.getConstructorType().getResolvedSignature().getParamTypes().stream()
+                        .map(MethodMatcher::typePattern)
+                        .filter(Objects::nonNull)
+                        .collect(joining(","))).matches();
     }
 
     boolean matchesTargetType(@Nullable JavaType.FullyQualified type) {
@@ -251,14 +247,23 @@ public class MethodMatcher {
     public static String methodPattern(J.MethodDeclaration method) {
         assert method.getType() != null;
 
+        JavaType.Method.Signature signature = method.getType().getResolvedSignature();
+        String signatureStr;
+        if (signature == null) {
+            signatureStr = "";
+        } else {
+            StringJoiner joiner = new StringJoiner(",");
+            for (JavaType javaType : signature.getParamTypes()) {
+                String s = typePattern(javaType);
+                if (s != null) {
+                    joiner.add(s);
+                }
+            }
+            signatureStr = joiner.toString();
+        }
+
         return method.getType().getDeclaringType().getFullyQualifiedName() + " " +
-                method.getSimpleName() +
-                "(" +
-                method.getType().getResolvedSignature().getParamTypes().stream()
-                        .map(MethodMatcher::typePattern)
-                        .filter(Objects::nonNull)
-                        .collect(joining(",")) +
-                ")";
+                method.getSimpleName() + "(" + signatureStr + ")";
     }
 }
 
