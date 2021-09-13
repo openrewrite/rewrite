@@ -18,10 +18,11 @@ package org.openrewrite.json;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.Result;
 import org.openrewrite.config.Environment;
-import org.openrewrite.config.NpmRegistryModuleLoader;
+import org.openrewrite.scheduling.DirectScheduler;
 
 import java.nio.file.Paths;
 import java.util.Collection;
@@ -54,8 +55,12 @@ class NpmRegistryModuleLoaderTest {
                 .build();
         assertThat(env.listRecipes()).isNotEmpty();
 
-        Recipe r = env.listRecipes().iterator().next();
-        List<Result> results = r.run(new JsonParser().parse("{}"));
+        Recipe r = env.activateRecipes("ts-recipes@latest");
+        List<Result> results = r.run(new JsonParser().parse("{}"),
+                new InMemoryExecutionContext(),
+                DirectScheduler.common(),
+                3,
+                1);
 
         System.out.println("results: " + results);
     }

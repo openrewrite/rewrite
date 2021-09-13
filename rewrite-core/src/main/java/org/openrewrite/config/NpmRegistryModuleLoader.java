@@ -22,43 +22,29 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
-import org.graalvm.polyglot.*;
-import org.openrewrite.Recipe;
-import org.openrewrite.polyglot.PolyglotRecipe;
-import org.openrewrite.style.NamedStyles;
+import org.graalvm.polyglot.Context;
 
-import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 import static java.lang.Math.toIntExact;
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.Collections.emptyList;
-import static org.openrewrite.polyglot.PolyglotUtils.invokeMember;
 
-public class NpmRegistryModuleLoader implements ResourceLoader {
+public class NpmRegistryModuleLoader extends PolyglotResourceLoader {
 
     private static final String JS = "js";
-
-    private final List<Recipe> recipes = new ArrayList<>();
-    private final List<NamedStyles> styles = new ArrayList<>();
-
-    private final List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();
-    private final List<CategoryDescriptor> categoryDescriptors = new ArrayList<>();
-    private final List<RecipeExample> recipeExamples = new ArrayList<>();
+    private static final String JAVA = "java";
 
     public NpmRegistryModuleLoader(String registry, String... modules) {
         if (!registry.endsWith("/")) {
             registry += "/";
         }
 
-        Context context = Context.newBuilder(JS)
+        Context context = Context.newBuilder(JS, JAVA)
                 .allowAllAccess(true)
-                .allowHostAccess(HostAccess.ALL)
                 .build();
 
         ObjectMapper mapper = new ObjectMapper();
@@ -72,7 +58,8 @@ public class NpmRegistryModuleLoader implements ResourceLoader {
                     String main = packageDescriptor.getMain();
 
                     Path jsPath = Paths.get(registry, module, main);
-                    evalRecipe(context,
+                    evalPolyglotRecipe(JS,
+                            context,
                             module + "@latest",
                             packageDescriptor.getDescription(),
                             jsPath.toString(),
@@ -98,7 +85,8 @@ public class NpmRegistryModuleLoader implements ResourceLoader {
                             //noinspection StatementWithEmptyBody
                             for (int i = 0; i < buff.length; i += tgzIn.read(buff, i, tgzIn.getRecordSize())) {
                             }
-                            evalRecipe(context,
+                            evalPolyglotRecipe(JS,
+                                    context,
                                     module + "@" + latestVersion,
                                     packageDescriptor.getDescription(),
                                     e.getName(),
@@ -111,64 +99,6 @@ public class NpmRegistryModuleLoader implements ResourceLoader {
                 throw new RuntimeException(e);
             }
         }
-    }
-
-    @Override
-    public Collection<Recipe> listRecipes() {
-        return recipes;
-    }
-
-    @Override
-    public Collection<RecipeDescriptor> listRecipeDescriptors() {
-        return recipeDescriptors;
-    }
-
-    @Override
-    public Collection<NamedStyles> listStyles() {
-        return styles;
-    }
-
-    @Override
-    public Collection<CategoryDescriptor> listCategoryDescriptors() {
-        return categoryDescriptors;
-    }
-
-    @Override
-    public Collection<RecipeExample> listRecipeExamples() {
-        return recipeExamples;
-    }
-
-    private void evalRecipe(Context context,
-                            String moduleName,
-                            String description,
-                            String jsFileName,
-                            URI srcUri,
-                            byte[] jsFile) throws IOException {
-        Value bindings = context.getBindings(JS);
-
-        Source src = Source.newBuilder(JS, new String(jsFile, UTF_8), jsFileName).build();
-        context.eval(src);
-
-        String recipeName = bindings.getMemberKeys().iterator().next();
-        Value recipeVal = bindings.getMember(recipeName);
-        Value opts = recipeVal.getMember("Options").newInstance();
-
-        Recipe r = new PolyglotRecipe(moduleName, opts, recipeVal.getMember("default"));
-
-        recipes.add(r);
-        RecipeDescriptor descriptor = new RecipeDescriptor(
-                moduleName,
-                moduleName,
-                description,
-                Collections.emptySet(),
-                invokeMember(opts, "getOptionsDescriptors")
-                        .map(descs -> descs.as(new TypeLiteral<List<OptionDescriptor>>() {
-                        }))
-                        .orElse(emptyList()),
-                Collections.singletonList(JS),
-                emptyList(),
-                srcUri);
-        recipeDescriptors.add(descriptor);
     }
 
     @Data

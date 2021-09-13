@@ -47,15 +47,14 @@ public class PolyglotUtils {
                 .orElse(orElse);
     }
 
-    public static Optional<Value> jsExtendConstructor(Value value, String memberKey, Object obj) {
+    public static Optional<Value> jsExtend(Value value, String member, Object obj) {
         Value bindings = value.getContext().getBindings(JS);
         Set<String> members = bindings.getMemberKeys();
         if (members == null || members.isEmpty()) {
             return Optional.empty();
         }
-        String thisName = members.iterator().next();
-        Value prototype = value.getContext().eval(JS, "this." + thisName + ".default.prototype");
-        prototype.putMember(memberKey, Value.asValue(obj));
+        Value prototype = value.getContext().eval(JS, "this.default." + member + ".prototype");
+        prototype.putMember(member, Value.asValue(obj));
         return Optional.of(value);
     }
 

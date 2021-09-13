@@ -25,8 +25,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 
 import static org.graalvm.polyglot.Value.asValue;
-import static org.openrewrite.polyglot.PolyglotUtils.invokeMember;
-import static org.openrewrite.polyglot.PolyglotUtils.invokeMemberOrElse;
+import static org.openrewrite.polyglot.PolyglotUtils.*;
 
 public class PolyglotRecipe extends Recipe {
 
@@ -39,7 +38,7 @@ public class PolyglotRecipe extends Recipe {
     private volatile Value instance;
 
     public PolyglotRecipe(String name, Value options, Value constructor) {
-        this.name=name;
+        this.name = name;
         this.options = options;
         this.constructor = constructor;
     }
@@ -70,9 +69,9 @@ public class PolyglotRecipe extends Recipe {
 
     private synchronized Value getInstance() {
         if (instance == null) {
-            constructor.getContext().eval("js", "this.default.OpenRewrite.Recipe.prototype.doNext")
-                    .putMember("doNext", Value.asValue(new DoNextProxy()));
-            instance = constructor.newInstance(options);
+            instance = jsExtend(constructor, "OpenRewrite.Recipe", new DoNextProxy())
+                    .map(v -> v.newInstance(options))
+                    .orElseThrow(IllegalStateException::new);
         }
         return instance;
     }
