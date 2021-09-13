@@ -142,6 +142,10 @@ class Java11ExplicitLambdaArgumentTypesTest : Java11Test, ExplicitLambdaArgument
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11ExternalizableHasNoArgsConstructorTest : Java11Test, ExternalizableHasNoArgConstructorTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11FallThroughTest : Java11Test, FallThroughTest
 
 @DebugOnly
