@@ -130,7 +130,7 @@ interface FindTypesTest : JavaRecipeTest {
         after = """
             import java.util.List;
             public class B {
-               public /*~~>*//*~~>*/List<String> foo() { return null; }
+               public /*~~>*/List<String> foo() { return null; }
             }
         """
     )
@@ -256,7 +256,7 @@ interface FindTypesTest : JavaRecipeTest {
         after = """
             import java.util.List;
             public class B {
-               /*~~>*//*~~>*/List<String> l;
+               /*~~>*/List<String> l;
             }
         """
     )

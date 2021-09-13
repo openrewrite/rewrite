@@ -25,7 +25,10 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.marker.JavaSearchResult;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.NameTree;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -70,8 +73,10 @@ public class FindTypes extends Recipe {
         return new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitIdentifier(J.Identifier ident, ExecutionContext executionContext) {
-                if (ident.getType() != null && getCursor().firstEnclosing(J.Import.class) == null &&
-                    getCursor().firstEnclosing(J.FieldAccess.class) == null) {
+                if (ident.getType() != null &&
+                        getCursor().firstEnclosing(J.Import.class) == null &&
+                        getCursor().firstEnclosing(J.FieldAccess.class) == null &&
+                        !(getCursor().getParentOrThrow().getValue() instanceof J.ParameterizedType)) {
                     JavaType.FullyQualified type = TypeUtils.asFullyQualified(ident.getType());
                     if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
                             ident.getSimpleName().equals(type.getClassName())) {
