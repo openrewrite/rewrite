@@ -69,7 +69,7 @@ public class PolyglotRecipe extends Recipe {
 
     private synchronized Value getInstance() {
         if (instance == null) {
-            instance = jsExtend(constructor, "OpenRewrite.Recipe", new DoNextProxy())
+            instance = jsExtend(constructor, "OpenRewrite.Recipe", "doNext", new DoNextProxy())
                     .map(v -> v.newInstance(options))
                     .orElseThrow(IllegalStateException::new);
         }

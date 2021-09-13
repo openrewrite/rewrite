@@ -33,6 +33,7 @@ public class PolyglotVisitor<T> extends TreeVisitor<Tree, T> {
 
     @Override
     public @Nullable Tree visit(@Nullable Tree tree, T ctx) {
+        value.putMember("super", Value.asValue(delegate));
         return value.execute(tree, ctx).as(Tree.class);
     }
 

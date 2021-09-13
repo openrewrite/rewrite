@@ -24,6 +24,7 @@ import org.openrewrite.Result;
 import org.openrewrite.config.Environment;
 import org.openrewrite.scheduling.DirectScheduler;
 
+import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.List;
@@ -48,7 +49,7 @@ class NpmRegistryModuleLoaderTest {
 
     @Disabled
     @Test
-    void mustLoadModuleFromLocal() {
+    void mustLoadModuleFromLocal() throws Exception {
         String registry = Paths.get(System.getProperty("user.home"), "src", "github.com", "openrewrite").toString();
         Environment env = Environment.builder()
                 .scanNpmModules(registry, "ts-recipes")
@@ -56,7 +57,7 @@ class NpmRegistryModuleLoaderTest {
         assertThat(env.listRecipes()).isNotEmpty();
 
         Recipe r = env.activateRecipes("ts-recipes@latest");
-        List<Result> results = r.run(new JsonParser().parse("{}"),
+        List<Result> results = r.run(new JsonParser().parse(Files.readString(Paths.get(registry, "ts-recipes", "package.json"))),
                 new InMemoryExecutionContext(),
                 DirectScheduler.common(),
                 3,
