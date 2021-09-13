@@ -135,19 +135,15 @@ interface MethodMatcherTest {
         val cu = jp.parse(
             """
             package a;
-
             class A { 
-                {
-                    A a = new A(); 
-                }
+                A a = new A(); 
             }
         """.trimIndent()
         )[0]
 
         assertTrue(
-            MethodMatcher("a.A A()").matches(
-                ((cu.classes.first().body.statements.first() as J.Block)
-                    .statements.first() as J.VariableDeclarations)
+            MethodMatcher("a.A <constructor>()").matches(
+                (cu.classes.first().body.statements.first() as J.VariableDeclarations)
                     .variables.first().initializer as J.NewClass
             )
         )
