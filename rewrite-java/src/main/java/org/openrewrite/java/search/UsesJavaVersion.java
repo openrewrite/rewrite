@@ -15,14 +15,13 @@
  */
 package org.openrewrite.java.search;
 
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.Marker;
 
-import java.util.*;
+import java.util.Optional;
 
 import static org.openrewrite.Tree.randomId;
 
