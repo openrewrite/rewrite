@@ -17,7 +17,6 @@ package org.openrewrite
 
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.ResponseBody
 import org.assertj.core.api.Assertions.*
 import org.junit.jupiter.api.fail
 import org.openrewrite.scheduling.DirectScheduler
@@ -270,9 +269,7 @@ interface RecipeTest <T: SourceFile> {
 
             httpClient.newCall(request).execute().use { response ->
                 check(response.isSuccessful) { "Unexpected status $response" }
-                val responseBody: ResponseBody = response.body ?:
-                throw IllegalStateException("No response body")
-                val source = treeSerializer.read(responseBody.byteStream())
+                val source = treeSerializer.read(response.peekBody(Long.MAX_VALUE).byteStream())
 
                 val results = recipe
                     .run(

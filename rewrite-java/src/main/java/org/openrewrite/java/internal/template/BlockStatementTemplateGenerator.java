@@ -77,8 +77,8 @@ public class BlockStatementTemplateGenerator {
             }
 
             @Override
-            public J.Block visitBlock(J.Block block, Integer integer) {
-                J.Block b = super.visitBlock(block, integer);
+            public J.Block visitBlock(J.Block block, Integer p) {
+                J.Block b = super.visitBlock(block, p);
                 if (b == blockEnclosingTemplateComment) {
                     done = true;
                 }
@@ -87,7 +87,7 @@ public class BlockStatementTemplateGenerator {
 
             @Nullable
             @Override
-            public J visit(@Nullable Tree tree, Integer integer) {
+            public J visit(@Nullable Tree tree, Integer p) {
                 if (done) {
                     return (J) tree;
                 }
@@ -109,7 +109,7 @@ public class BlockStatementTemplateGenerator {
                     }
                 }
 
-                return super.visit(tree, integer);
+                return super.visit(tree, p);
             }
         }.visit(cu, 0);
 
@@ -233,8 +233,11 @@ public class BlockStatementTemplateGenerator {
 
     private void classDeclaration(@Nullable J prior, StringBuilder before, J.ClassDeclaration parent, Set<J> templated) {
         J.ClassDeclaration c = parent;
-        for (Statement statement : c.getBody().getStatements()) {
-            if(templated.contains(statement)) {
+
+        List<Statement> statements = c.getBody().getStatements();
+        for (int i = statements.size() - 1; i >= 0; i--) {
+            Statement statement = statements.get(i);
+            if (templated.contains(statement)) {
                 continue;
             }
 
@@ -249,6 +252,14 @@ public class BlockStatementTemplateGenerator {
                 // setting prior to null will cause them all to be written.
                 before.insert(0, '}');
                 classDeclaration(null, before, (J.ClassDeclaration) statement, templated);
+            } else if (statement instanceof J.EnumValueSet) {
+                J.EnumValueSet enumValues = (J.EnumValueSet) statement;
+                before.insert(0, ";");
+                StringJoiner enumStr = new StringJoiner(",");
+                for (J.EnumValue anEnum : enumValues.getEnums()) {
+                    enumStr.add(anEnum.getName().getSimpleName());
+                }
+                before.insert(0, enumStr);
             }
         }
         c = c.withBody(null).withLeadingAnnotations(null).withPrefix(Space.EMPTY);

@@ -28,6 +28,70 @@ import java.util.Comparator.comparing
 interface JavaTemplateTest : JavaRecipeTest {
 
     @Test
+    fun innerEnumWithStaticMethod(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = toRecipe {
+            object : JavaVisitor<ExecutionContext>() {
+                val t = JavaTemplate.builder({ cursor }, "new A()").build()
+
+                override fun visitNewClass(newClass: J.NewClass, p: ExecutionContext): J = when(newClass.arguments!![0]) {
+                    is J.Empty -> newClass
+                    else -> newClass.withTemplate(t, newClass.coordinates.replace())
+                }
+            }
+        },
+        typeValidation = {
+            identifiers = false
+        },
+        before = """
+            class A {
+                public enum Type {
+                    One;
+            
+                    public Type(String t) {
+                    }
+            
+                    String t;
+            
+                    public static Type fromType(String type) {
+                        return null;
+                    }
+                }
+            
+                public A(Type type) {}
+                public A() {}
+            
+                public void method(Type type) {
+                    new A(type);
+                }
+            }
+        """,
+        after = """
+            class A {
+                public enum Type {
+                    One;
+            
+                    public Type(String t) {
+                    }
+            
+                    String t;
+            
+                    public static Type fromType(String type) {
+                        return null;
+                    }
+                }
+            
+                public A(Type type) {}
+                public A() {}
+            
+                public void method(Type type) {
+                    new A();
+                }
+            }
+        """
+    )
+
+    @Test
     fun replacePackage(jp: JavaParser) = assertChanged(
         jp,
         recipe = toRecipe {
