@@ -32,8 +32,8 @@ public class InJavaSourceSet<P> extends JavaIsoVisitor<P> {
     @Override
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
         return cu.getMarkers().findFirst(JavaSourceSet.class)
-                .filter(sourceSet -> sourceSet.getName().equals(this.sourceSet))
-                .map(sourceSet -> cu.withMarkers(cu.getMarkers().addIfAbsent(new JavaSearchResult(randomId(), null, null))))
-                .orElse(cu);
+                .filter(sourceSet -> !sourceSet.getName().equals(this.sourceSet))
+                .map(sourceSet -> cu)
+                .orElse(cu.withMarkers(cu.getMarkers().addIfAbsent(new JavaSearchResult(randomId(), null, null))));
     }
 }
