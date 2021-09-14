@@ -25,7 +25,7 @@ class JavaSourceSetTest {
     @Test
     fun typesFromClasspath() {
         val ctx = InMemoryExecutionContext { e -> throw e }
-        val javaVersion = JavaSourceSet.build("main", JavaParser.runtimeClasspath, ctx)
+        val javaVersion = JavaSourceSet.build("main", JavaParser.runtimeClasspath(), ctx)
         assertThat(javaVersion.classpath.map { it.fullyQualifiedName })
             .contains("org.junit.jupiter.api.Test")
     }

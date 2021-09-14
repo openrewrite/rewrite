@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import io.github.classgraph.ClassGraph;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
@@ -25,6 +26,7 @@ import org.openrewrite.style.NamedStyles;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -37,9 +39,17 @@ import static java.util.stream.Collectors.*;
 
 public interface JavaParser extends Parser<J.CompilationUnit> {
 
+    /**
+     * @deprecated Won't work in isolated classloaders.
+     */
+    @Deprecated
     List<Path> runtimeClasspath = Collections.unmodifiableList(Arrays.stream(System.getProperty("java.class.path").split("\\Q" + System.getProperty("path.separator") + "\\E"))
             .map(cpEntry -> new File(cpEntry).toPath())
             .collect(toList()));
+
+    static List<Path> runtimeClasspath() {
+        return new ClassGraph().getClasspathURIs().stream().map(Paths::get).collect(toList());
+    }
 
     /**
      * Convenience utility for constructing a parser with binary dependencies on the runtime classpath of the process
@@ -57,10 +67,11 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
 
         Set<String> foundArtifacts = new HashSet<>();
         List<Path> artifacts = new ArrayList<>();
-        for (Path cpEntry : runtimeClasspath) {
+        List<URI> runtimeClasspath = new ClassGraph().getClasspathURIs();
+        for (URI cpEntry : runtimeClasspath) {
             for (Map.Entry<String, Pattern> artifactNamePattern : artifactNamePatterns.entrySet()) {
                 if (artifactNamePattern.getValue().matcher(cpEntry.toString()).find()) {
-                    artifacts.add(cpEntry);
+                    artifacts.add(Paths.get(cpEntry));
                     foundArtifacts.add(artifactNamePattern.getKey());
                 }
             }
