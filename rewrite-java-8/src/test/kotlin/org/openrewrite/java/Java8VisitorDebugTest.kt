@@ -462,6 +462,10 @@ class Java8UseStaticImportTest : Java8Test, UseStaticImportTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8UseJavaInterfaceTest : Java8Test, UseJavaInterfaceTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8UsesJavaVersionTest : Java8Test, UsesJavaVersionTest
 
 @DebugOnly
