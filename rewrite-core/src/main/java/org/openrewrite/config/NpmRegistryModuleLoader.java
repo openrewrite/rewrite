@@ -23,9 +23,10 @@ import lombok.Data;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Source;
+import org.graalvm.polyglot.io.ByteSequence;
 
 import java.net.URI;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
@@ -58,13 +59,7 @@ public class NpmRegistryModuleLoader extends PolyglotResourceLoader {
                     String main = packageDescriptor.getMain();
 
                     Path jsPath = Paths.get(registry, module, main);
-                    evalPolyglotRecipe(JS,
-                            context,
-                            module + "@latest",
-                            packageDescriptor.getDescription(),
-                            jsPath.toString(),
-                            jsPath.toUri(),
-                            Files.readAllBytes(Paths.get(registry, module, main)));
+                    evalPolyglotRecipe(context, module + "@latest", Source.newBuilder(JS, jsPath.toFile()).name(jsPath.toString()).build());
                 } else {
                     URI srcUri = URI.create(registry + module);
                     PackagesDescriptor packages = mapper.readValue(srcUri.toURL(), PackagesDescriptor.class);
@@ -85,13 +80,7 @@ public class NpmRegistryModuleLoader extends PolyglotResourceLoader {
                             //noinspection StatementWithEmptyBody
                             for (int i = 0; i < buff.length; i += tgzIn.read(buff, i, tgzIn.getRecordSize())) {
                             }
-                            evalPolyglotRecipe(JS,
-                                    context,
-                                    module + "@" + latestVersion,
-                                    packageDescriptor.getDescription(),
-                                    e.getName(),
-                                    tarballUri,
-                                    buff);
+                            evalPolyglotRecipe(context, module + "@" + latestVersion, Source.newBuilder(JS, ByteSequence.create(buff), name).build());
                         }
                     }
                 }

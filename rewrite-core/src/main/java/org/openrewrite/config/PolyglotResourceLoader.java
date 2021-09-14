@@ -18,23 +18,17 @@ package org.openrewrite.config;
 
 import lombok.extern.slf4j.Slf4j;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.Source;
-import org.graalvm.polyglot.TypeLiteral;
 import org.graalvm.polyglot.Value;
 import org.openrewrite.Recipe;
 import org.openrewrite.polyglot.PolyglotRecipe;
-import org.openrewrite.polyglot.PolyglotUtils;
 import org.openrewrite.style.NamedStyles;
 
 import java.io.IOException;
-import java.net.URI;
-import java.time.Duration;
-import java.util.*;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
-import static org.openrewrite.polyglot.PolyglotUtils.invokeMember;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
 @Slf4j
 public class PolyglotResourceLoader implements ResourceLoader {
@@ -49,19 +43,11 @@ public class PolyglotResourceLoader implements ResourceLoader {
     public PolyglotResourceLoader() {
     }
 
-    public PolyglotResourceLoader(String language, Map<String, Object>... sources) {
-        Context context = Context.newBuilder(language, "java")
-                .allowAllAccess(true)
-                .build();
-        for (Map<String, Object> src : sources) {
+    public PolyglotResourceLoader(Source... sources) {
+        Context context = Context.newBuilder().allowAllAccess(true).build();
+        for (Source src : sources) {
             try {
-                evalPolyglotRecipe(language,
-                        context,
-                        (String) src.get("name"),
-                        (String) src.get("description"),
-                        (String) src.get("file"),
-                        URI.create((String) src.get("uri")),
-                        (byte[]) src.get("bytes"));
+                evalPolyglotRecipe(context, src.getName(), src);
             } catch (IOException e) {
                 log.error(e.getMessage(), e);
             }
@@ -93,43 +79,22 @@ public class PolyglotResourceLoader implements ResourceLoader {
         return recipeExamples;
     }
 
-    public Recipe evalPolyglotRecipe(String language,
-                                     Context context,
-                                     String moduleName,
-                                     String description,
-                                     String srcFile,
-                                     URI srcUri,
-                                     byte[] srcContent) throws IOException {
+    public void evalPolyglotRecipe(Context context, String name, Source src) throws IOException {
+        String language = src.getPath().substring(src.getPath().lastIndexOf('.') + 1);
         Value bindings = context.getBindings(language);
-
-        Source src = Source.newBuilder(language, new String(srcContent, UTF_8), srcFile).build();
         context.eval(src);
 
-        String recipeName = bindings.getMemberKeys().iterator().next();
-        Value recipeVal = bindings.getMember(recipeName);
-        Value opts = PolyglotUtils.getValue(recipeVal, "Options")
-                .map(Value::newInstance)
-                .orElse(Value.asValue(emptyMap()));
-
-        Recipe r = new PolyglotRecipe(moduleName, opts, recipeVal.getMember("default"));
-
-        recipes.add(r);
-        RecipeDescriptor descriptor = new RecipeDescriptor(
-                moduleName,
-                moduleName,
-                description,
-                Collections.emptySet(),
-                Duration.ZERO,
-                invokeMember(opts, "getOptionsDescriptors")
-                        .map(descs -> descs.as(new TypeLiteral<List<OptionDescriptor>>() {
-                        }))
-                        .orElse(emptyList()),
-                Collections.singletonList(language),
-                emptyList(),
-                srcUri);
-        recipeDescriptors.add(descriptor);
-
-        return r;
+        for (String exportedMember : bindings.getMemberKeys()) {
+            Value defaultExport = bindings.getMember(exportedMember).getMember("default");
+            if (defaultExport.canInstantiate()) {
+                defaultExport = defaultExport.newInstance();
+            } else if (defaultExport.canExecute()) {
+                defaultExport = defaultExport.execute();
+            }
+            Recipe r = new PolyglotRecipe(name, defaultExport);
+            recipes.add(r);
+            recipeDescriptors.add(r.getDescriptor());
+        }
     }
 
 }

@@ -16,31 +16,20 @@
 
 package org.openrewrite.polyglot;
 
-import lombok.experimental.NonFinal;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.proxy.ProxyExecutable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
-
-import static org.graalvm.polyglot.Value.asValue;
-import static org.openrewrite.polyglot.PolyglotUtils.*;
 
 public class PolyglotRecipe extends Recipe {
 
     private final String name;
-    private final Value options;
-    private final Value constructor;
+    private final Value value;
 
-    @Nullable
-    @NonFinal
-    private volatile Value instance;
-
-    public PolyglotRecipe(String name, Value options, Value constructor) {
+    public PolyglotRecipe(String name, Value value) {
         this.name = name;
-        this.options = options;
-        this.constructor = constructor;
+        this.value = value;
     }
 
     @Override
@@ -50,30 +39,17 @@ public class PolyglotRecipe extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return invokeMemberOrElse(getInstance(), "getDisplayName", asValue(options.getMember("displayName")))
-                .asString();
+        return value.invokeMember("getDisplayName").asString();
     }
 
     @Override
     public String getDescription() {
-        return invokeMemberOrElse(getInstance(), "getDescription", asValue(options.getMember("description")))
-                .asString();
+        return value.invokeMember("getDescription").asString();
     }
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return invokeMember(getInstance(), "getVisitor")
-                .map(v -> new PolyglotVisitor<>(v.getMember("visit"), super.getVisitor()))
-                .orElseThrow(() -> new IllegalStateException("Must provide a visit function"));
-    }
-
-    private synchronized Value getInstance() {
-        if (instance == null) {
-            instance = jsExtend(constructor, "OpenRewrite.Recipe", "doNext", new DoNextProxy())
-                    .map(v -> v.newInstance(options))
-                    .orElseThrow(IllegalStateException::new);
-        }
-        return instance;
+        return new PolyglotVisitor<>(value.invokeMember("getVisitor"), super.getVisitor());
     }
 
     @Override

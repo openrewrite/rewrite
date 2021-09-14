@@ -15,6 +15,7 @@
  */
 package org.openrewrite.config;
 
+import org.graalvm.polyglot.Source;
 import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
@@ -159,8 +160,8 @@ public class Environment {
             return load(new NpmRegistryModuleLoader(registry, modules));
         }
 
-        public Builder scanPolyglotModule(String language, Map<String, Object>... sources) {
-            return load(new PolyglotResourceLoader(language, sources));
+        public Builder scanPolyglotModule(Source... sources) {
+            return load(new PolyglotResourceLoader(sources));
         }
 
 
