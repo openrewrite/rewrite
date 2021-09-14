@@ -58,7 +58,7 @@ class NpmRegistryModuleLoaderTest {
 
         Recipe r = env.activateRecipes("ts-recipes@latest");
         List<Result> results = r.run(new JsonParser().parse(Files.readString(Paths.get(registry, "ts-recipes", "package.json"))),
-                new InMemoryExecutionContext(),
+                new InMemoryExecutionContext(Throwable::printStackTrace),
                 DirectScheduler.common(),
                 3,
                 1);
