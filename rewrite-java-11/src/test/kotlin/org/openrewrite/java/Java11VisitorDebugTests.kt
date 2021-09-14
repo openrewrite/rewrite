@@ -486,6 +486,10 @@ class Java11UseStaticImportTest : Java11Test, UseStaticImportTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11UseCollectionInterfacesTest : Java11Test, UseCollectionInterfacesTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11UsesJavaVersionTest : Java11Test, UsesJavaVersionTest
 
 @DebugOnly
