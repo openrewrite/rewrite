@@ -103,4 +103,32 @@ interface UseDiamondOperatorTest: JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    fun removeUnusedImports(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import java.util.Map;
+            import java.util.HashMap;
+            import java.math.BigDecimal;
+            import java.util.Date;
+
+            class Test {
+                void test() {
+                    Map<Object,Object> map = new HashMap<BigDecimal,Date>();
+                }
+            }
+        """,
+        after = """
+            import java.util.Map;
+            import java.util.HashMap;
+
+            class Test {
+                void test() {
+                    Map<Object,Object> map = new HashMap<>();
+                }
+            }
+        """
+    )
+
 }

@@ -20,8 +20,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
@@ -65,6 +64,11 @@ public class UseDiamondOperator extends Recipe {
                     J.ParameterizedType parameterizedType = (J.ParameterizedType) n.getClazz();
                     if (useDiamondOperator(newClass, parameterizedType)) {
                         n = n.withClazz(parameterizedType.withTypeParameters(singletonList(new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY))));
+                        if (parameterizedType.getTypeParameters() != null) {
+                            parameterizedType.getTypeParameters().stream()
+                                    .map(e -> TypeUtils.asFullyQualified(e.getType()))
+                                    .forEach(this::maybeRemoveImport);
+                        }
                     }
                 }
                 return n;
