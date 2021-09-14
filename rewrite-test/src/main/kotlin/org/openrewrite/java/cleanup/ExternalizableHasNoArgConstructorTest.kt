@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@file:Suppress("RedundantThrows")
+@file:Suppress("RedundantThrows", "ExternalizableWithoutPublicNoArgConstructor")
 
 package org.openrewrite.java.cleanup
 
@@ -65,12 +65,12 @@ interface ExternalizableHasNoArgConstructorTest : JavaRecipeTest {
                 private String a;
                 private String b;
                 
-                public MyThing() {}
-
                 public MyThing(String a, String b) {
                     this.a = a;
                     this.b = b;
                 }
+                
+                public MyThing() {}
                 
                 @Override 
                 public void writeExternal(ObjectOutput out) throws IOException {}
@@ -193,6 +193,115 @@ interface ExternalizableHasNoArgConstructorTest : JavaRecipeTest {
                     return a;
                 }
                 
+                @Override 
+                public void writeExternal(ObjectOutput out) throws IOException {}
+                
+                @Override
+                public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {}
+            }
+        """
+    )
+
+    @Test
+    fun hasFinalFieldVar() = assertUnchanged(
+        before = """
+            import java.io.Externalizable;
+            import java.io.IOException;
+            import java.io.ObjectInput;
+            import java.io.ObjectOutput;
+
+            public class MyThing implements Externalizable {
+                private final String a;
+                private final String b;
+                
+                public MyThing(String a, String b) {
+                    this.a = a;
+                    this.b = b;
+                }
+
+                @Override 
+                public void writeExternal(ObjectOutput out) throws IOException {}
+                
+                @Override
+                public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {}
+            }
+        """
+    )
+
+    @Test
+    fun hasInitializedFinalFieldVar() = assertChanged(
+        before = """
+            import java.io.Externalizable;
+            import java.io.IOException;
+            import java.io.ObjectInput;
+            import java.io.ObjectOutput;import java.util.ArrayList;
+
+            public class MyThing implements Externalizable {
+                private final Integer limit = 10;
+                private String a;
+                
+                public MyThing(String a) {
+                    this.a = a;
+                }
+
+                @Override 
+                public void writeExternal(ObjectOutput out) throws IOException {}
+                
+                @Override
+                public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {}
+            }
+        """,
+        after = """
+            import java.io.Externalizable;
+            import java.io.IOException;
+            import java.io.ObjectInput;
+            import java.io.ObjectOutput;import java.util.ArrayList;
+
+            public class MyThing implements Externalizable {
+                private final Integer limit = 10;
+                private String a;
+            
+                public MyThing() {
+                }
+                
+                public MyThing(String a) {
+                    this.a = a;
+                }
+
+                @Override 
+                public void writeExternal(ObjectOutput out) throws IOException {}
+                
+                @Override
+                public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {}
+            }
+        """
+    )
+
+    @Test
+    fun superClassDoesNotHaveDefaultConstructor() = assertUnchanged(
+        dependsOn = arrayOf("""
+            package abc;
+            public class SuperThing {
+                private final Long l;
+                public SuperThing(Long l) {
+                    this.l = l;
+                }
+                public void doSomething() {}
+            }
+        """),
+        before = """
+            package abc;
+            import java.io.Externalizable;
+            import java.io.IOException;
+            import java.io.ObjectInput;
+            import java.io.ObjectOutput;
+
+            public class MyThing extends SuperThing implements Externalizable {
+                
+                public MyThing(Long l) {
+                    super(l);
+                }
+
                 @Override 
                 public void writeExternal(ObjectOutput out) throws IOException {}
                 
