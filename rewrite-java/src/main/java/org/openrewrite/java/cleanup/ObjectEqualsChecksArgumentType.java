@@ -84,9 +84,4 @@ public class ObjectEqualsChecksArgumentType extends Recipe {
             return md;
         }
     }
-
-    @Override
-    public boolean equals(Object o) {
-        return super.equals(o);
-    }
 }

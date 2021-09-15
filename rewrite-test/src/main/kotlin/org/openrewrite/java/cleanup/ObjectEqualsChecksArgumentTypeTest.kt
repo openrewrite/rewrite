@@ -32,6 +32,7 @@ interface ObjectEqualsChecksArgumentTypeTest : JavaRecipeTest {
             class A {
                 public String name;
                 
+                @Override
                 public boolean equals(Object obj) {
                     if (obj == null) {
                         return false;
