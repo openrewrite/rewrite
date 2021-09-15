@@ -27,7 +27,7 @@ interface ObjectEqualsChecksArgumentTypeTest : JavaRecipeTest {
         get() = ObjectEqualsChecksArgumentType()
 
     @Test
-    fun testArgTypeNoChange() = assertUnchanged(
+    fun testArgTypeEquals() = assertUnchanged(
         before = """
             class A {
                 public String name;
@@ -49,7 +49,29 @@ interface ObjectEqualsChecksArgumentTypeTest : JavaRecipeTest {
     )
 
     @Test
-    fun testArgTypeNotTested() = assertChanged(
+    fun testArgTypeWithInstanceOf() = assertUnchanged(
+        before = """
+            class A {
+                public String name;
+                
+                @Override
+                public boolean equals(Object obj) {
+                    if (obj == null) {
+                        return false;
+                    }
+                    
+                    if (!(obj instanceof A)) {
+                        return false;
+                    }
+                    
+                    return this.name.equals(((A)obj).name);
+                }
+            }
+        """
+    )
+
+    @Test
+    fun testArgTypeNotValidated() = assertChanged(
         before = """
             class A {
                 public String name;

@@ -63,9 +63,25 @@ public class ObjectEqualsChecksArgumentType extends Recipe {
             J.MethodDeclaration md = getCursor().firstEnclosing(J.MethodDeclaration.class);
             if (md != null && JavaType.Primitive.Boolean == bn.getType() && objectsEqualsMethodMatcher.matches(md.getType())
                 && getClassMethodMatcher.matches(bn.getRight().getType()) && getClassMethodMatcher.matches(bn.getLeft().getType())) {
-                getCursor().dropParentUntil(J.MethodDeclaration.class::isInstance).putMessage("FOUND_CLASS_EQUALS", Boolean.TRUE);
+                getCursor().dropParentUntil(md::equals).putMessage("FOUND_CLASS_EQUALS", Boolean.TRUE);
             }
             return bn;
+        }
+
+        @Override
+        public J.InstanceOf visitInstanceOf(J.InstanceOf instanceOf, ExecutionContext executionContext) {
+            J.InstanceOf iof = super.visitInstanceOf(instanceOf, executionContext);
+            J.MethodDeclaration md = getCursor().firstEnclosing(J.MethodDeclaration.class);
+            J.ClassDeclaration cd = getCursor().firstEnclosing(J.ClassDeclaration.class);
+            if (md != null && cd != null) {
+                J.VariableDeclarations methodDeclParam = (J.VariableDeclarations)md.getParameters().get(0);
+                J.Identifier iofIdent = (J.Identifier)iof.getExpression();
+                if (TypeUtils.isOfType(iofIdent.getType(), methodDeclParam.getType())) {
+                    getCursor().dropParentUntil(md::equals).putMessage("FOUND_CLASS_EQUALS", Boolean.TRUE);
+                }
+            }
+
+            return iof;
         }
 
         @Override
