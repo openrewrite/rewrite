@@ -214,6 +214,10 @@ class Java11HideUtilityClassConstructorTest : Java11Test, HideUtilityClassConstr
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11IndexOfChecksShouldUseAStartPositionTest : Java11Test, IndexOfChecksShouldUseAStartPositionTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11IndexOfReplaceableByContainsTest : Java11Test, IndexOfReplaceableByContainsTest
 
 @DebugOnly

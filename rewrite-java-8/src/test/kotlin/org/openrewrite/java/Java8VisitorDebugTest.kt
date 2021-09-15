@@ -214,6 +214,10 @@ class Java8HideUtilityClassConstructorTest : Java8Test, HideUtilityClassConstruc
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8IndexOfChecksShouldUseAStartPositionTest : Java8Test, IndexOfChecksShouldUseAStartPositionTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8IndexOfReplaceableByContainsTest : Java8Test, IndexOfReplaceableByContainsTest
 
 @DebugOnly
