@@ -236,6 +236,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class NoRedundantJumpStatementsTck : NoRedundantJumpStatementsTest
 
     @Nested
+    inner class NoToStringOnStringTck : NoToStringOnStringTypeTest
+
+    @Nested
     inner class NoStaticImportTck : NoStaticImportTest
 
     @Nested
