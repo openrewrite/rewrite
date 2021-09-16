@@ -294,6 +294,10 @@ class Java11NoRedundantJumpStatementsTest : Java11Test, NoRedundantJumpStatement
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11NoToStringOnStringTypeTest : Java11Test, NoToStringOnStringTypeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11NoStaticImport : Java11Test, NoStaticImportTest
 
 @DebugOnly
