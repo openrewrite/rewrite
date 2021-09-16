@@ -42,6 +42,10 @@ class Java8AnnotationTemplateGeneratorTest : Java8Test, AnnotationTemplateGenera
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8AtomicPrimitiveEqualsUsesGetTest : Java8Test, AtomicPrimitiveEqualsUsesGetTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8AutodetectTest : Java8Test, AutodetectTest
 
 @DebugOnly

@@ -42,6 +42,10 @@ class Java11AnnotationTemplateGeneratorTest : Java11Test, AnnotationTemplateGene
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11AtomicPrimitiveEqualsUsesGetTest : Java11Test, AtomicPrimitiveEqualsUsesGetTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11AutodetectTest : Java11Test, AutodetectTest
 
 @DebugOnly
