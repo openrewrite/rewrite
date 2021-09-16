@@ -23,7 +23,7 @@ import org.openrewrite.java.JavaRecipeTest
 @Suppress("MethodMayBeStatic", "FunctionName")
 interface MissingOverrideAnnotationTest : JavaRecipeTest {
     override val recipe: Recipe?
-        get() = MissingOverrideAnnotation()
+        get() = MissingOverrideAnnotation(null, null)
 
     companion object {
         @Language("java")
@@ -294,9 +294,75 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
     )
 
     @Test
-    fun `when a method overrides from the base Object class`() = assertUnchanged(
+    fun `when ignoreAnonymousClassMethods is true and a method overrides within an anonymous class`() = assertUnchanged(
+        recipe = MissingOverrideAnnotation(null, true),
+        dependsOn = arrayOf(supportingParents),
         before = """
             class Test {
+                public void method() {
+                    TestParent t = new TestParent() {
+                        public void testParent() {
+                        }
+                    };
+                }
+            }
+        """
+    )
+
+    @Test
+    fun `when ignoreAnonymousClassMethods is false and a method overrides within an anonymous class`() = assertChanged(
+        recipe = MissingOverrideAnnotation(null, false),
+        dependsOn = arrayOf(supportingParents),
+        before = """
+            class Test {
+                public void method() {
+                    TestParent t = new TestParent() {
+                        public void testParent() {
+                        }
+                    };
+                }
+            }
+        """,
+        after = """
+            class Test {
+                public void method() {
+                    TestParent t = new TestParent() {
+                        @Override
+                        public void testParent() {
+                        }
+                    };
+                }
+            }
+        """
+    )
+
+    @Test
+    fun `when ignoreObjectMethods is true and a method overrides from the base Object class`() = assertUnchanged(
+        recipe = MissingOverrideAnnotation(true, null),
+        before = """
+            class Test {
+                public String toString() {
+                    return super.toString();
+                }
+            }
+        """
+    )
+
+    @Test
+    fun `when ignoreObjectMethods is false and a method overrides from the base Object class`() = assertChanged(
+        recipe = MissingOverrideAnnotation(false, null),
+        before = """
+            class Test {
+
+                public String toString() {
+                    return super.toString();
+                }
+            }
+        """,
+        after = """
+            class Test {
+
+                @Override
                 public String toString() {
                     return super.toString();
                 }
