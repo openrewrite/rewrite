@@ -18,16 +18,14 @@ package org.openrewrite.yaml
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Issue
-import org.openrewrite.properties.ChangePropertyKey
 import java.nio.file.Path
 
 class ChangeKeyTest : YamlRecipeTest {
-
     @Issue("https://github.com/openrewrite/rewrite/issues/434")
     @Test
     fun simpleChangeRootKey() = assertChanged(
         recipe = ChangeKey(
-            "/description",
+            "$.description",
             "newDescription",
             null
         ),
@@ -46,7 +44,7 @@ class ChangeKeyTest : YamlRecipeTest {
     @Test
     fun changeNestedKey() = assertChanged(
         recipe = ChangeKey(
-            "/metadata/name",
+            "$.metadata.name",
             "name2",
             null
         ),
@@ -67,7 +65,7 @@ class ChangeKeyTest : YamlRecipeTest {
     @Test
     fun changeRelativeKey() = assertChanged(
         recipe = ChangeKey(
-            "name",
+            ".name",
             "name2",
             null
         ),
@@ -86,9 +84,9 @@ class ChangeKeyTest : YamlRecipeTest {
     )
 
     @Test
-    fun changeSequenceKey() = assertChanged(
+    fun changeSequenceKeyByWildcard() = assertChanged(
         recipe = ChangeKey(
-            "/subjects/kind",
+            "$.subjects[*].kind",
             "kind2",
             null
         ),
@@ -105,6 +103,29 @@ class ChangeKeyTest : YamlRecipeTest {
     )
 
     @Test
+    fun changeSequenceKeyByExactMatch() = assertChanged(
+        recipe = ChangeKey(
+            "$.subjects[?(@.kind == 'ServiceAccount')].kind",
+            "kind2",
+            null
+        ),
+        before = """
+            subjects:
+              - kind: User
+                name: some-user
+              - kind: ServiceAccount
+                name: monitoring-tools
+        """,
+        after = """
+            subjects:
+              - kind: User
+                name: some-user
+              - kind2: ServiceAccount
+                name: monitoring-tools
+        """
+    )
+
+    @Test
     fun changeOnlyMatchingFile(@TempDir tempDir: Path) {
         val matchingFile = tempDir.resolve("a.yml").apply {
             toFile().parentFile.mkdirs()
@@ -114,7 +135,7 @@ class ChangeKeyTest : YamlRecipeTest {
             toFile().parentFile.mkdirs()
             toFile().writeText("description: desc")
         }.toFile()
-        val recipe = ChangeKey("description", "newDescription", "**/a.yml")
+        val recipe = ChangeKey("$.description", "newDescription", "**/a.yml")
         assertChanged(recipe = recipe, before = matchingFile, after = "newDescription: desc")
         assertUnchanged(recipe = recipe, before = nonMatchingFile)
     }

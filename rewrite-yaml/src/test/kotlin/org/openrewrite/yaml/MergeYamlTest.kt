@@ -21,7 +21,6 @@ import org.openrewrite.Issue
 import java.nio.file.Path
 
 class MergeYamlTest : YamlRecipeTest {
-
     @Issue("https://github.com/openrewrite/rewrite/issues/905")
     @Test
     fun existingMultipleEntryBlock() = assertChanged(
@@ -49,11 +48,10 @@ class MergeYamlTest : YamlRecipeTest {
         """
     )
 
-
     @Test
     fun existingBlock() = assertChanged(
         recipe = MergeYaml(
-            "/spec",
+            "$.spec",
             """
             lifecycleRule:
                 - condition:
@@ -87,9 +85,9 @@ class MergeYamlTest : YamlRecipeTest {
     )
 
     @Test
-    fun nonExistantBlock() = assertChanged(
+    fun nonExistentBlock() = assertChanged(
         recipe = MergeYaml(
-            "/spec",
+            "$.spec",
             """
               lifecycleRule:
                   - action:
@@ -122,7 +120,7 @@ class MergeYamlTest : YamlRecipeTest {
     @Test
     fun scalar() = assertChanged(
         recipe = MergeYaml(
-            "/spec",
+            "$.spec",
             """
               bucketPolicyOnly: true
             """.trimIndent(),
@@ -147,7 +145,7 @@ class MergeYamlTest : YamlRecipeTest {
     @Test
     fun insertYaml() = assertChanged(
         recipe = MergeYaml(
-            "/spec",
+            "$.spec",
             """
               lifecycleRule:
                   - action:
@@ -181,7 +179,7 @@ class MergeYamlTest : YamlRecipeTest {
     @Test
     fun insertAtRoot() = assertChanged(
         recipe = MergeYaml(
-            "/",
+            "/", // todo
             "spec: 0",
             true,
             null,
@@ -200,7 +198,7 @@ class MergeYamlTest : YamlRecipeTest {
     @Test
     fun insertInSequenceEntries() = assertChanged(
         recipe = MergeYaml(
-            "/spec/containers",
+            "$.spec.containers",
             "imagePullPolicy: Always",
             true,
             null

@@ -20,10 +20,9 @@ import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 
 class DeleteKeyTest : YamlRecipeTest {
-
     @Test
     fun deleteNestedKey() = assertChanged(
-        recipe = DeleteKey("/metadata/name", null),
+        recipe = DeleteKey("$.metadata.name", null),
         before = """
             apiVersion: v1
             metadata:
@@ -39,7 +38,7 @@ class DeleteKeyTest : YamlRecipeTest {
 
     @Test
     fun deleteRelativeKey() = assertChanged(
-        recipe = DeleteKey("name", null),
+        recipe = DeleteKey(".name", null),
         before = """
             apiVersion: v1
             metadata:
@@ -54,15 +53,36 @@ class DeleteKeyTest : YamlRecipeTest {
     )
 
     @Test
-    fun deleteSequenceKey() = assertChanged(
-        recipe = DeleteKey("/subjects/kind", null),
+    fun deleteSequenceKeyByWildcard() = assertChanged(
+        recipe = DeleteKey("$.subjects[*].kind", null),
         before = """
             subjects:
+              - kind: User
+                name: some-user
               - kind: ServiceAccount
                 name: monitoring-tools
         """,
         after = """
             subjects:
+              - name: some-user
+              - name: monitoring-tools
+        """
+    )
+
+    @Test
+    fun deleteSubSequenceKeyByExactMatch() = assertChanged(
+        recipe = DeleteKey("$.subjects[?(@.kind == 'ServiceAccount')].kind", null),
+        before = """
+            subjects:
+              - kind: User
+                name: some-user
+              - kind: ServiceAccount
+                name: monitoring-tools
+        """,
+        after = """
+            subjects:
+              - kind: User
+                name: some-user
               - name: monitoring-tools
         """
     )
@@ -77,7 +97,7 @@ class DeleteKeyTest : YamlRecipeTest {
             toFile().parentFile.mkdirs()
             toFile().writeText("apiVersion: v1")
         }.toFile()
-        val recipe = DeleteKey("/apiVersion", "**/a.yml")
+        val recipe = DeleteKey(".apiVersion", "**/a.yml")
         assertChanged(recipe = recipe, before = matchingFile, after = "")
         assertUnchanged(recipe = recipe, before = nonMatchingFile)
     }

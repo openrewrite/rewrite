@@ -26,7 +26,7 @@ import org.openrewrite.json.tree.Json;
 public class ChangeKey extends Recipe {
     @Option(displayName = "Old key path",
             description = "A JsonPath expression to locate a JSON entry.",
-            example = "subjects/kind")
+            example = "$.subjects.kind")
     String oldKeyPath;
 
     @Option(displayName = "New key",
@@ -69,7 +69,7 @@ public class ChangeKey extends Recipe {
                 Json.Member m = super.visitMember(member, executionContext);
                 if (matcher.matches(getCursor())) {
                     String value = ChangeKey.this.newKey;
-                    if(value.startsWith("'") || value.startsWith("\"")) {
+                    if (value.startsWith("'") || value.startsWith("\"")) {
                         value = value.substring(1, value.length() - 1);
                     }
                     m = m.withKey(

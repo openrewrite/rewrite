@@ -72,10 +72,10 @@ public class ChangeValue extends Recipe {
                 Json.Member m = super.visitMember(member, executionContext);
                 if (matcher.matches(getCursor()) && (!(m.getValue() instanceof Json.Literal) || !((Json.Literal) m.getValue()).getValue().equals(value))) {
                     String source = ChangeValue.this.value;
-                    if(source.startsWith("'") || source.startsWith("\"")) {
+                    if (source.startsWith("'") || source.startsWith("\"")) {
                         source = source.substring(1, source.length() - 1);
                     }
-                    if(!(m.getValue() instanceof Json.Literal) || !((Json.Literal) m.getValue()).getSource().equals(ChangeValue.this.value)) {
+                    if (!(m.getValue() instanceof Json.Literal) || !((Json.Literal) m.getValue()).getSource().equals(ChangeValue.this.value)) {
                         m = m.withValue(new Json.Literal(randomId(), m.getValue().getPrefix(), Markers.EMPTY, ChangeValue.this.value, source));
                     }
                 }

@@ -20,10 +20,9 @@ import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 
 class CopyValueTest : YamlRecipeTest {
-
     @Test
     fun copyValueAndItsFormatting() = assertChanged(
-        recipe = CopyValue("/source", "/destination", null),
+        recipe = CopyValue(".source", ".destination", null),
         before = """
             id: something
             source:   password
@@ -38,7 +37,7 @@ class CopyValueTest : YamlRecipeTest {
 
     @Test
     fun onlyCopiesScalars() = assertUnchanged(
-        recipe = CopyValue("/source", "/destination", null),
+        recipe = CopyValue(".source", ".destination", null),
         before = """
             id: something
             source:
@@ -51,8 +50,8 @@ class CopyValueTest : YamlRecipeTest {
     @Test
     fun insertCopyValueAndRemoveSource() = assertChanged(
         recipe = MergeYaml("/", "destination: TEMP", true, null)
-            .doNext(CopyValue("/source", "/destination", null))
-            .doNext(DeleteKey("/source", null)),
+            .doNext(CopyValue(".source", ".destination", null))
+            .doNext(DeleteKey(".source", null)),
         before = """
             id: something
             source:   password
@@ -67,27 +66,32 @@ class CopyValueTest : YamlRecipeTest {
     fun changeOnlyMatchingFile(@TempDir tempDir: Path) {
         val matchingFile = tempDir.resolve("a.yml").apply {
             toFile().parentFile.mkdirs()
-            toFile().writeText("""
-            source: password
-            destination: whatever
-        """.trimIndent())
+            toFile().writeText(//language=yml
+                """
+                source: password
+                destination: whatever
+        """.trimIndent()
+            )
         }.toFile()
         val nonMatchingFile = tempDir.resolve("b.yml").apply {
             toFile().parentFile.mkdirs()
-            toFile().writeText("""
-            source: password
-            destination: whatever
-        """.trimIndent())
+            toFile().writeText(//language=yml
+                """
+                source: password
+                destination: whatever
+        """.trimIndent()
+            )
         }.toFile()
 
-        val recipe = CopyValue("/source", "/destination", "**/a.yml")
+        val recipe = CopyValue(".source", ".destination", "**/a.yml")
         assertChanged(
-                recipe = recipe,
-                before = matchingFile,
-                after = """
-            source: password
-            destination: password
-        """)
+            recipe = recipe,
+            before = matchingFile,
+            after = """
+                source: password
+                destination: password
+        """
+        )
         assertUnchanged(recipe = recipe, before = nonMatchingFile)
     }
 }

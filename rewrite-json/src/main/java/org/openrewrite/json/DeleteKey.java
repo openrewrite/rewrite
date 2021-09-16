@@ -61,14 +61,14 @@ public class DeleteKey extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        JsonPathMatcher xPathMatcher = new JsonPathMatcher(keyPath);
+        JsonPathMatcher matcher = new JsonPathMatcher(keyPath);
         return new JsonIsoVisitor<ExecutionContext>() {
             @Override
             public Json.JsonObject visitObject(Json.JsonObject obj, ExecutionContext executionContext) {
                 Json.JsonObject o = super.visitObject(obj, executionContext);
                 AtomicReference<Space> copyFirstPrefix = new AtomicReference<>();
                 o = o.withMembers(ListUtils.map(o.getMembers(), (i, e) -> {
-                    if (xPathMatcher.matches(new Cursor(getCursor(), e))) {
+                    if (matcher.matches(new Cursor(getCursor(), e))) {
                         if (i == 0 && getCursor().getParentOrThrow().getValue() instanceof Json.Array) {
                             copyFirstPrefix.set(e.getPrefix());
                         }

@@ -32,9 +32,8 @@ import java.util.Set;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindKey extends Recipe {
-
     @Option(displayName = "Key path",
-            description = "JsonPath expression used to find matching keys.",
+            description = "A JsonPath expression used to find matching keys.",
             example = "$.subjects.kind")
     String key;
 
