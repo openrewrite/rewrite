@@ -326,10 +326,6 @@ class Java11NoEmptyCollectionWithRawTypeTest : Java11Test, NoEmptyCollectionWith
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11ObjectEqualsChecksArgumentTypeTest : Java11Test, ObjectEqualsChecksArgumentTypeTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
 class Java11OperatorWrapTest : Java11Test, OperatorWrapTest
 
 @DebugOnly

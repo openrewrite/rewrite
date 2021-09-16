@@ -322,10 +322,6 @@ class Java8NoEmptyCollectionWithRawTypeTest : Java8Test, NoEmptyCollectionWithRa
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java8ObjectEqualsChecksArgumentTypeTest : Java8Test, ObjectEqualsChecksArgumentTypeTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
 class Java8OperatorWrapTest : Java8Test, OperatorWrapTest
 
 @DebugOnly
