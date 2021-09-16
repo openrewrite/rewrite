@@ -37,13 +37,13 @@ import java.util.function.Predicate;
 @EqualsAndHashCode(callSuper = true)
 public class MissingOverrideAnnotation extends Recipe {
     @Option(displayName = "Ignore `Object` methods",
-            description = "True by default. When enabled, ignore missing annotations on methods which override methods from the base `java.lang.Object` class such as `equals()`, `hashCode()`, or `toString()`.",
+            description = "When enabled, ignore missing annotations on methods which override methods from the base `java.lang.Object` class such as `equals()`, `hashCode()`, or `toString()`.",
             required = false)
     @Nullable
     Boolean ignoreObjectMethods;
 
     @Option(displayName = "Ignore methods in anonymous classes",
-            description = "False by default. When enabled, ignore missing annotations on methods which override methods when the class definition is within an anonymous class.",
+            description = "When enabled, ignore missing annotations on methods which override methods when the class definition is within an anonymous class.",
             required = false)
     @Nullable
     Boolean ignoreAnonymousClassMethods;
@@ -85,7 +85,11 @@ public class MissingOverrideAnnotation extends Recipe {
         @Override
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
             // for efficiency, first check for type attribution and whether @Override is present.
-            if (method.getType() != null && method.getType().getDeclaringType() != null && method.getAllAnnotations().stream().noneMatch(OVERRIDE_ANNOTATION::matches)) {
+            if (method.getType() != null &&
+                    method.getType().getDeclaringType() != null &&
+                    !method.hasModifier(J.Modifier.Type.Static) &&
+                    method.getAllAnnotations().stream().noneMatch(OVERRIDE_ANNOTATION::matches)
+            ) {
                 if (!(Boolean.TRUE.equals(ignoreAnonymousClassMethods) && getCursorToParentScope(getCursor()).getValue() instanceof J.NewClass)) {
                     JavaType.FullyQualified declaringType = method.getType().getDeclaringType();
                     if (new FindOverriddenAndImplementedMethodDeclarations(method, declaringType).hasAny()) {
@@ -124,9 +128,9 @@ public class MissingOverrideAnnotation extends Recipe {
                     MethodMatcher matcher = new MethodMatcher(mPattern);
                     Predicate<JavaType.Method> filtering;
                     if (typeToSearch.getKind() == JavaType.Class.Kind.Class) {
-                        filtering = (m) -> !m.hasFlags(Flag.Abstract) && matcher.matches(m);
+                        filtering = (m) -> !(m.hasFlags(Flag.Abstract) || m.hasFlags(Flag.Abstract)) && matcher.matches(m);
                     } else {
-                        filtering = matcher::matches;
+                        filtering = (m) -> !m.hasFlags(Flag.Static) && matcher.matches(m);
                     }
 
                     if (typeToSearch.getMethods().stream().anyMatch(filtering)) {

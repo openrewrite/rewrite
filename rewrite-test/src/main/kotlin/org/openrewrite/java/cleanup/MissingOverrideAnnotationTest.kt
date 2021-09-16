@@ -239,6 +239,32 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
     )
 
     @Test
+    fun `when the method is static`() = assertUnchanged(
+        dependsOn = arrayOf(
+            """
+            import java.util.Collection;
+            import java.util.Collections;
+
+            class TestBase {
+                protected static Collection<Object[]> parameters() {
+                    return Collections.emptyList();
+                }
+            }
+        """.trimIndent()
+        ),
+        before = """
+            import java.util.Collection;
+            import java.util.Collections;
+
+            class Test extends TestBase {
+                protected static Collection<Object[]> parameters() {
+                    return Collections.emptyList();
+                }
+            }
+        """
+    )
+
+    @Test
     fun `when the parent is abstract and the method to override is abstract`() = assertUnchanged(
         dependsOn = arrayOf(supportingParents),
         before = """
