@@ -31,7 +31,6 @@ import java.util.Set;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindKey extends Recipe {
-
     @Option(displayName = "Path",
             description = "JsonPath expression used to find matching keys.",
             example = "$.subjects.kind")
@@ -44,7 +43,7 @@ public class FindKey extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Find YAML entries by XPath expression.";
+        return "Find YAML entries by JsonPath expression.";
     }
 
     @Override
