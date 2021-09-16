@@ -266,6 +266,10 @@ class Java8MinimumSwitchCasesTest : Java8Test, MinimumSwitchCasesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8MissingOverrideAnnotationTest : Java8Test, MissingOverrideAnnotationTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8ModifierOrderTest : Java8Test, ModifierOrderTest
 
 @DebugOnly

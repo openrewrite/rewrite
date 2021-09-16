@@ -218,6 +218,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class MinimumSwitchCasesTck : MinimumSwitchCasesTest
 
     @Nested
+    inner class MissingOverrideAnnotationTck : MissingOverrideAnnotationTest
+
+    @Nested
     inner class ModifierOrderTck : ModifierOrderTest
 
     @Nested

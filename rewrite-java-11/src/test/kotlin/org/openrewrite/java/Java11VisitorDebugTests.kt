@@ -270,6 +270,10 @@ class Java11MinimumSwitchCasesTest : Java11Test, MinimumSwitchCasesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11MissingOverrideAnnotationTest : Java11Test, MissingOverrideAnnotationTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11ModifierOrderTest : Java11Test, ModifierOrderTest
 
 @DebugOnly
