@@ -18,9 +18,11 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -43,6 +45,19 @@ public class AtomicPrimitiveEqualsUsesGet extends Recipe {
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-2204");
+    }
+
+    @Override
+    protected JavaIsoVisitor<ExecutionContext> getSingleSourceApplicableTest() {
+        return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                doAfterVisit(new UsesType<>("java.util.concurrent.atomic.AtomicBoolean"));
+                doAfterVisit(new UsesType<>("java.util.concurrent.atomic.AtomicInteger"));
+                doAfterVisit(new UsesType<>("java.util.concurrent.atomic.AtomicLong"));
+                return cu;
+            }
+        };
     }
 
     @Override
