@@ -43,6 +43,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class AnnotationTemplateGeneratorTck : AnnotationTemplateGeneratorTest
 
     @Nested
+    inner class AtomicPrimitiveEqualsUsesGetTck : AtomicPrimitiveEqualsUsesGetTest
+
+    @Nested
     inner class AutodetectTck : AutodetectTest
 
     @Nested
