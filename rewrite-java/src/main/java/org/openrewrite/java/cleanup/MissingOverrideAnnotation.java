@@ -70,8 +70,7 @@ public class MissingOverrideAnnotation extends Recipe {
             // for efficiency, first check for type attribution and whether @Override is present.
             if (method.getType() != null && method.getType().getDeclaringType() != null && method.getAllAnnotations().stream().noneMatch(OVERRIDE_ANNOTATION::matches)) {
                 JavaType.FullyQualified declaringType = method.getType().getDeclaringType();
-                Set<JavaType.Method> overriddenParents = new FindOverriddenAndImplementedMethodDeclarations(method, declaringType).find();
-                if (!overriddenParents.isEmpty()) {
+                if (new FindOverriddenAndImplementedMethodDeclarations(method, declaringType).hasAny()) {
                     method = method.withTemplate(
                             JavaTemplate.builder(this::getCursor, "@Override").build(),
                             method.getCoordinates().addAnnotation(Comparator.comparing(J.Annotation::getSimpleName))
@@ -84,17 +83,53 @@ public class MissingOverrideAnnotation extends Recipe {
         private static class FindOverriddenAndImplementedMethodDeclarations {
             private final J.MethodDeclaration methodTarget;
             private final JavaType.FullyQualified declaringType;
+            private final MethodMatcher matcher;
 
             private FindOverriddenAndImplementedMethodDeclarations(J.MethodDeclaration methodTarget, JavaType.FullyQualified declaringType) {
                 this.methodTarget = methodTarget;
                 this.declaringType = declaringType;
+                this.matcher = new MethodMatcher(
+                        MethodMatcher.methodPattern(methodTarget).replaceFirst(declaringType.getFullyQualifiedName(), "*")
+                );
             }
 
-            private Set<JavaType.Method> find() {
-                return new HashSet<>(find(declaringType));
+            private boolean hasAny() {
+                return hasAny(declaringType);
             }
 
-            private Set<JavaType.Method> find(@Nullable JavaType.FullyQualified typeToSearch) {
+            private boolean hasAny(@Nullable JavaType.FullyQualified typeToSearch) {
+                if (typeToSearch == null || methodTarget.getType() == null || "java.lang.Object".equals(typeToSearch.getFullyQualifiedName())) {
+                    return false;
+                }
+
+                // base case: skip visiting the declaringType class methods, only visit the interfaces. otherwise, we add @Override to everything.
+                if (!declaringType.getFullyQualifiedName().equals(typeToSearch.getFullyQualifiedName())) {
+                    Predicate<JavaType.Method> filtering;
+                    if (typeToSearch.getKind() == JavaType.Class.Kind.Class) {
+                        filtering = (m) -> !m.hasFlags(Flag.Abstract) && matcher.matches(m);
+                    } else {
+                        filtering = matcher::matches;
+                    }
+
+                    if (typeToSearch.getMethods().stream().anyMatch(filtering)) {
+                        return true;
+                    }
+                }
+
+                if (typeToSearch.getInterfaces().stream().anyMatch(this::hasAny)) {
+                    return true;
+                }
+                if (typeToSearch.getSupertype() != null) {
+                    return hasAny(typeToSearch.getSupertype());
+                }
+                return false;
+            }
+
+            private Set<JavaType.Method> findAll() {
+                return new HashSet<>(findAll(declaringType));
+            }
+
+            private Set<JavaType.Method> findAll(@Nullable JavaType.FullyQualified typeToSearch) {
                 if (typeToSearch == null || methodTarget.getType() == null || "java.lang.Object".equals(typeToSearch.getFullyQualifiedName())) {
                     return Collections.emptySet();
                 }
@@ -102,9 +137,6 @@ public class MissingOverrideAnnotation extends Recipe {
                 Set<JavaType.Method> methods = new HashSet<>();
                 // base case: skip visiting the declaringType class methods, only visit the interfaces. otherwise, we add @Override to everything.
                 if (!declaringType.getFullyQualifiedName().equals(typeToSearch.getFullyQualifiedName())) {
-                    String mPattern = MethodMatcher.methodPattern(methodTarget.withType(methodTarget.getType().withDeclaringType(typeToSearch)));
-                    MethodMatcher matcher = new MethodMatcher(mPattern);
-
                     Predicate<JavaType.Method> filtering;
                     if (typeToSearch.getKind() == JavaType.Class.Kind.Class) {
                         filtering = (m) -> !m.hasFlags(Flag.Abstract) && matcher.matches(m);
@@ -117,9 +149,9 @@ public class MissingOverrideAnnotation extends Recipe {
                             .forEach(methods::add);
                 }
 
-                typeToSearch.getInterfaces().forEach(i -> methods.addAll(find(i)));
+                typeToSearch.getInterfaces().forEach(i -> methods.addAll(findAll(i)));
                 if (typeToSearch.getSupertype() != null) {
-                    methods.addAll(find(typeToSearch.getSupertype()));
+                    methods.addAll(findAll(typeToSearch.getSupertype()));
                 }
                 return methods;
             }
