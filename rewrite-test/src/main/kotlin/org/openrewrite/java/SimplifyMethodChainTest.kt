@@ -27,21 +27,23 @@ interface SimplifyMethodChainTest : JavaRecipeTest {
                 "A b()",
                 "B c()"
             ),
-        "c2"
+            "c2"
         ),
-        dependsOn = arrayOf("""
-            class A {
-                static B b() { return new B(); }
-                static C c2() { return new C(); }
-            }
-            
-            class B {
-                C c() { return new C(); }
-            }
-            
-            class C {
-            }
-        """.trimIndent()),
+        dependsOn = arrayOf(
+            """
+                class A {
+                    static B b() { return new B(); }
+                    static C c2() { return new C(); }
+                }
+                
+                class B {
+                    C c() { return new C(); }
+                }
+                
+                class C {
+                }
+            """
+        ),
         before = """
             class Test {
                 C c = A.b().c();
