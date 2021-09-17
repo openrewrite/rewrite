@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Example
 
 class ChangeKeyTest : JsonRecipeTest {
-
     @Test
     fun simpleChangeRootKey() = assertChanged(
         recipe = ChangeKey(

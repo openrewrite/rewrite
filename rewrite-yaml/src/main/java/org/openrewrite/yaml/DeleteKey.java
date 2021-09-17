@@ -28,8 +28,8 @@ import java.util.concurrent.atomic.AtomicReference;
 @EqualsAndHashCode(callSuper = true)
 public class DeleteKey extends Recipe {
     @Option(displayName = "Key path",
-            description = "An XPath expression to locate a YAML entry.",
-            example = "subjects/kind")
+            description = "A JsonPath expression to locate a YAML entry.",
+            example = "$.source.kind")
     String keyPath;
 
     @Incubating(since = "7.8.0")
@@ -60,15 +60,15 @@ public class DeleteKey extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        XPathMatcher xPathMatcher = new XPathMatcher(keyPath);
+        JsonPathMatcher matcher = new JsonPathMatcher(keyPath);
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
             public Yaml.Mapping visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
                 Yaml.Mapping m = super.visitMapping(mapping, ctx);
                 AtomicReference<String> copyFirstPrefix = new AtomicReference<>();
                 m = m.withEntries(ListUtils.map(m.getEntries(), (i, e) -> {
-                    if (xPathMatcher.matches(new Cursor(getCursor(), e))) {
-                        if(i == 0 && getCursor().getParentOrThrow().getValue() instanceof Yaml.Sequence.Entry) {
+                    if (matcher.matches(new Cursor(getCursor(), e))) {
+                        if (i == 0 && getCursor().getParentOrThrow().getValue() instanceof Yaml.Sequence.Entry) {
                             copyFirstPrefix.set(e.getPrefix());
                         }
                         removeUnused();
@@ -77,7 +77,7 @@ public class DeleteKey extends Recipe {
                     return e;
                 }));
 
-                if(!m.getEntries().isEmpty() && copyFirstPrefix.get() != null) {
+                if (!m.getEntries().isEmpty() && copyFirstPrefix.get() != null) {
                     m = m.withEntries(ListUtils.mapFirst(m.getEntries(), e -> e.withPrefix(copyFirstPrefix.get())));
                 }
 

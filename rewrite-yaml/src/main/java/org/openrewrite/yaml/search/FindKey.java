@@ -32,7 +32,7 @@ import java.util.Set;
 @EqualsAndHashCode(callSuper = true)
 public class FindKey extends Recipe {
     @Option(displayName = "Path",
-            description = "JsonPath expression used to find matching keys.",
+            description = "A JsonPath expression used to find matching keys.",
             example = "$.subjects.kind")
     String key;
 
@@ -48,12 +48,12 @@ public class FindKey extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        JsonPathMatcher pathMatcher = new JsonPathMatcher(key);
+        JsonPathMatcher matcher = new JsonPathMatcher(key);
         return new YamlVisitor<ExecutionContext>() {
             @Override
             public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry e = (Yaml.Mapping.Entry) super.visitMappingEntry(entry, ctx);
-                if (pathMatcher.matches(getCursor())) {
+                if (matcher.matches(getCursor())) {
                     e = e.withMarkers(e.getMarkers().addIfAbsent(new YamlSearchResult(FindKey.this)));
                 }
                 return e;
@@ -62,12 +62,12 @@ public class FindKey extends Recipe {
     }
 
     public static Set<Yaml.Mapping.Entry> find(Yaml y, String jsonPath) {
-        JsonPathMatcher pathMatcher = new JsonPathMatcher(jsonPath);
+        JsonPathMatcher matcher = new JsonPathMatcher(jsonPath);
         YamlVisitor<Set<Yaml.Mapping.Entry>> findVisitor = new YamlVisitor<Set<Yaml.Mapping.Entry>>() {
             @Override
             public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, Set<Yaml.Mapping.Entry> es) {
                 Yaml.Mapping.Entry e = (Yaml.Mapping.Entry) super.visitMappingEntry(entry, es);
-                if (pathMatcher.matches(getCursor())) {
+                if (matcher.matches(getCursor())) {
                     es.add(e);
                 }
                 return e;

@@ -25,8 +25,8 @@ import org.openrewrite.yaml.tree.Yaml;
 @EqualsAndHashCode(callSuper = true)
 public class ChangeKey extends Recipe {
     @Option(displayName = "Old key path",
-            description = "An XPath expression to locate a YAML entry.",
-            example = "subjects/kind")
+            description = "A JsonPath expression to locate a YAML entry.",
+            example = "$.subjects.kind")
     String oldKeyPath;
 
     @Option(displayName = "New key",
@@ -62,12 +62,12 @@ public class ChangeKey extends Recipe {
 
     @Override
     public YamlVisitor<ExecutionContext> getVisitor() {
-        XPathMatcher xPathMatcher = new XPathMatcher(oldKeyPath);
+        JsonPathMatcher matcher = new JsonPathMatcher(oldKeyPath);
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext context) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, context);
-                if (xPathMatcher.matches(getCursor())) {
+                if (matcher.matches(getCursor())) {
                     e = e.withKey(e.getKey().withValue(newKey));
                 }
                 return e;

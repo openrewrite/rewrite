@@ -32,9 +32,8 @@ import java.util.Set;
 @EqualsAndHashCode(callSuper = true)
 @Value
 public class FindTags extends Recipe {
-
     @Option(displayName = "XPath",
-            description = "XPath expression used to find matching tags.",
+            description = "An XPath expression used to find matching tags.",
             example = "/dependencies/dependency")
     String xPath;
 
@@ -50,13 +49,13 @@ public class FindTags extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        XPathMatcher xPathMatcher = new XPathMatcher(xPath);
+        XPathMatcher matcher = new XPathMatcher(xPath);
         return new XmlVisitor<ExecutionContext>() {
 
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
-                if (xPathMatcher.matches(getCursor())) {
+                if (matcher.matches(getCursor())) {
                     t = t.withMarkers(t.getMarkers().addIfAbsent(new XmlSearchResult(FindTags.this)));
                 }
                 return t;
@@ -65,12 +64,12 @@ public class FindTags extends Recipe {
     }
 
     public static Set<Xml.Tag> find(Xml x, String xPath) {
-        XPathMatcher xPathMatcher = new XPathMatcher(xPath);
+        XPathMatcher matcher = new XPathMatcher(xPath);
         XmlVisitor<Set<Xml.Tag>> findVisitor = new XmlVisitor<Set<Xml.Tag>>() {
 
             @Override
             public Xml visitTag(Xml.Tag tag, Set<Xml.Tag> ts) {
-                if (xPathMatcher.matches(getCursor())) {
+                if (matcher.matches(getCursor())) {
                     ts.add(tag);
                 }
                 return super.visitTag(tag, ts);

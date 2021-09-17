@@ -13,13 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.json;
+package org.openrewrite.json
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Example
 
 class ChangeValueTest : JsonRecipeTest {
-
     @Example
     @Test
     fun changeNestedValue() = assertChanged(

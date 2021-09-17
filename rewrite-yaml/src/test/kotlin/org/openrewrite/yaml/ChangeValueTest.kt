@@ -17,15 +17,13 @@ package org.openrewrite.yaml
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import org.openrewrite.Issue
 import java.nio.file.Path
 
 class ChangeValueTest : YamlRecipeTest {
-
     @Test
     fun changeNestedKeyValue() = assertChanged(
         recipe = ChangeValue(
-            "/metadata/name",
+            "$.metadata.name",
             "monitoring",
             null
         ),
@@ -46,7 +44,7 @@ class ChangeValueTest : YamlRecipeTest {
     @Test
     fun changeRelativeKey() = assertChanged(
         recipe = ChangeValue(
-            "name",
+            ".name",
             "monitoring",
             null
         ),
@@ -65,19 +63,46 @@ class ChangeValueTest : YamlRecipeTest {
     )
 
     @Test
-    fun changeSequenceKey() = assertChanged(
+    fun changeSequenceKeyByWildcard() = assertChanged(
         recipe = ChangeValue(
-            "/subjects/kind",
+            "$.subjects[*].kind",
             "Deployment",
             null
         ),
         before = """
             subjects:
+              - kind: User
+                name: some-user
               - kind: ServiceAccount
                 name: monitoring-tools
         """,
         after = """
             subjects:
+              - kind: Deployment
+                name: some-user
+              - kind: Deployment
+                name: monitoring-tools
+        """
+    )
+
+    @Test
+    fun changeSequenceKeyByExactMatch() = assertChanged(
+        recipe = ChangeValue(
+            "$.subjects[?(@.kind == 'ServiceAccount')].kind",
+            "Deployment",
+            null
+        ),
+        before = """
+            subjects:
+              - kind: User
+                name: some-user
+              - kind: ServiceAccount
+                name: monitoring-tools
+        """,
+        after = """
+            subjects:
+              - kind: User
+                name: some-user
               - kind: Deployment
                 name: monitoring-tools
         """
@@ -93,7 +118,7 @@ class ChangeValueTest : YamlRecipeTest {
             toFile().parentFile.mkdirs()
             toFile().writeText("metadata: monitoring-tools")
         }.toFile()
-        val recipe = ChangeValue("/metadata", "monitoring", "**/a.yml")
+        val recipe = ChangeValue(".metadata", "monitoring", "**/a.yml")
         assertChanged(recipe = recipe, before = matchingFile, after = "metadata: monitoring")
         assertUnchanged(recipe = recipe, before = nonMatchingFile)
     }

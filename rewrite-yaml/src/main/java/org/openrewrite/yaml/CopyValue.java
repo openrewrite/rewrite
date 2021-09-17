@@ -25,13 +25,13 @@ import org.openrewrite.yaml.tree.Yaml;
 @EqualsAndHashCode(callSuper = true)
 public class CopyValue extends Recipe {
     @Option(displayName = "Old key path",
-            description = "An XPath expression to locate a YAML key/value pair to copy.",
-            example = "source/kind")
+            description = "A JsonPath expression to locate a YAML key/value pair to copy.",
+            example = "$.source.kind")
     String oldKeyPath;
 
     @Option(displayName = "New key path",
-            description = "An XPath expression for where the new value should be copied to.",
-            example = "dest/kind")
+            description = "A JsonPath expression for where the new value should be copied to.",
+            example = "$.dest.kind")
     String newKey;
 
     @Incubating(since = "7.8.0")
@@ -49,7 +49,10 @@ public class CopyValue extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Copies a YAML value from one key to another. The existing key/value pair remains unaffected by this change. If either the source or destination key path does not exist, no value will be copied. Furthermore, copies are limited to scalar values, not whole YAML blocks.";
+        return "Copies a YAML value from one key to another. " +
+                "The existing key/value pair remains unaffected by this change. " +
+                "If either the source or destination key path does not exist, no value will be copied. " +
+                "Furthermore, copies are limited to scalar values, not whole YAML blocks.";
     }
 
     @Override
@@ -62,8 +65,8 @@ public class CopyValue extends Recipe {
 
     @Override
     public YamlVisitor<ExecutionContext> getVisitor() {
-        XPathMatcher oldPathMatcher = new XPathMatcher(oldKeyPath);
-        XPathMatcher newPathMatcher = new XPathMatcher(newKey);
+        JsonPathMatcher oldPathMatcher = new JsonPathMatcher(oldKeyPath);
+        JsonPathMatcher newPathMatcher = new JsonPathMatcher(newKey);
 
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override

@@ -28,8 +28,8 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(callSuper = true)
 public class ChangeValue extends Recipe {
     @Option(displayName = "Key path",
-            description = "An XPath expression to locate a YAML entry.",
-            example = "subjects/kind")
+            description = "A JsonPath expression to locate a YAML entry.",
+            example = "$.subjects.kind")
     String oldKeyPath;
 
     @Option(displayName = "New value",
@@ -65,13 +65,13 @@ public class ChangeValue extends Recipe {
 
     @Override
     public YamlVisitor<ExecutionContext> getVisitor() {
-        XPathMatcher xPathMatcher = new XPathMatcher(oldKeyPath);
+        JsonPathMatcher matcher = new JsonPathMatcher(oldKeyPath);
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext context) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, context);
 
-                if (xPathMatcher.matches(getCursor()) && (!(e.getValue() instanceof Yaml.Scalar) || !((Yaml.Scalar) e.getValue()).getValue().equals(value))) {
+                if (matcher.matches(getCursor()) && (!(e.getValue() instanceof Yaml.Scalar) || !((Yaml.Scalar) e.getValue()).getValue().equals(value))) {
                     e = e.withValue(
                             new Yaml.Scalar(randomId(), e.getValue().getPrefix(), Markers.EMPTY,
                                     Yaml.Scalar.Style.PLAIN, value)

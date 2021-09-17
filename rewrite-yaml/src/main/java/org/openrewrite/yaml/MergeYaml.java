@@ -28,10 +28,9 @@ import java.util.List;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class MergeYaml extends Recipe {
-
     @Option(displayName = "Key path",
-            description = "XPath expression used to find matching keys.",
-            example = "/metadata")
+            description = "A JsonPath expression used to find matching keys.",
+            example = "$.metadata")
     String key;
 
     @Option(displayName = "YAML snippet",
@@ -84,7 +83,7 @@ public class MergeYaml extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        XPathMatcher matcher = new XPathMatcher(key);
+        JsonPathMatcher matcher = new JsonPathMatcher(key);
         Yaml incoming = new YamlParser().parse(yaml).get(0).getDocuments().get(0).getBlock();
 
         return new YamlIsoVisitor<ExecutionContext>() {
