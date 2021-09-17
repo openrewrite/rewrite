@@ -30,6 +30,7 @@ import org.openrewrite.marker.Markers;
 import java.util.*;
 
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.java.tree.TypeUtils.isOfClassType;
 
 /**
  * A Java refactoring visitor that can be used to add an import (or static import) to a given compilation unit.
@@ -153,7 +154,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
     private boolean isTypeReference(NameTree t) {
         boolean isTypRef = true;
         if (t instanceof J.FieldAccess) {
-            isTypRef = TypeUtils.isOfClassType(((J.FieldAccess) t).getTarget().getType(), type);
+            isTypRef = isOfClassType(((J.FieldAccess) t).getTarget().getType(), type);
         }
         return isTypRef;
     }
@@ -181,7 +182,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             return false;
         }
 
-        //For static imports, we are either looking for a specific method or a wildcard.
+        // For static method imports, we are either looking for a specific method or a wildcard.
         for (J invocation : FindMethods.find(compilationUnit, type + " *(..)")) {
             if (invocation instanceof J.MethodInvocation) {
                 J.MethodInvocation mi = (J.MethodInvocation) invocation;
@@ -189,6 +190,17 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                         (statik.equals("*") || mi.getName().getSimpleName().equals(statik))) {
                     return true;
                 }
+            }
+        }
+
+        // For static field imports there will be a JavaType.Variable in use
+        for(JavaType ty : compilationUnit.getTypesInUse()) {
+            if(!(ty instanceof JavaType.Variable)) {
+                continue;
+            }
+            JavaType.Variable varType = (JavaType.Variable)ty;
+            if(varType.getName().equals(statik) && isOfClassType(varType.getType(), type)) {
+                return true;
             }
         }
         return false;

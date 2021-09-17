@@ -481,7 +481,7 @@ interface AddImportTest : JavaRecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/108")
     @Test
-    fun addStaticImportField(jp: JavaParser) = assertChanged(
+    fun addStaticImportForUnreferencedField(jp: JavaParser) = assertChanged(
         jp,
         recipe = addImports(
             { AddImport("mycompany.Type", "FIELD", false) }
@@ -489,6 +489,7 @@ interface AddImportTest : JavaRecipeTest {
         dependsOn = arrayOf(
             """
                 package mycompany;
+                
                 public class Type {
                     public static String FIELD;
                 }
@@ -499,6 +500,49 @@ interface AddImportTest : JavaRecipeTest {
             import static mycompany.Type.FIELD;
             
             class A {}
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1030")
+    @Test
+    fun addStaticImportForReferencedField(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : Recipe() {
+            override fun getDisplayName() = "test"
+            override fun getVisitor() = object : JavaIsoVisitor<ExecutionContext>() {
+                override fun visitClassDeclaration(classDecl: J.ClassDeclaration, ctx: ExecutionContext): J.ClassDeclaration {
+                    var cd = classDecl
+                    if(cd.body.statements.isNotEmpty()) {
+                        return cd
+                    }
+                    cd = cd.withTemplate(
+                        JavaTemplate.builder(this::getCursor, "ChronoUnit unit = MILLIS;")
+                            .imports("java.time.temporal.ChronoUnit")
+                            .staticImports("java.time.temporal.ChronoUnit.MILLIS")
+                            .build(),
+                        cd.body.coordinates.lastStatement()
+                    )
+                    maybeAddImport("java.time.temporal.ChronoUnit")
+                    maybeAddImport("java.time.temporal.ChronoUnit", "MILLIS")
+
+                    return cd
+                }
+            }
+        },
+        before = """
+            public class A {
+            
+            }
+        """,
+        after = """
+            import java.time.temporal.ChronoUnit;
+            
+            import static java.time.temporal.ChronoUnit.MILLIS;
+            
+            public class A {
+                ChronoUnit unit = MILLIS;
+            
+            }
         """
     )
 
