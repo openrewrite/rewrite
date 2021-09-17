@@ -93,7 +93,6 @@ interface TryCatchTest : JavaTreeTest {
         """, "java.io.*"
     )
 
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/1027")
     @Test
     fun tryWithResourcesIdentifierAndVariables(jp: JavaParser) = assertParsePrintAndProcess(
