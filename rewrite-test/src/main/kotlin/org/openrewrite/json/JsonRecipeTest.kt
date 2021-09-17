@@ -31,7 +31,7 @@ interface JsonRecipeTest : RecipeTest<Json.Document> {
         recipe: Recipe = this.recipe!!,
         moderneAstLink: String,
         moderneApiBearerToken: String = apiTokenFromUserHome(),
-        @Language("javascript") after: String,
+        @Language("json") after: String,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Json.Document) -> Unit = { }
@@ -42,9 +42,9 @@ interface JsonRecipeTest : RecipeTest<Json.Document> {
     fun assertChanged(
         parser: JsonParser = this.parser,
         recipe: Recipe = this.recipe!!,
-        @Language("javascript") before: String,
-        @Language("javascript") dependsOn: Array<String> = emptyArray(),
-        @Language("javascript") after: String,
+        @Language("json") before: String,
+        @Language("json") dependsOn: Array<String> = emptyArray(),
+        @Language("json") after: String,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Json.Document) -> Unit = { }
@@ -55,10 +55,10 @@ interface JsonRecipeTest : RecipeTest<Json.Document> {
     fun assertChanged(
         parser: JsonParser = this.parser,
         recipe: Recipe = this.recipe!!,
-        @Language("javascript") before: File,
+        @Language("json") before: File,
         relativeTo: Path? = null,
-        @Language("javascript") dependsOn: Array<File> = emptyArray(),
-        @Language("javascript") after: String,
+        @Language("json") dependsOn: Array<File> = emptyArray(),
+        @Language("json") after: String,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Json.Document) -> Unit = { }
@@ -69,8 +69,8 @@ interface JsonRecipeTest : RecipeTest<Json.Document> {
     fun assertUnchanged(
         parser: JsonParser = this.parser,
         recipe: Recipe = this.recipe!!,
-        @Language("javascript") before: String,
-        @Language("javascript") dependsOn: Array<String> = emptyArray()
+        @Language("json") before: String,
+        @Language("json") dependsOn: Array<String> = emptyArray()
     ) {
         super.assertUnchangedBase(parser, recipe, before, dependsOn)
     }
@@ -78,9 +78,9 @@ interface JsonRecipeTest : RecipeTest<Json.Document> {
     fun assertUnchanged(
         parser: JsonParser = this.parser,
         recipe: Recipe = this.recipe!!,
-        @Language("javascript") before: File,
+        @Language("json") before: File,
         relativeTo: Path? = null,
-        @Language("javascript") dependsOn: Array<File> = emptyArray()
+        @Language("json") dependsOn: Array<File> = emptyArray()
     ) {
         super.assertUnchangedBase(parser, recipe, before, relativeTo, dependsOn)
     }
