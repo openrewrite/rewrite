@@ -1034,7 +1034,8 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
                 visitMarkers(resource.getElement().getMarkers(), p);
                 visit(resource.getElement().getVariableDeclarations(), p);
 
-                if (i < resources.size() - 1 || resource.getElement().isTerminatedWithSemicolon()) {
+                boolean nextResourceIsTerminatedWithSemicolon = i < resources.size() - 2 && resources.get(i + 1).getElement().isTerminatedWithSemicolon();
+                if (!nextResourceIsTerminatedWithSemicolon && (i < resources.size() - 1 || resource.getElement().isTerminatedWithSemicolon())) {
                     acc.append(';');
                 }
 
