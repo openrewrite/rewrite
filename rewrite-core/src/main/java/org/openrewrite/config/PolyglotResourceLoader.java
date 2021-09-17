@@ -16,6 +16,7 @@
 
 package org.openrewrite.config;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
@@ -23,31 +24,43 @@ import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
 import org.openrewrite.Recipe;
 import org.openrewrite.polyglot.PolyglotRecipe;
+import org.openrewrite.polyglot.PolyglotUtils;
 import org.openrewrite.style.NamedStyles;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static org.openrewrite.polyglot.PolyglotUtils.maybeInstantiateOrInvoke;
 
 @Slf4j
 public class PolyglotResourceLoader implements ResourceLoader {
 
-    private final List<Recipe> recipes = new ArrayList<>();
+    private static final ThreadLocal<Engine> ENGINES = new InheritableThreadLocal<Engine>() {
+        @Override
+        protected Engine initialValue() {
+            return Engine.newBuilder()
+                    .allowExperimentalOptions(true)
+                    .build();
+        }
+    };
+
+    private final List<PolyglotRecipes> recipes = new ArrayList<>();
     private final List<NamedStyles> styles = new ArrayList<>();
 
     private final List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();
     private final List<CategoryDescriptor> categoryDescriptors = new ArrayList<>();
     private final List<RecipeExample> recipeExamples = new ArrayList<>();
 
-    public PolyglotResourceLoader() {
-    }
-
     public PolyglotResourceLoader(Source... sources) {
-        Context context = Context.newBuilder().allowAllAccess(true).build();
         for (Source src : sources) {
             try {
-                evalPolyglotRecipe(context, src.getName(), src);
+                evalPolyglotRecipe(src.getName(), src);
             } catch (IOException e) {
                 log.error(e.getMessage(), e);
             }
@@ -56,7 +69,9 @@ public class PolyglotResourceLoader implements ResourceLoader {
 
     @Override
     public Collection<Recipe> listRecipes() {
-        return recipes;
+        return recipes.stream()
+                .flatMap(rs -> rs.getRecipes().stream())
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 
     @Override
@@ -79,21 +94,49 @@ public class PolyglotResourceLoader implements ResourceLoader {
         return recipeExamples;
     }
 
-    public void evalPolyglotRecipe(Context context, String name, Source src) throws IOException {
-        String language = src.getPath().substring(src.getPath().lastIndexOf('.') + 1);
-        Value bindings = context.getBindings(language);
-        context.eval(src);
+    public void evalPolyglotRecipe(String name, Source src) throws IOException {
+        String language = PolyglotUtils.getLanguage(src);
 
-        for (String exportedMember : bindings.getMemberKeys()) {
-            Value defaultExport = bindings.getMember(exportedMember).getMember("default");
-            if (defaultExport.canInstantiate()) {
-                defaultExport = defaultExport.newInstance();
-            } else if (defaultExport.canExecute()) {
-                defaultExport = defaultExport.execute();
+        recipes.add(new PolyglotRecipes(ctx -> {
+            ctx.eval(src);
+            Value bindings = ctx.getBindings(language);
+            return bindings.getMemberKeys().stream()
+                    .flatMap(exportName -> maybeInstantiateOrInvoke(bindings, exportName)
+                            .map(exportVal -> exportVal.getMemberKeys().stream()
+                                    .map(recipeName -> maybeInstantiateOrInvoke(exportVal, recipeName)
+                                            .map(v -> new PolyglotRecipe(name + "/" + recipeName, v))))
+                            .orElseGet(Stream::empty))
+                    .filter(Optional::isPresent)
+                    .map(Optional::get)
+                    .collect(Collectors.toList());
+        }));
+    }
+
+    @lombok.Value
+    @RequiredArgsConstructor
+    private static class PolyglotRecipes {
+        ThreadLocal<Context> context = new InheritableThreadLocal<Context>() {
+            @Override
+            protected Context initialValue() {
+                return Context.newBuilder()
+                        .engine(ENGINES.get())
+                        .allowAllAccess(true)
+                        .allowExperimentalOptions(true)
+                        .build();
             }
-            Recipe r = new PolyglotRecipe(name, defaultExport);
-            recipes.add(r);
-            recipeDescriptors.add(r.getDescriptor());
+        };
+
+        Function<Context, List<PolyglotRecipe>> recipes;
+
+        ThreadLocal<List<PolyglotRecipe>> perThreadRecipes = new InheritableThreadLocal<List<PolyglotRecipe>>() {
+            @Override
+            protected List<PolyglotRecipe> initialValue() {
+                return recipes.apply(context.get());
+            }
+        };
+
+        public List<PolyglotRecipe> getRecipes() {
+            return perThreadRecipes.get();
         }
     }
 

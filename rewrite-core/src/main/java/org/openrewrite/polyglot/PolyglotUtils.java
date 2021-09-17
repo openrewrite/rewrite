@@ -16,22 +16,42 @@
 
 package org.openrewrite.polyglot;
 
+import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
 
 import java.util.Optional;
 import java.util.Set;
 
+import static java.util.Optional.ofNullable;
+
 public class PolyglotUtils {
 
     public static final String JS = "js";
+    public static final String PYTHON = "python";
+    public static final String PY = "py";
+    public static final String PYC = "pyc";
+    public static final String LLVM = "llvm";
 
-    public static Optional<Value> getOption(Value value, String memberKey) {
-        return getValue(value, "options")
-                .flatMap(v -> Optional.ofNullable(v.getMember(memberKey)));
+    public static String getLanguage(Source source) {
+        String suffix = source.getPath().substring(source.getPath().lastIndexOf('.') + 1);
+        switch (suffix) {
+            case JS:
+                return JS;
+            case PY:
+            case PYC:
+                return PYTHON;
+            default:
+                return LLVM;
+        }
+    }
+
+    public static Optional<Value> maybeInstantiateOrInvoke(Value value, String memberKey) {
+        return getValue(value, memberKey).flatMap(
+                v -> ofNullable(v.canInstantiate() ? v.newInstance() : (v.canExecute() ? v.execute() : v)));
     }
 
     public static Optional<Value> getValue(Value value, String memberKey) {
-        return Optional.ofNullable(value.getMember(memberKey));
+        return ofNullable(value.getMember(memberKey));
     }
 
     public static Optional<Value> invokeMember(Value value, String memberKey, Object... args) {

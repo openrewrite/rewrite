@@ -22,7 +22,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
-import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.io.ByteSequence;
 
@@ -44,10 +43,6 @@ public class NpmRegistryModuleLoader extends PolyglotResourceLoader {
             registry += "/";
         }
 
-        Context context = Context.newBuilder(JS, JAVA)
-                .allowAllAccess(true)
-                .build();
-
         ObjectMapper mapper = new ObjectMapper();
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
@@ -59,7 +54,7 @@ public class NpmRegistryModuleLoader extends PolyglotResourceLoader {
                     String main = packageDescriptor.getMain();
 
                     Path jsPath = Paths.get(registry, module, main);
-                    evalPolyglotRecipe(context, module + "@latest", Source.newBuilder(JS, jsPath.toFile()).name(jsPath.toString()).build());
+                    evalPolyglotRecipe(module, Source.newBuilder(JS, jsPath.toFile()).name(jsPath.toString()).build());
                 } else {
                     URI srcUri = URI.create(registry + module);
                     PackagesDescriptor packages = mapper.readValue(srcUri.toURL(), PackagesDescriptor.class);
@@ -80,7 +75,7 @@ public class NpmRegistryModuleLoader extends PolyglotResourceLoader {
                             //noinspection StatementWithEmptyBody
                             for (int i = 0; i < buff.length; i += tgzIn.read(buff, i, tgzIn.getRecordSize())) {
                             }
-                            evalPolyglotRecipe(context, module + "@" + latestVersion, Source.newBuilder(JS, ByteSequence.create(buff), name).build());
+                            evalPolyglotRecipe(module, Source.newBuilder(JS, ByteSequence.create(buff), name).build());
                         }
                     }
                 }

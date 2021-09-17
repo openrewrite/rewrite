@@ -28,6 +28,10 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -56,7 +60,19 @@ class NpmRegistryModuleLoaderTest {
                 .build();
         assertThat(env.listRecipes()).isNotEmpty();
 
-        Recipe r = env.activateRecipes("ts-recipes@latest");
+        Recipe r = env.activateRecipes("ts-recipes/ChangeLicenseRecipe");
+        ExecutorService x = Executors.newFixedThreadPool(2);
+        CountDownLatch latch = new CountDownLatch(1);
+        Future<?> f1 = x.submit(() -> {
+            latch.await();
+            return r.getDisplayName();
+        });
+        Future<?> f2 = x.submit(() -> {
+            latch.countDown();
+            return r.getDisplayName();
+        });
+        f2.get();
+
         List<Result> results = r.run(new JsonParser().parse(Files.readString(Paths.get(registry, "ts-recipes", "package.json"))),
                 new InMemoryExecutionContext(Throwable::printStackTrace),
                 DirectScheduler.common(),
