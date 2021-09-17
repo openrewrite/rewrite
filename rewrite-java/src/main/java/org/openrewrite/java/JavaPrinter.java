@@ -1029,6 +1029,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
             List<JRightPadded<Try.Resource>> resources = tryable.getPadding().getResources().getPadding().getElements();
             for (int i = 0; i < resources.size(); i++) {
                 JRightPadded<Try.Resource> resource = resources.get(i);
+
                 visitSpace(resource.getElement().getPrefix(), Space.Location.TRY_RESOURCE, p);
                 visitMarkers(resource.getElement().getMarkers(), p);
                 visit(resource.getElement().getVariableDeclarations(), p);
