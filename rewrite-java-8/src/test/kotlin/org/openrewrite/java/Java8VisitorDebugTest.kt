@@ -486,3 +486,7 @@ class Java8SameClassNameTest : Java8Test, SameClassNameTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java8SimplifyMethodChainTest : Java8Test, SimplifyMethodChainTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8ReplaceMethodInvocationTest : Java8Test, ReplaceMethodInvocationTest
