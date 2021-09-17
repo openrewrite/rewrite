@@ -32,7 +32,7 @@ public class NormalizeLineBreaksVisitor<P> extends JavaIsoVisitor<P> {
     private final JavadocVisitor<Integer> lineBreakJavadocVisitor = new JavadocVisitor<Integer>() {
         @Override
         public Javadoc visitLineBreak(Javadoc.LineBreak lineBreak, Integer integer) {
-            return lineBreak.withMargin(normalizeNewLines(lineBreak.getMargin(), style.isUseCRLFNewLines()));
+            return lineBreak.withEndOfLine(normalizeNewLines(lineBreak.getEndOfLine(), style.isUseCRLFNewLines()));
         }
     };
 
@@ -79,7 +79,7 @@ public class NormalizeLineBreaksVisitor<P> extends JavaIsoVisitor<P> {
                 normalized.append(c);
             }
         }
-        return normalized.toString();
+        return normalized.toString().equals(text) ? text : normalized.toString();
     }
 
     @Override

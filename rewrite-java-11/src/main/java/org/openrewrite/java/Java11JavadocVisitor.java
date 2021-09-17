@@ -100,6 +100,10 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
         int i = 3;
         for (; i < sourceArr.length; i++) {
             char c = sourceArr[i];
+            if (c == '\r') {
+                continue;
+            }
+
             if (inFirstPrefix) {
                 if (Character.isWhitespace(c)) {
                     firstPrefixBuilder.append(c);
@@ -115,7 +119,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
                     inFirstPrefix = false;
                 } else {
                     if (i > 0 && sourceArr[i - 1] == '\n') {
-                        lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), "", Markers.EMPTY));
+                        lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), "", "\n", Markers.EMPTY));
                     }
                     javadocContent.append(c);
                 }
@@ -125,14 +129,14 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
                     if (c == '*') {
                         marginBuilder.append(c);
                         lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(),
-                                marginBuilder.toString(), Markers.EMPTY));
+                                marginBuilder.toString(), "\n", Markers.EMPTY));
                     } else if (c == '@') {
                         lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(),
-                                marginBuilder.toString(), Markers.EMPTY));
+                                marginBuilder.toString(), "\n", Markers.EMPTY));
                         javadocContent.append(c);
                     } else {
                         lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(),
-                                "", Markers.EMPTY));
+                                "", "\n", Markers.EMPTY));
                         javadocContent.append(marginBuilder).append(c);
                     }
                     marginBuilder = null;
@@ -153,11 +157,11 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
         if (marginBuilder != null && marginBuilder.length() > 0) {
             if (javadocContent.length() > 0 && javadocContent.charAt(0) != '\n') {
                 lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(),
-                        marginBuilder.toString(), Markers.EMPTY));
+                        marginBuilder.toString(), "\n", Markers.EMPTY));
                 source = source.substring(0, source.length() - 1); // strip trailing newline
             } else {
                 lineBreaks.put(source.length(), new Javadoc.LineBreak(randomId(),
-                        marginBuilder.toString(), Markers.EMPTY));
+                        marginBuilder.toString(), "\n", Markers.EMPTY));
             }
         }
     }

@@ -298,6 +298,7 @@ public interface Javadoc extends Serializable, Tree {
         UUID id;
 
         String margin;
+        String endOfLine;
         Markers markers;
 
         @Override
