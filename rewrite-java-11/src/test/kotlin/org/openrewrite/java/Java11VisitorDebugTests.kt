@@ -487,3 +487,7 @@ class Java11WriteOctalValuesAsDecimalTest : Java11Test, WriteOctalValuesAsDecima
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11SameClassNameTest : Java11Test, SameClassNameTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11SimplifyMethodChainTest : Java11Test, SimplifyMethodChainTest

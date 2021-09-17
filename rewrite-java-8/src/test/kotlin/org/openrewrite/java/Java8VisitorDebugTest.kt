@@ -482,3 +482,7 @@ class Java8WrappingAndBracesTest : Java8Test, WrappingAndBracesTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java8SameClassNameTest : Java8Test, SameClassNameTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8SimplifyMethodChainTest : Java8Test, SimplifyMethodChainTest

@@ -320,6 +320,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class SimplifyBooleanReturnTck : SimplifyBooleanReturnTest
 
     @Nested
+    inner class SimplifyMethodChainTck : SimplifyMethodChainTest
+
+    @Nested
     inner class RenameLocalVariablesToCamelCaseTck : RenameLocalVariablesToCamelCaseTest
 
     @Nested
