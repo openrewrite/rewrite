@@ -438,6 +438,10 @@ class Java11TypecastParenPadTest : Java11Test, TypecastParenPadTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11UnnecessaryCloseInTryWithResourcesTest : Java11Test, UnnecessaryCloseInTryWithResourcesTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11UnnecessaryExplicitTypeArgumentsTest : Java11Test, UnnecessaryExplicitTypeArgumentsTest
 
 @DebugOnly

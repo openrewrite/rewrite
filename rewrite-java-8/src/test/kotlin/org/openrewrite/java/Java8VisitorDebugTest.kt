@@ -434,6 +434,10 @@ class Java8TypecastParenPadTest : Java8Test, TypecastParenPadTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8UnnecessaryCloseInTryWithResourcesTest : Java8Test, UnnecessaryCloseInTryWithResourcesTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8UnnecessaryExplicitTypeArgumentsTest : Java8Test, UnnecessaryExplicitTypeArgumentsTest
 
 @DebugOnly
