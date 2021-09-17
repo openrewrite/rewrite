@@ -16,6 +16,7 @@
 package org.openrewrite.java.tree
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.java.JavaIsoVisitor
@@ -90,6 +91,17 @@ interface TryCatchTest : JavaTreeTest {
             catch(IOException e) {
             }
         """, "java.io.*"
+    )
+
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/1027")
+    @Test
+    fun tryWithResourcesIdentifierAndVariables(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, Block, """
+            FileInputStream fis = new FileInputStream(new File("file.txt"));
+            try (fis; Scanner sc = new Scanner("")) {
+            }
+        """, "java.io.*", "java.util.Scanner"
     )
 
     @Test
