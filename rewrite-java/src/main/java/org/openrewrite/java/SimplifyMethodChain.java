@@ -17,10 +17,8 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
+import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
@@ -50,6 +48,19 @@ public class SimplifyMethodChain extends Recipe {
     }
 
     @Override
+    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return new JavaVisitor<ExecutionContext>() {
+            @Override
+            public J visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                for (String method : methodPatternChain) {
+                    doAfterVisit(new UsesMethod<>(method));
+                }
+                return cu;
+            }
+        };
+    }
+
+    @Override
     public Validated validate() {
         return super.validate().and(Validated.test("methodPatternChain",
                 "Requires more than one pattern",
@@ -65,8 +76,8 @@ public class SimplifyMethodChain extends Recipe {
 
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
                 Expression select = m;
                 for (MethodMatcher matcher : matchers) {
