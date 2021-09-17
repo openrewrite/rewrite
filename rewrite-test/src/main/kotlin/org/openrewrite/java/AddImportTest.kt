@@ -546,6 +546,22 @@ interface AddImportTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1030")
+    @Test
+    fun dontAddImportToStaticFieldWithNamespaceConflict(jp: JavaParser) = assertUnchanged(
+        recipe = addImports({ AddImport("java.time.temporal.ChronoUnit", "MILLIS", true)}),
+        before = """
+            package a;
+            
+            import java.time.temporal.ChronoUnit;
+            
+            class A {
+                static final int MILLIS = 1;
+                ChronoUnit unit = ChronoUnit.MILLIS;
+            }
+        """
+    )
+
     @Test
     fun dontAddStaticWildcardImportIfNotReferenced(jp: JavaParser) = assertUnchanged(
         jp,

@@ -28,6 +28,7 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.tree.TypeUtils.isOfClassType;
@@ -193,16 +194,36 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             }
         }
 
-        // For static field imports there will be a JavaType.Variable in use
-        for(JavaType ty : compilationUnit.getTypesInUse()) {
-            if(!(ty instanceof JavaType.Variable)) {
-                continue;
+        // Check whether there is static-style access of the field in question
+        AtomicReference<Boolean> hasStaticFieldAccess = new AtomicReference<>(false);
+        new FindStaticFieldAccess().visit(compilationUnit, hasStaticFieldAccess);
+        return hasStaticFieldAccess.get();
+    }
+
+    private class FindStaticFieldAccess extends JavaIsoVisitor<AtomicReference<Boolean>> {
+        @Override
+        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, AtomicReference<Boolean> found) {
+            // If the type isn't used there's no need to proceed further
+            for(JavaType ty : cu.getTypesInUse()) {
+                if(!(ty instanceof JavaType.Variable)) {
+                    continue;
+                }
+                JavaType.Variable varType = (JavaType.Variable)ty;
+                if(varType.getName().equals(statik) && isOfClassType(varType.getType(), type)) {
+                    return super.visitCompilationUnit(cu, found);
+                }
             }
-            JavaType.Variable varType = (JavaType.Variable)ty;
-            if(varType.getName().equals(statik) && isOfClassType(varType.getType(), type)) {
-                return true;
-            }
+            return cu;
         }
-        return false;
+
+        @Override
+        public J.Identifier visitIdentifier(J.Identifier identifier, AtomicReference<Boolean> found) {
+            assert getCursor().getParent() != null;
+            if(identifier.getSimpleName().equals(statik) && isOfClassType(identifier.getType(), type) &&
+                    !(getCursor().getParent().firstEnclosingOrThrow(J.class) instanceof J.FieldAccess)) {
+                found.set(true);
+            }
+            return identifier;
+        }
     }
 }
