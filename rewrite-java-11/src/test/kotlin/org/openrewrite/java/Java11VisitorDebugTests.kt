@@ -491,7 +491,3 @@ class Java11SameClassNameTest : Java11Test, SameClassNameTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11SimplifyMethodChainTest : Java11Test, SimplifyMethodChainTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
-class Java11ReplaceMethodInvocationTest : Java11Test, ReplaceMethodInvocationTest
