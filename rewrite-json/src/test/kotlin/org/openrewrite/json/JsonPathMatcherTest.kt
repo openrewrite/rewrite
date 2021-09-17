@@ -17,6 +17,7 @@
 package org.openrewrite.json
 
 import org.assertj.core.api.Assertions.assertThat
+import org.intellij.lang.annotations.Language
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.json.tree.Json
@@ -24,7 +25,8 @@ import org.openrewrite.yaml.tree.Yaml
 
 class JsonPathMatcherTest {
 
-    private val jsons = arrayOf(
+    @Language("JSON5")
+    private val source = arrayOf(
         """
             {
               "apiVersion": "v1",
@@ -108,6 +110,7 @@ class JsonPathMatcherTest {
         """.trimIndent()
     )
 
+    private val topLevelKeys = "$.*"
     private val appLabel = "$.metadata.labels.app"
     private val appLabelBracket = "$.metadata.labels['app']"
     private val recurseSpecContainers = "..spec.containers"
@@ -118,8 +121,14 @@ class JsonPathMatcherTest {
     private val image = ".image"
 
     @Test
+    fun `must identify top-level elements`() {
+        val results = visit(topLevelKeys, source)
+        assertThat(results).hasSize(12)
+    }
+
+    @Test
     fun `must find expression result`() {
-        val results = visit(appLabel, jsons)
+        val results = visit(appLabel, source)
         assertThat(results).hasSize(2)
         assertThat(results[0] is Json.Member).isTrue
         assertThat((((results[0] as Json.Member).value) as Json.Literal).value).isEqualTo("myapp")
@@ -127,50 +136,50 @@ class JsonPathMatcherTest {
 
     @Test
     fun `must recurse to find elements`() {
-        val results = visit(recurseSpecContainers, jsons)
+        val results = visit(recurseSpecContainers, source)
         assertThat(results).hasSize(3)
     }
 
     @Test
     fun `must find enclosed elements`() {
-        val results = visit(recurseSpecContainers, jsons, true)
+        val results = visit(recurseSpecContainers, source, true)
         assertThat(results).hasSize(6)
     }
 
     @Test
     fun `must slice sequences`() {
-        val results = visit(firstContainerSlice, jsons, true)
+        val results = visit(firstContainerSlice, source, true)
         assertThat(results).hasSize(2)
     }
 
     @Test
     fun `must filter by expression`() {
-        val results = visit(containerByNameImage, jsons)
+        val results = visit(containerByNameImage, source)
         assertThat(results).hasSize(1)
         assertThat(((results[0] as Json.Member).value as Json.Literal).value).isEqualTo("mycompany.io/app:v2@digest")
     }
 
     @Test
     fun `must filter by relative expression`() {
-        val results = visit(image, jsons)
+        val results = visit(image, source)
         assertThat(results).hasSize(4)
     }
 
     @Test
     fun `must support wildcards as identifiers`() {
-        val results = visit(allSpecChildren, jsons)
+        val results = visit(allSpecChildren, source)
         assertThat(results).hasSize(3)
     }
 
     @Test
     fun `must support wildcards in range operators`() {
-        val results = visit(allContainerSlices, jsons, true)
+        val results = visit(allContainerSlices, source, true)
         assertThat(results).hasSize(2)
     }
 
     @Test
     fun `must support identifiers in bracket operators`() {
-        val results = visit(appLabelBracket, jsons)
+        val results = visit(appLabelBracket, source)
         assertThat(results).hasSize(2)
         assertThat(results[0] is Json.Member).isTrue
         assertThat((((results[0] as Json.Member).value) as Json.Literal).value).isEqualTo("myapp")
@@ -178,7 +187,7 @@ class JsonPathMatcherTest {
 
     @Test
     fun `must find mapping at document level`() {
-        val results = visitDocument(appLabel, jsons)
+        val results = visitDocument(appLabel, source)
         @Suppress("SameParameterValue")
         assertThat(results).hasSize(2)
     }

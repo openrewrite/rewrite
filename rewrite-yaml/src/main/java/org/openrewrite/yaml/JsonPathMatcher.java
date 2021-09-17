@@ -35,8 +35,9 @@ import static java.util.Collections.disjoint;
 /**
  * Provides methods for matching the given cursor location to a specified JsonPath expression.
  * <p>
- * This is not a full implementation of the JsonPath syntax documented here:
- * https://support.smartbear.com/alertsite/docs/monitors/api/endpoint/jsonpath.html
+ * This is not a full implementation of the JsonPath syntax as linked in the "see also."
+ *
+ * @see <a href="https://support.smartbear.com/alertsite/docs/monitors/api/endpoint/jsonpath.html">https://support.smartbear.com/alertsite/docs/monitors/api/endpoint/jsonpath.html</a>
  */
 public class JsonPathMatcher {
 

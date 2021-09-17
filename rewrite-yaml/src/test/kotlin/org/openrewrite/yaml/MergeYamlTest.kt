@@ -25,7 +25,7 @@ class MergeYamlTest : YamlRecipeTest {
     @Test
     fun existingMultipleEntryBlock() = assertChanged(
         recipe = MergeYaml(
-            "/",
+            "$",
             """
                 spring:
                   application:
@@ -179,7 +179,7 @@ class MergeYamlTest : YamlRecipeTest {
     @Test
     fun insertAtRoot() = assertChanged(
         recipe = MergeYaml(
-            "/", // todo
+            "$",
             "spec: 0",
             true,
             null,
@@ -227,7 +227,7 @@ class MergeYamlTest : YamlRecipeTest {
             writeText("apiVersion: policy/v1beta1")
         }
 
-        val recipe = MergeYaml("/", "spec: 0", true, "**/a.yml")
+        val recipe = MergeYaml("$", "spec: 0", true, "**/a.yml")
         assertChanged(
             recipe = recipe,
             before = matchingFile,
