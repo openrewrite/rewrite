@@ -17,7 +17,6 @@
 package org.openrewrite.config;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.Source;
@@ -38,7 +37,6 @@ import java.util.stream.Stream;
 
 import static org.openrewrite.polyglot.PolyglotUtils.maybeInstantiateOrInvoke;
 
-@Slf4j
 public class PolyglotResourceLoader implements ResourceLoader {
 
     private static final ThreadLocal<Engine> ENGINES = new InheritableThreadLocal<Engine>() {
@@ -62,7 +60,7 @@ public class PolyglotResourceLoader implements ResourceLoader {
             try {
                 evalPolyglotRecipe(src.getName(), src);
             } catch (IOException e) {
-                log.error(e.getMessage(), e);
+                throw new RuntimeException(e);
             }
         }
     }
