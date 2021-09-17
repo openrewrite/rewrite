@@ -1029,13 +1029,12 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
             List<JRightPadded<Try.Resource>> resources = tryable.getPadding().getResources().getPadding().getElements();
             for (int i = 0; i < resources.size(); i++) {
                 JRightPadded<Try.Resource> resource = resources.get(i);
-
                 visitSpace(resource.getElement().getPrefix(), Space.Location.TRY_RESOURCE, p);
                 visitMarkers(resource.getElement().getMarkers(), p);
                 visit(resource.getElement().getVariableDeclarations(), p);
 
-                boolean nextResourceIsTerminatedWithSemicolon = i < resources.size() - 2 && resources.get(i + 1).getElement().isTerminatedWithSemicolon();
-                if (!nextResourceIsTerminatedWithSemicolon && (i < resources.size() - 1 || resource.getElement().isTerminatedWithSemicolon())) {
+                boolean nextResourceHasSemicolon = i <= resources.size() - 2 && resources.get(i + 1).getElement().getPrefix().getWhitespace().contains(";");
+                if (!nextResourceHasSemicolon && (i < resources.size() - 1 || resource.getElement().isTerminatedWithSemicolon())) {
                     acc.append(';');
                 }
 

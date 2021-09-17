@@ -93,15 +93,18 @@ interface TryCatchTest : JavaTreeTest {
         """, "java.io.*"
     )
 
+    @Disabled("Java 8 does not allow resources as identifiers")
     @Issue("https://github.com/openrewrite/rewrite/issues/1027")
     @Test
-    fun tryWithResourcesIdentifierAndVariables(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, Block, """
-            FileInputStream fis = new FileInputStream(new File("file.txt"));
-            try (fis; Scanner sc = new Scanner("")) {
+    fun tryWithResourcesIdentifierAndVariables(jp: JavaParser) {
+        assertParsePrintAndProcess(
+            jp, Block, """
+            Scanner sc1 = new Scanner("abc");
+            try (sc1; Scanner sc = new Scanner(System.in)) {
             }
-        """, "java.io.*", "java.util.Scanner"
-    )
+        """, "java.util.Scanner"
+        )
+    }
 
     @Test
     fun multiCatch(jp: JavaParser) = assertParsePrintAndProcess(
