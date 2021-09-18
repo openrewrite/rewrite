@@ -1003,4 +1003,16 @@ interface JavadocTest : JavaTreeTest {
             }
         """.trimIndent()
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/980")
+    @Test
+    fun javaDocWithCRLF(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        "/**\r\n" +
+              " * JavaDoc.\r\n" +
+              " */\r\n" +
+              "public class A {\r\n" +
+              "}"
+    )
 }

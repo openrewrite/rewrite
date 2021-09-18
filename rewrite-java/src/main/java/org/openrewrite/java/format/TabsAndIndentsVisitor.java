@@ -508,7 +508,8 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     public Javadoc visitLineBreak(Javadoc.LineBreak lineBreak, Integer p) {
                         if (shift < 0) {
                             StringBuilder margin = new StringBuilder();
-                            char[] charArray = lineBreak.getMargin().toCharArray();
+                            String newLine = lineBreak.getMargin().startsWith("\n") ? "\n" : "\r\n";
+                            char[] charArray = lineBreak.getMargin().substring(lineBreak.getMargin().indexOf("\n") + 1).toCharArray();
                             boolean inMargin = true;
                             for (int i = 0; i < charArray.length; i++) {
                                 char c = charArray[i];
@@ -521,10 +522,11 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                                 }
                                 margin.append(c);
                             }
-                            return lineBreak.withMargin(margin.toString());
+                            return lineBreak.withMargin(newLine + margin);
                         } else{
-                            return lineBreak.withMargin(indent("", shift) +
-                                    lineBreak.getMargin());
+                            String newLine = lineBreak.getMargin().startsWith("\n") ? "\n" : "\r\n";
+                            return lineBreak.withMargin(newLine + indent("", shift) +
+                                    lineBreak.getMargin().substring(lineBreak.getMargin().indexOf("\n") + 1));
                         }
                     }
                 }.visitNonNull((Javadoc.DocComment) comment, 0);

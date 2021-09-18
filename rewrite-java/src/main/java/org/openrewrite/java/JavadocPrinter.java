@@ -189,7 +189,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     public Javadoc visitLineBreak(Javadoc.LineBreak lineBreak, P p) {
         visitMarkers(lineBreak.getMarkers(), p);
         StringBuilder acc = getPrinter();
-        acc.append('\n').append(lineBreak.getMargin());
+        acc.append(lineBreak.getMargin());
         return lineBreak;
     }
 
