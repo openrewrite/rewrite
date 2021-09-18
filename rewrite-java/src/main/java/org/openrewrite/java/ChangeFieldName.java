@@ -28,11 +28,20 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
     private final JavaType.Class classType;
     private final String hasName;
     private final String toName;
+    private boolean isStaticallyImported;
 
     public ChangeFieldName(JavaType.Class classType, String hasName, String toName) {
         this.classType = classType;
         this.hasName = hasName;
         this.toName = toName;
+    }
+
+    @Override
+    public J.Import visitImport(J.Import _import, P p) {
+        if(_import.isStatic() && TypeUtils.isOfClassType(classType, _import.getTypeName()) && _import.getQualid().getSimpleName().equals(hasName)) {
+            isStaticallyImported = true;
+        }
+        return super.visitImport(_import, p);
     }
 
     @Override
@@ -63,8 +72,8 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
     @Override
     public J.Identifier visitIdentifier(J.Identifier ident, P p) {
         J.Identifier i = super.visitIdentifier(ident, p);
-        if (ident.getSimpleName().equals(hasName) && isFieldReference(ident) &&
-                isThisReferenceToClassType()) {
+        if (ident.getSimpleName().equals(hasName) &&
+                (isStaticallyImported || (isFieldReference(ident) && isThisReferenceToClassType()))) {
             i = i.withName(toName);
         }
         return i;

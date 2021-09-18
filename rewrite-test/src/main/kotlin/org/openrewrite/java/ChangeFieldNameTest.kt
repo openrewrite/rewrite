@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
@@ -120,7 +119,6 @@ interface ChangeFieldNameTest : JavaRecipeTest {
     )
 
     @Test
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/632")
     fun changeFieldNameReferencesInOtherClassUsingStaticImport(jp: JavaParser) = assertChanged(
         jp,
