@@ -15,33 +15,20 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.Cursor;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JLeftPadded;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
-import java.util.concurrent.atomic.AtomicReference;
+import static org.openrewrite.Tree.randomId;
 
 public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
     private final JavaType.Class classType;
     private final String hasName;
     private final String toName;
-    private boolean isStaticallyImported;
 
     public ChangeFieldName(JavaType.Class classType, String hasName, String toName) {
         this.classType = classType;
         this.hasName = hasName;
         this.toName = toName;
-    }
-
-    @Override
-    public J.Import visitImport(J.Import _import, P p) {
-        if(_import.isStatic() && TypeUtils.isOfClassType(classType, _import.getTypeName()) && _import.getQualid().getSimpleName().equals(hasName)) {
-            isStaticallyImported = true;
-        }
-        return super.visitImport(_import, p);
     }
 
     @Override
@@ -72,9 +59,23 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
     @Override
     public J.Identifier visitIdentifier(J.Identifier ident, P p) {
         J.Identifier i = super.visitIdentifier(ident, p);
-        if (ident.getSimpleName().equals(hasName) &&
-                (isStaticallyImported || (isFieldReference(ident) && isThisReferenceToClassType()))) {
-            i = i.withName(toName);
+
+        if(i.getFieldType() instanceof JavaType.Variable) {
+            JavaType.Variable varType = (JavaType.Variable) i.getFieldType();
+            if(varType.getName().equals(hasName) && TypeUtils.isOfType(varType.getOwner(), classType)) {
+                i = J.Identifier.build(
+                        randomId(),
+                        i.getPrefix(),
+                        i.getMarkers(),
+                        toName,
+                        i.getType(),
+                        JavaType.Variable.build(
+                                toName,
+                                varType.getOwner(),
+                                varType.getType(),
+                                varType.getAnnotations(),
+                                Flag.flagsToBitMap(varType.getFlags())));
+            }
         }
         return i;
     }
@@ -82,50 +83,5 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
     private boolean matchesClass(@Nullable JavaType test) {
         JavaType.FullyQualified testClassType = TypeUtils.asFullyQualified(test);
         return testClassType != null && testClassType.getFullyQualifiedName().equals(classType.getFullyQualifiedName());
-    }
-
-    private boolean isThisReferenceToClassType() {
-        J.FieldAccess fieldAccess = getCursor().firstEnclosing(J.FieldAccess.class);
-        if (fieldAccess == null) {
-            return true;
-        }
-        while(fieldAccess.getType() == null && fieldAccess.getTarget() instanceof J.FieldAccess) {
-            fieldAccess = (J.FieldAccess) fieldAccess.getTarget();
-        }
-        return classType.equals(fieldAccess.getTarget().getType());
-    }
-
-    private boolean isFieldReference(J.Identifier ident) {
-        AtomicReference<Cursor> nearest = new AtomicReference<>();
-        new FindVariableDefinition(ident, getCursor()).visit(getCursor().firstEnclosing(J.CompilationUnit.class), nearest);
-        return nearest.get() != null && nearest.get()
-                .dropParentUntil(J.class::isInstance) // maybe J.VariableDecls
-                .dropParentUntil(J.class::isInstance) // maybe J.Block
-                .dropParentUntil(J.class::isInstance) // maybe J.ClassDecl
-                .getValue() instanceof J.ClassDeclaration;
-    }
-
-    private static class FindVariableDefinition extends JavaIsoVisitor<AtomicReference<Cursor>> {
-        private final J.Identifier ident;
-        private final Cursor referenceScope;
-
-        public FindVariableDefinition(J.Identifier ident, Cursor referenceScope) {
-            this.ident = ident;
-            this.referenceScope = referenceScope;
-        }
-
-        @Override
-        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, AtomicReference<Cursor> ctx) {
-            if (variable.getSimpleName().equalsIgnoreCase(ident.getSimpleName()) && isInSameNameScope(referenceScope)) {
-                // the definition will be the "closest" cursor, i.e. the one with the longest path in the same name scope
-                ctx.accumulateAndGet(getCursor(), (r1, r2) -> {
-                    if (r1 == null) {
-                        return r2;
-                    }
-                    return r1.getPathAsStream().count() > r2.getPathAsStream().count() ? r1 : r2;
-                });
-            }
-            return super.visitVariable(variable, ctx);
-        }
     }
 }

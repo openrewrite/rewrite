@@ -124,27 +124,27 @@ interface ChangeFieldNameTest : JavaRecipeTest {
         jp,
         dependsOn = arrayOf(
             """
-                package org.openrewrite.example;
+                package com.example;
 
                 public class Test {
                     public static final int IMPORT_ME_STATICALLY = 0;
                 }
             """
         ),
-        recipe = changeFieldName("org.openrewrite.example.Test", "IMPORT_ME_STATICALLY", "IMPORT_ME_STATICALLY_1"),
+        recipe = changeFieldName("com.example.Test", "IMPORT_ME_STATICALLY", "IMPORT_ME_STATICALLY_1"),
         before = """
-            package org.openrewrite.example;
+            package org.openrewrite.test;
 
-            import static org.openrewrite.example.Test.IMPORT_ME_STATICALLY;
+            import static com.example.Test.IMPORT_ME_STATICALLY;
 
             public class Caller {
                 int e = IMPORT_ME_STATICALLY;
             }
         """,
         after = """
-            package org.openrewrite.example;
+            package org.openrewrite.test;
 
-            import static org.openrewrite.example.Test.IMPORT_ME_STATICALLY_1;
+            import static com.example.Test.IMPORT_ME_STATICALLY_1;
 
             public class Caller {
                 int e = IMPORT_ME_STATICALLY_1;
