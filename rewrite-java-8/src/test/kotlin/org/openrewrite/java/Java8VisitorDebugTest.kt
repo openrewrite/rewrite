@@ -446,6 +446,10 @@ class Java8UnnecessaryParenthesesTest : Java8Test, UnnecessaryParenthesesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8UnnecessaryPrimitiveAnnotationsTest : Java8Test, UnnecessaryPrimitiveAnnotationsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8UnnecessaryThrowsTest : Java8Test, UnnecessaryThrowsTest
 
 @DebugOnly
