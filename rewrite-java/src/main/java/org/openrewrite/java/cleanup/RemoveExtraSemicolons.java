@@ -22,7 +22,8 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 
 import java.time.Duration;
-import java.util.Collections;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Set;
 
 public class RemoveExtraSemicolons extends Recipe {
@@ -39,7 +40,7 @@ public class RemoveExtraSemicolons extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("RSPEC-2959");
+        return new HashSet<>(Arrays.asList("RSPEC-2959", "RSPEC-1116"));
     }
 
     @Override
