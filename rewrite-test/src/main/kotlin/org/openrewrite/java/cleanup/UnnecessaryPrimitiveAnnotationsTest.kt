@@ -39,6 +39,10 @@ interface UnnecessaryPrimitiveAnnotationsTest : JavaRecipeTest {
                 public Object getCount(@Nullable Object val) {
                     return val;
                 }
+                
+                public void doSomething(long requestId, long stageId, String component, String host,
+                                          String type, boolean skipFailure) {
+                }
             }
         """
     )

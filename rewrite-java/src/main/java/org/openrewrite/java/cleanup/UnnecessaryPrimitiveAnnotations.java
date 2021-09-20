@@ -87,9 +87,6 @@ public class UnnecessaryPrimitiveAnnotations extends Recipe {
                 J.VariableDeclarations varDecls = super.visitVariableDeclarations(multiVariable, executionContext);
                 if (varDecls.getType() instanceof JavaType.Primitive) {
                     varDecls = varDecls.withLeadingAnnotations(filterAnnotations(varDecls.getLeadingAnnotations()));
-                    if (varDecls.getLeadingAnnotations().isEmpty() && varDecls.getTypeExpression() != null) {
-                        varDecls = varDecls.withTypeExpression(varDecls.getTypeExpression().withPrefix(varDecls.getPrefix()));
-                    }
                 }
                 return varDecls;
             }
