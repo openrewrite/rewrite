@@ -133,6 +133,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class FinalizeLocalVariablesTck : FinalizeLocalVariablesTest
 
     @Nested
+    inner class ForLoopControlVariablePostfixOperatorsTck : ForLoopControlVariablePostfixOperatorsTest
+
+    @Nested
     inner class ForLoopIncrementInUpdateTck : ForLoopIncrementInUpdateTest
 
     @Nested
