@@ -23,7 +23,6 @@ import okhttp3.Credentials
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.intellij.lang.annotations.Language
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
@@ -935,9 +934,9 @@ class MavenParserTest {
             )
             .find { it.model.artifactId == "a" }
 
-        assertThat(a!!.model.getDependencies(Scope.Compile))
-            .hasSize(2)
-            .anyMatch { it.artifactId == "b" && it.version == "0.1.0-SNAPSHOT" }
-            .anyMatch { it.artifactId == "d" && it.version == "0.1.0-SNAPSHOT" }
+        val compileDependencies = a!!.model.getDependencies(Scope.Compile)
+        assertThat(compileDependencies).hasSize(2)
+        assertThat(compileDependencies).anyMatch { it.artifactId == "b" && it.version == "0.1.0-SNAPSHOT" }
+        assertThat(compileDependencies).anyMatch { it.artifactId == "d" && it.version == "0.1.0-SNAPSHOT" }
     }
 }
