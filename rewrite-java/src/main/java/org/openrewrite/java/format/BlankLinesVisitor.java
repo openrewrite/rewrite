@@ -171,7 +171,7 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
                 int declMax = style.getKeepMaximum().getInDeclarations();
 
                 // don't adjust the first statement in a block
-                if (!block.getStatements().isEmpty() && block.getStatements().iterator().next() != j) {
+                if (!block.getStatements().isEmpty() && !block.getStatements().iterator().next().isScope(j)) {
                     if (j instanceof J.VariableDeclarations) {
                         if (classDecl.getKind() == J.ClassDeclaration.Kind.Type.Interface) {
                             declMax = Math.max(declMax, style.getMinimum().getAroundFieldInInterface());
