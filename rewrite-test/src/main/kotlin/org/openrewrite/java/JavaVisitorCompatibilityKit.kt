@@ -341,6 +341,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class TypecastParenPadTestTck : TypecastParenPadTest
 
     @Nested
+    inner class UnnecessaryPrimitiveAnnotationsTck : UnnecessaryPrimitiveAnnotationsTest
+
+    @Nested
     inner class UnnecessaryCloseInTryWithResourcesTck : UnnecessaryCloseInTryWithResourcesTest
 
     @Nested

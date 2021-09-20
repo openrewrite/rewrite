@@ -450,6 +450,10 @@ class Java11UnnecessaryParenthesesTest : Java11Test, UnnecessaryParenthesesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11UnnecessaryPrimitiveAnnotationsTest : Java11Test, UnnecessaryPrimitiveAnnotationsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11UnnecessaryThrowsTest : Java11Test, UnnecessaryThrowsTest
 
 @DebugOnly
