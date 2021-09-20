@@ -1061,18 +1061,25 @@ interface JavaTemplateTest : JavaRecipeTest {
         },
         before = """
             class Test {
+                public void test0() {
+                }
+
                 static final String WARNINGS = "ALL";
-            
-                public void test() {
+
+                public void test1() {
                 }
             }
         """,
         after = """
             class Test {
-                static final String WARNINGS = "ALL";
-            
                 @SuppressWarnings("other")
-                public void test() {
+                public void test0() {
+                }
+
+                static final String WARNINGS = "ALL";
+
+                @SuppressWarnings("other")
+                public void test1() {
                 }
             }
         """

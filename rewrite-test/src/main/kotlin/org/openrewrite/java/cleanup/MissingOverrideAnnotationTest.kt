@@ -66,7 +66,6 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
         dependsOn = arrayOf(supportingParents),
         before = """
             class Test extends TestParentParent {
-
                 public void testParentParent() {
                 }
 
@@ -76,7 +75,6 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
         """,
         after = """
             class Test extends TestParentParent {
-
                 @Override
                 public void testParentParent() {
                 }
@@ -92,7 +90,6 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
         dependsOn = arrayOf(supportingParents),
         before = """
             class Test extends TestParent {
-
                 public void testParent() {
                 }
 
@@ -102,7 +99,6 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
         """,
         after = """
             class Test extends TestParent {
-
                 @Override
                 public void testParent() {
                 }
@@ -118,7 +114,6 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
         dependsOn = arrayOf(supportingParents),
         before = """
             class Test implements TestInterface {
-
                 public void testInterface() {
                 }
 
@@ -128,7 +123,6 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
         """,
         after = """
             class Test implements TestInterface {
-
                 @Override
                 public void testInterface() {
                 }
@@ -144,7 +138,6 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
         dependsOn = arrayOf(supportingParents),
         before = """
             class Test implements TestInterface, TestInterface0 {
-
                 public void testInterface() {
                 }
 
@@ -157,7 +150,6 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
         """,
         after = """
             class Test implements TestInterface, TestInterface0 {
-
                 @Override
                 public void testInterface() {
                 }
@@ -177,7 +169,6 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
         dependsOn = arrayOf(supportingParents),
         before = """
             class Test implements TestInterfaceExtension {
-
                 public void testInterfaceExtension() {
                 }
 
@@ -190,7 +181,6 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
         """,
         after = """
             class Test implements TestInterfaceExtension {
-
                 @Override
                 public void testInterfaceExtension() {
                 }
@@ -210,7 +200,6 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
         dependsOn = arrayOf(supportingParents),
         before = """
             class Test extends TestParent implements TestInterface {
-
                 public void testParent() {
                 }
 
@@ -223,7 +212,6 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
         """,
         after = """
             class Test extends TestParent implements TestInterface {
-
                 @Override
                 public void testParent() {
                 }
@@ -269,7 +257,6 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
         dependsOn = arrayOf(supportingParents),
         before = """
             class Test extends AbstractTestParent {
-
                 public boolean isAbstractBoolean() {
                     return false;
                 }
@@ -282,7 +269,6 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
         dependsOn = arrayOf(supportingParents),
         before = """
             class Test extends AbstractTestParent {
-
                 public boolean isAbstractBoolean() {
                     return false;
                 }
@@ -294,7 +280,6 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
         """,
         after = """
             class Test extends AbstractTestParent {
-
                 public boolean isAbstractBoolean() {
                     return false;
                 }
@@ -312,7 +297,6 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
         dependsOn = arrayOf(supportingParents),
         before = """
             class Test extends TestParent {
-
                 @Override
                 public void testParent() {
                 }
@@ -382,7 +366,6 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
         recipe = MissingOverrideAnnotation(false, null),
         before = """
             class Test {
-
                 public String toString() {
                     return super.toString();
                 }
@@ -390,7 +373,6 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
         """,
         after = """
             class Test {
-
                 @Override
                 public String toString() {
                     return super.toString();
