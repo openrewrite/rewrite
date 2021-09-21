@@ -116,7 +116,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             public J visitBlock(J.Block block, Integer p) {
                 switch (loc) {
                     case BLOCK_END: {
-                        if(block.isScope(insertionPoint)) {
+                        if (block.isScope(insertionPoint)) {
                             List<Statement> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(
                                     new Cursor(getCursor(), insertionPoint),
                                     substitutedTemplate, loc));
@@ -211,7 +211,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                 if (loc.equals(LAMBDA_PARAMETERS_PREFIX) && lambda.getParameters().isScope(insertionPoint)) {
                     return lambda.withParameters(substitutions.unsubstitute(templateParser.parseLambdaParameters(substitutedTemplate)));
                 }
-                if(loc.equals(STATEMENT_PREFIX) && lambda.isScope(insertionPoint) && mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
+                if (loc.equals(STATEMENT_PREFIX) && lambda.isScope(insertionPoint) && mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
                     J gen = substitutions.unsubstitute(templateParser.parseExpression(substitutedTemplate));
                     return autoFormat(gen.withPrefix(lambda.getPrefix()), p, getCursor().getParentOrThrow());
                 }
@@ -258,17 +258,17 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
                             // Update the J.MethodDeclaration's type information to reflect its new parameter list
                             JavaType.Method type = method.getType();
-                            if(type != null) {
+                            if (type != null) {
                                 List<String> paramNames = new ArrayList<>();
                                 List<JavaType> paramTypes = new ArrayList<>();
-                                for(Statement parameter : parameters) {
-                                    if(!(parameter instanceof J.VariableDeclarations)) {
+                                for (Statement parameter : parameters) {
+                                    if (!(parameter instanceof J.VariableDeclarations)) {
                                         throw new IllegalArgumentException(
                                                 "Only variable declarations may be part of a method declaration's parameter " +
                                                         "list:" + parameter.print());
                                     }
                                     J.VariableDeclarations decl = (J.VariableDeclarations) parameter;
-                                    if(decl.getVariables().size() != 1) {
+                                    if (decl.getVariables().size() != 1) {
                                         throw new IllegalArgumentException(
                                                 "Multi-variable declarations may not be used in a method declaration's " +
                                                         "parameter list: " + parameter.print());
@@ -276,18 +276,18 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                     J.VariableDeclarations.NamedVariable namedVariable = decl.getVariables().get(0);
                                     paramNames.add(namedVariable.getSimpleName());
                                     // Make a best-effort attempt to update the type information
-                                    if(namedVariable.getType() == null && decl.getTypeExpression() instanceof J.Identifier) {
+                                    if (namedVariable.getType() == null && decl.getTypeExpression() instanceof J.Identifier) {
                                         // null if the type of the argument is a generic type parameter
                                         // Try to find an appropriate type from the method itself
                                         J.Identifier declTypeIdent = (J.Identifier) decl.getTypeExpression();
                                         String typeParameterName = declTypeIdent.getSimpleName();
                                         List<J.TypeParameter> typeParameters = (method.getTypeParameters() == null) ? emptyList() : method.getTypeParameters();
-                                        for(J.TypeParameter typeParameter : typeParameters) {
+                                        for (J.TypeParameter typeParameter : typeParameters) {
                                             J.Identifier typeParamIdent = (J.Identifier) typeParameter.getName();
-                                            if(typeParamIdent.getSimpleName().equals(typeParameterName)) {
+                                            if (typeParamIdent.getSimpleName().equals(typeParameterName)) {
                                                 List<TypeTree> bounds = typeParameter.getBounds();
                                                 JavaType.FullyQualified bound;
-                                                if(bounds == null || bounds.isEmpty()) {
+                                                if (bounds == null || bounds.isEmpty()) {
                                                     bound = JavaType.Class.OBJECT;
                                                 } else {
                                                     bound = (JavaType.FullyQualified) bounds.get(0);
@@ -317,10 +317,10 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
                             // Update method type information to reflect the new checked exceptions
                             JavaType.Method type = m.getType();
-                            if(type != null) {
+                            if (type != null) {
                                 List<JavaType.FullyQualified> newThrows = new ArrayList<>();
                                 List<NameTree> throwz = (m.getThrows() == null) ? emptyList() : m.getThrows();
-                                for(NameTree t : throwz) {
+                                for (NameTree t : throwz) {
                                     J.Identifier exceptionIdent = (J.Identifier) t;
                                     newThrows.add((JavaType.FullyQualified) exceptionIdent.getType());
                                 }
@@ -353,21 +353,21 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                     // Make a best-effort attempt to recover by patching together a new Method type from the old one
                     // There are many ways this type could be not quite right, but leaving the type alone is likely to cause MethodMatcher false-positives
                     JavaType.Method mt = method.getType();
-                    if(m.getType() == null && mt != null && mt.getGenericSignature() != null) {
+                    if (m.getType() == null && mt != null && mt.getGenericSignature() != null) {
                         List<JavaType> argTypes = m.getArguments().stream()
                                 .map(Expression::getType)
                                 .map(it -> {
                                     // If an argument to the method invocation is itself an invocation, use its return type
-                                    if(it instanceof JavaType.Method) {
+                                    if (it instanceof JavaType.Method) {
                                         JavaType.Method argType = (JavaType.Method) it;
-                                        if(argType.getGenericSignature() != null) {
+                                        if (argType.getGenericSignature() != null) {
                                             return argType.getGenericSignature().getReturnType();
                                         } else {
                                             return argType.getResolvedSignature().getReturnType();
                                         }
                                     }
                                     // Invoking a method with a string literal still means the invocation has the class type
-                                    if(it == JavaType.Primitive.String) {
+                                    if (it == JavaType.Primitive.String) {
                                         return JavaType.Class.build("java.lang.String");
                                     }
                                     return it;
@@ -380,7 +380,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                     m = autoFormat(m.withPrefix(method.getPrefix()), 0, getCursor().getParentOrThrow());
                     return m;
                 }
-                if(loc.equals(STATEMENT_PREFIX) && method.isScope(insertionPoint) && mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
+                if (loc.equals(STATEMENT_PREFIX) && method.isScope(insertionPoint) && mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
                     J gen = substitutions.unsubstitute(templateParser.parseExpression(substitutedTemplate));
                     return autoFormat(gen.withPrefix(method.getPrefix()), integer, getCursor().getParentOrThrow());
                 }
@@ -418,7 +418,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                     if (loc == ANNOTATIONS) {
                         J.VariableDeclarations v = multiVariable;
                         final List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
-                        if(mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
+                        if (mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
                             v = v.withLeadingAnnotations(gen);
                             if (v.getTypeExpression() instanceof J.AnnotatedType) {
                                 v = v.withTypeExpression(((J.AnnotatedType) v.getTypeExpression()).getTypeExpression());

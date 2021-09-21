@@ -16,8 +16,8 @@
 package org.openrewrite.java.format
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.style.GeneralFormatStyle
@@ -75,7 +75,21 @@ interface NormalizeLineBreaksTest: JavaRecipeTest {
         after = windows
     )
 
-    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/980")
+    @Test
+    fun doNotChangeWindowsJavadoc(jp: JavaParser) = assertUnchanged(
+        recipe = toRecipe { NormalizeLineBreaksVisitor(GeneralFormatStyle(true)) },
+        before = windowsJavadoc
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/980")
+    @Test
+    fun doNotChangeLinuxJavadoc(jp: JavaParser) = assertUnchanged(
+        recipe = toRecipe { NormalizeLineBreaksVisitor(GeneralFormatStyle(false)) },
+        before = linuxJavadoc
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/980")
     @Test
     fun windowsToLinuxJavadoc(jp: JavaParser) = assertChanged(
         recipe = toRecipe { NormalizeLineBreaksVisitor(GeneralFormatStyle(false)) },
@@ -83,7 +97,7 @@ interface NormalizeLineBreaksTest: JavaRecipeTest {
         after = linuxJavadoc
     )
 
-    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/980")
     @Test
     fun linuxToWindowsJavadoc(jp: JavaParser) = assertChanged(
         recipe = toRecipe { NormalizeLineBreaksVisitor(GeneralFormatStyle(true)) },

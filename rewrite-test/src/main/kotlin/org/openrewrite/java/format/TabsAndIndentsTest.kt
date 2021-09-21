@@ -1717,6 +1717,53 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/980")
+    @Test
+    fun alignJavaDocsWithCRLF(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(tabsAndIndents()).build(),
+        before =
+            "        /**\r\n" +
+            "         * Align JavaDoc left that starts on 2nd line.\r\n" +
+            "         */\r\n" +
+            "public class A {\r\n" +
+            "/** Align JavaDoc right that starts on 1st line.\r\n" +
+            "  * @param value test value.\r\n" +
+            "  * @return value + 1 */\r\n" +
+            "        public int methodOne(int value) {\r\n" +
+            "            return value + 1;\r\n" +
+            "        }\r\n" +
+            "\r\n" +
+            "                /** Edge case formatting test.\r\n" +
+            "   @param value test value.\r\n" +
+            "                 @return value + 1\r\n" +
+            "                 */\r\n"+
+            "        public int methodTwo(int value) {\r\n" +
+            "            return value + 1;\r\n" +
+            "        }\r\n" +
+            "}"
+        ,
+        after =
+            "/**\r\n" +
+            " * Align JavaDoc left that starts on 2nd line.\r\n" +
+            " */\r\n" +
+            "public class A {\r\n" +
+            "    /** Align JavaDoc right that starts on 1st line.\r\n" +
+            "      * @param value test value.\r\n" +
+            "      * @return value + 1 */\r\n" +
+            "    public int methodOne(int value) {\r\n" +
+            "        return value + 1;\r\n" +
+            "    }\r\n" +
+            "\r\n" +
+            "    /** Edge case formatting test.\r\n" +
+            "@param value test value.\r\n" +
+            "     @return value + 1\r\n" +
+            "     */\r\n"+
+            "    public int methodTwo(int value) {\r\n" +
+            "        return value + 1;\r\n" +
+            "    }\r\n" +
+            "}"
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/pull/659")
     @Test
     fun alignJavaDocs(jp: JavaParser.Builder<*, *>) = assertChanged(

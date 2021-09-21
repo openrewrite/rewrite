@@ -109,17 +109,26 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
                 }
             }
 
+            if (c == '\r') {
+                continue;
+            }
+
             if (c == '\n') {
                 if (inFirstPrefix) {
                     firstPrefix = firstPrefixBuilder.toString();
                     inFirstPrefix = false;
                 } else {
                     if (i > 0 && sourceArr[i - 1] == '\n') {
-                        lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), "", Markers.EMPTY));
+                        String prevNewLine = i > 1 && sourceArr[i - 2] == '\r' ? "\r\n" : "\n";
+                        lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), prevNewLine, Markers.EMPTY));
+                    }
+                    if (sourceArr[i - 1] == '\r') {
+                        javadocContent.append('\r');
                     }
                     javadocContent.append(c);
                 }
-                marginBuilder = new StringBuilder();
+                String newLine = sourceArr[i - 1] == '\r' ? "\r\n" : "\n";
+                marginBuilder = new StringBuilder(newLine);
             } else if (marginBuilder != null) {
                 if (!Character.isWhitespace(c)) {
                     if (c == '*') {
@@ -131,9 +140,11 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
                                 marginBuilder.toString(), Markers.EMPTY));
                         javadocContent.append(c);
                     } else {
+                        String newLine = sourceArr[i - 1] == '\r' ? "\r\n" : "\n";
                         lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(),
-                                "", Markers.EMPTY));
-                        javadocContent.append(marginBuilder).append(c);
+                                newLine, Markers.EMPTY));
+                        String margin = marginBuilder.toString();
+                        javadocContent.append(margin.substring(margin.indexOf("\n") + 1)).append(c);
                     }
                     marginBuilder = null;
                 } else {
@@ -151,10 +162,10 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
         source = javadocContent.toString();
 
         if (marginBuilder != null && marginBuilder.length() > 0) {
-            if (javadocContent.length() > 0 && javadocContent.charAt(0) != '\n') {
+            if (javadocContent.length() > 0 && javadocContent.charAt(0) != '\n' && javadocContent.charAt(0) != '\r') {
                 lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(),
                         marginBuilder.toString(), Markers.EMPTY));
-                source = source.substring(0, source.length() - 1); // strip trailing newline
+                source = source.substring(0, source.length() - (marginBuilder.toString().startsWith("\n") ? 1 : 2)); // strip trailing newline
             } else {
                 lineBreaks.put(source.length(), new Javadoc.LineBreak(randomId(),
                         marginBuilder.toString(), Markers.EMPTY));
@@ -243,7 +254,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
         Javadoc.LineBreak leadingLineBreak = lineBreaks.remove(0);
         if (leadingLineBreak != null) {
             if (!firstPrefix.isEmpty()) {
-                body.add(new Javadoc.Text(randomId(), Markers.EMPTY, firstPrefix.substring(0, firstPrefix.length() - 1)));
+                body.add(new Javadoc.Text(randomId(), Markers.EMPTY, firstPrefix.substring(0, firstPrefix.length() - (firstPrefix.endsWith("\r\n") ? 2 : 1))));
                 firstPrefix = "";
             }
             body.add(leadingLineBreak);
@@ -279,6 +290,11 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
                 StringBuilder whitespaceBeforeNewLine = new StringBuilder();
                 for (int j = cursor; j < source.length(); j++) {
                     char ch = source.charAt(j);
+                    if (ch == '\r') {
+                        cursor += 1;
+                        continue;
+                    }
+
                     if (ch == '\n') {
                         if (whitespaceBeforeNewLine.length() > 0) {
                             body.add(new Javadoc.Text(randomId(), Markers.EMPTY, whitespaceBeforeNewLine.toString()));

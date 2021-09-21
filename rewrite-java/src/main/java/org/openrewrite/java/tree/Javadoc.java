@@ -292,7 +292,6 @@ public interface Javadoc extends Serializable, Tree {
      */
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
     class LineBreak implements Javadoc {
         @EqualsAndHashCode.Include
         UUID id;
@@ -303,6 +302,20 @@ public interface Javadoc extends Serializable, Tree {
         @Override
         public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
             return v.visitLineBreak(this, p);
+        }
+
+        public LineBreak withMargin(String margin) {
+            if (margin.equals(this.margin)) {
+                return this;
+            }
+            return new LineBreak(this.id, margin, this.markers);
+        }
+
+        public LineBreak withMarkers(Markers markers) {
+            if (markers == this.markers) {
+                return this;
+            }
+            return new LineBreak(id, margin, markers);
         }
     }
 
