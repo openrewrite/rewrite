@@ -284,6 +284,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
             this.prefix = prefix;
         }
 
+        @Override
         public void push(Yaml.Block block) {
             if (key == null && block instanceof Yaml.Scalar) {
                 key = (Yaml.Scalar) block;
@@ -309,6 +310,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
             }
         }
 
+        @Override
         public MappingWithPrefix build() {
             return new MappingWithPrefix(prefix, entries);
         }
@@ -346,6 +348,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
             entries.add(new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, block.withPrefix(blockPrefix), hasDash, commaPrefix));
         }
 
+        @Override
         public SequenceWithPrefix build() {
             return new SequenceWithPrefix(prefix, startBracketPrefix, entries, null);
         }
