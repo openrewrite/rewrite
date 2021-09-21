@@ -478,6 +478,10 @@ class Java8UsesJavaVersionTest : Java8Test, UsesJavaVersionTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8UseJavaStyleArrayDeclarationsTck : Java8Test, UseJavaStyleArrayDeclarationsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8UsesMethodTest : Java8Test, UsesMethodTest
 
 @DebugOnly
