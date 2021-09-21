@@ -474,6 +474,10 @@ class Java11UseDiamondOperatorTest : Java11Test, UseDiamondOperatorTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11UseJavaStyleArrayDeclarations : Java11Test, UseJavaStyleArrayDeclarationsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11UseStaticImportTest : Java11Test, UseStaticImportTest
 
 @DebugOnly
