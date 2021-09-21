@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Issue
@@ -216,6 +217,32 @@ class MergeYamlTest : YamlRecipeTest {
                 - name: <container name>
                   imagePullPolicy: Always
         """
+    )
+
+    @Test
+    @Disabled
+    fun insertInSequenceEntriesMatchingPredicate() = assertChanged(
+        recipe = MergeYaml(
+            "$.spec.containers[?(@.name == 'pod-0')]",
+            "imagePullPolicy: Always",
+            true,
+            null
+        ),
+        before = """
+        kind: Pod
+        spec:
+          containers:
+            - name: pod-0
+            - name: pod-1
+    """,
+        after = """
+        kind: Pod
+        spec:
+          containers:
+            - name: pod-0
+              imagePullPolicy: Always
+            - name: pod-1
+    """
     )
 
     @Test
