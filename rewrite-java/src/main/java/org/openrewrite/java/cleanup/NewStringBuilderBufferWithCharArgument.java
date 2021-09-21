@@ -17,8 +17,11 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -29,7 +32,7 @@ import java.util.Set;
 public class NewStringBuilderBufferWithCharArgument extends Recipe {
     @Override
     public String getDisplayName() {
-        return "StringBuilder and StringBuffer character constructor arg to String";
+        return "Change StringBuilder and StringBuffer character constructor args to Strings";
     }
 
     @Override
@@ -40,6 +43,18 @@ public class NewStringBuilderBufferWithCharArgument extends Recipe {
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-1317");
+    }
+
+    @Override
+    protected JavaIsoVisitor<ExecutionContext> getSingleSourceApplicableTest() {
+        return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+                doAfterVisit(new UsesType<>("java.lang.StringBuilder"));
+                doAfterVisit(new UsesType<>("java.lang.StringBuffer"));
+                return cu;
+            }
+        };
     }
 
     @Override
