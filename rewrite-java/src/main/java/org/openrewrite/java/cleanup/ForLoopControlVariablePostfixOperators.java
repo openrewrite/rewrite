@@ -22,23 +22,16 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 
-import java.time.Duration;
-
 public class ForLoopControlVariablePostfixOperators extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Use postfix operators on for-loop control variables";
+        return "`for` loop counters should use postfix operators";
     }
 
     @Override
     public String getDescription() {
-        return "Replace for-loop control variables using pre-increment (`++i`) or pre-decrement (`--i`) operators " +
+        return "Replace `for` loop control variables using pre-increment (`++i`) or pre-decrement (`--i`) operators " +
                 "with their post-increment (`i++`) or post-decrement (`i++`) notation equivalents.";
-    }
-
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(1);
     }
 
     @Override
