@@ -35,7 +35,7 @@ public class ForLoopIncrementInUpdate extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "`for` loop counters incremented in update.";
+        return "`for` loop counters incremented in update";
     }
 
     @Override
