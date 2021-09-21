@@ -732,6 +732,7 @@ public class ImportLayoutStyle implements JavaStyle {
                 this.packageImports = packageImports;
             }
 
+            @Override
             public boolean isStatic() {
                 return statik;
             }
