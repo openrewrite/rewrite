@@ -219,6 +219,63 @@ class MergeYamlTest : YamlRecipeTest {
     )
 
     @Test
+    fun insertBlockInSequenceEntriesWithExistingBlock() = assertChanged(
+        recipe = MergeYaml(
+            "$.spec.containers",
+            """
+              securityContext:
+                privileged: false
+            """.trimIndent(),
+            true,
+            null
+        ),
+        before = """
+            kind: Pod
+            spec:
+              containers:
+                - name: pod-0
+                  securityContext:
+                    foo: bar
+        """,
+        after = """
+            kind: Pod
+            spec:
+              containers:
+                - name: pod-0
+                  securityContext:
+                    foo: bar
+                    privileged: false
+        """
+    )
+
+    @Test
+    fun insertNestedBlockInSequenceEntries() = assertChanged(
+        recipe = MergeYaml(
+            "$.spec.containers",
+            """
+              securityContext:
+                privileged: false
+            """.trimIndent(),
+            true,
+            null
+        ),
+        before = """
+            kind: Pod
+            spec:
+              containers:
+                - name: pod-0
+        """,
+        after = """
+            kind: Pod
+            spec:
+              containers:
+                - name: pod-0
+                  securityContext:
+                    privileged: false
+        """
+    )
+
+    @Test
     fun changeOnlyMatchingFile(@TempDir tempDir: Path) {
         val matchingFile = tempDir.resolve("a.yml").toFile().apply {
             writeText("apiVersion: policy/v1beta1")
