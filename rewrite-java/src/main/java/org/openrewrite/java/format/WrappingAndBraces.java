@@ -23,6 +23,11 @@ import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.J;
 
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.Set;
+
 public class WrappingAndBraces extends Recipe {
     @Override
     public String getDisplayName() {
@@ -32,6 +37,16 @@ public class WrappingAndBraces extends Recipe {
     @Override
     public String getDescription() {
         return "Format line wraps and braces in Java code.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return new LinkedHashSet<>(Arrays.asList("RSPEC-2681", "RSPEC-3626", "RSPEC-3973"));
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(10);
     }
 
     @Override
