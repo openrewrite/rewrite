@@ -323,6 +323,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class SimplifyMethodChainTck : SimplifyMethodChainTest
 
     @Nested
+    inner class StringBuilderBUfferNotInstantiatedWithCharTck : NewStringBuilderBufferWithCharArgumentTest
+
+    @Nested
     inner class RenameLocalVariablesToCamelCaseTck : RenameLocalVariablesToCamelCaseTest
 
     @Nested
