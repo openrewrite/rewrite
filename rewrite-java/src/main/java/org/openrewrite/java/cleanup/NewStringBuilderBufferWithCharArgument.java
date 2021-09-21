@@ -17,27 +17,31 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.Set;
 
 public class NewStringBuilderBufferWithCharArgument extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Change StringBuilder and StringBuffer character constructor args to Strings";
+        return "Change StringBuilder and StringBuffer character constructor arg to String";
     }
 
     @Override
     public String getDescription() {
         return "Instantiating a `StringBuilder` or a `StringBuffer` with a `Character` results in the `int` representation of the character being used for the initial size.";
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(5);
     }
 
     @Override

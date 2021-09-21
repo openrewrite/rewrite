@@ -25,6 +25,7 @@ import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.Marker;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.Set;
 
@@ -39,6 +40,11 @@ public class UnnecessaryCloseInTryWithResources extends Recipe {
     @Override
     public String getDescription() {
         return "Remove unnecessary `AutoCloseable#close()` statements in try-with-resources.";
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(2);
     }
 
     @Override

@@ -24,6 +24,7 @@ import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -45,6 +46,11 @@ public class UnnecessaryPrimitiveAnnotations extends Recipe {
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-4682");
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(1);
     }
 
     @Override
@@ -87,7 +93,7 @@ public class UnnecessaryPrimitiveAnnotations extends Recipe {
             @Override
             public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
                 J.VariableDeclarations varDecls = super.visitVariableDeclarations(multiVariable, executionContext);
-                if (varDecls.getType() instanceof JavaType.Primitive) {
+                if (varDecls.getType() instanceof JavaType.Primitive && varDecls.getVariables().stream().noneMatch(nv -> nv.getType() instanceof JavaType.Array)) {
                     varDecls = varDecls.withLeadingAnnotations(filterAnnotations(varDecls.getLeadingAnnotations()));
                 }
                 return varDecls;

@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeUtils;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -39,6 +40,11 @@ public class ExternalizableHasNoArgsConstructor extends Recipe {
     @Override
     public String getDescription() {
         return "`Externalizable` classes handle both serialization and deserialization and must have a no-args constructor for the deserialization process.";
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(20);
     }
 
     @Override

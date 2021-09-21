@@ -35,6 +35,9 @@ interface UnnecessaryPrimitiveAnnotationsTest : JavaRecipeTest {
             import javax.annotation.CheckForNull;
             import javax.annotation.Nullable;
             class A {
+                @Nullable
+                private long[] partitionLengths;
+                
                 @CheckForNull
                 public Object getCount(@Nullable Object val) {
                     return val;
