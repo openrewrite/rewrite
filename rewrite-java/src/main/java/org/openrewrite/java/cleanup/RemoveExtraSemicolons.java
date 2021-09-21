@@ -23,7 +23,7 @@ import org.openrewrite.java.tree.J;
 
 import java.time.Duration;
 import java.util.Arrays;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 public class RemoveExtraSemicolons extends Recipe {
@@ -40,7 +40,7 @@ public class RemoveExtraSemicolons extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return new HashSet<>(Arrays.asList("RSPEC-2959", "RSPEC-1116"));
+        return new LinkedHashSet<>(Arrays.asList("RSPEC-1116", "RSPEC-2959"));
     }
 
     @Override
