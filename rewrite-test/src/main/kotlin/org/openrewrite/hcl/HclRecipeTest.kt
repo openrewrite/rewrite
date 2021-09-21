@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package org.openrewrite.hcl
 
+import org.intellij.lang.annotations.Language
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.hcl.tree.Hcl
@@ -30,7 +31,7 @@ interface HclRecipeTest : RecipeTest<Hcl.ConfigFile> {
         recipe: Recipe = this.recipe!!,
         moderneAstLink: String,
         moderneApiBearerToken: String = apiTokenFromUserHome(),
-        after: String,
+        @Language("HCL") after: String,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Hcl.ConfigFile) -> Unit = { }
@@ -41,9 +42,9 @@ interface HclRecipeTest : RecipeTest<Hcl.ConfigFile> {
     fun assertChanged(
         parser: HclParser = this.parser,
         recipe: Recipe = this.recipe!!,
-        before: String,
-        dependsOn: Array<String> = emptyArray(),
-        after: String,
+        @Language("HCL") before: String,
+        @Language("HCL") dependsOn: Array<String> = emptyArray(),
+        @Language("HCL") after: String,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Hcl.ConfigFile) -> Unit = { }
@@ -54,10 +55,10 @@ interface HclRecipeTest : RecipeTest<Hcl.ConfigFile> {
     fun assertChanged(
         parser: HclParser = this.parser,
         recipe: Recipe = this.recipe!!,
-        before: File,
+        @Language("HCL") before: File,
         relativeTo: Path? = null,
-        dependsOn: Array<File> = emptyArray(),
-        after: String,
+        @Language("HCL") dependsOn: Array<File> = emptyArray(),
+        @Language("HCL") after: String,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Hcl.ConfigFile) -> Unit = { }
@@ -68,8 +69,8 @@ interface HclRecipeTest : RecipeTest<Hcl.ConfigFile> {
     fun assertUnchanged(
         parser: HclParser = this.parser,
         recipe: Recipe = this.recipe!!,
-        before: String,
-        dependsOn: Array<String> = emptyArray()
+        @Language("HCL") before: String,
+        @Language("HCL") dependsOn: Array<String> = emptyArray()
     ) {
         super.assertUnchangedBase(parser, recipe, before, dependsOn)
     }
@@ -77,9 +78,9 @@ interface HclRecipeTest : RecipeTest<Hcl.ConfigFile> {
     fun assertUnchanged(
         parser: HclParser = this.parser,
         recipe: Recipe = this.recipe!!,
-        before: File,
+        @Language("HCL") before: File,
         relativeTo: Path? = null,
-        dependsOn: Array<File> = emptyArray()
+        @Language("HCL") dependsOn: Array<File> = emptyArray()
     ) {
         super.assertUnchangedBase(parser, recipe, before, relativeTo, dependsOn)
     }

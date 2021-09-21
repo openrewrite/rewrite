@@ -21,8 +21,6 @@ import org.openrewrite.Tree
 import org.openrewrite.hcl.HclParser
 import org.openrewrite.hcl.HclRecipeTest
 import org.openrewrite.hcl.style.SpacesStyle
-import org.openrewrite.java.style.IntelliJ
-import org.openrewrite.java.style.TabsAndIndentsStyle
 import org.openrewrite.style.NamedStyles
 
 class SpacesTest : HclRecipeTest {
