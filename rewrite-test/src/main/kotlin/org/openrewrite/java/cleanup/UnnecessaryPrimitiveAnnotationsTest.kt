@@ -40,6 +40,11 @@ interface UnnecessaryPrimitiveAnnotationsTest : JavaRecipeTest {
                     return val;
                 }
                 
+                @Nullable
+                public byte[] getBytes() {
+                    return null;
+                }
+                
                 public void doSomething(long requestId, long stageId, String component, String host,
                                           String type, boolean skipFailure) {
                 }
