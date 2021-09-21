@@ -26,6 +26,7 @@ recipeList:
   - org.openrewrite.java.cleanup.HideUtilityClassConstructor
 #  - org.openrewrite.java.cleanup.MethodNameCasing
   - org.openrewrite.java.cleanup.ModifierOrder
+  - org.openrewrite.java.cleanup.NewStringBuilderBufferWithCharArgument
   - org.openrewrite.java.cleanup.RedundantFileCreation
   - org.openrewrite.java.cleanup.SimplifyBooleanExpression
   - org.openrewrite.java.cleanup.SimplifyBooleanReturn
@@ -34,6 +35,8 @@ recipeList:
   - org.openrewrite.java.cleanup.UnnecessaryParentheses
   - org.openrewrite.java.cleanup.UnnecessaryThrows
   - org.openrewrite.java.cleanup.UseDiamondOperator
+  - org.openrewrite.java.cleanup.UnnecessaryPrimitiveAnnotations
+  - org.openrewrite.java.cleanup.UseJavaStyleArrayDeclarations
   - org.openrewrite.java.cleanup.PrimitiveWrapperClassConstructorToValueOf
   - org.openrewrite.java.cleanup.BigDecimalRoundingConstantsToEnums
   - org.openrewrite.java.cleanup.FinalClass
