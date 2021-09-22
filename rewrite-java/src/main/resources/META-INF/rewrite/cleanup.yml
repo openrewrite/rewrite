@@ -26,6 +26,7 @@ recipeList:
   - org.openrewrite.java.cleanup.HideUtilityClassConstructor
 #  - org.openrewrite.java.cleanup.MethodNameCasing
   - org.openrewrite.java.cleanup.ModifierOrder
+  - org.openrewrite.java.cleanup.NestedEnumsAreNotStatic
   - org.openrewrite.java.cleanup.NewStringBuilderBufferWithCharArgument
   - org.openrewrite.java.cleanup.RedundantFileCreation
   - org.openrewrite.java.cleanup.SimplifyBooleanExpression
