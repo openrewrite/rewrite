@@ -310,6 +310,10 @@ class Java11NoToStringOnStringTypeTest : Java11Test, NoToStringOnStringTypeTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11NoValueOfOnStringTypeTest : Java11Test, NoValueOfOnStringTypeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11NoStaticImport : Java11Test, NoStaticImportTest
 
 @DebugOnly
