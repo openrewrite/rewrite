@@ -422,6 +422,10 @@ class Java11RenameLocalVariablesToCamelCaseTest : Java11Test, RenameLocalVariabl
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11SingleLineCommentsTest : Java11Test, SingleLineCommentsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11SpacesTest : Java11Test, SpacesTest
 
 @DebugOnly

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.cleanup;
+package org.openrewrite.java.format;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
@@ -23,15 +23,15 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TextComment;
 
-public class NoTylerComments extends Recipe {
+public class SingleLineComments extends Recipe {
     @Override
     public String getDisplayName() {
-        return "No Tyler";
+        return "Single line comments begin with a whitespace";
     }
 
     @Override
     public String getDescription() {
-        return "Why '//Hi' instead of '// hi'? Why Tyler? Why?";
+        return "Write `// hi` instead of `//hi`.";
     }
 
     @Override
@@ -43,7 +43,7 @@ public class NoTylerComments extends Recipe {
                     if (!c.isMultiline()) {
                         TextComment tc = (TextComment) c;
                         if(!tc.getText().startsWith(" ")) {
-                            tc.withText(" " + tc.getText());
+                            return tc.withText(" " + tc.getText());
                         }
                     }
                     return c;

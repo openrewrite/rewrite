@@ -414,6 +414,10 @@ class Java8SimplifyBooleanReturnTest : Java8Test, SimplifyBooleanReturnTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8SingleLineCommentsTest : Java8Test, SingleLineCommentsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8RenameLocalVariablesToCamelCaseTest : Java8Test, RenameLocalVariablesToCamelCaseTest
 
 @DebugOnly

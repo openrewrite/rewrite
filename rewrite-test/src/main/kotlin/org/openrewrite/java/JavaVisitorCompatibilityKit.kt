@@ -332,6 +332,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class SimplifyMethodChainTck : SimplifyMethodChainTest
 
     @Nested
+    inner class SingleLineCommentsTck : SingleLineCommentsTest
+
+    @Nested
     inner class NestedEnumsAreNotStaticTck : NestedEnumsAreNotStaticTest
 
     @Nested
