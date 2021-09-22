@@ -199,7 +199,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                             if (mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
                                 c = c.withImplements(implementings);
                                 //noinspection ConstantConditions
-                                c = c.getPadding().withImplements(c.getPadding().getImplements().withBefore(Space.format(" ")));
+                                c = c.getPadding().withImplements(c.getPadding().getImplements().withBefore(Space.EMPTY));
                             } else {
                                 c = c.withImplements(ListUtils.concatAll(c.getImplements(), implementings));
                             }
@@ -207,14 +207,14 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                 String fqn = c.getType().getFullyQualifiedName();
                                 c = c.withType(new JavaTypeVisitor<List<JavaType.FullyQualified>>() {
                                     @Override
-                                    public JavaType visitClass(JavaType.Class aClass, List<JavaType.FullyQualified> fullyQualifieds) {
-                                        JavaType.Class c = (JavaType.Class) super.visitClass(aClass, fullyQualifieds);
+                                    public JavaType visitClass(JavaType.Class aClass, List<JavaType.FullyQualified> fullyQualifiedTypes) {
+                                        JavaType.Class c = (JavaType.Class) super.visitClass(aClass, fullyQualifiedTypes);
                                         if (fqn.equals(c.getFullyQualifiedName())) {
-                                            c = c.withInterfaces(ListUtils.concatAll(c.getInterfaces(), fullyQualifieds));
+                                            c = c.withInterfaces(ListUtils.concatAll(c.getInterfaces(), fullyQualifiedTypes));
                                         }
                                         return c;
                                     }
-                                }.visit(c.getType(), implementsTypes));
+                                }.visitNonNull(c.getType(), implementsTypes));
                             }
 
                             //noinspection ConstantConditions

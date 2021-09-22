@@ -36,9 +36,9 @@ import java.util.function.Consumer;
 @EqualsAndHashCode(callSuper = true)
 public class FixSerializableFields extends Recipe {
 
-    private static final JavaType.ShallowClass SERIALIZABLE_FQ =  new JavaType.ShallowClass("java.io.Serializable");
-    private static final JavaType.ShallowClass COLLECTION_FQ =  new JavaType.ShallowClass("java.util.Collection");
-    private static final JavaType.ShallowClass MAP_FQ =  new JavaType.ShallowClass("java.util.Map");
+    private static final JavaType.Class SERIALIZABLE_FQ =  JavaType.Class.build("java.io.Serializable");
+    private static final JavaType.Class COLLECTION_FQ =  JavaType.Class.build("java.util.Collection");
+    private static final JavaType.Class MAP_FQ =  JavaType.Class.build("java.util.Map");
     private static final SerializedMarker SERIALIZED_MARKER = new SerializedMarker(Tree.randomId());
 
     @Option(displayName = "Mark fields as transient",

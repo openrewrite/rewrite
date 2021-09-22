@@ -45,6 +45,22 @@ public class JavaTypeVisitor<P> {
         return javaType;
     }
 
+    /**
+     * By calling this method, you are asserting that you know that the outcome will be non-null
+     * when the compiler couldn't otherwise prove this to be the case. This method is a shortcut
+     * for having to assert the non-nullability of the returned tree.
+     *
+     * @param javaType A non-null type.
+     * @param p    A state object that passes through the visitor.
+     * @return A non-null type.
+     */
+    public JavaType visitNonNull(JavaType javaType, P p) {
+        JavaType t = visit(javaType, p);
+        //noinspection ConstantConditions
+        assert t != null;
+        return t;
+    }
+
     public JavaType visit(@Nullable JavaType javaType, P p) {
         if (javaType != null) {
             cursor = new Cursor(cursor, javaType);
