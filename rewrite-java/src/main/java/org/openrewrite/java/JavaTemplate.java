@@ -214,6 +214,16 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                         }
                                         return c;
                                     }
+                                    //short circuiting navigation to methods and variables.
+                                    @Override
+                                    public JavaType visitMethod(JavaType.Method method, List<JavaType.FullyQualified> fullyQualifieds) {
+                                        return method;
+                                    }
+
+                                    @Override
+                                    public JavaType visitVariable(JavaType.Variable variable, List<JavaType.FullyQualified> fullyQualifieds) {
+                                        return variable;
+                                    }
                                 }.visitNonNull(c.getType(), implementsTypes));
                             }
 
