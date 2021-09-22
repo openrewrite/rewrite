@@ -20,17 +20,13 @@ import org.openrewrite.Recipe;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.J.VariableDeclarations;
 import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.Space;
-import org.openrewrite.marker.Marker;
 
 import java.time.Duration;
 import java.util.*;
-
-import static org.openrewrite.Tree.randomId;
 
 public class UseJavaStyleArrayDeclarations extends Recipe {
 
@@ -56,19 +52,16 @@ public class UseJavaStyleArrayDeclarations extends Recipe {
 
     @Override
     protected JavaIsoVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        //noinspection ConstantConditions
         return new JavaIsoVisitor<ExecutionContext>() {
-            private final Marker foundArrayMarker = new JavaSearchResult(randomId(), null, null);
-
             @Override
             public J.ArrayType visitArrayType(J.ArrayType arrayType, ExecutionContext executionContext) {
-                return arrayType.withMarkers(arrayType.getMarkers().addIfAbsent(foundArrayMarker));
+                return arrayType.withMarkers(arrayType.getMarkers().searchResult());
             }
 
             @Override
             public VariableDeclarations.NamedVariable visitVariable(VariableDeclarations.NamedVariable variable, ExecutionContext executionContext) {
                 if (!variable.getDimensionsAfterName().isEmpty()) {
-                    variable = variable.withMarkers(variable.getMarkers().addIfAbsent(foundArrayMarker));
+                    variable = variable.withMarkers(variable.getMarkers().searchResult());
                 }
                 return variable;
             }

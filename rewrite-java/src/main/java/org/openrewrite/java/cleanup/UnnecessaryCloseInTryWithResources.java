@@ -21,15 +21,11 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.marker.Marker;
 
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Set;
-
-import static org.openrewrite.Tree.randomId;
 
 public class UnnecessaryCloseInTryWithResources extends Recipe {
     @Override
@@ -54,12 +50,10 @@ public class UnnecessaryCloseInTryWithResources extends Recipe {
 
     @Override
     protected JavaIsoVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        //noinspection ConstantConditions
         return new JavaIsoVisitor<ExecutionContext>() {
-            private final Marker foundTryMarker = new JavaSearchResult(randomId(), null, null);
             @Override
             public J.Try.Resource visitTryResource(J.Try.Resource tryResource, ExecutionContext executionContext) {
-                return tryResource.withMarkers(tryResource.getMarkers().addIfAbsent(foundTryMarker));
+                return tryResource.withMarkers(tryResource.getMarkers().searchResult());
             }
         };
     }
