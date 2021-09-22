@@ -446,6 +446,10 @@ class Java11StringLiteralEqualityTest : Java11Test, StringLiteralEqualityTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11NestedEnumsAreNotStaticTest : Java11Test, NestedEnumsAreNotStaticTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11NewStringBuilderBufferWithCharArgumentTest : Java11Test, NewStringBuilderBufferWithCharArgumentTest
 
 @DebugOnly
