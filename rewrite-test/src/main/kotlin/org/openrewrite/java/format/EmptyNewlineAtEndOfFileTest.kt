@@ -17,13 +17,36 @@ package org.openrewrite.java.format
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
+import org.openrewrite.Tree
 import org.openrewrite.java.JavaParser
+import org.openrewrite.style.GeneralFormatStyle
+import org.openrewrite.style.NamedStyles
 
 interface EmptyNewlineAtEndOfFileTest {
 
+    fun generalFormat(useCRLF: Boolean) = listOf(
+        NamedStyles(
+            Tree.randomId(), "test", "test", "test", emptySet(), listOf(
+                GeneralFormatStyle(useCRLF))
+        )
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1045")
     @Test
-    fun noComments(jp: JavaParser) {
-        assertThat(EmptyNewlineAtEndOfFile().run(jp.parse("class Test {}"))[0].after!!.printAll()).isEqualTo(
+    fun usesCRLF(jp: JavaParser.Builder<*, *>) {
+        assertThat(EmptyNewlineAtEndOfFile().run(
+            jp.styles(generalFormat(true)).build()
+                .parse("class Test {}"))[0].after!!.printAll()).isEqualTo(
+            "class Test {}\r\n"
+        )
+    }
+
+    @Test
+    fun noComments(jp: JavaParser.Builder<*, *>) {
+        assertThat(EmptyNewlineAtEndOfFile().run(
+            jp.styles(generalFormat(false)).build()
+                .parse("class Test {}"))[0].after!!.printAll()).isEqualTo(
             """
                 class Test {}
                 
@@ -32,8 +55,10 @@ interface EmptyNewlineAtEndOfFileTest {
     }
 
     @Test
-    fun comments(jp: JavaParser) {
-        assertThat(EmptyNewlineAtEndOfFile().run(jp.parse("class Test {}\n/*comment*/"))[0].after!!.printAll()).isEqualTo(
+    fun comments(jp: JavaParser.Builder<*, *>) {
+        assertThat(EmptyNewlineAtEndOfFile().run(
+            jp.styles(generalFormat(false)).build()
+                .parse("class Test {}\n/*comment*/"))[0].after!!.printAll()).isEqualTo(
             """
                 class Test {}
                 /*comment*/
@@ -43,8 +68,10 @@ interface EmptyNewlineAtEndOfFileTest {
     }
 
     @Test
-    fun multipleLinesToOne(jp: JavaParser) {
-        assertThat(EmptyNewlineAtEndOfFile().run(jp.parse("class Test {}\n\n"))[0].after!!.printAll()).isEqualTo(
+    fun multipleLinesToOne(jp: JavaParser.Builder<*, *>) {
+        assertThat(EmptyNewlineAtEndOfFile().run(
+            jp.styles(generalFormat(false)).build()
+                .parse("class Test {}\n\n"))[0].after!!.printAll()).isEqualTo(
             """
                 class Test {}
                 

@@ -23,10 +23,12 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.style.GeneralFormatStyle;
 
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 public class EmptyNewlineAtEndOfFile extends Recipe {
@@ -55,14 +57,17 @@ public class EmptyNewlineAtEndOfFile extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                GeneralFormatStyle generalFormatStyle = Optional.ofNullable(cu.getStyle(GeneralFormatStyle.class))
+                        .orElse(GeneralFormatStyle.DEFAULT);
+
                 Space eof = cu.getEof();
                 if (eof.getLastWhitespace().chars().filter(c -> c == '\n').count() != 1) {
                     if (eof.getComments().isEmpty()) {
-                        return cu.withEof(Space.format("\n"));
+                        return cu.withEof(Space.format(generalFormatStyle.isUseCRLFNewLines() ? "\r\n" : "\n"));
                     } else {
                         List<Comment> comments = cu.getEof().getComments();
                         return cu.withEof(cu.getEof().withComments(ListUtils.map(comments,
-                                (i, comment) -> i == comments.size() - 1 ? comment.withSuffix("\n") : comment)));
+                                (i, comment) -> i == comments.size() - 1 ? comment.withSuffix(generalFormatStyle.isUseCRLFNewLines() ? "\r\n" : "\n") : comment)));
                     }
                 }
                 return cu;
