@@ -45,7 +45,7 @@ public class CaseInsensitiveComparisonsDoNotChangeCase extends Recipe {
     }
 
     @Override
-    public @Nullable Duration getEstimatedEffortPerOccurrence() {
+    public Duration getEstimatedEffortPerOccurrence() {
         return Duration.ofMinutes(5);
     }
 
