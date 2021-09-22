@@ -162,6 +162,10 @@ class Java8FinalizeLocalVariablesTest : Java8Test, FinalizeLocalVariablesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8FixSerializableFieldsTest : Java8Test, FixSerializableFieldsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8ForLoopControlVariablePostfixOperatorsTest : Java8Test, ForLoopControlVariablePostfixOperatorsTest
 
 @DebugOnly

@@ -162,6 +162,10 @@ class Java11FinalizeLocalVariablesTest : Java11Test, FinalizeLocalVariablesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11FixSerializableFieldsTest : Java11Test, FixSerializableFieldsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11ForLoopControlVariablePostfixOperatorsTest : Java11Test, ForLoopControlVariablePostfixOperatorsTest
 
 @DebugOnly
