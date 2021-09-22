@@ -306,6 +306,10 @@ class Java8NoToStringOnStringTypeTest : Java8Test, NoToStringOnStringTypeTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8NoValueOfOnStringTypeTest : Java8Test, NoValueOfOnStringTypeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8NormalizeFormatTest : Java8Test, NormalizeFormatTest
 
 @DebugOnly

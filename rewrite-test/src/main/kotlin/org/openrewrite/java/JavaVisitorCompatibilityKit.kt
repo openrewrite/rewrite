@@ -251,6 +251,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class NoToStringOnStringTck : NoToStringOnStringTypeTest
 
     @Nested
+    inner class NoValueOfOnStringTypeTck : NoValueOfOnStringTypeTest
+
+    @Nested
     inner class NoStaticImportTck : NoStaticImportTest
 
     @Nested
