@@ -106,6 +106,10 @@ public abstract class CoordinateBuilder {
         public JavaCoordinates replaceImplementsClause() {
             return replace(Space.Location.IMPLEMENTS);
         }
+
+        public JavaCoordinates addImplementsClause() {
+            return new JavaCoordinates(tree, Space.Location.IMPLEMENTS, JavaCoordinates.Mode.AFTER, null);
+        }
     }
 
     public static class Lambda {

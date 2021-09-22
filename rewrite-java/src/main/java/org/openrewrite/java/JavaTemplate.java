@@ -27,13 +27,11 @@ import org.openrewrite.java.tree.Space.Location;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.template.SourceTemplate;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
@@ -191,11 +189,37 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                         }
                         case IMPLEMENTS: {
                             List<TypeTree> implementings = substitutions.unsubstitute(templateParser.parseImplements(substitutedTemplate));
-                            J.ClassDeclaration c = classDecl.withImplements(implementings);
+                            List<JavaType.FullyQualified> implementsTypes = implementings.stream()
+                                    .map(TypedTree::getType)
+                                    .map(TypeUtils::asFullyQualified)
+                                    .filter(Objects::nonNull)
+                                    .collect(Collectors.toList());
+                            J.ClassDeclaration c = classDecl;
+
+                            if (mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
+                                c = c.withImplements(implementings);
+                                //noinspection ConstantConditions
+                                c = c.getPadding().withImplements(c.getPadding().getImplements().withBefore(Space.format(" ")));
+                            } else {
+                                c = c.withImplements(ListUtils.concatAll(c.getImplements(), implementings));
+                            }
+                            if (c.getType() != null) {
+                                String fqn = c.getType().getFullyQualifiedName();
+                                c = c.withType(new JavaTypeVisitor<List<JavaType.FullyQualified>>() {
+                                    @Override
+                                    public JavaType visitClass(JavaType.Class aClass, List<JavaType.FullyQualified> fullyQualifieds) {
+                                        JavaType.Class c = (JavaType.Class) super.visitClass(aClass, fullyQualifieds);
+                                        if (fqn.equals(c.getFullyQualifiedName())) {
+                                            c = c.withInterfaces(ListUtils.concatAll(c.getInterfaces(), fullyQualifieds));
+                                        }
+                                        return c;
+                                    }
+                                }.visit(c.getType(), implementsTypes));
+                            }
 
                             //noinspection ConstantConditions
-                            c = c.getPadding().withImplements(c.getPadding().getImplements().withBefore(Space.format(" ")));
-                            return c;
+                            return autoFormat(c, c.getImplements().get(c.getImplements().size() - 1), p,
+                                    getCursor().getParentOrThrow());
                         }
                         case TYPE_PARAMETERS: {
                             List<J.TypeParameter> typeParameters = substitutions.unsubstitute(templateParser.parseTypeParameters(substitutedTemplate));
