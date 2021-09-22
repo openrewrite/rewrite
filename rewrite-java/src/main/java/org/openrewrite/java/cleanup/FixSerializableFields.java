@@ -41,15 +41,12 @@ public class FixSerializableFields extends Recipe {
     private static final JavaType.ShallowClass MAP_FQ =  new JavaType.ShallowClass("java.util.Map");
     private static final SerializedMarker SERIALIZED_MARKER = new SerializedMarker(Tree.randomId());
 
-    /**
-     * Flag to indicate what action will be taken when a field is not serializable.
-     */
     @Option(displayName = "Mark fields as transient",
             description = "Mark any fields that are not serializable as transient")
     Boolean markAllAsTransient;
 
     @Option(displayName = "Fully-qualified exclusions",
-            description = "A list of fully-qualified type names that should always be marked as transient vs being made `Serializable`",
+            description = "A list of fully-qualified names that should always be marked as transient vs being made `Serializable`",
             example = "org.example.BeanFactory",
             required = false)
     @Nullable
