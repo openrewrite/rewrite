@@ -438,6 +438,10 @@ class Java8StringLiteralEqualityTest : Java8Test, StringLiteralEqualityTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8NestedEnumsAreNotStaticTest : Java8Test, NestedEnumsAreNotStaticTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8NewStringBuilderBufferWithCharArgumentTest : Java8Test, NewStringBuilderBufferWithCharArgumentTest
 
 @DebugOnly
