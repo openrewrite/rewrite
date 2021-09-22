@@ -47,6 +47,8 @@ recipeList:
   - org.openrewrite.java.cleanup.NoEqualityInForCondition
   - org.openrewrite.java.cleanup.NoFinalizer
   - org.openrewrite.java.cleanup.NoRedundantJumpStatements
+  - org.openrewrite.java.cleanup.NoToStringOnStringType
+  - org.openrewrite.java.cleanup.NoValueOfOnStringType
   - org.openrewrite.java.cleanup.PrimitiveWrapperClassConstructorToValueOf
   - org.openrewrite.java.cleanup.RemoveExtraSemicolons
   - org.openrewrite.java.RemoveUnusedImports

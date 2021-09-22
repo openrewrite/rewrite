@@ -28,6 +28,8 @@ recipeList:
   - org.openrewrite.java.cleanup.ModifierOrder
   - org.openrewrite.java.cleanup.NestedEnumsAreNotStatic
   - org.openrewrite.java.cleanup.NewStringBuilderBufferWithCharArgument
+  - org.openrewrite.java.cleanup.NoToStringOnStringType
+  - org.openrewrite.java.cleanup.NoValueOfOnStringType
   - org.openrewrite.java.cleanup.RedundantFileCreation
   - org.openrewrite.java.cleanup.SimplifyBooleanExpression
   - org.openrewrite.java.cleanup.SimplifyBooleanReturn
