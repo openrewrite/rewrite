@@ -66,6 +66,10 @@ class Java8BooleanChecksNotInvertedTest : Java8Test, BooleanChecksNotInvertedTes
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8CaseInsensitiveComparisonsDoNotChangeCaseTest : Java8Test, CaseInsensitiveComparisonsDoNotChangeCaseTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8CatchClauseOnlyRethrowsTest : Java8Test, CatchClauseOnlyRethrowsTest
 
 @DebugOnly
