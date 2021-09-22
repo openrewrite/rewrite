@@ -19,8 +19,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.FindSourceFiles
 import org.openrewrite.Recipe
-import org.openrewrite.text.PlainText
-import org.openrewrite.text.PlainTextParser
 import java.nio.file.Path
 
 class FindSourceFilesTest : YamlRecipeTest {

@@ -19,7 +19,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.xml.AutoFormat;
-import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 

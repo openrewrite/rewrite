@@ -20,11 +20,11 @@ import org.openrewrite.Recipe;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.style.EmptyForInitializerPadStyle;
 import org.openrewrite.java.style.EmptyForIteratorPadStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.List;
 
@@ -49,7 +49,7 @@ public class PadEmptyForLoopComponents extends Recipe {
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
                 if(cu.getStyle(EmptyForIteratorPadStyle.class) != null || cu.getStyle(EmptyForInitializerPadStyle.class) != null) {
-                    return cu.withMarkers(cu.getMarkers().add(new JavaSearchResult(randomId(), PadEmptyForLoopComponents.this, null)));
+                    return cu.withMarkers(cu.getMarkers().add(new SearchResult(randomId(), null)));
                 }
                 return cu;
             }

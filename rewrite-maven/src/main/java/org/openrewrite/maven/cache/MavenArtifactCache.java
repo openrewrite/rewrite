@@ -23,7 +23,6 @@ import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 public interface MavenArtifactCache {
     MavenArtifactCache NOOP = new MavenArtifactCache() {

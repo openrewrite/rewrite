@@ -16,7 +16,6 @@
 package org.openrewrite.marker;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.TreePrinter;
 import org.openrewrite.TreeVisitor;
 
 import java.util.Collections;
@@ -88,11 +87,6 @@ public class MarkersTest {
         @Override
         public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
             return false;
-        }
-
-        @Override
-        public <P> String print(TreePrinter<P> printer, P p) {
-            return "";
         }
     }
 

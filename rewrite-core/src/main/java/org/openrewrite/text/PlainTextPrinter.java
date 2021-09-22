@@ -15,60 +15,27 @@
  */
 package org.openrewrite.text;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.TreePrinter;
-import org.openrewrite.internal.lang.NonNull;
+import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
 
-public class PlainTextPrinter<P> extends PlainTextVisitor<P> {
-    private static final String PRINTER_ACC_KEY = "printed";
-
-    private final TreePrinter<P> treePrinter;
-
-    public PlainTextPrinter(TreePrinter<P> treePrinter) {
-        this.treePrinter = treePrinter;
-    }
-
-    public String print(PlainText text, P p) {
-        setCursor(new Cursor(null, "EPSILON"));
-        visit(text, p);
-        return getPrinter().toString();
-    }
-
+public class PlainTextPrinter<P> extends PlainTextVisitor<PrintOutputCapture<P>> {
     @Override
-    public PlainText visitText(PlainText text, P p) {
+    public PlainText visitText(PlainText text, PrintOutputCapture<P> p) {
         visitMarkers(text.getMarkers(), p);
-        getPrinter().append(text.getText());
+        p.out.append(text.getText());
         return text;
     }
 
-    @NonNull
-    protected StringBuilder getPrinter() {
-        StringBuilder acc = getCursor().getRoot().getNearestMessage(PRINTER_ACC_KEY);
-        if (acc == null) {
-            acc = new StringBuilder();
-            getCursor().getRoot().putMessage(PRINTER_ACC_KEY, acc);
-        }
-        return acc;
-    }
-
     @Override
-    public <M extends Marker> M visitMarker(Marker marker, P p) {
-        StringBuilder acc = getPrinter();
-        treePrinter.doBefore(marker, acc, p);
-        acc.append(marker.print(treePrinter, p));
-        treePrinter.doAfter(marker, acc, p);
+    public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
+        if(marker instanceof SearchResult) {
+            String description = ((SearchResult) marker).getDescription();
+            p.out.append("~~")
+                    .append(description == null ? "" : "(" + description + ")~~")
+                    .append(">");
+        }
         //noinspection unchecked
         return (M) marker;
-    }
-
-    @Override
-    public Markers visitMarkers(Markers markers, P p) {
-        StringBuilder acc = getPrinter();
-        treePrinter.doBefore(markers, acc, p);
-        Markers m = super.visitMarkers(markers, p);
-        treePrinter.doAfter(markers, acc, p);
-        return m;
     }
 }

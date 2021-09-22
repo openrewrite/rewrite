@@ -15,188 +15,120 @@
  */
 package org.openrewrite.yaml.internal;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.Tree;
-import org.openrewrite.TreePrinter;
-import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
-import java.util.List;
-
-public class YamlPrinter<P> extends YamlVisitor<P> {
-
-    private static final String PRINTER_ACC_KEY = "printed";
-
-    private final TreePrinter<P> treePrinter;
-
-    public YamlPrinter(TreePrinter<P> treePrinter) {
-        this.treePrinter = treePrinter;
-    }
-
-    @NonNull
-    protected StringBuilder getPrinter() {
-        StringBuilder acc = getCursor().getRoot().getMessage(PRINTER_ACC_KEY);
-        if (acc == null) {
-            acc = new StringBuilder();
-            getCursor().getRoot().putMessage(PRINTER_ACC_KEY, acc);
-        }
-        return acc;
-    }
-
-    public String print(Yaml yaml, P p) {
-        setCursor(new Cursor(null, "EPSILON"));
-        visit(yaml, p);
-        return getPrinter().toString();
-    }
+public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
 
     @Override
-    @Nullable
-    public Yaml visit(@Nullable Tree tree, P p) {
-
-        if (tree == null) {
-            return defaultValue(null, p);
-        }
-
-        StringBuilder printerAcc = getPrinter();
-        treePrinter.doBefore(tree, printerAcc, p);
-        tree = super.visit(tree, p);
-        if (tree != null) {
-            treePrinter.doAfter(tree, printerAcc, p);
-        }
-        return (Yaml) tree;
-    }
-
-    public void visit(@Nullable List<? extends Yaml> nodes, P p) {
-        if (nodes != null) {
-            for (Yaml node : nodes) {
-                visit(node, p);
-            }
-        }
-    }
-
-    @Override
-    public Yaml visitDocument(Yaml.Document document, P p) {
-        StringBuilder acc = getPrinter();
-        acc.append(document.getPrefix());
+    public Yaml visitDocument(Yaml.Document document, PrintOutputCapture<P> p) {
+        p.out.append(document.getPrefix());
         visitMarkers(document.getMarkers(), p);
         if (document.isExplicit()) {
-            acc.append("---");
+            p.out.append("---");
         }
         visit(document.getBlock(), p);
-        acc.append(document.getEnd().getPrefix());
+        p.out.append(document.getEnd().getPrefix());
         if(document.getEnd().isExplicit()) {
-            acc.append("...");
+            p.out.append("...");
         }
         return document;
     }
 
     @Override
-    public Yaml visitDocuments(Yaml.Documents documents, P p) {
-        getPrinter().append(documents.getPrefix());
+    public Yaml visitDocuments(Yaml.Documents documents, PrintOutputCapture<P> p) {
         visitMarkers(documents.getMarkers(), p);
         visit(documents.getDocuments(), p);
         return documents;
     }
 
     @Override
-    public Yaml visitSequenceEntry(Yaml.Sequence.Entry entry, P p) {
-        StringBuilder acc = getPrinter();
-        acc.append(entry.getPrefix());
+    public Yaml visitSequenceEntry(Yaml.Sequence.Entry entry, PrintOutputCapture<P> p) {
+        p.out.append(entry.getPrefix());
         if(entry.isDash()) {
-            acc.append('-');
+            p.out.append('-');
         }
         visit(entry.getBlock(), p);
         if(entry.getTrailingCommaPrefix() != null) {
-            acc.append(entry.getTrailingCommaPrefix()).append(',');
+            p.out.append(entry.getTrailingCommaPrefix()).append(',');
         }
         return entry;
     }
 
     @Override
-    public Yaml visitSequence(Yaml.Sequence sequence, P p) {
-        getPrinter().append(sequence.getPrefix());
+    public Yaml visitSequence(Yaml.Sequence sequence, PrintOutputCapture<P> p) {
         visitMarkers(sequence.getMarkers(), p);
         if(sequence.getOpeningBracketPrefix() != null) {
-            getPrinter().append(sequence.getOpeningBracketPrefix()).append('[');
+            p.out.append(sequence.getOpeningBracketPrefix()).append('[');
         }
         Yaml result = super.visitSequence(sequence, p);
         if(sequence.getClosingBracketPrefix() != null) {
-            getPrinter().append(sequence.getClosingBracketPrefix()).append(']');
+            p.out.append(sequence.getClosingBracketPrefix()).append(']');
         }
 
         return result;
     }
 
     @Override
-    public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, P p) {
-        StringBuilder acc = getPrinter();
-        acc.append(entry.getPrefix());
+    public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, PrintOutputCapture<P> p) {
+        p.out.append(entry.getPrefix());
         visitMarkers(entry.getMarkers(), p);
         visit(entry.getKey(), p);
-        acc.append(entry.getBeforeMappingValueIndicator()).append(':');
+        p.out.append(entry.getBeforeMappingValueIndicator()).append(':');
         visit(entry.getValue(), p);
         return entry;
     }
 
     @Override
-    public Yaml visitMapping(Yaml.Mapping mapping, P p) {
+    public Yaml visitMapping(Yaml.Mapping mapping, PrintOutputCapture<P> p) {
         visitMarkers(mapping.getMarkers(), p);
         return super.visitMapping(mapping, p);
     }
 
     @Override
-    public <M extends Marker> M visitMarker(Marker marker, P p) {
-        StringBuilder acc = getPrinter();
-        treePrinter.doBefore(marker, acc, p);
-        acc.append(marker.print(treePrinter, p));
-        treePrinter.doAfter(marker, acc, p);
-        //noinspection unchecked
-        return (M) marker;
-    }
-
-    @Override
-    public Markers visitMarkers(Markers markers, P p) {
-        StringBuilder acc = getPrinter();
-        treePrinter.doBefore(markers, acc, p);
-        Markers m = super.visitMarkers(markers, p);
-        treePrinter.doAfter(markers, acc, p);
-        return m;
-    }
-
-    @Override
-    public Yaml visitScalar(Yaml.Scalar scalar, P p) {
-        StringBuilder acc = getPrinter();
-        acc.append(scalar.getPrefix());
+    public Yaml visitScalar(Yaml.Scalar scalar, PrintOutputCapture<P> p) {
+        p.out.append(scalar.getPrefix());
         visitMarkers(scalar.getMarkers(), p);
         switch (scalar.getStyle()) {
             case DOUBLE_QUOTED:
-                acc.append('"')
+                p.out.append('"')
                         .append(scalar.getValue().replaceAll("\\n", "\\\\n"))
                         .append('"');
                 break;
             case SINGLE_QUOTED:
-                acc.append('\'')
+                p.out.append('\'')
                         .append(scalar.getValue().replaceAll("\\n", "\\\\n"))
                         .append('\'');
                 break;
             case LITERAL:
-                acc.append('|')
+                p.out.append('|')
                         .append(scalar.getValue());
                 break;
             case FOLDED:
-                acc.append('>')
+                p.out.append('>')
                         .append(scalar.getValue());
                 break;
             case PLAIN:
             default:
-                acc.append(scalar.getValue());
+                p.out.append(scalar.getValue());
                 break;
 
         }
         return scalar;
+    }
+
+    @Override
+    public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
+        if(marker instanceof SearchResult) {
+            String description = ((SearchResult) marker).getDescription();
+            p.out.append("~~")
+                    .append(description == null ? "" : "(" + description + ")~~")
+                    .append(">");
+        }
+        //noinspection unchecked
+        return (M) marker;
     }
 }

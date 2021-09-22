@@ -38,7 +38,7 @@ public interface HclTreeTest {
         TreeSerializer<Hcl.ConfigFile> treeSerializer = new TreeSerializer<>();
         Hcl.ConfigFile roundTripCf = treeSerializer.read(treeSerializer.write(cf));
 
-        assertThat(roundTripCf.print())
+        assertThat(roundTripCf.printAll())
                 .as("Source code is printed the same after parsing")
                 .isEqualTo(StringUtils.trimIndent(code));
     }

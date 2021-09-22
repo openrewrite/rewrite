@@ -24,16 +24,12 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
-import org.openrewrite.marker.Marker;
 
 import java.util.Iterator;
 import java.util.List;
-
-import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -65,10 +61,7 @@ public class FindDeprecatedMethods extends Recipe {
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
         MethodMatcher methodMatcher = methodPattern == null ? null : new MethodMatcher(methodPattern);
 
-        //noinspection ConstantConditions
         return new JavaIsoVisitor<ExecutionContext>() {
-            private final Marker USES_DEPRECATED = new JavaSearchResult(randomId(), null, null);
-
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
                 for (JavaType javaType : cu.getTypesInUse()) {
@@ -76,7 +69,7 @@ public class FindDeprecatedMethods extends Recipe {
                     if (method != null && (methodMatcher == null || methodMatcher.matches(method))) {
                         for (JavaType.FullyQualified annotation : method.getAnnotations()) {
                             if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
-                                return cu.withMarkers(cu.getMarkers().addIfAbsent(USES_DEPRECATED));
+                                return cu.withMarkers(cu.getMarkers().searchResult());
                             }
                         }
                     }
@@ -110,7 +103,7 @@ public class FindDeprecatedMethods extends Recipe {
                                 }
                             }
 
-                            m = m.withMarkers(m.getMarkers().addIfAbsent(new JavaSearchResult(FindDeprecatedMethods.this)));
+                            m = m.withMarkers(m.getMarkers().searchResult());
                         }
                     }
                 }

@@ -18,22 +18,15 @@ package org.openrewrite.java.search;
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
-import org.openrewrite.marker.Marker;
 
 import java.util.Set;
-
-import static org.openrewrite.Tree.randomId;
 
 @RequiredArgsConstructor
 @Incubating(since = "7.7.0")
 public class UsesField<P> extends JavaIsoVisitor<P> {
-    @SuppressWarnings("ConstantConditions")
-    private static final Marker FOUND_TYPE = new JavaSearchResult(randomId(), null, null);
-
     private final String owner;
     private final String field;
 
@@ -44,7 +37,7 @@ public class UsesField<P> extends JavaIsoVisitor<P> {
             if (type instanceof JavaType.Variable) {
                 JavaType.Variable variable = (JavaType.Variable) type;
                 if (variable.getName().equals(field) && TypeUtils.isOfClassType(variable.getOwner(), owner)) {
-                    return cu.withMarkers(cu.getMarkers().addIfAbsent(FOUND_TYPE));
+                    return cu.withMarkers(cu.getMarkers().searchResult());
                 }
             }
         }

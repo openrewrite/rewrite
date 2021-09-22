@@ -34,9 +34,6 @@ interface RecipeTest <T: SourceFile> {
     val recipe: Recipe?
         get() = null
 
-    val treePrinter: TreePrinter<*>?
-        get() = null
-
     val parser: Parser<T>?
         get() = null
 
@@ -127,7 +124,7 @@ interface RecipeTest <T: SourceFile> {
 
         assertThat(result).`as`("The recipe must make changes").isNotNull
         assertThat(result!!.after).isNotNull
-        val actual = result.after!!.print(treePrinter ?: TreePrinter.identity<Any>(), null)
+        val actual = result.after!!.printAll( )
         val expected = after.trimIndentPreserveCRLF()
         assertThat(actual).isEqualTo(expected)
         afterConditions(result.after as T)
@@ -182,12 +179,12 @@ interface RecipeTest <T: SourceFile> {
 
         results.filter { result -> result.before == source }
             .forEach { result ->
-                if (result.diff(treePrinter ?: TreePrinter.identity<Any>()).isEmpty()) {
+                if (result.diff().isEmpty()) {
                     fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.")
                 }
-                assertThat(result.after?.print(treePrinter ?: TreePrinter.identity<Any>(), null))
+                assertThat(result.after?.printAll())
                     .`as`("The recipe must not make changes")
-                    .isEqualTo(result.before?.print(treePrinter ?: TreePrinter.identity<Any>(), null))
+                    .isEqualTo(result.before?.printAll())
             }
     }
 
@@ -243,7 +240,7 @@ interface RecipeTest <T: SourceFile> {
 
                 assertThat(result).`as`("The recipe must make changes").isNotNull
                 assertThat(result!!.after).isNotNull
-                assertThat(result.after!!.print(treePrinter ?: TreePrinter.identity<Any>(), null))
+                assertThat(result.after!!.printAll())
                     .isEqualTo(after.trimIndentPreserveCRLF())
                 afterConditions(result.after as T)
 
@@ -285,9 +282,9 @@ interface RecipeTest <T: SourceFile> {
                 }
 
                 for (result in results) {
-                    assertThat(result.after?.print())
+                    assertThat(result.after?.printAll())
                         .`as`("The recipe must not make changes")
-                        .isEqualTo(result.before?.print())
+                        .isEqualTo(result.before?.printAll())
                 }
             }
         } catch (e: IOException) {
@@ -328,12 +325,12 @@ interface RecipeTest <T: SourceFile> {
                     before.isNotEmpty() && afterList.isNotEmpty()
                 ) {
                     for (i in before.indices) {
-                        assertThat(afterList[i]!!.printTrimmed())
+                        assertThat(afterList[i]!!.printAllTrimmed())
                             .`as`(
                                 "Expected recipe to complete in $expectedCyclesThatMakeChanges cycle${if (expectedCyclesThatMakeChanges == 1) "" else "s"}, " +
                                         "but took at least one more cycle. Between the last two executed cycles there were changes."
                             )
-                            .isEqualTo(before[i]!!.printTrimmed())
+                            .isEqualTo(before[i]!!.printAllTrimmed())
                     }
                 }
             }

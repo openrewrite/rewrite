@@ -15,17 +15,9 @@
  */
 package org.openrewrite.maven
 
-import mockwebserver3.Dispatcher
-import mockwebserver3.MockResponse
-import mockwebserver3.MockWebServer
-import mockwebserver3.RecordedRequest
-import okhttp3.Credentials
-import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.InMemoryExecutionContext
-import org.openrewrite.Parser
 import org.openrewrite.maven.cache.LocalMavenArtifactCache
 import org.openrewrite.maven.cache.ReadOnlyLocalMavenArtifactCache
 import org.openrewrite.maven.tree.Maven

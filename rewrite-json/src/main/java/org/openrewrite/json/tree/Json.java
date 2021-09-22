@@ -20,10 +20,7 @@ import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
-import org.openrewrite.TreePrinter;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.json.JsonVisitor;
 import org.openrewrite.json.internal.JsonPrinter;
@@ -53,15 +50,6 @@ public interface Json extends Serializable, Tree {
     @Override
     default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
         return v instanceof JsonVisitor;
-    }
-
-    default <P> String print(TreePrinter<P> printer, P p) {
-        return new JsonPrinter<>(printer).print(this, p);
-    }
-
-    @Override
-    default <P> String print(P p) {
-        return print(TreePrinter.identity(), p);
     }
 
     Space getPrefix();
@@ -160,6 +148,11 @@ public interface Json extends Serializable, Tree {
         @Override
         public <P> Json acceptJson(JsonVisitor<P> v, P p) {
             return v.visitDocument(this, p);
+        }
+
+        @Override
+        public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
+            return new JsonPrinter<>();
         }
     }
 

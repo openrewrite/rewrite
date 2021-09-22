@@ -28,7 +28,6 @@ import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.ChangeTagValueVisitor;
-import org.openrewrite.xml.marker.XmlSearchResult;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Collection;
@@ -99,12 +98,12 @@ public class UpgradePluginVersion extends Recipe {
     }
 
     @Override
-    protected @Nullable TreeVisitor<?, ExecutionContext> getApplicableTest() {
+    protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
         return new MavenVisitor() {
             @Override
             public Maven visitMaven(Maven maven, ExecutionContext ctx) {
                 if (!FindPlugin.find(maven, groupId, artifactId).isEmpty()) {
-                    maven = maven.withMarkers(maven.getMarkers().addIfAbsent(new XmlSearchResult(UpgradePluginVersion.this)));
+                    maven = maven.withMarkers(maven.getMarkers().searchResult());
                 }
                 return super.visitMaven(maven, ctx);
             }
@@ -129,30 +128,25 @@ public class UpgradePluginVersion extends Recipe {
         @Override
         public Maven visitMaven(Maven maven, ExecutionContext ctx) {
             Maven m = super.visitMaven(maven, ctx);
-            FindPlugin.find(m, groupId, artifactId).forEach(plugin -> {
-                maybeChangePluginVersion(plugin, ctx);
-            });
-
+            FindPlugin.find(m, groupId, artifactId).forEach(plugin ->
+                    maybeChangePluginVersion(plugin, ctx));
             return m;
         }
 
         private void maybeChangePluginVersion(Xml.Tag model, ExecutionContext ctx) {
             Optional<Xml.Tag> versionTag = model.getChild("version");
-            versionTag.ifPresent(tag -> {
-                tag.getValue().ifPresent(versionValue -> {
+            versionTag.flatMap(Xml.Tag::getValue).ifPresent(versionValue -> {
+                String versionLookup = versionValue.startsWith("${")
+                        ? super.model.getValue(versionValue.trim())
+                        : versionValue;
 
-                    String versionLookup = versionValue.startsWith("${")
-                            ? super.model.getValue(versionValue.trim())
-                            : versionValue;
+                if (versionLookup != null) {
+                    findNewerDependencyVersion(groupId, artifactId, versionLookup, ctx).ifPresent(newer -> {
+                        ChangePluginVersionVisitor changeDependencyVersion = new ChangePluginVersionVisitor(groupId, artifactId, newer);
+                        doAfterVisit(changeDependencyVersion);
+                    });
+                }
 
-                    if (versionLookup != null) {
-                        findNewerDependencyVersion(groupId, artifactId, versionLookup, ctx).ifPresent(newer -> {
-                            ChangePluginVersionVisitor changeDependencyVersion = new ChangePluginVersionVisitor(groupId, artifactId, newer);
-                            doAfterVisit(changeDependencyVersion);
-                        });
-                    }
-
-                });
             });
         }
 

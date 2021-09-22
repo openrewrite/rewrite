@@ -17,7 +17,6 @@ package org.openrewrite.java.style;
 
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 

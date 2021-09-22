@@ -19,7 +19,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -45,11 +44,11 @@ public class FindMissingTypes extends Recipe {
                 Expression select = method.getSelect();
                 if(select != null) {
                     if (type == null) {
-                        return method.withSelect(select.withMarkers(select.getMarkers().addIfAbsent(new JavaSearchResult(FindMissingTypes.this, "type is `null`"))));
+                        return method.withSelect(select.withMarkers(select.getMarkers().searchResult( "type is `null`")));
                     } else if (type.getGenericSignature() == null) {
-                        return method.withSelect(select.withMarkers(select.getMarkers().addIfAbsent(new JavaSearchResult(FindMissingTypes.this, "generic signature is `null`"))));
+                        return method.withSelect(select.withMarkers(select.getMarkers().searchResult("generic signature is `null`")));
                     } else if (!type.getName().equals(method.getSimpleName())) {
-                        return method.withSelect(select.withMarkers(select.getMarkers().addIfAbsent(new JavaSearchResult(FindMissingTypes.this, "type information has a different method name '" + type.getName() + "'"))));
+                        return method.withSelect(select.withMarkers(select.getMarkers().searchResult("type information has a different method name '" + type.getName() + "'")));
                     }
                 }
                 return super.visitMethodInvocation(method, executionContext);

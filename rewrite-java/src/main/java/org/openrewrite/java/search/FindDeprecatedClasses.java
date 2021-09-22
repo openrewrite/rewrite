@@ -23,16 +23,14 @@ import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.TypeMatcher;
-import org.openrewrite.java.marker.JavaSearchResult;
-import org.openrewrite.java.tree.*;
-import org.openrewrite.marker.Marker;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.NameTree;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.Iterator;
 import java.util.List;
-
-import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -70,10 +68,7 @@ public class FindDeprecatedClasses extends Recipe {
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
         TypeMatcher typeMatcher = typePattern == null ? null : new TypeMatcher(typePattern);
 
-        //noinspection ConstantConditions
         return new JavaIsoVisitor<ExecutionContext>() {
-            private final Marker USES_DEPRECATED = new JavaSearchResult(randomId(), null, null);
-
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
                 for (JavaType javaType : cu.getTypesInUse()) {
@@ -81,7 +76,7 @@ public class FindDeprecatedClasses extends Recipe {
                     if (fqn != null && (typeMatcher == null || typeMatcher.matches(fqn))) {
                         for (JavaType.FullyQualified annotation : fqn.getAnnotations()) {
                             if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
-                                return cu.withMarkers(cu.getMarkers().addIfAbsent(USES_DEPRECATED));
+                                return cu.withMarkers(cu.getMarkers().searchResult());
                             }
                         }
                     }
@@ -118,7 +113,7 @@ public class FindDeprecatedClasses extends Recipe {
                                     }
                                 }
 
-                                return nameTree.withMarkers(nameTree.getMarkers().addIfAbsent(new JavaSearchResult(FindDeprecatedClasses.this)));
+                                return nameTree.withMarkers(nameTree.getMarkers().searchResult());
                             }
                         }
                     }

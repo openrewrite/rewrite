@@ -20,7 +20,6 @@ import lombok.Data;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.hcl.HclStyle;
-import org.openrewrite.hcl.format.TabsAndIndents;
 import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 

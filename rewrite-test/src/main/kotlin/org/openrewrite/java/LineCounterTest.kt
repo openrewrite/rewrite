@@ -17,9 +17,10 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
-import org.openrewrite.java.marker.JavaSearchResult
+import org.openrewrite.Tree
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.Space
+import org.openrewrite.marker.SearchResult
 
 interface LineCounterTest: JavaRecipeTest {
 
@@ -37,7 +38,7 @@ interface LineCounterTest: JavaRecipeTest {
 
                 override fun preVisit(tree: J, p: ExecutionContext): J? {
                     if (lineCount.line == 3) {
-                        return tree.withMarkers(tree.markers.addIfAbsent(JavaSearchResult(null)))
+                        return tree.withMarkers(tree.markers.searchResult())
                     }
                     return super.preVisit(tree, p)
                 }

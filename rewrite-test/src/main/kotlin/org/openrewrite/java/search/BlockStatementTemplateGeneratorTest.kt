@@ -15,18 +15,6 @@
  */
 package org.openrewrite.java.search
 
-import org.assertj.core.api.Assertions.assertThat
-import org.intellij.lang.annotations.Language
-import org.junit.jupiter.api.Test
-import org.openrewrite.Issue
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaVisitor
-import org.openrewrite.java.internal.template.BlockStatementTemplateGenerator
-import org.openrewrite.java.tree.J
-import org.openrewrite.java.tree.Space
-import java.io.ByteArrayOutputStream
-import java.io.OutputStreamWriter
-
 interface BlockStatementTemplateGeneratorTest {
 //
 //    @Issue("https://github.com/openrewrite/rewrite/issues/653")

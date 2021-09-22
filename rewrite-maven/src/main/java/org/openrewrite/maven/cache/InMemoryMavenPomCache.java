@@ -17,8 +17,8 @@ package org.openrewrite.maven.cache;
 
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Tags;
-import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.MavenMetadata;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.RawMaven;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.MavenRepository;

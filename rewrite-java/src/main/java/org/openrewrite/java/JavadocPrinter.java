@@ -15,66 +15,25 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.Tree;
-import org.openrewrite.TreePrinter;
-import org.openrewrite.internal.lang.NonNull;
+import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 
 import java.util.List;
 
-public class JavadocPrinter<P> extends JavadocVisitor<P> {
-    private static final String PRINTER_ACC_KEY = "printed";
-
-    private final TreePrinter<P> treePrinter;
-
-    public JavadocPrinter(TreePrinter<P> treePrinter) {
+public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
+    public JavadocPrinter() {
         this.javaVisitor = new JavadocJavaPrinter();
-        this.treePrinter = treePrinter;
-    }
-
-    @NonNull
-    protected StringBuilder getPrinter() {
-        StringBuilder acc = getCursor().getRoot().getNearestMessage(PRINTER_ACC_KEY);
-        if (acc == null) {
-            acc = new StringBuilder();
-            getCursor().getRoot().putMessage(PRINTER_ACC_KEY, acc);
-        }
-        return acc;
-    }
-
-    public String print(Javadoc j, P p) {
-        setCursor(new Cursor(null, "EPSILON"));
-        visit(j, p);
-        return getPrinter().toString();
     }
 
     @Override
-    @Nullable
-    public Javadoc visit(@Nullable Tree tree, P p) {
-        if (tree == null) {
-            return defaultValue(null, p);
-        }
-
-        StringBuilder printerAcc = getPrinter();
-        treePrinter.doBefore(tree, printerAcc, p);
-        tree = super.visit(tree, p);
-        if (tree != null) {
-            treePrinter.doAfter(tree, printerAcc, p);
-        }
-        return (Javadoc) tree;
-    }
-
-    @Override
-    public Javadoc visitAttribute(Javadoc.Attribute attribute, P p) {
+    public Javadoc visitAttribute(Javadoc.Attribute attribute, PrintOutputCapture<P> p) {
         visitMarkers(attribute.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append(attribute.getName());
+        p.out.append(attribute.getName());
         if (attribute.getSpaceBeforeEqual() != null) {
             visit(attribute.getSpaceBeforeEqual(), p);
             if (attribute.getValue() != null) {
-                acc.append('=');
+                p.out.append('=');
                 visit(attribute.getValue(), p);
             }
         }
@@ -82,83 +41,75 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     }
 
     @Override
-    public Javadoc visitAuthor(Javadoc.Author author, P p) {
+    public Javadoc visitAuthor(Javadoc.Author author, PrintOutputCapture<P> p) {
         visitMarkers(author.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("@author");
+        p.out.append("@author");
         visit(author.getName(), p);
         return author;
     }
 
     @Override
-    public Javadoc visitDeprecated(Javadoc.Deprecated deprecated, P p) {
+    public Javadoc visitDeprecated(Javadoc.Deprecated deprecated, PrintOutputCapture<P> p) {
         visitMarkers(deprecated.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("@deprecated");
+        p.out.append("@deprecated");
         visit(deprecated.getDescription(), p);
         return deprecated;
     }
 
     @Override
-    public Javadoc visitDocComment(Javadoc.DocComment javadoc, P p) {
+    public Javadoc visitDocComment(Javadoc.DocComment javadoc, PrintOutputCapture<P> p) {
         visitMarkers(javadoc.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("/**");
+        p.out.append("/**");
         visit(javadoc.getBody(), p);
-        acc.append("*/");
+        p.out.append("*/");
         return javadoc;
     }
 
     @Override
-    public Javadoc visitDocRoot(Javadoc.DocRoot docRoot, P p) {
+    public Javadoc visitDocRoot(Javadoc.DocRoot docRoot, PrintOutputCapture<P> p) {
         visitMarkers(docRoot.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("{@docRoot");
+        p.out.append("{@docRoot");
         visit(docRoot.getEndBrace(), p);
         return docRoot;
     }
 
     @Override
-    public Javadoc visitDocType(Javadoc.DocType docType, P p) {
+    public Javadoc visitDocType(Javadoc.DocType docType, PrintOutputCapture<P> p) {
         visitMarkers(docType.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("<!doctype");
+        p.out.append("<!doctype");
         visit(docType.getText(), p);
-        acc.append('>');
+        p.out.append('>');
         return docType;
     }
 
     @Override
-    public Javadoc visitEndElement(Javadoc.EndElement endElement, P p) {
+    public Javadoc visitEndElement(Javadoc.EndElement endElement, PrintOutputCapture<P> p) {
         visitMarkers(endElement.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("</").append(endElement.getName());
+        p.out.append("</").append(endElement.getName());
         visit(endElement.getSpaceBeforeEndBracket(), p);
-        acc.append('>');
+        p.out.append('>');
         return endElement;
     }
 
     @Override
-    public Javadoc visitErroneous(Javadoc.Erroneous erroneous, P p) {
+    public Javadoc visitErroneous(Javadoc.Erroneous erroneous, PrintOutputCapture<P> p) {
         visitMarkers(erroneous.getMarkers(), p);
         visit(erroneous.getText(), p);
         return erroneous;
     }
 
     @Override
-    public Javadoc visitHidden(Javadoc.Hidden hidden, P p) {
+    public Javadoc visitHidden(Javadoc.Hidden hidden, PrintOutputCapture<P> p) {
         visitMarkers(hidden.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("@hidden");
+        p.out.append("@hidden");
         visit(hidden.getBody(), p);
         return hidden;
     }
 
     @Override
-    public Javadoc visitIndex(Javadoc.Index index, P p) {
+    public Javadoc visitIndex(Javadoc.Index index, PrintOutputCapture<P> p) {
         visitMarkers(index.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("{@index");
+        p.out.append("{@index");
         visit(index.getSearchTerm(), p);
         visit(index.getDescription(), p);
         visit(index.getEndBrace(), p);
@@ -166,19 +117,17 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     }
 
     @Override
-    public Javadoc visitInheritDoc(Javadoc.InheritDoc inheritDoc, P p) {
+    public Javadoc visitInheritDoc(Javadoc.InheritDoc inheritDoc, PrintOutputCapture<P> p) {
         visitMarkers(inheritDoc.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("{@inheritDoc");
+        p.out.append("{@inheritDoc");
         visit(inheritDoc.getEndBrace(), p);
         return inheritDoc;
     }
 
     @Override
-    public Javadoc visitInlinedValue(Javadoc.InlinedValue value, P p) {
+    public Javadoc visitInlinedValue(Javadoc.InlinedValue value, PrintOutputCapture<P> p) {
         visitMarkers(value.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("{@value");
+        p.out.append("{@value");
         visit(value.getSpaceBeforeTree(), p);
         javaVisitor.visit(value.getTree(), p);
         visit(value.getEndBrace(), p);
@@ -186,18 +135,16 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     }
 
     @Override
-    public Javadoc visitLineBreak(Javadoc.LineBreak lineBreak, P p) {
+    public Javadoc visitLineBreak(Javadoc.LineBreak lineBreak, PrintOutputCapture<P> p) {
         visitMarkers(lineBreak.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append(lineBreak.getMargin());
+        p.out.append(lineBreak.getMargin());
         return lineBreak;
     }
 
     @Override
-    public Javadoc visitLink(Javadoc.Link link, P p) {
+    public Javadoc visitLink(Javadoc.Link link, PrintOutputCapture<P> p) {
         visitMarkers(link.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append(link.isPlain() ? "{@linkplain" : "{@link");
+        p.out.append(link.isPlain() ? "{@linkplain" : "{@link");
         visit(link.getSpaceBeforeTree(), p);
         javaVisitor.visit(link.getTree(), p);
         visit(link.getLabel(), p);
@@ -206,20 +153,18 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     }
 
     @Override
-    public Javadoc visitLiteral(Javadoc.Literal literal, P p) {
+    public Javadoc visitLiteral(Javadoc.Literal literal, PrintOutputCapture<P> p) {
         visitMarkers(literal.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append(literal.isCode() ? "{@code" : "{@literal");
+        p.out.append(literal.isCode() ? "{@code" : "{@literal");
         visit(literal.getDescription(), p);
         visit(literal.getEndBrace(), p);
         return literal;
     }
 
     @Override
-    public Javadoc visitParameter(Javadoc.Parameter parameter, P p) {
+    public Javadoc visitParameter(Javadoc.Parameter parameter, PrintOutputCapture<P> p) {
         visitMarkers(parameter.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("@param");
+        p.out.append("@param");
         visit(parameter.getSpaceBeforeName(), p);
         javaVisitor.visit(parameter.getName(), p);
         visit(parameter.getDescription(), p);
@@ -227,10 +172,9 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     }
 
     @Override
-    public Javadoc visitProvides(Javadoc.Provides provides, P p) {
+    public Javadoc visitProvides(Javadoc.Provides provides, PrintOutputCapture<P> p) {
         visitMarkers(provides.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("@provides");
+        p.out.append("@provides");
         visit(provides.getSpaceBeforeServiceType(), p);
         javaVisitor.visit(provides.getServiceType(), p);
         visit(provides.getDescription(), p);
@@ -238,19 +182,17 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     }
 
     @Override
-    public Javadoc visitReturn(Javadoc.Return aReturn, P p) {
+    public Javadoc visitReturn(Javadoc.Return aReturn, PrintOutputCapture<P> p) {
         visitMarkers(aReturn.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("@return");
+        p.out.append("@return");
         visit(aReturn.getDescription(), p);
         return aReturn;
     }
 
     @Override
-    public Javadoc visitSee(Javadoc.See see, P p) {
+    public Javadoc visitSee(Javadoc.See see, PrintOutputCapture<P> p) {
         visitMarkers(see.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("@see");
+        p.out.append("@see");
         visit(see.getSpaceBeforeTree(), p);
         javaVisitor.visit(see.getTree(), p);
         visit(see.getReference(), p);
@@ -258,28 +200,25 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     }
 
     @Override
-    public Javadoc visitSerial(Javadoc.Serial serial, P p) {
+    public Javadoc visitSerial(Javadoc.Serial serial, PrintOutputCapture<P> p) {
         visitMarkers(serial.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("@serial");
+        p.out.append("@serial");
         visit(serial.getDescription(), p);
         return serial;
     }
 
     @Override
-    public Javadoc visitSerialData(Javadoc.SerialData serialData, P p) {
+    public Javadoc visitSerialData(Javadoc.SerialData serialData, PrintOutputCapture<P> p) {
         visitMarkers(serialData.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("@serialData");
+        p.out.append("@serialData");
         visit(serialData.getDescription(), p);
         return serialData;
     }
 
     @Override
-    public Javadoc visitSerialField(Javadoc.SerialField serialField, P p) {
+    public Javadoc visitSerialField(Javadoc.SerialField serialField, PrintOutputCapture<P> p) {
         visitMarkers(serialField.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("@serialField");
+        p.out.append("@serialField");
         javaVisitor.visit(serialField.getName(), p);
         javaVisitor.visit(serialField.getType(), p);
         visit(serialField.getDescription(), p);
@@ -287,51 +226,46 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     }
 
     @Override
-    public Javadoc visitSince(Javadoc.Since since, P p) {
+    public Javadoc visitSince(Javadoc.Since since, PrintOutputCapture<P> p) {
         visitMarkers(since.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("@since");
+        p.out.append("@since");
         visit(since.getDescription(), p);
         return since;
     }
 
     @Override
-    public Javadoc visitStartElement(Javadoc.StartElement startElement, P p) {
+    public Javadoc visitStartElement(Javadoc.StartElement startElement, PrintOutputCapture<P> p) {
         visitMarkers(startElement.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append('<').append(startElement.getName());
+        p.out.append('<').append(startElement.getName());
         visit(startElement.getAttributes(), p);
         visit(startElement.getSpaceBeforeEndBracket(), p);
         if (startElement.isSelfClosing()) {
-            acc.append('/');
+            p.out.append('/');
         }
-        acc.append('>');
+        p.out.append('>');
         return startElement;
     }
 
     @Override
-    public Javadoc visitSummary(Javadoc.Summary summary, P p) {
+    public Javadoc visitSummary(Javadoc.Summary summary, PrintOutputCapture<P> p) {
         visitMarkers(summary.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("{@summary");
+        p.out.append("{@summary");
         visit(summary.getSummary(), p);
         visit(summary.getBeforeBrace(), p);
         return summary;
     }
 
     @Override
-    public Javadoc visitText(Javadoc.Text text, P p) {
+    public Javadoc visitText(Javadoc.Text text, PrintOutputCapture<P> p) {
         visitMarkers(text.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append(text.getText());
+        p.out.append(text.getText());
         return text;
     }
 
     @Override
-    public Javadoc visitThrows(Javadoc.Throws aThrows, P p) {
+    public Javadoc visitThrows(Javadoc.Throws aThrows, PrintOutputCapture<P> p) {
         visitMarkers(aThrows.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append(aThrows.isThrowsKeyword() ? "@throws" : "@exception");
+        p.out.append(aThrows.isThrowsKeyword() ? "@throws" : "@exception");
         visit(aThrows.getSpaceBeforeExceptionName(), p);
         javaVisitor.visit(aThrows.getExceptionName(), p);
         visit(aThrows.getDescription(), p);
@@ -339,29 +273,26 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     }
 
     @Override
-    public Javadoc visitUnknownBlock(Javadoc.UnknownBlock unknownBlock, P p) {
+    public Javadoc visitUnknownBlock(Javadoc.UnknownBlock unknownBlock, PrintOutputCapture<P> p) {
         visitMarkers(unknownBlock.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("@").append(unknownBlock.getName());
+        p.out.append("@").append(unknownBlock.getName());
         visit(unknownBlock.getContent(), p);
         return unknownBlock;
     }
 
     @Override
-    public Javadoc visitUnknownInline(Javadoc.UnknownInline unknownInline, P p) {
+    public Javadoc visitUnknownInline(Javadoc.UnknownInline unknownInline, PrintOutputCapture<P> p) {
         visitMarkers(unknownInline.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("{@").append(unknownInline.getName());
+        p.out.append("{@").append(unknownInline.getName());
         visit(unknownInline.getContent(), p);
         visit(unknownInline.getEndBrace(), p);
         return unknownInline;
     }
 
     @Override
-    public Javadoc visitUses(Javadoc.Uses uses, P p) {
+    public Javadoc visitUses(Javadoc.Uses uses, PrintOutputCapture<P> p) {
         visitMarkers(uses.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("@uses");
+        p.out.append("@uses");
         visit(uses.getBeforeServiceType(), p);
         javaVisitor.visit(uses.getServiceType(), p);
         visit(uses.getDescription(), p);
@@ -369,15 +300,14 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
     }
 
     @Override
-    public Javadoc visitVersion(Javadoc.Version since, P p) {
+    public Javadoc visitVersion(Javadoc.Version since, PrintOutputCapture<P> p) {
         visitMarkers(since.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("@version");
+        p.out.append("@version");
         visit(since.getBody(), p);
         return since;
     }
 
-    protected void visit(@Nullable List<? extends Javadoc> nodes, P p) {
+    protected void visit(@Nullable List<? extends Javadoc> nodes, PrintOutputCapture<P> p) {
         if (nodes != null) {
             for (Javadoc node : nodes) {
                 visit(node, p);
@@ -385,32 +315,30 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
         }
     }
 
-    class JavadocJavaPrinter extends JavaVisitor<P> {
+    class JavadocJavaPrinter extends JavaVisitor<PrintOutputCapture<P>> {
         @Override
-        public J visitMethodInvocation(J.MethodInvocation method, P p) {
+        public J visitMethodInvocation(J.MethodInvocation method, PrintOutputCapture<P> p) {
             visitMarkers(method.getMarkers(), p);
             visitSpace(method.getPrefix(), Space.Location.IDENTIFIER_PREFIX, p);
-            StringBuilder acc = getPrinter();
             visit(method.getSelect(), p);
             if (method.getSelect() != null) {
-                acc.append('#');
+                p.out.append('#');
             }
-            acc.append(method.getSimpleName());
+            p.out.append(method.getSimpleName());
             visitContainer("(", method.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, ",", ")", p);
             return method;
         }
 
         @Override
-        public J visitIdentifier(J.Identifier ident, P p) {
+        public J visitIdentifier(J.Identifier ident, PrintOutputCapture<P> p) {
             visitMarkers(ident.getMarkers(), p);
             visitSpace(ident.getPrefix(), Space.Location.IDENTIFIER_PREFIX, p);
-            StringBuilder acc = getPrinter();
-            acc.append(ident.getSimpleName());
+            p.out.append(ident.getSimpleName());
             return ident;
         }
 
         @Override
-        public J visitFieldAccess(J.FieldAccess fieldAccess, P p) {
+        public J visitFieldAccess(J.FieldAccess fieldAccess, PrintOutputCapture<P> p) {
             visitSpace(fieldAccess.getPrefix(), Space.Location.FIELD_ACCESS_PREFIX, p);
             visitMarkers(fieldAccess.getMarkers(), p);
             visit(fieldAccess.getTarget(), p);
@@ -419,7 +347,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
         }
 
         @Override
-        public J visitMemberReference(J.MemberReference memberRef, P p) {
+        public J visitMemberReference(J.MemberReference memberRef, PrintOutputCapture<P> p) {
             visitSpace(memberRef.getPrefix(), Space.Location.MEMBER_REFERENCE_PREFIX, p);
             visitMarkers(memberRef.getMarkers(), p);
             visit(memberRef.getContaining(), p);
@@ -428,53 +356,49 @@ public class JavadocPrinter<P> extends JavadocVisitor<P> {
         }
 
         @Override
-        public J visitTypeParameter(J.TypeParameter typeParam, P p) {
+        public J visitTypeParameter(J.TypeParameter typeParam, PrintOutputCapture<P> p) {
             visitSpace(typeParam.getPrefix(), Space.Location.TYPE_PARAMETERS_PREFIX, p);
             visitMarkers(typeParam.getMarkers(), p);
-            StringBuilder acc = getPrinter();
-            acc.append("<");
+            p.out.append("<");
             visit(typeParam.getName(), p);
-            acc.append(">");
+            p.out.append(">");
             return typeParam;
         }
 
         @Override
-        public Space visitSpace(Space space, Space.Location loc, P p) {
-            getPrinter().append(space.getWhitespace());
+        public Space visitSpace(Space space, Space.Location loc, PrintOutputCapture<P> p) {
+            p.out.append(space.getWhitespace());
             return space;
         }
 
-        private void visitLeftPadded(@Nullable String prefix, @Nullable JLeftPadded<? extends J> leftPadded, JLeftPadded.Location location, P p) {
+        private void visitLeftPadded(@Nullable String prefix, @Nullable JLeftPadded<? extends J> leftPadded, JLeftPadded.Location location, PrintOutputCapture<P> p) {
             if (leftPadded != null) {
-                StringBuilder acc = getPrinter();
                 visitSpace(leftPadded.getBefore(), location.getBeforeLocation(), p);
                 if (prefix != null) {
-                    acc.append(prefix);
+                    p.out.append(prefix);
                 }
                 visit(leftPadded.getElement(), p);
             }
         }
 
         @SuppressWarnings("SameParameterValue")
-        private void visitContainer(String before, @Nullable JContainer<? extends J> container, JContainer.Location location, String suffixBetween, @Nullable String after, P p) {
+        private void visitContainer(String before, @Nullable JContainer<? extends J> container, JContainer.Location location, String suffixBetween, @Nullable String after, PrintOutputCapture<P> p) {
             if (container == null) {
                 return;
             }
-            StringBuilder acc = getPrinter();
             visitSpace(container.getBefore(), location.getBeforeLocation(), p);
-            acc.append(before);
+            p.out.append(before);
             visitRightPadded(container.getPadding().getElements(), location.getElementLocation(), suffixBetween, p);
-            acc.append(after == null ? "" : after);
+            p.out.append(after == null ? "" : after);
         }
 
-        private void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, JRightPadded.Location location, String suffixBetween, P p) {
-            StringBuilder acc = getPrinter();
+        private void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, JRightPadded.Location location, String suffixBetween, PrintOutputCapture<P> p) {
             for (int i = 0; i < nodes.size(); i++) {
                 JRightPadded<? extends J> node = nodes.get(i);
                 visit(node.getElement(), p);
                 visitSpace(node.getAfter(), location.getAfterLocation(), p);
                 if (i < nodes.size() - 1) {
-                    acc.append(suffixBetween);
+                    p.out.append(suffixBetween);
                 }
             }
         }

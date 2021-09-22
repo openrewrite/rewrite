@@ -17,11 +17,8 @@ package org.openrewrite.json
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
-import org.openrewrite.TreePrinter
 import org.openrewrite.internal.StringUtils
-import org.openrewrite.json.internal.JsonPrinter
 
 class JsonParserTest {
     private val parser: JsonParser = JsonParser()
@@ -29,9 +26,7 @@ class JsonParserTest {
     private fun assertUnchanged(before: String) {
         val jsonDocument = parser.parse(InMemoryExecutionContext { t -> t.printStackTrace() },
             StringUtils.trimIndent(before)).iterator().next()
-        val jsonPrinter = JsonPrinter<ExecutionContext>(TreePrinter.identity())
-        val after = jsonPrinter.print(jsonDocument, InMemoryExecutionContext())
-        assertThat(after).`as`("Source should not be changed").isEqualTo(before)
+        assertThat(jsonDocument.printAll()).`as`("Source should not be changed").isEqualTo(before)
     }
 
     @Test

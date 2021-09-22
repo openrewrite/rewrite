@@ -599,7 +599,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
         int column = 0;
         boolean afterInitStart = false;
-        for (char c : alignTo.print().toCharArray()) {
+        for (char c : alignTo.print(getCursor()).toCharArray()) {
             if (c == '(') {
                 afterInitStart = true;
             } else if (afterInitStart && !Character.isWhitespace(c)) {

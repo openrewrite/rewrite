@@ -23,11 +23,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
-import org.openrewrite.TreePrinter;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.StringUtils;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.YamlVisitor;
@@ -43,28 +39,6 @@ import static org.openrewrite.Tree.randomId;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public interface Yaml extends Serializable, Tree {
-    @Override
-    default <P> String print(P p) {
-        return new YamlPrinter<>(TreePrinter.identity()).print(this, p);
-    }
-
-    default <P> String print(TreePrinter<P> printer, P p) {
-        return new YamlPrinter<>(printer).print(this, p);
-    }
-
-    @SuppressWarnings("StatementWithEmptyBody")
-    default String printTrimmed() {
-        String print = print();
-
-        int i = 0;
-        for (; i < print.toCharArray().length && (print.charAt(i) == '\n' || print.charAt(i) == '\r'); i++) {
-        }
-        print = print.substring(i);
-
-        return print.isEmpty() || !Character.isWhitespace(print.charAt(0)) ?
-                print :
-                StringUtils.trimIndent(print.trim());
-    }
 
     @SuppressWarnings("unchecked")
     @Override
@@ -139,6 +113,11 @@ public interface Yaml extends Serializable, Tree {
                 throw new UnsupportedOperationException("Yaml.Documents may not have a non-empty prefix");
             }
             return this;
+        }
+
+        @Override
+        public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
+            return new YamlPrinter<>();
         }
     }
 

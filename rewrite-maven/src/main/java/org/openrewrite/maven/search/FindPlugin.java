@@ -20,7 +20,6 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.xml.marker.XmlSearchResult;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashSet;
@@ -71,7 +70,7 @@ public class FindPlugin extends Recipe {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
                 if (isPluginTag(groupId, artifactId)) {
-                    return tag.withMarkers(tag.getMarkers().addIfAbsent(new XmlSearchResult(FindPlugin.this)));
+                    return tag.withMarkers(tag.getMarkers().searchResult());
                 }
                 return super.visitTag(tag, context);
             }

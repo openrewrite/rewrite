@@ -17,24 +17,17 @@ package org.openrewrite.java.search;
 
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
-import org.openrewrite.marker.Marker;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 import java.util.Set;
 
-import static org.openrewrite.Tree.randomId;
-
 public class UsesType<P> extends JavaIsoVisitor<P> {
-    @SuppressWarnings("ConstantConditions")
-    private static final Marker FOUND_TYPE = new JavaSearchResult(randomId(), null, null);
-
     private final JavaType.FullyQualified fullyQualifiedType;
     private final List<String> fullyQualifiedTypeSegments;
 
@@ -88,7 +81,7 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
         }
 
         if(fullyQualifiedType.isAssignableFrom(fq)) {
-            return c.withMarkers(c.getMarkers().addIfAbsent(FOUND_TYPE));
+            return c.withMarkers(c.getMarkers().searchResult());
         }
 
         Scanner scanner = new Scanner(fq.getFullyQualifiedName());
@@ -105,6 +98,6 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
             }
         }
 
-        return c.withMarkers(c.getMarkers().addIfAbsent(FOUND_TYPE));
+        return c.withMarkers(c.getMarkers().searchResult());
     }
 }

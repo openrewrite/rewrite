@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@NonNullApi
-@NonNullFields
-package org.openrewrite.hcl.marker;
+package org.openrewrite;
 
-import org.openrewrite.internal.lang.NonNullApi;
-import org.openrewrite.internal.lang.NonNullFields;
+public class PrintOutputCapture<P> {
+    private final P p;
+    public final StringBuilder out = new StringBuilder();
+
+    public PrintOutputCapture(P p) {
+        this.p = p;
+    }
+
+    public P getContext() {
+        return p;
+    }
+}

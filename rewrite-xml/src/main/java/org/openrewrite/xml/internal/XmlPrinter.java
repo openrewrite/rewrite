@@ -15,101 +15,44 @@
  */
 package org.openrewrite.xml.internal;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.Tree;
-import org.openrewrite.TreePrinter;
-import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.List;
-
-public class XmlPrinter<P> extends XmlVisitor<P> {
-
-    private static final String PRINTER_ACC_KEY = "printed";
-
-    private final TreePrinter<P> treePrinter;
-
-    public XmlPrinter(TreePrinter<P> treePrinter) {
-        this.treePrinter = treePrinter;
-    }
-
-    @NonNull
-    protected StringBuilder getPrinter() {
-        StringBuilder acc = getCursor().getRoot().getMessage(PRINTER_ACC_KEY);
-        if (acc == null) {
-            acc = new StringBuilder();
-            getCursor().getRoot().putMessage(PRINTER_ACC_KEY, acc);
-        }
-        return acc;
-    }
-
-    public String print(Xml xml, P p) {
-        setCursor(new Cursor(null, "EPSILON"));
-        visit(xml, p);
-        return getPrinter().toString();
-    }
+public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
 
     @Override
-    @Nullable
-    public Xml visit(@Nullable Tree tree, P p) {
-
-        if (tree == null) {
-            return defaultValue(null, p);
-        }
-
-        StringBuilder printerAcc = getPrinter();
-        treePrinter.doBefore(tree, printerAcc, p);
-        tree = super.visit(tree, p);
-        if (tree != null) {
-            treePrinter.doAfter(tree, printerAcc, p);
-        }
-        return (Xml) tree;
-    }
-
-    public void visit(@Nullable List<? extends Xml> nodes, P p) {
-        if (nodes != null) {
-            for (Xml node : nodes) {
-                visit(node, p);
-            }
-        }
-    }
-
-    @Override
-    public Xml visitDocument(Xml.Document document, P p) {
-        StringBuilder acc = getPrinter();
-        acc.append(document.getPrefix());
+    public Xml visitDocument(Xml.Document document, PrintOutputCapture<P> p) {
+        p.out.append(document.getPrefix());
         visitMarkers(document.getMarkers(), p);
         document = (Xml.Document) super.visitDocument(document, p);
-        acc.append(document.getEof());
+        p.out.append(document.getEof());
         return document;
     }
 
     @Override
-    public Xml visitProlog(Xml.Prolog prolog, P p) {
-        getPrinter().append(prolog.getPrefix());
+    public Xml visitProlog(Xml.Prolog prolog, PrintOutputCapture<P> p) {
+        p.out.append(prolog.getPrefix());
         visitMarkers(prolog.getMarkers(), p);
         return super.visitProlog(prolog, p);
     }
 
     @Override
-    public Xml visitTag(Xml.Tag tag, P p) {
-        StringBuilder acc = getPrinter();
-        acc.append(tag.getPrefix());
+    public Xml visitTag(Xml.Tag tag, PrintOutputCapture<P> p) {
+        p.out.append(tag.getPrefix());
         visitMarkers(tag.getMarkers(), p);
-        acc.append('<')
+        p.out.append('<')
                 .append(tag.getName());
         visit(tag.getAttributes(), p);
-        acc.append(tag.getBeforeTagDelimiterPrefix());
+        p.out.append(tag.getBeforeTagDelimiterPrefix());
         if (tag.getClosing() == null) {
-            acc.append("/>");
+            p.out.append("/>");
         } else {
-            acc.append('>');
+            p.out.append('>');
             visit(tag.getContent(), p);
-            acc.append(tag.getClosing().getPrefix())
+            p.out.append(tag.getClosing().getPrefix())
                     .append("</")
                     .append(tag.getClosing().getName())
                     .append(tag.getClosing().getBeforeTagDelimiterPrefix())
@@ -120,17 +63,16 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
     }
 
     @Override
-    public Xml visitAttribute(Xml.Attribute attribute, P p) {
-        StringBuilder acc = getPrinter();
+    public Xml visitAttribute(Xml.Attribute attribute, PrintOutputCapture<P> p) {
         char valueDelim;
         if (Xml.Attribute.Value.Quote.Double.equals(attribute.getValue().getQuote())) {
             valueDelim = '"';
         } else {
             valueDelim = '\'';
         }
-        acc.append(attribute.getPrefix());
+        p.out.append(attribute.getPrefix());
         visitMarkers(attribute.getMarkers(), p);
-        acc.append(attribute.getKey().getPrefix())
+        p.out.append(attribute.getKey().getPrefix())
                 .append(attribute.getKeyAsString())
                 .append('=')
                 .append(attribute.getValue().getPrefix())
@@ -143,100 +85,87 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
     }
 
     @Override
-    public Xml visitComment(Xml.Comment comment, P p) {
-        StringBuilder acc = getPrinter();
-        acc.append(comment.getPrefix());
+    public Xml visitComment(Xml.Comment comment, PrintOutputCapture<P> p) {
+        p.out.append(comment.getPrefix());
         visitMarkers(comment.getMarkers(), p);
-        acc.append("<!--")
+        p.out.append("<!--")
                 .append(comment.getText())
                 .append("-->");
         return comment;
     }
 
     @Override
-    public Xml visitProcessingInstruction(Xml.ProcessingInstruction pi, P p) {
-        StringBuilder acc = getPrinter();
-        acc.append(pi.getPrefix());
+    public Xml visitProcessingInstruction(Xml.ProcessingInstruction pi, PrintOutputCapture<P> p) {
+        p.out.append(pi.getPrefix());
         visitMarkers(pi.getMarkers(), p);
-        acc.append("<?")
+        p.out.append("<?")
                 .append(pi.getName());
         visit(pi.getAttributes(), p);
-        acc.append(pi.getBeforeTagDelimiterPrefix())
+        p.out.append(pi.getBeforeTagDelimiterPrefix())
                 .append("?>");
         return pi;
     }
 
     @Override
-    public Xml visitCharData(Xml.CharData charData, P p) {
-        StringBuilder acc = getPrinter();
-        acc.append(charData.getPrefix());
+    public Xml visitCharData(Xml.CharData charData, PrintOutputCapture<P> p) {
+        p.out.append(charData.getPrefix());
         visitMarkers(charData.getMarkers(), p);
         if (charData.isCdata()) {
-            acc.append("<![CDATA[")
+            p.out.append("<![CDATA[")
                     .append(charData.getText())
                     .append("]]>");
         } else {
-            acc.append(charData.getText());
+            p.out.append(charData.getText());
         }
-        acc.append(charData.getAfterText());
+        p.out.append(charData.getAfterText());
         return charData;
     }
 
     @Override
-    public Xml visitDocTypeDecl(Xml.DocTypeDecl docTypeDecl, P p) {
-        StringBuilder acc = getPrinter();
-        acc.append(docTypeDecl.getPrefix());
+    public Xml visitDocTypeDecl(Xml.DocTypeDecl docTypeDecl, PrintOutputCapture<P> p) {
+        p.out.append(docTypeDecl.getPrefix());
         visitMarkers(docTypeDecl.getMarkers(), p);
-        acc.append("<!DOCTYPE");
+        p.out.append("<!DOCTYPE");
         visit(docTypeDecl.getName(), p);
         visit(docTypeDecl.getExternalId(), p);
         visit(docTypeDecl.getInternalSubset(), p);
         if (docTypeDecl.getExternalSubsets() != null) {
-            acc.append(docTypeDecl.getExternalSubsets().getPrefix())
+            p.out.append(docTypeDecl.getExternalSubsets().getPrefix())
                     .append('[');
             visit(docTypeDecl.getExternalSubsets().getElements(), p);
-            acc.append(']');
+            p.out.append(']');
         }
-        acc.append('>');
+        p.out.append('>');
         return docTypeDecl;
     }
 
     @Override
-    public Xml visitElement(Xml.Element element, P p) {
-        StringBuilder acc = getPrinter();
-        acc.append(element.getPrefix());
+    public Xml visitElement(Xml.Element element, PrintOutputCapture<P> p) {
+        p.out.append(element.getPrefix());
         visitMarkers(element.getMarkers(), p);
-        acc.append("<!ELEMENT");
+        p.out.append("<!ELEMENT");
         visit(element.getSubset(), p);
-        acc.append('>');
+        p.out.append('>');
         return element;
     }
 
     @Override
-    public Xml visitIdent(Xml.Ident ident, P p) {
-        StringBuilder acc = getPrinter();
-        acc.append(ident.getPrefix());
+    public Xml visitIdent(Xml.Ident ident, PrintOutputCapture<P> p) {
+        p.out.append(ident.getPrefix());
         visitMarkers(ident.getMarkers(), p);
-        acc.append(ident.getName());
+        p.out.append(ident.getName());
         return ident;
     }
 
     @Override
-    public <M extends Marker> M visitMarker(Marker marker, P p) {
-        StringBuilder acc = getPrinter();
-        treePrinter.doBefore(marker, acc, p);
-        acc.append(marker.print(treePrinter, p));
-        treePrinter.doAfter(marker, acc, p);
+    public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
+        if(marker instanceof SearchResult) {
+            String description = ((SearchResult) marker).getDescription();
+            p.out.append("<!--~~")
+                    .append(description == null ? "" : "(" + description + ")~~")
+                    .append(">-->");
+        }
         //noinspection unchecked
         return (M) marker;
-    }
-
-    @Override
-    public Markers visitMarkers(Markers markers, P p) {
-        StringBuilder acc = getPrinter();
-        treePrinter.doBefore(markers, acc, p);
-        Markers m = super.visitMarkers(markers, p);
-        treePrinter.doAfter(markers, acc, p);
-        return m;
     }
 }

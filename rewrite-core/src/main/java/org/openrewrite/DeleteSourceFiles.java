@@ -18,12 +18,9 @@ package org.openrewrite;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.RecipeSearchResult;
 
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
-
-import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = true)

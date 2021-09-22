@@ -20,7 +20,6 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
@@ -80,7 +79,7 @@ public class FindText extends Recipe {
                 return space.withComments(ListUtils.map(space.getComments(), comment -> {
                     if(comment instanceof TextComment) {
                         if (compiledPatterns.stream().anyMatch(p -> p.matcher(((TextComment) comment).getText()).find())) {
-                            return comment.withMarkers(comment.getMarkers().addIfAbsent(new JavaSearchResult(FindText.this)));
+                            return comment.withMarkers(comment.getMarkers().searchResult());
                         }
                     }
                     return comment;
@@ -96,7 +95,7 @@ public class FindText extends Recipe {
                 assert literal.getValue() != null;
                 if (compiledPatterns.stream().anyMatch(p -> p
                         .matcher(literal.getValue().toString()).find())) {
-                    return literal.withMarkers(literal.getMarkers().addIfAbsent(new JavaSearchResult(FindText.this)));
+                    return literal.withMarkers(literal.getMarkers().searchResult());
                 }
 
                 return literal;

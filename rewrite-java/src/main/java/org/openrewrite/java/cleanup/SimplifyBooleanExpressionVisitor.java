@@ -51,8 +51,8 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
             } else if (isLiteralFalse(asBinary.getRight())) {
                 maybeUnwrapParentheses();
                 j = asBinary.getRight();
-            } else if (removeAllSpace(asBinary.getLeft()).printTrimmed()
-                    .equals(removeAllSpace(asBinary.getRight()).printTrimmed())) {
+            } else if (removeAllSpace(asBinary.getLeft()).printTrimmed(getCursor())
+                    .equals(removeAllSpace(asBinary.getRight()).printTrimmed(getCursor()))) {
                 maybeUnwrapParentheses();
                 j = asBinary.getLeft();
             }
@@ -63,8 +63,8 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
             } else if (isLiteralTrue(asBinary.getRight())) {
                 maybeUnwrapParentheses();
                 j = asBinary.getRight();
-            } else if (removeAllSpace(asBinary.getLeft()).printTrimmed()
-                    .equals(removeAllSpace(asBinary.getRight()).printTrimmed())) {
+            } else if (removeAllSpace(asBinary.getLeft()).printTrimmed(getCursor())
+                    .equals(removeAllSpace(asBinary.getRight()).printTrimmed(getCursor()))) {
                 maybeUnwrapParentheses();
                 j = asBinary.getLeft();
             }

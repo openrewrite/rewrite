@@ -45,4 +45,24 @@ public interface SourceFile extends Tree {
     default <S extends Style> S getStyle(Class<S> style) {
         return NamedStyles.merge(style, getMarkers().findAll(NamedStyles.class));
     }
+
+    default <P> String printAll(P p) {
+        return print(p, new Cursor(null, this));
+    }
+
+    default String printAll() {
+        return printAll(0);
+    }
+
+    default <P> String printAllTrimmed(P p) {
+        return printTrimmed(p, new Cursor(null, this));
+    }
+
+    default String printAllTrimmed() {
+        return printAllTrimmed(0);
+    }
+
+    default <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
+        throw new UnsupportedOperationException("SourceFile implementations should override this method");
+    }
 }

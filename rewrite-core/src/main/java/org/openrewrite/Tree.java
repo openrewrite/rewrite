@@ -18,6 +18,8 @@ package org.openrewrite;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.template.Coordinates;
+import org.openrewrite.template.SourceTemplate;
 
 import java.util.UUID;
 
@@ -61,26 +63,34 @@ public interface Tree {
      */
     <P> boolean isAcceptable(TreeVisitor<?, P> v, P p);
 
-    <P> String print(TreePrinter<P> printer, P p);
-
-    default <P> String print(P p) {
-        return print(TreePrinter.identity(), p);
+    default <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
+        return cursor.firstEnclosingOrThrow(SourceFile.class).printer(cursor);
     }
 
-    default String print() {
-        return print(TreePrinter.identity(), new Object());
+    default <P> TreeVisitor<?, P> formatter(@Nullable Tree stopAfter, Cursor cursor) {
+        return cursor.firstEnclosingOrThrow(SourceFile.class).formatter(stopAfter, cursor);
     }
 
-    default <P> String printTrimmed(TreePrinter<P> printer, P p) {
-        return StringUtils.trimIndent(print(printer, p).trim());
+    default <T extends Tree, C extends Coordinates> SourceTemplate<T, C> template(Cursor cursor, String code) {
+        return cursor.firstEnclosingOrThrow(SourceFile.class).template(cursor, code);
     }
 
-    default <P> String printTrimmed(P p) {
-        return printTrimmed(TreePrinter.identity(), p);
+    default <P> String print(P p, Cursor cursor) {
+        PrintOutputCapture<P> outputCapture = new PrintOutputCapture<>(p);
+        this.<P>printer(cursor).visit(this, outputCapture, cursor);
+        return outputCapture.out.toString();
     }
 
-    default String printTrimmed() {
-        return printTrimmed(TreePrinter.identity(), new Object());
+    default String print(Cursor cursor) {
+        return print(0, cursor);
+    }
+
+    default <P> String printTrimmed(P p, Cursor cursor) {
+        return StringUtils.trimIndent(print(p, cursor));
+    }
+
+    default String printTrimmed(Cursor cursor) {
+        return StringUtils.trimIndent(print(cursor));
     }
 
     default boolean isScope(@Nullable Tree tree) {

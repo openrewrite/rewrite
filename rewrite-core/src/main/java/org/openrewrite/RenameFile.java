@@ -17,7 +17,6 @@ package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.nio.file.Path;

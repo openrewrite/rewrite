@@ -23,10 +23,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
-import org.openrewrite.TreePrinter;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesVisitor;
@@ -39,15 +36,6 @@ import java.util.UUID;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public interface Properties extends Serializable, Tree {
-
-    default <P> String print(TreePrinter<P> printer, P p) {
-        return new PropertiesPrinter<>(printer).print(this, p);
-    }
-
-    @Override
-    default <P> String print(P p) {
-        return new PropertiesPrinter<>(TreePrinter.identity()).print(this, p);
-    }
 
     @SuppressWarnings("unchecked")
     @Override
@@ -99,6 +87,11 @@ public interface Properties extends Serializable, Tree {
         @Override
         public <P> Properties acceptProperties(PropertiesVisitor<P> v, P p) {
             return v.visitFile(this, p);
+        }
+
+        @Override
+        public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
+            return new PropertiesPrinter<>();
         }
     }
 

@@ -21,7 +21,6 @@ import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.maven.MavenParser
-import java.io.File
 import java.nio.file.Path
 
 class RocksdbMavenPomCacheTest {

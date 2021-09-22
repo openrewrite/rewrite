@@ -36,6 +36,7 @@ class MavenParserTest {
     private val parser = MavenParser.builder().build()
     private val ctx = InMemoryExecutionContext { t -> throw t }
 
+    @Suppress("CheckDtdRefs")
     @Test
     fun parse() {
         val parser = MavenParser.builder().build()

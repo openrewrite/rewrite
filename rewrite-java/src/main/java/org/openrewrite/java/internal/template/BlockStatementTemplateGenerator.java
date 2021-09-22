@@ -52,7 +52,7 @@ public class BlockStatementTemplateGenerator {
                             location.equals(Space.Location.BLOCK_PREFIX)) {
                         J.MethodDeclaration method = cursor.getValue();
                         J.MethodDeclaration m = method.withBody(null).withLeadingAnnotations(emptyList()).withPrefix(Space.EMPTY);
-                        before.insert(0, m.printTrimmed().trim() + '{');
+                        before.insert(0, m.printTrimmed(cursor).trim() + '{');
                         after.append('}');
                     }
 
@@ -123,20 +123,20 @@ public class BlockStatementTemplateGenerator {
         if (j instanceof J.CompilationUnit) {
             J.CompilationUnit cu = (J.CompilationUnit) j;
             for (J.Import anImport : cu.getImports()) {
-                before.insert(0, anImport.withPrefix(Space.EMPTY).printTrimmed() + ";\n");
+                before.insert(0, anImport.withPrefix(Space.EMPTY).printTrimmed(cursor) + ";\n");
             }
             for (String anImport : imports) {
                 before.insert(0, anImport);
             }
 
             if (cu.getPackageDeclaration() != null) {
-                before.insert(0, cu.getPackageDeclaration().withPrefix(Space.EMPTY).printTrimmed() + ";\n");
+                before.insert(0, cu.getPackageDeclaration().withPrefix(Space.EMPTY).printTrimmed(cursor) + ";\n");
             }
             return;
         } else if (j instanceof J.Block) {
             J parent = next(cursor).getValue();
             if (parent instanceof J.ClassDeclaration) {
-                classDeclaration(prior, before, (J.ClassDeclaration) parent, templated);
+                classDeclaration(prior, before, (J.ClassDeclaration) parent, templated, cursor);
             } else if (parent instanceof J.MethodDeclaration) {
                 J.MethodDeclaration m = (J.MethodDeclaration) parent;
 
@@ -147,7 +147,7 @@ public class BlockStatementTemplateGenerator {
                         break;
                     } else if (statement instanceof J.VariableDeclarations) {
                         before.insert(0, "\n" +
-                                variable((J.VariableDeclarations) statement, true) +
+                                variable((J.VariableDeclarations) statement, true, cursor) +
                                 ";\n");
                     }
                 }
@@ -163,7 +163,7 @@ public class BlockStatementTemplateGenerator {
                 before.insert(0, m.withBody(null)
                         .withLeadingAnnotations(emptyList())
                         .withPrefix(Space.EMPTY)
-                        .printTrimmed().trim() + '{');
+                        .printTrimmed(cursor).trim() + '{');
             } else if (parent instanceof J.Block) {
                 J.Block b = (J.Block) j;
 
@@ -173,7 +173,7 @@ public class BlockStatementTemplateGenerator {
                         break;
                     } else if (statement instanceof J.VariableDeclarations) {
                         before.insert(0, "\n" +
-                                variable((J.VariableDeclarations) statement, true) +
+                                variable((J.VariableDeclarations) statement, true, cursor) +
                                 ";\n");
                     }
                 }
@@ -196,24 +196,24 @@ public class BlockStatementTemplateGenerator {
             J.NewClass n = (J.NewClass) j;
             if (n.getArguments() != null && n.getArguments().stream().noneMatch(arg -> arg==prior)) {
                 n = n.withBody(null).withPrefix(Space.EMPTY);
-                before.insert(0, n.printTrimmed().trim());
+                before.insert(0, n.printTrimmed(cursor).trim());
                 after.append(';');
             }
         } else if (j instanceof J.ForLoop) {
             J.ForLoop f = (J.ForLoop) j;
             f = f.withBody(null).withPrefix(Space.EMPTY)
                     .withControl(f.getControl().withCondition(null).withUpdate(emptyList()));
-            before.insert(0, f.printTrimmed().trim());
+            before.insert(0, f.printTrimmed(cursor).trim());
         } else if (j instanceof J.ForEachLoop) {
             J.ForEachLoop f = (J.ForEachLoop) j;
             f = f.withBody(null).withPrefix(Space.EMPTY);
-            before.insert(0, f.printTrimmed().trim());
+            before.insert(0, f.printTrimmed(cursor).trim());
         } else if (j instanceof J.Try) {
             J.Try t = (J.Try) j;
             if (t.getResources() != null) {
                 before.insert(0, ")");
                 for (J.Try.Resource resource : t.getResources()) {
-                    before.insert(0, resource.withPrefix(Space.EMPTY).printTrimmed().trim() + ';');
+                    before.insert(0, resource.withPrefix(Space.EMPTY).printTrimmed(cursor).trim() + ';');
                 }
                 before.insert(0, "try(");
                 after.append("catch(Throwable t) { throw new RuntimeException(t); }");
@@ -224,14 +224,14 @@ public class BlockStatementTemplateGenerator {
             before.insert(0, "{ if(true) {");
             after.append("}\nreturn ").append(valueOfType(l.getType())).append(";\n};\n");
 
-            before.insert(0, l.withBody(null).withPrefix(Space.EMPTY).printTrimmed().trim());
+            before.insert(0, l.withBody(null).withPrefix(Space.EMPTY).printTrimmed(cursor).trim());
         } else if (j instanceof J.VariableDeclarations) {
-            before.insert(0, variable((J.VariableDeclarations) j, false) + '=');
+            before.insert(0, variable((J.VariableDeclarations) j, false, cursor) + '=');
         }
         template(next(cursor), j, before, after, templated);
     }
 
-    private void classDeclaration(@Nullable J prior, StringBuilder before, J.ClassDeclaration parent, Set<J> templated) {
+    private void classDeclaration(@Nullable J prior, StringBuilder before, J.ClassDeclaration parent, Set<J> templated, Cursor cursor) {
         J.ClassDeclaration c = parent;
 
         List<Statement> statements = c.getBody().getStatements();
@@ -242,16 +242,16 @@ public class BlockStatementTemplateGenerator {
             }
 
             if (statement instanceof J.VariableDeclarations) {
-                before.insert(0, variable((J.VariableDeclarations) statement, false) + ";\n");
+                before.insert(0, variable((J.VariableDeclarations) statement, false, cursor) + ";\n");
             } else if (statement instanceof J.MethodDeclaration) {
                 if (statement != prior) {
-                    before.insert(0, method((J.MethodDeclaration) statement));
+                    before.insert(0, method((J.MethodDeclaration) statement, cursor));
                 }
             } else if (statement instanceof J.ClassDeclaration) {
                 // this is a sibling class. we need declarations for all variables and methods.
                 // setting prior to null will cause them all to be written.
                 before.insert(0, '}');
-                classDeclaration(null, before, (J.ClassDeclaration) statement, templated);
+                classDeclaration(null, before, (J.ClassDeclaration) statement, templated, cursor);
             } else if (statement instanceof J.EnumValueSet) {
                 J.EnumValueSet enumValues = (J.EnumValueSet) statement;
                 before.insert(0, ";");
@@ -263,17 +263,17 @@ public class BlockStatementTemplateGenerator {
             }
         }
         c = c.withBody(null).withLeadingAnnotations(null).withPrefix(Space.EMPTY);
-        before.insert(0, c.printTrimmed().trim() + '{');
+        before.insert(0, c.printTrimmed(cursor).trim() + '{');
     }
 
-    private String method(J.MethodDeclaration method) {
+    private String method(J.MethodDeclaration method, Cursor cursor) {
         if (method.isAbstract()) {
-            return "\n" + method.withPrefix(Space.EMPTY).printTrimmed().trim() + ";\n";
+            return "\n" + method.withPrefix(Space.EMPTY).printTrimmed(cursor).trim() + ";\n";
         }
 
         StringBuilder methodBuilder = new StringBuilder("\n");
         J.MethodDeclaration m = method.withBody(null).withLeadingAnnotations(emptyList()).withPrefix(Space.EMPTY);
-        methodBuilder.append(m.printTrimmed().trim()).append('{');
+        methodBuilder.append(m.printTrimmed(cursor).trim()).append('{');
         if (method.getReturnTypeExpression() != null && !JavaType.Primitive.Void.equals(method.getReturnTypeExpression().getType())) {
             methodBuilder.append("\nreturn ")
                     .append(valueOfType(method.getReturnTypeExpression().getType()))
@@ -283,7 +283,7 @@ public class BlockStatementTemplateGenerator {
         return methodBuilder.toString();
     }
 
-    private String variable(J.VariableDeclarations variable, boolean initializer) {
+    private String variable(J.VariableDeclarations variable, boolean initializer, Cursor cursor) {
         StringBuilder varBuilder = new StringBuilder();
         for (J.Modifier modifier : variable.getModifiers()) {
             varBuilder.append(modifier.getType().toString().toLowerCase()).append(' ');
@@ -294,7 +294,7 @@ public class BlockStatementTemplateGenerator {
             J.VariableDeclarations.NamedVariable nv = variables.get(i);
             if (i == 0) {
                 if (variable.getTypeExpression() != null) {
-                    varBuilder.append(variable.getTypeExpression().withPrefix(Space.EMPTY).printTrimmed());
+                    varBuilder.append(variable.getTypeExpression().withPrefix(Space.EMPTY).printTrimmed(cursor));
                 }
                 if (nv.getType() instanceof JavaType.Array) {
                     varBuilder.append("[]");

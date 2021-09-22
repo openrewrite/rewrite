@@ -70,7 +70,7 @@ public class FindProperty extends Recipe {
                         .collect(Collectors.joining("."));
 
                 if (prop.equals(propertyKey)) {
-                    e = e.withValue(e.getValue().withMarkers(e.getValue().getMarkers().addIfAbsent(new YamlSearchResult(FindProperty.this))));
+                    e = e.withValue(e.getValue().withMarkers(e.getValue().getMarkers().searchResult()));
                 }
 
                 return e;

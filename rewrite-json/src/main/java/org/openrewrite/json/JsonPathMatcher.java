@@ -48,14 +48,6 @@ public class JsonPathMatcher {
         this.jsonPath = jsonPath;
     }
 
-    private String debugPath(Cursor cursor) {
-        return cursor.getPathAsStream()
-                .filter(Json.Member.class::isInstance)
-                .map(Json.Member.class::cast)
-                .map(m -> m.getKey().print())
-                .collect(Collectors.joining(","));
-    }
-
     public <T> Optional<T> find(Cursor cursor) {
         LinkedList<Tree> cursorPath = cursor.getPathAsStream()
                 .filter(o -> o instanceof Tree)

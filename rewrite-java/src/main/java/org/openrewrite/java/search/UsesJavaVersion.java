@@ -16,19 +16,12 @@
 package org.openrewrite.java.search;
 
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.marker.Marker;
 
 import java.util.Optional;
 
-import static org.openrewrite.Tree.randomId;
-
 public class UsesJavaVersion<P> extends JavaIsoVisitor<P> {
-    @SuppressWarnings("ConstantConditions")
-    private static final Marker JAVA_VERSION_SEARCH_RESULT = new JavaSearchResult(randomId(), null, null);
-
     int majorVersionMin;
     int majorVersionMax;
 
@@ -46,7 +39,7 @@ public class UsesJavaVersion<P> extends JavaIsoVisitor<P> {
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
         Optional<JavaVersion> javaVersion = cu.getMarkers().findFirst(JavaVersion.class);
         if (javaVersion.isPresent() && isVersionInRange(javaVersion.get().getMajorVersion())) {
-            return cu.withMarkers(cu.getMarkers().addIfAbsent(JAVA_VERSION_SEARCH_RESULT));
+            return cu.withMarkers(cu.getMarkers().searchResult());
         }
 
         return cu;

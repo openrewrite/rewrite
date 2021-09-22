@@ -17,9 +17,12 @@ package org.openrewrite.java.tree;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
-import lombok.*;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import lombok.With;
+import org.openrewrite.Cursor;
+import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
-import org.openrewrite.TreePrinter;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavadocPrinter;
@@ -48,13 +51,14 @@ public interface Javadoc extends Serializable, Tree {
         return v.defaultValue(this, p);
     }
 
-    default <P> String print(TreePrinter<P> printer, P p) {
-        return new JavadocPrinter<>(printer).print(this, p);
+    @Override
+    default <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
+        return new JavadocPrinter<>();
     }
 
     @Override
-    default <P> String print(P p) {
-        return print(TreePrinter.identity(), p);
+    default <P> TreeVisitor<?, P> formatter(@Nullable Tree stopAfter, Cursor cursor) {
+        return TreeVisitor.noop();
     }
 
     @Value
@@ -163,7 +167,9 @@ public interface Javadoc extends Serializable, Tree {
 
         @Override
         public String printComment() {
-            return print();
+            PrintOutputCapture<Integer> print = new PrintOutputCapture<>(0);
+            new JavadocPrinter<Integer>().visit(this, print);
+            return print.out.toString();
         }
     }
 

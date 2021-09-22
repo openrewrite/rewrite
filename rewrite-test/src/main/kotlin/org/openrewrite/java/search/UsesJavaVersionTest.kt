@@ -21,9 +21,9 @@ import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
-import org.openrewrite.java.marker.JavaSearchResult
 import org.openrewrite.java.marker.JavaVersion
 import org.openrewrite.java.tree.J
+import org.openrewrite.marker.SearchResult
 import java.util.*
 
 interface UsesJavaVersionTest : JavaRecipeTest {
@@ -47,7 +47,7 @@ interface UsesJavaVersionTest : JavaRecipeTest {
         Assertions.assertThat(result).isNotNull
         Assertions.assertThat(result.isNotEmpty())
         Assertions.assertThat(result[0].after!!.markers.markers.map {
-            j -> j is JavaSearchResult
+            j -> j is SearchResult
         }.any()).isTrue
     }
 

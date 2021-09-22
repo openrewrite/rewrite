@@ -18,19 +18,12 @@ package org.openrewrite.java.search;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.marker.Marker;
 
 import java.util.Set;
 
-import static org.openrewrite.Tree.randomId;
-
 public class DeclaresMethod<P> extends JavaIsoVisitor<P> {
-    @SuppressWarnings("ConstantConditions")
-    private static final Marker FOUND_METHOD = new JavaSearchResult(randomId(), null, null);
-
     private final MethodMatcher methodMatcher;
 
     public DeclaresMethod(String methodPattern) {
@@ -54,7 +47,7 @@ public class DeclaresMethod<P> extends JavaIsoVisitor<P> {
         Set<JavaType.Method> methods = cu.getDeclaredMethods();
         for (JavaType.Method method : methods) {
             if (methodMatcher.matches(method)) {
-                return cu.withMarkers(cu.getMarkers().addIfAbsent(FOUND_METHOD));
+                return cu.withMarkers(cu.getMarkers().searchResult());
             }
         }
         return cu;

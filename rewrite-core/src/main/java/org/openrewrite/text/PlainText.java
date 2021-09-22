@@ -17,10 +17,7 @@ package org.openrewrite.text;
 
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
-import org.openrewrite.TreePrinter;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.marker.Markers;
 
 import java.nio.file.Path;
@@ -54,12 +51,7 @@ public class PlainText implements SourceFile, Tree {
     }
 
     @Override
-    public <P> String print(TreePrinter<P> printer, P p) {
-        return new PlainTextPrinter<>(printer).print(this, p);
-    }
-
-    @Override
-    public <P> String print(P p) {
-        return print(TreePrinter.identity(), p);
+    public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
+        return new PlainTextPrinter<>();
     }
 }

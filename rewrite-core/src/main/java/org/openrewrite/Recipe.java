@@ -24,7 +24,6 @@ import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.NullUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.scheduling.ForkJoinScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +33,6 @@ import java.time.Duration;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.joining;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -60,28 +58,6 @@ public abstract class Recipe {
     public String getJacksonPolymorphicTypeTag() {
         return getClass().getName();
     }
-
-    /**
-     * This tree printer is used when comparing before/after source files and reifies any markers as a list of
-     * hash codes.
-     */
-    static final TreePrinter<ExecutionContext> MARKER_ID_PRINTER = new TreePrinter<ExecutionContext>() {
-        @Override
-        public void doBefore(@Nullable Tree tree, StringBuilder printerAcc, ExecutionContext executionContext) {
-            if (tree instanceof Markers) {
-                String markerIds = ((Markers) tree).entries().stream()
-                        .filter(marker -> !(marker instanceof RecipeThatMadeChanges))
-                        .map(marker -> String.valueOf(marker.hashCode()))
-                        .collect(joining(","));
-                if (!markerIds.isEmpty()) {
-                    printerAcc
-                            .append("markers[")
-                            .append(markerIds)
-                            .append("]->");
-                }
-            }
-        }
-    };
 
     public static final TreeVisitor<?, ExecutionContext> NOOP = new TreeVisitor<Tree, ExecutionContext>() {
         @Override

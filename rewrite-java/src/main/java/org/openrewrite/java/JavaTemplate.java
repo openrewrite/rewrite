@@ -265,13 +265,13 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                     if (!(parameter instanceof J.VariableDeclarations)) {
                                         throw new IllegalArgumentException(
                                                 "Only variable declarations may be part of a method declaration's parameter " +
-                                                        "list:" + parameter.print());
+                                                        "list:" + parameter.print(getCursor()));
                                     }
                                     J.VariableDeclarations decl = (J.VariableDeclarations) parameter;
                                     if (decl.getVariables().size() != 1) {
                                         throw new IllegalArgumentException(
                                                 "Multi-variable declarations may not be used in a method declaration's " +
-                                                        "parameter list: " + parameter.print());
+                                                        "parameter list: " + parameter.print(getCursor()));
                                     }
                                     J.VariableDeclarations.NamedVariable namedVariable = decl.getVariables().get(0);
                                     paramNames.add(namedVariable.getSimpleName());

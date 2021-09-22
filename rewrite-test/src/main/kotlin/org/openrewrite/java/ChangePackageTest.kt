@@ -19,7 +19,6 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 import org.openrewrite.java.search.FindTypes
-import org.openrewrite.java.tree.TypeUtils
 import java.nio.file.Paths
 
 interface ChangePackageTest: JavaRecipeTest {

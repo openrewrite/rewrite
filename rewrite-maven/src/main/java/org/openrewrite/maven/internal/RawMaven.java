@@ -17,7 +17,10 @@ package org.openrewrite.maven.internal;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.micrometer.core.instrument.Timer;
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;

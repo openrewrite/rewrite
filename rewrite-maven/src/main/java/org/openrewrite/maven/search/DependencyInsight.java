@@ -23,7 +23,6 @@ import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.Scope;
-import org.openrewrite.xml.marker.XmlSearchResult;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
@@ -68,7 +67,7 @@ public class DependencyInsight extends Recipe {
                 //noinspection ResultOfMethodCallIgnored
                 Scope.fromName(s);
                 return true;
-            } catch(Throwable t) {
+            } catch (Throwable t) {
                 return false;
             }
         }));
@@ -100,15 +99,14 @@ public class DependencyInsight extends Recipe {
 
                 if (isDependencyTag()) {
                     Pom.Dependency dependency = findDependency(t);
-                    if(dependency != null) {
+                    if (dependency != null) {
                         Set<Pom.Dependency> dependencies = model.getDependencies(dependency, aScope);
                         Optional<Pom.Dependency> match = dependencies.stream().filter(this::dependencyMatches).findFirst();
-                        if(match.isPresent()) {
-                            if(dependencyMatches(dependency)) {
-                                t = t.withMarkers(t.getMarkers().addIfAbsent(new XmlSearchResult(searchId, DependencyInsight.this)));
+                        if (match.isPresent()) {
+                            if (dependencyMatches(dependency)) {
+                                t = t.withMarkers(t.getMarkers().searchResult());
                             } else {
-                                t = t.withMarkers(t.getMarkers().addIfAbsent(new XmlSearchResult(searchId,DependencyInsight.this,
-                                        match.get().getCoordinates())));
+                                t = t.withMarkers(t.getMarkers().searchResult(match.get().getCoordinates()));
                             }
                         }
                     }
@@ -128,11 +126,10 @@ public class DependencyInsight extends Recipe {
      * This method will search the Maven tree for a dependency (including any transitive references) and return
      * true if the dependency is found.
      *
-     * @param maven The maven tree to search.
-     * @param groupIdPattern The artifact's group ID
+     * @param maven             The maven tree to search.
+     * @param groupIdPattern    The artifact's group ID
      * @param artifactIdPattern The artifact's ID
-     * @param scope An optional scope.
-     *
+     * @param scope             An optional scope.
      * @return true if the dependency is found.
      */
     public static boolean isDependencyPresent(Maven maven, String groupIdPattern, String artifactIdPattern, @Nullable String scope) {

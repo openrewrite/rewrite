@@ -15,8 +15,8 @@
  */
 package org.openrewrite.json.tree;
 
-import lombok.*;
-import lombok.experimental.FieldDefaults;
+import lombok.Value;
+import lombok.With;
 import org.openrewrite.marker.Markers;
 
 @Value

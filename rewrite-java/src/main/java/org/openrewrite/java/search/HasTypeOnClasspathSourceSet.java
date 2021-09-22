@@ -18,13 +18,10 @@ package org.openrewrite.java.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
-
-import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -43,6 +40,6 @@ public class HasTypeOnClasspathSourceSet<P> extends JavaIsoVisitor<P> {
                     return true;
                 })
                 .map(sourceSet -> cu)
-                .orElse(cu.withMarkers(cu.getMarkers().addIfAbsent(new JavaSearchResult(randomId(), null, null))));
+                .orElse(cu.withMarkers(cu.getMarkers().searchResult()));
     }
 }

@@ -24,7 +24,6 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.java.ChangeType;
 import org.openrewrite.java.RemoveImport;
 
 import java.util.concurrent.TimeUnit;

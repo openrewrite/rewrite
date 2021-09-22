@@ -24,7 +24,7 @@ import org.openrewrite.marker.Markers;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.List;
 
 @Incubating(since = "7.12.0")
 @Value

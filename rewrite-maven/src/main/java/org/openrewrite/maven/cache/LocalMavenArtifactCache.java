@@ -17,12 +17,13 @@ package org.openrewrite.maven.cache;
 
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.tree.Pom;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;

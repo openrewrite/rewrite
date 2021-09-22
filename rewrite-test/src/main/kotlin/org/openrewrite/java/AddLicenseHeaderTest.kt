@@ -17,7 +17,6 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
-import java.util.*
 
 interface AddLicenseHeaderTest : JavaRecipeTest {
     override val recipe: Recipe

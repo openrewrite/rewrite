@@ -16,7 +16,6 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.RecipeTest
 import org.openrewrite.java.format.TabsAndIndents
 import java.nio.file.Files
 import java.nio.file.Path

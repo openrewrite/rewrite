@@ -24,7 +24,6 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.NameTree;
@@ -77,7 +76,7 @@ public class FindTypes extends Recipe {
                     JavaType.FullyQualified type = TypeUtils.asFullyQualified(ident.getType());
                     if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
                             ident.getSimpleName().equals(type.getClassName())) {
-                        return ident.withMarkers(ident.getMarkers().addIfAbsent(new JavaSearchResult(FindTypes.this)));
+                        return ident.withMarkers(ident.getMarkers().searchResult());
                     }
                 }
                 return super.visitIdentifier(ident, executionContext);
@@ -89,7 +88,7 @@ public class FindTypes extends Recipe {
                 JavaType.FullyQualified type = TypeUtils.asFullyQualified(n.getType());
                 if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
                         getCursor().firstEnclosing(J.Import.class) == null) {
-                    return n.withMarkers(n.getMarkers().addIfAbsent(new JavaSearchResult(FindTypes.this)));
+                    return n.withMarkers(n.getMarkers().searchResult());
                 }
                 return n;
             }
@@ -100,7 +99,7 @@ public class FindTypes extends Recipe {
                 JavaType.FullyQualified type = TypeUtils.asFullyQualified(fa.getTarget().getType());
                 if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
                         fa.getName().getSimpleName().equals("class")) {
-                    return fa.withMarkers(fa.getMarkers().addIfAbsent(new JavaSearchResult(FindTypes.this)));
+                    return fa.withMarkers(fa.getMarkers().searchResult());
                 }
                 return fa;
             }

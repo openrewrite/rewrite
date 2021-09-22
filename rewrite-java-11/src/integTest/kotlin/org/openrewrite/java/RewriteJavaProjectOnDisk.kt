@@ -49,7 +49,7 @@ object RewriteJavaProjectOnDisk {
         recipe.run(sourceFiles).map {
             println(it.diff())
             if(System.getenv("rewrite.autofix")?.equals("true") == true) {
-                it.after!!.sourcePath.toFile().writeText(it.after!!.print(), Charsets.UTF_8)
+                it.after!!.sourcePath.toFile().writeText(it.after!!.printAll(), Charsets.UTF_8)
             }
         }
     }

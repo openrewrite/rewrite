@@ -38,7 +38,7 @@ interface YamlParserTest {
         val trimmedSource = source.trimIndent()
         val ast = parser.parse(InMemoryExecutionContext(onError), trimmedSource).first()
         afterConditions(ast)
-        val after = ast.print()
+        val after = ast.printAll()
         Assertions.assertThat(after).isEqualTo(trimmedSource)
     }
 }

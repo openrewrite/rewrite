@@ -22,9 +22,9 @@ import lombok.Getter;
 import lombok.With;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
-import org.openrewrite.TreePrinter;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -103,21 +103,17 @@ public class Markers implements Tree {
      * @return A new {@link Markers} with an added or updated marker.
      */
     public <M extends Marker> Markers computeByType(M identity, BinaryOperator<M> remappingFunction) {
-        List<Marker> updatedmarker = new ArrayList<>(markers.size() + 1);
-        boolean updated = false;
-        for (Marker m : this.markers) {
+        AtomicBoolean updated = new AtomicBoolean(false);
+        List<Marker> markers = ListUtils.map(this.markers, m -> {
             if (m.getClass().equals(identity.getClass())) {
+                updated.set(true);
+
                 //noinspection unchecked
-                updatedmarker.add(remappingFunction.apply((M) m, identity));
-                updated = true;
-            } else {
-                updatedmarker.add(m);
+                return remappingFunction.apply((M) m, identity);
             }
-        }
-        if (!updated) {
-            updatedmarker.add(identity);
-        }
-        return new Markers(id, updatedmarker);
+            return m;
+        });
+        return withMarkers(!updated.get() ? ListUtils.concat(markers, identity) : markers);
     }
 
     /**
@@ -139,7 +135,7 @@ public class Markers implements Tree {
             return m;
         });
 
-        if(!foundEqualMarker.get()) {
+        if (!foundEqualMarker.get()) {
             updatedMarkers = ListUtils.concat(updatedMarkers, identity);
         }
 
@@ -172,6 +168,14 @@ public class Markers implements Tree {
                 .findFirst();
     }
 
+    public Markers searchResult() {
+        return searchResult(null);
+    }
+
+    public Markers searchResult(@Nullable String description) {
+        return computeByType(new SearchResult(randomId(), description), (s1, s2) -> s1 == null ? s2 : s1);
+    }
+
     @Override
     public UUID getId() {
         return id;
@@ -180,10 +184,5 @@ public class Markers implements Tree {
     @Override
     public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
         return false;
-    }
-
-    @Override
-    public <P> String print(TreePrinter<P> printer, P p) {
-        return "";
     }
 }

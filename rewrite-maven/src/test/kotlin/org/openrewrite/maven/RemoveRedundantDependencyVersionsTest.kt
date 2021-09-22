@@ -16,7 +16,6 @@
 package org.openrewrite.maven
 
 import org.junit.jupiter.api.Test
-import kotlin.text.trimIndent
 
 class RemoveRedundantDependencyVersionsTest : MavenRecipeTest {
 

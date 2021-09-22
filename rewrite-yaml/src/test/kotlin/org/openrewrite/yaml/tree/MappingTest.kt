@@ -110,7 +110,7 @@ class MappingTest: YamlParserTest {
                 asdf: hjkl
         """.trimIndent()
         val y = YamlParser().parse(yText)[0]
-        Assertions.assertThat(y.print()).isEqualTo(yText)
+        Assertions.assertThat(y.printAll()).isEqualTo(yText)
     }
 
     @Test

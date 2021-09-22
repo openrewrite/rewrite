@@ -18,9 +18,6 @@ package org.openrewrite.java.style;
 import com.puppycrawl.tools.checkstyle.ConfigurationLoader;
 import com.puppycrawl.tools.checkstyle.api.CheckstyleException;
 import com.puppycrawl.tools.checkstyle.api.Configuration;
-
-import java.nio.charset.StandardCharsets;
-import java.util.stream.Collectors;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.internal.lang.Nullable;
 import org.xml.sax.InputSource;
@@ -28,9 +25,11 @@ import org.xml.sax.InputSource;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.lang.Boolean.parseBoolean;

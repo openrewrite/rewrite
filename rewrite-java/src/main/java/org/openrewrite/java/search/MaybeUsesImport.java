@@ -17,17 +17,12 @@ package org.openrewrite.java.search;
 
 import org.openrewrite.Incubating;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Scanner;
-
-import static org.openrewrite.Tree.randomId;
 
 /**
  * Acts as a sort of bloom filter for the presence of an import for a particular type in a {@link org.openrewrite.java.tree.J.CompilationUnit},
@@ -35,10 +30,6 @@ import static org.openrewrite.Tree.randomId;
  */
 @Incubating(since = "7.4.0")
 public class MaybeUsesImport<P> extends JavaIsoVisitor<P> {
-    @SuppressWarnings("ConstantConditions")
-    private static final Markers FOUND_TYPE = Markers.build(Collections.singletonList(
-            new JavaSearchResult(randomId(), null, null)));
-
     private final List<String> fullyQualifiedTypeSegments;
 
     public MaybeUsesImport(String fullyQualifiedType) {
@@ -54,7 +45,7 @@ public class MaybeUsesImport<P> extends JavaIsoVisitor<P> {
     public J.Import visitImport(J.Import _import, P p) {
         J.Import i = super.visitImport(_import, p);
         if (matchesType(i)) {
-            i = i.withMarkers(FOUND_TYPE);
+            i = i.withMarkers(i.getMarkers().searchResult());
         }
         return i;
     }

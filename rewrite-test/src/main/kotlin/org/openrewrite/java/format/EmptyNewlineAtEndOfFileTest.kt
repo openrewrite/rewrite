@@ -23,7 +23,7 @@ interface EmptyNewlineAtEndOfFileTest {
 
     @Test
     fun noComments(jp: JavaParser) {
-        assertThat(EmptyNewlineAtEndOfFile().run(jp.parse("class Test {}"))[0].after!!.print()).isEqualTo(
+        assertThat(EmptyNewlineAtEndOfFile().run(jp.parse("class Test {}"))[0].after!!.printAll()).isEqualTo(
             """
                 class Test {}
                 
@@ -33,7 +33,7 @@ interface EmptyNewlineAtEndOfFileTest {
 
     @Test
     fun comments(jp: JavaParser) {
-        assertThat(EmptyNewlineAtEndOfFile().run(jp.parse("class Test {}\n/*comment*/"))[0].after!!.print()).isEqualTo(
+        assertThat(EmptyNewlineAtEndOfFile().run(jp.parse("class Test {}\n/*comment*/"))[0].after!!.printAll()).isEqualTo(
             """
                 class Test {}
                 /*comment*/
@@ -44,7 +44,7 @@ interface EmptyNewlineAtEndOfFileTest {
 
     @Test
     fun multipleLinesToOne(jp: JavaParser) {
-        assertThat(EmptyNewlineAtEndOfFile().run(jp.parse("class Test {}\n\n"))[0].after!!.print()).isEqualTo(
+        assertThat(EmptyNewlineAtEndOfFile().run(jp.parse("class Test {}\n\n"))[0].after!!.printAll()).isEqualTo(
             """
                 class Test {}
                 

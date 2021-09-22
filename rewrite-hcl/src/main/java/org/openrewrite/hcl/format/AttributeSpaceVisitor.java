@@ -18,7 +18,9 @@ package org.openrewrite.hcl.format;
 import org.openrewrite.Tree;
 import org.openrewrite.hcl.HclIsoVisitor;
 import org.openrewrite.hcl.style.SpacesStyle;
-import org.openrewrite.hcl.tree.*;
+import org.openrewrite.hcl.tree.BodyContent;
+import org.openrewrite.hcl.tree.Hcl;
+import org.openrewrite.hcl.tree.HclLeftPadded;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -74,7 +76,7 @@ public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
     }
 
     private int endColumn(Hcl.Attribute attribute) {
-        return (attribute.getPrefix().getIndent() + attribute.getName().print()).length();
+        return (attribute.getPrefix().getIndent() + attribute.getName().print(getCursor())).length();
     }
 
     @Nullable

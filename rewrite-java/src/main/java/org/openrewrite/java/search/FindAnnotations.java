@@ -24,7 +24,6 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.J;
 
 import java.util.HashSet;
@@ -66,7 +65,7 @@ public class FindAnnotations extends Recipe {
             public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
                 J.Annotation a = super.visitAnnotation(annotation, ctx);
                 if (annotationMatcher.matches(annotation)) {
-                    a = a.withMarkers(a.getMarkers().addIfAbsent(new JavaSearchResult(FindAnnotations.this)));
+                    a = a.withMarkers(a.getMarkers().searchResult());
                 }
                 return a;
             }

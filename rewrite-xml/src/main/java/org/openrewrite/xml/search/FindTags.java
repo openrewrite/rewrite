@@ -23,7 +23,6 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlVisitor;
-import org.openrewrite.xml.marker.XmlSearchResult;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashSet;
@@ -56,7 +55,7 @@ public class FindTags extends Recipe {
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
                 if (matcher.matches(getCursor())) {
-                    t = t.withMarkers(t.getMarkers().addIfAbsent(new XmlSearchResult(FindTags.this)));
+                    t = t.withMarkers(t.getMarkers().searchResult());
                 }
                 return t;
             }

@@ -28,7 +28,6 @@ import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
-import java.util.function.UnaryOperator;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.newSetFromMap;
@@ -98,14 +97,14 @@ public class AnnotationTemplateGenerator {
         if (j instanceof J.CompilationUnit) {
             J.CompilationUnit cu = (J.CompilationUnit) j;
             for (J.Import anImport : cu.getImports()) {
-                before.insert(0, anImport.withPrefix(Space.EMPTY).printTrimmed() + ";\n");
+                before.insert(0, anImport.withPrefix(Space.EMPTY).printTrimmed(cursor) + ";\n");
             }
             for (String anImport : imports) {
                 before.insert(0, anImport);
             }
 
             if (cu.getPackageDeclaration() != null) {
-                before.insert(0, cu.getPackageDeclaration().withPrefix(Space.EMPTY).printTrimmed() + ";\n");
+                before.insert(0, cu.getPackageDeclaration().withPrefix(Space.EMPTY).printTrimmed(cursor) + ";\n");
             }
             List<J.ClassDeclaration> classes = cu.getClasses();
             if (!classes.get(classes.size() - 1).getName().getSimpleName().equals("$Placeholder")) {
@@ -116,7 +115,7 @@ public class AnnotationTemplateGenerator {
         if (j instanceof J.Block) {
             J parent = next(cursor).getValue();
             if (parent instanceof J.ClassDeclaration) {
-                classDeclaration(before, (J.ClassDeclaration) parent, templated);
+                classDeclaration(before, (J.ClassDeclaration) parent, templated, cursor);
                 after.append('}');
             } else if (parent instanceof J.MethodDeclaration) {
                 J.MethodDeclaration m = (J.MethodDeclaration) parent;
@@ -128,7 +127,7 @@ public class AnnotationTemplateGenerator {
                         break;
                     } else if (statement instanceof J.VariableDeclarations) {
                         before.insert(0, "\n" +
-                                variable((J.VariableDeclarations) statement) +
+                                variable((J.VariableDeclarations) statement, cursor) +
                                 ";\n");
                     }
                 }
@@ -143,7 +142,7 @@ public class AnnotationTemplateGenerator {
                 before.insert(0, m.withBody(null)
                         .withLeadingAnnotations(emptyList())
                         .withPrefix(Space.EMPTY)
-                        .printTrimmed().trim() + '{');
+                        .printTrimmed(cursor).trim() + '{');
                 after.append('}');
             } else if (parent instanceof J.Block) {
                 J.Block b = (J.Block) j;
@@ -155,7 +154,7 @@ public class AnnotationTemplateGenerator {
                     } else if (statement instanceof J.VariableDeclarations) {
                         J.VariableDeclarations v = (J.VariableDeclarations) statement;
                         if (v.hasModifier(J.Modifier.Type.Final)) {
-                            before.insert(0, "\n" + variable(v) + ";\n");
+                            before.insert(0, "\n" + variable(v, cursor) + ";\n");
                         }
                     }
                 }
@@ -169,20 +168,20 @@ public class AnnotationTemplateGenerator {
         } else if (j instanceof J.VariableDeclarations) {
             J.VariableDeclarations v = (J.VariableDeclarations) j;
             if (v.hasModifier(J.Modifier.Type.Final)) {
-                before.insert(0, variable((J.VariableDeclarations) j) + '=');
+                before.insert(0, variable((J.VariableDeclarations) j, cursor) + '=');
             }
         } else if (j instanceof J.NewClass) {
             J.NewClass n = (J.NewClass) j;
             n = n.withBody(null).withPrefix(Space.EMPTY);
             before.insert(0, '{');
-            before.insert(0, n.printTrimmed().trim());
+            before.insert(0, n.printTrimmed(cursor).trim());
             after.append("};");
         }
 
         template(next(cursor), j, before, after, templated);
     }
 
-    private void classDeclaration(StringBuilder before, J.ClassDeclaration parent, Set<J> templated) {
+    private void classDeclaration(StringBuilder before, J.ClassDeclaration parent, Set<J> templated, Cursor cursor) {
         J.ClassDeclaration c = parent;
         for (Statement statement : c.getBody().getStatements()) {
             if (templated.contains(statement)) {
@@ -192,26 +191,26 @@ public class AnnotationTemplateGenerator {
             if (statement instanceof J.VariableDeclarations) {
                 J.VariableDeclarations v = (J.VariableDeclarations) statement;
                 if (v.hasModifier(J.Modifier.Type.Final) && v.hasModifier(J.Modifier.Type.Static)) {
-                    before.insert(0, variable((J.VariableDeclarations) statement) + ";\n");
+                    before.insert(0, variable((J.VariableDeclarations) statement, cursor) + ";\n");
                 }
             } else if (statement instanceof J.ClassDeclaration) {
                 // this is a sibling class. we need declarations for all variables and methods.
                 // setting prior to null will cause them all to be written.
                 before.insert(0, '}');
-                classDeclaration(before, (J.ClassDeclaration) statement, templated);
+                classDeclaration(before, (J.ClassDeclaration) statement, templated, cursor);
             }
         }
         c = c.withBody(null).withLeadingAnnotations(null).withPrefix(Space.EMPTY);
-        before.insert(0, c.printTrimmed().trim() + '{');
+        before.insert(0, c.printTrimmed(cursor).trim() + '{');
     }
 
-    private String variable(J.VariableDeclarations variable) {
+    private String variable(J.VariableDeclarations variable, Cursor cursor) {
         StringBuilder varBuilder = new StringBuilder();
         if (variable.getTypeExpression() != null) {
             for (J.Modifier modifier : variable.getModifiers()) {
                 varBuilder.append(modifier.getType().toString().toLowerCase()).append(' ');
             }
-            varBuilder.append(variable.getTypeExpression().withPrefix(Space.EMPTY).printTrimmed())
+            varBuilder.append(variable.getTypeExpression().withPrefix(Space.EMPTY).printTrimmed(cursor))
                     .append(' ');
         }
 

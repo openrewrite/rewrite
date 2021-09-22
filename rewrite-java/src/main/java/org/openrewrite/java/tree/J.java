@@ -22,11 +22,13 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.openrewrite.*;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
+import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.internal.*;
+import org.openrewrite.java.internal.TypeCache;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.template.SourceTemplate;
@@ -69,15 +71,6 @@ public interface J extends Serializable, Tree {
         return v.defaultValue(this, p);
     }
 
-    default <P> String print(TreePrinter<P> printer, P p) {
-        return new JavaPrinter<>(printer).print(this, p);
-    }
-
-    @Override
-    default <P> String print(P p) {
-        return print(TreePrinter.identity(), p);
-    }
-
     <J2 extends J> J2 withId(UUID id);
 
     <J2 extends J> J2 withPrefix(Space space);
@@ -100,6 +93,28 @@ public interface J extends Serializable, Tree {
     <J2 extends J> J2 withMarkers(Markers markers);
 
     Markers getMarkers();
+
+    /**
+     * @return This tree, printed.
+     * @deprecated This method doesn't print in a way that is
+     * specialized for each language extension of the base Java model. Use {@link #print(Cursor)} instead.
+     */
+    @Deprecated
+    default String print() {
+        PrintOutputCapture<Integer> outputCapture = new PrintOutputCapture<>(0);
+        new JavaPrinter<Integer>().visit(this, outputCapture);
+        return outputCapture.out.toString();
+    }
+
+    /**
+     * @return This tree, printed.
+     * @deprecated This method doesn't print in a way that is
+     * specialized for each language extension of the base Java model. Use {@link #print(Cursor)} instead.
+     */
+    @Deprecated
+    default String printTrimmed() {
+        return StringUtils.trimIndent(print());
+    }
 
     @SuppressWarnings("unchecked")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -998,11 +1013,6 @@ public interface J extends Serializable, Tree {
             return Modifier.hasModifier(getModifiers(), modifier);
         }
 
-        @Override
-        public String toString() {
-            return "ClassDeclaration(" + ClassDeclarationToString.toString(this) + ")";
-        }
-
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -1163,6 +1173,17 @@ public interface J extends Serializable, Tree {
 
         public Set<JavaType.Method> getDeclaredMethods() {
             return typeCache().getDeclaredMethods();
+        }
+
+        @Override
+        public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
+            return new JavaPrinter<>();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public JavaTemplate template(Cursor cursor, String code) {
+            return JavaTemplate.builder(() -> cursor, code).build();
         }
 
         private TypeCache typeCache() {
@@ -1532,13 +1553,6 @@ public interface J extends Serializable, Tree {
         @Override
         public List<J> getSideEffects() {
             return target.getSideEffects();
-        }
-
-        /**
-         * Make debugging a bit easier
-         */
-        public String toString() {
-            return "FieldAccess(" + printTrimmed() + ")";
         }
 
         /**
@@ -2080,13 +2094,6 @@ public interface J extends Serializable, Tree {
             @Nullable
             JavaType fieldType;
         }
-
-        /**
-         * Making debugging a bit easier
-         */
-        public String toString() {
-            return "Ident(" + printTrimmed() + ")";
-        }
     }
 
     @ToString
@@ -2280,7 +2287,7 @@ public interface J extends Serializable, Tree {
 
         public boolean isFromType(String clazz) {
             if ("*".equals(qualid.getSimpleName())) {
-                return qualid.target.printTrimmed().equals(Arrays.stream(clazz.split("\\."))
+                return qualid.getTarget().printTrimmed().equals(stream(clazz.split("\\."))
                         .filter(pkgOrNam -> Character.isLowerCase(pkgOrNam.charAt(0)))
                         .collect(Collectors.joining("."))
                 );
@@ -2301,7 +2308,6 @@ public interface J extends Serializable, Tree {
          * import org.foo.*;            == "org.foo"
          * </code>
          */
-
         public String getPackageName() {
             JavaType.FullyQualified importType = TypeUtils.asFullyQualified(qualid.getType());
             if (importType != null) {
@@ -2316,6 +2322,7 @@ public interface J extends Serializable, Tree {
                     })
                     .collect(joining("."));
         }
+
 
         public String getClassName() {
             String pkg = getPackageName();
@@ -2342,13 +2349,6 @@ public interface J extends Serializable, Tree {
 
             return p1s.length < p2s.length ? -1 :
                     this.getQualid().getSimpleName().compareTo(o.getQualid().getSimpleName());
-        }
-
-        /**
-         * Make debugging a bit easier
-         */
-        public String toString() {
-            return "Import(" + ImportToString.toString(this) + ")";
         }
 
         public Padding getPadding() {
@@ -2691,11 +2691,6 @@ public interface J extends Serializable, Tree {
             return v.visitLiteral(this, p);
         }
 
-        @Override
-        public String toString() {
-            return "Literal(" + LiteralToString.toString(this) + ")";
-        }
-
         /**
          * See <a href="https://docs.oracle.com/javase/specs/jls/se7/html/jls-3.html#jls-3.3">jls-3.3</a>.
          * <p>
@@ -3003,11 +2998,6 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public String toString() {
-            return "MethodDeclaration(" + MethodDeclarationToString.toString(this) + ")";
-        }
-
-        @Override
         public CoordinateBuilder.MethodDeclaration getCoordinates() {
             return new CoordinateBuilder.MethodDeclaration(this);
         }
@@ -3254,11 +3244,6 @@ public interface J extends Serializable, Tree {
         @Override
         public List<J> getSideEffects() {
             return singletonList(this);
-        }
-
-        @Override
-        public String toString() {
-            return "MethodInvocation(" + MethodInvocationToString.toString(this) + ")";
         }
 
         public Padding getPadding() {
@@ -4938,11 +4923,6 @@ public interface J extends Serializable, Tree {
 
         public boolean hasModifier(Modifier.Type modifier) {
             return Modifier.hasModifier(getModifiers(), modifier);
-        }
-
-        @Override
-        public String toString() {
-            return "VariableDeclarations(" + VariableDeclarationsToString.toString(this) + ")";
         }
 
         public Padding getPadding() {

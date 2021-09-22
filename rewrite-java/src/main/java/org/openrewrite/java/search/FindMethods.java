@@ -25,7 +25,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.J;
 
 import java.util.HashSet;
@@ -76,7 +75,7 @@ public class FindMethods extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if (methodMatcher.matches(method)) {
-                    m = m.withMarkers(m.getMarkers().addIfAbsent(new JavaSearchResult(FindMethods.this)));
+                    m = m.withMarkers(m.getMarkers().searchResult());
                 }
                 return m;
             }
@@ -85,7 +84,7 @@ public class FindMethods extends Recipe {
             public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
                 J.MemberReference m = super.visitMemberReference(memberRef, ctx);
                 if (methodMatcher.matches(m.getReferenceType())) {
-                    m = m.withReference(m.getReference().withMarkers(m.getReference().getMarkers().addIfAbsent(new JavaSearchResult(FindMethods.this))));
+                    m = m.withReference(m.getReference().withMarkers(m.getReference().getMarkers().searchResult()));
                 }
                 return m;
             }
@@ -94,7 +93,7 @@ public class FindMethods extends Recipe {
             public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
                 J.NewClass n = super.visitNewClass(newClass, ctx);
                 if (methodMatcher.matches(newClass)) {
-                    n = n.withMarkers(n.getMarkers().addIfAbsent(new JavaSearchResult(FindMethods.this)));
+                    n = n.withMarkers(n.getMarkers().searchResult());
                 }
                 return n;
             }

@@ -17,7 +17,10 @@ package org.openrewrite.config
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.*
+import org.openrewrite.ExecutionContext
+import org.openrewrite.Issue
+import org.openrewrite.Parser
+import org.openrewrite.RecipeTest
 import org.openrewrite.Tree.randomId
 import org.openrewrite.marker.Markers
 import org.openrewrite.text.PlainText

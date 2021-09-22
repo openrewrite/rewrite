@@ -77,7 +77,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         int dotIndex = classType.getFullyQualifiedName().lastIndexOf('.');
         if (cu.getPackageDeclaration() != null && dotIndex >= 0) {
             String packageName = classType.getFullyQualifiedName().substring(0, dotIndex);
-            if (packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed())) {
+            if (packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()))) {
                 return cu;
             }
         }

@@ -54,7 +54,7 @@ public class FindKey extends Recipe {
             public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry e = (Yaml.Mapping.Entry) super.visitMappingEntry(entry, ctx);
                 if (matcher.matches(getCursor())) {
-                    e = e.withMarkers(e.getMarkers().addIfAbsent(new YamlSearchResult(FindKey.this)));
+                    e = e.withMarkers(e.getMarkers().searchResult());
                 }
                 return e;
             }

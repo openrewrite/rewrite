@@ -23,7 +23,6 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.J;
 
 @Value
@@ -57,7 +56,7 @@ public class ResultOfMethodCallIgnored extends Recipe {
                 J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
                 if (methodMatcher.matches(method)) {
                     if (getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.Block) {
-                        m = m.withMarkers(m.getMarkers().addIfAbsent(new JavaSearchResult(ResultOfMethodCallIgnored.this)));
+                        m = m.withMarkers(m.getMarkers().searchResult());
                     }
                 }
                 return m;

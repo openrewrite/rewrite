@@ -23,7 +23,6 @@ import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 

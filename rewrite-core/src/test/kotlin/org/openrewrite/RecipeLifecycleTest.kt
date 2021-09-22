@@ -150,7 +150,6 @@ class RecipeLifecycleTest {
         override fun getMarkers(): Markers = throw NotImplementedError()
         override fun <T : SourceFile?> withMarkers(markers: Markers): T = throw NotImplementedError()
         override fun getId(): UUID = throw NotImplementedError()
-        override fun <P : Any?> print(printer: TreePrinter<P>, p: P) = throw NotImplementedError()
         override fun getSourcePath() = throw NotImplementedError()
         override fun withSourcePath(path: Path): SourceFile = throw NotImplementedError()
     }
@@ -185,8 +184,8 @@ class RecipeLifecycleTest {
                     return object : PlainTextVisitor<ExecutionContext>() {
                         override fun visit(tree: Tree, p: ExecutionContext): PlainText {
                             var pt = tree as PlainText;
-                            if (!pt.print().startsWith("Change1")) {
-                                pt = pt.withText("Change1" + pt.print())
+                            if (!pt.printAll().startsWith("Change1")) {
+                                pt = pt.withText("Change1" + pt.printAll())
                             }
                             return pt;
                         }
@@ -214,8 +213,8 @@ class RecipeLifecycleTest {
                         return object : PlainTextVisitor<ExecutionContext>() {
                             override fun visit(tree: Tree, p: ExecutionContext): PlainText {
                                 var pt = tree as PlainText;
-                                if (!pt.print().endsWith("Change2")) {
-                                    pt = pt.withText(pt.print() + "Change2")
+                                if (!pt.printAll().endsWith("Change2")) {
+                                    pt = pt.withText(pt.printAll() + "Change2")
                                 }
                                 return pt;
                             }

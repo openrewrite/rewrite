@@ -22,9 +22,9 @@ import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.Tree
 import org.openrewrite.java.cleanup.NoWhitespaceAfter
-import org.openrewrite.java.style.NoWhitespaceAfterStyle
 import org.openrewrite.java.format.AutoFormatVisitor
 import org.openrewrite.java.style.Checkstyle
+import org.openrewrite.java.style.NoWhitespaceAfterStyle
 import org.openrewrite.style.NamedStyles
 
 @Suppress(

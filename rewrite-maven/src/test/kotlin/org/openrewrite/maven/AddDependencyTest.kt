@@ -62,7 +62,7 @@ class AddDependencyTest {
                         </project>
                     """.trimIndent()
                 )
-            )[0].after!!.printTrimmed()
+            )[0].after!!.printAllTrimmed()
         ).isEqualTo(
             """
                 <project>
@@ -96,7 +96,7 @@ class AddDependencyTest {
                         </project>
                     """.trimIndent()
                 )
-            )[0].after!!.printTrimmed()
+            )[0].after!!.printAllTrimmed()
         ).isEqualTo(
             """
                 <project>
@@ -152,7 +152,7 @@ class AddDependencyTest {
                         </project>
                     """.trimIndent()
                 )
-            )[0].after!!.printTrimmed()
+            )[0].after!!.printAllTrimmed()
         ).isEqualTo(
             """
                 <project>
@@ -217,7 +217,7 @@ class AddDependencyTest {
                         </project>
                     """.trimIndent()
                 )
-            )[0].after!!.printTrimmed()
+            )[0].after!!.printAllTrimmed()
         ).isEqualTo(
             """
                 <project>
@@ -256,7 +256,7 @@ class AddDependencyTest {
                         </project>
                     """.trimIndent()
                 )
-            )[0].after!!.printTrimmed()
+            )[0].after!!.printAllTrimmed()
         ).isEqualTo(
             """
                 <project>
@@ -344,7 +344,7 @@ class AddDependencyTest {
                         maven.withMarkers(maven.markers.compute(javaProject) { j, _ -> j.withId(randomId()) })
                     } else maven
                 }
-            )[0].after!!.printTrimmed()
+            )[0].after!!.printAllTrimmed()
         ).isEqualTo(
             """
                 <project>
@@ -400,7 +400,7 @@ class AddDependencyTest {
                         </project>
                     """.trimIndent()
                 )
-            )[0].after!!.printTrimmed()
+            )[0].after!!.printAllTrimmed()
         ).isEqualTo(
             """
                 <project>

@@ -88,7 +88,7 @@ class HclTemplateTest : HclRecipeTest {
                 val t = HclTemplate.builder({ cursor }, "\"jonathan\"").build()
 
                 override fun visitExpression(expression: Expression, p: ExecutionContext): Hcl {
-                    if (expression is Hcl.QuotedTemplate && expression.print().contains("you")) {
+                    if (expression is Hcl.QuotedTemplate && expression.print(cursor).contains("you")) {
                         return expression.withTemplate(t, expression.coordinates.replace())
                     }
                     return super.visitExpression(expression, p)

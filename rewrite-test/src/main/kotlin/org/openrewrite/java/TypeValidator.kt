@@ -115,17 +115,17 @@ class TypeValidator(
         }
         val cu = cursor.firstEnclosing(J.CompilationUnit::class.java)!!
         val pack = cu.packageDeclaration
-        if(pack != null && !t.packageName.equals(pack.expression.printTrimmed())) {
-            p.add(invalidTypeResult("J.ClassDeclaration package \"${t.packageName}\" does not match the enclosing J.CompilationUnit's package declaration \"${pack.expression.printTrimmed()}\""))
+        if(pack != null && !t.packageName.equals(pack.expression.printTrimmed(cursor))) {
+            p.add(invalidTypeResult("J.ClassDeclaration package \"${t.packageName}\" does not match the enclosing J.CompilationUnit's package declaration \"${pack.expression.printTrimmed(cursor)}\""))
         }
 
-        return c;
+        return c
     }
 
     override fun visitMethodInvocation(method: J.MethodInvocation, p: MutableList<InvalidTypeResult>): J.MethodInvocation {
         val m = super.visitMethodInvocation(method, p)
         if(!options.methodInvocations) {
-            return m;
+            return m
         }
         val mt = method.type
         if(mt == null) {
@@ -158,7 +158,7 @@ class TypeValidator(
         if(!m.simpleName.equals(mt.name)) {
             p.add(invalidTypeResult("J.MethodDeclaration name \"${m.simpleName}\" does not match the name in its type information \"${mt.name}\""))
         }
-        return m;
+        return m
     }
 
     override fun visitIdentifier(identifier: J.Identifier, p: MutableList<InvalidTypeResult>): J.Identifier {
@@ -242,6 +242,6 @@ class TypeValidator(
 
     private fun J.Identifier.isAnnotationField(): Boolean {
         val parent = cursor.parent!!.getValue<Any>()
-        return parent is J.Assignment && parent.variable == this && cursor.firstEnclosing(J.Annotation::class.java) != null;
+        return parent is J.Assignment && parent.variable == this && cursor.firstEnclosing(J.Annotation::class.java) != null
     }
 }

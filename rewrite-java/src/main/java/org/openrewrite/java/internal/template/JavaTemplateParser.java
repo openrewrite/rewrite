@@ -163,7 +163,7 @@ public class JavaTemplateParser {
 
     public J.MethodInvocation parseMethodArguments(Cursor cursor, String template, Space.Location location) {
         J.MethodInvocation method = cursor.getValue();
-        String methodWithReplacementArgs = method.withArguments(Collections.emptyList()).printTrimmed()
+        String methodWithReplacementArgs = method.withArguments(Collections.emptyList()).printTrimmed(cursor)
                 .replaceAll("\\)$", template + ");");
         @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacementArgs, location);
         onBeforeParseTemplate.accept(stub);

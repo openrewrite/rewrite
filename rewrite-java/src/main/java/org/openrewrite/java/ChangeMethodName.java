@@ -16,7 +16,6 @@
 package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
-import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
@@ -24,7 +23,10 @@ import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeTree;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -142,7 +144,7 @@ public class ChangeMethodName extends Recipe {
             if (methodMatcher.isFullyQualifiedClassReference(f)) {
                 Expression target = f.getTarget();
                 if (target instanceof J.FieldAccess) {
-                    String className = target.printTrimmed();
+                    String className = target.printTrimmed(getCursor());
                     String fullyQualified = className + "." + newMethodName;
                     return TypeTree.build(fullyQualified)
                             .withPrefix(f.getPrefix());

@@ -16,10 +16,12 @@
 package org.openrewrite;
 
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.RecipeSearchResult;
+import org.openrewrite.marker.SearchResult;
 
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
+
+import static org.openrewrite.Tree.randomId;
 
 public class HasSourcePath<P> extends TreeVisitor<Tree, P> {
     private final String syntax;
@@ -42,14 +44,15 @@ public class HasSourcePath<P> extends TreeVisitor<Tree, P> {
     @Override
     public Tree visit(@Nullable Tree tree, P p) {
         if (filePattern == null) {
-            return new RecipeSearchResult(Tree.randomId(), null, "has file");
+            return new SearchResult(randomId(), "has file");
         }
 
         if (tree instanceof SourceFile) {
-            Path sourcePath = ((SourceFile) tree).getSourcePath();
+            SourceFile sourceFile = (SourceFile) tree;
+            Path sourcePath = sourceFile.getSourcePath();
             PathMatcher pathMatcher = sourcePath.getFileSystem().getPathMatcher(syntax + ":" + filePattern);
             if (pathMatcher.matches(sourcePath)) {
-                return new RecipeSearchResult(Tree.randomId(), null, "has file");
+                return sourceFile.withMarkers(sourceFile.getMarkers().searchResult("has file"));
             }
         }
         return super.visit(tree, p);

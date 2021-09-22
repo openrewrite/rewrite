@@ -15,7 +15,6 @@
  */
 package org.openrewrite.internal.lang;
 
-import javax.annotation.Nonnull;
 import javax.annotation.meta.TypeQualifierDefault;
 import java.lang.annotation.*;
 

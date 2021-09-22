@@ -90,7 +90,7 @@ public class RemoveUnusedImports extends Recipe {
 
             boolean changed = false;
 
-            // the key is a list because one star import may get replaced with multiple unfolded imports
+            // the key is a list because a star import may get replaced with multiple unfolded imports
             List<ImportUsage> importUsage = new ArrayList<>(cu.getPadding().getImports().size());
             for (JRightPadded<J.Import> anImport : cu.getPadding().getImports()) {
                 // assume initially that all imports are unused
@@ -140,7 +140,7 @@ public class RemoveUnusedImports extends Recipe {
 
                             changed = true;
                         }
-                    } else if (staticClasses != null && staticClasses.stream().anyMatch(c -> elem.getQualid().printTrimmed().equals(c.getFullyQualifiedName())) ||
+                    } else if (staticClasses != null && staticClasses.stream().anyMatch(c -> elem.getQualid().printTrimmed(getCursor()).equals(c.getFullyQualifiedName())) ||
                             methodsAndFields != null && methodsAndFields.contains(qualid.getSimpleName())) {
                         anImport.used = true;
                     } else {

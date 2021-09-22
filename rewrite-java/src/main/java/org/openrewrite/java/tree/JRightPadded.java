@@ -23,7 +23,10 @@ import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;

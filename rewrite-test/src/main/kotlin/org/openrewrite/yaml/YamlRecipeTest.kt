@@ -18,8 +18,6 @@ package org.openrewrite.yaml
 import org.intellij.lang.annotations.Language
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
-import org.openrewrite.TreePrinter
-import org.openrewrite.marker.SearchResult
 import org.openrewrite.yaml.tree.Yaml
 import java.io.File
 import java.nio.file.Path
@@ -28,9 +26,6 @@ import java.nio.file.Path
 interface YamlRecipeTest : RecipeTest<Yaml.Documents> {
     override val parser: YamlParser
         get() = YamlParser()
-
-    override val treePrinter: TreePrinter<*>?
-        get() = SearchResult.printer("~~>", "~~(%s)~~>")
 
     fun assertChanged(
         recipe: Recipe = this.recipe!!,

@@ -23,7 +23,6 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -67,7 +66,7 @@ public class FindFields extends Recipe {
                 JavaType.Variable varType = TypeUtils.asVariable(fieldAccess.getName().getFieldType());
                 if (varType != null && varType.getOwner().getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         varType.getName().equals(fieldName)) {
-                    return fieldAccess.withMarkers(fieldAccess.getMarkers().addIfAbsent(new JavaSearchResult(FindFields.this)));
+                    return fieldAccess.withMarkers(fieldAccess.getMarkers().searchResult());
                 }
                 return super.visitFieldAccess(fieldAccess, executionContext);
             }
@@ -78,7 +77,7 @@ public class FindFields extends Recipe {
                 JavaType.Variable varType = TypeUtils.asVariable(identifier.getFieldType());
                 if (varType != null && varType.getOwner().getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         varType.getName().equals(fieldName)) {
-                    i = i.withMarkers(i.getMarkers().addIfAbsent(new JavaSearchResult(FindFields.this)));
+                    i = i.withMarkers(i.getMarkers().searchResult());
                 }
                 return i;
             }
@@ -89,7 +88,7 @@ public class FindFields extends Recipe {
                 JavaType.Variable varType = TypeUtils.asVariable(memberRef.getReferenceType());
                 if (varType != null && varType.getOwner().getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         varType.getName().equals(fieldName)) {
-                    m = m.withReference(m.getReference().withMarkers(m.getReference().getMarkers().addIfAbsent(new JavaSearchResult(FindFields.this))));
+                    m = m.withReference(m.getReference().withMarkers(m.getReference().getMarkers().searchResult()));
                 }
                 return m;
             }

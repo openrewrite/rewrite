@@ -82,38 +82,29 @@ public class Result {
      * @return Git-style patch diff representing the changes to this compilation unit.
      */
     public String diff() {
-        return diff(TreePrinter.identity());
-    }
-
-    /**
-     * @param treePrinter Influences the printing of individual tree elements.
-     * @return Git-style patch diff representing the changes to this compilation unit.
-     */
-    public String diff(TreePrinter<?> treePrinter) {
-        return diff(null, treePrinter);
+        return diff(null);
     }
 
     /**
      * @param relativeTo  Optional relative path that is used to relativize file paths of reported differences.
-     * @param treePrinter Influences the printing of individual tree elements.
      * @return Git-style patch diff representing the changes to this compilation unit.
      */
-    public String diff(@Nullable Path relativeTo, TreePrinter<?> treePrinter) {
+    public String diff(@Nullable Path relativeTo) {
         String d;
         if (this.diff == null) {
-            d = computeDiff(relativeTo, treePrinter);
+            d = computeDiff(relativeTo);
             this.diff = new WeakReference<>(d);
         } else {
             d = this.diff.get();
             if (d == null) {
-                d = computeDiff(relativeTo, treePrinter);
+                d = computeDiff(relativeTo);
                 this.diff = new WeakReference<>(d);
             }
         }
         return d;
     }
 
-    private String computeDiff(@Nullable Path relativeTo, TreePrinter<?> treePrinter) {
+    private String computeDiff(@Nullable Path relativeTo) {
         Path sourcePath;
         if (after != null) {
             sourcePath = after.getSourcePath();
@@ -128,13 +119,12 @@ public class Result {
             originalSourcePath = before.getSourcePath();
         }
 
-        //noinspection ConstantConditions
         try (InMemoryDiffEntry diffEntry = new InMemoryDiffEntry(
                 originalSourcePath,
                 sourcePath,
                 relativeTo,
-                before == null ? "" : before.print(),
-                after == null ? "" : after.print(treePrinter, null),
+                before == null ? "" : before.printAll(),
+                after == null ? "" : after.printAll(),
                 recipesThatMadeChanges
         )) {
             return diffEntry.getDiff();

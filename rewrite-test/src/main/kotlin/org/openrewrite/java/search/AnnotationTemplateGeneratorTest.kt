@@ -15,12 +15,6 @@
  */
 package org.openrewrite.java.search
 
-import org.assertj.core.api.Assertions.assertThat
-import org.intellij.lang.annotations.Language
-import org.junit.jupiter.api.Test
-import org.openrewrite.Issue
-import org.openrewrite.java.JavaParser
-
 interface AnnotationTemplateGeneratorTest {
 //
 //    @Issue("https://github.com/openrewrite/rewrite/issues/653")

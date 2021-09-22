@@ -15,82 +15,25 @@
  */
 package org.openrewrite.properties.internal;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.Tree;
-import org.openrewrite.TreePrinter;
-import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 
-import java.util.List;
-
-public class PropertiesPrinter<P> extends PropertiesVisitor<P> {
-
-    private static final String PRINTER_ACC_KEY = "printed";
-
-    private final TreePrinter<P> treePrinter;
-
-    public PropertiesPrinter(TreePrinter<P> treePrinter) {
-        this.treePrinter = treePrinter;
-    }
-
-    @NonNull
-    protected StringBuilder getPrinter() {
-        StringBuilder acc = getCursor().getRoot().getMessage(PRINTER_ACC_KEY);
-        if (acc == null) {
-            acc = new StringBuilder();
-            getCursor().getRoot().putMessage(PRINTER_ACC_KEY, acc);
-        }
-        return acc;
-    }
-
-    public String print(Properties properties, P p) {
-        setCursor(new Cursor(null, "EPSILON"));
-        visit(properties, p);
-        return getPrinter().toString();
-    }
+public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P>> {
 
     @Override
-    @Nullable
-    public Properties visit(@Nullable Tree tree, P p) {
-
-        if (tree == null) {
-            return defaultValue(null, p);
-        }
-
-        StringBuilder printer = getPrinter();
-        treePrinter.doBefore(tree, printer, p);
-        tree = super.visit(tree, p);
-        if (tree != null) {
-            treePrinter.doAfter(tree, printer, p);
-        }
-        return (Properties) tree;
-    }
-
-    public void visit(@Nullable List<? extends Properties> nodes, P p) {
-        if (nodes != null) {
-            for (Properties node : nodes) {
-                visit(node, p);
-            }
-        }
-    }
-
-    @Override
-    public Properties visitFile(Properties.File file, P p) {
-        StringBuilder acc = getPrinter();
-        acc.append(file.getPrefix());
+    public Properties visitFile(Properties.File file, PrintOutputCapture<P> p) {
+        p.out.append(file.getPrefix());
         visit(file.getContent(), p);
-        acc.append(file.getEof());
+        p.out.append(file.getEof());
         return file;
     }
 
     @Override
-    public Properties visitEntry(Properties.Entry entry, P p) {
-        StringBuilder acc = getPrinter();
-        acc.append(entry.getPrefix())
+    public Properties visitEntry(Properties.Entry entry, PrintOutputCapture<P> p) {
+        p.out.append(entry.getPrefix())
                 .append(entry.getKey())
                 .append(entry.getBeforeEquals())
                 .append('=')
@@ -100,30 +43,22 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<P> {
     }
 
     @Override
-    public Properties visitComment(Properties.Comment comment, P p) {
-        StringBuilder acc = getPrinter();
-        acc.append(comment.getPrefix())
+    public Properties visitComment(Properties.Comment comment, PrintOutputCapture<P> p) {
+        p.out.append(comment.getPrefix())
                 .append('#')
                 .append(comment.getMessage());
         return comment;
     }
 
     @Override
-    public <M extends Marker> M visitMarker(Marker marker, P p) {
-        StringBuilder acc = getPrinter();
-        treePrinter.doBefore(marker, acc, p);
-        acc.append(marker.print(treePrinter, p));
-        treePrinter.doAfter(marker, acc, p);
+    public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
+        if(marker instanceof SearchResult) {
+            String description = ((SearchResult) marker).getDescription();
+            p.out.append("~~")
+                    .append(description == null ? "" : "(" + description + ")~~")
+                    .append(">");
+        }
         //noinspection unchecked
         return (M) marker;
-    }
-
-    @Override
-    public Markers visitMarkers(Markers markers, P p) {
-        StringBuilder acc = getPrinter();
-        treePrinter.doBefore(markers, acc, p);
-        Markers m = super.visitMarkers(markers, p);
-        treePrinter.doAfter(markers, acc, p);
-        return m;
     }
 }

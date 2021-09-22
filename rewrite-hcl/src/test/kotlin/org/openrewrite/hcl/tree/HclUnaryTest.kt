@@ -16,7 +16,6 @@
 package org.openrewrite.hcl.tree
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.hcl.HclParser
 
 class HclUnaryTest : HclTreeTest {
 

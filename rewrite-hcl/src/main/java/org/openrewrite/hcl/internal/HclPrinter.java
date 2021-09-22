@@ -15,157 +15,83 @@
  */
 package org.openrewrite.hcl.internal;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.Tree;
-import org.openrewrite.TreePrinter;
+import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.tree.*;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.List;
 
-public class HclPrinter<P> extends HclVisitor<P> {
-    private static final String PRINTER_ACC_KEY = "printed";
-
-    private final TreePrinter<P> treePrinter;
-
-    public HclPrinter(TreePrinter<P> treePrinter) {
-        this.treePrinter = treePrinter;
-    }
-
-    @NonNull
-    protected StringBuilder getPrinter() {
-        StringBuilder acc = getCursor().getRoot().getMessage(PRINTER_ACC_KEY);
-        if (acc == null) {
-            acc = new StringBuilder();
-            getCursor().getRoot().putMessage(PRINTER_ACC_KEY, acc);
-        }
-        return acc;
-    }
+public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
 
     @Override
-    public Space visitSpace(Space space, Space.Location loc, P p) {
-        StringBuilder acc = getPrinter();
-        acc.append(space.getWhitespace());
+    public Space visitSpace(Space space, Space.Location loc, PrintOutputCapture<P> p) {
+        p.out.append(space.getWhitespace());
 
         for (Comment comment : space.getComments()) {
             visitMarkers(comment.getMarkers(), p);
             switch (comment.getStyle()) {
                 case LINE_SLASH:
-                    acc.append("//").append(comment.getText());
+                    p.out.append("//").append(comment.getText());
                     break;
                 case LINE_HASH:
-                    acc.append("#").append(comment.getText());
+                    p.out.append("#").append(comment.getText());
                     break;
                 case INLINE:
-                    acc.append("/*").append(comment.getText()).append("*/");
+                    p.out.append("/*").append(comment.getText()).append("*/");
                     break;
             }
-            acc.append(comment.getSuffix());
+            p.out.append(comment.getSuffix());
         }
         return space;
     }
 
-    protected void visitLeftPadded(@Nullable String prefix, @Nullable HclLeftPadded<? extends Hcl> leftPadded, HclLeftPadded.Location location, P p) {
+    protected void visitLeftPadded(@Nullable String prefix, @Nullable HclLeftPadded<? extends Hcl> leftPadded, HclLeftPadded.Location location, PrintOutputCapture<P> p) {
         if (leftPadded != null) {
-            StringBuilder acc = getPrinter();
             visitSpace(leftPadded.getBefore(), location.getBeforeLocation(), p);
             if (prefix != null) {
-                acc.append(prefix);
+                p.out.append(prefix);
             }
             visit(leftPadded.getElement(), p);
         }
     }
 
-    protected void visitRightPadded(List<? extends HclRightPadded<? extends Hcl>> nodes, HclRightPadded.Location location, String suffixBetween, P p) {
-        StringBuilder acc = getPrinter();
+    protected void visitRightPadded(List<? extends HclRightPadded<? extends Hcl>> nodes, HclRightPadded.Location location, String suffixBetween, PrintOutputCapture<P> p) {
         for (int i = 0; i < nodes.size(); i++) {
             HclRightPadded<? extends Hcl> node = nodes.get(i);
             visit(node.getElement(), p);
             visitSpace(node.getAfter(), location.getAfterLocation(), p);
             if (i < nodes.size() - 1) {
-                acc.append(suffixBetween);
+                p.out.append(suffixBetween);
             }
         }
     }
 
-    protected void visitContainer(String before, @Nullable HclContainer<? extends Hcl> container, HclContainer.Location location, String suffixBetween, @Nullable String after, P p) {
+    protected void visitContainer(String before, @Nullable HclContainer<? extends Hcl> container, HclContainer.Location location, String suffixBetween, @Nullable String after, PrintOutputCapture<P> p) {
         if (container == null) {
             return;
         }
-        StringBuilder acc = getPrinter();
         visitSpace(container.getBefore(), location.getBeforeLocation(), p);
-        acc.append(before);
+        p.out.append(before);
         visitRightPadded(container.getPadding().getElements(), location.getElementLocation(), suffixBetween, p);
-        acc.append(after == null ? "" : after);
+        p.out.append(after == null ? "" : after);
     }
 
     @Override
-    public <M extends Marker> M visitMarker(Marker marker, P p) {
-        StringBuilder acc = getPrinter();
-        treePrinter.doBefore(marker, acc, p);
-        acc.append(marker.print(treePrinter, p));
-        treePrinter.doAfter(marker, acc, p);
-        //noinspection unchecked
-        return (M) marker;
-    }
-
-    @Override
-    public Markers visitMarkers(Markers markers, P p) {
-        StringBuilder acc = getPrinter();
-        treePrinter.doBefore(markers, acc, p);
-        Markers m = super.visitMarkers(markers, p);
-        treePrinter.doAfter(markers, acc, p);
-        return m;
-    }
-
-    public String print(Hcl hcl, P p) {
-        setCursor(new Cursor(null, "EPSILON"));
-        visit(hcl, p);
-        return getPrinter().toString();
-    }
-
-    @Override
-    @Nullable
-    public Hcl visit(@Nullable Tree tree, P p) {
-        if (tree == null) {
-            return defaultValue(null, p);
-        }
-
-        StringBuilder printerAcc = getPrinter();
-        treePrinter.doBefore(tree, printerAcc, p);
-        tree = super.visit(tree, p);
-        if (tree != null) {
-            treePrinter.doAfter(tree, printerAcc, p);
-        }
-        return (Hcl) tree;
-    }
-
-    public void visit(@Nullable List<? extends Hcl> nodes, P p) {
-        if (nodes != null) {
-            for (Hcl node : nodes) {
-                visit(node, p);
-            }
-        }
-    }
-
-    @Override
-    public Hcl visitAttribute(Hcl.Attribute attribute, P p) {
+    public Hcl visitAttribute(Hcl.Attribute attribute, PrintOutputCapture<P> p) {
         visitSpace(attribute.getPrefix(), Space.Location.ATTRIBUTE, p);
         visitMarkers(attribute.getMarkers(), p);
         visit(attribute.getName(), p);
-        StringBuilder acc = getPrinter();
         visitSpace(attribute.getPadding().getType().getBefore(), Space.Location.ATTRIBUTE_ASSIGNMENT, p);
-        acc.append(attribute.getType().equals(Hcl.Attribute.Type.Assignment) ? "=" : ":");
+        p.out.append(attribute.getType().equals(Hcl.Attribute.Type.Assignment) ? "=" : ":");
         visit(attribute.getValue(), p);
         return attribute;
     }
 
     @Override
-    public Hcl visitAttributeAccess(Hcl.AttributeAccess attributeAccess, P p) {
+    public Hcl visitAttributeAccess(Hcl.AttributeAccess attributeAccess, PrintOutputCapture<P> p) {
         visitSpace(attributeAccess.getPrefix(), Space.Location.ATTRIBUTE_ACCESS, p);
         visitMarkers(attributeAccess.getMarkers(), p);
         visit(attributeAccess.getAttribute(), p);
@@ -174,51 +100,50 @@ public class HclPrinter<P> extends HclVisitor<P> {
     }
 
     @Override
-    public Hcl visitBinary(Hcl.Binary binary, P p) {
+    public Hcl visitBinary(Hcl.Binary binary, PrintOutputCapture<P> p) {
         visitSpace(binary.getPrefix(), Space.Location.BINARY, p);
         visitMarkers(binary.getMarkers(), p);
         visit(binary.getLeft(), p);
-        StringBuilder acc = getPrinter();
         visitSpace(binary.getPadding().getOperator().getBefore(), Space.Location.BINARY_OPERATOR, p);
         switch(binary.getOperator()) {
             case Addition:
-                acc.append('+');
+                p.out.append('+');
                 break;
             case Subtraction:
-                acc.append('-');
+                p.out.append('-');
                 break;
             case Multiplication:
-                acc.append('*');
+                p.out.append('*');
                 break;
             case Division:
-                acc.append('/');
+                p.out.append('/');
                 break;
             case Modulo:
-                acc.append('%');
+                p.out.append('%');
                 break;
             case LessThan:
-                acc.append('<');
+                p.out.append('<');
                 break;
             case GreaterThan:
-                acc.append('>');
+                p.out.append('>');
                 break;
             case LessThanOrEqual:
-                acc.append("<=");
+                p.out.append("<=");
                 break;
             case GreaterThanOrEqual:
-                acc.append(">=");
+                p.out.append(">=");
                 break;
             case Equal:
-                acc.append("==");
+                p.out.append("==");
                 break;
             case NotEqual:
-                acc.append("!=");
+                p.out.append("!=");
                 break;
             case Or:
-                acc.append("||");
+                p.out.append("||");
                 break;
             case And:
-                acc.append("&&");
+                p.out.append("&&");
                 break;
         }
         visit(binary.getRight(), p);
@@ -226,22 +151,21 @@ public class HclPrinter<P> extends HclVisitor<P> {
     }
 
     @Override
-    public Hcl visitBlock(Hcl.Block block, P p) {
+    public Hcl visitBlock(Hcl.Block block, PrintOutputCapture<P> p) {
         visitSpace(block.getPrefix(), Space.Location.BLOCK, p);
         visitMarkers(block.getMarkers(), p);
         visit(block.getType(), p);
         visit(block.getLabels(), p);
-        StringBuilder acc = getPrinter();
         visitSpace(block.getOpen(), Space.Location.BLOCK_OPEN, p);
-        acc.append('{');
+        p.out.append('{');
         visit(block.getBody(), p);
         visitSpace(block.getClose(), Space.Location.BLOCK_CLOSE, p);
-        acc.append('}');
+        p.out.append('}');
         return block;
     }
 
     @Override
-    public Hcl visitConditional(Hcl.Conditional conditional, P p) {
+    public Hcl visitConditional(Hcl.Conditional conditional, PrintOutputCapture<P> p) {
         visitSpace(conditional.getPrefix(), Space.Location.CONDITIONAL, p);
         visitMarkers(conditional.getMarkers(), p);
         visit(conditional.getCondition(), p);
@@ -251,7 +175,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     }
 
     @Override
-    public Hcl visitConfigFile(Hcl.ConfigFile configFile, P p) {
+    public Hcl visitConfigFile(Hcl.ConfigFile configFile, PrintOutputCapture<P> p) {
         visitSpace(configFile.getPrefix(), Space.Location.CONFIG_FILE, p);
         visitMarkers(configFile.getMarkers(), p);
         visit(configFile.getBody(), p);
@@ -259,7 +183,7 @@ public class HclPrinter<P> extends HclVisitor<P> {
     }
 
     @Override
-    public Hcl visitForIntro(Hcl.ForIntro forIntro, P p) {
+    public Hcl visitForIntro(Hcl.ForIntro forIntro, PrintOutputCapture<P> p) {
         visitSpace(forIntro.getPrefix(), Space.Location.FOR_INTRO, p);
         visitMarkers(forIntro.getMarkers(), p);
         visitContainer("for", forIntro.getPadding().getVariables(), HclContainer.Location.FOR_VARIABLES,
@@ -269,44 +193,42 @@ public class HclPrinter<P> extends HclVisitor<P> {
     }
 
     @Override
-    public Hcl visitForObject(Hcl.ForObject forObject, P p) {
+    public Hcl visitForObject(Hcl.ForObject forObject, PrintOutputCapture<P> p) {
         visitSpace(forObject.getPrefix(), Space.Location.FOR_OBJECT, p);
         visitMarkers(forObject.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("{");
+        p.out.append("{");
         visit(forObject.getIntro(), p);
         visitLeftPadded(":", forObject.getPadding().getUpdateName(), HclLeftPadded.Location.FOR_UPDATE, p);
         visitLeftPadded("=>", forObject.getPadding().getUpdateValue(), HclLeftPadded.Location.FOR_UPDATE_VALUE, p);
         if(forObject.getEllipsis() != null) {
             visitSpace(forObject.getEllipsis().getPrefix(), Space.Location.FOR_UPDATE_VALUE_ELLIPSIS, p);
-            acc.append("...");
+            p.out.append("...");
         }
         if (forObject.getPadding().getCondition() != null) {
             visitLeftPadded("if", forObject.getPadding().getCondition(), HclLeftPadded.Location.FOR_CONDITION, p);
         }
         visitSpace(forObject.getEnd(), Space.Location.FOR_OBJECT_SUFFIX, p);
-        acc.append("}");
+        p.out.append("}");
         return forObject;
     }
 
     @Override
-    public Hcl visitForTuple(Hcl.ForTuple forTuple, P p) {
+    public Hcl visitForTuple(Hcl.ForTuple forTuple, PrintOutputCapture<P> p) {
         visitSpace(forTuple.getPrefix(), Space.Location.FOR_TUPLE, p);
         visitMarkers(forTuple.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("[");
+        p.out.append("[");
         visit(forTuple.getIntro(), p);
         visitLeftPadded(":", forTuple.getPadding().getUpdate(), HclLeftPadded.Location.FOR_UPDATE, p);
         if (forTuple.getPadding().getCondition() != null) {
             visitLeftPadded("if", forTuple.getPadding().getCondition(), HclLeftPadded.Location.FOR_CONDITION, p);
         }
         visitSpace(forTuple.getEnd(), Space.Location.FOR_TUPLE_SUFFIX, p);
-        acc.append("]");
+        p.out.append("]");
         return forTuple;
     }
 
     @Override
-    public Hcl visitFunctionCall(Hcl.FunctionCall functionCall, P p) {
+    public Hcl visitFunctionCall(Hcl.FunctionCall functionCall, PrintOutputCapture<P> p) {
         visitSpace(functionCall.getPrefix(), Space.Location.FUNCTION_CALL, p);
         visitMarkers(functionCall.getMarkers(), p);
         visit(functionCall.getName(), p);
@@ -316,29 +238,27 @@ public class HclPrinter<P> extends HclVisitor<P> {
     }
 
     @Override
-    public Hcl visitHeredocTemplate(Hcl.HeredocTemplate heredocTemplate, P p) {
+    public Hcl visitHeredocTemplate(Hcl.HeredocTemplate heredocTemplate, PrintOutputCapture<P> p) {
         visitSpace(heredocTemplate.getPrefix(), Space.Location.HEREDOC, p);
         visitMarkers(heredocTemplate.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append(heredocTemplate.getArrow());
+        p.out.append(heredocTemplate.getArrow());
         visit(heredocTemplate.getDelimiter(), p);
         visit(heredocTemplate.getExpressions(), p);
         visitSpace(heredocTemplate.getEnd(), Space.Location.HEREDOC_END, p);
-        acc.append(heredocTemplate.getDelimiter().getName());
+        p.out.append(heredocTemplate.getDelimiter().getName());
         return heredocTemplate;
     }
 
     @Override
-    public Hcl visitIdentifier(Hcl.Identifier identifier, P p) {
+    public Hcl visitIdentifier(Hcl.Identifier identifier, PrintOutputCapture<P> p) {
         visitSpace(identifier.getPrefix(), Space.Location.IDENTIFIER, p);
         visitMarkers(identifier.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append(identifier.getName());
+        p.out.append(identifier.getName());
         return identifier;
     }
 
     @Override
-    public Hcl visitIndex(Hcl.Index index, P p) {
+    public Hcl visitIndex(Hcl.Index index, PrintOutputCapture<P> p) {
         visitSpace(index.getPrefix(), Space.Location.INDEX, p);
         visitMarkers(index.getMarkers(), p);
         visit(index.getIndexed(), p);
@@ -347,28 +267,26 @@ public class HclPrinter<P> extends HclVisitor<P> {
     }
 
     @Override
-    public Hcl visitIndexPosition(Hcl.Index.Position indexPosition, P p) {
+    public Hcl visitIndexPosition(Hcl.Index.Position indexPosition, PrintOutputCapture<P> p) {
         visitSpace(indexPosition.getPrefix(), Space.Location.INDEX_POSITION, p);
         visitMarkers(indexPosition.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("[");
+        p.out.append("[");
         visitMarkers(indexPosition.getMarkers(), p);
         visitRightPadded(indexPosition.getPadding().getPosition(), HclRightPadded.Location.INDEX_POSITION, p);
-        acc.append("]");
+        p.out.append("]");
         return indexPosition;
     }
 
     @Override
-    public Hcl visitLiteral(Hcl.Literal literal, P p) {
+    public Hcl visitLiteral(Hcl.Literal literal, PrintOutputCapture<P> p) {
         visitSpace(literal.getPrefix(), Space.Location.LITERAL, p);
         visitMarkers(literal.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append(literal.getValueSource());
+        p.out.append(literal.getValueSource());
         return literal;
     }
 
     @Override
-    public Hcl visitObjectValue(Hcl.ObjectValue objectValue, P p) {
+    public Hcl visitObjectValue(Hcl.ObjectValue objectValue, PrintOutputCapture<P> p) {
         visitSpace(objectValue.getPrefix(), Space.Location.OBJECT_VALUE, p);
         visitMarkers(objectValue.getMarkers(), p);
         visitContainer("{", objectValue.getPadding().getAttributes(), HclContainer.Location.OBJECT_VALUE_ATTRIBUTES,
@@ -377,40 +295,37 @@ public class HclPrinter<P> extends HclVisitor<P> {
     }
 
     @Override
-    public Hcl visitParentheses(Hcl.Parentheses parentheses, P p) {
+    public Hcl visitParentheses(Hcl.Parentheses parentheses, PrintOutputCapture<P> p) {
         visitSpace(parentheses.getPrefix(), Space.Location.PARENTHETICAL_EXPRESSION, p);
         visitMarkers(parentheses.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append('(');
+        p.out.append('(');
         visitRightPadded(parentheses.getPadding().getExpression(), HclRightPadded.Location.PARENTHESES, p);
-        acc.append(')');
+        p.out.append(')');
         return parentheses;
     }
 
     @Override
-    public Hcl visitQuotedTemplate(Hcl.QuotedTemplate template, P p) {
+    public Hcl visitQuotedTemplate(Hcl.QuotedTemplate template, PrintOutputCapture<P> p) {
         visitSpace(template.getPrefix(), Space.Location.QUOTED_TEMPLATE, p);
         visitMarkers(template.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append('"');
+        p.out.append('"');
         visit(template.getExpressions(), p);
-        acc.append('"');
+        p.out.append('"');
         return template;
     }
 
     @Override
-    public Hcl visitTemplateInterpolation(Hcl.TemplateInterpolation template, P p) {
+    public Hcl visitTemplateInterpolation(Hcl.TemplateInterpolation template, PrintOutputCapture<P> p) {
         visitSpace(template.getPrefix(), Space.Location.TEMPLATE_INTERPOLATION, p);
         visitMarkers(template.getMarkers(), p);
-        StringBuilder acc = getPrinter();
-        acc.append("${");
+        p.out.append("${");
         visit(template.getExpression(), p);
-        acc.append('}');
+        p.out.append('}');
         return template;
     }
 
     @Override
-    public Hcl visitSplat(Hcl.Splat splat, P p) {
+    public Hcl visitSplat(Hcl.Splat splat, PrintOutputCapture<P> p) {
         visitSpace(splat.getPrefix(), Space.Location.ATTRIBUTE_ACCESS, p);
         visitMarkers(splat.getMarkers(), p);
         visit(splat.getSelect(), p);
@@ -419,26 +334,25 @@ public class HclPrinter<P> extends HclVisitor<P> {
     }
 
     @Override
-    public Hcl visitSplatOperator(Hcl.Splat.Operator splatOperator, P p) {
+    public Hcl visitSplatOperator(Hcl.Splat.Operator splatOperator, PrintOutputCapture<P> p) {
         visitSpace(splatOperator.getPrefix(), Space.Location.SPLAT_OPERATOR, p);
         visitMarkers(splatOperator.getMarkers(), p);
-        StringBuilder acc = getPrinter();
         if (splatOperator.getType().equals(Hcl.Splat.Operator.Type.Full)) {
-            acc.append('[');
+            p.out.append('[');
         } else {
-            acc.append('.');
+            p.out.append('.');
         }
         visitSpace(splatOperator.getSplat().getElement().getPrefix(), Space.Location.SPLAT_OPERATOR_PREFIX, p);
-        acc.append('*');
+        p.out.append('*');
         if (splatOperator.getType().equals(Hcl.Splat.Operator.Type.Full)) {
             visitSpace(splatOperator.getSplat().getAfter(), Space.Location.SPLAT_OPERATOR_SUFFIX, p);
-            acc.append(']');
+            p.out.append(']');
         }
         return splatOperator;
     }
 
     @Override
-    public Hcl visitTuple(Hcl.Tuple tuple, P p) {
+    public Hcl visitTuple(Hcl.Tuple tuple, PrintOutputCapture<P> p) {
         visitSpace(tuple.getPrefix(), Space.Location.FUNCTION_CALL, p);
         visitMarkers(tuple.getMarkers(), p);
         visitContainer("[", tuple.getPadding().getValues(), HclContainer.Location.TUPLE_VALUES,
@@ -447,16 +361,15 @@ public class HclPrinter<P> extends HclVisitor<P> {
     }
 
     @Override
-    public Hcl visitUnary(Hcl.Unary unary, P p) {
+    public Hcl visitUnary(Hcl.Unary unary, PrintOutputCapture<P> p) {
         visitSpace(unary.getPrefix(), Space.Location.UNARY, p);
         visitMarkers(unary.getMarkers(), p);
-        StringBuilder acc = getPrinter();
         switch(unary.getOperator()) {
             case Negative:
-                acc.append('-');
+                p.out.append('-');
                 break;
             case Not:
-                acc.append('!');
+                p.out.append('!');
                 break;
         }
         visit(unary.getExpression(), p);
@@ -464,10 +377,22 @@ public class HclPrinter<P> extends HclVisitor<P> {
     }
 
     @Override
-    public Hcl visitVariableExpression(Hcl.VariableExpression variableExpression, P p) {
+    public Hcl visitVariableExpression(Hcl.VariableExpression variableExpression, PrintOutputCapture<P> p) {
         visitSpace(variableExpression.getPrefix(), Space.Location.VARIABLE_EXPRESSION, p);
         visitMarkers(variableExpression.getMarkers(), p);
         visit(variableExpression.getName(), p);
         return variableExpression;
+    }
+
+    @Override
+    public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
+        if(marker instanceof SearchResult) {
+            String description = ((SearchResult) marker).getDescription();
+            p.out.append("/*~~")
+                    .append(description == null ? "" : "(" + description + ")~~")
+                    .append(">*/");
+        }
+        //noinspection unchecked
+        return (M) marker;
     }
 }

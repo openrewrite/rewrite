@@ -17,10 +17,11 @@ package org.openrewrite.text
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
-import org.openrewrite.*
+import org.openrewrite.Parser
+import org.openrewrite.Recipe
+import org.openrewrite.RecipeTest
+import org.openrewrite.Tree
 import org.openrewrite.marker.Markers
-import java.nio.file.Path
 import java.nio.file.Paths
 
 class CreateTextFileTest : RecipeTest<PlainText> {
@@ -31,43 +32,43 @@ class CreateTextFileTest : RecipeTest<PlainText> {
         get() = CreateTextFile("foo", ".github/CODEOWNERS", false)
 
     @Test
-    fun hasCreatedFile(@TempDir tempDir: Path) {
-        val results = recipe.run(emptyList());
-        assertThat(results).hasSize(1);
-        assertThat(results[0].after.print()).isEqualTo("foo");
+    fun hasCreatedFile() {
+        val results = recipe.run(emptyList())
+        assertThat(results).hasSize(1)
+        assertThat(results[0].after!!.printAll()).isEqualTo("foo")
     }
 
     @Test
-    fun hasOverwrittenFile(@TempDir tempDir: Path) {
+    fun hasOverwrittenFile() {
         val overwriteRecipe: Recipe = CreateTextFile("foo", ".github/CODEOWNERS", true)
-        val results = overwriteRecipe.run(listOf(PlainText(Tree.randomId(), Paths.get(".github/CODEOWNERS"), Markers.EMPTY, "hello")));
+        val results = overwriteRecipe.run(listOf(PlainText(Tree.randomId(), Paths.get(".github/CODEOWNERS"), Markers.EMPTY, "hello")))
 
-        assertThat(results).hasSize(1);
-        assertThat(results[0].after.print()).isEqualTo("foo");
+        assertThat(results).hasSize(1)
+        assertThat(results[0].after!!.printAll()).isEqualTo("foo")
     }
 
     @Test
-    fun shouldNotChangeExistingFile(@TempDir tempDir: Path) {
+    fun shouldNotChangeExistingFile() {
         val overwriteRecipe: Recipe = CreateTextFile("foo", ".github/CODEOWNERS", false)
-        val results = overwriteRecipe.run(listOf(PlainText(Tree.randomId(), Paths.get(".github/CODEOWNERS"), Markers.EMPTY, "hello")));
+        val results = overwriteRecipe.run(listOf(PlainText(Tree.randomId(), Paths.get(".github/CODEOWNERS"), Markers.EMPTY, "hello")))
 
-        assertThat(results).hasSize(0);
+        assertThat(results).hasSize(0)
     }
 
     @Test
-    fun shouldNotChangeExistingFileWhenOverwriteNull(@TempDir tempDir: Path) {
+    fun shouldNotChangeExistingFileWhenOverwriteNull() {
         val overwriteRecipe: Recipe = CreateTextFile("foo", ".github/CODEOWNERS", null)
-        val results = overwriteRecipe.run(listOf(PlainText(Tree.randomId(), Paths.get(".github/CODEOWNERS"), Markers.EMPTY, "hello")));
+        val results = overwriteRecipe.run(listOf(PlainText(Tree.randomId(), Paths.get(".github/CODEOWNERS"), Markers.EMPTY, "hello")))
 
-        assertThat(results).hasSize(0);
+        assertThat(results).hasSize(0)
     }
 
     @Test
-    fun shouldAddAnotherFile(@TempDir tempDir: Path) {
+    fun shouldAddAnotherFile() {
         val overwriteRecipe: Recipe = CreateTextFile("foo", ".github/CODEOWNERSZ", false)
-        val results = overwriteRecipe.run(listOf(PlainText(Tree.randomId(), Paths.get(".github/CODEOWNERS"), Markers.EMPTY, "hello")));
+        val results = overwriteRecipe.run(listOf(PlainText(Tree.randomId(), Paths.get(".github/CODEOWNERS"), Markers.EMPTY, "hello")))
 
-        assertThat(results).hasSize(1);
-        assertThat(results[0].after.print()).isEqualTo("foo");
+        assertThat(results).hasSize(1)
+        assertThat(results[0].after!!.printAll()).isEqualTo("foo")
     }
 }

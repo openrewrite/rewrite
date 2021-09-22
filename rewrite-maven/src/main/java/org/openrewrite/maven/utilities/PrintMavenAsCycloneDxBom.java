@@ -16,16 +16,11 @@
 package org.openrewrite.maven.utilities;
 
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.Scope;
 
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.*;
 

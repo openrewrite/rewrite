@@ -24,13 +24,10 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 
 import java.nio.file.Paths;
-
-import static org.openrewrite.Tree.randomId;
 
 /**
  * A recipe that will rename a package name in package statements, imports, and fully-qualified types (see: NOTE).
@@ -79,9 +76,9 @@ public class ChangePackage extends Recipe {
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
                 if (cu.getPackageDeclaration() != null) {
                     String original = cu.getPackageDeclaration().getExpression()
-                            .printTrimmed().replaceAll("\\s", "");
+                            .printTrimmed(getCursor()).replaceAll("\\s", "");
                     if (original.startsWith(oldPackageName)) {
-                        return cu.withMarkers(cu.getMarkers().addIfAbsent(new JavaSearchResult(randomId(), ChangePackage.this)));
+                        return cu.withMarkers(cu.getMarkers().searchResult());
                     }
                 }
                 doAfterVisit(new UsesType<>(oldPackageName + ".*"));
@@ -170,17 +167,17 @@ public class ChangePackage extends Recipe {
 
         @Override
         public J.Package visitPackage(J.Package pkg, ExecutionContext context) {
-            String original = pkg.getExpression().printTrimmed().replaceAll("\\s", "");
+            String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
             getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, RENAME_FROM_KEY, original);
 
             if (original.equals(oldPackageName)) {
                 getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, RENAME_TO_KEY, newPackageName);
-                pkg = pkg.withTemplate(JavaTemplate.builder(this::getCursor, newPackageName).build(), pkg.getCoordinates().replace());
+                pkg = pkg.withTemplate(pkg.template(getCursor(), newPackageName), pkg.getCoordinates().replace());
             } else if ((recursive == null || recursive)
                     && original.startsWith(oldPackageName) && !original.startsWith(newPackageName)) {
                 String changingTo = newPackageName + original.substring(oldPackageName.length());
                 getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, RENAME_TO_KEY, changingTo);
-                pkg = pkg.withTemplate(JavaTemplate.builder(this::getCursor, changingTo).build(), pkg.getCoordinates().replace());
+                pkg = pkg.withTemplate(pkg.template(getCursor(), changingTo), pkg.getCoordinates().replace());
             }
             return pkg;
         }

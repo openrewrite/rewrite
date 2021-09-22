@@ -19,7 +19,10 @@ import org.openrewrite.Cursor;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.json.tree.*;
+import org.openrewrite.json.tree.Json;
+import org.openrewrite.json.tree.JsonRightPadded;
+import org.openrewrite.json.tree.JsonValue;
+import org.openrewrite.json.tree.Space;
 
 public class JsonVisitor<P> extends TreeVisitor<Json, P> {
 

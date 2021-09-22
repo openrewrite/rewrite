@@ -21,10 +21,7 @@ import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
-import org.openrewrite.TreePrinter;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.internal.HclPrinter;
 import org.openrewrite.internal.lang.Nullable;
@@ -57,15 +54,6 @@ public interface Hcl extends Serializable, Tree {
     @Override
     default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
         return v instanceof HclVisitor;
-    }
-
-    default <P> String print(TreePrinter<P> printer, P p) {
-        return new HclPrinter<>(printer).print(this, p);
-    }
-
-    @Override
-    default <P> String print(P p) {
-        return print(TreePrinter.identity(), p);
     }
 
     Space getPrefix();
@@ -521,6 +509,11 @@ public interface Hcl extends Serializable, Tree {
         @Override
         public String toString() {
             return "ConfigFile";
+        }
+
+        @Override
+        public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
+            return new HclPrinter<>();
         }
     }
 

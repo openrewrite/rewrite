@@ -55,7 +55,7 @@ public class FindKey extends Recipe {
             public Json.Member visitMember(Json.Member member, ExecutionContext executionContext) {
                 Json.Member m = super.visitMember(member, executionContext);
                 if (matcher.matches(getCursor())) {
-                    m = m.withKey(m.getKey().withMarkers(m.getKey().getMarkers().addIfAbsent(new JsonSearchResult(FindKey.this))));
+                    m = m.withKey(m.getKey().withMarkers(m.getKey().getMarkers().searchResult()));
                 }
                 return m;
             }
@@ -74,7 +74,7 @@ public class FindKey extends Recipe {
                 }
                 return m;
             }
-        };
+        }.visit(j, ks);
         return ks;
     }
 }

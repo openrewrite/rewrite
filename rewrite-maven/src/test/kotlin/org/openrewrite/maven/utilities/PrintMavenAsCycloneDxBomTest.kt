@@ -16,9 +16,7 @@
 package org.openrewrite.maven.utilities
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
-import org.openrewrite.internal.StringUtils
 import org.openrewrite.maven.MavenParser
 
 class PrintMavenAsCycloneDxBomTest {

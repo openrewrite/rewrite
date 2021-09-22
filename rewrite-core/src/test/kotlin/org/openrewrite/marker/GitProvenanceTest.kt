@@ -17,7 +17,6 @@ package org.openrewrite.marker
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.Tree
 import org.openrewrite.Tree.randomId
 
 class GitProvenanceTest {

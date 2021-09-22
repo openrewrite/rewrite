@@ -20,8 +20,6 @@ import lombok.With;
 import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
-import java.util.regex.Pattern;
-
 @Value
 @With
 public class FallThroughStyle implements Style {

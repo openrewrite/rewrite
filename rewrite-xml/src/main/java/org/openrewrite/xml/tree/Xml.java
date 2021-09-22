@@ -65,15 +65,6 @@ public interface Xml extends Serializable, Tree {
         return v instanceof XmlVisitor;
     }
 
-    default <P> String print(TreePrinter<P> printer, P p) {
-        return new XmlPrinter<>(printer).print(this, p);
-    }
-
-    @Override
-    default <P> String print(P p) {
-        return print(TreePrinter.identity(), p);
-    }
-
     String getPrefix();
 
     Xml withPrefix(String prefix);
@@ -125,6 +116,11 @@ public interface Xml extends Serializable, Tree {
         @Override
         public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
             return v.visitDocument(this, p);
+        }
+
+        @Override
+        public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
+            return new XmlPrinter<>();
         }
     }
 

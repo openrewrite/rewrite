@@ -16,6 +16,7 @@
 package org.openrewrite.java
 
 import org.assertj.core.api.Assertions
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.*
 import org.openrewrite.Tree.randomId
@@ -842,8 +843,8 @@ interface AddImportTest : JavaRecipeTest {
 
         val recipe: AddImport<ExecutionContext> = AddImport("org.foo.Shared", null, false)
         val result = recipe.visit(markedFiles[0], InMemoryExecutionContext())
-        Assertions.assertThat((result as J.CompilationUnit).imports.size == 6).isTrue
-        Assertions.assertThat((result).imports[5].qualid.printTrimmed()).isEqualTo("org.foo.Shared")
+        assertThat((result as J.CompilationUnit).imports.size == 6).isTrue
+        assertThat((result).imports[5].qualid.printTrimmed()).isEqualTo("org.foo.Shared")
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/880")
@@ -921,8 +922,8 @@ interface AddImportTest : JavaRecipeTest {
 
         val recipe: AddImport<ExecutionContext> = AddImport("org.buz.Buz", "assertThatC", false)
         val result = recipe.visit(markedFiles[2], InMemoryExecutionContext())
-        Assertions.assertThat((result as J.CompilationUnit).imports.size == 6).isTrue
-        Assertions.assertThat((result).imports[5].qualid.printTrimmed()).isEqualTo("org.buz.Buz.assertThatC")
+        assertThat((result as J.CompilationUnit).imports.size == 6).isTrue
+        assertThat((result).imports[5].qualid.printTrimmed()).isEqualTo("org.buz.Buz.assertThatC")
     }
 
     /**

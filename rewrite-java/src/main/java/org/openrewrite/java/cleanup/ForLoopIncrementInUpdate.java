@@ -83,7 +83,7 @@ public class ForLoopIncrementInUpdate extends Recipe {
                                     J.ForLoop f = forLoop.withControl(forLoop.getControl().withUpdate(ListUtils.insertInOrder(
                                             ListUtils.map(forLoop.getControl().getUpdate(), u -> u instanceof J.Empty ? null : u),
                                             unary.withPrefix(Space.format(" ")),
-                                            Comparator.comparing(Statement::printTrimmed, Comparator.naturalOrder())
+                                            Comparator.comparing(s -> s.printTrimmed(getCursor()), Comparator.naturalOrder())
                                     )));
 
                                     //noinspection ConstantConditions

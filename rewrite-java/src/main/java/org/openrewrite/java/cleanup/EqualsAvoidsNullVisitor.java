@@ -72,7 +72,7 @@ public class EqualsAvoidsNullVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private boolean matchesSelect(Expression expression, Expression select) {
-        return expression.printTrimmed().replaceAll("\\s", "").equals(select.printTrimmed().replaceAll("\\s", ""));
+        return expression.printTrimmed(getCursor()).replaceAll("\\s", "").equals(select.printTrimmed(getCursor()).replaceAll("\\s", ""));
     }
 
     private static class RemoveUnnecessaryNullCheck<P> extends JavaVisitor<P> {

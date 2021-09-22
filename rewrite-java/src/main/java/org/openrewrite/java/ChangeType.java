@@ -22,15 +22,11 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.marker.JavaSearchResult;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
 import java.util.Stack;
-
-import static org.openrewrite.Tree.randomId;
 
 /**
  * NOTE: Does not currently transform all possible type references, and accomplishing this would be non-trivial.
@@ -42,8 +38,6 @@ import static org.openrewrite.Tree.randomId;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeType extends Recipe {
-    @SuppressWarnings("ConstantConditions")
-    private static final Marker FOUND_TYPE = new JavaSearchResult(randomId(), null, null);
 
     /**
      * Fully-qualified class name of the original type.
@@ -88,7 +82,7 @@ public class ChangeType extends Recipe {
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
                 for (J.ClassDeclaration it : cu.getClasses()) {
                     if (TypeUtils.isOfClassType(it.getType(), oldFullyQualifiedTypeName)) {
-                        return cu.withMarkers(cu.getMarkers().addIfAbsent(FOUND_TYPE));
+                        return cu.withMarkers(cu.getMarkers().searchResult());
                     }
                 }
                 doAfterVisit(new UsesType<>(oldFullyQualifiedTypeName));

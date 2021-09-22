@@ -21,10 +21,10 @@ import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.Tree
+import org.openrewrite.java.cleanup.PadEmptyForLoopComponents
 import org.openrewrite.java.format.SpacesVisitor
 import org.openrewrite.java.style.EmptyForInitializerPadStyle
 import org.openrewrite.java.style.EmptyForIteratorPadStyle
-import org.openrewrite.java.cleanup.PadEmptyForLoopComponents
 import org.openrewrite.java.style.IntelliJ
 import org.openrewrite.style.NamedStyles
 import org.openrewrite.style.Style

@@ -42,12 +42,28 @@ import java.util.function.BiFunction;
  */
 public abstract class TreeVisitor<T extends Tree, P> {
     private static final boolean IS_DEBUGGING = System.getProperty("org.openrewrite.debug") != null ||
-            ManagementFactory.getRuntimeMXBean().getInputArguments().toString().indexOf("-agentlib:jdwp") > 0;
+            ManagementFactory.getRuntimeMXBean().getInputArguments().toString().contains("-agentlib:jdwp");
 
     private Cursor cursor;
 
     {
         setCursor(new Cursor(null, "root"));
+    }
+
+    public static <T extends Tree, P> TreeVisitor<T, P> noop() {
+        return new TreeVisitor<T, P>() {
+            @Override
+            public @Nullable T visit(@Nullable Tree tree, P p) {
+                //noinspection unchecked
+                return (T) tree;
+            }
+
+            @Override
+            public @Nullable T visit(@Nullable Tree tree, P p, Cursor parent) {
+                //noinspection unchecked
+                return (T) tree;
+            }
+        };
     }
 
     private List<TreeVisitor<T, P>> afterVisit;
@@ -199,6 +215,14 @@ public abstract class TreeVisitor<T extends Tree, P> {
 
         //noinspection unchecked
         return (isAcceptable) ? t : (T) tree;
+    }
+
+    protected void visit(@Nullable List<? extends T> nodes, P p) {
+        if (nodes != null) {
+            for (T node : nodes) {
+                visit(node, p);
+            }
+        }
     }
 
     /**

@@ -24,8 +24,8 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.MavenArtifactCache;
 import org.openrewrite.maven.internal.MavenDownloadingException;
-import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.tree.Pom;
 
 import java.io.IOException;
 import java.io.InputStream;
