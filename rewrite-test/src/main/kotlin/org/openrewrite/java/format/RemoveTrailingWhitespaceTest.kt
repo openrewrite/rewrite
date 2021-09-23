@@ -16,6 +16,7 @@
 package org.openrewrite.java.format
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 
@@ -36,6 +37,22 @@ interface RemoveTrailingWhitespaceTest: JavaRecipeTest {
             
                 public void method(Test t) {
                 }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1053")
+    @Test
+    fun doNotRemoveTrailingComma(jp: JavaParser) = assertUnchanged(
+        jp,
+        recipe = RemoveTrailingWhitespace(),
+        before = """
+            public class Test {
+                Integer[] integerArray = new Integer[] {
+                    1,
+                    2,
+                    4,
+                };
             }
         """
     )

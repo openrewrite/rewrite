@@ -58,7 +58,7 @@ public class RemoveTrailingWhitespaceVisitor<P> extends JavaIsoVisitor<P> {
                 char c = charArray[i];
                 if (i >= lastNewline) {
                     ws.append(c);
-                } else if (c == '\r' || c == '\n') {
+                } else if (c == ',' || c == '\r' || c == '\n') {
                     ws.append(c);
                 }
             }
