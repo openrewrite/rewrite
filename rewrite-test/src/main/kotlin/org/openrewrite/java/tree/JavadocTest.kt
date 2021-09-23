@@ -1018,13 +1018,30 @@ interface JavadocTest : JavaTreeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1026")
     @Test
-    fun selfClosingElement(jp: JavaParser) = assertParsePrintAndProcess(
+    fun selfClosingHTMLTag(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
         CompilationUnit,
         """
             /**
              *<p/>
              * text
+             */
+            class Test {
+            }
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1047")
+    @Test
+    fun preserveWhitespaceBeforeHTMLTag(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /**
+             * <p>
+             * <p/>
+             * text <br>
+             * text <br/>
              */
             class Test {
             }

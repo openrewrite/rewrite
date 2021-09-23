@@ -278,14 +278,12 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         }
 
         List<? extends DocTree> restOfBody = node.getBody();
-        for (DocTree docTree : restOfBody) {
-            Javadoc.LineBreak lineBreak;
-            while ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
-                cursor++;
-                body.add(lineBreak);
+        for (int i = 0; i < restOfBody.size(); i++) {
+            DocTree docTree = restOfBody.get(i);
+            if (!(docTree instanceof DCTree.DCText && i > 0)) {
+                body.addAll(whitespaceBefore());
             }
             if (docTree instanceof DCTree.DCText) {
-                body.addAll(whitespaceBefore());
                 body.addAll(visitText(((DCTree.DCText) docTree).getBody()));
             } else {
                 body.add((Javadoc) scan(docTree, whitespaceBefore()));
