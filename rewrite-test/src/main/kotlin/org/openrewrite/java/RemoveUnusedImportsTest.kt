@@ -35,6 +35,22 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1052")
+    @Test
+    fun usedInJavadocWithThrows(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            import java.time.DateTimeException;
+            
+            class A {
+                /** 
+                 * @throws DateTimeException when ...
+                 */
+                void foo() {}
+            }
+        """
+    )
+
     @Test
     fun usedInJavadoc(jp: JavaParser) = assertUnchanged(
         jp,

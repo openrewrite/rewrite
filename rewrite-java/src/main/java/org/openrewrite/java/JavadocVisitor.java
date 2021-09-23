@@ -222,6 +222,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
     public Javadoc visitThrows(Javadoc.Throws aThrows, P p) {
         Javadoc.Throws e = aThrows;
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        e = e.withExceptionName(javaVisitor.visit(e.getExceptionName(), p));
         e = e.withSpaceBeforeExceptionName(ListUtils.map(e.getSpaceBeforeExceptionName(), s -> visit(s, p)));
         e = e.withDescription(ListUtils.map(e.getDescription(), desc -> visit(desc, p)));
         return e;
