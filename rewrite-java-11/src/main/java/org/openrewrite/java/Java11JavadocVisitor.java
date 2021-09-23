@@ -710,6 +710,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
         body.addAll(sourceBefore("<"));
         String name = node.getName().toString();
         cursor += name.length();
+        cursor += node.isSelfClosing() ? 1 : 0;
         return new Javadoc.StartElement(
                 randomId(),
                 Markers.EMPTY,
