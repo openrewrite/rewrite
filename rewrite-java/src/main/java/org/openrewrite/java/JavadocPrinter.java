@@ -307,7 +307,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         return since;
     }
 
-    protected void visit(@Nullable List<? extends Javadoc> nodes, PrintOutputCapture<P> p) {
+    public void visit(@Nullable List<? extends Javadoc> nodes, PrintOutputCapture<P> p) {
         if (nodes != null) {
             for (Javadoc node : nodes) {
                 visit(node, p);

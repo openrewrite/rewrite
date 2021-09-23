@@ -217,7 +217,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
         return (isAcceptable) ? t : (T) tree;
     }
 
-    protected void visit(@Nullable List<? extends T> nodes, P p) {
+    public void visit(@Nullable List<? extends T> nodes, P p) {
         if (nodes != null) {
             for (T node : nodes) {
                 visit(node, p);

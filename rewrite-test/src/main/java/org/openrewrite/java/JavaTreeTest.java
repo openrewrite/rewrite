@@ -92,7 +92,7 @@ class JavaParserTestUtil {
                 break;
             case CompilationUnit:
             default:
-                printed = cu.printTrimmed();
+                printed = cu.printAllTrimmed();
                 printed = printed.substring(printed.indexOf("/*<START>*/") + "/*<START>*/".length());
                 break;
         }

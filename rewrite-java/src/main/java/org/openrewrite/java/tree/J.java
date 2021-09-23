@@ -2248,7 +2248,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class Import implements J, Comparable<Import> {
+    final class Import implements Statement, Comparable<Import> {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -2377,6 +2377,11 @@ public interface J extends Serializable, Tree {
             public Import withStatic(JLeftPadded<Boolean> statik) {
                 return t.statik == statik ? t : new Import(t.id, t.prefix, t.markers, statik, t.qualid);
             }
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
     }
 
