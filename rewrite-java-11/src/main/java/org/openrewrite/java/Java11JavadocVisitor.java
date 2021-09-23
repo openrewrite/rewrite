@@ -291,7 +291,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
                 for (int j = cursor; j < source.length(); j++) {
                     char ch = source.charAt(j);
                     if (ch == '\r') {
-                        cursor += 1;
+                        cursor ++;
                         continue;
                     }
 
