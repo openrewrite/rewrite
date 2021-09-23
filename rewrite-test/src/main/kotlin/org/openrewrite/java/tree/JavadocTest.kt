@@ -1015,4 +1015,19 @@ interface JavadocTest : JavaTreeTest {
               "public class A {\r\n" +
               "}"
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1026")
+    @Test
+    fun selfClosingElement(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /**
+             *<p/>
+             * text
+             */
+            class Test {
+            }
+        """.trimIndent()
+    )
 }
