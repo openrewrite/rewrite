@@ -41,7 +41,7 @@ public class WrappingAndBraces extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return new LinkedHashSet<>(Arrays.asList("RSPEC-2681", "RSPEC-3626", "RSPEC-3973"));
+        return new LinkedHashSet<>(Arrays.asList("RSPEC-2681", "RSPEC-3972", "RSPEC-3973"));
     }
 
     @Override
