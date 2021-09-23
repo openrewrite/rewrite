@@ -93,7 +93,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     <T extends J> JRightPadded<T> spaceAfter(JRightPadded<T> container, boolean spaceAfter) {
         if (spaceAfter && StringUtils.isNullOrEmpty(container.getAfter().getWhitespace())) {
             return container.withAfter(container.getAfter().withWhitespace(" "));
-        } else if (!spaceAfter && container.getAfter().getWhitespace().equals(" ")) {
+        } else if (!spaceAfter && container.getAfter().getWhitespace().equals(" ") && container.getAfter().getComments().isEmpty()) {
             return container.withAfter(container.getAfter().withWhitespace(""));
         } else {
             return container;

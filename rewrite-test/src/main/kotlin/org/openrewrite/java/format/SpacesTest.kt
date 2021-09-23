@@ -18,6 +18,7 @@
 package org.openrewrite.java.format
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
@@ -4833,6 +4834,17 @@ interface SpacesTest : JavaRecipeTest {
                 {
                     for (int i = 0; i < 10;) { i++; }
                 }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1051")
+    @Test
+    fun preserveSpacePrecedingComment(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            @Deprecated("version" /* some comment */) 
+            class Test {
             }
         """
     )
