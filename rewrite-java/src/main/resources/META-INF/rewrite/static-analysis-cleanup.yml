@@ -22,6 +22,7 @@ recipeList:
   - org.openrewrite.java.cleanup.BigDecimalRoundingConstantsToEnums
   - org.openrewrite.java.cleanup.BooleanChecksNotInverted
   - org.openrewrite.java.cleanup.CatchClauseOnlyRethrows
+  - org.openrewrite.java.cleanup.CaseInsensitiveComparisonsDoNotChangeCase
   - org.openrewrite.java.cleanup.ControlFlowIndentation
   - org.openrewrite.java.cleanup.CovariantEquals
   - org.openrewrite.java.cleanup.DefaultComesLast

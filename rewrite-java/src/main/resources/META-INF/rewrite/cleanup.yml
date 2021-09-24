@@ -19,6 +19,7 @@ name: org.openrewrite.java.cleanup.Cleanup
 displayName: Code cleanup
 description: Automatically cleanup code, e.g. remove unnecessary parentheses, simplify expressions.
 recipeList:
+  - org.openrewrite.java.cleanup.CaseInsensitiveComparisonsDoNotChangeCase
   - org.openrewrite.java.cleanup.CovariantEquals
   - org.openrewrite.java.cleanup.EmptyBlock
   - org.openrewrite.java.cleanup.EqualsAvoidsNull
