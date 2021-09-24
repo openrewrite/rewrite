@@ -76,9 +76,13 @@ class ReloadableTypeMapping {
                         fields = new ArrayList<>();
                         methods = new ArrayList<>();
                         for (Symbol elem : sym.members_field.getElements()) {
-                            if (elem instanceof Symbol.VarSymbol) {
+                            if (elem instanceof Symbol.VarSymbol &&
+                                    (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
+                                            Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
                                 fields.add(variableType(elem, stackWithSym));
-                            } else if (elem instanceof Symbol.MethodSymbol) {
+                            } else if (elem instanceof Symbol.MethodSymbol &&
+                                    (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
+                                            Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
                                 methods.add(methodType(elem.type, elem, elem.getSimpleName().toString(), stackWithSym));
                             }
                         }
@@ -124,8 +128,7 @@ class ReloadableTypeMapping {
                     }
 
                     clazz = JavaType.Class.build(
-                            //Currently only the first 16 bits are meaninful
-                            (int) sym.flags_field & 0xFFFF,
+                            sym.flags_field,
                             sym.className(),
                             kind,
                             fields,
@@ -226,12 +229,12 @@ class ReloadableTypeMapping {
 
     @Nullable
     public JavaType.Variable variableType(@Nullable Symbol symbol, List<Symbol> stack) {
-        if(!(symbol instanceof Symbol.VarSymbol)) {
+        if (!(symbol instanceof Symbol.VarSymbol)) {
             return null;
         }
 
         JavaType.FullyQualified owner = TypeUtils.asFullyQualified(type(symbol.owner.type, stack));
-        if(owner == null) {
+        if (owner == null) {
             return null;
         }
 
@@ -251,8 +254,7 @@ class ReloadableTypeMapping {
                 owner,
                 type(symbol.type, stack),
                 annotations,
-                // currently only the first 16 bits are meaningful
-                (int) symbol.flags_field & 0xFFFF
+                symbol.flags_field
         );
     }
 
@@ -334,8 +336,7 @@ class ReloadableTypeMapping {
             }
 
             return JavaType.Method.build(
-                    // currently only the first 16 bits are meaningful
-                    (int) methodSymbol.flags_field & 0xFFFF,
+                    methodSymbol.flags_field,
                     declaringType,
                     methodName,
                     genericSignature,

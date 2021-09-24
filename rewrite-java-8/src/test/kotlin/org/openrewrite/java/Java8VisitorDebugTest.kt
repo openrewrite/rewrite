@@ -266,6 +266,10 @@ class Java8JavaVisitorTest : Java8Test, JavaVisitorTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8LambdaBlockToExpressionTest : Java8Test, LambdaBlockToExpressionTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8MaybeUsesImportTest : Java8Test, MaybeUsesImportTest
 
 @DebugOnly
@@ -503,6 +507,10 @@ class Java8UsesJavaVersionTest : Java8Test, UsesJavaVersionTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java8UseJavaStyleArrayDeclarationsTck : Java8Test, UseJavaStyleArrayDeclarationsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8UseLambdaForFunctionalInterfaceTck : Java8Test, UseLambdaForFunctionalInterfaceTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

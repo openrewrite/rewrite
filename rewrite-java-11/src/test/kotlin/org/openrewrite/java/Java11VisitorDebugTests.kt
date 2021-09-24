@@ -266,6 +266,10 @@ class Java11JavaVisitorTest : Java11Test, JavaVisitorTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11LambdaBlockToExpressionTest : Java11Test, LambdaBlockToExpressionTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11LineCounterTest : Java11Test, LineCounterTest
 
 @DebugOnly
@@ -495,6 +499,10 @@ class Java11UseDiamondOperatorTest : Java11Test, UseDiamondOperatorTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11UseJavaStyleArrayDeclarations : Java11Test, UseJavaStyleArrayDeclarationsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11UseLambdaForFunctionalInterface : Java11Test, UseLambdaForFunctionalInterfaceTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

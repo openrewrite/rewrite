@@ -17,67 +17,39 @@ package org.openrewrite.java.tree;
 
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.Collections;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.*;
 
 public enum Flag {
+    Public(1L),
+    Private(1L << 1),
+    Protected(1L << 2),
+    Static(1L << 3),
+    Final(1L << 4),
+    Synchronized(1L << 5),
+    Volatile(1L << 6),
+    Transient(1L << 7),
+    Native(1L << 8),
+    Interface(1L << 9),
+    Abstract(1L << 10),
+    Strictfp(1L << 11),
+    /**
+     * Flag is set for a variable symbol if the variable's definition
+     * has an initializer part.
+     */
+    HasInit(1L << 18),
+    Varargs(1L << 34),
+    Union(1L << 39),
+    Default(1L << 43),
+    SignaturePolymorphic(1L << 46),
+    PotentiallyAmbiguous(1L << 48);
 
-    // The bitmasks in the flags are mapped to their values defined in the Java Language Specification. For references:
-    // Field access flags: https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.5-200-A.1
-    // Method access flags: https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.6-200-A.1
+    private final long bitMask;
 
-    // 0000 0000 0000 0001 public
-    // 0000 0000 0000 0010 private
-    // 0000 0000 0000 0100 protected
-    // 0000 0000 0000 1000 static
-    // 0000 0000 0001 0000 final
-    // 0000 0000 0010 0000 super
-    // 0000 0000 0100 0000 bridge (on methods) or volatile (on fields)
-    // 0000 0000 1000 0000 synchronized
-    // 0000 0010 0000 0000 interface
-    // 0000 0100 0000 0000 abstract
-    // 0001 0000 0000 0000 synthetic
-    // 0010 0000 0000 0000 annotation
-    // 0100 0000 0000 0000 enum
-
-    Public("public", 1),
-    Private("private", 1<<1),
-    Protected("protected", 1<<2),
-    Static("static", 1<<3),
-    Final("final", 1<<4),
-    Synchronized("synchronized",1<<5),
-    Volatile("volatile",1<<6),
-    Transient("transient", 1<<7),
-    Abstract("abstract", 1<<10);
-
-    private final String keyword;
-    private final int bitMask;
-
-    Flag(String keyword, int bitMask) {
-        this.keyword = keyword;
+    Flag(long bitMask) {
         this.bitMask = bitMask;
     }
 
-    public String getKeyword() {
-        return this.keyword;
-    }
-
-    @Nullable
-    public static Flag fromKeyword(String keyword) {
-        for (Flag flag : values()) {
-            if (flag.keyword.equals(keyword)) {
-                return flag;
-            }
-        }
-        return null;
-    }
-
-    // ----------------------------------------------------------------------------------------------
-    // This code is similar to the code in the com.sun.tools.javac.code.Flags.
-    // ----------------------------------------------------------------------------------------------
-    private static final Map<Integer, Set<Flag>> flagSets = new ConcurrentHashMap<>(64);
+    private static final Map<Long, Set<Flag>> flagSets = new HashMap<>(64);
 
     /**
      * Convert the Java language specification's access flags bitmap into a set of Flag enumerations.
@@ -85,20 +57,15 @@ public enum Flag {
      * @param flagsBitMap The flag from the Javac symbol into a set of rewrite's Flag enum
      * @return A set of Flag enums.
      */
-    public static Set<Flag> bitMapToFlags(int flagsBitMap) {
+    public static Set<Flag> bitMapToFlags(long flagsBitMap) {
         Set<Flag> flags = flagSets.get(flagsBitMap);
         if (flags == null) {
             flags = java.util.EnumSet.noneOf(Flag.class);
-            if (0 != (flagsBitMap & Public.bitMask)) flags.add(Flag.Public);
-            if (0 != (flagsBitMap & Protected.bitMask)) flags.add(Flag.Protected);
-            if (0 != (flagsBitMap & Private.bitMask))   flags.add(Flag.Private);
-            if (0 != (flagsBitMap & Abstract.bitMask))  flags.add(Flag.Abstract);
-            if (0 != (flagsBitMap & Static.bitMask))    flags.add(Flag.Static);
-            if (0 != (flagsBitMap & Final.bitMask))     flags.add(Flag.Final);
-            if (0 != (flagsBitMap & Transient.bitMask)) flags.add(Flag.Transient);
-            if (0 != (flagsBitMap & Volatile.bitMask))  flags.add(Flag.Volatile);
-            if (0 != (flagsBitMap & Synchronized.bitMask)) flags.add(Flag.Synchronized);
-            //No mappings for NATIVE, STRICTFP, or DEFAULT
+            for (Flag flag : values()) {
+                if((flagsBitMap & flag.bitMask) != 0) {
+                    flags.add(flag);
+                }
+            }
             flags = Collections.unmodifiableSet(flags);
             flagSets.put(flagsBitMap, flags);
         }
@@ -111,8 +78,8 @@ public enum Flag {
      * @param flags A set of Flag enumerations
      * @return The bitmask representation of those flags.
      */
-    public static int flagsToBitMap(@Nullable  Set<Flag> flags) {
-        int mask = 0;
+    public static long flagsToBitMap(@Nullable Set<Flag> flags) {
+        long mask = 0;
         if (flags != null) {
             for (Flag flag : flags) {
                 mask = mask | flag.bitMask;
@@ -123,10 +90,10 @@ public enum Flag {
 
     /**
      * @param flagsBitMap Java Language Specification's access flags bitmap
-     * @param flags A set of flags to test
+     * @param flags       A set of flags to test
      * @return Returns true if the access flags bitmap contains all the flags passed to this method.
      */
-    public static boolean hasFlags(int flagsBitMap, Flag... flags) {
+    public static boolean hasFlags(long flagsBitMap, Flag... flags) {
         for (Flag flag : flags) {
             if ((flag.bitMask & flagsBitMap) == 0) {
                 return false;

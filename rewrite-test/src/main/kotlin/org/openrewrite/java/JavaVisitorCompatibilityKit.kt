@@ -221,6 +221,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class JavaVisitorTestTck : JavaVisitorTest
 
     @Nested
+    inner class LambdaBlockToExpressionTck : LambdaBlockToExpressionTest
+
+    @Nested
     inner class MaybeUsesImportTck : MaybeUsesImportTest
 
     @Nested
@@ -390,6 +393,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class UseJavaStyleArrayDeclarationsTck : UseJavaStyleArrayDeclarationsTest
+
+    @Nested
+    inner class UseLambdaForFunctionalInterfaceTck : UseLambdaForFunctionalInterfaceTest
 
     @Nested
     inner class UsesMethodTck : UsesMethodTest

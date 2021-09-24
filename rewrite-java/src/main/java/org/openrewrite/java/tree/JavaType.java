@@ -224,7 +224,7 @@ public interface JavaType extends Serializable {
         private final String fullyQualifiedName;
 
         @Getter(AccessLevel.NONE)
-        private final int flagsBitMap;
+        private final long flagsBitMap;
         private final Kind kind;
         private final List<FullyQualified> annotations;
         private final List<Variable> members;
@@ -237,7 +237,7 @@ public interface JavaType extends Serializable {
         @Nullable
         private final FullyQualified owningClass;
 
-        private Class(int flagsBitMap,
+        private Class(long flagsBitMap,
                       String fullyQualifiedName,
                       Kind kind,
                       List<Variable> members,
@@ -402,7 +402,7 @@ public interface JavaType extends Serializable {
         }
 
         @JsonCreator
-        protected static Class build(int flagsBitMap,
+        protected static Class build(long flagsBitMap,
                                      String fullyQualifiedName,
                                      Kind kind,
                                      List<Variable> members,
@@ -414,7 +414,7 @@ public interface JavaType extends Serializable {
             return build(flagsBitMap, fullyQualifiedName, kind, members, interfaces, methods, supertype, owningClass, annotations, false);
         }
 
-        public static Class build(int flagsBitMap,
+        public static Class build(long flagsBitMap,
                                   String fullyQualifiedName,
                                   Kind kind,
                                   List<Variable> members,
@@ -467,7 +467,7 @@ public interface JavaType extends Serializable {
             }
         }
 
-        private static JavaType.Class buildCandidate(int flagsBitMap,
+        private static JavaType.Class buildCandidate(long flagsBitMap,
                                                      String fullyQualifiedName,
                                                      Kind kind,
                                                      List<Variable> members,
@@ -774,10 +774,10 @@ public interface JavaType extends Serializable {
         private final List<FullyQualified> annotations;
 
         @Getter(AccessLevel.NONE)
-        private final int flagsBitMap;
+        private final long flagsBitMap;
 
         private Variable(String name, JavaType.FullyQualified owner, @Nullable JavaType type,
-                         List<FullyQualified> annotations, int flagsBitMap) {
+                         List<FullyQualified> annotations, long flagsBitMap) {
             this.name = name;
             this.type = type;
             this.owner = owner;
@@ -787,7 +787,7 @@ public interface JavaType extends Serializable {
 
         @JsonCreator
         public static Variable build(String name, JavaType.FullyQualified owner, @Nullable JavaType type,
-                                     List<FullyQualified> annotations, int flagsBitMap) {
+                                     List<FullyQualified> annotations, long flagsBitMap) {
             Variable test = new Variable(name, owner, type, annotations, flagsBitMap);
 
             synchronized (flyweights) {
@@ -855,7 +855,7 @@ public interface JavaType extends Serializable {
         private static final Map<FullyQualified, Map<String, Set<Method>>> flyweights = new WeakHashMap<>();
 
         @Getter(AccessLevel.NONE)
-        private final int flagsBitMap;
+        private final long flagsBitMap;
 
         private final FullyQualified declaringType;
 
@@ -871,7 +871,7 @@ public interface JavaType extends Serializable {
         private final List<FullyQualified> thrownExceptions;
         private final List<FullyQualified> annotations;
 
-        private Method(int flagsBitMap, FullyQualified declaringType, String name,
+        private Method(long flagsBitMap, FullyQualified declaringType, String name,
                        @Nullable Signature genericSignature, @Nullable Signature resolvedSignature, List<String> paramNames,
                        List<FullyQualified> thrownExceptions, List<FullyQualified> annotations) {
             this.flagsBitMap = flagsBitMap;
@@ -892,7 +892,7 @@ public interface JavaType extends Serializable {
         }
 
         @JsonCreator
-        public static Method build(int flagsBitMap, FullyQualified declaringType, String name,
+        public static Method build(long flagsBitMap, FullyQualified declaringType, String name,
                                    @Nullable Signature genericSignature, @Nullable Signature resolvedSignature, List<String> paramNames,
                                    List<FullyQualified> thrownExceptions, List<FullyQualified> annotations) {
             Method test = new Method(flagsBitMap, declaringType, name, genericSignature, resolvedSignature, paramNames, thrownExceptions, annotations);
@@ -945,7 +945,7 @@ public interface JavaType extends Serializable {
         }
 
         public Method withFlags(Set<Flag> flags) {
-            int flagsBitMap = Flag.flagsToBitMap(flags);
+            long flagsBitMap = Flag.flagsToBitMap(flags);
             if (this.flagsBitMap == flagsBitMap) {
                 return this;
             }
