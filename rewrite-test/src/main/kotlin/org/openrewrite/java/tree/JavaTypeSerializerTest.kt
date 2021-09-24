@@ -28,7 +28,6 @@ import org.openrewrite.TreeSerializer
 import org.openrewrite.java.JavaParser
 
 interface JavaTypeSerializerTest {
-
     fun treeSerializer() : TreeSerializer<J.CompilationUnit> = TreeSerializer()
 
     fun objectMapper() : ObjectMapper {
@@ -71,34 +70,34 @@ interface JavaTypeSerializerTest {
         var classTypeOut = mapper.writeValueAsString(javaClass)
         var copy = mapper.readValue(classTypeOut, JavaType.Class::class.java)
 
-        assertThat(TypeUtils.deepEquals(javaClass, copy)).isTrue()
+        assertThat(TypeUtils.deepEquals(javaClass, copy)).isTrue
         assertThat(copy.flags).hasSize(2)
-        assertThat(copy.hasFlags(Flag.Public, Flag.Abstract)).isTrue()
+        assertThat(copy.hasFlags(Flag.Public, Flag.Abstract)).isTrue
 
         //Inner Class B
         javaClass = (clazz.body.statements[0] as J.ClassDeclaration).type
         classTypeOut = mapper.writeValueAsString(javaClass)
         copy = mapper.readValue(classTypeOut, JavaType.Class::class.java)
 
-        assertThat(TypeUtils.deepEquals(javaClass, copy)).isTrue()
+        assertThat(TypeUtils.deepEquals(javaClass, copy)).isTrue
         assertThat(copy.flags).hasSize(3)
-        assertThat(copy.hasFlags(Flag.Protected, Flag.Static, Flag.Final)).isTrue()
+        assertThat(copy.hasFlags(Flag.Protected, Flag.Static, Flag.Final)).isTrue
 
         //Inner Class C
         javaClass = (clazz.body.statements[1] as J.ClassDeclaration).type
         classTypeOut = mapper.writeValueAsString(javaClass)
         copy = mapper.readValue(classTypeOut, JavaType.Class::class.java)
 
-        assertThat(TypeUtils.deepEquals(javaClass, copy)).isTrue()
+        assertThat(TypeUtils.deepEquals(javaClass, copy)).isTrue
         assertThat(copy.flags).hasSize(1)
-        assertThat(copy.hasFlags(Flag.Private)).isTrue()
+        assertThat(copy.hasFlags(Flag.Private)).isTrue
 
         //Inner Class D
         javaClass = (clazz.body.statements[2] as J.ClassDeclaration).type
         classTypeOut = mapper.writeValueAsString(javaClass)
         copy = mapper.readValue(classTypeOut, JavaType.Class::class.java)
 
-        assertThat(TypeUtils.deepEquals(javaClass, copy)).isTrue()
+        assertThat(TypeUtils.deepEquals(javaClass, copy)).isTrue
         assertThat(copy.flags).hasSize(0)
     }
 
@@ -121,14 +120,14 @@ interface JavaTypeSerializerTest {
         //Make sure the whole class serializes properly
         val classOut = mapper.writeValueAsString(clazz)
         val classCopy = mapper.readValue(classOut, J.ClassDeclaration::class.java)
-        assertThat(clazz.equals(classCopy)).isTrue()
+        assertThat(clazz.equals(classCopy)).isTrue
 
         //NumberList1
         var variableType = (clazz.body.statements[0] as J.VariableDeclarations).variables[0].type
         var variableTypeOut = mapper.writeValueAsString(variableType)
         var copy = mapper.readValue(variableTypeOut, JavaType.Parameterized::class.java)
         var typeParameter = (variableType as JavaType.Parameterized).typeParameters[0] as JavaType.Class
-        assertThat(TypeUtils.deepEquals(variableType, copy)).isTrue()
+        assertThat(TypeUtils.deepEquals(variableType, copy)).isTrue
         assertThat(typeParameter.fullyQualifiedName).isEqualTo("java.lang.Number")
 
         //NumberList2
@@ -136,7 +135,7 @@ interface JavaTypeSerializerTest {
         variableTypeOut = mapper.writeValueAsString(variableType)
         copy = mapper.readValue(variableTypeOut, JavaType.Parameterized::class.java)
         typeParameter = (variableType as JavaType.Parameterized).typeParameters[0] as JavaType.Class
-        assertThat(TypeUtils.deepEquals(variableType, copy)).isTrue()
+        assertThat(TypeUtils.deepEquals(variableType, copy)).isTrue
         assertThat(typeParameter.fullyQualifiedName).isEqualTo("java.lang.Number")
 
         //NumberList3
@@ -144,7 +143,7 @@ interface JavaTypeSerializerTest {
         variableTypeOut = mapper.writeValueAsString(variableType)
         copy = mapper.readValue(variableTypeOut, JavaType.Parameterized::class.java)
         typeParameter = (variableType as JavaType.Parameterized).typeParameters[0] as JavaType.Class
-        assertThat(TypeUtils.deepEquals(variableType, copy)).isTrue()
+        assertThat(TypeUtils.deepEquals(variableType, copy)).isTrue
         assertThat(typeParameter.fullyQualifiedName).isEqualTo("java.lang.Object")
 
         //NumberList4
@@ -152,7 +151,7 @@ interface JavaTypeSerializerTest {
         variableTypeOut = mapper.writeValueAsString(variableType)
         copy = mapper.readValue(variableTypeOut, JavaType.Parameterized::class.java)
         val genericTypeParameter = (variableType as JavaType.Parameterized).typeParameters[0] as JavaType.GenericTypeVariable
-        assertThat(TypeUtils.deepEquals(variableType, copy)).isTrue()
+        assertThat(TypeUtils.deepEquals(variableType, copy)).isTrue
         assertThat(genericTypeParameter.bound?.fullyQualifiedName).isEqualTo("java.lang.Number")
 
     }
@@ -183,34 +182,34 @@ interface JavaTypeSerializerTest {
         var methodTypeOut = mapper.writeValueAsString(methodType)
         var copy = mapper.readValue(methodTypeOut, JavaType.Method::class.java)
 
-        assertThat(TypeUtils.deepEquals(methodType, copy)).isTrue()
+        assertThat(TypeUtils.deepEquals(methodType, copy)).isTrue
         assertThat(copy.flags).hasSize(2)
-        assertThat(copy.hasFlags(Flag.Public, Flag.Abstract)).isTrue()
+        assertThat(copy.hasFlags(Flag.Public, Flag.Abstract)).isTrue
 
         //getFoo2
         methodType = (statements[1] as J.MethodDeclaration).type
         methodTypeOut = mapper.writeValueAsString(methodType)
         copy = mapper.readValue(methodTypeOut, JavaType.Method::class.java)
 
-        assertThat(TypeUtils.deepEquals(methodType, copy)).isTrue()
+        assertThat(TypeUtils.deepEquals(methodType, copy)).isTrue
         assertThat(copy.flags).hasSize(2)
-        assertThat(copy.hasFlags(Flag.Private, Flag.Static)).isTrue()
+        assertThat(copy.hasFlags(Flag.Private, Flag.Static)).isTrue
 
         //getFoo3
         methodType = (statements[2] as J.MethodDeclaration).type
         methodTypeOut = mapper.writeValueAsString(methodType)
         copy = mapper.readValue(methodTypeOut, JavaType.Method::class.java)
 
-        assertThat(TypeUtils.deepEquals(methodType, copy)).isTrue()
+        assertThat(TypeUtils.deepEquals(methodType, copy)).isTrue
         assertThat(copy.flags).hasSize(2)
-        assertThat(copy.hasFlags(Flag.Protected, Flag.Final)).isTrue()
+        assertThat(copy.hasFlags(Flag.Protected, Flag.Final)).isTrue
 
         //getFoo4
         methodType = (statements[3] as J.MethodDeclaration).type
         methodTypeOut = mapper.writeValueAsString(methodType)
         copy = mapper.readValue(methodTypeOut, JavaType.Method::class.java)
 
-        assertThat(TypeUtils.deepEquals(methodType, copy)).isTrue()
+        assertThat(TypeUtils.deepEquals(methodType, copy)).isTrue
         assertThat(copy.flags).isEmpty()
     }
 
@@ -227,41 +226,39 @@ interface JavaTypeSerializerTest {
 
         val mapper = objectMapper()
 
-
         //getFoo
         var variableType = members[0]
         var variableTypeOut = mapper.writeValueAsString(variableType)
         var copy = mapper.readValue(variableTypeOut, JavaType.Variable::class.java)
 
-        assertThat(TypeUtils.deepEquals(variableType, copy)).isTrue()
+        assertThat(TypeUtils.deepEquals(variableType, copy)).isTrue
         assertThat(copy.flags).hasSize(1)
-        assertThat(copy.hasFlags(Flag.Public)).isTrue()
+        assertThat(copy.hasFlags(Flag.Public)).isTrue
 
         //getFoo2
         variableType = members[1]
         variableTypeOut = mapper.writeValueAsString(variableType)
         copy = mapper.readValue(variableTypeOut, JavaType.Variable::class.java)
 
-        assertThat(TypeUtils.deepEquals(variableType, copy)).isTrue()
-        assertThat(copy.flags).hasSize(2)
-        assertThat(copy.hasFlags(Flag.Private, Flag.Final)).isTrue()
+        assertThat(TypeUtils.deepEquals(variableType, copy)).isTrue
+        assertThat(copy.flags).hasSize(3)
+        assertThat(copy.hasFlags(Flag.Private, Flag.Final)).isTrue
 
         //getFoo3
         variableType = members[2]
         variableTypeOut = mapper.writeValueAsString(variableType)
         copy = mapper.readValue(variableTypeOut, JavaType.Variable::class.java)
 
-        assertThat(TypeUtils.deepEquals(variableType, copy)).isTrue()
+        assertThat(TypeUtils.deepEquals(variableType, copy)).isTrue
         assertThat(copy.flags).hasSize(2)
-        assertThat(copy.hasFlags(Flag.Protected, Flag.Static)).isTrue()
+        assertThat(copy.hasFlags(Flag.Protected, Flag.Static)).isTrue
 
         //getFoo4
         variableType = members[3]
         variableTypeOut = mapper.writeValueAsString(variableType)
         copy = mapper.readValue(variableTypeOut, JavaType.Variable::class.java)
 
-        assertThat(TypeUtils.deepEquals(variableType, copy)).isTrue()
+        assertThat(TypeUtils.deepEquals(variableType, copy)).isTrue
         assertThat(copy.flags).isEmpty()
     }
-
 }
