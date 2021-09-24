@@ -198,6 +198,10 @@ class Java8FindDeprecatedMethodsTest : Java8Test, FindDeprecatedMethodsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8FindEmptyClassesTest : Java8Test, FindEmptyClassesTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8FindFieldsTest : Java8Test, FindFieldsTest
 
 @DebugOnly
