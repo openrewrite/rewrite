@@ -54,7 +54,7 @@ public class NpmRegistryModuleLoader extends PolyglotResourceLoader {
                     String main = packageDescriptor.getMain();
 
                     Path jsPath = Paths.get(registry, module, main);
-                    evalPolyglotRecipe(module, Source.newBuilder(JS, jsPath.toFile()).name(jsPath.toString()).build());
+                    evalPolyglotRecipe(Source.newBuilder(JS, jsPath.toFile()).name(jsPath.toString()).build());
                 } else {
                     URI srcUri = URI.create(registry + module);
                     PackagesDescriptor packages = mapper.readValue(srcUri.toURL(), PackagesDescriptor.class);
@@ -75,7 +75,7 @@ public class NpmRegistryModuleLoader extends PolyglotResourceLoader {
                             //noinspection StatementWithEmptyBody
                             for (int i = 0; i < buff.length; i += tgzIn.read(buff, i, tgzIn.getRecordSize())) {
                             }
-                            evalPolyglotRecipe(module, Source.newBuilder(JS, ByteSequence.create(buff), name).build());
+                            evalPolyglotRecipe(Source.newBuilder(JS, ByteSequence.create(buff), name).build());
                         }
                     }
                 }

@@ -16,26 +16,115 @@
 
 package org.openrewrite.polyglot;
 
-import org.graalvm.polyglot.Value;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 
-public class PolyglotVisitor<T> extends TreeVisitor<Tree, T> {
-
-    private final Value value;
-    private final TreeVisitor<? extends Tree, T> delegate;
-
-    public PolyglotVisitor(Value value, TreeVisitor<? extends Tree, T> delegate) {
-        this.value = value;
-        this.delegate = delegate;
-    }
+public class PolyglotVisitor<T> extends TreeVisitor<Polyglot, T> {
 
     @Override
-    public @Nullable Tree visit(@Nullable Tree tree, T ctx) {
-        value.putMember("super", Value.asValue(delegate));
-        Value v = value.invokeMember("visit", tree, ctx);
-        return v.as(Tree.class);
+    public @Nullable Polyglot visit(@Nullable Tree tree, T ctx) {
+        if (tree instanceof Polyglot.Instantiable) {
+            return visitInstantiable((Polyglot.Instantiable) tree, ctx);
+        }
+
+        if (tree instanceof Polyglot.Executable) {
+            return visitExecutable((Polyglot.Executable) tree, ctx);
+        }
+
+        if (tree instanceof Polyglot.Members) {
+            return visitMembers((Polyglot.Members) tree, ctx);
+        }
+
+        if (tree instanceof Polyglot.HashEntries) {
+            return visitHashEntries((Polyglot.HashEntries) tree, ctx);
+        }
+
+        if (tree instanceof Polyglot.ArrayElements) {
+            return visitArrayElements((Polyglot.ArrayElements) tree, ctx);
+        }
+
+        if (tree instanceof Polyglot.StringValue) {
+            return visitStringValue((Polyglot.StringValue) tree, ctx);
+        }
+
+        if (tree instanceof Polyglot.NumberValue) {
+            return visitNumberValue((Polyglot.NumberValue) tree, ctx);
+        }
+
+        return super.visit(tree, ctx);
+    }
+
+    public Polyglot visitSource(Polyglot.Source source, T ctx) {
+        return source
+                .withMembers(visitAndCast(source.getMembers(), ctx))
+                .withMarkers(visitMarkers(source.getMarkers(), ctx));
+    }
+
+    public Polyglot visitMembers(Polyglot.Members members, T ctx) {
+        return members
+                .withMembers(ListUtils.map(members.getMembers(), m -> visitAndCast(m, ctx)))
+                .withMarkers(visitMarkers(members.getMarkers(), ctx));
+    }
+
+    public Polyglot visitMember(Polyglot.Member member, T ctx) {
+        return member
+                .withMarkers(visitMarkers(member.getMarkers(), ctx));
+
+    }
+
+    public Polyglot visitStringValue(Polyglot.StringValue stringValue, T ctx) {
+        return stringValue
+                .withMarkers(visitMarkers(stringValue.getMarkers(), ctx));
+    }
+
+    public Polyglot visitNumberValue(Polyglot.NumberValue numberValue, T ctx) {
+        return numberValue
+                .withMarkers(visitMarkers(numberValue.getMarkers(), ctx));
+    }
+
+    public Polyglot visitInstantiable(Polyglot.Instantiable instantiable, T ctx) {
+        return instantiable
+                .withValue(visitAndCast(instantiable, ctx))
+                .withMarkers(visitMarkers(instantiable.getMarkers(), ctx));
+    }
+
+    public Polyglot visitHashEntries(Polyglot.HashEntries hashEntries, T ctx) {
+        return hashEntries
+                .withEntries(ListUtils.map(hashEntries.getEntries(), m -> visitAndCast(m, ctx)))
+                .withMarkers(visitMarkers(hashEntries.getMarkers(), ctx));
+    }
+
+    public Polyglot visitHashEntry(Polyglot.HashEntry hashEntry, T ctx) {
+        return hashEntry
+                .withMarkers(visitMarkers(hashEntry.getMarkers(), ctx));
+    }
+
+    public Polyglot visitArrayElements(Polyglot.ArrayElements arrayElements, T ctx) {
+        return arrayElements
+                .withElements(ListUtils.map(arrayElements.getElements(), e -> visitAndCast(e, ctx)))
+                .withMarkers(visitMarkers(arrayElements.getMarkers(), ctx));
+    }
+
+    public Polyglot visitArrayElement(Polyglot.ArrayElement arrayElement, T ctx) {
+        return arrayElement
+                .withMarkers(visitMarkers(arrayElement.getMarkers(), ctx));
+    }
+
+    public Polyglot visitExecutable(Polyglot.Executable executable, T ctx) {
+        return executable
+                .withMarkers(visitMarkers(executable.getMarkers(), ctx));
+    }
+
+    public Polyglot visitError(Polyglot.Error error, T ctx) {
+        return error
+                .withMarkers(visitMarkers(error.getMarkers(), ctx));
+    }
+
+    public Polyglot visitInstance(Polyglot.Instance instance, T ctx) {
+        return instance
+                .withMarkers(visitMarkers(instance.getMarkers(), ctx));
     }
 
 }

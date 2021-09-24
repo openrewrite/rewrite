@@ -17,36 +17,22 @@
 package org.openrewrite.config;
 
 import lombok.RequiredArgsConstructor;
-import org.graalvm.polyglot.Context;
-import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.Source;
-import org.graalvm.polyglot.Value;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.polyglot.Polyglot;
+import org.openrewrite.polyglot.PolyglotParser;
 import org.openrewrite.polyglot.PolyglotRecipe;
-import org.openrewrite.polyglot.PolyglotUtils;
+import org.openrewrite.polyglot.PolyglotVisitor;
 import org.openrewrite.style.NamedStyles;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
-import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import static org.openrewrite.polyglot.PolyglotUtils.maybeInstantiateOrInvoke;
 
 public class PolyglotResourceLoader implements ResourceLoader {
-
-    private static final ThreadLocal<Engine> ENGINES = new InheritableThreadLocal<Engine>() {
-        @Override
-        protected Engine initialValue() {
-            return Engine.newBuilder()
-                    .allowExperimentalOptions(true)
-                    .build();
-        }
-    };
 
     private final List<PolyglotRecipes> recipes = new ArrayList<>();
     private final List<NamedStyles> styles = new ArrayList<>();
@@ -58,9 +44,9 @@ public class PolyglotResourceLoader implements ResourceLoader {
     public PolyglotResourceLoader(Source... sources) {
         for (Source src : sources) {
             try {
-                evalPolyglotRecipe(src.getName(), src);
+                evalPolyglotRecipe(src);
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                throw new RuntimeException(e.getMessage(), e);
             }
         }
     }
@@ -92,44 +78,41 @@ public class PolyglotResourceLoader implements ResourceLoader {
         return recipeExamples;
     }
 
-    public void evalPolyglotRecipe(String name, Source src) throws IOException {
-        String language = PolyglotUtils.getLanguage(src);
-
-        recipes.add(new PolyglotRecipes(ctx -> {
-            ctx.eval(src);
-            Value bindings = ctx.getBindings(language);
-            return bindings.getMemberKeys().stream()
-                    .flatMap(exportName -> maybeInstantiateOrInvoke(bindings, exportName)
-                            .map(exportVal -> exportVal.getMemberKeys().stream()
-                                    .map(recipeName -> maybeInstantiateOrInvoke(exportVal, recipeName)
-                                            .map(v -> new PolyglotRecipe(name + "/" + recipeName, v))))
-                            .orElseGet(Stream::empty))
-                    .filter(Optional::isPresent)
-                    .map(Optional::get)
-                    .collect(Collectors.toList());
-        }));
+    public void evalPolyglotRecipe(Source moduleSrc) throws IOException {
+        recipes.add(new PolyglotRecipes(moduleSrc));
+        recipes.stream().flatMap(r -> r.getRecipes().stream())
+                .forEach(r -> {
+                    recipeDescriptors.add(r.getRecipeDescriptor());
+                    categoryDescriptors.addAll(r.getCategoryDescriptors());
+                    styles.addAll(r.getNamedStyles());
+                });
     }
 
     @lombok.Value
     @RequiredArgsConstructor
     private static class PolyglotRecipes {
-        ThreadLocal<Context> context = new InheritableThreadLocal<Context>() {
-            @Override
-            protected Context initialValue() {
-                return Context.newBuilder()
-                        .engine(ENGINES.get())
-                        .allowAllAccess(true)
-                        .allowExperimentalOptions(true)
-                        .build();
-            }
-        };
-
-        Function<Context, List<PolyglotRecipe>> recipes;
+        PolyglotParser parser = new PolyglotParser();
+        Source source;
 
         ThreadLocal<List<PolyglotRecipe>> perThreadRecipes = new InheritableThreadLocal<List<PolyglotRecipe>>() {
             @Override
             protected List<PolyglotRecipe> initialValue() {
-                return recipes.apply(context.get());
+                List<Polyglot.Source> sources = parser.parse(new InMemoryExecutionContext(), source);
+                List<PolyglotRecipe> recipes = new ArrayList<>();
+
+                PolyglotVisitor<List<PolyglotRecipe>> recipesVisitor = new PolyglotVisitor<List<PolyglotRecipe>>() {
+                    @Override
+                    public Polyglot visitInstantiable(Polyglot.Instantiable instantiable, List<PolyglotRecipe> l) {
+                        Polyglot.Instance inst = instantiable.instantiate();
+                        inst.as(PolyglotRecipe.class).ifPresent(l::add);
+                        return inst;
+                    }
+                };
+                for (Polyglot.Source src : sources) {
+                    recipesVisitor.visitMembers(src.getMembers(), recipes);
+                }
+
+                return recipes;
             }
         };
 

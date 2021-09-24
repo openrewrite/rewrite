@@ -47,6 +47,7 @@ import static org.openrewrite.Tree.randomId;
  * <p>
  * returns a list of {@link Result results} for each modified {@link SourceFile}
  */
+@PolyglotExport(typeScript = "Recipe", llvm = "Recipe")
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
 public abstract class Recipe {
     public static final String PANIC = "__AHHH_PANIC!!!__";

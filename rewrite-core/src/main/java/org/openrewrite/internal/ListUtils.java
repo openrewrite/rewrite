@@ -15,6 +15,7 @@
  */
 package org.openrewrite.internal;
 
+import org.graalvm.polyglot.Value;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.ArrayList;
@@ -110,6 +111,16 @@ public final class ListUtils {
         return ls;
     }
 
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public static <T> List<T> mapValues(Value values, BiFunction<Integer, Value, T> mapFn) {
+        final int size = ((Long) values.getArraySize()).intValue();
+        List ls = new ArrayList(size);
+        for (int i = 0; i < size; i++) {
+            ls.set(i, mapFn.apply(i, values.getArrayElement(i)));
+        }
+        return ls;
+    }
+
     public static <T> List<T> map(List<T> ls, BiFunction<Integer, T, T> map) {
         if (ls == null || ls.isEmpty()) {
             return ls;
@@ -191,22 +202,22 @@ public final class ListUtils {
     }
 
     public static <T> List<T> concat(@Nullable List<T> ls, @Nullable T t) {
-        if(t == null && ls == null) {
+        if (t == null && ls == null) {
             return emptyList();
         }
         List<T> newLs = ls == null ? new ArrayList<>(1) : new ArrayList<>(ls);
-        if(t != null) {
+        if (t != null) {
             newLs.add(t);
         }
         return newLs;
     }
 
     public static <T> List<T> concat(@Nullable T t, @Nullable List<T> ls) {
-        if(t == null && ls == null) {
+        if (t == null && ls == null) {
             return emptyList();
         }
         List<T> newLs = ls == null ? new ArrayList<>(1) : new ArrayList<>(ls.size() + 1);
-        if(t != null) {
+        if (t != null) {
             newLs.add(t);
         }
         if (ls != null) {

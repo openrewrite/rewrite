@@ -16,14 +16,20 @@
 
 package org.openrewrite.polyglot;
 
+import org.apache.commons.io.FilenameUtils;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
+import org.openrewrite.Tree;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.util.Optional;
-import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.Supplier;
 
 import static java.util.Optional.ofNullable;
+import static org.graalvm.polyglot.Value.asValue;
 
+@SuppressWarnings("unchecked")
 public class PolyglotUtils {
 
     public static final String JS = "js";
@@ -32,8 +38,8 @@ public class PolyglotUtils {
     public static final String PYC = "pyc";
     public static final String LLVM = "llvm";
 
-    public static String getLanguage(Source source) {
-        String suffix = source.getPath().substring(source.getPath().lastIndexOf('.') + 1);
+    public static String getLanguage(String source) {
+        String suffix = FilenameUtils.getExtension(source);
         switch (suffix) {
             case JS:
                 return JS;
@@ -45,37 +51,43 @@ public class PolyglotUtils {
         }
     }
 
-    public static Optional<Value> maybeInstantiateOrInvoke(Value value, String memberKey) {
-        return getValue(value, memberKey).flatMap(
-                v -> ofNullable(v.canInstantiate() ? v.newInstance() : (v.canExecute() ? v.execute() : v)));
+    public static String getLanguage(Source source) {
+        return getLanguage(source.getPath());
+    }
+
+    public static String getName(Value value) {
+        if (value.getMetaObject() == null) {
+            return "undefined";
+        }
+        try {
+            return value.getMetaSimpleName();
+        } catch (UnsupportedOperationException e) {
+            return value.getMetaObject().toString();
+        }
     }
 
     public static Optional<Value> getValue(Value value, String memberKey) {
         return ofNullable(value.getMember(memberKey));
     }
 
-    public static Optional<Value> invokeMember(Value value, String memberKey, Object... args) {
-        return getValue(value, memberKey)
-                .filter(Value::canExecute)
-                .map(v -> v.execute(args));
+    @SuppressWarnings("unchecked")
+    @Nullable
+    public static <O> O invokeMemberOrElse(Value value,
+                                           String member,
+                                           @Nullable Supplier<O> superFn) {
+        return value.canInvokeMember(member)
+                ? (O) value.invokeMember(member)
+                : superFn != null ? superFn.get() : null;
     }
 
-    public static Value invokeMemberOrElse(Value value, String memberKey, Value orElse, Object... args) {
-        return getValue(value, memberKey)
-                .filter(Value::canExecute)
-                .map(v -> v.execute(args))
-                .orElse(orElse);
-    }
-
-    public static Optional<Value> jsExtend(Value value, String member, String name, Object obj) {
-        Value bindings = value.getContext().getBindings(JS);
-        Set<String> members = bindings.getMemberKeys();
-        if (members == null || members.isEmpty()) {
-            return Optional.empty();
-        }
-        Value prototype = value.getContext().eval(JS, "this.default." + member + ".prototype");
-        prototype.putMember(name, Value.asValue(obj));
-        return Optional.of(value);
+    public static <TREE extends Tree, CTX> TREE invokeMemberOrElse(Value value,
+                                                                   String member,
+                                                                   @Nullable TREE tree,
+                                                                   CTX ctx,
+                                                                   BiFunction<TREE, CTX, TREE> superFn) {
+        return value.canInvokeMember(member)
+                ? (TREE) value.invokeMember(member, asValue(tree), asValue(ctx)).as(Tree.class)
+                : superFn.apply(tree, ctx);
     }
 
 }
