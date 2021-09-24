@@ -23,6 +23,7 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.*;
 
+import java.time.Duration;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -42,6 +43,11 @@ public class UseLambdaForFunctionalInterface extends Recipe {
     @Override
     public Set<String> getTags() {
         return singleton("RSPEC-1604");
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(5);
     }
 
     @Override
