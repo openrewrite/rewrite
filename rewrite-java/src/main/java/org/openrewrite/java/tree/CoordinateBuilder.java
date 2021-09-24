@@ -69,6 +69,14 @@ public abstract class CoordinateBuilder {
             super(tree);
         }
 
+        public JavaCoordinates firstStatement() {
+            if (((J.Block) tree).getStatements().isEmpty()) {
+                return lastStatement();
+            } else {
+                return ((J.Block) tree).getStatements().get(0).getCoordinates().before();
+            }
+        }
+
         public JavaCoordinates lastStatement() {
             return before(Space.Location.BLOCK_END);
         }
