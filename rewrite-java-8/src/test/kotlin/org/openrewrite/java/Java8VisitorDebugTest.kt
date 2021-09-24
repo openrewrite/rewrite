@@ -306,6 +306,10 @@ class Java8NeedBracesTest : Java8Test, NeedBracesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8NoDoubleBraceInitializationTest : Java8Test, NoDoubleBraceInitializationTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8NoEqualityInForConditionTest : Java8Test, NoEqualityInForConditionTest
 
 @DebugOnly
