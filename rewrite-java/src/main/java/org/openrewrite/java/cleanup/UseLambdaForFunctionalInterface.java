@@ -23,7 +23,10 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.*;
 
+import java.util.Set;
 import java.util.stream.Collectors;
+
+import static java.util.Collections.singleton;
 
 public class UseLambdaForFunctionalInterface extends Recipe {
     @Override
@@ -34,6 +37,11 @@ public class UseLambdaForFunctionalInterface extends Recipe {
     @Override
     public String getDescription() {
         return "Instead of anonymous class declarations, use a lambda where possible.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return singleton("RSPEC-1604");
     }
 
     @Override
