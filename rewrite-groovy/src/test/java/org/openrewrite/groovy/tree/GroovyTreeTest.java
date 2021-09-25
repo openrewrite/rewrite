@@ -15,6 +15,7 @@
  */
 package org.openrewrite.groovy.tree;
 
+import org.intellij.lang.annotations.Language;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.TreeSerializer;
 import org.openrewrite.groovy.GroovyParser;
@@ -25,7 +26,7 @@ import org.openrewrite.java.tree.J;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public interface GroovyTreeTest {
-    default void assertParsePrintAndProcess(String code) {
+    default void assertParsePrintAndProcess(@Language("groovy") String code) {
         G.CompilationUnit cu = GroovyParser.builder().build().parse(
                 new InMemoryExecutionContext(t -> {
                     throw new RuntimeException(t.getMessage(), t);

@@ -18,7 +18,6 @@ package org.openrewrite.groovy;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.groovy.marker.Semicolon;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
@@ -46,8 +45,27 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
     private class GroovyJavaPrinter extends JavaPrinter<P> {
         @Override
+        public J visitLambda(J.Lambda lambda, PrintOutputCapture<P> p) {
+            p.out.append('{');
+            visit(lambda.getParameters(), p);
+            if (!lambda.getParameters().getParameters().isEmpty()) {
+                visitSpace(lambda.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, p);
+                p.out.append("->");
+            }
+            if (lambda.getBody() instanceof J.Block) {
+                J.Block block = (J.Block) lambda.getBody();
+                visit(block.getStatements(), p);
+                visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
+            } else {
+                visit(lambda.getBody(), p);
+            }
+            p.out.append('}');
+            return lambda;
+        }
+
+        @Override
         public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
-            if(marker instanceof Semicolon) {
+            if (marker instanceof Semicolon) {
                 p.out.append(';');
             }
             return super.visitMarker(marker, p);

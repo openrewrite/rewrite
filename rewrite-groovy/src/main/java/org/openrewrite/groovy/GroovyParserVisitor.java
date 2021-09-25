@@ -19,16 +19,17 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.codehaus.groovy.ast.*;
-import org.codehaus.groovy.ast.expr.ConstantExpression;
-import org.codehaus.groovy.ast.expr.DeclarationExpression;
-import org.codehaus.groovy.ast.expr.VariableExpression;
+import org.codehaus.groovy.ast.expr.*;
+import org.codehaus.groovy.ast.stmt.BlockStatement;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.transform.stc.StaticTypeCheckingVisitor;
 import org.codehaus.groovy.transform.stc.StaticTypesMarker;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.groovy.marker.Semicolon;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -55,8 +56,6 @@ public class GroovyParserVisitor {
     private final ExecutionContext ctx;
 
     private int cursor = 0;
-    private int line = 0;
-    private int column = 0;
 
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
@@ -73,7 +72,7 @@ public class GroovyParserVisitor {
         if (ast.getPackage() != null) {
             cursor += "package".length();
             String pkgName = ast.getPackage().getName();
-            if(pkgName.endsWith(".")) {
+            if (pkgName.endsWith(".")) {
                 pkgName = pkgName.substring(0, pkgName.length() - 1);
             }
             pkg = padRight(new J.Package(randomId(), EMPTY, Markers.EMPTY,
@@ -102,7 +101,7 @@ public class GroovyParserVisitor {
         List<JRightPadded<Statement>> statements = new ArrayList<>(sortedByPosition.size());
         for (List<ASTNode> values : sortedByPosition.values()) {
             for (ASTNode value : values) {
-                statements.add(convertStatement(unit, ast, value));
+                statements.add(convertTopLevelStatement(unit, ast, value));
             }
         }
 
@@ -133,6 +132,72 @@ public class GroovyParserVisitor {
     private class RewriteGroovyVisitor extends CodeVisitorSupport {
         private final Queue<Object> queue = new LinkedList<>();
 
+        private <T> T visit(ASTNode node) {
+            node.visit(this);
+            return pollQueue();
+        }
+
+        private <T> List<T> visit(ASTNode[] nodes) {
+            List<T> ts = new ArrayList<>(nodes.length);
+            for (ASTNode node : nodes) {
+                ts.add(visit(node));
+            }
+            return ts;
+        }
+
+        private <T> List<JRightPadded<T>> visitRightPadded(List<? extends ASTNode> nodes, char lastPadTo) {
+            List<JRightPadded<T>> ts = new ArrayList<>(nodes.size());
+            for (int i = 0; i < nodes.size(); i++) {
+                ASTNode node = nodes.get(i);
+
+                Space pad;
+                if(i == nodes.size() - 1) {
+                    int saveCursor = cursor;
+                    pad = whitespace();
+                    if (cursor >= source.length() || source.charAt(cursor) != lastPadTo) {
+                        cursor = saveCursor;
+                    }
+                } else {
+                    pad = whitespace();
+                }
+
+                //noinspection unchecked
+                ts.add((JRightPadded<T>) JRightPadded.build(visit(node)).withAfter(pad));
+            }
+            return ts;
+        }
+
+        private <T> List<JRightPadded<T>> visitRightPadded(ASTNode[] nodes, char lastPadTo) {
+            List<JRightPadded<T>> ts = new ArrayList<>(nodes.length);
+            for (ASTNode node : nodes) {
+                //noinspection unchecked
+                ts.add((JRightPadded<T>) JRightPadded.build(visit(node)).withAfter(whitespace()));
+            }
+            return ts;
+        }
+
+        @Override
+        public void visitBlockStatement(BlockStatement block) {
+            List<JRightPadded<Statement>> statements = new ArrayList<>(block.getStatements().size());
+            for (ASTNode statement : block.getStatements()) {
+                JRightPadded<Statement> stat = JRightPadded.build(visit(statement));
+                int saveCursor = cursor;
+                Space beforeSemicolon = whitespace();
+                if (cursor < source.length() && source.charAt(cursor) == ';') {
+                    stat = stat
+                            .withMarkers(stat.getMarkers().add(new Semicolon(randomId())))
+                            .withAfter(beforeSemicolon);
+                } else {
+                    cursor = saveCursor;
+                }
+
+                statements.add(stat);
+            }
+
+            Space beforeBrace = whitespace();
+            queue.add(new J.Block(randomId(), EMPTY, Markers.EMPTY, JRightPadded.build(false), statements, beforeBrace));
+        }
+
         @Override
         public void visitConstantExpression(ConstantExpression expression) {
             Space prefix = whitespace();
@@ -159,9 +224,11 @@ public class GroovyParserVisitor {
                 jType = JavaType.Primitive.Short;
             } else if (type == ClassHelper.STRING_TYPE) {
                 jType = JavaType.Primitive.String;
-                text = "'" + text + "'";
+                if (source.startsWith("'", cursor)) {
+                    text = "'" + text + "'";
+                }
                 cursor += text.length();
-            } else if(expression.isNullExpression()) {
+            } else if (expression.isNullExpression()) {
                 jType = JavaType.Primitive.Null;
             } else {
                 throw new IllegalStateException("Unexpected constant type " + type);
@@ -169,6 +236,22 @@ public class GroovyParserVisitor {
 
             queue.add(new J.Literal(randomId(), prefix, Markers.EMPTY, expression.getValue(), text,
                     null, jType));
+        }
+
+        @Override
+        public void visitClosureExpression(ClosureExpression expression) {
+            Space prefix = whitespace();
+            cursor += 1; // skip '{'
+
+            J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), EMPTY, Markers.EMPTY, false, visitRightPadded(expression.getParameters(), '-'));
+            Space arrow = EMPTY;
+            if (!params.getParameters().isEmpty()) {
+                arrow = whitespace();
+                cursor += 2;
+            }
+
+            queue.add(new J.Lambda(randomId(), prefix, Markers.EMPTY, params, arrow, visit(expression.getCode()), null));
+            cursor += 1; // skip '}'
         }
 
         @Override
@@ -204,6 +287,26 @@ public class GroovyParserVisitor {
             );
 
             queue.add(variableDeclarations);
+        }
+
+        @Override
+        public void visitMethodCallExpression(MethodCallExpression call) {
+            Expression select = null;
+            if (!call.isImplicitThis()) {
+                call.getObjectExpression().visit(this);
+                select = pollQueue();
+            }
+
+            J.Identifier name = J.Identifier.build(randomId(), whitespace(), Markers.EMPTY,
+                    call.getMethodAsString(), null);
+            cursor += call.getMethodAsString().length();
+
+            JContainer<Expression> args = JContainer.build(visitRightPadded(((ArgumentListExpression) call.getArguments()).getExpressions(),
+                    ')'));
+
+            queue.add(new J.MethodInvocation(randomId(), EMPTY, Markers.EMPTY,
+                    select == null ? null : JRightPadded.build(select),
+                    null, name, args, null));
         }
 
         @Override
@@ -243,7 +346,7 @@ public class GroovyParserVisitor {
         }
     }
 
-    private JRightPadded<Statement> convertStatement(SourceUnit unit, ModuleNode ast, ASTNode node) {
+    private JRightPadded<Statement> convertTopLevelStatement(SourceUnit unit, ModuleNode ast, ASTNode node) {
         if (node instanceof ClassNode) {
             ClassNode classNode = (ClassNode) node;
             RewriteGroovyClassVisitor classVisitor = new RewriteGroovyClassVisitor(unit);
@@ -452,9 +555,5 @@ public class GroovyParserVisitor {
 
         //noinspection unchecked,ConstantConditions
         return ((T) expr).withPrefix(prefix);
-    }
-
-    private void setCursor(int cursor) {
-        this.cursor = cursor;
     }
 }
