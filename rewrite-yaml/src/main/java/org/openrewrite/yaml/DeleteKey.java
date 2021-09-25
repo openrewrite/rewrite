@@ -63,6 +63,15 @@ public class DeleteKey extends Recipe {
         JsonPathMatcher matcher = new JsonPathMatcher(keyPath);
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
+            public Yaml.Sequence.Entry visitSequenceEntry(Yaml.Sequence.Entry entry, ExecutionContext executionContext) {
+                if(matcher.matches(getCursor()) || matcher.matches(new Cursor(getCursor(), entry.getBlock()))) {
+                    //noinspection ConstantConditions
+                    return null;
+                }
+                return super.visitSequenceEntry(entry, executionContext);
+            }
+
+            @Override
             public Yaml.Mapping visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
                 Yaml.Mapping m = super.visitMapping(mapping, ctx);
                 AtomicReference<String> copyFirstPrefix = new AtomicReference<>();

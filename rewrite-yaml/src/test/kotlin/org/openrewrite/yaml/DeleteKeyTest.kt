@@ -53,6 +53,23 @@ class DeleteKeyTest : YamlRecipeTest {
     )
 
     @Test
+    fun deleteSequenceEntry() = assertChanged(
+        recipe = DeleteKey("$.subjects[?(@.kind == 'ServiceAccount')]", null),
+        before = """
+            subjects:
+              - kind: User
+                name: some-user
+              - kind: ServiceAccount
+                name: monitoring-tools
+        """,
+        after = """
+            subjects:
+              - kind: User
+                name: some-user
+        """
+    )
+
+    @Test
     fun deleteSequenceKeyByWildcard() = assertChanged(
         recipe = DeleteKey("$.subjects[*].kind", null),
         before = """
