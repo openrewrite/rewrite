@@ -58,23 +58,41 @@ public class FindKey extends Recipe {
                 }
                 return e;
             }
+
+            @Override
+            public Yaml visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
+                Yaml.Mapping m = (Yaml.Mapping) super.visitMapping(mapping, ctx);
+                if (matcher.matches(getCursor())) {
+                    m = m.withMarkers(m.getMarkers().searchResult());
+                }
+                return m;
+            }
         };
     }
 
-    public static Set<Yaml.Mapping.Entry> find(Yaml y, String jsonPath) {
+    public static Set<Yaml> find(Yaml y, String jsonPath) {
         JsonPathMatcher matcher = new JsonPathMatcher(jsonPath);
-        YamlVisitor<Set<Yaml.Mapping.Entry>> findVisitor = new YamlVisitor<Set<Yaml.Mapping.Entry>>() {
+        YamlVisitor<Set<Yaml>> findVisitor = new YamlVisitor<Set<Yaml>>() {
             @Override
-            public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, Set<Yaml.Mapping.Entry> es) {
+            public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, Set<Yaml> es) {
                 Yaml.Mapping.Entry e = (Yaml.Mapping.Entry) super.visitMappingEntry(entry, es);
                 if (matcher.matches(getCursor())) {
                     es.add(e);
                 }
                 return e;
             }
+
+            @Override
+            public Yaml visitMapping(Yaml.Mapping mapping, Set<Yaml> es) {
+                Yaml.Mapping m = (Yaml.Mapping) super.visitMapping(mapping, es);
+                if (matcher.matches(getCursor())) {
+                    es.add(m);
+                }
+                return m;
+            }
         };
 
-        Set<Yaml.Mapping.Entry> es = new HashSet<>();
+        Set<Yaml> es = new HashSet<>();
         findVisitor.visit(y, es);
         return es;
     }
