@@ -82,7 +82,7 @@ public class MergeYaml extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         JsonPathMatcher matcher = new JsonPathMatcher(key);
         Yaml incoming = new YamlParser().parse(yaml).get(0).getDocuments().get(0).getBlock();
 
