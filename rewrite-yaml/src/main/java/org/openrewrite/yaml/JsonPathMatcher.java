@@ -28,6 +28,7 @@ import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.*;
 import java.util.function.BiPredicate;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.disjoint;
@@ -226,10 +227,30 @@ public class JsonPathMatcher {
         }
 
         @Override
+        public Object visitAndExpression(JsonPath.AndExpressionContext ctx) {
+            // TODO this is not correct
+            Object left = visit(ctx.expression(0));
+            Object right = visit(ctx.expression(1));
+
+            if (left instanceof List) {
+                List<Object> l = (List<Object>) left;
+                l.retainAll((List<Object>) right);
+                return l;
+            } else {
+                return Objects.equals(left, right);
+            }
+        }
+
+        @Override
         public Object visitBinaryExpression(JsonPath.BinaryExpressionContext ctx) {
             BiPredicate<Object, Object> predicate = (lh, rh) -> {
                 if (ctx.EQ() != null) {
                     return Objects.equals(lh, rh);
+                } else if (ctx.MATCHES() != null) {
+                    String lhStr = lh.toString();
+                    if (rh instanceof String) {
+                        return Pattern.compile(rh.toString()).matcher(lhStr).matches();
+                    }
                 }
                 return false;
             };

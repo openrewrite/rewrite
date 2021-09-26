@@ -15,18 +15,14 @@
  */
 // Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-yaml/src/main/antlr/JsonPath.g4 by ANTLR 4.9.2
 package org.openrewrite.yaml.internal.grammar;
-
-import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.atn.ATN;
-import org.antlr.v4.runtime.atn.ATNDeserializer;
-import org.antlr.v4.runtime.atn.ParserATNSimulator;
-import org.antlr.v4.runtime.atn.PredictionContextCache;
+import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
-import org.antlr.v4.runtime.tree.ParseTreeListener;
-import org.antlr.v4.runtime.tree.ParseTreeVisitor;
-import org.antlr.v4.runtime.tree.TerminalNode;
-
+import org.antlr.v4.runtime.*;
+import org.antlr.v4.runtime.misc.*;
+import org.antlr.v4.runtime.tree.*;
 import java.util.List;
+import java.util.Iterator;
+import java.util.ArrayList;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast"})
 public class JsonPath extends Parser {
@@ -37,9 +33,9 @@ public class JsonPath extends Parser {
 		new PredictionContextCache();
 	public static final int
 		StringLiteral=1, NumericLiteral=2, AT=3, DOT_DOT=4, DOT=5, ROOT=6, WILDCARD=7, 
-		AND=8, EQ=9, GE=10, GT=11, LE=12, LT=13, NE=14, NOT=15, OR=16, TRUE=17, 
-		FALSE=18, NULL=19, LBRACE=20, RBRACE=21, LBRACK=22, RBRACK=23, COLON=24, 
-		COMMA=25, LPAREN=26, RPAREN=27, QUESTION=28, Identifier=29, WS=30;
+		AND=8, EQ=9, NE=10, MATCHES=11, TRUE=12, FALSE=13, NULL=14, LBRACE=15, 
+		RBRACE=16, LBRACK=17, RBRACK=18, COLON=19, COMMA=20, LPAREN=21, RPAREN=22, 
+		QUESTION=23, Identifier=24, WS=25;
 	public static final int
 		RULE_jsonpath = 0, RULE_object = 1, RULE_rangeOp = 2, RULE_start = 3, 
 		RULE_end = 4, RULE_expression = 5, RULE_litExpression = 6;
@@ -52,18 +48,18 @@ public class JsonPath extends Parser {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, null, "'@'", "'..'", "'.'", "'$'", "'*'", "'and'", "'=='", 
-			"'>='", "'>'", "'<='", "'<'", "'!='", "'not'", "'or'", "'true'", "'false'", 
-			"'null'", "'{'", "'}'", "'['", "']'", "':'", "','", "'('", "')'", "'?'"
+			null, null, null, "'@'", "'..'", "'.'", "'$'", "'*'", "'&&'", "'=='", 
+			"'!='", "'=~'", "'true'", "'false'", "'null'", "'{'", "'}'", "'['", "']'", 
+			"':'", "','", "'('", "')'", "'?'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
 			null, "StringLiteral", "NumericLiteral", "AT", "DOT_DOT", "DOT", "ROOT", 
-			"WILDCARD", "AND", "EQ", "GE", "GT", "LE", "LT", "NE", "NOT", "OR", "TRUE", 
-			"FALSE", "NULL", "LBRACE", "RBRACE", "LBRACK", "RBRACK", "COLON", "COMMA", 
-			"LPAREN", "RPAREN", "QUESTION", "Identifier", "WS"
+			"WILDCARD", "AND", "EQ", "NE", "MATCHES", "TRUE", "FALSE", "NULL", "LBRACE", 
+			"RBRACE", "LBRACK", "RBRACK", "COLON", "COMMA", "LPAREN", "RPAREN", "QUESTION", 
+			"Identifier", "WS"
 		};
 	}
 	private static final String[] _SYMBOLIC_NAMES = makeSymbolicNames();
@@ -705,10 +701,7 @@ public class JsonPath extends Parser {
 		}
 		public TerminalNode EQ() { return getToken(JsonPath.EQ, 0); }
 		public TerminalNode NE() { return getToken(JsonPath.NE, 0); }
-		public TerminalNode LT() { return getToken(JsonPath.LT, 0); }
-		public TerminalNode LE() { return getToken(JsonPath.LE, 0); }
-		public TerminalNode GT() { return getToken(JsonPath.GT, 0); }
-		public TerminalNode GE() { return getToken(JsonPath.GE, 0); }
+		public TerminalNode MATCHES() { return getToken(JsonPath.MATCHES, 0); }
 		public BinaryExpressionContext(ExpressionContext ctx) { copyFrom(ctx); }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
@@ -740,26 +733,6 @@ public class JsonPath extends Parser {
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
 			if ( visitor instanceof JsonPathVisitor ) return ((JsonPathVisitor<? extends T>)visitor).visitLiteralExpression(this);
-			else return visitor.visitChildren(this);
-		}
-	}
-	public static class NotExpressionContext extends ExpressionContext {
-		public TerminalNode NOT() { return getToken(JsonPath.NOT, 0); }
-		public ExpressionContext expression() {
-			return getRuleContext(ExpressionContext.class,0);
-		}
-		public NotExpressionContext(ExpressionContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathListener ) ((JsonPathListener)listener).enterNotExpression(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathListener ) ((JsonPathListener)listener).exitNotExpression(this);
-		}
-		@Override
-		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathVisitor ) return ((JsonPathVisitor<? extends T>)visitor).visitNotExpression(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -802,29 +775,6 @@ public class JsonPath extends Parser {
 			else return visitor.visitChildren(this);
 		}
 	}
-	public static class OrExpressionContext extends ExpressionContext {
-		public List<ExpressionContext> expression() {
-			return getRuleContexts(ExpressionContext.class);
-		}
-		public ExpressionContext expression(int i) {
-			return getRuleContext(ExpressionContext.class,i);
-		}
-		public TerminalNode OR() { return getToken(JsonPath.OR, 0); }
-		public OrExpressionContext(ExpressionContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathListener ) ((JsonPathListener)listener).enterOrExpression(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathListener ) ((JsonPathListener)listener).exitOrExpression(this);
-		}
-		@Override
-		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathVisitor ) return ((JsonPathVisitor<? extends T>)visitor).visitOrExpression(this);
-			else return visitor.visitChildren(this);
-		}
-	}
 
 	public final ExpressionContext expression() throws RecognitionException {
 		return expression(0);
@@ -842,33 +792,22 @@ public class JsonPath extends Parser {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(86);
+			setState(84);
 			_errHandler.sync(this);
 			switch (_input.LA(1)) {
-			case NOT:
-				{
-				_localctx = new NotExpressionContext(_localctx);
-				_ctx = _localctx;
-				_prevctx = _localctx;
-
-				setState(65);
-				match(NOT);
-				setState(66);
-				expression(9);
-				}
-				break;
 			case QUESTION:
 				{
 				_localctx = new FilterExpressionContext(_localctx);
 				_ctx = _localctx;
 				_prevctx = _localctx;
-				setState(67);
+
+				setState(65);
 				match(QUESTION);
-				setState(68);
+				setState(66);
 				match(LPAREN);
-				setState(69);
+				setState(67);
 				expression(0);
-				setState(70);
+				setState(68);
 				match(RPAREN);
 				}
 				break;
@@ -877,11 +816,11 @@ public class JsonPath extends Parser {
 				_localctx = new ParentheticalExpressionContext(_localctx);
 				_ctx = _localctx;
 				_prevctx = _localctx;
-				setState(72);
+				setState(70);
 				match(LPAREN);
-				setState(73);
+				setState(71);
 				expression(0);
-				setState(74);
+				setState(72);
 				match(RPAREN);
 				}
 				break;
@@ -894,7 +833,7 @@ public class JsonPath extends Parser {
 				_localctx = new LiteralExpressionContext(_localctx);
 				_ctx = _localctx;
 				_prevctx = _localctx;
-				setState(76);
+				setState(74);
 				litExpression();
 				}
 				break;
@@ -903,7 +842,7 @@ public class JsonPath extends Parser {
 				_localctx = new IdentifierContext(_localctx);
 				_ctx = _localctx;
 				_prevctx = _localctx;
-				setState(77);
+				setState(75);
 				match(Identifier);
 				}
 				break;
@@ -915,7 +854,7 @@ public class JsonPath extends Parser {
 				_localctx = new PathExpressionContext(_localctx);
 				_ctx = _localctx;
 				_prevctx = _localctx;
-				setState(78);
+				setState(76);
 				jsonpath();
 				}
 				break;
@@ -924,7 +863,7 @@ public class JsonPath extends Parser {
 				_localctx = new WildcardExpressionContext(_localctx);
 				_ctx = _localctx;
 				_prevctx = _localctx;
-				setState(79);
+				setState(77);
 				match(WILDCARD);
 				}
 				break;
@@ -933,9 +872,9 @@ public class JsonPath extends Parser {
 				_localctx = new ScopedPathExpressionContext(_localctx);
 				_ctx = _localctx;
 				_prevctx = _localctx;
-				setState(80);
+				setState(78);
 				match(AT);
-				setState(82); 
+				setState(80); 
 				_errHandler.sync(this);
 				_alt = 1;
 				do {
@@ -943,7 +882,7 @@ public class JsonPath extends Parser {
 					case 1:
 						{
 						{
-						setState(81);
+						setState(79);
 						object();
 						}
 						}
@@ -951,7 +890,7 @@ public class JsonPath extends Parser {
 					default:
 						throw new NoViableAltException(this);
 					}
-					setState(84); 
+					setState(82); 
 					_errHandler.sync(this);
 					_alt = getInterpreter().adaptivePredict(_input,7,_ctx);
 				} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
@@ -961,7 +900,7 @@ public class JsonPath extends Parser {
 				throw new NoViableAltException(this);
 			}
 			_ctx.stop = _input.LT(-1);
-			setState(99);
+			setState(94);
 			_errHandler.sync(this);
 			_alt = getInterpreter().adaptivePredict(_input,10,_ctx);
 			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
@@ -969,42 +908,30 @@ public class JsonPath extends Parser {
 					if ( _parseListeners!=null ) triggerExitRuleEvent();
 					_prevctx = _localctx;
 					{
-					setState(97);
+					setState(92);
 					_errHandler.sync(this);
 					switch ( getInterpreter().adaptivePredict(_input,9,_ctx) ) {
 					case 1:
 						{
 						_localctx = new AndExpressionContext(new ExpressionContext(_parentctx, _parentState));
 						pushNewRecursionContext(_localctx, _startState, RULE_expression);
-						setState(88);
-						if (!(precpred(_ctx, 11))) throw new FailedPredicateException(this, "precpred(_ctx, 11)");
-						setState(89);
+						setState(86);
+						if (!(precpred(_ctx, 9))) throw new FailedPredicateException(this, "precpred(_ctx, 9)");
+						setState(87);
 						match(AND);
-						setState(90);
-						expression(12);
+						setState(88);
+						expression(10);
 						}
 						break;
 					case 2:
 						{
-						_localctx = new OrExpressionContext(new ExpressionContext(_parentctx, _parentState));
-						pushNewRecursionContext(_localctx, _startState, RULE_expression);
-						setState(91);
-						if (!(precpred(_ctx, 10))) throw new FailedPredicateException(this, "precpred(_ctx, 10)");
-						setState(92);
-						match(OR);
-						setState(93);
-						expression(11);
-						}
-						break;
-					case 3:
-						{
 						_localctx = new BinaryExpressionContext(new ExpressionContext(_parentctx, _parentState));
 						pushNewRecursionContext(_localctx, _startState, RULE_expression);
-						setState(94);
+						setState(89);
 						if (!(precpred(_ctx, 4))) throw new FailedPredicateException(this, "precpred(_ctx, 4)");
-						setState(95);
+						setState(90);
 						_la = _input.LA(1);
-						if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << EQ) | (1L << GE) | (1L << GT) | (1L << LE) | (1L << LT) | (1L << NE))) != 0)) ) {
+						if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << EQ) | (1L << NE) | (1L << MATCHES))) != 0)) ) {
 						_errHandler.recoverInline(this);
 						}
 						else {
@@ -1012,14 +939,14 @@ public class JsonPath extends Parser {
 							_errHandler.reportMatch(this);
 							consume();
 						}
-						setState(96);
+						setState(91);
 						expression(5);
 						}
 						break;
 					}
 					} 
 				}
-				setState(101);
+				setState(96);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,10,_ctx);
 			}
@@ -1068,7 +995,7 @@ public class JsonPath extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(102);
+			setState(97);
 			_la = _input.LA(1);
 			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << StringLiteral) | (1L << NumericLiteral) | (1L << TRUE) | (1L << FALSE) | (1L << NULL))) != 0)) ) {
 			_errHandler.recoverInline(this);
@@ -1101,44 +1028,41 @@ public class JsonPath extends Parser {
 	private boolean expression_sempred(ExpressionContext _localctx, int predIndex) {
 		switch (predIndex) {
 		case 0:
-			return precpred(_ctx, 11);
+			return precpred(_ctx, 9);
 		case 1:
-			return precpred(_ctx, 10);
-		case 2:
 			return precpred(_ctx, 4);
 		}
 		return true;
 	}
 
 	public static final String _serializedATN =
-		"\3\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964\3 k\4\2\t\2\4\3\t\3"+
-		"\4\4\t\4\4\5\t\5\4\6\t\6\4\7\t\7\4\b\t\b\3\2\5\2\22\n\2\3\2\6\2\25\n\2"+
-		"\r\2\16\2\26\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\7\3%\n\3"+
-		"\f\3\16\3(\13\3\3\3\3\3\3\3\5\3-\n\3\3\4\3\4\3\4\3\4\5\4\63\n\4\3\4\3"+
-		"\4\3\4\3\4\3\4\5\4:\n\4\3\4\5\4=\n\4\3\5\3\5\3\6\3\6\3\7\3\7\3\7\3\7\3"+
-		"\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\6\7U\n\7\r\7\16"+
-		"\7V\5\7Y\n\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\7\7d\n\7\f\7\16\7g\13"+
-		"\7\3\b\3\b\3\b\2\3\f\t\2\4\6\b\n\f\16\2\4\3\2\13\20\4\2\3\4\23\25\2x\2"+
-		"\21\3\2\2\2\4,\3\2\2\2\6<\3\2\2\2\b>\3\2\2\2\n@\3\2\2\2\fX\3\2\2\2\16"+
-		"h\3\2\2\2\20\22\7\b\2\2\21\20\3\2\2\2\21\22\3\2\2\2\22\24\3\2\2\2\23\25"+
-		"\5\4\3\2\24\23\3\2\2\2\25\26\3\2\2\2\26\24\3\2\2\2\26\27\3\2\2\2\27\3"+
-		"\3\2\2\2\30\31\7\30\2\2\31\32\5\f\7\2\32\33\7\31\2\2\33-\3\2\2\2\34\35"+
-		"\7\7\2\2\35-\5\f\7\2\36\37\7\6\2\2\37-\5\f\7\2 !\7\30\2\2!&\5\f\7\2\""+
-		"#\7\33\2\2#%\5\f\7\2$\"\3\2\2\2%(\3\2\2\2&$\3\2\2\2&\'\3\2\2\2\')\3\2"+
-		"\2\2(&\3\2\2\2)*\7\31\2\2*-\3\2\2\2+-\5\6\4\2,\30\3\2\2\2,\34\3\2\2\2"+
-		",\36\3\2\2\2, \3\2\2\2,+\3\2\2\2-\5\3\2\2\2./\7\30\2\2/\60\5\b\5\2\60"+
-		"\62\7\32\2\2\61\63\5\n\6\2\62\61\3\2\2\2\62\63\3\2\2\2\63\64\3\2\2\2\64"+
-		"\65\7\31\2\2\65=\3\2\2\2\66\67\7\30\2\2\679\7\32\2\28:\5\n\6\298\3\2\2"+
-		"\29:\3\2\2\2:;\3\2\2\2;=\7\31\2\2<.\3\2\2\2<\66\3\2\2\2=\7\3\2\2\2>?\7"+
-		"\4\2\2?\t\3\2\2\2@A\7\4\2\2A\13\3\2\2\2BC\b\7\1\2CD\7\21\2\2DY\5\f\7\13"+
-		"EF\7\36\2\2FG\7\34\2\2GH\5\f\7\2HI\7\35\2\2IY\3\2\2\2JK\7\34\2\2KL\5\f"+
-		"\7\2LM\7\35\2\2MY\3\2\2\2NY\5\16\b\2OY\7\37\2\2PY\5\2\2\2QY\7\t\2\2RT"+
-		"\7\5\2\2SU\5\4\3\2TS\3\2\2\2UV\3\2\2\2VT\3\2\2\2VW\3\2\2\2WY\3\2\2\2X"+
-		"B\3\2\2\2XE\3\2\2\2XJ\3\2\2\2XN\3\2\2\2XO\3\2\2\2XP\3\2\2\2XQ\3\2\2\2"+
-		"XR\3\2\2\2Ye\3\2\2\2Z[\f\r\2\2[\\\7\n\2\2\\d\5\f\7\16]^\f\f\2\2^_\7\22"+
-		"\2\2_d\5\f\7\r`a\f\6\2\2ab\t\2\2\2bd\5\f\7\7cZ\3\2\2\2c]\3\2\2\2c`\3\2"+
-		"\2\2dg\3\2\2\2ec\3\2\2\2ef\3\2\2\2f\r\3\2\2\2ge\3\2\2\2hi\t\3\2\2i\17"+
-		"\3\2\2\2\r\21\26&,\629<VXce";
+		"\3\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964\3\33f\4\2\t\2\4\3\t"+
+		"\3\4\4\t\4\4\5\t\5\4\6\t\6\4\7\t\7\4\b\t\b\3\2\5\2\22\n\2\3\2\6\2\25\n"+
+		"\2\r\2\16\2\26\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\3\7\3%\n"+
+		"\3\f\3\16\3(\13\3\3\3\3\3\3\3\5\3-\n\3\3\4\3\4\3\4\3\4\5\4\63\n\4\3\4"+
+		"\3\4\3\4\3\4\3\4\5\4:\n\4\3\4\5\4=\n\4\3\5\3\5\3\6\3\6\3\7\3\7\3\7\3\7"+
+		"\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\3\7\6\7S\n\7\r\7\16\7T\5"+
+		"\7W\n\7\3\7\3\7\3\7\3\7\3\7\3\7\7\7_\n\7\f\7\16\7b\13\7\3\b\3\b\3\b\2"+
+		"\3\f\t\2\4\6\b\n\f\16\2\4\3\2\13\r\4\2\3\4\16\20\2q\2\21\3\2\2\2\4,\3"+
+		"\2\2\2\6<\3\2\2\2\b>\3\2\2\2\n@\3\2\2\2\fV\3\2\2\2\16c\3\2\2\2\20\22\7"+
+		"\b\2\2\21\20\3\2\2\2\21\22\3\2\2\2\22\24\3\2\2\2\23\25\5\4\3\2\24\23\3"+
+		"\2\2\2\25\26\3\2\2\2\26\24\3\2\2\2\26\27\3\2\2\2\27\3\3\2\2\2\30\31\7"+
+		"\23\2\2\31\32\5\f\7\2\32\33\7\24\2\2\33-\3\2\2\2\34\35\7\7\2\2\35-\5\f"+
+		"\7\2\36\37\7\6\2\2\37-\5\f\7\2 !\7\23\2\2!&\5\f\7\2\"#\7\26\2\2#%\5\f"+
+		"\7\2$\"\3\2\2\2%(\3\2\2\2&$\3\2\2\2&\'\3\2\2\2\')\3\2\2\2(&\3\2\2\2)*"+
+		"\7\24\2\2*-\3\2\2\2+-\5\6\4\2,\30\3\2\2\2,\34\3\2\2\2,\36\3\2\2\2, \3"+
+		"\2\2\2,+\3\2\2\2-\5\3\2\2\2./\7\23\2\2/\60\5\b\5\2\60\62\7\25\2\2\61\63"+
+		"\5\n\6\2\62\61\3\2\2\2\62\63\3\2\2\2\63\64\3\2\2\2\64\65\7\24\2\2\65="+
+		"\3\2\2\2\66\67\7\23\2\2\679\7\25\2\28:\5\n\6\298\3\2\2\29:\3\2\2\2:;\3"+
+		"\2\2\2;=\7\24\2\2<.\3\2\2\2<\66\3\2\2\2=\7\3\2\2\2>?\7\4\2\2?\t\3\2\2"+
+		"\2@A\7\4\2\2A\13\3\2\2\2BC\b\7\1\2CD\7\31\2\2DE\7\27\2\2EF\5\f\7\2FG\7"+
+		"\30\2\2GW\3\2\2\2HI\7\27\2\2IJ\5\f\7\2JK\7\30\2\2KW\3\2\2\2LW\5\16\b\2"+
+		"MW\7\32\2\2NW\5\2\2\2OW\7\t\2\2PR\7\5\2\2QS\5\4\3\2RQ\3\2\2\2ST\3\2\2"+
+		"\2TR\3\2\2\2TU\3\2\2\2UW\3\2\2\2VB\3\2\2\2VH\3\2\2\2VL\3\2\2\2VM\3\2\2"+
+		"\2VN\3\2\2\2VO\3\2\2\2VP\3\2\2\2W`\3\2\2\2XY\f\13\2\2YZ\7\n\2\2Z_\5\f"+
+		"\7\f[\\\f\6\2\2\\]\t\2\2\2]_\5\f\7\7^X\3\2\2\2^[\3\2\2\2_b\3\2\2\2`^\3"+
+		"\2\2\2`a\3\2\2\2a\r\3\2\2\2b`\3\2\2\2cd\t\3\2\2d\17\3\2\2\2\r\21\26&,"+
+		"\629<TV^`";
 	public static final ATN _ATN =
 		new ATNDeserializer().deserialize(_serializedATN.toCharArray());
 	static {

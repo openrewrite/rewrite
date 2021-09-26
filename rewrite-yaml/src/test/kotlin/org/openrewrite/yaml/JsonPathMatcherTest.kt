@@ -18,8 +18,10 @@ package org.openrewrite.yaml
 
 import org.assertj.core.api.Assertions.assertThat
 import org.intellij.lang.annotations.Language
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
+import org.openrewrite.Issue
 import org.openrewrite.yaml.tree.Yaml
 
 class JsonPathMatcherTest {
@@ -80,6 +82,8 @@ class JsonPathMatcherTest {
     private val allContainerSlices = "$.spec.template.spec.containers[*]"
     private val allSpecChildren = "$.spec.template.spec.*"
     private val containerByNameImage = "..spec.containers[?(@.name == 'app')].image"
+    private val containerByNameImageMatches = "..spec.containers[?(@.name =~ 'a.*')].image"
+    private val containerByNameImageWithAnd = "..spec.containers[?(@.name =~ 'a.*' && @.image =~ 'mycompany.*')].image"
     private val image = ".image"
 
     @Test
@@ -117,6 +121,22 @@ class JsonPathMatcherTest {
     @Test
     fun `must filter by expression`() {
         val results = visit(containerByNameImage, source)
+        assertThat(results).hasSize(1)
+        assertThat(((results[0] as Yaml.Mapping.Entry).value as Yaml.Scalar).value).isEqualTo("mycompany.io/app:v2@digest")
+    }
+
+    @Test
+    fun `must filter by pattern`() {
+        val results = visit(containerByNameImageMatches, source)
+        assertThat(results).hasSize(1)
+        assertThat(((results[0] as Yaml.Mapping.Entry).value as Yaml.Scalar).value).isEqualTo("mycompany.io/app:v2@digest")
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1063")
+    @Disabled
+    @Test
+    fun `must filter by filters combined with and`() {
+        val results = visit(containerByNameImageWithAnd, source)
         assertThat(results).hasSize(1)
         assertThat(((results[0] as Yaml.Mapping.Entry).value as Yaml.Scalar).value).isEqualTo("mycompany.io/app:v2@digest")
     }

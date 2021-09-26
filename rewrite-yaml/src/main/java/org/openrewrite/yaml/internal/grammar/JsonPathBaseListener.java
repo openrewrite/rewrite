@@ -223,18 +223,6 @@ public class JsonPathBaseListener implements JsonPathListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterNotExpression(JsonPath.NotExpressionContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitNotExpression(JsonPath.NotExpressionContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
 	@Override public void enterWildcardExpression(JsonPath.WildcardExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -254,18 +242,6 @@ public class JsonPathBaseListener implements JsonPathListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitFilterExpression(JsonPath.FilterExpressionContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterOrExpression(JsonPath.OrExpressionContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitOrExpression(JsonPath.OrExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

@@ -134,13 +134,6 @@ public interface JsonPathVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitLiteralExpression(JsonPath.LiteralExpressionContext ctx);
 	/**
-	 * Visit a parse tree produced by the {@code NotExpression}
-	 * labeled alternative in {@link JsonPath#expression}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitNotExpression(JsonPath.NotExpressionContext ctx);
-	/**
 	 * Visit a parse tree produced by the {@code WildcardExpression}
 	 * labeled alternative in {@link JsonPath#expression}.
 	 * @param ctx the parse tree
@@ -154,13 +147,6 @@ public interface JsonPathVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitFilterExpression(JsonPath.FilterExpressionContext ctx);
-	/**
-	 * Visit a parse tree produced by the {@code OrExpression}
-	 * labeled alternative in {@link JsonPath#expression}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitOrExpression(JsonPath.OrExpressionContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link JsonPath#litExpression}.
 	 * @param ctx the parse tree

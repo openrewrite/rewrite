@@ -29,6 +29,7 @@ import org.openrewrite.json.tree.JsonValue;
 
 import java.util.*;
 import java.util.function.BiPredicate;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.disjoint;
@@ -227,6 +228,10 @@ public class JsonPathMatcher {
             BiPredicate<Object, Object> predicate = (lh, rh) -> {
                 if (ctx.EQ() != null) {
                     return Objects.equals(lh, rh);
+                } else if(ctx.MATCHES() != null) {
+                    String lhStr = lh.toString();
+                    String rhStr = rh.toString();
+                    return Pattern.compile(rhStr).matcher(lhStr).matches();
                 }
                 return false;
             };

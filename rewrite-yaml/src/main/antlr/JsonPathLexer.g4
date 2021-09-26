@@ -1,8 +1,8 @@
 lexer grammar JsonPathLexer;
 
 StringLiteral
-   : '"' (EscapeSequence | SAFECODEPOINT)* '"'
-   | '\'' (EscapeSequence | SAFECODEPOINT)* '\''
+   : '"' (EscapeSequence | SAFECODEPOINT)*? '"'
+   | '\'' (EscapeSequence | SAFECODEPOINT)*? '\''
    ;
 
 fragment EscapeSequence
@@ -37,15 +37,16 @@ DOT : '.';
 ROOT : '$';
 WILDCARD : '*';
 
-AND : 'and';
+AND : '&&';
 EQ : '==';
-GE : '>=';
-GT : '>';
-LE : '<=';
-LT : '<';
+//GE : '>=';
+//GT : '>';
+//LE : '<=';
+//LT : '<';
 NE : '!=';
-NOT : 'not';
-OR : 'or';
+MATCHES: '=~';
+//NOT : '!';
+//OR : '||';
 
 TRUE : 'true';
 FALSE : 'false';

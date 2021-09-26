@@ -28,17 +28,17 @@ end
     ;
 
 expression
-    : expression AND expression                                 #AndExpression
-    | expression OR expression                                  #OrExpression
-    | NOT expression                                            #NotExpression
-    | QUESTION LPAREN expression RPAREN                         #FilterExpression
-    | LPAREN expression RPAREN                                  #ParentheticalExpression
-    | litExpression                                             #LiteralExpression
-    | Identifier                                                #Identifier
-    | expression ( EQ | NE | LT | LE | GT | GE ) expression     #BinaryExpression
-    | jsonpath                                                  #PathExpression
-    | WILDCARD                                                  #WildcardExpression
-    | AT object+                                                #ScopedPathExpression
+    : expression AND expression                                             #AndExpression
+//    | expression OR expression                                              #OrExpression
+//    | NOT expression                                                        #NotExpression
+    | QUESTION LPAREN expression RPAREN                                     #FilterExpression
+    | LPAREN expression RPAREN                                              #ParentheticalExpression
+    | litExpression                                                         #LiteralExpression
+    | Identifier                                                            #Identifier
+    | expression ( EQ | NE | MATCHES ) expression       #BinaryExpression
+    | jsonpath                                                              #PathExpression
+    | WILDCARD                                                              #WildcardExpression
+    | AT object+                                                            #ScopedPathExpression
     ;
 
 litExpression

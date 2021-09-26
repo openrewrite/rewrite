@@ -118,6 +118,7 @@ class JsonPathMatcherTest {
     private val allContainerSlices = "$.spec.template.spec.containers[*]"
     private val allSpecChildren = "$.spec.template.spec.*"
     private val containerByNameImage = "..spec.containers[?(@.name == 'app')].image"
+    private val containerByNameImageMatches = "..spec.containers[?(@.name =~ 'a.*')].image"
     private val image = ".image"
 
     @Test
@@ -155,6 +156,13 @@ class JsonPathMatcherTest {
     @Test
     fun `must filter by expression`() {
         val results = visit(containerByNameImage, source)
+        assertThat(results).hasSize(1)
+        assertThat(((results[0] as Json.Member).value as Json.Literal).value).isEqualTo("mycompany.io/app:v2@digest")
+    }
+
+    @Test
+    fun `must filter by pattern`() {
+        val results = visit(containerByNameImageMatches, source)
         assertThat(results).hasSize(1)
         assertThat(((results[0] as Json.Member).value as Json.Literal).value).isEqualTo("mycompany.io/app:v2@digest")
     }
