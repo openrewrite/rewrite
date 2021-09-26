@@ -54,18 +54,20 @@ class DeleteKeyTest : YamlRecipeTest {
 
     @Test
     fun deleteSequenceEntry() = assertChanged(
-        recipe = DeleteKey("$.subjects[?(@.kind == 'ServiceAccount')]", null),
+        recipe = DeleteKey("$.subjects[?(@.kind == 'User')]", null),
         before = """
             subjects:
               - kind: User
                 name: some-user
+                restore-keys: |
+                  gradle
               - kind: ServiceAccount
                 name: monitoring-tools
         """,
         after = """
             subjects:
-              - kind: User
-                name: some-user
+              - kind: ServiceAccount
+                name: monitoring-tools
         """
     )
 

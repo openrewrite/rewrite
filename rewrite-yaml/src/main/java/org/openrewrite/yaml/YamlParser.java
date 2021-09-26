@@ -102,7 +102,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
             pos = variableMatcher.end(1);
         }
 
-        if(pos < yamlSource.length() - 1) {
+        if (pos < yamlSource.length() - 1) {
             yamlSourceWithVariablePlaceholders.append(yamlSource, pos, yamlSource.length());
         }
 
@@ -118,12 +118,14 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
             List<Yaml.Document> documents = new ArrayList<>();
             Yaml.Document document = null;
             Stack<BlockBuilder> blockStack = new Stack<>();
+            String newLine = "";
 
             for (Event event = parser.getEvent(); event != null; event = parser.getEvent()) {
-                String fmt = reader.prefix(lastEnd, event);
-
                 switch (event.getEventId()) {
-                    case DocumentEnd:
+                    case DocumentEnd: {
+                        String fmt = newLine + reader.prefix(lastEnd, event);
+                        newLine = "";
+
                         assert document != null;
                         documents.add(document.withEnd(new Yaml.Document.End(
                                 randomId(),
@@ -133,7 +135,11 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                         )));
                         lastEnd = event.getEndMark().getIndex();
                         break;
-                    case DocumentStart:
+                    }
+                    case DocumentStart: {
+                        String fmt = newLine + reader.prefix(lastEnd, event);
+                        newLine = "";
+
                         document = new Yaml.Document(
                                 randomId(),
                                 fmt,
@@ -144,13 +150,20 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                         );
                         lastEnd = event.getEndMark().getIndex();
                         break;
-                    case MappingStart:
+                    }
+                    case MappingStart: {
+                        String fmt = newLine + reader.prefix(lastEnd, event);
+                        newLine = "";
                         blockStack.push(new MappingBuilder(fmt));
                         break;
-                    case Scalar:
+                    }
+                    case Scalar: {
+                        String fmt = newLine + reader.prefix(lastEnd, event);
+                        newLine = "";
+
                         ScalarEvent scalar = (ScalarEvent) event;
                         String scalarValue = scalar.getValue();
-                        if(variableByUuid.containsKey(scalarValue)) {
+                        if (variableByUuid.containsKey(scalarValue)) {
                             scalarValue = variableByUuid.get(scalarValue);
                         }
 
@@ -165,6 +178,10 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                             case LITERAL:
                                 style = Yaml.Scalar.Style.LITERAL;
                                 scalarValue = reader.readStringFromBuffer(event.getStartMark().getIndex() + 1, event.getEndMark().getIndex() - 1);
+                                if (scalarValue.endsWith("\n")) {
+                                    newLine = "\n";
+                                    scalarValue = scalarValue.substring(0, scalarValue.length() - 1);
+                                }
                                 break;
                             case FOLDED:
                                 style = Yaml.Scalar.Style.FOLDED;
@@ -176,14 +193,14 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                                 break;
                         }
                         BlockBuilder builder = blockStack.peek();
-                        if(builder instanceof SequenceBuilder) {
+                        if (builder instanceof SequenceBuilder) {
                             // Inline sequences like [1, 2] need to keep track of any whitespace between the element
                             // and its trailing comma.
                             SequenceBuilder sequenceBuilder = (SequenceBuilder) builder;
                             String betweenEvents = reader.readStringFromBuffer(event.getEndMark().getIndex(), parser.peekEvent().getStartMark().getIndex() - 1);
                             int commaIndex = commentAwareIndexOf(',', betweenEvents);
                             String commaPrefix = null;
-                            if(commaIndex != -1) {
+                            if (commaIndex != -1) {
                                 commaPrefix = betweenEvents.substring(0, commaIndex);
 
                             }
@@ -195,12 +212,13 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                             lastEnd = event.getEndMark().getIndex();
                         }
                         break;
+                    }
                     case SequenceEnd:
-                    case MappingEnd:
+                    case MappingEnd: {
                         Yaml.Block mappingOrSequence = blockStack.pop().build();
-                        if(mappingOrSequence instanceof Yaml.Sequence) {
+                        if (mappingOrSequence instanceof Yaml.Sequence) {
                             Yaml.Sequence seq = (Yaml.Sequence) mappingOrSequence;
-                            if(seq.getOpeningBracketPrefix() != null) {
+                            if (seq.getOpeningBracketPrefix() != null) {
                                 String s = reader.readStringFromBuffer(lastEnd, event.getStartMark().getIndex());
                                 int closingBracketIndex = commentAwareIndexOf(']', s);
                                 lastEnd = lastEnd + closingBracketIndex + 1;
@@ -214,17 +232,22 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                             blockStack.peek().push(mappingOrSequence);
                         }
                         break;
-                    case SequenceStart:
+                    }
+                    case SequenceStart: {
+                        String fmt = newLine + reader.prefix(lastEnd, event);
+                        newLine = "";
+
                         String fullPrefix = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex() - 1);
                         String startBracketPrefix = null;
                         int openingBracketIndex = commentAwareIndexOf('[', fullPrefix);
-                        if(openingBracketIndex != -1) {
+                        if (openingBracketIndex != -1) {
                             int startIndex = commentAwareIndexOf(':', fullPrefix) + 1;
                             startBracketPrefix = fullPrefix.substring(startIndex, openingBracketIndex);
                             lastEnd = event.getEndMark().getIndex();
                         }
                         blockStack.push(new SequenceBuilder(fmt, startBracketPrefix));
                         break;
+                    }
                     case Alias:
                     case StreamEnd:
                     case StreamStart:
@@ -243,16 +266,16 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
      */
     private static int commentAwareIndexOf(char target, String s) {
         boolean inComment = false;
-        for(int i = 0; i < s.length(); i++) {
+        for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
             if (inComment) {
                 if (c == '\n') {
                     inComment = false;
                 }
             } else {
-                if(c == target) {
+                if (c == target) {
                     return i;
-                } else if(c == '#') {
+                } else if (c == '#') {
                     inComment = true;
                 }
             }
@@ -318,7 +341,8 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
 
     private static class SequenceBuilder implements BlockBuilder {
         private final String prefix;
-        @Nullable private final String startBracketPrefix;
+        @Nullable
+        private final String startBracketPrefix;
 
         private final List<Yaml.Sequence.Entry> entries = new ArrayList<>();
 
@@ -338,7 +362,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
             String entryPrefix;
             String blockPrefix;
             boolean hasDash = dashIndex != -1;
-            if(hasDash) {
+            if (hasDash) {
                 entryPrefix = rawPrefix.substring(0, dashIndex);
                 blockPrefix = rawPrefix.substring(dashIndex + 1);
             } else {
