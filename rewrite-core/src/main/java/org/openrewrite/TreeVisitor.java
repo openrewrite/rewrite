@@ -159,6 +159,12 @@ public abstract class TreeVisitor<T extends Tree, P> {
         return t;
     }
 
+    public T visitNonNull(Tree tree, P p, Cursor parent) {
+        T t = visit(tree, p, parent);
+        assert t != null;
+        return t;
+    }
+
     @Nullable
     public T visit(@Nullable Tree tree, P p) {
         if (tree == null) {

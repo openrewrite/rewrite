@@ -303,6 +303,31 @@ class MergeYamlTest : YamlRecipeTest {
     )
 
     @Test
+    fun mergeMappingEntry() = assertChanged(
+        recipe = MergeYaml(
+            "$.steps[?(@.uses == 'actions/setup-java')]",
+            """
+              with:
+                cache: 'gradle'
+            """.trimIndent(),
+            false,
+            null
+        ),
+        before = """
+            steps:
+              - uses: actions/checkout
+              - uses: actions/setup-java
+        """,
+        after = """
+            steps:
+              - uses: actions/checkout
+              - uses: actions/setup-java
+                with:
+                  cache: 'gradle'
+        """
+    )
+
+    @Test
     fun changeOnlyMatchingFile(@TempDir tempDir: Path) {
         val matchingFile = tempDir.resolve("a.yml").toFile().apply {
             writeText("apiVersion: policy/v1beta1")

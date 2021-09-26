@@ -97,6 +97,16 @@ public class MergeYaml extends Recipe {
             }
 
             @Override
+            public Yaml.Mapping visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
+                Yaml.Mapping m = super.visitMapping(mapping, ctx);
+                if (matcher.matches(getCursor())) {
+                    m = (Yaml.Mapping) new MergeYamlVisitor<>(mapping, incoming, Boolean.TRUE.equals(acceptTheirs))
+                            .visitNonNull(mapping, ctx, getCursor().getParentOrThrow());
+                }
+                return m;
+            }
+
+            @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 if (matcher.matches(getCursor())) {
                     // this tests for an awkward case that will be better handled by JsonPathMatcher.
