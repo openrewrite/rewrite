@@ -26,6 +26,7 @@ import org.codehaus.groovy.transform.stc.StaticTypeCheckingVisitor;
 import org.codehaus.groovy.transform.stc.StaticTypesMarker;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.groovy.marker.OmitParentheses;
 import org.openrewrite.groovy.marker.Semicolon;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.lang.Nullable;
@@ -151,7 +152,7 @@ public class GroovyParserVisitor {
                 ASTNode node = nodes.get(i);
 
                 Space pad;
-                if(i == nodes.size() - 1) {
+                if (i == nodes.size() - 1) {
                     int saveCursor = cursor;
                     pad = whitespace();
                     if (cursor >= source.length() || source.charAt(cursor) != lastPadTo) {
@@ -301,12 +302,67 @@ public class GroovyParserVisitor {
                     call.getMethodAsString(), null);
             cursor += call.getMethodAsString().length();
 
-            JContainer<Expression> args = JContainer.build(visitRightPadded(((ArgumentListExpression) call.getArguments()).getExpressions(),
-                    ')'));
+            Space beforeOpenParen = EMPTY;
+            List<org.codehaus.groovy.ast.expr.Expression> unparsedArgs = ((ArgumentListExpression) call.getArguments()).getExpressions();
+            List<JRightPadded<Expression>> args = new ArrayList<>(unparsedArgs.size());
+            for (int i = 0; i < unparsedArgs.size(); i++) {
+                org.codehaus.groovy.ast.expr.Expression unparsedArg = unparsedArgs.get(i);
+
+                OmitParentheses omitParentheses = null;
+                Space pad;
+                if (i == 0) {
+                    pad = whitespace();
+                    if (source.charAt(cursor) != '(') {
+                        omitParentheses = new OmitParentheses(randomId());
+                    } else {
+                        beforeOpenParen = pad;
+                        pad = EMPTY;
+                        cursor++;
+                    }
+                } else if (i == unparsedArgs.size() - 1) {
+                    int saveCursor = cursor;
+                    pad = whitespace();
+                    if (cursor >= source.length() || source.charAt(cursor) != ')') {
+                        cursor = saveCursor;
+                    } else {
+                        cursor++;
+                    }
+                } else {
+                    pad = whitespace();
+                }
+
+                Expression arg = visit(unparsedArg);
+                if (omitParentheses != null) {
+                    arg = arg.withMarkers(arg.getMarkers().add(omitParentheses));
+                }
+
+                args.add(JRightPadded.build(arg.withPrefix(pad)));
+            }
+
+            if (unparsedArgs.isEmpty()) {
+                int saveCursor = cursor;
+                Space pad = whitespace();
+                OmitParentheses omitParentheses = null;
+                if (source.charAt(cursor) != '(') {
+                    omitParentheses = new OmitParentheses(randomId());
+                    pad = EMPTY;
+                    cursor = saveCursor;
+                } else {
+                    cursor++;
+                }
+
+                Expression element = new J.Empty(randomId(), pad, Markers.EMPTY);
+                if(omitParentheses != null) {
+                    element = element.withMarkers(element.getMarkers().add(omitParentheses));
+                }
+
+                args.add(JRightPadded.build(element).withAfter(whitespace()));
+                cursor++;
+            }
 
             queue.add(new J.MethodInvocation(randomId(), EMPTY, Markers.EMPTY,
                     select == null ? null : JRightPadded.build(select),
-                    null, name, args, null));
+                    null, name, JContainer.build(beforeOpenParen, args, Markers.EMPTY), null));
         }
 
         @Override

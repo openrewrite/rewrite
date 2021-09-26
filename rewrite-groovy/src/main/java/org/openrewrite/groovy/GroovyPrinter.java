@@ -16,13 +16,14 @@
 package org.openrewrite.groovy;
 
 import org.openrewrite.PrintOutputCapture;
+import org.openrewrite.groovy.marker.OmitParentheses;
 import org.openrewrite.groovy.marker.Semicolon;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaPrinter;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JRightPadded;
-import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
+
+import java.util.List;
 
 public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     private final GroovyJavaPrinter delegate = new GroovyJavaPrinter();
@@ -46,6 +47,8 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     private class GroovyJavaPrinter extends JavaPrinter<P> {
         @Override
         public J visitLambda(J.Lambda lambda, PrintOutputCapture<P> p) {
+            visitSpace(lambda.getPrefix(), Space.Location.LAMBDA_PREFIX, p);
+            visitMarkers(lambda.getMarkers(), p);
             p.out.append('{');
             visit(lambda.getParameters(), p);
             if (!lambda.getParameters().getParameters().isEmpty()) {
@@ -61,6 +64,40 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             }
             p.out.append('}');
             return lambda;
+        }
+
+        @Override
+        public J visitMethodInvocation(J.MethodInvocation method, PrintOutputCapture<P> p) {
+            visitSpace(method.getPrefix(), Space.Location.METHOD_INVOCATION_PREFIX, p);
+            visitMarkers(method.getMarkers(), p);
+            visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, ".", p);
+            visitContainer("<", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
+            visit(method.getName(), p);
+
+            JContainer<Expression> argContainer = method.getPadding().getArguments();
+
+            visitSpace(argContainer.getBefore(), Space.Location.METHOD_INVOCATION_ARGUMENTS, p);
+            List<JRightPadded<Expression>> args = argContainer.getPadding().getElements();
+            for (int i = 0; i < args.size(); i++) {
+                JRightPadded<Expression> arg = args.get(i);
+                boolean omitParens = arg.getElement().getMarkers()
+                        .findFirst(OmitParentheses.class).isPresent();
+
+                if (i == 0 && !omitParens) {
+                    p.out.append('(');
+                }
+
+                visitRightPadded(arg, JRightPadded.Location.METHOD_INVOCATION_ARGUMENT, p);
+                if (i < args.size() - 1) {
+                    p.out.append(',');
+                }
+
+                if (i == args.size() - 1 && !omitParens) {
+                    p.out.append(')');
+                }
+            }
+
+            return method;
         }
 
         @Override
