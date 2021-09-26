@@ -246,7 +246,7 @@ public class JsonPathMatcher {
             BiPredicate<Object, Object> predicate = (lh, rh) -> {
                 if (ctx.EQ() != null) {
                     return Objects.equals(lh, rh);
-                } else if (ctx.MATCHES() != null) {
+                } else if (ctx.MATCHES() != null && lh != null && rh != null) {
                     String lhStr = lh.toString();
                     if (rh instanceof String) {
                         return Pattern.compile(rh.toString()).matcher(lhStr).matches();
