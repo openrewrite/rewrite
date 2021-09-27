@@ -4848,4 +4848,21 @@ interface SpacesTest : JavaRecipeTest {
             }
         """
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1064")
+    @Test
+    fun preserveSpacePrecedingCommentInSpaceBefore(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            @Deprecated("version" /* some comment */) 
+            class Test {
+                void foo() {
+                    List.of( // another comment
+                        1,
+                        2
+                    );
+                }
+            }
+        """
+    )
 }

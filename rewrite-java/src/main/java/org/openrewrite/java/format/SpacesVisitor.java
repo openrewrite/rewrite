@@ -55,7 +55,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     <T extends J> T spaceBefore(T j, boolean spaceBefore) {
         if (spaceBefore && StringUtils.isNullOrEmpty(j.getPrefix().getWhitespace())) {
             return j.withPrefix(j.getPrefix().withWhitespace(" "));
-        } else if (!spaceBefore && j.getPrefix().getWhitespace().equals(" ")) {
+        } else if (!spaceBefore && j.getPrefix().getWhitespace().equals(" ") && j.getComments().isEmpty()) {
             return j.withPrefix(j.getPrefix().withWhitespace(""));
         } else {
             return j;
