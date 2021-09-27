@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaRecipeTest
 
@@ -95,5 +96,20 @@ interface FinalClassTest : JavaRecipeTest {
                 }
              }
          """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1061")
+    @Test
+    fun abstractClass() = assertUnchanged(
+        before = """
+            public abstract class A {
+                
+                public static void foo() {
+                }
+                
+                private A() {
+                }
+            }
+        """
     )
 }

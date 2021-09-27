@@ -33,7 +33,7 @@ import static org.openrewrite.java.tree.J.ClassDeclaration.Kind.Type.Interface;
 public class FinalClassVisitor extends JavaIsoVisitor<ExecutionContext> {
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDeclaration, ExecutionContext executionContext) {
-        if(classDeclaration.getKind() == Interface) {
+        if(classDeclaration.getKind() == Interface || classDeclaration.hasModifier(J.Modifier.Type.Abstract)) {
             return classDeclaration;
         }
         J.ClassDeclaration cd = super.visitClassDeclaration(classDeclaration, executionContext);
