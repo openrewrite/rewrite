@@ -361,27 +361,13 @@ interface HideUtilityClassConstructorTest : JavaRecipeTest {
         """
     )
 
-    /**
-     * Should be a utility class since all methods are static, and has public constructor
-     */
+    @Issue("https://github.com/openrewrite/rewrite/issues/1060")
     @Test
-    fun identifyUtilityClassesOnlyStaticMethodsAndAbstractClass(jp: JavaParser) = assertChanged(
+    fun identifyAbstractClass(jp: JavaParser) = assertUnchanged(
         jp,
         before = """
             public abstract class A {
                 public A() {
-                }
-
-                public static void someStatic1() {
-                }
-
-                public static void someStatic2() {
-                }
-            }
-        """,
-        after = """
-            public abstract class A {
-                private A() {
                 }
 
                 public static void someStatic1() {

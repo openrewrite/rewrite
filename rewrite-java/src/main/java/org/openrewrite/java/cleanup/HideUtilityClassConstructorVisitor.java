@@ -61,7 +61,7 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
-        if (utilityClassMatcher.isRefactorableUtilityClass(c)) {
+        if (!c.hasModifier(J.Modifier.Type.Abstract) && utilityClassMatcher.isRefactorableUtilityClass(c)) {
             /*
              * Note, it's a deliberate choice to have these be their own respective visitors rather than putting
              * all the logic in one visitor. It's conceptually easier to distinguish what each are doing.
