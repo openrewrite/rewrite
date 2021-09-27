@@ -27,6 +27,7 @@ import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.transform.stc.StaticTypeCheckingVisitor;
 import org.codehaus.groovy.transform.stc.StaticTypesMarker;
 import org.jetbrains.annotations.NotNull;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.groovy.marker.OmitParentheses;
 import org.openrewrite.groovy.marker.Semicolon;
@@ -192,13 +193,13 @@ public class GroovyParserVisitor {
     }
 
     private class RewriteGroovyVisitor extends CodeVisitorSupport {
-        private final Stack<ASTNode> nodeStack = new Stack<>();
+        private Cursor nodeCursor = new Cursor(null, "root");
         private final Queue<Object> queue = new LinkedList<>();
 
         private <T> T visit(ASTNode node) {
-            nodeStack.push(node);
+            nodeCursor = new Cursor(nodeCursor, node);
             node.visit(this);
-            nodeStack.pop();
+            nodeCursor = nodeCursor.getParentOrThrow();
             return pollQueue();
         }
 
@@ -244,7 +245,7 @@ public class GroovyParserVisitor {
         @Override
         public void visitBlockStatement(BlockStatement block) {
             Space fmt = EMPTY;
-            if (!(nodeStack.peek() instanceof ClosureExpression)) {
+            if (!(nodeCursor.getParentOrThrow().getValue() instanceof ClosureExpression)) {
                 fmt = sourceBefore("{");
             }
             List<JRightPadded<Statement>> statements = new ArrayList<>(block.getStatements().size());
@@ -266,7 +267,7 @@ public class GroovyParserVisitor {
 
             Space beforeBrace = whitespace();
             queue.add(new J.Block(randomId(), fmt, Markers.EMPTY, JRightPadded.build(false), statements, beforeBrace));
-            if (!(nodeStack.peek() instanceof ClosureExpression)) {
+            if (!(nodeCursor.getParentOrThrow().getValue() instanceof ClosureExpression)) {
                 sourceBefore("}");
             }
         }
@@ -612,16 +613,6 @@ public class GroovyParserVisitor {
         return format(prefix);
     }
 
-    private String skip(@Nullable String token) {
-        if (token == null) {
-            //noinspection ConstantConditions
-            return null;
-        }
-        if (source.startsWith(token, cursor))
-            cursor += token.length();
-        return token;
-    }
-
     @Nullable
     private JavaType type(@Nullable ASTNode node) {
         if (node == null || node.getMetaDataMap() == null) {
@@ -673,8 +664,7 @@ public class GroovyParserVisitor {
             }
         }
 
-        //noinspection unchecked,ConstantConditions
-        return ((T) expr).withPrefix(prefix);
+        return expr.withPrefix(prefix);
     }
 
     private Space sourceBefore(String untilDelim) {
