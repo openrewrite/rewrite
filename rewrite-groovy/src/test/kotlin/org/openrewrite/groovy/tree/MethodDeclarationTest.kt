@@ -26,4 +26,13 @@ class MethodDeclarationTest : GroovyTreeTest {
             }
         """.trimIndent()
     )
+
+    @Test
+    fun primitiveReturn() = assertParsePrintAndProcess(
+        """
+            static int accept(Map m) {
+                return 0;
+            }
+        """.trimIndent()
+    )
 }

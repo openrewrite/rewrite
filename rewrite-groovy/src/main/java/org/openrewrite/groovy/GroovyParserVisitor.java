@@ -15,12 +15,14 @@
  */
 package org.openrewrite.groovy;
 
+import groovyjarjarasm.asm.Opcodes;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.ast.expr.*;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
+import org.codehaus.groovy.ast.stmt.ReturnStatement;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.transform.stc.StaticTypeCheckingVisitor;
 import org.codehaus.groovy.transform.stc.StaticTypesMarker;
@@ -132,6 +134,8 @@ public class GroovyParserVisitor {
         public void visitMethod(MethodNode node) {
             Space fmt = sourceBefore("def");
 
+            List<J.Modifier> modifiers = visitModifiers(node.getModifiers());
+
             TypeTree returnType = visitTypeTree(node.getReturnType());
 
             J.Identifier name = J.Identifier.build(randomId(),
@@ -169,7 +173,7 @@ public class GroovyParserVisitor {
             queue.add(new J.MethodDeclaration(
                     randomId(), fmt, Markers.EMPTY,
                     emptyList(),
-                    emptyList(),
+                    modifiers,
                     null,
                     returnType,
                     new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
@@ -252,6 +256,7 @@ public class GroovyParserVisitor {
                     stat = stat
                             .withMarkers(stat.getMarkers().add(new Semicolon(randomId())))
                             .withAfter(beforeSemicolon);
+                    cursor++;
                 } else {
                     cursor = saveCursor;
                 }
@@ -295,13 +300,14 @@ public class GroovyParserVisitor {
                 if (source.startsWith("'", cursor)) {
                     text = "'" + text + "'";
                 }
-                cursor += text.length();
             } else if (expression.isNullExpression()) {
+                text = "null";
                 jType = JavaType.Primitive.Null;
             } else {
                 throw new IllegalStateException("Unexpected constant type " + type);
             }
 
+            cursor += text.length();
             queue.add(new J.Literal(randomId(), prefix, Markers.EMPTY, expression.getValue(), text,
                     null, jType));
         }
@@ -430,6 +436,12 @@ public class GroovyParserVisitor {
             queue.add(new J.MethodInvocation(randomId(), EMPTY, Markers.EMPTY,
                     select == null ? null : JRightPadded.build(select),
                     null, name, JContainer.build(beforeOpenParen, args, Markers.EMPTY), null));
+        }
+
+        @Override
+        public void visitReturnStatement(ReturnStatement retn) {
+            Space fmt = sourceBefore("return");
+            queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, visit(retn.getExpression())));
         }
 
         @Override
@@ -687,9 +699,68 @@ public class GroovyParserVisitor {
 
     private TypeTree visitTypeTree(ClassNode classNode) {
         if (classNode.getLineNumber() >= 0) {
-            return buildName(classNode.getName());
+            JavaType.Primitive primitiveType = JavaType.Primitive.fromKeyword(classNode.getName());
+            if (primitiveType == null) {
+                return buildName(classNode.getName());
+            }
+            Space fmt = whitespace();
+            cursor += classNode.getName().length();
+            return new J.Primitive(randomId(), fmt, Markers.EMPTY, primitiveType);
         }
         return J.Identifier.build(randomId(), sourceBefore("def"), Markers.EMPTY, "def",
                 JavaType.Class.build("java.lang.Object"));
+    }
+
+    private List<J.Modifier> visitModifiers(int modifiers) {
+        List<J.Modifier> unorderedModifiers = new ArrayList<>();
+
+        if ((modifiers & Opcodes.ACC_ABSTRACT) != 0) {
+            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, J.Modifier.Type.Abstract, emptyList()));
+        }
+        if ((modifiers & Opcodes.ACC_FINAL) != 0) {
+            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, J.Modifier.Type.Final, emptyList()));
+        }
+        if ((modifiers & Opcodes.ACC_PRIVATE) != 0) {
+            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, J.Modifier.Type.Private, emptyList()));
+        }
+        if ((modifiers & Opcodes.ACC_PROTECTED) != 0) {
+            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, J.Modifier.Type.Protected, emptyList()));
+        }
+        if ((modifiers & Opcodes.ACC_PUBLIC) != 0) {
+            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, J.Modifier.Type.Public, emptyList()));
+        }
+        if ((modifiers & Opcodes.ACC_STATIC) != 0) {
+            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, J.Modifier.Type.Static, emptyList()));
+        }
+        if ((modifiers & Opcodes.ACC_SYNCHRONIZED) != 0) {
+            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, J.Modifier.Type.Synchronized, emptyList()));
+        }
+        if ((modifiers & Opcodes.ACC_TRANSIENT) != 0) {
+            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, J.Modifier.Type.Transient, emptyList()));
+        }
+        if ((modifiers & Opcodes.ACC_VOLATILE) != 0) {
+            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, J.Modifier.Type.Volatile, emptyList()));
+        }
+
+        List<J.Modifier> orderedModifiers = new ArrayList<>(unorderedModifiers.size());
+        boolean foundModifier = true;
+        nextModifier:
+        while (foundModifier) {
+            int saveCursor = cursor;
+            Space fmt = whitespace();
+            for (J.Modifier mod : unorderedModifiers) {
+                String modName = mod.getType().name().toLowerCase();
+                if (source.startsWith(modName, cursor)) {
+                    orderedModifiers.add(mod.withPrefix(fmt));
+                    unorderedModifiers.remove(mod);
+                    cursor += modName.length();
+                    continue nextModifier;
+                }
+            }
+            foundModifier = false;
+            cursor = saveCursor;
+        }
+
+        return orderedModifiers;
     }
 }
