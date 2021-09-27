@@ -17,31 +17,13 @@ package org.openrewrite.groovy.tree
 
 import org.junit.jupiter.api.Test
 
-class MethodInvocationTest : GroovyTreeTest {
+class MapLiteralTest : GroovyTreeTest {
 
     @Test
-    fun gradle() = assertParsePrintAndProcess(
+    fun mapLiteral() = assertParsePrintAndProcess(
         """
-            plugins {
-                id 'java-library'
+            def accept(Map m) {
             }
-            
-            repositories {
-                mavenCentral()
-            }
-            
-            dependencies {
-                implementation 'org.hibernate:hibernate-core:3.6.7.Final'
-                api 'com.google.guava:guava:23.0'
-                testImplementation 'junit:junit:4.+'
-            }
-        """.trimIndent()
-    )
-
-    @Test
-    fun emptyArgsWithParens() = assertParsePrintAndProcess(
-        """
-            mavenCentral()
         """.trimIndent()
     )
 }

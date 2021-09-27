@@ -7,6 +7,7 @@ pluginManagement {
 
 include(
     "rewrite-core",
+    "rewrite-gradle",
     "rewrite-groovy",
     "rewrite-hcl",
     "rewrite-java",

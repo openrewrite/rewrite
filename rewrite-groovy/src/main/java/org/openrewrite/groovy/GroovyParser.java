@@ -44,6 +44,9 @@ import static java.util.stream.Collectors.toList;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public class GroovyParser implements Parser<G.CompilationUnit> {
+    @Nullable
+    private final Collection<Path> classpath;
+
     /**
      * When true, enables a parser to use class types from the in-memory type cache rather than performing
      * a deep equality check. Useful when deep class types have already been built from a separate parsing phase
@@ -101,7 +104,12 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
             );
 
             GroovyClassLoader transformLoader = new GroovyClassLoader(getClass().getClassLoader());
-            CompilationUnit compUnit = new CompilationUnit(null, null, null, transformLoader);
+            CompilerConfiguration compilerConfiguration = new CompilerConfiguration();
+            compilerConfiguration.setClasspathList(classpath.stream()
+                    .map(cp -> cp.toFile().toString())
+                    .collect(toList()));
+
+            CompilationUnit compUnit = new CompilationUnit(compilerConfiguration, null, null, transformLoader);
             compUnit.addSource(unit);
 
             try {
@@ -192,7 +200,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
         }
 
         public GroovyParser build() {
-            return new GroovyParser(relaxedClassTypeMatching);
+            return new GroovyParser(classpath, relaxedClassTypeMatching);
         }
     }
 }

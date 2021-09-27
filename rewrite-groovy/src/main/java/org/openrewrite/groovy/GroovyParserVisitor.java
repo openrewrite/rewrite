@@ -99,6 +99,10 @@ public class GroovyParserVisitor {
             }
         }
 
+        for (MethodNode method : ast.getMethods()) {
+            sortedByPosition.computeIfAbsent(pos(method), i -> new ArrayList<>()).add(method);
+        }
+
         List<JRightPadded<Statement>> statements = new ArrayList<>(sortedByPosition.size());
         for (List<ASTNode> values : sortedByPosition.values()) {
             for (ASTNode value : values) {
@@ -118,11 +122,64 @@ public class GroovyParserVisitor {
     }
 
     @RequiredArgsConstructor
-    private static class RewriteGroovyClassVisitor extends ClassCodeVisitorSupport {
+    private class RewriteGroovyClassVisitor extends ClassCodeVisitorSupport {
         @Getter
         private final SourceUnit sourceUnit;
 
         private final Queue<Object> queue = new LinkedList<>();
+
+        @Override
+        public void visitMethod(MethodNode node) {
+            Space fmt = sourceBefore("def");
+
+            TypeTree returnType = visitTypeTree(node.getReturnType());
+
+            J.Identifier name = J.Identifier.build(randomId(),
+                    sourceBefore(node.getName()),
+                    Markers.EMPTY,
+                    node.getName(),
+                    null);
+
+            RewriteGroovyVisitor bodyVisitor = new RewriteGroovyVisitor();
+
+            // Parameter has no visit implementation, so we've got to do this by hand
+            Space beforeParen = sourceBefore("(");
+            List<JRightPadded<Statement>> params = new ArrayList<>(node.getParameters().length);
+            Parameter[] unparsedParams = node.getParameters();
+            for (int i = 0; i < unparsedParams.length; i++) {
+                Parameter param = unparsedParams[i];
+                TypeTree paramType = visitTypeTree(param.getType());
+                JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
+                        new J.VariableDeclarations.NamedVariable(randomId(), whitespace(), Markers.EMPTY,
+                                J.Identifier.build(randomId(), EMPTY, Markers.EMPTY, param.getName(), null),
+                                emptyList(), null, null)
+                );
+                cursor += param.getName().length();
+
+                Space rightPad = sourceBefore(i == unparsedParams.length - 1 ? ")" : ",");
+
+                params.add(JRightPadded.build((Statement) new J.VariableDeclarations(randomId(), paramType.getPrefix(),
+                        Markers.EMPTY, emptyList(), emptyList(), paramType.withPrefix(EMPTY),
+                        null, emptyList(),
+                        singletonList(paramName))).withAfter(rightPad));
+            }
+
+            J.Block body = bodyVisitor.visit(node.getCode());
+
+            queue.add(new J.MethodDeclaration(
+                    randomId(), fmt, Markers.EMPTY,
+                    emptyList(),
+                    emptyList(),
+                    null,
+                    returnType,
+                    new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
+                    JContainer.build(beforeParen, params, Markers.EMPTY),
+                    null,
+                    body,
+                    null,
+                    null
+            ));
+        }
 
         @SuppressWarnings({"ConstantConditions", "unchecked"})
         private <T> T pollQueue() {
@@ -131,19 +188,14 @@ public class GroovyParserVisitor {
     }
 
     private class RewriteGroovyVisitor extends CodeVisitorSupport {
+        private final Stack<ASTNode> nodeStack = new Stack<>();
         private final Queue<Object> queue = new LinkedList<>();
 
         private <T> T visit(ASTNode node) {
+            nodeStack.push(node);
             node.visit(this);
+            nodeStack.pop();
             return pollQueue();
-        }
-
-        private <T> List<T> visit(ASTNode[] nodes) {
-            List<T> ts = new ArrayList<>(nodes.length);
-            for (ASTNode node : nodes) {
-                ts.add(visit(node));
-            }
-            return ts;
         }
 
         private <T> List<JRightPadded<T>> visitRightPadded(List<? extends ASTNode> nodes, char lastPadTo) {
@@ -177,8 +229,20 @@ public class GroovyParserVisitor {
             return ts;
         }
 
+        private <T> List<T> visit(ASTNode[] nodes) {
+            List<T> ts = new ArrayList<>(nodes.length);
+            for (ASTNode node : nodes) {
+                ts.add(visit(node));
+            }
+            return ts;
+        }
+
         @Override
         public void visitBlockStatement(BlockStatement block) {
+            Space fmt = EMPTY;
+            if (!(nodeStack.peek() instanceof ClosureExpression)) {
+                fmt = sourceBefore("{");
+            }
             List<JRightPadded<Statement>> statements = new ArrayList<>(block.getStatements().size());
             for (ASTNode statement : block.getStatements()) {
                 JRightPadded<Statement> stat = JRightPadded.build(visit(statement));
@@ -196,7 +260,10 @@ public class GroovyParserVisitor {
             }
 
             Space beforeBrace = whitespace();
-            queue.add(new J.Block(randomId(), EMPTY, Markers.EMPTY, JRightPadded.build(false), statements, beforeBrace));
+            queue.add(new J.Block(randomId(), fmt, Markers.EMPTY, JRightPadded.build(false), statements, beforeBrace));
+            if (!(nodeStack.peek() instanceof ClosureExpression)) {
+                sourceBefore("}");
+            }
         }
 
         @Override
@@ -352,7 +419,7 @@ public class GroovyParserVisitor {
                 }
 
                 Expression element = new J.Empty(randomId(), pad, Markers.EMPTY);
-                if(omitParentheses != null) {
+                if (omitParentheses != null) {
                     element = element.withMarkers(element.getMarkers().add(omitParentheses));
                 }
 
@@ -408,6 +475,11 @@ public class GroovyParserVisitor {
             RewriteGroovyClassVisitor classVisitor = new RewriteGroovyClassVisitor(unit);
             classVisitor.visitClass(classNode);
             return classVisitor.pollQueue();
+        } else if (node instanceof MethodNode) {
+            MethodNode methodNode = (MethodNode) node;
+            RewriteGroovyClassVisitor classVisitor = new RewriteGroovyClassVisitor(unit);
+            classVisitor.visitMethod(methodNode);
+            return JRightPadded.build(classVisitor.pollQueue());
         }
 
         for (ClassNode aClass : ast.getClasses()) {
@@ -439,26 +511,6 @@ public class GroovyParserVisitor {
         public int compareTo(@NotNull GroovyParserVisitor.LineColumn lc) {
             return line != lc.line ? line - lc.line : column - lc.column;
         }
-    }
-
-    private Space sourceBefore(String untilDelim) {
-        return sourceBefore(untilDelim, null);
-    }
-
-    /**
-     * @return Source from <code>cursor</code> to next occurrence of <code>untilDelim</code>,
-     * and if not found in the remaining source, the empty String. If <code>stop</code> is reached before
-     * <code>untilDelim</code> return the empty String.
-     */
-    private Space sourceBefore(String untilDelim, @Nullable Character stop) {
-        int delimIndex = positionOfNext(untilDelim, stop);
-        if (delimIndex < 0) {
-            return EMPTY; // unable to find this delimiter
-        }
-
-        String prefix = source.substring(cursor, delimIndex);
-        cursor += prefix.length() + untilDelim.length(); // advance past the delimiter
-        return Space.format(prefix);
     }
 
     private <T> JRightPadded<T> padRight(T tree, Space right) {
@@ -611,5 +663,33 @@ public class GroovyParserVisitor {
 
         //noinspection unchecked,ConstantConditions
         return ((T) expr).withPrefix(prefix);
+    }
+
+    private Space sourceBefore(String untilDelim) {
+        return sourceBefore(untilDelim, null);
+    }
+
+    /**
+     * @return Source from <code>cursor</code> to next occurrence of <code>untilDelim</code>,
+     * and if not found in the remaining source, the empty String. If <code>stop</code> is reached before
+     * <code>untilDelim</code> return the empty String.
+     */
+    private Space sourceBefore(String untilDelim, @Nullable Character stop) {
+        int delimIndex = positionOfNext(untilDelim, stop);
+        if (delimIndex < 0) {
+            return EMPTY; // unable to find this delimiter
+        }
+
+        String prefix = source.substring(cursor, delimIndex);
+        cursor += prefix.length() + untilDelim.length(); // advance past the delimiter
+        return Space.format(prefix);
+    }
+
+    private TypeTree visitTypeTree(ClassNode classNode) {
+        if (classNode.getLineNumber() >= 0) {
+            return buildName(classNode.getName());
+        }
+        return J.Identifier.build(randomId(), sourceBefore("def"), Markers.EMPTY, "def",
+                JavaType.Class.build("java.lang.Object"));
     }
 }
