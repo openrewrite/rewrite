@@ -90,7 +90,8 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
         @Override
         public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
             J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
-            if (UtilityClassMatcher.hasImplicitDefaultConstructor(c)) {
+            if (UtilityClassMatcher.hasImplicitDefaultConstructor(c) &&
+                    !J.ClassDeclaration.Kind.Type.Enum.equals(classDecl.getKind())) {
                 c = c.withTemplate(JavaTemplate.builder(this::getCursor, "private #{}() {}").build(),
                         c.getBody().getCoordinates().lastStatement(),
                         classDecl.getSimpleName()
@@ -111,7 +112,8 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
         @Override
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
             J.MethodDeclaration md = super.visitMethodDeclaration(method, p);
-            if (!md.isConstructor() || (md.hasModifier(J.Modifier.Type.Private) || md.hasModifier(J.Modifier.Type.Protected))) {
+            if (!md.isConstructor() || (md.hasModifier(J.Modifier.Type.Private) || md.hasModifier(J.Modifier.Type.Protected) ||
+                    (md.getType() != null && md.getType().getDeclaringType().getKind().equals(JavaType.Class.Kind.Enum)))) {
                 return md;
             }
 

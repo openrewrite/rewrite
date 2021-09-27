@@ -471,4 +471,35 @@ interface HideUtilityClassConstructorTest : JavaRecipeTest {
             }
         """
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1058")
+    @Test
+    fun doesNotChangePackagePrivateEnumConstructorToPrivate(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            public enum SomeEnum {
+                A,B,C;
+
+                SomeEnum() {
+                }
+
+                public static void utility() {
+                }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1058")
+    @Test
+    fun enumClass(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            public enum SomeEnum {
+                A,B,C;
+
+                public static void utility() {
+                }
+            }
+        """
+    )
 }
