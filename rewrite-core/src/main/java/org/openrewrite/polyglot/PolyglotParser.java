@@ -26,7 +26,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
@@ -45,8 +44,6 @@ import static java.util.Collections.singletonList;
 import static org.graalvm.polyglot.Value.asValue;
 
 public class PolyglotParser implements Parser<Polyglot.Source> {
-
-    private static final String JS_UTILS = StringUtils.readFully(PolyglotParser.class.getResourceAsStream("/META-INF/rewrite/polyglot.js"));
 
     private static final ThreadLocal<Engine> ENGINES = new InheritableThreadLocal<Engine>() {
         @Override

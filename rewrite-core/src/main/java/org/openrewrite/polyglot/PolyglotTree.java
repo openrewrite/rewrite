@@ -75,6 +75,6 @@ public class PolyglotTree<T extends Tree> implements Tree, ProxyObject {
 
     @Override
     public void putMember(String key, org.graalvm.polyglot.Value value) {
-
+        throw new UnsupportedOperationException();
     }
 }
