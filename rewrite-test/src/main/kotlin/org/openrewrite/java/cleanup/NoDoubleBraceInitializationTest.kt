@@ -40,6 +40,24 @@ interface NoDoubleBraceInitializationTest : JavaRecipeTest {
         """
     )
 
+    @Test
+    fun doubleBraceInitWithinConstructorArg() = assertUnchanged(
+        before = """
+            import java.util.List;
+            import java.util.Collections;
+            import java.util.ArrayList;
+            class A {
+                private final List<String> expectedCommand =
+                  Collections.unmodifiableList(
+                      new ArrayList<String>() {
+                        {
+                          add("a");
+                          add("b");
+                        }
+                      });
+            }
+        """
+    )
 
     @Test
     fun addStatementInForLoop() = assertChanged(

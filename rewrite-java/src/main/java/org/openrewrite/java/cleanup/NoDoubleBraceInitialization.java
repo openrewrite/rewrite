@@ -72,9 +72,14 @@ public class NoDoubleBraceInitialization extends Recipe {
 
     private static class NoDoubleBraceInitializationVisitor extends JavaIsoVisitor<ExecutionContext> {
 
-        private boolean isDoubleBraceInitialization(J.NewClass nc) {
+        private boolean isSupportedDoubleBraceInitialization(J.NewClass nc) {
+            if (getCursor().getParent() == null
+                    || getCursor().getParent().firstEnclosing(J.class) instanceof J.MethodInvocation) {
+                return false;
+            }
             if (nc.getBody() != null && !nc.getBody().getStatements().isEmpty()
-                    && nc.getBody().getStatements().get(0) instanceof J.Block) {
+                    && nc.getBody().getStatements().get(0) instanceof J.Block
+                    && getCursor().getParent(3) != null) {
                 return TypeUtils.isAssignableTo(MAP_TYPE, nc.getType())
                         || TypeUtils.isAssignableTo(LIST_TYPE, nc.getType())
                         || TypeUtils.isAssignableTo(SET_TYPE, nc.getType());
@@ -85,7 +90,7 @@ public class NoDoubleBraceInitialization extends Recipe {
         @Override
         public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext executionContext) {
             J.NewClass nc = super.visitNewClass(newClass, executionContext);
-            if (isDoubleBraceInitialization(newClass)) {
+            if (isSupportedDoubleBraceInitialization(newClass)) {
                 Cursor parentBlockCursor = getCursor().dropParentUntil(J.Block.class::isInstance);
                 J.VariableDeclarations.NamedVariable var = getCursor().firstEnclosing(J.VariableDeclarations.NamedVariable.class);
                 //noinspection ConstantConditions
@@ -105,12 +110,12 @@ public class NoDoubleBraceInitialization extends Recipe {
                             nc = nc.withTemplate(template, nc.getCoordinates().replace());
                             initStatements = addSelectToInitStatements(initStatements, var.getName(), executionContext);
                             initStatements.add(0, new J.Assignment(UUID.randomUUID(), Space.EMPTY, Markers.EMPTY, var.getName().withId(UUID.randomUUID()), JLeftPadded.build(nc), fq));
-                            parentBlockCursor.computeMessageIfAbsent("INIT_STATEMENTS", v -> new HashMap<Object, List<Statement>>()).put(varDeclsCursor.getValue(), initStatements);
+                            parentBlockCursor.computeMessageIfAbsent("INIT_STATEMENTS", v -> new HashMap<Statement, List<Statement>>()).put(varDeclsCursor.getValue(), initStatements);
                         }
                     } else if (parentBlockCursor.getParent().getValue() instanceof J.MethodDeclaration) {
                         initStatements = addSelectToInitStatements(initStatements, var.getName(), executionContext);
                         Cursor varDeclsCursor = getCursor().dropParentUntil(parent -> parent instanceof J.VariableDeclarations);
-                        parentBlockCursor.computeMessageIfAbsent("METHOD_DECL_STATEMENTS", v -> new HashMap<Object, List<Statement>>()).put(varDeclsCursor.getValue(), initStatements);
+                        parentBlockCursor.computeMessageIfAbsent("METHOD_DECL_STATEMENTS", v -> new HashMap<Statement, List<Statement>>()).put(varDeclsCursor.getValue(), initStatements);
                         nc = nc.withBody(null);
                     }
                 }
@@ -123,7 +128,7 @@ public class NoDoubleBraceInitialization extends Recipe {
             AddSelectVisitor selectVisitor = new AddSelectVisitor(identifier);
             List<Statement> statementList = new ArrayList<>();
             for (Statement statement : statements) {
-                statementList.add((Statement) selectVisitor.visit(statement, ctx ));
+                statementList.add((Statement) selectVisitor.visit(statement, ctx));
             }
             return statementList;
         }
@@ -155,48 +160,42 @@ public class NoDoubleBraceInitialization extends Recipe {
         @Override
         public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
             J.Block bl = super.visitBlock(block, ctx);
-            Map<Object, List<Statement>> initStatements = getCursor().pollMessage("INIT_STATEMENTS");
-            Map<Object, List<Statement>> methodInitStatemnts = getCursor().pollMessage("METHOD_DECL_STATEMENTS");
+            Map<Statement, List<Statement>> initStatements = getCursor().pollMessage("INIT_STATEMENTS");
+            Map<Statement, List<Statement>> methodInitStatemnts = getCursor().pollMessage("METHOD_DECL_STATEMENTS");
 
             if (initStatements != null) {
-                for (Map.Entry<Object, List<Statement>> objectListEntry : initStatements.entrySet()) {
-                    List<Statement> statements = bl.getStatements();
-                    for (int i = 0; i < statements.size(); i++) {
-                        Statement statement = statements.get(i);
+                for (Map.Entry<Statement, List<Statement>> objectListEntry : initStatements.entrySet()) {
+                    Object statement = objectListEntry.getKey();
+                    int statementIndex = bl.getStatements().indexOf(statement);
+                    if (statementIndex > -1) {
                         JRightPadded<Boolean> padding;
-                        if (statement instanceof J.VariableDeclarations && J.Modifier.hasModifier(((J.VariableDeclarations) statement).getModifiers(), J.Modifier.Type.Static)) {
+                        if (objectListEntry.getKey() instanceof J.VariableDeclarations && J.Modifier.hasModifier(((J.VariableDeclarations) statement).getModifiers(), J.Modifier.Type.Static)) {
                             padding = JRightPadded.build(true).withAfter(Space.format(" "));
                         } else {
                             padding = JRightPadded.build(false);
                         }
-                        if (statement.equals(objectListEntry.getKey())) {
-                            J.Block initBlock = new J.Block(
-                                    Tree.randomId(),
-                                    Space.EMPTY,
-                                    Markers.EMPTY,
-                                    padding,
-                                    objectListEntry.getValue().stream().map(JRightPadded::build).collect(Collectors.toList()),
-                                    Space.EMPTY
-                            );
-                            //noinspection ConstantConditions
-                            bl = maybeAutoFormat(bl, bl.withStatements(ListUtils.insertAll(bl.getStatements(), i + 1, Collections.singletonList(initBlock))),
-                                    initBlock, ctx, getCursor().getParent(2));
-                        }
+                        J.Block initBlock = new J.Block(
+                                Tree.randomId(),
+                                Space.EMPTY,
+                                Markers.EMPTY,
+                                padding,
+                                objectListEntry.getValue().stream().map(JRightPadded::build).collect(Collectors.toList()),
+                                Space.EMPTY
+                        );
+                        //noinspection ConstantConditions
+                        bl = maybeAutoFormat(bl, bl.withStatements(ListUtils.insertAll(bl.getStatements(), statementIndex + 1, Collections.singletonList(initBlock))),
+                                initBlock, ctx, getCursor().getParent(2));
                     }
                 }
             } else if (methodInitStatemnts != null) {
-                for (Map.Entry<Object, List<Statement>> objectListEntry : methodInitStatemnts.entrySet()) {
-                    List<Statement> statements = bl.getStatements();
-                    for (int i = 0; i < statements.size(); i++) {
-                        Statement statement = statements.get(i);
-                        if (statement.equals(objectListEntry.getKey())) {
-                            //noinspection ConstantConditions
-                            bl = maybeAutoFormat(bl, bl.withStatements(ListUtils.insertAll(bl.getStatements(), i + 1, objectListEntry.getValue())),
-                                    objectListEntry.getValue().get(objectListEntry.getValue().size() - 1), ctx, getCursor().getParent());
-                        }
+                for (Map.Entry<Statement, List<Statement>> objectListEntry : methodInitStatemnts.entrySet()) {
+                    int statementIndex = bl.getStatements().indexOf(objectListEntry.getKey());
+                    if (statementIndex > -1) {
+                        //noinspection ConstantConditions
+                        bl = maybeAutoFormat(bl, bl.withStatements(ListUtils.insertAll(bl.getStatements(), statementIndex + 1, objectListEntry.getValue())),
+                                objectListEntry.getValue().get(objectListEntry.getValue().size() - 1), ctx, getCursor().getParent());
                     }
                 }
-
             }
             return bl;
         }
