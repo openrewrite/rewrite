@@ -13,20 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@file:Suppress("unchecked")
+@file:Suppress("unchecked", "rawtypes", "WrapperTypeMayBePrimitive", "ResultOfMethodCallIgnored")
 
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
-import org.openrewrite.java.JavaIsoVisitor
 import org.openrewrite.java.JavaRecipeTest
-import org.openrewrite.java.JavaVisitor
-import org.openrewrite.java.marker.JavaVersion
-import org.openrewrite.java.search.UsesJavaVersion
-import org.openrewrite.java.tree.J
-import java.util.*
 
 interface NoDoubleBraceInitializationTest : JavaRecipeTest {
     override val recipe: Recipe
@@ -42,6 +35,38 @@ interface NoDoubleBraceInitializationTest : JavaRecipeTest {
                 }
                 void m2() {
                     m1(new HashMap<String, String>(){{put("a", "a");}});
+                }
+            }
+        """
+    )
+
+
+    @Test
+    fun addStatementInForLoop() = assertChanged(
+        before = """
+            import java.util.Set;
+            import java.util.LinkedHashSet;
+            class A {
+                void a() {
+                    Integer CNT = 10;
+                    final Set<Integer> keys = new LinkedHashSet(){{
+                        for (int i = 0; i < CNT; i++) {
+                            add(i);
+                        }
+                    }};
+                }
+            }
+        """,
+        after = """
+            import java.util.Set;
+            import java.util.LinkedHashSet;
+            class A {
+                void a() {
+                    Integer CNT = 10;
+                    final Set<Integer> keys = new LinkedHashSet();
+                    for (int i = 0; i < CNT; i++) {
+                        keys.add(i);
+                    }
                 }
             }
         """

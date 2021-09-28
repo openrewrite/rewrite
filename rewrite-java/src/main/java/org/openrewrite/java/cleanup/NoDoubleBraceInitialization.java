@@ -15,10 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
@@ -69,11 +66,11 @@ public class NoDoubleBraceInitialization extends Recipe {
     }
 
     @Override
-    protected NoDoubleBraceInitializationVisitor<ExecutionContext> getVisitor() {
-        return new NoDoubleBraceInitializationVisitor<>();
+    protected NoDoubleBraceInitializationVisitor getVisitor() {
+        return new NoDoubleBraceInitializationVisitor();
     }
 
-    private static class NoDoubleBraceInitializationVisitor<ExecutionContext> extends JavaIsoVisitor<ExecutionContext> {
+    private static class NoDoubleBraceInitializationVisitor extends JavaIsoVisitor<ExecutionContext> {
 
         private boolean isDoubleBraceInitialization(J.NewClass nc) {
             if (nc.getBody() != null && !nc.getBody().getStatements().isEmpty()
@@ -106,12 +103,12 @@ public class NoDoubleBraceInitialization extends Recipe {
                             String newInitializer = " new " + fq.getClassName() + "<>();";
                             JavaTemplate template = JavaTemplate.builder(this::getCursor, newInitializer).imports(fq.getFullyQualifiedName()).build();
                             nc = nc.withTemplate(template, nc.getCoordinates().replace());
-                            initStatements = addSelectToInitStatements(initStatements, var.getName());
+                            initStatements = addSelectToInitStatements(initStatements, var.getName(), executionContext);
                             initStatements.add(0, new J.Assignment(UUID.randomUUID(), Space.EMPTY, Markers.EMPTY, var.getName().withId(UUID.randomUUID()), JLeftPadded.build(nc), fq));
                             parentBlockCursor.computeMessageIfAbsent("INIT_STATEMENTS", v -> new HashMap<Object, List<Statement>>()).put(varDeclsCursor.getValue(), initStatements);
                         }
                     } else if (parentBlockCursor.getParent().getValue() instanceof J.MethodDeclaration) {
-                        initStatements = addSelectToInitStatements(initStatements, var.getName());
+                        initStatements = addSelectToInitStatements(initStatements, var.getName(), executionContext);
                         Cursor varDeclsCursor = getCursor().dropParentUntil(parent -> parent instanceof J.VariableDeclarations);
                         parentBlockCursor.computeMessageIfAbsent("METHOD_DECL_STATEMENTS", v -> new HashMap<Object, List<Statement>>()).put(varDeclsCursor.getValue(), initStatements);
                         nc = nc.withBody(null);
@@ -122,18 +119,29 @@ public class NoDoubleBraceInitialization extends Recipe {
             return nc;
         }
 
-        private List<Statement> addSelectToInitStatements(List<Statement> statements, J.Identifier identifier) {
-            return statements.stream().map(stmt -> {
-                if (stmt instanceof J.MethodInvocation) {
-                    J.MethodInvocation mi = (J.MethodInvocation) stmt;
-                    if (mi.getSelect() == null && mi.getType() != null && TypeUtils.isAssignableTo(identifier.getType(), mi.getType().getDeclaringType())) {
-                        return mi.withSelect(identifier);
-                    }
-                }
-                return stmt;
-            }).collect(Collectors.toList());
+        private List<Statement> addSelectToInitStatements(List<Statement> statements, J.Identifier identifier, ExecutionContext ctx) {
+            AddSelectVisitor selectVisitor = new AddSelectVisitor(identifier);
+            List<Statement> statementList = new ArrayList<>();
+            for (Statement statement : statements) {
+                statementList.add((Statement) selectVisitor.visit(statement, ctx ));
+            }
+            return statementList;
         }
 
+        private static class AddSelectVisitor extends JavaIsoVisitor<ExecutionContext> {
+            private  final J.Identifier identifier;
+            public AddSelectVisitor(J.Identifier identifier) {
+                this.identifier = identifier;
+            }
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                J.MethodInvocation mi = super.visitMethodInvocation(method, executionContext);
+                if (mi.getSelect() == null && mi.getType() != null && TypeUtils.isAssignableTo(identifier.getType(), mi.getType().getDeclaringType())) {
+                    return mi.withSelect(identifier);
+                }
+                return mi;
+            }
+        }
 
         @Override
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext executionContext) {
