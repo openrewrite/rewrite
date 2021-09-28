@@ -16,9 +16,13 @@
 package org.openrewrite.groovy;
 
 import org.openrewrite.PrintOutputCapture;
+import org.openrewrite.Tree;
 import org.openrewrite.groovy.marker.OmitParentheses;
 import org.openrewrite.groovy.marker.Semicolon;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.groovy.tree.GRightPadded;
+import org.openrewrite.groovy.tree.GSpace;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
@@ -29,22 +33,57 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     private final GroovyJavaPrinter delegate = new GroovyJavaPrinter();
 
     @Override
-    public G visitCompilationUnit(G.CompilationUnit cu, PrintOutputCapture<P> p) {
+    public J visit(@Nullable Tree tree, PrintOutputCapture<P> p) {
+        if(!(tree instanceof G)) {
+            // re-route printing to the java printer
+            return delegate.visit(tree, p);
+        } else {
+            return super.visit(tree, p);
+        }
+    }
+
+    @Override
+    public J visitCompilationUnit(G.CompilationUnit cu, PrintOutputCapture<P> p) {
         visitSpace(cu.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p);
         visitMarkers(cu.getMarkers(), p);
 
         JRightPadded<J.Package> pkg = cu.getPadding().getPackageDeclaration();
         if (pkg != null) {
-            delegate.visit(pkg.getElement(), p);
-            delegate.visitSpace(pkg.getAfter(), Space.Location.PACKAGE_SUFFIX, p);
+            visit(pkg.getElement(), p);
+            visitSpace(pkg.getAfter(), Space.Location.PACKAGE_SUFFIX, p);
         }
 
-        delegate.visit(cu.getStatements(), p);
+        visit(cu.getStatements(), p);
         visitSpace(cu.getEof(), Space.Location.COMPILATION_UNIT_EOF, p);
         return cu;
     }
 
+    @Override
+    public J visitMapEntry(G.MapEntry mapEntry, PrintOutputCapture<P> p) {
+        visitSpace(mapEntry.getPrefix(), GSpace.Location.MAP_ENTRY_PREFIX, p);
+        visitMarkers(mapEntry.getMarkers(), p);
+        visitRightPadded(mapEntry.getPadding().getKey(), GRightPadded.Location.MAP_ENTRY_KEY, p);
+        p.out.append(':');
+        visit(mapEntry.getValue(), p);
+        return mapEntry;
+    }
+
+    @Override
+    public Space visitSpace(Space space, GSpace.Location loc, PrintOutputCapture<P> p) {
+        return delegate.visitSpace(space, Space.Location.LANGUAGE_EXTENSION, p);
+    }
+
     private class GroovyJavaPrinter extends JavaPrinter<P> {
+        @Override
+        public J visit(@Nullable Tree tree, PrintOutputCapture<P> p) {
+            if(tree instanceof G) {
+                // re-route printing back up to groovy
+                return GroovyPrinter.this.visit(tree, p);
+            } else {
+                return super.visit(tree, p);
+            }
+        }
+
         @Override
         public J visitLambda(J.Lambda lambda, PrintOutputCapture<P> p) {
             visitSpace(lambda.getPrefix(), Space.Location.LAMBDA_PREFIX, p);

@@ -47,7 +47,7 @@ public interface G extends J {
     }
 
     @Nullable
-    default <P> G acceptGroovy(GroovyVisitor<P> v, P p) {
+    default <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
         return (G) v.defaultValue(this, p);
     }
 
@@ -182,7 +182,7 @@ public interface G extends J {
         }
 
         @Override
-        public <P> G acceptGroovy(GroovyVisitor<P> v, P p) {
+        public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
             return v.visitCompilationUnit(this, p);
         }
 
@@ -265,6 +265,82 @@ public interface G extends J {
 
             public G.CompilationUnit withStatements(List<JRightPadded<Statement>> statements) {
                 return t.statements == statements ? t : new G.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.packageDeclaration, statements, t.eof);
+            }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class MapEntry implements G, Expression, TypedTree {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        JRightPadded<Expression> key;
+
+        public Expression getKey() {
+            return key.getElement();
+        }
+
+        public MapEntry withKey(@Nullable Expression key) {
+            return getPadding().withKey(JRightPadded.withElement(this.key, key));
+        }
+
+        @Getter
+        @With
+        Expression value;
+
+        @Getter
+        @With
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
+            return v.visitMapEntry(this, p);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final MapEntry t;
+
+            @Nullable
+            public JRightPadded<Expression> getKey() {
+                return t.key;
+            }
+
+            public MapEntry withKey(@Nullable JRightPadded<Expression> key) {
+                return t.key == key ? t : new MapEntry(t.id, t.prefix, t.markers, key, t.value, t.type);
             }
         }
     }

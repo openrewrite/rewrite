@@ -16,10 +16,12 @@
 package org.openrewrite.groovy;
 
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.groovy.tree.GRightPadded;
+import org.openrewrite.groovy.tree.GSpace;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.*;
 
 public class GroovyVisitor<P> extends JavaVisitor<P> {
     @Override
@@ -27,7 +29,7 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         return "groovy";
     }
 
-    public G visitCompilationUnit(G.CompilationUnit cu, P p) {
+    public J visitCompilationUnit(G.CompilationUnit cu, P p) {
         G.CompilationUnit c = cu;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
@@ -37,7 +39,28 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
-    public final G visitCompilationUnit(J.CompilationUnit cu, P p) {
+    public final J visitCompilationUnit(J.CompilationUnit cu, P p) {
         throw new UnsupportedOperationException("Groovy has a different structure for its compilation unit. See G.CompilationUnit.");
+    }
+
+    public J visitMapEntry(G.MapEntry mapEntry, P p) {
+        G.MapEntry m = mapEntry;
+        Expression temp = (Expression) visitExpression(m, p);
+        if (!(temp instanceof G.MapEntry)) {
+            return temp;
+        } else {
+            m = (G.MapEntry) temp;
+        }
+        m = m.getPadding().withKey(visitRightPadded(m.getPadding().getKey(), GRightPadded.Location.MAP_ENTRY_KEY, p));
+        m = m.withValue((Expression) visit(m.getValue(), p));
+        return m;
+    }
+
+    public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, GRightPadded.Location loc, P p) {
+        return super.visitRightPadded(right, JRightPadded.Location.LANGUAGE_EXTENSION, p);
+    }
+
+    public Space visitSpace(Space space, GSpace.Location loc, P p) {
+        return super.visitSpace(space, Space.Location.LANGUAGE_EXTENSION, p);
     }
 }

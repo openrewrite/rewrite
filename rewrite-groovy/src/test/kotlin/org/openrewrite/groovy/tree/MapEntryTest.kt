@@ -17,13 +17,8 @@ package org.openrewrite.groovy.tree
 
 import org.junit.jupiter.api.Test
 
-class MapLiteralTest : GroovyTreeTest {
+class MapEntryTest : GroovyTreeTest {
 
     @Test
-    fun mapLiteral() = assertParsePrintAndProcess(
-        """
-            def accept(Map m) {
-            }
-        """.trimIndent()
-    )
+    fun mapEntryMethodArguments() = assertParsePrintAndProcess("apply plugin: 'java'")
 }

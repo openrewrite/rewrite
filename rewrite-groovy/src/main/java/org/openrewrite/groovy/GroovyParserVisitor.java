@@ -243,6 +243,69 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        public void visitArgumentlistExpression(ArgumentListExpression expression) {
+            List<JRightPadded<Expression>> args = new ArrayList<>(expression.getExpressions().size());
+            Space beforeOpenParen = EMPTY;
+            List<org.codehaus.groovy.ast.expr.Expression> unparsedArgs = expression.getExpressions();
+            for (int i = 0; i < unparsedArgs.size(); i++) {
+                org.codehaus.groovy.ast.expr.Expression unparsedArg = unparsedArgs.get(i);
+
+                OmitParentheses omitParentheses = null;
+                Space pad;
+                if (i == 0) {
+                    pad = whitespace();
+                    if (source.charAt(cursor) != '(') {
+                        omitParentheses = new OmitParentheses(randomId());
+                    } else {
+                        beforeOpenParen = pad;
+                        pad = EMPTY;
+                        cursor++;
+                    }
+                } else if (i == unparsedArgs.size() - 1) {
+                    int saveCursor = cursor;
+                    pad = whitespace();
+                    if (cursor >= source.length() || source.charAt(cursor) != ')') {
+                        cursor = saveCursor;
+                    } else {
+                        cursor++;
+                    }
+                } else {
+                    pad = sourceBefore(",");
+                }
+
+                Expression arg = visit(unparsedArg);
+                if (omitParentheses != null) {
+                    arg = arg.withMarkers(arg.getMarkers().add(omitParentheses));
+                }
+
+                args.add(JRightPadded.build(arg.withPrefix(pad)));
+            }
+
+            if (unparsedArgs.isEmpty()) {
+                int saveCursor = cursor;
+                Space pad = whitespace();
+                OmitParentheses omitParentheses = null;
+                if (source.charAt(cursor) != '(') {
+                    omitParentheses = new OmitParentheses(randomId());
+                    pad = EMPTY;
+                    cursor = saveCursor;
+                } else {
+                    cursor++;
+                }
+
+                Expression element = new J.Empty(randomId(), pad, Markers.EMPTY);
+                if (omitParentheses != null) {
+                    element = element.withMarkers(element.getMarkers().add(omitParentheses));
+                }
+
+                args.add(JRightPadded.build(element).withAfter(whitespace()));
+                cursor++;
+            }
+
+            queue.add(JContainer.build(beforeOpenParen, args, Markers.EMPTY));
+        }
+
+        @Override
         public void visitBlockStatement(BlockStatement block) {
             Space fmt = EMPTY;
             if (!(nodeCursor.getParentOrThrow().getValue() instanceof ClosureExpression)) {
@@ -365,6 +428,16 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        public void visitMapEntryExpression(MapEntryExpression expression) {
+            G.MapEntry mapEntry = new G.MapEntry(randomId(), EMPTY, Markers.EMPTY,
+                    JRightPadded.build((Expression) visit(expression.getKeyExpression())).withAfter(sourceBefore(":")),
+                    visit(expression.getValueExpression()),
+                    null
+            );
+            queue.add(mapEntry);
+        }
+
+        @Override
         public void visitMethodCallExpression(MethodCallExpression call) {
             Expression select = null;
             if (!call.isImplicitThis()) {
@@ -376,73 +449,65 @@ public class GroovyParserVisitor {
                     call.getMethodAsString(), null);
             cursor += call.getMethodAsString().length();
 
-            Space beforeOpenParen = EMPTY;
-            List<org.codehaus.groovy.ast.expr.Expression> unparsedArgs = ((ArgumentListExpression) call.getArguments()).getExpressions();
-            List<JRightPadded<Expression>> args = new ArrayList<>(unparsedArgs.size());
-            for (int i = 0; i < unparsedArgs.size(); i++) {
-                org.codehaus.groovy.ast.expr.Expression unparsedArg = unparsedArgs.get(i);
-
-                OmitParentheses omitParentheses = null;
-                Space pad;
-                if (i == 0) {
-                    pad = whitespace();
-                    if (source.charAt(cursor) != '(') {
-                        omitParentheses = new OmitParentheses(randomId());
-                    } else {
-                        beforeOpenParen = pad;
-                        pad = EMPTY;
-                        cursor++;
-                    }
-                } else if (i == unparsedArgs.size() - 1) {
-                    int saveCursor = cursor;
-                    pad = whitespace();
-                    if (cursor >= source.length() || source.charAt(cursor) != ')') {
-                        cursor = saveCursor;
-                    } else {
-                        cursor++;
-                    }
-                } else {
-                    pad = whitespace();
-                }
-
-                Expression arg = visit(unparsedArg);
-                if (omitParentheses != null) {
-                    arg = arg.withMarkers(arg.getMarkers().add(omitParentheses));
-                }
-
-                args.add(JRightPadded.build(arg.withPrefix(pad)));
-            }
-
-            if (unparsedArgs.isEmpty()) {
-                int saveCursor = cursor;
-                Space pad = whitespace();
-                OmitParentheses omitParentheses = null;
-                if (source.charAt(cursor) != '(') {
-                    omitParentheses = new OmitParentheses(randomId());
-                    pad = EMPTY;
-                    cursor = saveCursor;
-                } else {
-                    cursor++;
-                }
-
-                Expression element = new J.Empty(randomId(), pad, Markers.EMPTY);
-                if (omitParentheses != null) {
-                    element = element.withMarkers(element.getMarkers().add(omitParentheses));
-                }
-
-                args.add(JRightPadded.build(element).withAfter(whitespace()));
-                cursor++;
-            }
+            JContainer<Expression> args = visit(call.getArguments());
 
             queue.add(new J.MethodInvocation(randomId(), EMPTY, Markers.EMPTY,
                     select == null ? null : JRightPadded.build(select),
-                    null, name, JContainer.build(beforeOpenParen, args, Markers.EMPTY), null));
+                    null, name, args, null));
         }
 
         @Override
         public void visitReturnStatement(ReturnStatement retn) {
             Space fmt = sourceBefore("return");
             queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, visit(retn.getExpression())));
+        }
+
+        // the current understanding is that TupleExpression only exist as method invocation arguments.
+        // this is the reason behind the simplifying assumption that there is one expression, and it is
+        // a NamedArgumentListExpression.
+        @Override
+        public void visitTupleExpression(TupleExpression tuple) {
+            Space beforeOpenParen = EMPTY;
+            List<JRightPadded<Expression>> args = new ArrayList<>(tuple.getExpressions().size());
+
+            List<org.codehaus.groovy.ast.expr.Expression> expressions = tuple.getExpressions();
+            for (org.codehaus.groovy.ast.expr.Expression expression : expressions) {
+                NamedArgumentListExpression namedArgList = (NamedArgumentListExpression) expression;
+                List<MapEntryExpression> mapEntryExpressions = namedArgList.getMapEntryExpressions();
+                for (int i = 0; i < mapEntryExpressions.size(); i++) {
+                    OmitParentheses omitParentheses = null;
+                    Space pad;
+                    if (i == 0) {
+                        pad = whitespace();
+                        if (source.charAt(cursor) != '(') {
+                            omitParentheses = new OmitParentheses(randomId());
+                        } else {
+                            beforeOpenParen = pad;
+                            pad = EMPTY;
+                            cursor++;
+                        }
+                    } else if (i == mapEntryExpressions.size() - 1) {
+                        int saveCursor = cursor;
+                        pad = whitespace();
+                        if (cursor >= source.length() || source.charAt(cursor) != ')') {
+                            cursor = saveCursor;
+                        } else {
+                            cursor++;
+                        }
+                    } else {
+                        pad = sourceBefore(",");
+                    }
+
+                    Expression arg = visit(mapEntryExpressions.get(i));
+                    if (omitParentheses != null) {
+                        arg = arg.withMarkers(arg.getMarkers().add(omitParentheses));
+                    }
+
+                    args.add(JRightPadded.build(arg.withPrefix(pad)));
+                }
+            }
+
+            queue.add(JContainer.build(beforeOpenParen, args, Markers.EMPTY));
         }
 
         @Override
