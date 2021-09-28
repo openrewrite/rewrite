@@ -178,6 +178,10 @@ class Java11ForLoopIncrementInUpdateTest : Java11Test, ForLoopIncrementInUpdateT
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11NoDoubleBraceInitializationTest : Java11Test, NoDoubleBraceInitializationTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11StaticMethodNotFinalTest : Java11Test, StaticMethodNotFinalTest
 
 @DebugOnly

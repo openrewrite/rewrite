@@ -148,6 +148,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class LineCounterTck : LineCounterTest
 
     @Nested
+    inner class NoBoubleBraceInitializationTck : NoDoubleBraceInitializationTest
+
+    @Nested
     inner class StaticMethodNotFinalTck : StaticMethodNotFinalTest
 
     @Nested
