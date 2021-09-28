@@ -24,7 +24,8 @@ import org.openrewrite.java.style.UnnecessaryParenthesesStyle;
 import org.openrewrite.java.tree.J;
 
 import java.time.Duration;
-import java.util.Collections;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 public class UnnecessaryParentheses extends Recipe {
@@ -41,7 +42,7 @@ public class UnnecessaryParentheses extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("RSPEC-1110");
+        return new LinkedHashSet<>(Arrays.asList("RSPEC-1110", "RSPEC-1611"));
     }
 
     @Override
