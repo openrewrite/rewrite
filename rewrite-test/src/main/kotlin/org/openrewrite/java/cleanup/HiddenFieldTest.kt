@@ -524,6 +524,7 @@ interface HiddenFieldTest : JavaRecipeTest {
     fun ignoreSetter(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(hiddenFieldStyle {
             withIgnoreSetter(true)
+                .withSetterCanReturnItsClass(false)
         }).build(),
         before = """
             package org.openrewrite;
