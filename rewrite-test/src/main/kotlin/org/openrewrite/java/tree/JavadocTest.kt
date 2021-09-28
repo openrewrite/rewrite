@@ -1008,8 +1008,8 @@ interface JavadocTest : JavaTreeTest {
     @Test
     fun javaDocWithCRLF(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
-        CompilationUnit,
-        "/**\r\n" +
+        CompilationUnit, "" +
+              "/**\r\n" +
               " * JavaDoc.\r\n" +
               " */\r\n" +
               "public class A {\r\n" +
@@ -1046,5 +1046,40 @@ interface JavadocTest : JavaTreeTest {
             class Test {
             }
         """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/976")
+    @Test
+    fun multilineJavaDocWithCRLF(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit, "" +
+                "/**\r\n" +
+                " * Line 1.\r\n" +
+                " * Line 2.\r\n" +
+                " */\r\n" +
+                "public class A {\r\n" +
+                "    /**\r\n" +
+                "     * Line 1.\r\n" +
+                "     * Line 2.\r\n" +
+                "     */\r\n" +
+                "    void method() {}\r\n" +
+                "}"
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/976")
+    @Test
+    fun multilineWithThrowsAndCRLF(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit, "" +
+                "import java.io.IOException;\r\n" +
+                "\r\n" +
+                "public class A {\r\n" +
+                "    /**\r\n" +
+                "     * Line 1.\r\n" +
+                "     * Line 2.\r\n" +
+                "     * @throws IOException text.\r\n" +
+                "     */\r\n" +
+                "    void method() throws IOException {}\r\n" +
+                "}"
     )
 }
