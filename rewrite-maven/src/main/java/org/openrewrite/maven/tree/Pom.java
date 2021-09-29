@@ -110,6 +110,7 @@ public class Pom {
      * for that property.
      */
     @EqualsAndHashCode.Include
+    @Getter
     Map<String, String> propertyOverrides;
 
     private Pom(
