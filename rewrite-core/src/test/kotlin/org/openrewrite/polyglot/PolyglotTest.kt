@@ -17,9 +17,9 @@
 package org.openrewrite.polyglot
 
 import org.assertj.core.api.Assertions.assertThat
-import org.graalvm.polyglot.Context
 import org.graalvm.polyglot.Source
 import org.intellij.lang.annotations.Language
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
@@ -35,6 +35,7 @@ class PolyglotTest {
         }
     """.trimIndent()
 
+    @Disabled
     @Test
     fun `must recognize instantiable values`() {
         val ex = InMemoryExecutionContext()
