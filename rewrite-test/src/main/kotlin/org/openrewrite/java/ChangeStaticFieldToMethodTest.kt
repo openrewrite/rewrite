@@ -102,7 +102,23 @@ interface ChangeStaticFieldToMethodTest : JavaRecipeTest {
     )
 
     @Test
-    fun ignoreUnrelatedFields(jp: JavaParser) = assertUnchanged(
+    fun migratesFieldInitializer() = assertChanged(
+            before = """
+            import java.util.Collections;
+            class A {
+                private final Object collection = Collections.EMPTY_LIST;
+            }
+            """,
+            after = """
+            import com.acme.Lists;
+            class A {
+                private final Object collection = Lists.of();
+            }
+            """
+    )
+
+    @Test
+    fun ignoresUnrelatedFields(jp: JavaParser) = assertUnchanged(
             jp,
             dependsOn = arrayOf(list),
             before = """
