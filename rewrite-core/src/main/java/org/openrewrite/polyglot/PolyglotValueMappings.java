@@ -22,17 +22,16 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Type;
 import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
@@ -40,7 +39,22 @@ import static org.openrewrite.polyglot.PolyglotUtils.invokeMemberOrElse;
 
 public interface PolyglotValueMappings {
 
-    TypeLiteral<List<Value>> VALUES = new TypeLiteral<List<Value>>() {
+    TypeLiteral<String> STRING_TYPE = new TypeLiteral<String>() {
+    };
+    TypeLiteral<Boolean> BOOLEAN_TYPE = new TypeLiteral<Boolean>() {
+    };
+    TypeLiteral<Set<String>> STRING_SET_TYPE = new TypeLiteral<Set<String>>() {
+    };
+    TypeLiteral<List<String>> STRING_LIST_TYPE = new TypeLiteral<List<String>>() {
+    };
+    TypeLiteral<Duration> DURATION_TYPE = new TypeLiteral<Duration>() {
+    };
+    TypeLiteral<URI> URI_TYPE = new TypeLiteral<URI>() {
+    };
+    @SuppressWarnings("rawtypes")
+    TypeLiteral<List> RAW_LIST_TYPE = new TypeLiteral<List>() {
+    };
+    TypeLiteral<List<OptionDescriptor>> OPTIONS_TYPE = new TypeLiteral<List<OptionDescriptor>>() {
     };
     TypeLiteral<List<Marker>> MARKERS = new TypeLiteral<List<Marker>>() {
     };
@@ -118,15 +132,15 @@ public interface PolyglotValueMappings {
                 }
             }
             return new ConstructorMappingBuilder<>(v, RecipeDescriptor.class)
-                    .withGetterOrMetaProperty("getName", "name")
-                    .withGetterOrMetaProperty("getDisplayName", "displayName")
-                    .withGetterOrMetaProperty("getDescription", "description")
-                    .withGetterOrMetaProperty("getTags", "tags")
-                    .withGetterOrMetaProperty("getEstimatedEffortPerOccurrence", "estimatedEffortPerOccurrence", Duration.ZERO)
-                    .withRawValue(options)
-                    .withGetterOrMetaProperty("getLanguages", "languages")
-                    .withGetterOrMetaProperty("getRecipeList", "recipeList")
-                    .withRawValue(v.getContext().getPolyglotBindings().getMember("sourceUri").as(URI.class))
+                    .withGetterOrMetaProperty("getName", "name", STRING_TYPE)
+                    .withGetterOrMetaProperty("getDisplayName", "displayName", STRING_TYPE)
+                    .withGetterOrMetaProperty("getDescription", "description", STRING_TYPE)
+                    .withGetterOrMetaProperty("getTags", "tags", STRING_SET_TYPE)
+                    .withGetterOrMetaProperty("getEstimatedEffortPerOccurrence", "estimatedEffortPerOccurrence", Duration.ZERO, DURATION_TYPE)
+                    .withRawValue(options, OPTIONS_TYPE)
+                    .withGetterOrMetaProperty("getLanguages", "languages", STRING_LIST_TYPE)
+                    .withGetterOrMetaProperty("getRecipeList", "recipeList", RAW_LIST_TYPE)
+                    .withRawValue(v.getContext().getPolyglotBindings().getMember("sourceUri").as(URI.class), URI_TYPE)
                     .build();
         }
     }
@@ -140,14 +154,14 @@ public interface PolyglotValueMappings {
         @Override
         public OptionDescriptor apply(Value value) {
             return new ConstructorMappingBuilder<>(value, OptionDescriptor.class)
-                    .withProperty("name")
-                    .withProperty("type")
-                    .withProperty("displayName")
-                    .withProperty("description")
-                    .withProperty("example")
-                    .withProperty("valid")
-                    .withProperty("required")
-                    .withProperty("value")
+                    .withProperty("name", STRING_TYPE)
+                    .withProperty("type", STRING_TYPE)
+                    .withProperty("displayName", STRING_TYPE)
+                    .withProperty("description", STRING_TYPE)
+                    .withProperty("example", STRING_TYPE)
+                    .withProperty("valid", STRING_LIST_TYPE)
+                    .withProperty("required", BOOLEAN_TYPE)
+                    .withProperty("value", STRING_TYPE)
                     .build();
         }
 
@@ -200,23 +214,6 @@ public interface PolyglotValueMappings {
         }
     }
 
-    class MarkerEntriesMapping implements FromValuePolyglotMapping<List<Marker>> {
-        @Override
-        public Class<List<Marker>> outputType() {
-            return MARKERS.getRawType();
-        }
-
-        @Override
-        public List<Marker> apply(Value value) {
-            return ListUtils.mapValues(value, (i, v) -> v.as(Marker.class));
-        }
-
-        @Override
-        public boolean test(Value value) {
-            return value.hasArrayElements();
-        }
-    }
-
     class MarkersMapping implements FromValuePolyglotMapping<Markers> {
         @Override
         public Class<Markers> outputType() {
@@ -257,7 +254,6 @@ public interface PolyglotValueMappings {
 
         private final Constructor<?> ctor;
         private final Object[] constructorArgs;
-        private final Type[] constructorArgTypes;
 
         private int argIdx = 0;
 
@@ -272,36 +268,44 @@ public interface PolyglotValueMappings {
                     .findFirst()
                     .orElseThrow(RuntimeException::new);
             this.constructorArgs = new Object[ctor.getParameterCount()];
-            this.constructorArgTypes = ctor.getGenericParameterTypes();
         }
 
-        public <O> ConstructorMappingBuilder<T> withRawValue(O property) {
-            return withPropertyOrDefault(null, property);
+        public <O> ConstructorMappingBuilder<T> withRawValue(O property,
+                                                             TypeLiteral<O> targetType) {
+            return withPropertyOrDefault(null, property, targetType);
         }
 
-        public ConstructorMappingBuilder<T> withProperty(String property) {
-            return withPropertyOrDefault(property, null);
+        public <O> ConstructorMappingBuilder<T> withProperty(String property,
+                                                             TypeLiteral<O> targetType) {
+            return withPropertyOrDefault(property, null, targetType);
         }
 
-        public <O> ConstructorMappingBuilder<T> withGetterOrMetaProperty(String getter, @Nullable String property) {
-            return withGetterOrMetaProperty(getter, property, null);
+        public <O> ConstructorMappingBuilder<T> withGetterOrMetaProperty(String getter,
+                                                                         @Nullable String property,
+                                                                         TypeLiteral<O> targetType) {
+            return withGetterOrMetaProperty(getter, property, null, targetType);
         }
 
-        public <O> ConstructorMappingBuilder<T> withGetterOrMetaProperty(String getter, @Nullable String property, @Nullable O defaultValue) {
+        public <O> ConstructorMappingBuilder<T> withGetterOrMetaProperty(String getter,
+                                                                         @Nullable String property,
+                                                                         @Nullable O defaultValue,
+                                                                         TypeLiteral<O> targetType) {
             int i = argIdx++;
             if (parent.hasMember(getter) && parent.getMember(getter).canExecute()) {
-                constructorArgs[i] = parent.getMember(getter).execute().as((Class<?>) constructorArgTypes[i]);
+                constructorArgs[i] = parent.getMember(getter).execute().as(targetType);
             } else if (property != null && parent.getMetaObject().getMember("meta").hasMember(property)) {
-                constructorArgs[i] = parent.getMetaObject().getMember("meta").getMember(property).as((Class<?>) constructorArgTypes[i]);
+                constructorArgs[i] = parent.getMetaObject().getMember("meta").getMember(property).as(targetType);
             } else {
                 constructorArgs[i] = defaultValue;
             }
             return this;
         }
 
-        public <O> ConstructorMappingBuilder<T> withPropertyOrDefault(@Nullable String property, @Nullable O defaultValue) {
+        public <O> ConstructorMappingBuilder<T> withPropertyOrDefault(@Nullable String property,
+                                                                      @Nullable O defaultValue,
+                                                                      TypeLiteral<O> targetType) {
             int i = argIdx++;
-            constructorArgs[i] = property != null && parent.hasMember(property) ? parent.getMember(property).as((Class<?>) constructorArgTypes[i]) : defaultValue;
+            constructorArgs[i] = property != null && parent.hasMember(property) ? parent.getMember(property).as(targetType) : defaultValue;
             return this;
         }
 

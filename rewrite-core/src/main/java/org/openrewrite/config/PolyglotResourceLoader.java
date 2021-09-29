@@ -32,6 +32,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static org.openrewrite.polyglot.PolyglotValueMappings.hasGetVisitor;
+
 public class PolyglotResourceLoader implements ResourceLoader {
 
     private final List<PolyglotRecipes> recipes = new ArrayList<>();
@@ -104,8 +106,11 @@ public class PolyglotResourceLoader implements ResourceLoader {
                     @Override
                     public Polyglot visitInstantiable(Polyglot.Instantiable instantiable, List<PolyglotRecipe> l) {
                         Polyglot.Instance inst = instantiable.instantiate();
-                        inst.as(PolyglotRecipe.class).ifPresent(l::add);
-                        return inst;
+                        if (hasGetVisitor().test(inst.getValue())) {
+                            inst.as(PolyglotRecipe.class).ifPresent(l::add);
+                            return inst;
+                        }
+                        return instantiable;
                     }
                 };
                 for (Polyglot.Source src : sources) {

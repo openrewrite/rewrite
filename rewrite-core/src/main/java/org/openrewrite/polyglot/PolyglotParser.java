@@ -22,6 +22,8 @@ import io.github.classgraph.ScanResult;
 import org.apache.commons.io.IOUtils;
 import org.graalvm.polyglot.*;
 import org.graalvm.polyglot.io.ByteSequence;
+import org.graalvm.polyglot.proxy.ProxyExecutable;
+import org.graalvm.polyglot.proxy.ProxyObject;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
@@ -138,9 +140,36 @@ public class PolyglotParser implements Parser<Polyglot.Source> {
         return path.endsWith(".js");
     }
 
-    private static class PolyglotHelper {
-        public Value randomId() {
-            return asValue(Tree.randomId());
+    private static class PolyglotHelper implements ProxyObject {
+        @Override
+        public Object getMember(String key) {
+            switch (key) {
+                case "randomId":
+                    return (ProxyExecutable) arguments -> asValue(Tree.randomId());
+                default:
+                    return Value.asValue(null);
+            }
+        }
+
+        @Override
+        public Object getMemberKeys() {
+            return Value.asValue(new String[]{"randomId"});
+        }
+
+        @Override
+        public boolean hasMember(String key) {
+            switch (key) {
+                case "randomId":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        @Override
+        public void putMember(String key, Value value) {
+
         }
     }
+
 }
