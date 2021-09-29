@@ -66,9 +66,18 @@ class TypeMapping {
                 List<Symbol> stackWithSym = new ArrayList<>(stack);
                 stackWithSym.add(sym);
                 if (clazz == null) {
+                    if (!sym.completer.isTerminal()) {
+                        String packageName = sym.packge().fullname.toString();
+                        if (!packageName.startsWith("com.sun.") &&
+                                !packageName.startsWith("sun.") &&
+                                !packageName.startsWith("jdk.")) {
+                            sym.complete();
+                        }
+                    }
 
                     List<JavaType.Variable> fields;
                     List<JavaType.Method> methods;
+
                     if (sym.members_field == null) {
                         fields = emptyList();
                         methods = emptyList();

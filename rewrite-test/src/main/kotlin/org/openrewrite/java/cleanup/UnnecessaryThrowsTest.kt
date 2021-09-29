@@ -114,4 +114,18 @@ interface UnnecessaryThrowsTest : JavaRecipeTest {
             }
         """
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1059")
+    @Test
+    fun necessaryThrowsFromStaticMethod(jp: JavaParser) = assertUnchanged(
+        before = """
+            import javax.xml.datatype.DatatypeFactory;
+            
+            class Test {
+                void test() throws Exception {
+                    DatatypeFactory.newInstance();
+                }
+            }
+        """
+    )
 }

@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletionException;
 import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
@@ -66,6 +67,15 @@ class ReloadableTypeMapping {
                 List<Symbol> stackWithSym = new ArrayList<>(stack);
                 stackWithSym.add(sym);
                 if (clazz == null) {
+                    try {
+                        String packageName = sym.packge().fullname.toString();
+                        if (!packageName.startsWith("com.sun.") &&
+                                !packageName.startsWith("sun.") &&
+                                !packageName.startsWith("jdk.")) {
+                            sym.complete();
+                        }
+                    } catch(Symbol.CompletionFailure ignored) {
+                    }
 
                     List<JavaType.Variable> fields;
                     List<JavaType.Method> methods;
