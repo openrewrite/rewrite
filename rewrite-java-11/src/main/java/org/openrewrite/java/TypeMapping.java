@@ -67,11 +67,14 @@ class TypeMapping {
                 stackWithSym.add(sym);
                 if (clazz == null) {
                     if (!sym.completer.isTerminal()) {
-                        String packageName = sym.packge().fullname.toString();
-                        if (!packageName.startsWith("com.sun.") &&
-                                !packageName.startsWith("sun.") &&
-                                !packageName.startsWith("jdk.")) {
-                            sym.complete();
+                        try {
+                            String packageName = sym.packge().fullname.toString();
+                            if (!packageName.startsWith("com.sun.") &&
+                                    !packageName.startsWith("sun.") &&
+                                    !packageName.startsWith("jdk.")) {
+                                sym.complete();
+                            }
+                        } catch(Symbol.CompletionFailure ignore) {
                         }
                     }
 
@@ -143,7 +146,8 @@ class TypeMapping {
                             fields,
                             interfaces,
                             methods,
-                            TypeUtils.asFullyQualified(type(classType.supertype_field, stackWithSym)),
+                            TypeUtils.asFullyQualified(type(classType.supertype_field == null ? symType.supertype_field :
+                                    classType.supertype_field, stackWithSym)),
                             owner,
                             annotations,
                             relaxedClassTypeMatching);

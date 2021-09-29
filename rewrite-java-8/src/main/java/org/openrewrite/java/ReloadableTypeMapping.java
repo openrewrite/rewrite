@@ -144,7 +144,8 @@ class ReloadableTypeMapping {
                             fields,
                             interfaces,
                             methods,
-                            TypeUtils.asFullyQualified(type(classType.supertype_field, stackWithSym)),
+                            TypeUtils.asFullyQualified(type(classType.supertype_field == null ? symType.supertype_field :
+                                    classType.supertype_field, stackWithSym)),
                             owner,
                             annotations,
                             relaxedClassTypeMatching);

@@ -56,7 +56,7 @@ interface CatchClauseOnlyRethrowsTest : JavaRecipeTest {
                     } catch (IOException e) {
                         throw e;
                     } catch(Exception e) {
-                        throw e;
+                        System.out.println(e.getMessage());
                     } catch(Throwable t) {
                         t.printStackTrace();
                     }
