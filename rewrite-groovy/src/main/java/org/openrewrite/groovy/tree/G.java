@@ -62,7 +62,7 @@ public interface G extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class CompilationUnit implements G, SourceFile {
+    final class CompilationUnit implements G, JavaSourceFile {
         @Nullable
         @NonFinal
         transient WeakReference<TypeCache> typesInUse;

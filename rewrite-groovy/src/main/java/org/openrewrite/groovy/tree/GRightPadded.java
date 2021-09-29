@@ -17,7 +17,8 @@ package org.openrewrite.groovy.tree;
 
 public class GRightPadded {
     public enum Location {
-        MAP_ENTRY_KEY(GSpace.Location.MAP_ENTRY_KEY_SUFFIX);
+        MAP_ENTRY_KEY(GSpace.Location.MAP_ENTRY_KEY_SUFFIX),
+        TOP_LEVEL_STATEMENT_SUFFIX(GSpace.Location.TOP_LEVEL_STATEMENT);
 
         private final GSpace.Location afterLocation;
 

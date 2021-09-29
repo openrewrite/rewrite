@@ -13,12 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.groovy.tree;
+package org.openrewrite.groovy.tree
 
-public class GSpace {
-    public enum Location {
-        MAP_ENTRY_PREFIX,
-        MAP_ENTRY_KEY_SUFFIX,
-        TOP_LEVEL_STATEMENT,
-    }
+import org.junit.jupiter.api.Test
+
+class BinaryTest : GroovyTreeTest {
+
+    @Test
+    fun equals() = assertParsePrintAndProcess(
+        """
+            int n = 0;
+            boolean b = n == 0;
+        """
+    )
 }

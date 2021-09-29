@@ -22,6 +22,8 @@ import lombok.Value;
 import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.ast.expr.*;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
+import org.codehaus.groovy.ast.stmt.EmptyStatement;
+import org.codehaus.groovy.ast.stmt.IfStatement;
 import org.codehaus.groovy.ast.stmt.ReturnStatement;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.transform.stc.StaticTypeCheckingVisitor;
@@ -79,8 +81,8 @@ public class GroovyParserVisitor {
             if (pkgName.endsWith(".")) {
                 pkgName = pkgName.substring(0, pkgName.length() - 1);
             }
-            pkg = padRight(new J.Package(randomId(), EMPTY, Markers.EMPTY,
-                    buildName(pkgName), emptyList()), EMPTY);
+            pkg = JRightPadded.build(new J.Package(randomId(), EMPTY, Markers.EMPTY,
+                    buildName(pkgName), emptyList()));
         }
 
         for (ImportNode anImport : ast.getImports()) {
@@ -306,6 +308,79 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        public void visitBinaryExpression(BinaryExpression binary) {
+            Space fmt = whitespace();
+            Expression left = visit(binary.getLeftExpression());
+
+            Space opPrefix = whitespace();
+            J.Binary.Type operator = null;
+            switch (binary.getOperation().getText()) {
+                case "&&":
+                    operator = J.Binary.Type.And;
+                    break;
+                case "&=":
+                    operator = J.Binary.Type.BitAnd;
+                    break;
+                case "|=":
+                    operator = J.Binary.Type.BitOr;
+                    break;
+                case "^=":
+                    operator = J.Binary.Type.BitXor;
+                    break;
+                case "/":
+                    operator = J.Binary.Type.Division;
+                    break;
+                case "==":
+                    operator = J.Binary.Type.Equal;
+                    break;
+                case ">":
+                    operator = J.Binary.Type.GreaterThan;
+                    break;
+                case ">=":
+                    operator = J.Binary.Type.GreaterThanOrEqual;
+                    break;
+                case "<<=":
+                    operator = J.Binary.Type.LeftShift;
+                    break;
+                case "<":
+                    operator = J.Binary.Type.LessThan;
+                    break;
+                case "<=":
+                    operator = J.Binary.Type.LessThanOrEqual;
+                    break;
+                case "%":
+                    operator = J.Binary.Type.Modulo;
+                    break;
+                case "*":
+                    operator = J.Binary.Type.Multiplication;
+                    break;
+                case "!=":
+                    operator = J.Binary.Type.NotEqual;
+                    break;
+                case "||":
+                    operator = J.Binary.Type.Or;
+                    break;
+                case ">>=":
+                    operator = J.Binary.Type.RightShift;
+                    break;
+                case "-":
+                    operator = J.Binary.Type.Subtraction;
+                    break;
+                case ">>>=":
+                    operator = J.Binary.Type.UnsignedRightShift;
+                    break;
+            }
+            cursor += binary.getOperation().getText().length();
+            assert operator != null;
+
+            Expression right = visit(binary.getRightExpression());
+
+            queue.add(new J.Binary(randomId(), fmt, Markers.EMPTY,
+                    left, JLeftPadded.build(operator).withBefore(opPrefix),
+                    right, type(binary.getType())));
+        }
+
+        @Override
         public void visitBlockStatement(BlockStatement block) {
             Space fmt = EMPTY;
             if (!(nodeCursor.getParentOrThrow().getValue() instanceof ClosureExpression)) {
@@ -394,21 +469,28 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitDeclarationExpression(DeclarationExpression expression) {
+            TypeTree typeExpr = visitVariableExpressionType(expression.getVariableExpression());
+
+            J.VariableDeclarations.NamedVariable namedVariable = null;
             if (expression.isMultipleAssignmentDeclaration()) {
                 // def (a, b) = [1, 2]
                 throw new UnsupportedOperationException("FIXME");
             } else {
-                VariableExpression variableExpression = expression.getVariableExpression();
-                visitVariableExpression(variableExpression);
+                J.Identifier name = visit(expression.getVariableExpression());
+                namedVariable = new J.VariableDeclarations.NamedVariable(
+                        randomId(),
+                        name.getPrefix(),
+                        Markers.EMPTY,
+                        name.withPrefix(EMPTY),
+                        emptyList(),
+                        null,
+                        name.getType()
+                );
             }
-
-            J.Identifier name = pollQueue();
-            J.VariableDeclarations.NamedVariable namedVariable = pollQueue();
 
             if (expression.getRightExpression() != null) {
                 Space beforeAssign = sourceBefore("=");
-                expression.getRightExpression().visit(this);
-                Expression initializer = pollQueue();
+                Expression initializer = visit(expression.getRightExpression());
                 namedVariable = namedVariable.getPadding().withInitializer(padLeft(beforeAssign, initializer));
             }
 
@@ -418,13 +500,25 @@ public class GroovyParserVisitor {
                     Markers.EMPTY,
                     emptyList(),
                     emptyList(),
-                    name,
+                    typeExpr,
                     null,
                     emptyList(),
-                    singletonList(padRight(namedVariable, EMPTY))
+                    singletonList(JRightPadded.build(namedVariable))
             );
 
             queue.add(variableDeclarations);
+        }
+
+        @Override
+        public void visitIfElse(IfStatement ifElse) {
+            Space fmt = sourceBefore("if");
+            J.ControlParentheses<Expression> ifCondition = new J.ControlParentheses<Expression>(randomId(), sourceBefore("("), Markers.EMPTY,
+                    JRightPadded.build((Expression) visit(ifElse.getBooleanExpression().getExpression())).withAfter(sourceBefore(")")));
+            JRightPadded<Statement> then = maybeSemicolon(visit(ifElse.getIfBlock()));
+            J.If.Else elze = ifElse.getElseBlock() instanceof EmptyStatement ? null :
+                    new J.If.Else(randomId(), sourceBefore("else"), Markers.EMPTY,
+                            maybeSemicolon(visit(ifElse.getElseBlock())));
+            queue.add(new J.If(randomId(), fmt, Markers.EMPTY, ifCondition, then, elze));
         }
 
         @Override
@@ -511,34 +605,90 @@ public class GroovyParserVisitor {
         }
 
         @Override
-        public void visitVariableExpression(VariableExpression expression) {
+        public void visitPostfixExpression(PostfixExpression unary) {
+            Space fmt = whitespace();
+            Expression expression = visit(unary.getExpression());
+
+            Space operatorPrefix = whitespace();
+            String typeToken = unary.getOperation().getText();
+            cursor += typeToken.length();
+
+            J.Unary.Type operator = null;
+            switch (typeToken) {
+                case "++":
+                    operator = J.Unary.Type.PostIncrement;
+                    break;
+                case "--":
+                    operator = J.Unary.Type.PostDecrement;
+                    break;
+            }
+            assert operator != null;
+
+            queue.add(new J.Unary(randomId(), fmt, Markers.EMPTY,
+                    JLeftPadded.build(operator).withBefore(operatorPrefix),
+                    expression, null));
+        }
+
+        @Override
+        public void visitPrefixExpression(PrefixExpression unary) {
+            Space fmt = whitespace();
+            String typeToken = unary.getOperation().getText();
+            cursor += typeToken.length();
+
+            J.Unary.Type operator = null;
+            switch (typeToken) {
+                case "++":
+                    operator = J.Unary.Type.PreIncrement;
+                    break;
+                case "--":
+                    operator = J.Unary.Type.PreDecrement;
+                    break;
+                case "+":
+                    operator = J.Unary.Type.Positive;
+                    break;
+                case "-":
+                    operator = J.Unary.Type.Negative;
+                    break;
+                case "~":
+                    operator = J.Unary.Type.Complement;
+                    break;
+                case "!":
+                    operator = J.Unary.Type.Not;
+                    break;
+            }
+
+            assert operator != null;
+            queue.add(new J.Unary(randomId(), fmt, Markers.EMPTY,
+                    JLeftPadded.build(operator),
+                    visit(unary.getExpression()),
+                    null));
+        }
+
+        public TypeTree visitVariableExpressionType(VariableExpression expression) {
             JavaType type = type(expression);
             if (expression.isDynamicTyped()) {
-                queue.add(J.Identifier.build(randomId(),
+                return J.Identifier.build(randomId(),
                         sourceBefore("def"),
                         Markers.EMPTY,
                         "def",
-                        type));
-            } else {
-                queue.add(J.Identifier.build(randomId(),
-                        sourceBefore(expression.getOriginType().getName()),
-                        Markers.EMPTY,
-                        expression.getOriginType().getName(),
-                        type));
+                        type);
             }
+            return J.Identifier.build(randomId(),
+                    sourceBefore(expression.getOriginType().getName()),
+                    Markers.EMPTY,
+                    expression.getOriginType().getName(),
+                    type);
+        }
 
-            queue.add(new J.VariableDeclarations.NamedVariable(randomId(),
+        @Override
+        public void visitVariableExpression(VariableExpression expression) {
+            JavaType type = type(expression);
+            queue.add(J.Identifier.build(randomId(),
                     sourceBefore(expression.getName()),
                     Markers.EMPTY,
-                    J.Identifier.build(randomId(),
-                            EMPTY,
-                            Markers.EMPTY,
-                            expression.getName(),
-                            type),
-                    emptyList(),
-                    null,
-                    type
-            ));
+                    expression.getName(),
+                    type)
+            );
         }
 
         @SuppressWarnings({"unchecked", "ConstantConditions"})
@@ -569,7 +719,7 @@ public class GroovyParserVisitor {
 
         RewriteGroovyVisitor groovyVisitor = new RewriteGroovyVisitor();
         node.visit(groovyVisitor);
-        return padRight(groovyVisitor.pollQueue(), EMPTY);
+        return maybeSemicolon(groovyVisitor.pollQueue());
     }
 
     private static LineColumn pos(ASTNode node) {
@@ -589,10 +739,6 @@ public class GroovyParserVisitor {
         public int compareTo(@NotNull GroovyParserVisitor.LineColumn lc) {
             return line != lc.line ? line - lc.line : column - lc.column;
         }
-    }
-
-    private <T> JRightPadded<T> padRight(T tree, Space right) {
-        return new JRightPadded<>(tree, right, Markers.EMPTY);
     }
 
     private <T> JLeftPadded<T> padLeft(Space left, T tree) {
@@ -729,6 +875,7 @@ public class GroovyParserVisitor {
             }
         }
 
+        assert expr != null;
         return expr.withPrefix(prefix);
     }
 
@@ -817,5 +964,25 @@ public class GroovyParserVisitor {
         }
 
         return orderedModifiers;
+    }
+
+    private <G2 extends J> JRightPadded<G2> maybeSemicolon(G2 g) {
+        int saveCursor = cursor;
+        Space beforeSemi = whitespace();
+        Semicolon semicolon = null;
+        if (cursor < source.length() && source.charAt(cursor) == ';') {
+            semicolon = new Semicolon(randomId());
+            cursor++;
+        } else {
+            beforeSemi = EMPTY;
+            cursor = saveCursor;
+        }
+
+        JRightPadded<G2> paddedG = JRightPadded.build(g).withAfter(beforeSemi);
+        if (semicolon != null) {
+            paddedG = paddedG.withMarkers(paddedG.getMarkers().add(semicolon));
+        }
+
+        return paddedG;
     }
 }

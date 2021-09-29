@@ -53,7 +53,10 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             visitSpace(pkg.getAfter(), Space.Location.PACKAGE_SUFFIX, p);
         }
 
-        visit(cu.getStatements(), p);
+        for (JRightPadded<Statement> statement : cu.getPadding().getStatements()) {
+            visitRightPadded(statement, GRightPadded.Location.TOP_LEVEL_STATEMENT_SUFFIX, p);
+        }
+
         visitSpace(cu.getEof(), Space.Location.COMPILATION_UNIT_EOF, p);
         return cu;
     }
@@ -146,5 +149,13 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             }
             return super.visitMarker(marker, p);
         }
+    }
+
+    @Override
+    public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
+        if (marker instanceof Semicolon) {
+            p.out.append(';');
+        }
+        return super.visitMarker(marker, p);
     }
 }

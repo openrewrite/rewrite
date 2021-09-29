@@ -1102,7 +1102,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class CompilationUnit implements J, SourceFile {
+    final class CompilationUnit implements J, JavaSourceFile {
         @Nullable
         @NonFinal
         transient SoftReference<TypeCache> typesInUse;

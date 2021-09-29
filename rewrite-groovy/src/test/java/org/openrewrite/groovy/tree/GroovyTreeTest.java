@@ -31,7 +31,7 @@ public interface GroovyTreeTest {
                 new InMemoryExecutionContext(t -> {
                     throw new RuntimeException(t.getMessage(), t);
                 }),
-                code
+                StringUtils.trimIndent(code)
         ).iterator().next();
 
         J processed = new GroovyVisitor<>().visit(cu, new Object());

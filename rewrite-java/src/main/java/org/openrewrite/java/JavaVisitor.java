@@ -1176,8 +1176,11 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         if (t == null) {
             return null;
         }
+
         Space after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
-        return (after == right.getAfter() && t == right.getElement()) ? right : new JRightPadded<>(t, after, right.getMarkers());
+        Markers markers = visitMarkers(right.getMarkers(), p);
+        return (after == right.getAfter() && t == right.getElement() && markers == right.getMarkers()) ?
+                right : new JRightPadded<>(t, after, markers);
     }
 
     public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, JLeftPadded.Location loc, P p) {
