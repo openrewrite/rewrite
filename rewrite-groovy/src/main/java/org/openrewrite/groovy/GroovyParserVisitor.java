@@ -31,6 +31,7 @@ import org.codehaus.groovy.transform.stc.StaticTypesMarker;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.groovy.marker.ImplicitReturn;
 import org.openrewrite.groovy.marker.OmitParentheses;
 import org.openrewrite.groovy.marker.Semicolon;
 import org.openrewrite.groovy.tree.G;
@@ -43,6 +44,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -134,25 +136,140 @@ public class GroovyParserVisitor {
         private final Queue<Object> queue = new LinkedList<>();
 
         @Override
-        public void visitMethod(MethodNode node) {
+        public void visitClass(ClassNode clazz) {
+            Space fmt = whitespace();
+            List<J.Modifier> modifiers = visitModifiers(clazz.getModifiers());
+
+            Space kindPrefix = whitespace();
+            J.ClassDeclaration.Kind.Type kindType = null;
+            if (source.startsWith("class", cursor)) {
+                kindType = J.ClassDeclaration.Kind.Type.Class;
+                cursor += "class".length();
+            } else if (source.startsWith("interface", cursor)) {
+                kindType = J.ClassDeclaration.Kind.Type.Interface;
+                cursor += "interface".length();
+            }
+            assert kindType != null;
+            J.ClassDeclaration.Kind kind = new J.ClassDeclaration.Kind(randomId(), kindPrefix, Markers.EMPTY, emptyList(), kindType);
+
+            J.Identifier name = J.Identifier.build(randomId(), sourceBefore(clazz.getName()), Markers.EMPTY, clazz.getName(), null);
+
+            JLeftPadded<TypeTree> extendings = null;
+            if (clazz.getSuperClass().getLineNumber() >= 0) {
+                extendings = padLeft(sourceBefore("extends"), visitTypeTree(clazz.getSuperClass()));
+            }
+
+            JContainer<TypeTree> implementings = null;
+            if (clazz.getInterfaces().length > 0) {
+                Space implPrefix = sourceBefore("implements");
+                List<JRightPadded<TypeTree>> implTypes = new ArrayList<>(clazz.getInterfaces().length);
+                ClassNode[] interfaces = clazz.getInterfaces();
+                for (int i = 0; i < interfaces.length; i++) {
+                    ClassNode anInterface = interfaces[i];
+                    implTypes.add(JRightPadded.build(visitTypeTree(anInterface))
+                            .withAfter(i == interfaces.length - 1 ? EMPTY : sourceBefore(",")));
+                }
+
+                implementings = JContainer.build(implPrefix, implTypes, Markers.EMPTY);
+            }
+
+            NavigableMap<LineColumn, List<ASTNode>> sortedByPosition = new TreeMap<>();
+            for (MethodNode method : clazz.getMethods()) {
+                sortedByPosition.computeIfAbsent(pos(method), i -> new ArrayList<>()).add(method);
+            }
+            for (FieldNode field : clazz.getFields()) {
+                sortedByPosition.computeIfAbsent(pos(field), i -> new ArrayList<>()).add(field);
+            }
+
+            J.Block body = new J.Block(randomId(), sourceBefore("{"), Markers.EMPTY,
+                    JRightPadded.build(false),
+                    sortedByPosition.values().stream()
+                            .flatMap(asts -> asts.stream()
+                                    .map(ast -> {
+                                        if (ast instanceof FieldNode) {
+                                            visitField((FieldNode) ast);
+                                        } else if (ast instanceof MethodNode) {
+                                            visitMethod((MethodNode) ast);
+                                        }
+                                        Statement stat = pollQueue();
+                                        return maybeSemicolon(stat);
+                                    }))
+                            .collect(Collectors.toList()),
+                    sourceBefore("}"));
+
+            queue.add(new J.ClassDeclaration(randomId(), fmt, Markers.EMPTY,
+                    emptyList(),
+                    modifiers,
+                    kind,
+                    name,
+                    null,
+                    extendings,
+                    implementings,
+                    body,
+                    TypeUtils.asFullyQualified(type(clazz))));
+        }
+
+        @Override
+        public void visitField(FieldNode field) {
+            RewriteGroovyVisitor visitor = new RewriteGroovyVisitor(field);
+
+            List<J.Modifier> modifiers = visitModifiers(field.getModifiers());
+            TypeTree typeExpr = visitTypeTree(field.getType());
+
+            J.Identifier name = J.Identifier.build(randomId(), sourceBefore(field.getName()), Markers.EMPTY,
+                    field.getName(), type(field.getType()));
+
+            J.VariableDeclarations.NamedVariable namedVariable = new J.VariableDeclarations.NamedVariable(
+                    randomId(),
+                    name.getPrefix(),
+                    Markers.EMPTY,
+                    name.withPrefix(EMPTY),
+                    emptyList(),
+                    null,
+                    name.getType()
+            );
+
+            if (field.getInitialExpression() != null) {
+                Space beforeAssign = sourceBefore("=");
+                Expression initializer = visitor.visit(field.getInitialExpression());
+                namedVariable = namedVariable.getPadding().withInitializer(padLeft(beforeAssign, initializer));
+            }
+
+            J.VariableDeclarations variableDeclarations = new J.VariableDeclarations(
+                    randomId(),
+                    EMPTY,
+                    Markers.EMPTY,
+                    emptyList(),
+                    modifiers,
+                    typeExpr,
+                    null,
+                    emptyList(),
+                    singletonList(JRightPadded.build(namedVariable))
+            );
+
+            queue.add(variableDeclarations);
+        }
+
+        @Override
+        public void visitMethod(MethodNode method) {
             Space fmt = sourceBefore("def");
 
-            List<J.Modifier> modifiers = visitModifiers(node.getModifiers());
+            List<J.Modifier> modifiers = visitModifiers(method.getModifiers());
 
-            TypeTree returnType = visitTypeTree(node.getReturnType());
+            TypeTree returnType = visitTypeTree(method.getReturnType());
 
             J.Identifier name = J.Identifier.build(randomId(),
-                    sourceBefore(node.getName()),
+                    sourceBefore(method.getName()),
                     Markers.EMPTY,
-                    node.getName(),
+                    method.getName(),
                     null);
 
-            RewriteGroovyVisitor bodyVisitor = new RewriteGroovyVisitor();
+            RewriteGroovyVisitor bodyVisitor = new RewriteGroovyVisitor(method);
 
             // Parameter has no visit implementation, so we've got to do this by hand
             Space beforeParen = sourceBefore("(");
-            List<JRightPadded<Statement>> params = new ArrayList<>(node.getParameters().length);
-            Parameter[] unparsedParams = node.getParameters();
+            List<JRightPadded<Statement>> params = new ArrayList<>(method.getParameters().length);
+            Parameter[] unparsedParams = method.getParameters();
             for (int i = 0; i < unparsedParams.length; i++) {
                 Parameter param = unparsedParams[i];
                 TypeTree paramType = visitTypeTree(param.getType());
@@ -171,7 +288,7 @@ public class GroovyParserVisitor {
                         singletonList(paramName))).withAfter(rightPad));
             }
 
-            J.Block body = bodyVisitor.visit(node.getCode());
+            J.Block body = bodyVisitor.visit(method.getCode());
 
             queue.add(new J.MethodDeclaration(
                     randomId(), fmt, Markers.EMPTY,
@@ -195,8 +312,12 @@ public class GroovyParserVisitor {
     }
 
     private class RewriteGroovyVisitor extends CodeVisitorSupport {
-        private Cursor nodeCursor = new Cursor(null, "root");
+        private Cursor nodeCursor;
         private final Queue<Object> queue = new LinkedList<>();
+
+        public RewriteGroovyVisitor(ASTNode root) {
+            this.nodeCursor = new Cursor(null, root);
+        }
 
         private <T> T visit(ASTNode node) {
             nodeCursor = new Cursor(nodeCursor, node);
@@ -205,41 +326,11 @@ public class GroovyParserVisitor {
             return pollQueue();
         }
 
-        private <T> List<JRightPadded<T>> visitRightPadded(List<? extends ASTNode> nodes, char lastPadTo) {
-            List<JRightPadded<T>> ts = new ArrayList<>(nodes.size());
-            for (int i = 0; i < nodes.size(); i++) {
-                ASTNode node = nodes.get(i);
-
-                Space pad;
-                if (i == nodes.size() - 1) {
-                    int saveCursor = cursor;
-                    pad = whitespace();
-                    if (cursor >= source.length() || source.charAt(cursor) != lastPadTo) {
-                        cursor = saveCursor;
-                    }
-                } else {
-                    pad = whitespace();
-                }
-
-                //noinspection unchecked
-                ts.add((JRightPadded<T>) JRightPadded.build(visit(node)).withAfter(pad));
-            }
-            return ts;
-        }
-
         private <T> List<JRightPadded<T>> visitRightPadded(ASTNode[] nodes, char lastPadTo) {
             List<JRightPadded<T>> ts = new ArrayList<>(nodes.length);
             for (ASTNode node : nodes) {
                 //noinspection unchecked
                 ts.add((JRightPadded<T>) JRightPadded.build(visit(node)).withAfter(whitespace()));
-            }
-            return ts;
-        }
-
-        private <T> List<T> visit(ASTNode[] nodes) {
-            List<T> ts = new ArrayList<>(nodes.length);
-            for (ASTNode node : nodes) {
-                ts.add(visit(node));
             }
             return ts;
         }
@@ -315,6 +406,9 @@ public class GroovyParserVisitor {
             Space opPrefix = whitespace();
             J.Binary.Type operator = null;
             switch (binary.getOperation().getText()) {
+                case "+":
+                    operator = J.Binary.Type.Addition;
+                    break;
                 case "&&":
                     operator = J.Binary.Type.And;
                     break;
@@ -383,12 +477,25 @@ public class GroovyParserVisitor {
         @Override
         public void visitBlockStatement(BlockStatement block) {
             Space fmt = EMPTY;
-            if (!(nodeCursor.getParentOrThrow().getValue() instanceof ClosureExpression)) {
+            Object parent = nodeCursor.getParentOrThrow().getValue();
+            if (!(parent instanceof ClosureExpression)) {
                 fmt = sourceBefore("{");
             }
             List<JRightPadded<Statement>> statements = new ArrayList<>(block.getStatements().size());
-            for (ASTNode statement : block.getStatements()) {
-                JRightPadded<Statement> stat = JRightPadded.build(visit(statement));
+            List<org.codehaus.groovy.ast.stmt.Statement> blockStatements = block.getStatements();
+            for (int i = 0; i < blockStatements.size(); i++) {
+                ASTNode statement = blockStatements.get(i);
+                J expr = visit(statement);
+                if (i == blockStatements.size() - 1 && !(expr instanceof ReturnStatement)) {
+                    if (parent instanceof ClosureExpression || (parent instanceof MethodNode &&
+                            !JavaType.Primitive.Void.equals(type(((MethodNode) parent).getReturnType())))) {
+                        expr = new J.Return(randomId(), expr.getPrefix(), Markers.EMPTY,
+                                expr.withPrefix(EMPTY));
+                        expr = expr.withMarkers(expr.getMarkers().add(new ImplicitReturn(randomId())));
+                    }
+                }
+
+                JRightPadded<Statement> stat = JRightPadded.build((Statement) expr);
                 int saveCursor = cursor;
                 Space beforeSemicolon = whitespace();
                 if (cursor < source.length() && source.charAt(cursor) == ';') {
@@ -405,7 +512,7 @@ public class GroovyParserVisitor {
 
             Space beforeBrace = whitespace();
             queue.add(new J.Block(randomId(), fmt, Markers.EMPTY, JRightPadded.build(false), statements, beforeBrace));
-            if (!(nodeCursor.getParentOrThrow().getValue() instanceof ClosureExpression)) {
+            if (!(parent instanceof ClosureExpression)) {
                 sourceBefore("}");
             }
         }
@@ -702,7 +809,7 @@ public class GroovyParserVisitor {
             ClassNode classNode = (ClassNode) node;
             RewriteGroovyClassVisitor classVisitor = new RewriteGroovyClassVisitor(unit);
             classVisitor.visitClass(classNode);
-            return classVisitor.pollQueue();
+            return JRightPadded.build(classVisitor.pollQueue());
         } else if (node instanceof MethodNode) {
             MethodNode methodNode = (MethodNode) node;
             RewriteGroovyClassVisitor classVisitor = new RewriteGroovyClassVisitor(unit);
@@ -717,7 +824,7 @@ public class GroovyParserVisitor {
             }
         }
 
-        RewriteGroovyVisitor groovyVisitor = new RewriteGroovyVisitor();
+        RewriteGroovyVisitor groovyVisitor = new RewriteGroovyVisitor(node);
         node.visit(groovyVisitor);
         return maybeSemicolon(groovyVisitor.pollQueue());
     }
@@ -829,7 +936,11 @@ public class GroovyParserVisitor {
         if (node == null || node.getMetaDataMap() == null) {
             return null;
         }
+
         ClassNode type = (ClassNode) node.getMetaDataMap().get(StaticTypesMarker.INFERRED_TYPE);
+        if (type == null) {
+            return null;
+        }
 
         JavaType.Primitive primitive = JavaType.Primitive.fromKeyword(type.getName());
         if (primitive != null) {

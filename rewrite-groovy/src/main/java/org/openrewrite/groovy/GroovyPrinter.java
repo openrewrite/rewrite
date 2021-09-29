@@ -17,6 +17,7 @@ package org.openrewrite.groovy;
 
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
+import org.openrewrite.groovy.marker.ImplicitReturn;
 import org.openrewrite.groovy.marker.OmitParentheses;
 import org.openrewrite.groovy.marker.Semicolon;
 import org.openrewrite.groovy.tree.G;
@@ -34,7 +35,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
     @Override
     public J visit(@Nullable Tree tree, PrintOutputCapture<P> p) {
-        if(!(tree instanceof G)) {
+        if (!(tree instanceof G)) {
             // re-route printing to the java printer
             return delegate.visit(tree, p);
         } else {
@@ -79,7 +80,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     private class GroovyJavaPrinter extends JavaPrinter<P> {
         @Override
         public J visit(@Nullable Tree tree, PrintOutputCapture<P> p) {
-            if(tree instanceof G) {
+            if (tree instanceof G) {
                 // re-route printing back up to groovy
                 return GroovyPrinter.this.visit(tree, p);
             } else {
@@ -140,6 +141,24 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             }
 
             return method;
+        }
+
+        @Override
+        public J visitReturn(J.Return retrn, PrintOutputCapture<P> p) {
+            if (retrn.getMarkers().findFirst(ImplicitReturn.class).isPresent()) {
+                visitSpace(retrn.getPrefix(), Space.Location.RETURN_PREFIX, p);
+                visitMarkers(retrn.getMarkers(), p);
+                visit(retrn.getExpression(), p);
+                return retrn;
+            }
+            return super.visitReturn(retrn, p);
+        }
+
+        protected void visitStatement(@Nullable JRightPadded<Statement> paddedStat, JRightPadded.Location location, PrintOutputCapture<P> p) {
+            if (paddedStat != null) {
+                visit(paddedStat.getElement(), p);
+                visitSpace(paddedStat.getAfter(), location.getAfterLocation(), p);
+            }
         }
 
         @Override
