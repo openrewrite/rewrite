@@ -110,6 +110,10 @@ class Java8ChangePackageTest : Java8Test, ChangePackageTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8ChangeStaticFieldToMethodTest : Java8Test, ChangeStaticFieldToMethodTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8ChangeTypeTest : Java8Test, ChangeTypeTest
 
 @DebugOnly
