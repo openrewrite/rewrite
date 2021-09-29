@@ -16,13 +16,31 @@
 
 package org.openrewrite.polyglot;
 
+import org.graalvm.polyglot.TypeLiteral;
 import org.graalvm.polyglot.Value;
-import org.graalvm.polyglot.proxy.ProxyExecutable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.config.CategoryDescriptor;
+import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.style.NamedStyles;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
+
+import static org.graalvm.polyglot.Value.asValue;
+import static org.openrewrite.polyglot.PolyglotUtils.invokeMemberOrElse;
+
+@SuppressWarnings({"ConstantConditions", "unchecked", "rawtypes"})
 public class PolyglotRecipe extends Recipe {
+
+    private static final Value EMPTY_VISITOR = asValue(new TreeVisitor() {
+    });
+
+    private static final TypeLiteral<Set<String>> SET_OF_STRINGS = new TypeLiteral<Set<String>>() {
+    };
 
     private final String name;
     private final Value value;
@@ -37,33 +55,51 @@ public class PolyglotRecipe extends Recipe {
         return name;
     }
 
+    public RecipeDescriptor getRecipeDescriptor() {
+        return value.as(RecipeDescriptor.class);
+    }
+
+    public List<CategoryDescriptor> getCategoryDescriptors() {
+        return Collections.emptyList();
+    }
+
+    public List<NamedStyles> getNamedStyles() {
+        return Collections.emptyList();
+    }
+
     @Override
     public String getDisplayName() {
-        return value.invokeMember("getDisplayName").asString();
+        return invokeMemberOrElse(value, "getDisplayName", () -> asValue(name)).asString();
     }
 
     @Override
     public String getDescription() {
-        return value.invokeMember("getDescription").asString();
+        return invokeMemberOrElse(value, "getDescription", () -> asValue(name)).asString();
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return invokeMemberOrElse(value, "getTags", () -> asValue(Collections.emptySet())).as(SET_OF_STRINGS);
+    }
+
+    @Override
+    protected @Nullable TreeVisitor<?, ExecutionContext> getApplicableTest() {
+        return invokeMemberOrElse(value, "getApplicableTest", () -> asValue(null)).as(TreeVisitor.class);
+    }
+
+    @Override
+    protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return invokeMemberOrElse(value, "getSingleSourceApplicableTest", () -> asValue(null)).as(TreeVisitor.class);
     }
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new PolyglotVisitor<>(value.invokeMember("getVisitor"), super.getVisitor());
+        return invokeMemberOrElse(value, "getVisitor", () -> EMPTY_VISITOR).as(TreeVisitor.class);
     }
 
     @Override
-    public boolean equals(Object o) {
-        if (!(o instanceof PolyglotRecipe)) {
-            return false;
-        }
-        return ((PolyglotRecipe) o).getName().equals(getName());
+    public String toString() {
+        return "$classname{ value: " + value + " }";
     }
 
-    private class DoNextProxy implements ProxyExecutable {
-        @Override
-        public Object execute(Value... arguments) {
-            return doNext(arguments[0].as(Recipe.class));
-        }
-    }
 }

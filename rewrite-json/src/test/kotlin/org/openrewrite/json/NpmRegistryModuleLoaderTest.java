@@ -60,7 +60,7 @@ class NpmRegistryModuleLoaderTest {
                 .build();
         assertThat(env.listRecipes()).isNotEmpty();
 
-        Recipe r = env.activateRecipes("ts-recipes/ChangeLicenseRecipe");
+        Recipe r = env.activateRecipes("org.openrewrite.typescript.ChangeLicenseRecipe");
         ExecutorService x = Executors.newFixedThreadPool(2);
         CountDownLatch latch = new CountDownLatch(1);
         Future<?> f1 = x.submit(() -> {
@@ -79,6 +79,7 @@ class NpmRegistryModuleLoaderTest {
                 3,
                 1);
 
+        assertThat(results).isNotEmpty();
         System.out.println("results: " + results);
     }
 
