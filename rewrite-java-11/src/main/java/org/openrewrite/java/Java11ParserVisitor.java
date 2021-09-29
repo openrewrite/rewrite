@@ -1153,6 +1153,12 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
                 J.Try.Resource tryResource = new J.Try.Resource(randomId(), resourcePrefix, Markers.EMPTY,
                         resourceVar.withPrefix(EMPTY), semicolonPresent);
+
+                // Starting in Java 9, you can have an identifier in the try with resource, if an Identifier
+                // is parsed, the cursor is advance to the trailing semicolon. We do not want to pick this up in the
+                // prefix of the next resource (or the right padding of identifier (if it is the last resource)
+                skip(";");
+
                 resourceList.add(padRight(tryResource, i == node.getResources().size() - 1 ?
                         sourceBefore(")") : EMPTY));
             }

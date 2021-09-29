@@ -37,4 +37,25 @@ class TryCatchJava11Test: JavaTreeTest, Java11Test {
             }
         """
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1027")
+    @Test
+    fun tryWithResourcesIdentifierAndVariables(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.Block, """
+            FileInputStream fis = new FileInputStream(new File("file.txt"));
+            try (fis; Scanner sc = new Scanner("")) {
+            }
+        """, "java.io.*", "java.util.Scanner"
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1027")
+    @Test
+    fun tryWithResourcesIdentifierAndSemicolon(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.Block, """
+            FileInputStream fis = new FileInputStream(new File("file.txt"));
+            try (fis;) {
+            }
+        """, "java.io.*", "java.util.Scanner"
+    )
+
 }

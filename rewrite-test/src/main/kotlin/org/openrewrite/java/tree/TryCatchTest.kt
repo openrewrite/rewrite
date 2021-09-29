@@ -93,17 +93,6 @@ interface TryCatchTest : JavaTreeTest {
         """, "java.io.*"
     )
 
-    @Disabled
-    @Issue("https://github.com/openrewrite/rewrite/issues/1027")
-    @Test
-    fun tryWithResourcesIdentifierAndVariables(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, Block, """
-            FileInputStream fis = new FileInputStream(new File("file.txt"));
-            try (fis; Scanner sc = new Scanner("")) {
-            }
-        """, "java.io.*", "java.util.Scanner"
-    )
-
     @Test
     fun multiCatch(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
