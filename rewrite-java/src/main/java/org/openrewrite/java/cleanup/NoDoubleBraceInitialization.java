@@ -39,7 +39,7 @@ public class NoDoubleBraceInitialization extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Replace List, Map, and Set double brace initialization with an initialization block.";
+        return "Replace `List`, `Map`, and `Set` double brace initialization with an initialization block.";
     }
 
     @Override

@@ -178,10 +178,6 @@ class Java8ForLoopIncrementInUpdateTest : Java8Test, ForLoopIncrementInUpdateTes
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java8StaticMethodNotFinalTest : Java8Test, StaticMethodNotFinalTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
 class Java8FindAnnotationsTest : Java8Test, FindAnnotationsTest
 
 @DebugOnly
@@ -406,6 +402,10 @@ class Java8RemoveUnusedImportsTest : Java8Test, RemoveUnusedImportsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8RenameLocalVariablesToCamelCaseTest : Java8Test, RenameLocalVariablesToCamelCaseTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8RenameVariableTest : Java8Test, RenameVariableTest
 
 @DebugOnly
@@ -434,7 +434,7 @@ class Java8SingleLineCommentsTest : Java8Test, SingleLineCommentsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java8RenameLocalVariablesToCamelCaseTest : Java8Test, RenameLocalVariablesToCamelCaseTest
+class Java8StaticMethodNotFinalTest : Java8Test, StaticMethodNotFinalTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

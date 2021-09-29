@@ -45,6 +45,7 @@ recipeList:
   - org.openrewrite.java.cleanup.NeedBraces
   - org.openrewrite.java.cleanup.NestedEnumsAreNotStatic
   - org.openrewrite.java.cleanup.NewStringBuilderBufferWithCharArgument
+  - org.openrewrite.java.cleanup.NoDoubleBraceInitialization
   - org.openrewrite.java.cleanup.NoEqualityInForCondition
   - org.openrewrite.java.cleanup.NoFinalizer
   - org.openrewrite.java.cleanup.NoRedundantJumpStatements

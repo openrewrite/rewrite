@@ -178,14 +178,6 @@ class Java11ForLoopIncrementInUpdateTest : Java11Test, ForLoopIncrementInUpdateT
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11NoDoubleBraceInitializationTest : Java11Test, NoDoubleBraceInitializationTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
-class Java11StaticMethodNotFinalTest : Java11Test, StaticMethodNotFinalTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
 class Java11FindAnnotationsTest : Java11Test, FindAnnotationsTest
 
 @DebugOnly
@@ -314,6 +306,10 @@ class Java11NeedBracesTest : Java11Test, NeedBracesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11NoDoubleBraceInitializationTest : Java11Test, NoDoubleBraceInitializationTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11NoEqualityInForConditionTest : Java11Test, NoEqualityInForConditionTest
 
 @DebugOnly
@@ -410,6 +406,10 @@ class Java11RemoveUnusedImportsTest : Java11Test, RemoveUnusedImportsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11RenameLocalVariablesToCamelCaseTest : Java11Test, RenameLocalVariablesToCamelCaseTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11RenameVariableTest : Java11Test, RenameVariableTest
 
 @DebugOnly
@@ -434,7 +434,7 @@ class Java11SimplifyBooleanReturnTest : Java11Test, SimplifyBooleanReturnTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11RenameLocalVariablesToCamelCaseTest : Java11Test, RenameLocalVariablesToCamelCaseTest
+class Java11StaticMethodNotFinalTest : Java11Test, StaticMethodNotFinalTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
