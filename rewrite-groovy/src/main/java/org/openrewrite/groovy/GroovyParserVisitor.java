@@ -486,7 +486,7 @@ public class GroovyParserVisitor {
             for (int i = 0; i < blockStatements.size(); i++) {
                 ASTNode statement = blockStatements.get(i);
                 J expr = visit(statement);
-                if (i == blockStatements.size() - 1 && !(expr instanceof ReturnStatement)) {
+                if (i == blockStatements.size() - 1 && !(expr instanceof J.Return)) {
                     if (parent instanceof ClosureExpression || (parent instanceof MethodNode &&
                             !JavaType.Primitive.Void.equals(type(((MethodNode) parent).getReturnType())))) {
                         expr = new J.Return(randomId(), expr.getPrefix(), Markers.EMPTY,
@@ -515,6 +515,22 @@ public class GroovyParserVisitor {
             if (!(parent instanceof ClosureExpression)) {
                 sourceBefore("}");
             }
+        }
+
+        @Override
+        public void visitClosureExpression(ClosureExpression expression) {
+            Space prefix = whitespace();
+            cursor += 1; // skip '{'
+
+            J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), EMPTY, Markers.EMPTY, false, visitRightPadded(expression.getParameters(), '-'));
+            Space arrow = EMPTY;
+            if (!params.getParameters().isEmpty()) {
+                arrow = whitespace();
+                cursor += 2;
+            }
+
+            queue.add(new J.Lambda(randomId(), prefix, Markers.EMPTY, params, arrow, visit(expression.getCode()), null));
+            cursor += 1; // skip '}'
         }
 
         @Override
@@ -559,19 +575,12 @@ public class GroovyParserVisitor {
         }
 
         @Override
-        public void visitClosureExpression(ClosureExpression expression) {
-            Space prefix = whitespace();
-            cursor += 1; // skip '{'
-
-            J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), EMPTY, Markers.EMPTY, false, visitRightPadded(expression.getParameters(), '-'));
-            Space arrow = EMPTY;
-            if (!params.getParameters().isEmpty()) {
-                arrow = whitespace();
-                cursor += 2;
-            }
-
-            queue.add(new J.Lambda(randomId(), prefix, Markers.EMPTY, params, arrow, visit(expression.getCode()), null));
-            cursor += 1; // skip '}'
+        public void visitConstructorCallExpression(ConstructorCallExpression ctor) {
+            Space fmt = sourceBefore("new");
+            TypeTree clazz = visitTypeTree(ctor.getType());
+            JContainer<Expression> args = visit(ctor.getArguments());
+            queue.add(new J.NewClass(randomId(), fmt, Markers.EMPTY, null, EMPTY,
+                    clazz, args, null, null, type(ctor.getType())));
         }
 
         @Override
@@ -655,6 +664,20 @@ public class GroovyParserVisitor {
             queue.add(new J.MethodInvocation(randomId(), EMPTY, Markers.EMPTY,
                     select == null ? null : JRightPadded.build(select),
                     null, name, args, null));
+        }
+
+        @Override
+        public void visitPropertyExpression(PropertyExpression expression) {
+            Space fmt = whitespace();
+            Expression target = visit(expression.getObjectExpression());
+            Space beforeDot = sourceBefore(".");
+            J name = visit(expression.getProperty());
+            if(name instanceof J.Literal) {
+                String nameStr = ((J.Literal) name).getValueSource();
+                assert nameStr != null;
+                name = J.Identifier.build(randomId(), name.getPrefix(), Markers.EMPTY, nameStr, null);
+            }
+            queue.add(new J.FieldAccess(randomId(), fmt, Markers.EMPTY, target, padLeft(beforeDot, (J.Identifier) name), null));
         }
 
         @Override

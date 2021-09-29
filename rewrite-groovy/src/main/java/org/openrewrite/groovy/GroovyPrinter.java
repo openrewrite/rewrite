@@ -158,6 +158,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             if (paddedStat != null) {
                 visit(paddedStat.getElement(), p);
                 visitSpace(paddedStat.getAfter(), location.getAfterLocation(), p);
+                visitMarkers(paddedStat.getMarkers(), p);
             }
         }
 
