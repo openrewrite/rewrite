@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java: ["java11", "java16"]
+        java: ["java11"]
         graal: ["21.2.0"]
         os: ["ubuntu-latest"]
     runs-on: ${{ matrix.os }}
