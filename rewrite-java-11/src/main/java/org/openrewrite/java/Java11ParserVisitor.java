@@ -165,9 +165,12 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
         TypeTree elemType = convert(typeIdent);
 
-        List<JRightPadded<Space>> dimensions = new ArrayList<>();
-        for (int n = 0; n < dimCount; n++) {
-            dimensions.add(padRight(sourceBefore("["), sourceBefore("]")));
+        List<JRightPadded<Space>> dimensions = emptyList();
+        if(dimCount > 0) {
+            dimensions = new ArrayList<>(dimCount);
+            for (int n = 0; n < dimCount; n++) {
+                dimensions.add(padRight(sourceBefore("["), sourceBefore("]")));
+            }
         }
 
         return new J.ArrayType(
@@ -1499,6 +1502,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     private <J2 extends J> List<JRightPadded<J2>> convertAll(List<? extends Tree> trees,
                                                              Function<Tree, Space> innerSuffix,
                                                              Function<Tree, Space> suffix) {
+        if(trees.isEmpty()) {
+            return emptyList();
+        }
         List<JRightPadded<J2>> converted = new ArrayList<>(trees.size());
         for (int i = 0; i < trees.size(); i++) {
             converted.add(convert(trees.get(i), i == trees.size() - 1 ? suffix : innerSuffix));
@@ -1561,8 +1567,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     @SuppressWarnings("unchecked")
     private List<JRightPadded<Statement>> convertStatements(@Nullable List<? extends Tree> trees,
                                                             Function<Tree, Space> suffix) {
-        if (trees == null)
+        if (trees == null || trees.isEmpty()) {
             return emptyList();
+        }
 
         Map<Integer, List<Tree>> treesGroupedByStartPosition = new LinkedHashMap<>();
         for (Tree t : trees) {
@@ -1834,7 +1841,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         if (sortedModifiers.isEmpty()) {
             cursor = lastAnnotationPosition;
         }
-        return new Java11ModifierResults(leadingAnnotations, sortedModifiers);
+        return new Java11ModifierResults(
+                leadingAnnotations.isEmpty() ? emptyList() : leadingAnnotations,
+                sortedModifiers.isEmpty() ? emptyList() : sortedModifiers
+        );
     }
 
     private J.Modifier mapModifier(Modifier mod, List<J.Annotation> annotations) {
