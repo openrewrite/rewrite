@@ -32,7 +32,7 @@ import static java.util.Collections.singletonList;
 public class JavaTemplateParser {
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("#{", "}", null);
 
-    private final Object templateCacheLock = new Object();
+    private static final Object templateCacheLock = new Object();
 
     private static final Map<String, List<? extends J>> templateCache = new LinkedHashMap<String, List<? extends J>>() {
         @Override
@@ -232,4 +232,11 @@ public class JavaTemplateParser {
         }
         return ListUtils.map(js, j -> (J2) new RandomizeIdVisitor<Integer>().visit(j, 0));
     }
+
+    public static void clearCache() {
+        synchronized (templateCacheLock) {
+            templateCache.clear();
+        }
+    }
+
 }

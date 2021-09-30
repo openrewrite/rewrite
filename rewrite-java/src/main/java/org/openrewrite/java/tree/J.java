@@ -29,6 +29,7 @@ import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.internal.TypeCache;
+import org.openrewrite.java.internal.template.JavaTemplateParser;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.template.SourceTemplate;
@@ -53,6 +54,7 @@ public interface J extends Serializable, Tree {
     static void clearCaches() {
         Identifier.flyweights.clear();
         JavaType.clearCaches();
+        JavaTemplateParser.clearCache();
     }
 
     @SuppressWarnings("unchecked")
