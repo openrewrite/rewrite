@@ -386,6 +386,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class UnnecessaryThrowsTck : UnnecessaryThrowsTest
 
     @Nested
+    inner class UseFilesCreateTempDirectoryTck: UseFilesCreateTempDirectoryTest
+
+    @Nested
     inner class UnwrapParenthesesTck : UnwrapParenthesesTest
 
     @Nested
