@@ -78,23 +78,24 @@ class TypeMapping {
                         }
                     }
 
-                    List<JavaType.Variable> fields;
-                    List<JavaType.Method> methods;
+                    List<JavaType.Variable> fields = emptyList();
+                    List<JavaType.Method> methods = emptyList();
 
-                    if (sym.members_field == null) {
-                        fields = emptyList();
-                        methods = emptyList();
-                    } else {
-                        fields = new ArrayList<>();
-                        methods = new ArrayList<>();
+                    if (sym.members_field != null) {
                         for (Symbol elem : sym.members_field.getSymbols()) {
                             if (elem instanceof Symbol.VarSymbol &&
                                     (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
                                             Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
+                                if (fields.isEmpty()) {
+                                    fields = new ArrayList<>();
+                                }
                                 fields.add(variableType(elem, stackWithSym));
                             } else if (elem instanceof Symbol.MethodSymbol &&
                                     (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
                                             Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
+                                if (methods.isEmpty()) {
+                                    methods = new ArrayList<>();
+                                }
                                 methods.add(methodType(elem.type, elem, elem.getSimpleName().toString(), stackWithSym));
                             }
                         }
@@ -281,14 +282,16 @@ class TypeMapping {
                 if (t instanceof Type.MethodType) {
                     Type.MethodType mt = (Type.MethodType) t;
 
-                    List<JavaType> paramTypes = new ArrayList<>();
-                    for (com.sun.tools.javac.code.Type argtype : mt.argtypes) {
-                        if (argtype != null) {
-                            JavaType javaType = type(argtype, stack);
-                            paramTypes.add(javaType);
+                    List<JavaType> paramTypes = emptyList();
+                    if (!mt.argtypes.isEmpty()) {
+                        paramTypes = new ArrayList<>(mt.argtypes.size());
+                        for (com.sun.tools.javac.code.Type argtype : mt.argtypes) {
+                            if (argtype != null) {
+                                JavaType javaType = type(argtype, stack);
+                                paramTypes.add(javaType);
+                            }
                         }
                     }
-
                     return new JavaType.Method.Signature(type(mt.restype, stack), paramTypes);
                 }
                 return null;
@@ -301,27 +304,34 @@ class TypeMapping {
                 genericSignature = signature.apply(methodSymbol.type);
             }
 
-            List<String> paramNames = new ArrayList<>();
-            for (Symbol.VarSymbol p : methodSymbol.params()) {
-                String s = p.name.toString();
-                paramNames.add(s);
+            List<String> paramNames = emptyList();
+            if (!methodSymbol.params().isEmpty()) {
+                paramNames = new ArrayList<>(methodSymbol.params().size());
+                for (Symbol.VarSymbol p : methodSymbol.params()) {
+                    String s = p.name.toString();
+                    paramNames.add(s);
+                }
             }
 
-            List<JavaType.FullyQualified> exceptionTypes = new ArrayList<>();
+            List<JavaType.FullyQualified> exceptionTypes = emptyList();
             if (selectType instanceof Type.MethodType) {
-                for (com.sun.tools.javac.code.Type exceptionType : ((Type.MethodType) selectType).thrown) {
-                    JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(exceptionType, stack));
-                    if (javaType == null) {
-                        //If the type cannot be resolved to a class (it might not be on the classpath or it might have
-                        //been mapped to cyclic, build the class.
-                        if (exceptionType instanceof Type.ClassType) {
-                            Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
-                            javaType = JavaType.Class.build(sym.className());
+                Type.MethodType methodType = (Type.MethodType) selectType;
+                if (!methodType.thrown.isEmpty()) {
+                    exceptionTypes = new ArrayList<>(methodType.thrown.size());
+                    for (com.sun.tools.javac.code.Type exceptionType : methodType.thrown) {
+                        JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(exceptionType, stack));
+                        if (javaType == null) {
+                            //If the type cannot be resolved to a class (it might not be on the classpath or it might have
+                            //been mapped to cyclic, build the class.
+                            if (exceptionType instanceof Type.ClassType) {
+                                Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
+                                javaType = JavaType.Class.build(sym.className());
+                            }
                         }
-                    }
-                    if (javaType != null) {
-                        //If the exception type is not resolved, it is not added to the list of exceptions.
-                        exceptionTypes.add(javaType);
+                        if (javaType != null) {
+                            //If the exception type is not resolved, it is not added to the list of exceptions.
+                            exceptionTypes.add(javaType);
+                        }
                     }
                 }
             }
