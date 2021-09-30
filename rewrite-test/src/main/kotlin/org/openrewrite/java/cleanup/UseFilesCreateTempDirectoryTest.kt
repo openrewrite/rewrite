@@ -90,4 +90,45 @@ interface UseFilesCreateTempDirectoryTest : JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    fun onlySupportAssignmentToJIdentifier() = assertChanged(
+        dependsOn = arrayOf(
+            """
+                package abc;
+                import java.io.File;
+                public class C {
+                    public static File FILE;
+                }
+            """),
+        before = """
+            package abc;
+            import java.io.File;
+            import java.io.IOException;
+            
+            class A {
+                void b() throws IOException {
+                    C.FILE = File.createTempFile("cfile", ".");
+                    File tempDir = File.createTempFile("abc", ".");
+                    tempDir.delete();
+                    tempDir.mkdir();
+                }
+            }
+        """,
+        after = """
+            package abc;
+            import java.io.File;
+            import java.io.IOException;
+            import java.nio.file.Files;
+            
+            class A {
+                void b() throws IOException {
+                    C.FILE = File.createTempFile("cfile", ".");
+                    File tempDir = Files.createTempDirectory("abc").toFile();
+                }
+            }
+        """
+
+    )
+
 }

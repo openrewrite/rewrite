@@ -82,7 +82,11 @@ public class UseFilesCreateTempDirectory extends Recipe {
             if (CREATE_TEMP_FILE_MATCHER.matches(mi)) {
                 J.Block block = getCursor().firstEnclosing(J.Block.class);
                 if (block != null) {
-                    J createFileStatement = getCursor().firstEnclosing(J.Assignment.class);
+                    J createFileStatement = null;
+                    J.Assignment assignment = getCursor().firstEnclosing(J.Assignment.class);
+                    if (assignment != null && assignment.getVariable() instanceof J.Identifier) {
+                        createFileStatement = assignment;
+                    }
                     if (createFileStatement == null) {
                         createFileStatement = getCursor().firstEnclosing(J.VariableDeclarations.NamedVariable.class);
                     }
