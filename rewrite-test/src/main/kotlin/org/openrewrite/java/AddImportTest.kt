@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java
 
-import org.assertj.core.api.Assertions
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.*
@@ -863,7 +862,7 @@ interface AddImportTest : JavaRecipeTest {
             JavaType.Method.build(flags, JavaType.Class.build("org.fuz.Fuz"), it, null, methodSignature, listOf(), listOf(), listOf())) }
         fqns.add(JavaType.Class.build(
             Flag.flagsToBitMap(flags), classNames[0], JavaType.Class.Kind.Class, variables,
-            listOf(), methodsFoo, null, null, listOf(), false))
+            listOf(), methodsFoo, null, null, listOf(), null, false))
 
         val methodsBar: MutableList<JavaType.Method> = mutableListOf()
         val methodNamesBar = arrayOf("assertShared", "assertThatA", "assertThatB", "assertThatC")
@@ -871,7 +870,7 @@ interface AddImportTest : JavaRecipeTest {
             JavaType.Method.build(flags, JavaType.Class.build("org.buz.Buz"), it, null, methodSignature, listOf(), listOf(), listOf())) }
         fqns.add(JavaType.Class.build(
             Flag.flagsToBitMap(flags), classNames[1], JavaType.Class.Kind.Class, variables,
-            listOf(), methodsBar, null, null, listOf(), false))
+            listOf(), methodsBar, null, null, listOf(), null, false))
 
         val sourceSet = JavaSourceSet(randomId(),"main", fqns)
         val markedFiles: MutableList<J.CompilationUnit> = mutableListOf()

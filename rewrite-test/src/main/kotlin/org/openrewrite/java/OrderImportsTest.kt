@@ -980,7 +980,7 @@ interface OrderImportsTest : JavaRecipeTest {
         val variables: MutableList<JavaType.Variable> = mutableListOf()
         variableNames.forEach { variables.add(JavaType.Variable.build(it, null, JavaType.buildType("int"), emptyList(), Flag.flagsToBitMap(flags))) }
 
-        classNames.forEach { fqns.add(JavaType.Class.build(flags, it, JavaType.Class.Kind.Class, variables, listOf(), listOf(), null, null)) }
+        classNames.forEach { fqns.add(JavaType.Class.build(flags, it, JavaType.Class.Kind.Class, variables, listOf(), listOf(), null, null, null)) }
         val sourceSet = JavaSourceSet(randomId(),"main", fqns)
         val markedFiles: MutableList<J.CompilationUnit> = mutableListOf()
         sourceFiles.forEach { markedFiles.add(it.withMarkers(it.markers.addIfAbsent(sourceSet))) }
@@ -1005,14 +1005,14 @@ interface OrderImportsTest : JavaRecipeTest {
         methodNamesFoo.forEach { methodsFoo.add(
             JavaType.Method.build(flags, JavaType.Class.build("declClass"), it, null, methodSignature, listOf(), listOf(), listOf())) }
         fqns.add(JavaType.Class.build(Flag.flagsToBitMap(flags), classNames[0], JavaType.Class.Kind.Class, variables,
-            listOf(), methodsFoo, null, null, listOf(), false))
+            listOf(), methodsFoo, null, null, listOf(), null, false))
 
         val methodsBar: MutableList<JavaType.Method> = mutableListOf()
         val methodNamesBar = arrayOf("assertShared", "assertThatA", "assertThatB", "assertThatC")
         methodNamesBar.forEach { methodsBar.add(
             JavaType.Method.build(flags, JavaType.Class.build("declClass"), it, null, methodSignature, listOf(), listOf(), listOf())) }
         fqns.add(JavaType.Class.build(Flag.flagsToBitMap(flags), classNames[1], JavaType.Class.Kind.Class, variables,
-            listOf(), methodsBar, null, null, listOf(), false))
+            listOf(), methodsBar, null, null, listOf(), null, false))
 
         val sourceSet = JavaSourceSet(randomId(),"main", fqns)
         val markedFiles: MutableList<J.CompilationUnit> = mutableListOf()

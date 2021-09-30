@@ -47,9 +47,6 @@ class TypeMapping {
 
     @Nullable
     public JavaType type(@Nullable com.sun.tools.javac.code.Type type, List<Symbol> stack) {
-        // Word of caution, during attribution, we will likely encounter symbols that have been parsed but are not
-        // on the parser's classpath. Calling a method on the symbol that calls complete() will result in an exception
-        // being thrown. That is why this method uses the symbol's underlying fields directly vs the accessor methods.
         if (type instanceof Type.ClassType) {
             if (type instanceof com.sun.tools.javac.code.Type.ErrorType) {
                 return null;
@@ -151,6 +148,7 @@ class TypeMapping {
                                     classType.supertype_field, stackWithSym)),
                             owner,
                             annotations,
+                            sym.classfile == null ? null : sym.classfile.toUri(),
                             relaxedClassTypeMatching);
                     sharedClassTypes.put(clazz.getFullyQualifiedName(), clazz);
                 }

@@ -431,6 +431,7 @@ interface SemanticallyEqualTest {
                 listOf(JavaType.Class.build("org.foo.Baz")),
                 listOf(),
                 null,
+                null,
                 null
             )
         )

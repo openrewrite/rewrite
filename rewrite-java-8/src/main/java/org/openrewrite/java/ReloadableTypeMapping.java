@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletionException;
 import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
@@ -48,9 +47,6 @@ class ReloadableTypeMapping {
 
     @Nullable
     public JavaType type(@Nullable Type type, List<Symbol> stack) {
-        // Word of caution, during attribution, we will likely encounter symbols that have been parsed but are not
-        // on the parser's classpath. Calling a method on the symbol that calls complete() will result in an exception
-        // being thrown. That is why this method uses the symbol's underlying fields directly vs the accessor methods.
         if (type instanceof Type.ClassType) {
             if (type instanceof Type.ErrorType) {
                 return null;
@@ -148,6 +144,7 @@ class ReloadableTypeMapping {
                                     classType.supertype_field, stackWithSym)),
                             owner,
                             annotations,
+                            sym.classfile == null ? null : sym.classfile.toUri(),,
                             relaxedClassTypeMatching);
                     sharedClassTypes.put(clazz.getFullyQualifiedName(), clazz);
                 }
