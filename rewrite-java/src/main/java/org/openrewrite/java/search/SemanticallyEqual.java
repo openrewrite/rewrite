@@ -47,11 +47,7 @@ public class SemanticallyEqual {
      */
     @SuppressWarnings("ConstantConditions")
     private static class SemanticallyEqualVisitor extends JavaVisitor<J> {
-        boolean isEqual;
-
-        SemanticallyEqualVisitor() {
-            isEqual = true;
-        }
+        boolean isEqual = true;
 
         @Override
         public J visitAnnotation(J.Annotation firstAnnotation, J second) {
@@ -126,7 +122,7 @@ public class SemanticallyEqual {
             J.Assignment secondAssignment = (J.Assignment) second;
 
             isEqual = isEqual &&
-                    Objects.equals(firstAssignment.getType(), secondAssignment.getType()) &&
+                    typeEquals(firstAssignment.getType(), secondAssignment.getType()) &&
                     SemanticallyEqual.areEqual(firstAssignment.getVariable(), secondAssignment.getVariable()) &&
                     SemanticallyEqual.areEqual(firstAssignment.getAssignment(), secondAssignment.getAssignment());
 
@@ -142,7 +138,6 @@ public class SemanticallyEqual {
             J.Literal secondLiteral = (J.Literal) second;
 
             isEqual = isEqual && Objects.equals(firstLiteral.getValue(), secondLiteral.getValue());
-
             return null;
         }
 

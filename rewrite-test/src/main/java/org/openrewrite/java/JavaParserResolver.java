@@ -20,6 +20,7 @@ import org.junit.jupiter.api.extension.ParameterContext;
 import org.junit.jupiter.api.extension.ParameterResolutionException;
 import org.junit.jupiter.api.extension.ParameterResolver;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.tree.J;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -43,6 +44,8 @@ public class JavaParserResolver implements ParameterResolver {
             Object target = o;
             do {
                 try {
+                    J.clearCaches();
+
                     Method javaParser = clazz.getMethod("javaParser");
                     javaParser.setAccessible(true); // because JUnit 5 test classes don't have to be public
 

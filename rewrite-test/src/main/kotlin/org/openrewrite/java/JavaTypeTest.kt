@@ -17,12 +17,10 @@ package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.Issue
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 
-@ExtendWith(JavaParserResolver::class)
 interface JavaTypeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/762")

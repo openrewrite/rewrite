@@ -58,8 +58,8 @@ interface SemanticallyEqualTest {
         val c1Anno = cu1[0].classes[0].leadingAnnotations[0]
         val c2Anno = cu1[0].classes[1].leadingAnnotations[0]
 
-        assertThat(SemanticallyEqual.areEqual(c2Anno, c2Anno)).isTrue()
-        assertThat(SemanticallyEqual.areEqual(c1Anno, c2Anno)).isTrue()
+        assertThat(SemanticallyEqual.areEqual(c2Anno, c2Anno)).isTrue
+        assertThat(SemanticallyEqual.areEqual(c1Anno, c2Anno)).isTrue
     }
 
     @Test
@@ -94,8 +94,8 @@ interface SemanticallyEqualTest {
             annotInterface
         )[0].classes[0].leadingAnnotations[0]
 
-        assertThat(SemanticallyEqual.areEqual(firstAnnot, secondAnnot)).isFalse()
-        assertThat(SemanticallyEqual.areEqual(secondAnnot,thirdAnnot)).isTrue()
+        assertThat(SemanticallyEqual.areEqual(firstAnnot, secondAnnot)).isFalse
+        assertThat(SemanticallyEqual.areEqual(secondAnnot,thirdAnnot)).isTrue
     }
 
     @Test
@@ -126,8 +126,8 @@ interface SemanticallyEqualTest {
         val fastTest2 = cu[0].classes[0].leadingAnnotations[1]
         val slowTest = cu[0].classes[0].leadingAnnotations[2]
 
-        assertThat(SemanticallyEqual.areEqual(fastTest, fastTest2)).isTrue()
-        assertThat(SemanticallyEqual.areEqual(fastTest, slowTest)).isFalse()
+        assertThat(SemanticallyEqual.areEqual(fastTest, fastTest2)).isTrue
+        assertThat(SemanticallyEqual.areEqual(fastTest, slowTest)).isFalse
     }
 
     @Test
@@ -152,7 +152,7 @@ interface SemanticallyEqualTest {
             annotInterface
         )[0].classes[0].leadingAnnotations[0]
 
-        assertThat(SemanticallyEqual.areEqual(firstAnnot, secondAnnot)).isTrue()
+        assertThat(SemanticallyEqual.areEqual(firstAnnot, secondAnnot)).isTrue
     }
 
     @Test
@@ -181,9 +181,9 @@ interface SemanticallyEqualTest {
             JavaType.buildType("YourAnnotation")
         )
 
-        assertThat(SemanticallyEqual.areEqual(firstIdent, secondIdent)).isTrue()
+        assertThat(SemanticallyEqual.areEqual(firstIdent, secondIdent)).isTrue
 
-        assertThat(SemanticallyEqual.areEqual(firstIdent, thirdIdent)).isFalse()
+        assertThat(SemanticallyEqual.areEqual(firstIdent, thirdIdent)).isFalse
     }
 
     @Test
@@ -243,7 +243,7 @@ interface SemanticallyEqualTest {
                     firstFieldAccess,
                     secondFieldAccess
                 )
-        ).isTrue()
+        ).isTrue
 
         assertThat(
             SemanticallyEqual
@@ -251,7 +251,7 @@ interface SemanticallyEqualTest {
                     firstFieldAccess,
                     thirdFieldAccess
                 )
-        ).isFalse()
+        ).isFalse
     }
 
     @Test
@@ -304,7 +304,7 @@ interface SemanticallyEqualTest {
                     firstAssign,
                     secondAssign
                 )
-        ).isTrue()
+        ).isTrue
 
         assertThat(
             SemanticallyEqual
@@ -312,7 +312,7 @@ interface SemanticallyEqualTest {
                     firstAssign,
                     thirdAssign
                 )
-        ).isFalse()
+        ).isFalse
 
         assertThat(
             SemanticallyEqual
@@ -320,7 +320,7 @@ interface SemanticallyEqualTest {
                     firstAssign,
                     fourthAssign
                 )
-        ).isFalse()
+        ).isFalse
     }
 
     @Test
@@ -353,7 +353,7 @@ interface SemanticallyEqualTest {
                         JavaType.Primitive.Int
                     )
                 )
-        ).isTrue()
+        ).isTrue
 
         assertThat(
             SemanticallyEqual
@@ -369,7 +369,7 @@ interface SemanticallyEqualTest {
                         JavaType.Primitive.String
                     )
                 )
-        ).isTrue()
+        ).isTrue
 
         assertThat(
             SemanticallyEqual
@@ -385,7 +385,7 @@ interface SemanticallyEqualTest {
                         JavaType.Primitive.String
                     )
                 )
-        ).isTrue()
+        ).isTrue
 
         assertThat(
             SemanticallyEqual
@@ -401,7 +401,7 @@ interface SemanticallyEqualTest {
                         JavaType.Primitive.Int
                     )
                 )
-        ).isFalse()
+        ).isFalse
     }
 
     @Test
@@ -435,6 +435,6 @@ interface SemanticallyEqualTest {
             )
         )
 
-        assertThat(SemanticallyEqual.areEqual(nameA, nameB)).isTrue()
+        assertThat(SemanticallyEqual.areEqual(nameA, nameB)).isTrue
     }
 }
