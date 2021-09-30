@@ -144,7 +144,7 @@ class ReloadableTypeMapping {
                                     classType.supertype_field, stackWithSym)),
                             owner,
                             annotations,
-                            sym.classfile == null ? null : sym.classfile.toUri(),,
+                            sym.classfile == null ? null : sym.classfile.toUri(),
                             relaxedClassTypeMatching);
                     sharedClassTypes.put(clazz.getFullyQualifiedName(), clazz);
                 }
