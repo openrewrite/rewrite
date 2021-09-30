@@ -506,6 +506,10 @@ class Java11UseDiamondOperatorTest : Java11Test, UseDiamondOperatorTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11UseFilesCreateTempDirectoryTest : Java11Test, UseFilesCreateTempDirectoryTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11UseJavaStyleArrayDeclarations : Java11Test, UseJavaStyleArrayDeclarationsTest
 
 @DebugOnly

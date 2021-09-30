@@ -502,6 +502,10 @@ class Java8UseDiamondOperatorTest : Java8Test, UseDiamondOperatorTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8UseFilesCreateTempDirectoryTest : Java8Test, UseFilesCreateTempDirectoryTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8UseStaticImportTest : Java8Test, UseStaticImportTest
 
 @DebugOnly
