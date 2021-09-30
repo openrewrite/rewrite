@@ -6,6 +6,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -13,10 +14,7 @@ import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class UseFilesCreateTempDirectory extends Recipe {
     @Override
@@ -53,6 +51,15 @@ public class UseFilesCreateTempDirectory extends Recipe {
         private static final MethodMatcher CREATE_TEMP_FILE_MATCHER = new MethodMatcher("java.io.File createTempFile(..)");
         private static final MethodMatcher DELETE_MATCHER = new MethodMatcher("java.io.File delete()");
         private static final MethodMatcher MKDIR_MATCHER = new MethodMatcher("java.io.File mkdir()");
+
+        @Override
+        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+            Optional<JavaVersion> javaVersion = cu.getMarkers().findFirst(JavaVersion.class);
+            if (javaVersion.isPresent() && javaVersion.get().getMajorVersion() < 7) {
+                return cu;
+            }
+            return super.visitCompilationUnit(cu, executionContext);
+        }
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
