@@ -356,6 +356,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class RenameLocalVariablesToCamelCaseTck : RenameLocalVariablesToCamelCaseTest
 
     @Nested
+    inner class RenameMethodsNamedHashcodeEqualOrTostringTck : RenameMethodsNamedHashcodeEqualOrTostringTest
+
+    @Nested
     inner class SpacesTck : SpacesTest
 
     @Nested

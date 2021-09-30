@@ -406,6 +406,10 @@ class Java8RenameLocalVariablesToCamelCaseTest : Java8Test, RenameLocalVariables
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8RenameMethodsNamedHashcodeEqualOrTostringTest : Java8Test, RenameMethodsNamedHashcodeEqualOrTostringTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8RenameVariableTest : Java8Test, RenameVariableTest
 
 @DebugOnly

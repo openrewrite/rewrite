@@ -410,6 +410,10 @@ class Java11RenameLocalVariablesToCamelCaseTest : Java11Test, RenameLocalVariabl
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11RenameMethodsNamedHashcodeEqualOrTostringTest : Java11Test, RenameMethodsNamedHashcodeEqualOrTostringTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11RenameVariableTest : Java11Test, RenameVariableTest
 
 @DebugOnly
