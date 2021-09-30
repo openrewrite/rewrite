@@ -218,13 +218,6 @@ public interface JavaType extends Serializable {
     class Class extends FullyQualified {
         // there shouldn't be too many distinct types represented by the same fully qualified name
         private static final Map<String, Set<Class>> flyweights = new WeakHashMap<>();
-        public static void flyweightReport() {
-            for (Map.Entry<String, Set<Class>> entry : flyweights.entrySet()) {
-                if (entry.getValue().size() > 1) {
-                    System.out.println(entry.getKey() + " has " + entry.getValue().size() + " variants.");
-                }
-            }
-        }
 
         public static final Class OBJECT = build("java.lang.Object");
 
@@ -861,23 +854,6 @@ public interface JavaType extends Serializable {
     @Getter
     class Method implements JavaType {
         private static final Map<FullyQualified, Map<String, Set<Method>>> flyweights = new WeakHashMap<>();
-        public static void flyweightReport() {
-            for (Map.Entry<FullyQualified, Map<String, Set<Method>>> entry : flyweights.entrySet()) {
-                System.out.println(entry.getKey().getFullyQualifiedName() + " has " + entry.getValue().size() + " methods");
-                for (Map.Entry<String, Set<Method>> methodEntry : entry.getValue().entrySet()) {
-                    if (methodEntry.getValue().size() > 1) {
-                        System.out.println("  |-- " + methodEntry.getKey() + " has " + methodEntry.getValue().size() + " variants");
-                    }
-                }
-                System.out.println("----------------------------------------------------------------------");
-            }
-        }
-        static {
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                Class.flyweightReport();
-                Method.flyweightReport();
-            }));
-        }
 
         @Getter(AccessLevel.NONE)
         private final long flagsBitMap;
