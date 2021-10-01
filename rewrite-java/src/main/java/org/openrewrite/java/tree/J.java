@@ -1506,7 +1506,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class FieldAccess implements J, TypeTree, Expression {
+    final class FieldAccess implements J, TypeTree, Expression, Statement {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -1622,6 +1622,11 @@ public interface J extends Serializable, Tree {
             public FieldAccess withName(JLeftPadded<Identifier> name) {
                 return t.name == name ? t : new FieldAccess(t.id, t.prefix, t.markers, t.target, name, t.type);
             }
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
     }
 

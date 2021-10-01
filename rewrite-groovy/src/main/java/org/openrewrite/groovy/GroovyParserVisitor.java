@@ -697,7 +697,7 @@ public class GroovyParserVisitor {
 
             J.Identifier name = J.Identifier.build(randomId(), sourceBefore(call.getMethodAsString()), Markers.EMPTY,
                     call.getMethodAsString(), null);
-            if(call.isSafe()) {
+            if (call.isSafe()) {
                 name = name.withMarkers(name.getMarkers().add(new NullSafe(randomId())));
             }
 
@@ -709,15 +709,18 @@ public class GroovyParserVisitor {
         }
 
         @Override
-        public void visitPropertyExpression(PropertyExpression expression) {
+        public void visitPropertyExpression(PropertyExpression prop) {
             Space fmt = whitespace();
-            Expression target = visit(expression.getObjectExpression());
-            Space beforeDot = sourceBefore(".");
-            J name = visit(expression.getProperty());
+            Expression target = visit(prop.getObjectExpression());
+            Space beforeDot = sourceBefore(prop.isSafe() ? "?." : ".");
+            J name = visit(prop.getProperty());
             if (name instanceof J.Literal) {
                 String nameStr = ((J.Literal) name).getValueSource();
                 assert nameStr != null;
                 name = J.Identifier.build(randomId(), name.getPrefix(), Markers.EMPTY, nameStr, null);
+            }
+            if (prop.isSafe()) {
+                name = name.withMarkers(name.getMarkers().add(new NullSafe(randomId())));
             }
             queue.add(new J.FieldAccess(randomId(), fmt, Markers.EMPTY, target, padLeft(beforeDot, (J.Identifier) name), null));
         }

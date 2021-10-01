@@ -525,6 +525,12 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         } else {
             f = (J.FieldAccess) temp;
         }
+        Statement tempStat = (Statement) visitStatement(f, p);
+        if (!(tempStat instanceof J.FieldAccess)) {
+            return temp;
+        } else {
+            f = (J.FieldAccess) tempStat;
+        }
         f = f.withTarget(visitAndCast(f.getTarget(), p));
         f = f.getPadding().withName(visitLeftPadded(f.getPadding().getName(), JLeftPadded.Location.FIELD_ACCESS_NAME, p));
         return f;

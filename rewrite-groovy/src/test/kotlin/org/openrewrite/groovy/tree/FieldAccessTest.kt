@@ -28,4 +28,15 @@ class FieldAccessTest : GroovyTreeTest {
             }
         """
     )
+
+    @Test
+    fun nullSafeDereference() = assertParsePrintAndProcess(
+        """
+            class Test {
+                Integer n
+            }
+            Test t
+            t?.n
+        """
+    )
 }
