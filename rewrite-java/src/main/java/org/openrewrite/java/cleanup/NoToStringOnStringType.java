@@ -34,7 +34,7 @@ public class NoToStringOnStringType extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Use `String`";
+        return "No #toString() on String";
     }
 
     @Override
