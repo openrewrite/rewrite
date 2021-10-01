@@ -608,7 +608,11 @@ public class GroovyParserVisitor {
                 jType = JavaType.Primitive.Short;
             } else if (type == ClassHelper.STRING_TYPE) {
                 jType = JavaType.Primitive.String;
-                if (source.startsWith("'", cursor)) {
+                if (source.startsWith("/", cursor)) {
+                    text = "/" + text + "/";
+                } else if (source.startsWith("\"\"\"", cursor)) {
+                    text = "\"\"\"" + text + "\"\"\"";
+                } else if (source.startsWith("'", cursor)) {
                     text = "'" + text + "'";
                 } else if (source.startsWith("\"", cursor)) {
                     text = "\"" + text + "\"";
@@ -1091,9 +1095,7 @@ public class GroovyParserVisitor {
             if (primitiveType == null) {
                 return buildName(classNode.getUnresolvedName());
             }
-            Space fmt = whitespace();
-            cursor += classNode.getUnresolvedName().length();
-            return new J.Primitive(randomId(), fmt, Markers.EMPTY, primitiveType);
+            return new J.Primitive(randomId(), sourceBefore(classNode.getUnresolvedName()), Markers.EMPTY, primitiveType);
         }
         return J.Identifier.build(randomId(), sourceBefore("def"), Markers.EMPTY, "def",
                 JavaType.Class.build("java.lang.Object"));

@@ -33,4 +33,20 @@ class LiteralTest : GroovyTreeTest {
     fun boxedInt() = assertParsePrintAndProcess(
         "Integer a = 1"
     )
+
+    @Test
+    fun tripleQuotedString() = assertParsePrintAndProcess(
+        """
+            def template = ""${'"'}
+                Hi
+            ""${'"'}
+        """.trimIndent()
+    )
+
+    @Test
+    fun slashyString() = assertParsePrintAndProcess(
+        """
+            def fooPattern = /.*foo.*/
+        """.trimIndent()
+    )
 }
