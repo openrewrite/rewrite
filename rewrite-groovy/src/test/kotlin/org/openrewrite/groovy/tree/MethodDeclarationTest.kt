@@ -40,6 +40,7 @@ class MethodDeclarationTest : GroovyTreeTest {
     @Test
     fun emptyArguments() = assertParsePrintAndProcess(
         """
-            def foo() {}
-        """)
+            def foo( ) {}
+        """
+    )
 }

@@ -296,8 +296,9 @@ public class GroovyParserVisitor {
                         null, emptyList(),
                         singletonList(paramName))).withAfter(rightPad));
             }
-            if(source.charAt(cursor) == ')') {
-                cursor++;
+
+            if(unparsedParams.length == 0) {
+                params.add(JRightPadded.build(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY)));
             }
 
             J.Block body = bodyVisitor.visit(method.getCode());
