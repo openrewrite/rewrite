@@ -1717,6 +1717,35 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1076")
+    @Test
+    fun javaDocsWithMultipleLeadingAsterisks() = assertChanged(
+        before = """
+                /******** Align JavaDoc with multiple leading '*' in margin left.
+                 **** Align left
+                 */
+            public class Test {
+            /******** Align JavaDoc with multiple leading '*' in margin right.
+             **** Align right
+             */
+                void method() {
+                }
+            }
+        """,
+        after = """
+            /******** Align JavaDoc with multiple '*' in margin left.
+             **** Align left
+             */
+            public class Test {
+                /******** Align JavaDoc with multiple '*' in margin right.
+                 **** Align right
+                 */
+                void method() {
+                }
+            }
+        """.trimIndent()
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/980")
     @Test
     fun alignJavaDocsWithCRLF(jp: JavaParser.Builder<*, *>) = assertChanged(

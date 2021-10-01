@@ -95,13 +95,18 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         StringBuilder javadocContent = new StringBuilder();
         StringBuilder marginBuilder = null;
         boolean inFirstPrefix = true;
+        boolean isPrefixAsterisk = true;
 
         // skip past the opening '/**'
         int i = 3;
         for (; i < sourceArr.length; i++) {
             char c = sourceArr[i];
             if (inFirstPrefix) {
-                if (Character.isWhitespace(c)) {
+                // '*' characters are considered a part of the margin until a non '*' is parsed.
+                if (Character.isWhitespace(c) || c == '*' && isPrefixAsterisk) {
+                    if (isPrefixAsterisk && i + 1 <= sourceArr.length - 1 && sourceArr[i + 1] != '*') {
+                        isPrefixAsterisk = false;
+                    }
                     firstPrefixBuilder.append(c);
                 } else {
                     firstPrefix = firstPrefixBuilder.toString();
@@ -129,21 +134,27 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
             } else if (marginBuilder != null) {
                 if (!Character.isWhitespace(c)) {
                     if (c == '*') {
+                        // '*' characters are considered a part of the margin until a non '*' is parsed.
                         marginBuilder.append(c);
-                        lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(),
-                                marginBuilder.toString(), Markers.EMPTY));
-                    } else if (c == '@') {
-                        lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(),
-                                marginBuilder.toString(), Markers.EMPTY));
-                        javadocContent.append(c);
+                        if (i + 1 <= sourceArr.length - 1 && sourceArr[i + 1] != '*') {
+                            lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(),
+                                    marginBuilder.toString(), Markers.EMPTY));
+                            marginBuilder = null;
+                        }
                     } else {
-                        String newLine = sourceArr[i - 1] == '\r' ? "\r\n" : "\n";
-                        lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(),
-                                newLine, Markers.EMPTY));
-                        String margin = marginBuilder.toString();
-                        javadocContent.append(margin.substring(margin.indexOf("\n") + 1)).append(c);
+                        if (c == '@') {
+                            lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(),
+                                    marginBuilder.toString(), Markers.EMPTY));
+                            javadocContent.append(c);
+                        } else {
+                            String newLine = sourceArr[i - 1] == '\r' ? "\r\n" : "\n";
+                            lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(),
+                                    newLine, Markers.EMPTY));
+                            String margin = marginBuilder.toString();
+                            javadocContent.append(margin.substring(margin.indexOf("\n") + 1)).append(c);
+                        }
+                        marginBuilder = null;
                     }
-                    marginBuilder = null;
                 } else {
                     marginBuilder.append(c);
                 }

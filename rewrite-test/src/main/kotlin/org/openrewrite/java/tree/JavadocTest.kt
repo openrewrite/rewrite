@@ -1031,6 +1031,20 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1076")
+    @Test
+    fun javaDocWithMultipleLeadingAsterisks(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+           /** ** * First '*' characters are treated as a margin until a non '*' is parsed.
+            ** * @throws IOException validate cursor position.
+            */
+           class Test {
+           }
+        """.trimIndent()
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1047")
     @Test
     fun preserveWhitespaceBeforeHTMLTag(jp: JavaParser) = assertParsePrintAndProcess(
