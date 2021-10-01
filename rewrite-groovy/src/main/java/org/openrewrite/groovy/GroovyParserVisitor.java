@@ -30,6 +30,7 @@ import org.jetbrains.annotations.NotNull;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.groovy.marker.ImplicitReturn;
+import org.openrewrite.groovy.marker.NullSafe;
 import org.openrewrite.groovy.marker.OmitParentheses;
 import org.openrewrite.groovy.marker.Semicolon;
 import org.openrewrite.groovy.tree.G;
@@ -597,7 +598,7 @@ public class GroovyParserVisitor {
                 jType = JavaType.Primitive.String;
                 if (source.startsWith("'", cursor)) {
                     text = "'" + text + "'";
-                } else if(source.startsWith("\"", cursor)) {
+                } else if (source.startsWith("\"", cursor)) {
                     text = "\"" + text + "\"";
                 }
             } else if (expression.isNullExpression()) {
@@ -687,20 +688,22 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitMethodCallExpression(MethodCallExpression call) {
-            Expression select = null;
+            JRightPadded<Expression> select = null;
             if (!call.isImplicitThis()) {
-                call.getObjectExpression().visit(this);
-                select = pollQueue();
+                select = JRightPadded.build((Expression) visit(call.getObjectExpression()))
+                        .withAfter(sourceBefore(call.isSafe() ? "?." : "."));
             }
 
-            J.Identifier name = J.Identifier.build(randomId(), whitespace(), Markers.EMPTY,
+            J.Identifier name = J.Identifier.build(randomId(), sourceBefore(call.getMethodAsString()), Markers.EMPTY,
                     call.getMethodAsString(), null);
-            cursor += call.getMethodAsString().length();
+            if(call.isSafe()) {
+                name = name.withMarkers(name.getMarkers().add(new NullSafe(randomId())));
+            }
 
             JContainer<Expression> args = visit(call.getArguments());
 
             queue.add(new J.MethodInvocation(randomId(), EMPTY, Markers.EMPTY,
-                    select == null ? null : JRightPadded.build(select),
+                    select,
                     null, name, args, null));
         }
 

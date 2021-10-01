@@ -13,18 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.groovy.tree
+package org.openrewrite.groovy.marker;
 
-import org.junit.jupiter.api.Test
+import lombok.Value;
+import org.openrewrite.marker.Marker;
 
-class ThrowTest : GroovyTreeTest {
+import java.util.UUID;
 
-    @Test
-    fun throwException() = assertParsePrintAndProcess(
-        """
-            def test() {
-                throw new UnsupportedOperationException()
-            }
-        """
-    )
+@Value
+public class NullSafe implements Marker {
+    UUID id;
 }

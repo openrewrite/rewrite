@@ -44,4 +44,12 @@ class MethodInvocationTest : GroovyTreeTest {
             mavenCentral()
         """.trimIndent()
     )
+
+    @Test
+    fun nullSafeDereference() = assertParsePrintAndProcess(
+        """
+            Map m
+            m?.clear()
+        """
+    )
 }
