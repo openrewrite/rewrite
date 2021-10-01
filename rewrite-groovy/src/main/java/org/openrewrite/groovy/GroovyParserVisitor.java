@@ -301,15 +301,8 @@ public class GroovyParserVisitor {
                 params.add(JRightPadded.build(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY)));
             }
 
-            JContainer<NameTree> throwz = null;
-            if(method.getExceptions().length > 0) {
-                Space throwFmt = sourceBefore("throws");
-                List<JRightPadded<NameTree>> exceptions = new ArrayList<>();
-                for (ClassNode exceptionNode : method.getExceptions()) {
-                    exceptions.add(JRightPadded.build(visitTypeTree(exceptionNode)));
-                }
-                throwz = JContainer.build(throwFmt, exceptions, Markers.EMPTY);
-            }
+            JContainer<NameTree> throwz = method.getExceptions().length == 0 ? null :
+                    JContainer.build(sourceBefore("throws"), bodyVisitor.visitRightPadded(method.getExceptions(), ",", null), Markers.EMPTY);
             J.Block body = bodyVisitor.visit(method.getCode());
 
             queue.add(new J.MethodDeclaration(
@@ -352,7 +345,8 @@ public class GroovyParserVisitor {
             List<JRightPadded<T>> ts = new ArrayList<>(nodes.length);
             for (int i = 0; i < nodes.length; i++) {
                 ASTNode node = nodes[i];
-                JRightPadded<T> converted = JRightPadded.build(visit(node));
+                @SuppressWarnings("unchecked") JRightPadded<T> converted = JRightPadded.build(
+                        node instanceof ClassNode ? (T) visitTypeTree((ClassNode) node) : visit(node));
                 if (i == nodes.length - 1) {
                     ts.add(converted.withAfter(afterLast == null ? EMPTY : sourceBefore(afterLast)));
                 } else {
