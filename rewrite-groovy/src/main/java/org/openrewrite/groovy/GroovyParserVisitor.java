@@ -414,74 +414,100 @@ public class GroovyParserVisitor {
             Expression left = visit(binary.getLeftExpression());
 
             Space opPrefix = whitespace();
-            J.Binary.Type operator = null;
+            boolean assignment = false;
+            J.AssignmentOperation.Type assignOp = null;
+            J.Binary.Type binaryOp = null;
             switch (binary.getOperation().getText()) {
                 case "+":
-                    operator = J.Binary.Type.Addition;
+                    binaryOp = J.Binary.Type.Addition;
                     break;
                 case "&&":
-                    operator = J.Binary.Type.And;
+                    binaryOp = J.Binary.Type.And;
                     break;
                 case "&=":
-                    operator = J.Binary.Type.BitAnd;
+                    binaryOp = J.Binary.Type.BitAnd;
                     break;
                 case "|=":
-                    operator = J.Binary.Type.BitOr;
+                    binaryOp = J.Binary.Type.BitOr;
                     break;
                 case "^=":
-                    operator = J.Binary.Type.BitXor;
+                    binaryOp = J.Binary.Type.BitXor;
                     break;
                 case "/":
-                    operator = J.Binary.Type.Division;
+                    binaryOp = J.Binary.Type.Division;
                     break;
                 case "==":
-                    operator = J.Binary.Type.Equal;
+                    binaryOp = J.Binary.Type.Equal;
                     break;
                 case ">":
-                    operator = J.Binary.Type.GreaterThan;
+                    binaryOp = J.Binary.Type.GreaterThan;
                     break;
                 case ">=":
-                    operator = J.Binary.Type.GreaterThanOrEqual;
+                    binaryOp = J.Binary.Type.GreaterThanOrEqual;
                     break;
                 case "<<=":
-                    operator = J.Binary.Type.LeftShift;
+                    binaryOp = J.Binary.Type.LeftShift;
                     break;
                 case "<":
-                    operator = J.Binary.Type.LessThan;
+                    binaryOp = J.Binary.Type.LessThan;
                     break;
                 case "<=":
-                    operator = J.Binary.Type.LessThanOrEqual;
+                    binaryOp = J.Binary.Type.LessThanOrEqual;
                     break;
                 case "%":
-                    operator = J.Binary.Type.Modulo;
+                    binaryOp = J.Binary.Type.Modulo;
                     break;
                 case "*":
-                    operator = J.Binary.Type.Multiplication;
+                    binaryOp = J.Binary.Type.Multiplication;
                     break;
                 case "!=":
-                    operator = J.Binary.Type.NotEqual;
+                    binaryOp = J.Binary.Type.NotEqual;
                     break;
                 case "||":
-                    operator = J.Binary.Type.Or;
+                    binaryOp = J.Binary.Type.Or;
                     break;
                 case ">>=":
-                    operator = J.Binary.Type.RightShift;
+                    binaryOp = J.Binary.Type.RightShift;
                     break;
                 case "-":
-                    operator = J.Binary.Type.Subtraction;
+                    binaryOp = J.Binary.Type.Subtraction;
                     break;
                 case ">>>=":
-                    operator = J.Binary.Type.UnsignedRightShift;
+                    binaryOp = J.Binary.Type.UnsignedRightShift;
+                    break;
+                case "=":
+                    assignment = true;
+                    break;
+                case "-=":
+                    assignOp = J.AssignmentOperation.Type.Subtraction;
+                    break;
+                case "/=":
+                    assignOp = J.AssignmentOperation.Type.Division;
+                    break;
+                case "*=":
+                    assignOp = J.AssignmentOperation.Type.Multiplication;
+                    break;
+                case "%=":
+                    assignOp = J.AssignmentOperation.Type.Modulo;
                     break;
             }
-            cursor += binary.getOperation().getText().length();
-            assert operator != null;
 
+            cursor += binary.getOperation().getText().length();
             Expression right = visit(binary.getRightExpression());
 
-            queue.add(new J.Binary(randomId(), fmt, Markers.EMPTY,
-                    left, JLeftPadded.build(operator).withBefore(opPrefix),
-                    right, typeMapping.type(binary.getType())));
+            if (assignment) {
+                queue.add(new J.Assignment(randomId(), fmt, Markers.EMPTY,
+                        left, JLeftPadded.build(right).withBefore(opPrefix),
+                        typeMapping.type(binary.getType())));
+            } else if (assignOp != null) {
+                queue.add(new J.AssignmentOperation(randomId(), fmt, Markers.EMPTY,
+                        left, JLeftPadded.build(assignOp).withBefore(opPrefix),
+                        right, typeMapping.type(binary.getType())));
+            } else if (binaryOp != null) {
+                queue.add(new J.Binary(randomId(), fmt, Markers.EMPTY,
+                        left, JLeftPadded.build(binaryOp).withBefore(opPrefix),
+                        right, typeMapping.type(binary.getType())));
+            }
         }
 
         @Override
@@ -571,6 +597,8 @@ public class GroovyParserVisitor {
                 jType = JavaType.Primitive.String;
                 if (source.startsWith("'", cursor)) {
                     text = "'" + text + "'";
+                } else if(source.startsWith("\"", cursor)) {
+                    text = "\"" + text + "\"";
                 }
             } else if (expression.isNullExpression()) {
                 text = "null";
