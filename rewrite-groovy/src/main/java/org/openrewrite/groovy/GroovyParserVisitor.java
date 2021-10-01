@@ -301,6 +301,15 @@ public class GroovyParserVisitor {
                 params.add(JRightPadded.build(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY)));
             }
 
+            JContainer<NameTree> throwz = null;
+            if(method.getExceptions().length > 0) {
+                Space throwFmt = sourceBefore("throws");
+                List<JRightPadded<NameTree>> exceptions = new ArrayList<>();
+                for (ClassNode exceptionNode : method.getExceptions()) {
+                    exceptions.add(JRightPadded.build(visitTypeTree(exceptionNode)));
+                }
+                throwz = JContainer.build(throwFmt, exceptions, Markers.EMPTY);
+            }
             J.Block body = bodyVisitor.visit(method.getCode());
 
             queue.add(new J.MethodDeclaration(
@@ -311,7 +320,7 @@ public class GroovyParserVisitor {
                     returnType,
                     new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
                     JContainer.build(beforeParen, params, Markers.EMPTY),
-                    null,
+                    throwz,
                     body,
                     null,
                     null

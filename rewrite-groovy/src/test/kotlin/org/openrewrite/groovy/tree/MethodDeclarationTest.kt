@@ -43,4 +43,12 @@ class MethodDeclarationTest : GroovyTreeTest {
             def foo( ) {}
         """
     )
+
+    @Test
+    fun methodThrows() = assertParsePrintAndProcess(
+        """
+            def foo(int a) throws Exception {
+            }
+        """
+    )
 }
