@@ -45,8 +45,8 @@ class ClassDeclarationTest : GroovyTreeTest {
     @Test
     fun extends() = assertParsePrintAndProcess(
         """
-            public class B {}
-            class A extends B {}
+            public class Test {}
+            class A extends Test {}
         """
     )
 

@@ -22,9 +22,9 @@ class FieldAccessTest : GroovyTreeTest {
     @Test
     fun fieldAccess() = assertParsePrintAndProcess(
         """
-            class B {
-                public B field = new B();
-                B b = new B() . field . field;
+            class Test {
+                public Test field = new Test();
+                Test b = new Test() . field . field;
             }
         """
     )

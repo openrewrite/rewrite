@@ -33,6 +33,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.style.NamedStyles;
 
 import java.io.ByteArrayInputStream;
+import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -40,6 +41,7 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
@@ -94,28 +96,34 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
         for (Input input : sources) {
             CompilerConfiguration configuration = new CompilerConfiguration();
             configuration.setTolerance(Integer.MAX_VALUE);
+            configuration.setDebug(true);
+            configuration.setClasspathList(classpath == null ? emptyList() : classpath.stream()
+                    .map(cp -> cp.toFile().toString())
+                    .collect(toList()));
 
+            ErrorCollector errorCollector = new ErrorCollector(configuration);
             SourceUnit unit = new SourceUnit(
                     "doesntmatter",
                     new InputStreamReaderSource(input.getSource(), configuration),
                     configuration,
                     null,
-                    new ErrorCollector(configuration)
+                    errorCollector
             );
 
             GroovyClassLoader transformLoader = new GroovyClassLoader(getClass().getClassLoader());
-            CompilerConfiguration compilerConfiguration = new CompilerConfiguration();
-            compilerConfiguration.setClasspathList(classpath.stream()
-                    .map(cp -> cp.toFile().toString())
-                    .collect(toList()));
 
-            CompilationUnit compUnit = new CompilationUnit(compilerConfiguration, null, null, transformLoader);
+            CompilationUnit compUnit = new CompilationUnit(configuration, null, null, transformLoader);
             compUnit.addSource(unit);
 
             try {
 //                removeGrabTransformation(compUnit) <-- codenarc does this for some reason
 
-                compUnit.compile(Phases.CONVERSION);
+                compUnit.compile(Phases.CANONICALIZATION);
+
+                if(errorCollector.hasErrors() || errorCollector.hasWarnings()) {
+                    errorCollector.write(new PrintWriter(System.out), new Janitor());
+                }
+
                 ModuleNode ast = unit.getAST();
 
                 GroovyParserVisitor mappingVisitor = new GroovyParserVisitor(
@@ -153,7 +161,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
         @Nullable
         protected Collection<Path> classpath = JavaParser.runtimeClasspath();
 
-        protected Collection<byte[]> classBytesClasspath = Collections.emptyList();
+        protected Collection<byte[]> classBytesClasspath = emptyList();
 
         @Nullable
         protected Collection<Parser.Input> dependsOn;

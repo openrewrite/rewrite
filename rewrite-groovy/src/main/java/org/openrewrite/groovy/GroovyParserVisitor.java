@@ -26,8 +26,6 @@ import org.codehaus.groovy.ast.stmt.EmptyStatement;
 import org.codehaus.groovy.ast.stmt.IfStatement;
 import org.codehaus.groovy.ast.stmt.ReturnStatement;
 import org.codehaus.groovy.control.SourceUnit;
-import org.codehaus.groovy.transform.stc.StaticTypeCheckingVisitor;
-import org.codehaus.groovy.transform.stc.StaticTypesMarker;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
@@ -55,12 +53,10 @@ import static org.openrewrite.java.tree.Space.format;
 /**
  * See the <a href="https://groovy-lang.org/syntax.html">language syntax reference</a>.
  */
-@RequiredArgsConstructor
 public class GroovyParserVisitor {
     private final Path sourcePath;
     private final String source;
-    private final boolean relaxedClassTypeMatching;
-    private final Map<String, JavaType.Class> sharedClassTypes;
+    private final TypeMapping typeMapping;
     private final ExecutionContext ctx;
 
     private int cursor = 0;
@@ -68,7 +64,21 @@ public class GroovyParserVisitor {
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
+    public GroovyParserVisitor(Path sourcePath, String source,
+                               boolean relaxedClassTypeMatching,
+                               Map<String, JavaType.Class> sharedClassTypes,
+                               ExecutionContext ctx) {
+        this.sourcePath = sourcePath;
+        this.source = source;
+        this.typeMapping = new TypeMapping(relaxedClassTypeMatching, sharedClassTypes);
+        this.ctx = ctx;
+    }
+
     public G.CompilationUnit visit(SourceUnit unit, ModuleNode ast) {
+//        for (ClassNode aClass : ast.getClasses()) {
+//            new StaticTypeCheckingVisitor(unit, aClass).visitClass(aClass);
+//        }
+
         NavigableMap<LineColumn, List<ASTNode>> sortedByPosition = new TreeMap<>();
         for (org.codehaus.groovy.ast.stmt.Statement s : ast.getStatementBlock().getStatements()) {
             if (!isSynthetic(s)) {
@@ -206,7 +216,7 @@ public class GroovyParserVisitor {
                     extendings,
                     implementings,
                     body,
-                    TypeUtils.asFullyQualified(type(clazz))));
+                    TypeUtils.asFullyQualified(typeMapping.type(clazz))));
         }
 
         @Override
@@ -214,10 +224,10 @@ public class GroovyParserVisitor {
             RewriteGroovyVisitor visitor = new RewriteGroovyVisitor(field);
 
             List<J.Modifier> modifiers = visitModifiers(field.getModifiers());
-            TypeTree typeExpr = visitTypeTree(field.getType());
+            TypeTree typeExpr = visitTypeTree(field.getOriginType());
 
             J.Identifier name = J.Identifier.build(randomId(), sourceBefore(field.getName()), Markers.EMPTY,
-                    field.getName(), type(field.getType()));
+                    field.getName(), typeMapping.type(field.getOriginType()));
 
             J.VariableDeclarations.NamedVariable namedVariable = new J.VariableDeclarations.NamedVariable(
                     randomId(),
@@ -252,7 +262,7 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitMethod(MethodNode method) {
-            Space fmt = sourceBefore("def");
+            Space fmt = whitespace();
 
             List<J.Modifier> modifiers = visitModifiers(method.getModifiers());
 
@@ -272,7 +282,7 @@ public class GroovyParserVisitor {
             Parameter[] unparsedParams = method.getParameters();
             for (int i = 0; i < unparsedParams.length; i++) {
                 Parameter param = unparsedParams[i];
-                TypeTree paramType = visitTypeTree(param.getType());
+                TypeTree paramType = visitTypeTree(param.getOriginType());
                 JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
                         new J.VariableDeclarations.NamedVariable(randomId(), whitespace(), Markers.EMPTY,
                                 J.Identifier.build(randomId(), EMPTY, Markers.EMPTY, param.getName(), null),
@@ -471,7 +481,7 @@ public class GroovyParserVisitor {
 
             queue.add(new J.Binary(randomId(), fmt, Markers.EMPTY,
                     left, JLeftPadded.build(operator).withBefore(opPrefix),
-                    right, type(binary.getType())));
+                    right, typeMapping.type(binary.getType())));
         }
 
         @Override
@@ -488,7 +498,7 @@ public class GroovyParserVisitor {
                 J expr = visit(statement);
                 if (i == blockStatements.size() - 1 && !(expr instanceof J.Return)) {
                     if (parent instanceof ClosureExpression || (parent instanceof MethodNode &&
-                            !JavaType.Primitive.Void.equals(type(((MethodNode) parent).getReturnType())))) {
+                            !JavaType.Primitive.Void.equals(typeMapping.type(((MethodNode) parent).getReturnType())))) {
                         expr = new J.Return(randomId(), expr.getPrefix(), Markers.EMPTY,
                                 expr.withPrefix(EMPTY));
                         expr = expr.withMarkers(expr.getMarkers().add(new ImplicitReturn(randomId())));
@@ -580,7 +590,7 @@ public class GroovyParserVisitor {
             TypeTree clazz = visitTypeTree(ctor.getType());
             JContainer<Expression> args = visit(ctor.getArguments());
             queue.add(new J.NewClass(randomId(), fmt, Markers.EMPTY, null, EMPTY,
-                    clazz, args, null, null, type(ctor.getType())));
+                    clazz, args, null, null, typeMapping.type(ctor.getType())));
         }
 
         @Override
@@ -604,7 +614,7 @@ public class GroovyParserVisitor {
                 );
             }
 
-            if (expression.getRightExpression() != null) {
+            if (!(expression.getRightExpression() instanceof EmptyExpression)) {
                 Space beforeAssign = sourceBefore("=");
                 Expression initializer = visit(expression.getRightExpression());
                 namedVariable = namedVariable.getPadding().withInitializer(padLeft(beforeAssign, initializer));
@@ -672,7 +682,7 @@ public class GroovyParserVisitor {
             Expression target = visit(expression.getObjectExpression());
             Space beforeDot = sourceBefore(".");
             J name = visit(expression.getProperty());
-            if(name instanceof J.Literal) {
+            if (name instanceof J.Literal) {
                 String nameStr = ((J.Literal) name).getValueSource();
                 assert nameStr != null;
                 name = J.Identifier.build(randomId(), name.getPrefix(), Markers.EMPTY, nameStr, null);
@@ -795,7 +805,7 @@ public class GroovyParserVisitor {
         }
 
         public TypeTree visitVariableExpressionType(VariableExpression expression) {
-            JavaType type = type(expression);
+            JavaType type = typeMapping.type(expression.getOriginType());
             if (expression.isDynamicTyped()) {
                 return J.Identifier.build(randomId(),
                         sourceBefore("def"),
@@ -804,15 +814,15 @@ public class GroovyParserVisitor {
                         type);
             }
             return J.Identifier.build(randomId(),
-                    sourceBefore(expression.getOriginType().getName()),
+                    sourceBefore(expression.getOriginType().getUnresolvedName()),
                     Markers.EMPTY,
-                    expression.getOriginType().getName(),
+                    expression.getOriginType().getUnresolvedName(),
                     type);
         }
 
         @Override
         public void visitVariableExpression(VariableExpression expression) {
-            JavaType type = type(expression);
+            JavaType type = typeMapping.type(expression.getOriginType());
             queue.add(J.Identifier.build(randomId(),
                     sourceBefore(expression.getName()),
                     Markers.EMPTY,
@@ -838,13 +848,6 @@ public class GroovyParserVisitor {
             RewriteGroovyClassVisitor classVisitor = new RewriteGroovyClassVisitor(unit);
             classVisitor.visitMethod(methodNode);
             return JRightPadded.build(classVisitor.pollQueue());
-        }
-
-        for (ClassNode aClass : ast.getClasses()) {
-            if (aClass.getSuperClass() != null && aClass.getSuperClass().getName().equals("groovy.lang.Script")) {
-                StaticTypeCheckingVisitor staticTypeChecker = new StaticTypeCheckingVisitor(unit, aClass);
-                node.visit(staticTypeChecker);
-            }
         }
 
         RewriteGroovyVisitor groovyVisitor = new RewriteGroovyVisitor(node);
@@ -954,25 +957,6 @@ public class GroovyParserVisitor {
         return format(prefix);
     }
 
-    @Nullable
-    private JavaType type(@Nullable ASTNode node) {
-        if (node == null || node.getMetaDataMap() == null) {
-            return null;
-        }
-
-        ClassNode type = (ClassNode) node.getMetaDataMap().get(StaticTypesMarker.INFERRED_TYPE);
-        if (type == null) {
-            return null;
-        }
-
-        JavaType.Primitive primitive = JavaType.Primitive.fromKeyword(type.getName());
-        if (primitive != null) {
-            return primitive;
-        }
-
-        return JavaType.Class.build(type.getName());
-    }
-
     private <T extends TypeTree & Expression> T buildName(String fullyQualifiedName) {
         Space prefix = whitespace();
         cursor += fullyQualifiedName.length();
@@ -1035,12 +1019,12 @@ public class GroovyParserVisitor {
 
     private TypeTree visitTypeTree(ClassNode classNode) {
         if (classNode.getLineNumber() >= 0) {
-            JavaType.Primitive primitiveType = JavaType.Primitive.fromKeyword(classNode.getName());
+            JavaType.Primitive primitiveType = JavaType.Primitive.fromKeyword(classNode.getUnresolvedName());
             if (primitiveType == null) {
-                return buildName(classNode.getName());
+                return buildName(classNode.getUnresolvedName());
             }
             Space fmt = whitespace();
-            cursor += classNode.getName().length();
+            cursor += classNode.getUnresolvedName().length();
             return new J.Primitive(randomId(), fmt, Markers.EMPTY, primitiveType);
         }
         return J.Identifier.build(randomId(), sourceBefore("def"), Markers.EMPTY, "def",

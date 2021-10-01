@@ -4871,6 +4871,9 @@ public interface J extends Serializable, Tree {
             }
 
             public NamedVariable withInitializer(@Nullable Expression initializer) {
+                if (initializer == null) {
+                    return this.initializer == null ? this : new NamedVariable(id, prefix, markers, name, dimensionsAfterName, null, type);
+                }
                 return getPadding().withInitializer(JLeftPadded.withElement(this.initializer, initializer));
             }
 
