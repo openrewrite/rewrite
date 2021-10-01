@@ -22,7 +22,7 @@ class ThrowTest : GroovyTreeTest {
     @Test
     fun throwException() = assertParsePrintAndProcess(
         """
-            def test() {
+            def test(int a) {
                 throw new UnsupportedOperationException()
             }
         """

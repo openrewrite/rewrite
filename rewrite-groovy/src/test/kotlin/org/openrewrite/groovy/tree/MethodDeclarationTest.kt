@@ -36,4 +36,10 @@ class MethodDeclarationTest : GroovyTreeTest {
             }
         """.trimIndent()
     )
+
+    @Test
+    fun emptyArguments() = assertParsePrintAndProcess(
+        """
+            def foo() {}
+        """)
 }

@@ -21,10 +21,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.ast.expr.*;
-import org.codehaus.groovy.ast.stmt.BlockStatement;
-import org.codehaus.groovy.ast.stmt.EmptyStatement;
-import org.codehaus.groovy.ast.stmt.IfStatement;
-import org.codehaus.groovy.ast.stmt.ReturnStatement;
+import org.codehaus.groovy.ast.stmt.*;
 import org.codehaus.groovy.control.SourceUnit;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.Cursor;
@@ -37,6 +34,7 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.Markers;
 
 import java.nio.file.Path;
@@ -298,6 +296,9 @@ public class GroovyParserVisitor {
                         null, emptyList(),
                         singletonList(paramName))).withAfter(rightPad));
             }
+            if(source.charAt(cursor) == ')') {
+                cursor++;
+            }
 
             J.Block body = bodyVisitor.visit(method.getCode());
 
@@ -523,7 +524,7 @@ public class GroovyParserVisitor {
             for (int i = 0; i < blockStatements.size(); i++) {
                 ASTNode statement = blockStatements.get(i);
                 J expr = visit(statement);
-                if (i == blockStatements.size() - 1 && !(expr instanceof J.Return)) {
+                if (i == blockStatements.size() - 1 && (expr instanceof Expression)) {
                     if (parent instanceof ClosureExpression || (parent instanceof MethodNode &&
                             !JavaType.Primitive.Void.equals(typeMapping.type(((MethodNode) parent).getReturnType())))) {
                         expr = new J.Return(randomId(), expr.getPrefix(), Markers.EMPTY,
@@ -725,6 +726,21 @@ public class GroovyParserVisitor {
         public void visitReturnStatement(ReturnStatement retn) {
             Space fmt = sourceBefore("return");
             queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, visit(retn.getExpression())));
+        }
+
+        @Override
+        public void visitSynchronizedStatement(SynchronizedStatement statement) {
+            Space fmt = sourceBefore("synchronized");
+            queue.add(new J.Synchronized(randomId(), fmt, Markers.EMPTY,
+                    new J.ControlParentheses<>(randomId(),sourceBefore("("), Markers.EMPTY,
+                            JRightPadded.build((Expression) visit(statement.getExpression())).withAfter(sourceBefore(")"))),
+                    visit(statement.getCode())));
+        }
+
+        @Override
+        public void visitThrowStatement(ThrowStatement statement) {
+            Space fmt = sourceBefore("throw");
+            queue.add(new J.Throw(randomId(), fmt, Markers.EMPTY, visit(statement.getExpression())));
         }
 
         // the current understanding is that TupleExpression only exist as method invocation arguments.
