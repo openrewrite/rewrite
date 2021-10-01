@@ -16,6 +16,7 @@
 package org.openrewrite.groovy;
 
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.groovy.tree.GContainer;
 import org.openrewrite.groovy.tree.GRightPadded;
 import org.openrewrite.groovy.tree.GSpace;
 import org.openrewrite.internal.ListUtils;
@@ -43,6 +44,18 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         throw new UnsupportedOperationException("Groovy has a different structure for its compilation unit. See G.CompilationUnit.");
     }
 
+    public J visitListLiteral(G.ListLiteral listLiteral, P p) {
+        G.ListLiteral l = listLiteral;
+        Expression temp = (Expression) visitExpression(l, p);
+        if (!(temp instanceof G.ListLiteral)) {
+            return temp;
+        } else {
+            l = (G.ListLiteral) temp;
+        }
+        l = l.getPadding().withElements(visitContainer(l.getPadding().getElements(), GContainer.Location.LIST_LITERAL_ELEMENTS, p));
+        return l;
+    }
+
     public J visitMapEntry(G.MapEntry mapEntry, P p) {
         G.MapEntry m = mapEntry;
         Expression temp = (Expression) visitExpression(m, p);
@@ -62,5 +75,10 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
 
     public Space visitSpace(Space space, GSpace.Location loc, P p) {
         return super.visitSpace(space, Space.Location.LANGUAGE_EXTENSION, p);
+    }
+
+    public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container,
+                                                        GContainer.Location loc, P p) {
+        return super.visitContainer(container, JContainer.Location.LANGUAGE_EXTENSION, p);
     }
 }

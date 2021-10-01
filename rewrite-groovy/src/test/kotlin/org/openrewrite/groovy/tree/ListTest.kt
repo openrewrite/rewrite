@@ -13,22 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.groovy.tree;
+package org.openrewrite.groovy.tree
 
-public class GRightPadded {
-    public enum Location {
-        LIST_LITERAL_ELEMENT_SUFFIX(GSpace.Location.LIST_LITERAL_ELEMENT_SUFFIX),
-        MAP_ENTRY_KEY(GSpace.Location.MAP_ENTRY_KEY_SUFFIX),
-        TOP_LEVEL_STATEMENT_SUFFIX(GSpace.Location.TOP_LEVEL_STATEMENT);
+import org.junit.jupiter.api.Test
 
-        private final GSpace.Location afterLocation;
+class ListTest: GroovyTreeTest {
 
-        Location(GSpace.Location afterLocation) {
-            this.afterLocation = afterLocation;
-        }
-
-        public GSpace.Location getAfterLocation() {
-            return afterLocation;
-        }
-    }
+    @Test
+    fun listLiteral() = assertParsePrintAndProcess(
+        """
+            def numbers = [1, 2, 3]
+        """
+    )
 }

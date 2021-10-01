@@ -22,6 +22,7 @@ import org.openrewrite.groovy.marker.NullSafe;
 import org.openrewrite.groovy.marker.OmitParentheses;
 import org.openrewrite.groovy.marker.Semicolon;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.groovy.tree.GContainer;
 import org.openrewrite.groovy.tree.GRightPadded;
 import org.openrewrite.groovy.tree.GSpace;
 import org.openrewrite.internal.lang.Nullable;
@@ -64,6 +65,15 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitListLiteral(G.ListLiteral listLiteral, PrintOutputCapture<P> p) {
+        visitSpace(listLiteral.getPrefix(), GSpace.Location.MAP_ENTRY_PREFIX, p);
+        visitMarkers(listLiteral.getMarkers(), p);
+        visitContainer("[", listLiteral.getPadding().getElements(), GContainer.Location.LIST_LITERAL_ELEMENTS,
+                ",", "]", p);
+        return listLiteral;
+    }
+
+    @Override
     public J visitMapEntry(G.MapEntry mapEntry, PrintOutputCapture<P> p) {
         visitSpace(mapEntry.getPrefix(), GSpace.Location.MAP_ENTRY_PREFIX, p);
         visitMarkers(mapEntry.getMarkers(), p);
@@ -76,6 +86,28 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     @Override
     public Space visitSpace(Space space, GSpace.Location loc, PrintOutputCapture<P> p) {
         return delegate.visitSpace(space, Space.Location.LANGUAGE_EXTENSION, p);
+    }
+
+    protected void visitContainer(String before, @Nullable JContainer<? extends J> container, GContainer.Location location,
+                                  String suffixBetween, @Nullable String after, PrintOutputCapture<P> p) {
+        if (container == null) {
+            return;
+        }
+        visitSpace(container.getBefore(), location.getBeforeLocation(), p);
+        p.out.append(before);
+        visitRightPadded(container.getPadding().getElements(), location.getElementLocation(), suffixBetween, p);
+        p.out.append(after == null ? "" : after);
+    }
+
+    protected void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, GRightPadded.Location location, String suffixBetween, PrintOutputCapture<P> p) {
+        for (int i = 0; i < nodes.size(); i++) {
+            JRightPadded<? extends J> node = nodes.get(i);
+            visit(node.getElement(), p);
+            visitSpace(node.getAfter(), location.getAfterLocation(), p);
+            if (i < nodes.size() - 1) {
+                p.out.append(suffixBetween);
+            }
+        }
     }
 
     private class GroovyJavaPrinter extends JavaPrinter<P> {

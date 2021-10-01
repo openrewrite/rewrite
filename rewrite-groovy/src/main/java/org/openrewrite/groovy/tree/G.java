@@ -18,7 +18,10 @@ package org.openrewrite.groovy.tree;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
-import org.openrewrite.*;
+import org.openrewrite.Cursor;
+import org.openrewrite.PrintOutputCapture;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.groovy.GroovyPrinter;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.internal.lang.Nullable;
@@ -341,6 +344,77 @@ public interface G extends J {
 
             public MapEntry withKey(@Nullable JRightPadded<Expression> key) {
                 return t.key == key ? t : new MapEntry(t.id, t.prefix, t.markers, key, t.value, t.type);
+            }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class ListLiteral implements G, Expression, TypedTree {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        JContainer<Expression> elements;
+
+        public List<Expression> getElements() {
+            return elements.getElements();
+        }
+
+        public ListLiteral withElements(List<Expression> elements) {
+            return getPadding().withElements(JContainer.withElements(this.elements, elements));
+        }
+
+        @Getter
+        @With
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
+            return v.visitListLiteral(this, p);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ListLiteral t;
+
+            public JContainer<Expression> getElements() {
+                return t.elements;
+            }
+
+            public ListLiteral withElements(JContainer<Expression> elements) {
+                return t.elements == elements ? t : new ListLiteral(t.id, t.prefix, t.markers, elements, t.type);
             }
         }
     }

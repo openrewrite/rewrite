@@ -33,8 +33,8 @@ import org.openrewrite.groovy.marker.Semicolon;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.nio.file.Path;
@@ -297,7 +297,7 @@ public class GroovyParserVisitor {
                         singletonList(paramName))).withAfter(rightPad));
             }
 
-            if(unparsedParams.length == 0) {
+            if (unparsedParams.length == 0) {
                 params.add(JRightPadded.build(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY)));
             }
 
@@ -339,11 +339,16 @@ public class GroovyParserVisitor {
             return pollQueue();
         }
 
-        private <T> List<JRightPadded<T>> visitRightPadded(ASTNode[] nodes, char lastPadTo) {
+        private <T> List<JRightPadded<T>> visitRightPadded(ASTNode[] nodes, String between, @Nullable String afterLast) {
             List<JRightPadded<T>> ts = new ArrayList<>(nodes.length);
-            for (ASTNode node : nodes) {
-                //noinspection unchecked
-                ts.add((JRightPadded<T>) JRightPadded.build(visit(node)).withAfter(whitespace()));
+            for (int i = 0; i < nodes.length; i++) {
+                ASTNode node = nodes[i];
+                JRightPadded<T> converted = JRightPadded.build(visit(node));
+                if (i == nodes.length - 1) {
+                    ts.add(converted.withAfter(afterLast == null ? EMPTY : sourceBefore(afterLast)));
+                } else {
+                    ts.add(converted.withAfter(sourceBefore(between)));
+                }
             }
             return ts;
         }
@@ -558,15 +563,11 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitClosureExpression(ClosureExpression expression) {
-            Space prefix = whitespace();
-            cursor += 1; // skip '{'
+            Space prefix = sourceBefore("{");
 
-            J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), EMPTY, Markers.EMPTY, false, visitRightPadded(expression.getParameters(), '-'));
-            Space arrow = EMPTY;
-            if (!params.getParameters().isEmpty()) {
-                arrow = whitespace();
-                cursor += 2;
-            }
+            J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), EMPTY, Markers.EMPTY, false,
+                    visitRightPadded(expression.getParameters(), ",", null));
+            Space arrow = params.getParameters().isEmpty() ? EMPTY : sourceBefore("->");
 
             queue.add(new J.Lambda(randomId(), prefix, Markers.EMPTY, params, arrow, visit(expression.getCode()), null));
             cursor += 1; // skip '}'
@@ -679,6 +680,13 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        public void visitListExpression(ListExpression list) {
+            queue.add(new G.ListLiteral(randomId(), sourceBefore("["), Markers.EMPTY,
+                    JContainer.build(visitRightPadded(list.getExpressions().toArray(new ASTNode[0]), ",", "]")),
+                    typeMapping.type(list.getType())));
+        }
+
+        @Override
         public void visitMapEntryExpression(MapEntryExpression expression) {
             G.MapEntry mapEntry = new G.MapEntry(randomId(), EMPTY, Markers.EMPTY,
                     JRightPadded.build((Expression) visit(expression.getKeyExpression())).withAfter(sourceBefore(":")),
@@ -736,7 +744,7 @@ public class GroovyParserVisitor {
         public void visitSynchronizedStatement(SynchronizedStatement statement) {
             Space fmt = sourceBefore("synchronized");
             queue.add(new J.Synchronized(randomId(), fmt, Markers.EMPTY,
-                    new J.ControlParentheses<>(randomId(),sourceBefore("("), Markers.EMPTY,
+                    new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
                             JRightPadded.build((Expression) visit(statement.getExpression())).withAfter(sourceBefore(")"))),
                     visit(statement.getCode())));
         }

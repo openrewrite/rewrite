@@ -15,20 +15,24 @@
  */
 package org.openrewrite.groovy.tree;
 
-public class GRightPadded {
+public class GContainer {
     public enum Location {
-        LIST_LITERAL_ELEMENT_SUFFIX(GSpace.Location.LIST_LITERAL_ELEMENT_SUFFIX),
-        MAP_ENTRY_KEY(GSpace.Location.MAP_ENTRY_KEY_SUFFIX),
-        TOP_LEVEL_STATEMENT_SUFFIX(GSpace.Location.TOP_LEVEL_STATEMENT);
+        LIST_LITERAL_ELEMENTS(GSpace.Location.LIST_LITERAL_ELEMENTS, GRightPadded.Location.LIST_LITERAL_ELEMENT_SUFFIX);
 
-        private final GSpace.Location afterLocation;
+        private final GSpace.Location beforeLocation;
+        private final GRightPadded.Location elementLocation;
 
-        Location(GSpace.Location afterLocation) {
-            this.afterLocation = afterLocation;
+        Location(GSpace.Location beforeLocation, GRightPadded.Location elementLocation) {
+            this.beforeLocation = beforeLocation;
+            this.elementLocation = elementLocation;
         }
 
-        public GSpace.Location getAfterLocation() {
-            return afterLocation;
+        public GSpace.Location getBeforeLocation() {
+            return beforeLocation;
+        }
+
+        public GRightPadded.Location getElementLocation() {
+            return elementLocation;
         }
     }
 }
