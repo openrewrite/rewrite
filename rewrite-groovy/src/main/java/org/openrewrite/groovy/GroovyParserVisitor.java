@@ -23,6 +23,8 @@ import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.ast.expr.*;
 import org.codehaus.groovy.ast.stmt.*;
 import org.codehaus.groovy.control.SourceUnit;
+import org.codehaus.groovy.transform.stc.StaticTypeCheckingVisitor;
+import org.codehaus.groovy.transform.stc.StaticTypesMarker;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
@@ -64,19 +66,18 @@ public class GroovyParserVisitor {
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
     public GroovyParserVisitor(Path sourcePath, String source,
-                               boolean relaxedClassTypeMatching,
                                Map<String, JavaType.Class> sharedClassTypes,
                                ExecutionContext ctx) {
         this.sourcePath = sourcePath;
         this.source = source;
-        this.typeMapping = new TypeMapping(relaxedClassTypeMatching, sharedClassTypes);
+        this.typeMapping = new TypeMapping(sharedClassTypes);
         this.ctx = ctx;
     }
 
     public G.CompilationUnit visit(SourceUnit unit, ModuleNode ast) {
-//        for (ClassNode aClass : ast.getClasses()) {
-//            new StaticTypeCheckingVisitor(unit, aClass).visitClass(aClass);
-//        }
+        for (ClassNode aClass : ast.getClasses()) {
+            new StaticTypeCheckingVisitor(unit, aClass).visitClass(aClass);
+        }
 
         NavigableMap<LineColumn, List<ASTNode>> sortedByPosition = new TreeMap<>();
         for (org.codehaus.groovy.ast.stmt.Statement s : ast.getStatementBlock().getStatements()) {
@@ -745,9 +746,10 @@ public class GroovyParserVisitor {
 
             JContainer<Expression> args = visit(call.getArguments());
 
+            MethodNode methodNode = (MethodNode) call.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
+            JavaType.Method methodType = typeMapping.type(methodNode);
             queue.add(new J.MethodInvocation(randomId(), EMPTY, Markers.EMPTY,
-                    select,
-                    null, name, args, null));
+                    select, null, name, args, methodType));
         }
 
         @Override
@@ -951,6 +953,16 @@ public class GroovyParserVisitor {
             RewriteGroovyClassVisitor classVisitor = new RewriteGroovyClassVisitor(unit);
             classVisitor.visitMethod(methodNode);
             return JRightPadded.build(classVisitor.pollQueue());
+        } else if (node instanceof ImportNode) {
+            ImportNode importNode = (ImportNode) node;
+            String packageName = importNode.getPackageName();
+            if (importNode.isStar()) {
+                packageName += "*";
+            }
+            J.Import anImport = new J.Import(randomId(), sourceBefore("import"), Markers.EMPTY,
+                    padLeft(importNode.isStatic() ? sourceBefore("static") : EMPTY, importNode.isStatic()),
+                    TypeTree.build(packageName).withPrefix(sourceBefore(packageName)));
+            return maybeSemicolon(anImport);
         }
 
         RewriteGroovyVisitor groovyVisitor = new RewriteGroovyVisitor(node);

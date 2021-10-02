@@ -15,24 +15,63 @@
  */
 package org.openrewrite.gradle;
 
-import lombok.RequiredArgsConstructor;
+import org.gradle.configuration.DefaultImportsReader;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.io.ByteArrayInputStream;
+import java.io.SequenceInputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
-@RequiredArgsConstructor
 public class GradleParser implements Parser<G.CompilationUnit> {
     private final GroovyParser groovyParser;
 
+    private final String preamble;
+
+    public GradleParser(GroovyParser.Builder groovyParser) {
+        this.groovyParser = groovyParser
+                .classpath("gradle-api")
+                .build();
+
+        DefaultImportsReader reader = new DefaultImportsReader();
+        preamble = Arrays.stream(reader.getImportPackages())
+                .map(i -> "import " + i + ".*")
+                .collect(Collectors.joining("\n", "",
+                        "\nclass RewriteGradleProject extends " +
+                                "org.gradle.api.internal.project.DefaultProject {" +
+                                "void __script__() {"));
+    }
+
     @Override
     public List<G.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
-        return Collections.emptyList();
+        Iterable<Input> gradleWrapped = StreamSupport.stream(sources.spliterator(), false)
+                .map(source ->
+                        new Parser.Input(
+                                source.getPath(),
+                                () -> new SequenceInputStream(
+                                        Collections.enumeration(Arrays.asList(
+                                                new ByteArrayInputStream(preamble.getBytes(StandardCharsets.UTF_8)),
+                                                source.getSource(),
+                                                new ByteArrayInputStream(new byte[] { '}', '}' })
+                                        ))
+                                ),
+                                source.isSynthetic()
+                        )
+                )
+                .collect(Collectors.toList());
+
+        return groovyParser.parseInputs(gradleWrapped, relativeTo, ctx).stream()
+                .map(cu -> cu.withStatements(cu.getClasses().get(0).getBody().getStatements()))
+                .collect(Collectors.toList());
     }
 
     @Override

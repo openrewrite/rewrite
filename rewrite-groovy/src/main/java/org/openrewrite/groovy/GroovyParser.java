@@ -49,14 +49,6 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
     @Nullable
     private final Collection<Path> classpath;
 
-    /**
-     * When true, enables a parser to use class types from the in-memory type cache rather than performing
-     * a deep equality check. Useful when deep class types have already been built from a separate parsing phase
-     * and we want to parse some code snippet without requiring the classpath to be fully specified, using type
-     * information we've already learned about in a prior phase.
-     */
-    private final boolean relaxedClassTypeMatching;
-
     @Override
     public List<G.CompilationUnit> parse(@Language("groovy") String... sources) {
         Pattern packagePattern = Pattern.compile("^package\\s+([^;]+);");
@@ -120,16 +112,11 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
 
                 compUnit.compile(Phases.CANONICALIZATION);
 
-                if(errorCollector.hasErrors() || errorCollector.hasWarnings()) {
-                    errorCollector.write(new PrintWriter(System.out), new Janitor());
-                }
-
                 ModuleNode ast = unit.getAST();
 
                 GroovyParserVisitor mappingVisitor = new GroovyParserVisitor(
                         input.getPath(),
                         StringUtils.readFully(input.getSource()),
-                        relaxedClassTypeMatching,
                         sharedClassTypes,
                         ctx
                 );
@@ -137,6 +124,10 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
                 cus.add(mappingVisitor.visit(unit, ast));
             } catch (Throwable t) {
                 ctx.getOnError().accept(t);
+            } finally {
+                if(errorCollector.hasErrors() || errorCollector.hasWarnings()) {
+                    errorCollector.write(new PrintWriter(System.out), new Janitor());
+                }
             }
         }
 
@@ -166,14 +157,8 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
         @Nullable
         protected Collection<Parser.Input> dependsOn;
 
-        protected boolean relaxedClassTypeMatching = false;
         protected boolean logCompilationWarningsAndErrors = false;
         protected final List<NamedStyles> styles = new ArrayList<>();
-
-        public Builder relaxedClassTypeMatching(boolean relaxedClassTypeMatching) {
-            this.relaxedClassTypeMatching = relaxedClassTypeMatching;
-            return this;
-        }
 
         public Builder logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
             this.logCompilationWarningsAndErrors = logCompilationWarningsAndErrors;
@@ -208,7 +193,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
         }
 
         public GroovyParser build() {
-            return new GroovyParser(classpath, relaxedClassTypeMatching);
+            return new GroovyParser(classpath);
         }
     }
 }

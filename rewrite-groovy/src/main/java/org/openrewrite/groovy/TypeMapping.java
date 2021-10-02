@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.GenericsType;
+import org.codehaus.groovy.ast.MethodNode;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -40,25 +41,45 @@ class TypeMapping {
     private static final int KIND_BITMASK_ANNOTATION = 1 << 13;
     private static final int KIND_BITMASK_ENUM = 1 << 14;
 
-    // if we ever find that the groovy static compiler is useful again
-    /*
-        if (node.getMetaDataMap() == null) {
-            return null;
-        }
-
-        ClassNode type = (ClassNode) node.getMetaDataMap().get(StaticTypesMarker.INFERRED_TYPE);
-        if (type == null) {
-            return null;
-        }
-
-        JavaType.Primitive primitive = JavaType.Primitive.fromKeyword(type.getName());
-        if (primitive != null) {
-            return primitive;
-        }
-     */
-
-    private final boolean relaxedClassTypeMatching;
     private final Map<String, JavaType.Class> sharedClassTypes;
+
+    @Nullable
+    public JavaType.Method type(@Nullable MethodNode node) {
+        if (node == null) {
+            return null;
+        }
+
+        JavaType.Method.Signature signature = new JavaType.Method.Signature(
+                type(node.getReturnType(), emptyList()),
+                Arrays.stream(node.getParameters())
+                        .map(p -> {
+                            JavaType.FullyQualified fqn = (JavaType.FullyQualified) type(p.getOriginType(), emptyList());
+                            if(fqn instanceof JavaType.Parameterized) {
+                                return ((JavaType.Parameterized) fqn).getType();
+                            }
+                            return fqn;
+                        })
+                        .collect(Collectors.toList())
+        );
+
+        //noinspection ConstantConditions
+        return JavaType.Method.build(
+                node.getModifiers(),
+                (JavaType.FullyQualified) type(node.getDeclaringClass(), emptyList()),
+                node.getName(),
+                signature,
+                signature,
+                Arrays.stream(node.getParameters())
+                        .map(org.codehaus.groovy.ast.Parameter::getName)
+                        .collect(Collectors.toList()),
+                Arrays.stream(node.getExceptions())
+                        .map(e -> (JavaType.FullyQualified) type(e, emptyList()))
+                        .collect(Collectors.toList()),
+                node.getAnnotations().stream()
+                        .map(a -> (JavaType.FullyQualified) type(a.getClassNode(), emptyList()))
+                        .collect(Collectors.toList())
+        );
+    }
 
     @Nullable
     public JavaType type(@Nullable ClassNode node) {
@@ -78,8 +99,8 @@ class TypeMapping {
 
         try {
             return node.getGenericsTypes() != null && node.getGenericsTypes().length > 0 ?
-                    parameterizedType(node.getTypeClass(), node.getGenericsTypes(), emptyList()) :
-                    type(node.getTypeClass(), emptyList());
+                    parameterizedType(node.getTypeClass(), node.getGenericsTypes(), stack) :
+                    type(node.getTypeClass(), stack);
         } catch (GroovyBugError ignored) {
             return null;
         }
@@ -115,10 +136,15 @@ class TypeMapping {
             return null;
         }
 
-        if(clazz.getName().equals("java.lang.Object")) {
+        if (clazz.getName().equals("java.lang.Object")) {
             return (T) JavaType.Class.OBJECT;
-        } else if(clazz.getName().equals("java.lang.Class")) {
+        } else if (clazz.getName().equals("java.lang.Class")) {
             return (T) JavaType.Class.build("java.lang.Class");
+        }
+
+        JavaType.Primitive primitiveType = JavaType.Primitive.fromKeyword(clazz.getName());
+        if (primitiveType != null) {
+            return (T) primitiveType;
         }
 
         if (stack.contains(clazz)) {
@@ -130,10 +156,11 @@ class TypeMapping {
             return (T) sharedClass;
         }
 
-        JavaType.Primitive primitiveType = JavaType.Primitive.fromKeyword(clazz.getName());
-        if (primitiveType != null) {
-            return (T) primitiveType;
+        JavaType.Class cached = JavaType.Class.find(clazz.getName());
+        if(cached != null) {
+            return (T) cached;
         }
+
 
         List<Class<?>> stackWithSym = new ArrayList<>(stack);
         stackWithSym.add(clazz);
@@ -168,7 +195,7 @@ class TypeMapping {
                         .map(a -> (JavaType.FullyQualified) type(a.annotationType(), stackWithSym))
                         .collect(Collectors.toList()),
                 null,
-                relaxedClassTypeMatching
+                false
         );
     }
 

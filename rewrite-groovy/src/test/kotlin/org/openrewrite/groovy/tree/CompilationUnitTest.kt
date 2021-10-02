@@ -15,6 +15,7 @@
  */
 package org.openrewrite.groovy.tree
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 
 class CompilationUnitTest : GroovyTreeTest {
@@ -27,6 +28,7 @@ class CompilationUnitTest : GroovyTreeTest {
         """.trimIndent()
     )
 
+    @Disabled
     @Test
     fun mixedImports() = assertParsePrintAndProcess(
         """
