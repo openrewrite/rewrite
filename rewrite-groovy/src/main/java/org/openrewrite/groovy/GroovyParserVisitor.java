@@ -630,6 +630,19 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        public void visitClosureListExpression(ClosureListExpression closureListExpression) {
+            List<org.codehaus.groovy.ast.expr.Expression> expressions = closureListExpression.getExpressions();
+            List<JRightPadded<Object>> results = new ArrayList<>(closureListExpression.getExpressions().size());
+            for (int i = 0, expressionsSize = expressions.size(); i < expressionsSize; i++) {
+                results.add(JRightPadded.build(visit(expressions.get(i))).withAfter(whitespace()));
+                if(i < expressionsSize - 1) {
+                    cursor++; // ","
+                }
+            }
+            queue.add(results);
+        }
+
+        @Override
         public void visitConstantExpression(ConstantExpression expression) {
             Space prefix = whitespace();
 
@@ -695,7 +708,8 @@ public class GroovyParserVisitor {
                 // def (a, b) = [1, 2]
                 throw new UnsupportedOperationException("FIXME");
             } else {
-                J.Identifier name = visit(expression.getVariableExpression());
+                Object it = visit(expression.getVariableExpression());
+                J.Identifier name = (J.Identifier) it;
                 namedVariable = new J.VariableDeclarations.NamedVariable(
                         randomId(),
                         name.getPrefix(),
@@ -726,6 +740,37 @@ public class GroovyParserVisitor {
             );
 
             queue.add(variableDeclarations);
+        }
+
+        @Override
+        public void visitEmptyExpression(EmptyExpression expression) {
+            queue.add(new J.Empty(randomId(), EMPTY, Markers.EMPTY));
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public void visitForLoop(ForStatement forLoop) {
+            Space fmt = sourceBefore("for");
+            Space controlFmt = sourceBefore("(");
+            if(forLoop.getCollectionExpression() instanceof ClosureListExpression) {
+                List<JRightPadded<?>> controls = visit(forLoop.getCollectionExpression());
+                // There will always be exactly three elements in a for loop's ClosureListExpression
+                List<JRightPadded<Statement>> init = controls.get(0).getElement() instanceof List ?
+                        (List<JRightPadded<Statement>>) controls.get(0).getElement() :
+                        Collections.singletonList((JRightPadded<Statement>) controls.get(0));
+
+                JRightPadded<Expression> condition = (JRightPadded<Expression>) controls.get(1);
+
+                List<JRightPadded<Statement>> update = controls.get(2).getElement() instanceof List ?
+                        (List<JRightPadded<Statement>>) controls.get(2).getElement() :
+                        Collections.singletonList((JRightPadded<Statement>) controls.get(2));
+                cursor++; // skip ')'
+
+                queue.add(new J.ForLoop(randomId(), fmt, Markers.EMPTY,
+                        new J.ForLoop.Control(randomId(), controlFmt,
+                                Markers.EMPTY, init, condition, update),
+                        JRightPadded.build(visit(forLoop.getLoopBlock()))));
+            }
         }
 
         @Override
@@ -763,7 +808,6 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitListExpression(ListExpression list) {
-            //      def b() throws Exception , Exc
             queue.add(new G.ListLiteral(randomId(), sourceBefore("["), Markers.EMPTY,
                     JContainer.build(visitRightPadded(list.getExpressions().toArray(new ASTNode[0]), ",", "]")),
                     typeMapping.type(list.getType())));
