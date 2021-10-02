@@ -65,8 +65,27 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitGString(G.GString gString, PrintOutputCapture<P> p) {
+        visitSpace(gString.getPrefix(), GSpace.Location.GSTRING, p);
+        visitMarkers(gString.getMarkers(), p);
+        p.out.append('"');
+        visit(gString.getStrings(), p);
+        p.out.append('"');
+        return gString;
+    }
+
+    @Override
+    public J visitGStringValue(G.GString.Value value, PrintOutputCapture<P> p) {
+        visitMarkers(value.getMarkers(), p);
+        p.out.append("${");
+        visit(value.getTree(), p);
+        p.out.append('}');
+        return value;
+    }
+
+    @Override
     public J visitListLiteral(G.ListLiteral listLiteral, PrintOutputCapture<P> p) {
-        visitSpace(listLiteral.getPrefix(), GSpace.Location.MAP_ENTRY_PREFIX, p);
+        visitSpace(listLiteral.getPrefix(), GSpace.Location.MAP_ENTRY, p);
         visitMarkers(listLiteral.getMarkers(), p);
         visitContainer("[", listLiteral.getPadding().getElements(), GContainer.Location.LIST_LITERAL_ELEMENTS,
                 ",", "]", p);
@@ -75,7 +94,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
     @Override
     public J visitMapEntry(G.MapEntry mapEntry, PrintOutputCapture<P> p) {
-        visitSpace(mapEntry.getPrefix(), GSpace.Location.MAP_ENTRY_PREFIX, p);
+        visitSpace(mapEntry.getPrefix(), GSpace.Location.MAP_ENTRY, p);
         visitMarkers(mapEntry.getMarkers(), p);
         visitRightPadded(mapEntry.getPadding().getKey(), GRightPadded.Location.MAP_ENTRY_KEY, p);
         p.out.append(':');

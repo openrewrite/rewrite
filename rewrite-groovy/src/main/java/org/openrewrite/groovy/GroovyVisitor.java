@@ -44,8 +44,31 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         throw new UnsupportedOperationException("Groovy has a different structure for its compilation unit. See G.CompilationUnit.");
     }
 
+    public J visitGString(G.GString gString, P p) {
+        G.GString g = gString;
+        g = g.withPrefix(visitSpace(g.getPrefix(), GSpace.Location.GSTRING, p));
+        g = g.withMarkers(visitMarkers(g.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(g, p);
+        if (!(temp instanceof G.GString)) {
+            return temp;
+        } else {
+            g = (G.GString) temp;
+        }
+        visit(g.getStrings(), p);
+        return g;
+    }
+
+    public J visitGStringValue(G.GString.Value value, P p) {
+        G.GString.Value v = value;
+        v = v.withMarkers(visitMarkers(v.getMarkers(), p));
+        v = v.withTree(visit(v.getTree(), p));
+        return v;
+    }
+
     public J visitListLiteral(G.ListLiteral listLiteral, P p) {
         G.ListLiteral l = listLiteral;
+        l = l.withPrefix(visitSpace(l.getPrefix(), GSpace.Location.LIST_LITERAL, p));
+        l = l.withMarkers(visitMarkers(l.getMarkers(), p));
         Expression temp = (Expression) visitExpression(l, p);
         if (!(temp instanceof G.ListLiteral)) {
             return temp;
@@ -58,6 +81,8 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
 
     public J visitMapEntry(G.MapEntry mapEntry, P p) {
         G.MapEntry m = mapEntry;
+        m = m.withPrefix(visitSpace(m.getPrefix(), GSpace.Location.MAP_ENTRY, p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
         Expression temp = (Expression) visitExpression(m, p);
         if (!(temp instanceof G.MapEntry)) {
             return temp;

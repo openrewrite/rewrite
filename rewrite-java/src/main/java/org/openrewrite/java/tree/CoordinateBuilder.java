@@ -37,7 +37,7 @@ public abstract class CoordinateBuilder {
     }
 
     public static class Statement extends CoordinateBuilder {
-        Statement(org.openrewrite.java.tree.Statement tree) {
+        public Statement(org.openrewrite.java.tree.Statement tree) {
             super(tree);
         }
 

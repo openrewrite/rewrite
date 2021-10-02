@@ -49,4 +49,11 @@ class LiteralTest : GroovyTreeTest {
             def fooPattern = /.*foo.*/
         """.trimIndent()
     )
+
+    @Test
+    fun gstring() = assertParsePrintAndProcess(
+        """
+           def s = "uid: ${'$'}{UUID.randomUUID()}"
+        """.trimIndent()
+    )
 }

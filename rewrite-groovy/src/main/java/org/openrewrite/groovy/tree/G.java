@@ -418,4 +418,53 @@ public interface G extends J {
             }
         }
     }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    @With
+    final class GString implements G, Statement, Expression {
+        UUID id;
+        Space prefix;
+        Markers markers;
+        List<J> strings;
+
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
+            return v.visitGString(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @Data
+        @With
+        public static final class Value implements G {
+            UUID id;
+            Markers markers;
+            J tree;
+
+            @Override
+            public <J2 extends J> J2 withPrefix(Space space) {
+                return (J2) this;
+            }
+
+            @Override
+            public Space getPrefix() {
+                return Space.EMPTY;
+            }
+
+            @Override
+            public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
+                return v.visitGStringValue(this, p);
+            }
+        }
+    }
 }

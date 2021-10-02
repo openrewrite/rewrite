@@ -301,8 +301,11 @@ public class GroovyParserVisitor {
                 params.add(JRightPadded.build(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY)));
             }
 
-            JContainer<NameTree> throwz = method.getExceptions().length == 0 ? null :
-                    JContainer.build(sourceBefore("throws"), bodyVisitor.visitRightPadded(method.getExceptions(), ",", null), Markers.EMPTY);
+            JContainer<NameTree> throwz = method.getExceptions().length == 0 ? null : JContainer.build(
+                    sourceBefore("throws"),
+                    bodyVisitor.visitRightPadded(method.getExceptions(), ",", null),
+                    Markers.EMPTY
+            );
             J.Block body = bodyVisitor.visit(method.getCode());
 
             queue.add(new J.MethodDeclaration(
@@ -687,7 +690,29 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        public void visitGStringExpression(GStringExpression gstring) {
+            Space fmt = sourceBefore("\"");
+
+            List<J> strings = new ArrayList<>(gstring.getStrings().size());
+            int valueIndex = 0;
+            for (ConstantExpression string : gstring.getStrings()) {
+                if (string.getValue().equals("")) {
+                    cursor += 2; // skip ${
+                    strings.add(new G.GString.Value(randomId(), Markers.EMPTY, visit(gstring.getValue(valueIndex++))));
+                    cursor++; // skip }
+                } else {
+                    strings.add(visit(string));
+                }
+            }
+
+            queue.add(new G.GString(randomId(), fmt, Markers.EMPTY, strings,
+                    typeMapping.type(gstring.getType())));
+            cursor++; // skip "
+        }
+
+        @Override
         public void visitListExpression(ListExpression list) {
+            //      def b() throws Exception , Exc
             queue.add(new G.ListLiteral(randomId(), sourceBefore("["), Markers.EMPTY,
                     JContainer.build(visitRightPadded(list.getExpressions().toArray(new ASTNode[0]), ",", "]")),
                     typeMapping.type(list.getType())));
