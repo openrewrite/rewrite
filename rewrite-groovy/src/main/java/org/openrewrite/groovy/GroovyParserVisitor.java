@@ -923,6 +923,17 @@ public class GroovyParserVisitor {
             );
         }
 
+        @Override
+        public void visitWhileLoop(WhileStatement loop) {
+            Space fmt = sourceBefore("while");
+            queue.add(new J.WhileLoop(randomId(), fmt, Markers.EMPTY,
+                    new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
+                            JRightPadded.build((Expression) visit(loop.getBooleanExpression().getExpression()))
+                                    .withAfter(sourceBefore(")"))),
+                    JRightPadded.build(visit(loop.getLoopBlock()))
+            ));
+        }
+
         @SuppressWarnings({"unchecked", "ConstantConditions"})
         private <T> T pollQueue() {
             return (T) queue.poll();
