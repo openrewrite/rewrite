@@ -162,6 +162,16 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitFieldAccess(J.FieldAccess fieldAccess, PrintOutputCapture<P> p) {
+            visitSpace(fieldAccess.getPrefix(), Space.Location.FIELD_ACCESS_PREFIX, p);
+            visitMarkers(fieldAccess.getMarkers(), p);
+            visit(fieldAccess.getTarget(), p);
+            visitLeftPadded(fieldAccess.getName().getMarkers().findFirst(NullSafe.class).isPresent() ? "?." : ".",
+                    fieldAccess.getPadding().getName(), JLeftPadded.Location.FIELD_ACCESS_NAME, p);
+            return fieldAccess;
+        }
+
+        @Override
         public J visitMethodInvocation(J.MethodInvocation method, PrintOutputCapture<P> p) {
             visitSpace(method.getPrefix(), Space.Location.METHOD_INVOCATION_PREFIX, p);
             visitMarkers(method.getMarkers(), p);
