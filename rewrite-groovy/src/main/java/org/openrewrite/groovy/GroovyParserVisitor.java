@@ -122,7 +122,7 @@ public class GroovyParserVisitor {
         List<JRightPadded<Statement>> statements = new ArrayList<>(sortedByPosition.size());
         for (List<ASTNode> values : sortedByPosition.values()) {
             for (ASTNode value : values) {
-                statements.add(convertTopLevelStatement(unit, ast, value));
+                statements.add(convertTopLevelStatement(unit, value));
             }
         }
 
@@ -618,7 +618,8 @@ public class GroovyParserVisitor {
                 text = "null";
                 jType = JavaType.Primitive.Null;
             } else {
-                throw new IllegalStateException("Unexpected constant type " + type);
+                ctx.getOnError().accept(new IllegalStateException("Unexpected constant type " + type));
+                return;
             }
 
             cursor += text.length();
@@ -639,7 +640,7 @@ public class GroovyParserVisitor {
         public void visitDeclarationExpression(DeclarationExpression expression) {
             TypeTree typeExpr = visitVariableExpressionType(expression.getVariableExpression());
 
-            J.VariableDeclarations.NamedVariable namedVariable = null;
+            J.VariableDeclarations.NamedVariable namedVariable;
             if (expression.isMultipleAssignmentDeclaration()) {
                 // def (a, b) = [1, 2]
                 throw new UnsupportedOperationException("FIXME");
@@ -680,7 +681,7 @@ public class GroovyParserVisitor {
         @Override
         public void visitIfElse(IfStatement ifElse) {
             Space fmt = sourceBefore("if");
-            J.ControlParentheses<Expression> ifCondition = new J.ControlParentheses<Expression>(randomId(), sourceBefore("("), Markers.EMPTY,
+            J.ControlParentheses<Expression> ifCondition = new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
                     JRightPadded.build((Expression) visit(ifElse.getBooleanExpression().getExpression())).withAfter(sourceBefore(")")));
             JRightPadded<Statement> then = maybeSemicolon(visit(ifElse.getIfBlock()));
             J.If.Else elze = ifElse.getElseBlock() instanceof EmptyStatement ? null :
@@ -928,7 +929,7 @@ public class GroovyParserVisitor {
         }
     }
 
-    private JRightPadded<Statement> convertTopLevelStatement(SourceUnit unit, ModuleNode ast, ASTNode node) {
+    private JRightPadded<Statement> convertTopLevelStatement(SourceUnit unit, ASTNode node) {
         if (node instanceof ClassNode) {
             ClassNode classNode = (ClassNode) node;
             RewriteGroovyClassVisitor classVisitor = new RewriteGroovyClassVisitor(unit);
@@ -969,7 +970,7 @@ public class GroovyParserVisitor {
         return new JLeftPadded<>(left, tree, Markers.EMPTY);
     }
 
-    private int positionOfNext(String untilDelim, @Nullable Character stop) {
+    private int positionOfNext(String untilDelim) {
         boolean inMultiLineComment = false;
         boolean inSingleLineComment = false;
 
@@ -996,9 +997,6 @@ public class GroovyParserVisitor {
                 }
 
                 if (!inMultiLineComment && !inSingleLineComment) {
-                    if (stop != null && source.charAt(delimIndex) == stop)
-                        return -1; // reached stop word before finding the delimiter
-
                     if (source.startsWith(untilDelim, delimIndex)) {
                         break; // found it!
                     }
@@ -1089,16 +1087,7 @@ public class GroovyParserVisitor {
     }
 
     private Space sourceBefore(String untilDelim) {
-        return sourceBefore(untilDelim, null);
-    }
-
-    /**
-     * @return Source from <code>cursor</code> to next occurrence of <code>untilDelim</code>,
-     * and if not found in the remaining source, the empty String. If <code>stop</code> is reached before
-     * <code>untilDelim</code> return the empty String.
-     */
-    private Space sourceBefore(String untilDelim, @Nullable Character stop) {
-        int delimIndex = positionOfNext(untilDelim, stop);
+        int delimIndex = positionOfNext(untilDelim);
         if (delimIndex < 0) {
             return EMPTY; // unable to find this delimiter
         }
