@@ -18,18 +18,17 @@ package org.openrewrite.groovy.tree;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
-import org.openrewrite.Cursor;
-import org.openrewrite.PrintOutputCapture;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyPrinter;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.internal.TypeCache;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
+import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.nio.file.Path;
 import java.util.List;
@@ -41,12 +40,10 @@ public interface G extends J {
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
-        return (R) acceptGroovy((GroovyVisitor<P>) v, p);
-    }
-
-    @Override
-    default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return v instanceof GroovyVisitor;
+        if (v instanceof GroovyVisitor) {
+            return (R) acceptGroovy((GroovyVisitor<P>) v, p);
+        }
+        return (R) acceptJava((JavaVisitor<P>) v, p);
     }
 
     @Nullable
@@ -65,10 +62,10 @@ public interface G extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class CompilationUnit implements G, JavaSourceFile {
+    final class CompilationUnit implements G, JavaSourceFile, SourceFile {
         @Nullable
         @NonFinal
-        transient WeakReference<TypeCache> typesInUse;
+        transient SoftReference<TypeCache> typesInUse;
 
         @Nullable
         @NonFinal
@@ -181,32 +178,33 @@ public interface G extends J {
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
-            return this;
+            return new GroovyVisitor<P>() {
+                @Override
+                public J visit(@Nullable Tree tree, P p) {
+                    return tree instanceof G.CompilationUnit ?
+                            visitJavaSourceFile((JavaSourceFile) v.visitJavaSourceFile((G.CompilationUnit) tree, p), p) :
+                            v.visit(tree, p);
+                }
+            }.visit(this, p);
         }
 
         @Override
         public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
-            return v.visitCompilationUnit(this, p);
+            return v.visitJavaSourceFile(this, p);
         }
 
         public Set<NameTree> findType(String clazz) {
             return FindTypes.find(this, clazz);
         }
 
+        @Override
         public Set<JavaType> getTypesInUse() {
-            TypeCache cache;
-//            if (this.typesInUse == null) {
-//                cache = TypeCache.build(this);
-//                this.typesInUse = new WeakReference<>(cache);
-//            } else {
-//                cache = this.typesInUse.get();
-//                if (cache == null || cache.t != this) {
-//                    cache = new TypeCache(this, FindAllUsedTypes.findAll(this));
-//                    this.typesInUse = new WeakReference<>(cache);
-//                }
-//            }
-//            return cache.typesInUse;
-            return null;
+            return typeCache().getTypesInUse();
+        }
+
+        @Override
+        public Set<JavaType.Method> getDeclaredMethods() {
+            return typeCache().getDeclaredMethods();
         }
 
         @Override
@@ -214,10 +212,19 @@ public interface G extends J {
             return new GroovyPrinter<>();
         }
 
-        @RequiredArgsConstructor
-        private static class TypeCache {
-            private final G.CompilationUnit t;
-            private final Set<JavaType> typesInUse;
+        private TypeCache typeCache() {
+            TypeCache cache;
+            if (this.typesInUse == null) {
+                cache = TypeCache.build(this);
+                this.typesInUse = new SoftReference<>(cache);
+            } else {
+                cache = this.typesInUse.get();
+                if (cache == null || cache.getCu() != this) {
+                    cache = TypeCache.build(this);
+                    this.typesInUse = new SoftReference<>(cache);
+                }
+            }
+            return cache;
         }
 
         public Padding getPadding() {

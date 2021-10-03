@@ -732,6 +732,8 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitMethodCallExpression(MethodCallExpression call) {
+            Space fmt = whitespace();
+
             JRightPadded<Expression> select = null;
             if (!call.isImplicitThis()) {
                 select = JRightPadded.build((Expression) visit(call.getObjectExpression()))
@@ -748,7 +750,7 @@ public class GroovyParserVisitor {
 
             MethodNode methodNode = (MethodNode) call.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
             JavaType.Method methodType = typeMapping.type(methodNode);
-            queue.add(new J.MethodInvocation(randomId(), EMPTY, Markers.EMPTY,
+            queue.add(new J.MethodInvocation(randomId(), fmt, Markers.EMPTY,
                     select, null, name, args, methodType));
         }
 

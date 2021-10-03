@@ -12,33 +12,15 @@ class GradleParserTest : GroovyRecipeTest {
     override val parser: Parser<G.CompilationUnit>
         get() = GradleParser(GroovyParser.builder())
 
-    override val recipe: Recipe
-        get() = FindMethods("org.gradle.api.Project dependencies(groovy.lang.Closure)", true)
-
     @Test
-    fun gradle() = assertChanged(
+    fun findDependenciesBlock() = assertChanged(
+        recipe = FindMethods("org.gradle.api.Project dependencies(groovy.lang.Closure)", true),
         before = """
-            plugins {
-                id 'java-library'
-            }
-            
-            repositories {
-                mavenCentral()
-            }
-            
             dependencies {
                 api 'com.google.guava:guava:23.0'
             }
         """,
         after = """
-            plugins {
-                id 'java-library'
-            }
-            
-            repositories {
-                mavenCentral()
-            }
-            
             /*~~>*/dependencies {
                 api 'com.google.guava:guava:23.0'
             }

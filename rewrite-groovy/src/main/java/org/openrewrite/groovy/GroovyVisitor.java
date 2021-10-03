@@ -30,6 +30,11 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         return "groovy";
     }
 
+    @Override
+    public J visitJavaSourceFile(JavaSourceFile cu, P p) {
+        return cu instanceof G.CompilationUnit ? visitCompilationUnit((G.CompilationUnit) cu, p) : cu;
+    }
+
     public J visitCompilationUnit(G.CompilationUnit cu, P p) {
         G.CompilationUnit c = cu;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p));

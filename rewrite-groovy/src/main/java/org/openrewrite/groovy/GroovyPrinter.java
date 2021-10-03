@@ -46,7 +46,8 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public J visitCompilationUnit(G.CompilationUnit cu, PrintOutputCapture<P> p) {
+    public J visitJavaSourceFile(JavaSourceFile sourceFile, PrintOutputCapture<P> p) {
+        G.CompilationUnit cu = (G.CompilationUnit) sourceFile;
         visitSpace(cu.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p);
         visitMarkers(cu.getMarkers(), p);
 

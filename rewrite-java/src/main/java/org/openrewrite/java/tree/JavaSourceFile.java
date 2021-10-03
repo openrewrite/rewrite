@@ -15,7 +15,9 @@
  */
 package org.openrewrite.java.tree;
 
-import org.openrewrite.SourceFile;
+import java.util.Set;
 
-public interface JavaSourceFile extends SourceFile {
+public interface JavaSourceFile extends J {
+    Set<JavaType> getTypesInUse();
+    Set<JavaType.Method> getDeclaredMethods();
 }

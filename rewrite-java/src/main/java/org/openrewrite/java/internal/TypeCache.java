@@ -28,11 +28,11 @@ import java.util.Set;
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 @Getter
 public class TypeCache {
-    private final J.CompilationUnit cu;
+    private final JavaSourceFile cu;
     private final Set<JavaType> typesInUse;
     private final Set<JavaType.Method> declaredMethods;
 
-    public static TypeCache build(J.CompilationUnit cu) {
+    public static TypeCache build(JavaSourceFile cu) {
         Set<JavaType> types = new HashSet<JavaType>() {
             @Override
             public boolean add(@Nullable JavaType javaType) {
@@ -53,7 +53,7 @@ public class TypeCache {
             }
         };
 
-        new JavaIsoVisitor<Integer>() {
+        JavaIsoVisitor<Integer> findTypes = new JavaIsoVisitor<Integer>() {
             @Override
             public J preVisit(J tree, Integer integer) {
                 if (tree instanceof TypedTree) {
@@ -127,7 +127,9 @@ public class TypeCache {
                 types.add(newClass.getConstructorType());
                 return super.visitNewClass(newClass, integer);
             }
-        }.visit(cu, 0);
+        };
+
+        findTypes.visit(cu, 0);
 
         return new TypeCache(cu, types, declaredMethods);
     }

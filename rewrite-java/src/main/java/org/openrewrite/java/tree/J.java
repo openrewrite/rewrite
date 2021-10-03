@@ -1104,7 +1104,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class CompilationUnit implements J, JavaSourceFile {
+    final class CompilationUnit implements J, JavaSourceFile, SourceFile {
         @Nullable
         @NonFinal
         transient SoftReference<TypeCache> typesInUse;
@@ -1169,10 +1169,12 @@ public interface J extends Serializable, Tree {
             return FindTypes.find(this, clazz);
         }
 
+        @Override
         public Set<JavaType> getTypesInUse() {
             return typeCache().getTypesInUse();
         }
 
+        @Override
         public Set<JavaType.Method> getDeclaredMethods() {
             return typeCache().getDeclaredMethods();
         }

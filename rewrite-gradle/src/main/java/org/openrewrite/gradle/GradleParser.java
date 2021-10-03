@@ -21,6 +21,8 @@ import org.openrewrite.Parser;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Statement;
 
 import java.io.ByteArrayInputStream;
 import java.io.SequenceInputStream;
@@ -70,7 +72,11 @@ public class GradleParser implements Parser<G.CompilationUnit> {
                 .collect(Collectors.toList());
 
         return groovyParser.parseInputs(gradleWrapped, relativeTo, ctx).stream()
-                .map(cu -> cu.withStatements(cu.getClasses().get(0).getBody().getStatements()))
+                .map(cu -> {
+                    J.MethodDeclaration script = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+                    assert script.getBody() != null;
+                    return cu.withStatements(script.getBody().getStatements());
+                })
                 .collect(Collectors.toList());
     }
 

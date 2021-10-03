@@ -19,6 +19,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 
 import java.util.Set;
@@ -43,7 +44,7 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
+    public J visitJavaSourceFile(JavaSourceFile cu, P p) {
         Set<JavaType> types = cu.getTypesInUse();
         for (JavaType type : types) {
             if (type instanceof JavaType.Method) {

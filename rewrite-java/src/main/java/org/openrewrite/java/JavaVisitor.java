@@ -415,6 +415,12 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return c;
     }
 
+    public J visitJavaSourceFile(JavaSourceFile cu, P p) {
+        return cu instanceof J.CompilationUnit ?
+                visitCompilationUnit((J.CompilationUnit) cu, p) :
+                cu;
+    }
+
     public J visitCompilationUnit(J.CompilationUnit cu, P p) {
         J.CompilationUnit c = cu;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p));
