@@ -108,24 +108,20 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
             compUnit.addSource(unit);
 
             try {
-//                removeGrabTransformation(compUnit) <-- codenarc does this for some reason
-
                 compUnit.compile(Phases.CANONICALIZATION);
-
                 ModuleNode ast = unit.getAST();
-
                 GroovyParserVisitor mappingVisitor = new GroovyParserVisitor(
                         input.getPath(),
                         StringUtils.readFully(input.getSource()),
                         sharedClassTypes,
                         ctx
                 );
-
                 cus.add(mappingVisitor.visit(unit, ast));
             } catch (Throwable t) {
                 ctx.getOnError().accept(t);
             } finally {
                 if(errorCollector.hasErrors() || errorCollector.hasWarnings()) {
+//                    org.slf4j.LoggerFactory.getLogger(GroovyParser.class).warn(log);
                     errorCollector.write(new PrintWriter(System.out), new Janitor());
                 }
             }

@@ -8,6 +8,8 @@ dependencies {
 
     implementation("org.codehaus.groovy:groovy:latest.release")
 
+    compileOnly("org.slf4j:slf4j-api:1.7.+")
+
     api("io.micrometer:micrometer-core:latest.release")
 
     api("org.jetbrains:annotations:latest.release")

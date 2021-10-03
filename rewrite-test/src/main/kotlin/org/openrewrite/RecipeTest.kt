@@ -19,6 +19,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.assertj.core.api.Assertions.*
 import org.junit.jupiter.api.fail
+import org.openrewrite.config.Environment
 import org.openrewrite.scheduling.DirectScheduler
 import org.openrewrite.scheduling.ForkJoinScheduler
 import java.io.File
@@ -30,7 +31,7 @@ import java.util.concurrent.Callable
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ForkJoinPool
 
-interface RecipeTest <T: SourceFile> {
+interface RecipeTest<T : SourceFile> {
     val recipe: Recipe?
         get() = null
 
@@ -52,7 +53,7 @@ interface RecipeTest <T: SourceFile> {
         afterConditions: (T) -> Unit = { }
     ) {
         val inputs = arrayOf(before.trimIndentPreserveCRLF()) + dependsOn.map { s -> s.trimIndentPreserveCRLF() }
-        val sources = parser.parse(executionContext, *inputs )
+        val sources = parser.parse(executionContext, *inputs)
 
         assertThat(sources.size)
             .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
@@ -80,8 +81,8 @@ interface RecipeTest <T: SourceFile> {
         )
         val inputSize = 1 + dependsOn.size
         assertThat(sources.size)
-                .`as`("The parser was provided with $inputSize inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
-                .isEqualTo(inputSize)
+            .`as`("The parser was provided with $inputSize inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
+            .isEqualTo(inputSize)
 
         assertChangedBase(recipe, sources, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
@@ -124,7 +125,7 @@ interface RecipeTest <T: SourceFile> {
 
         assertThat(result).`as`("The recipe must make changes").isNotNull
         assertThat(result!!.after).isNotNull
-        val actual = result.after!!.printAll( )
+        val actual = result.after!!.printAll()
         val expected = after.trimIndentPreserveCRLF()
         assertThat(actual).isEqualTo(expected)
         afterConditions(result.after as T)
@@ -156,7 +157,7 @@ interface RecipeTest <T: SourceFile> {
         dependsOn: Array<File> = emptyArray()
     ) {
         val sources = parser.parse(
-                listOf(before).plus(dependsOn).map { it.toPath() },
+            listOf(before).plus(dependsOn).map { it.toPath() },
             relativeTo,
             executionContext
         )
@@ -188,11 +189,11 @@ interface RecipeTest <T: SourceFile> {
             }
     }
 
-    fun toRecipe(supplier : () -> TreeVisitor<*, ExecutionContext>) : Recipe {
+    fun toRecipe(supplier: () -> TreeVisitor<*, ExecutionContext>): Recipe {
         return AdHocRecipe(supplier)
     }
 
-    class AdHocRecipe(private val visitor : () -> TreeVisitor<*, ExecutionContext>) : Recipe() {
+    class AdHocRecipe(private val visitor: () -> TreeVisitor<*, ExecutionContext>) : Recipe() {
         override fun getDisplayName(): String = "Ad hoc recipe"
         override fun getVisitor(): TreeVisitor<*, ExecutionContext> = visitor()
     }
@@ -220,7 +221,10 @@ interface RecipeTest <T: SourceFile> {
                 val source = treeSerializer.read(response.peekBody(Long.MAX_VALUE).byteStream())
 
                 val recipeSchedulerCheckingExpectedCycles =
-                    RecipeSchedulerCheckingExpectedCycles(ForkJoinScheduler(ForkJoinPool(1)), expectedCyclesThatMakeChanges)
+                    RecipeSchedulerCheckingExpectedCycles(
+                        ForkJoinScheduler(ForkJoinPool(1)),
+                        expectedCyclesThatMakeChanges
+                    )
 
                 var results = recipe.run(
                     listOf(source),
@@ -294,11 +298,11 @@ interface RecipeTest <T: SourceFile> {
 
     fun apiTokenFromUserHome(): String {
         val tokenFile = File(System.getProperty("user.home") + "/.moderne/token.txt")
-        if(!tokenFile.exists()) {
+        if (!tokenFile.exists()) {
             throw IllegalStateException("No token file was not found at ~/.moderne/token.txt")
         }
         val token = tokenFile.readText().trim()
-        return if(token.startsWith("Bearer ")) token else "Bearer $token"
+        return if (token.startsWith("Bearer ")) token else "Bearer $token"
     }
 
     private class RecipeSchedulerCheckingExpectedCycles(
@@ -345,4 +349,9 @@ interface RecipeTest <T: SourceFile> {
     }
 
     private fun String.trimIndentPreserveCRLF() = replace('\r', '⏎').trimIndent().replace('⏎', '\r')
+
+    fun fromRuntimeClasspath(recipe: String) = Environment.builder()
+        .scanRuntimeClasspath()
+        .build()
+        .activateRecipes(recipe)
 }
