@@ -1733,17 +1733,17 @@ interface TabsAndIndentsTest : JavaRecipeTest {
             }
         """,
         after = """
-            /******** Align JavaDoc with multiple '*' in margin left.
+            /******** Align JavaDoc with multiple leading '*' in margin left.
              **** Align left
              */
             public class Test {
-                /******** Align JavaDoc with multiple '*' in margin right.
+                /******** Align JavaDoc with multiple leading '*' in margin right.
                  **** Align right
                  */
                 void method() {
                 }
             }
-        """.trimIndent()
+        """
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/980")
