@@ -57,6 +57,38 @@ interface UseFilesCreateTempDirectoryTest : JavaRecipeTest {
     )
 
     @Test
+    fun useFilesCreateTempDirectoryWithParentDir() = assertChanged(
+        before = """
+            import java.io.File;
+            import java.io.IOException;
+            import java.nio.file.Files;
+            
+            class A {
+                File testData = Files.createTempDirectory("").toFile();
+                void b() throws IOException {
+                    File tmpDir = File.createTempFile("test", "dir", testData);
+                    tmpDir.delete();
+                    tmpDir.mkdir();
+                    System.out.println(tmpDir.getAbsolutePath());
+                }
+            }
+        """,
+        after = """
+            import java.io.File;
+            import java.io.IOException;
+            import java.nio.file.Files;
+            
+            class A {
+                File testData = Files.createTempDirectory("").toFile();
+                void b() throws IOException {
+                    File tmpDir = Files.createTempDirectory(testData.toPath(), "test").toFile();
+                    System.out.println(tmpDir.getAbsolutePath());
+                }
+            }
+        """
+    )
+
+    @Test
     fun useFilesCreateTempDirectory2() = assertChanged(
         before = """
             import java.io.File;
@@ -128,7 +160,6 @@ interface UseFilesCreateTempDirectoryTest : JavaRecipeTest {
                 }
             }
         """
-
     )
 
 }

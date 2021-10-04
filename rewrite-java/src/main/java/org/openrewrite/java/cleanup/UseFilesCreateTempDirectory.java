@@ -134,20 +134,27 @@ public class UseFilesCreateTempDirectory extends Recipe {
 
         @Nullable
         private Statement toCreateTempDirectoryStatement(Statement statement) {
-            String templateString = null;
+            StringBuilder templateString = new StringBuilder();
             if (statement instanceof J.Assignment) {
                 J.Identifier ident = getIdent(statement);
                 if (ident != null) {
-                    templateString = ident.getSimpleName();
+                    templateString.append(ident.getSimpleName());
                 }
             } else if (statement instanceof J.VariableDeclarations) {
                 J.VariableDeclarations varD = (J.VariableDeclarations) statement;
-                templateString = "File " + varD.getVariables().get(0).getName().getSimpleName();
+                templateString.append("File ").append(varD.getVariables().get(0).getName().getSimpleName());
             }
-            if (templateString != null) {
-                templateString = templateString + " = Files.createTempDirectory(#{any()}).toFile()";
-                JavaTemplate template = JavaTemplate.builder(this::getCursor, templateString).imports("java.nio.file.Files").build();
-                return statement.withTemplate(template, statement.getCoordinates().replace(), getArg(statement));
+            if (templateString.length() > 0) {
+                Object[] args = getArgs(statement);
+                templateString.append(" = Files.createTempDirectory(");
+                if (args.length == 1) {
+                    templateString.append("#{any()}");
+                } else if (args.length == 2) {
+                    templateString.append("#{any(java.io.File)}.toPath(), #{any()}");
+                }
+                templateString.append(").toFile()");
+                JavaTemplate template = JavaTemplate.builder(this::getCursor, templateString.toString()).imports("java.nio.file.Files").build();
+                return statement.withTemplate(template, statement.getCoordinates().replace(), args);
             }
             return null;
         }
@@ -192,18 +199,22 @@ public class UseFilesCreateTempDirectory extends Recipe {
         }
 
         @Nullable
-        private Expression getArg(J createFileStatement) {
+        private Object[] getArgs(J createFileStatement) {
+            List<Expression> args = null;
             if (createFileStatement instanceof J.Assignment) {
                 J.Assignment assignment = (J.Assignment) createFileStatement;
-                return ((J.MethodInvocation) assignment.getAssignment()).getArguments().get(0);
+                args = ((J.MethodInvocation) assignment.getAssignment()).getArguments();
             } else if (createFileStatement instanceof J.VariableDeclarations) {
                 J.VariableDeclarations var = (J.VariableDeclarations) createFileStatement;
                 J.MethodInvocation initializer = (J.MethodInvocation) var.getVariables().get(0).getInitializer();
                 if (initializer != null) {
-                    return initializer.getArguments().get(0);
+                    args = initializer.getArguments();
                 }
             }
-            return null;
+            if (args != null) {
+                return args.size() == 3 ? new Object[]{args.get(2), args.get(0)} : new Object[]{args.get(0)};
+            }
+            return new Object[0];
         }
     }
 }
