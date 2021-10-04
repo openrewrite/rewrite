@@ -75,7 +75,12 @@ public class XmlParser implements Parser<Xml.Document> {
 
     @Override
     public boolean accept(Path path) {
-        return path.toString().endsWith(".xml");
+        return path.toString().endsWith(".xml") ||
+                path.toString().endsWith(".wsdl") ||
+                path.toString().endsWith(".xhtml") ||
+                path.toString().endsWith(".xsd") ||
+                path.toString().endsWith(".xsl") ||
+                path.toString().endsWith(".xslt");
     }
 
     private static class ForwardingErrorListener extends BaseErrorListener {
