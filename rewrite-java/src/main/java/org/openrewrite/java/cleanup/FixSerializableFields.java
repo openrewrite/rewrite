@@ -76,7 +76,7 @@ public class FixSerializableFields extends Recipe {
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
         Set<String> serializableTargets = new HashSet<>();
 
-        if (!markAllAsTransient) {
+        if (markAllAsTransient == null || !markAllAsTransient) {
             //Search all serializable classes for fields that are not serializable and collect those FQNs.
             Set<String> serializableCandidates = new HashSet<>();
             FindSerializableCandidatesVisitor candidateSearchVisitor = new FindSerializableCandidatesVisitor();
