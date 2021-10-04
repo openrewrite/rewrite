@@ -30,9 +30,4 @@ public interface Marker extends Tree {
     default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
         return false;
     }
-
-    @Override
-    default <P> TreeVisitor<?, P> formatter(@Nullable Tree stopAfter, Cursor cursor) {
-        return TreeVisitor.noop();
-    }
 }

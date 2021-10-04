@@ -1184,12 +1184,6 @@ public interface J extends Serializable, Tree {
             return new JavaPrinter<>();
         }
 
-        @SuppressWarnings("unchecked")
-        @Override
-        public JavaTemplate template(Cursor cursor, String code) {
-            return JavaTemplate.builder(() -> cursor, code).build();
-        }
-
         private TypeCache typeCache() {
             TypeCache cache;
             if (this.typesInUse == null) {

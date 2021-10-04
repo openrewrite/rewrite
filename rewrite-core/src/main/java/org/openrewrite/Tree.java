@@ -67,14 +67,6 @@ public interface Tree {
         return cursor.firstEnclosingOrThrow(SourceFile.class).printer(cursor);
     }
 
-    default <P> TreeVisitor<?, P> formatter(@Nullable Tree stopAfter, Cursor cursor) {
-        return cursor.firstEnclosingOrThrow(SourceFile.class).formatter(stopAfter, cursor);
-    }
-
-    default <T extends Tree, C extends Coordinates> SourceTemplate<T, C> template(Cursor cursor, String code) {
-        return cursor.firstEnclosingOrThrow(SourceFile.class).template(cursor, code);
-    }
-
     default <P> String print(P p, Cursor cursor) {
         PrintOutputCapture<P> outputCapture = new PrintOutputCapture<>(p);
         this.<P>printer(cursor).visit(this, outputCapture, cursor);
