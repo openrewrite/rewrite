@@ -91,7 +91,7 @@ public class XmlParser implements Parser<Xml.Document> {
         public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
                                 int line, int charPositionInLine, String msg, RecognitionException e) {
             ctx.getOnError().accept(new XmlParsingException(sourcePath,
-                    String.format("Syntax error in %s at line %d:%d %s.", sourcePath.toString(), line, charPositionInLine, msg), e));
+                    String.format("Syntax error in %s at line %d:%d %s.", sourcePath, line, charPositionInLine, msg), e));
         }
     }
 }

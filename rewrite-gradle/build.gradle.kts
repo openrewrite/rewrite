@@ -1,7 +1,15 @@
 dependencies {
     api(project(":rewrite-groovy"))
-    implementation("dev.gradleplugins:gradle-api:7.2")
+    implementation("dev.gradleplugins:gradle-api:latest.release")
     implementation("org.gradle:gradle-tooling-api:latest.release")
+
+    implementation("dev.gradleplugins:gradle-api:latest.release")
+    implementation("org.gradle:gradle-tooling-api:latest.release")
+    implementation("com.squareup.okhttp3:okhttp:latest.release")
+
+    // FIXME: switch to `latest.release`
+    // when https://github.com/resilience4j/resilience4j/issues/1472 is resolved
+    implementation("io.github.resilience4j:resilience4j-retry:1.7.0")
 
     testImplementation(project(":rewrite-test")) {
         // because gradle-api fatjars this implementation already
