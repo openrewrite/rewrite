@@ -13,14 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle
+package org.openrewrite.gradle.search
 
-import org.openrewrite.Parser
-import org.openrewrite.groovy.GroovyParser
-import org.openrewrite.groovy.GroovyRecipeTest
-import org.openrewrite.groovy.tree.G
+import org.junit.jupiter.api.Test
+import org.openrewrite.gradle.GradleRecipeTest
 
-interface GradleRecipeTest : GroovyRecipeTest {
-    override val parser: Parser<G.CompilationUnit>
-        get() = GradleParser(GroovyParser.builder())
+class FindDependencyHandlerTest : GradleRecipeTest {
+    @Test
+    fun findDependenciesBlock() = assertChanged(
+        recipe = fromRuntimeClasspath("org.openrewrite.gradle.search.FindDependencyHandler"),
+        before = """
+            dependencies {
+                api 'com.google.guava:guava:23.0'
+            }
+        """,
+        after = """
+            /*~~>*/dependencies {
+                api 'com.google.guava:guava:23.0'
+            }
+        """
+    )
 }

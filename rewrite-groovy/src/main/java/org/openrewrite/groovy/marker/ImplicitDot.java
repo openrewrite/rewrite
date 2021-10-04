@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle
+package org.openrewrite.groovy.marker;
 
-import org.openrewrite.Parser
-import org.openrewrite.groovy.GroovyParser
-import org.openrewrite.groovy.GroovyRecipeTest
-import org.openrewrite.groovy.tree.G
+import lombok.Value;
+import org.openrewrite.marker.Marker;
 
-interface GradleRecipeTest : GroovyRecipeTest {
-    override val parser: Parser<G.CompilationUnit>
-        get() = GradleParser(GroovyParser.builder())
+import java.util.UUID;
+
+@Value
+public class ImplicitDot implements Marker {
+    UUID id;
 }

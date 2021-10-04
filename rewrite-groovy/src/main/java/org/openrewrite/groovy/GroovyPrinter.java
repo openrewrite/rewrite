@@ -17,10 +17,7 @@ package org.openrewrite.groovy;
 
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
-import org.openrewrite.groovy.marker.ImplicitReturn;
-import org.openrewrite.groovy.marker.NullSafe;
-import org.openrewrite.groovy.marker.OmitParentheses;
-import org.openrewrite.groovy.marker.Semicolon;
+import org.openrewrite.groovy.marker.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.groovy.tree.GContainer;
 import org.openrewrite.groovy.tree.GRightPadded;
@@ -29,6 +26,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markers;
 
 import java.util.List;
 
@@ -176,8 +174,12 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         public J visitMethodInvocation(J.MethodInvocation method, PrintOutputCapture<P> p) {
             visitSpace(method.getPrefix(), Space.Location.METHOD_INVOCATION_PREFIX, p);
             visitMarkers(method.getMarkers(), p);
+
+            Markers nameMarkers = method.getName().getMarkers();
             visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT,
-                    method.getName().getMarkers().findFirst(NullSafe.class).isPresent() ? "?." : ".", p);
+                    nameMarkers.findFirst(ImplicitDot.class).isPresent() ? "" :
+                            nameMarkers.findFirst(NullSafe.class).isPresent() ? "?." : ".", p);
+
             visitContainer("<", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
             visit(method.getName(), p);
 

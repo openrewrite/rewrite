@@ -20,6 +20,7 @@ import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.ast.MethodNode;
+import org.codehaus.groovy.transform.stc.StaticTypesMarker;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -53,11 +54,11 @@ class TypeMapping {
                 type(node.getReturnType(), emptyList()),
                 Arrays.stream(node.getParameters())
                         .map(p -> {
-                            JavaType.FullyQualified fqn = (JavaType.FullyQualified) type(p.getOriginType(), emptyList());
-                            if(fqn instanceof JavaType.Parameterized) {
-                                return ((JavaType.Parameterized) fqn).getType();
+                            JavaType paramType = type(p.getOriginType(), emptyList());
+                            if(paramType instanceof JavaType.Parameterized) {
+                                return ((JavaType.Parameterized) paramType).getType();
                             }
-                            return fqn;
+                            return paramType;
                         })
                         .collect(Collectors.toList())
         );
@@ -102,7 +103,7 @@ class TypeMapping {
                     parameterizedType(node.getTypeClass(), node.getGenericsTypes(), stack) :
                     type(node.getTypeClass(), stack);
         } catch (GroovyBugError ignored) {
-            return null;
+            return JavaType.Class.build(node.getName());
         }
     }
 

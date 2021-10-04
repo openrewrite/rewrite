@@ -60,7 +60,7 @@ public interface Parser<S extends SourceFile> {
         return parseInputs(
                 Arrays.stream(sources).map(source ->
                         new Input(
-                                Paths.get(Long.toString(System.nanoTime())),
+                                randomSourceName(),
                                 () -> new ByteArrayInputStream(source.getBytes()),
                                 true
                         )
@@ -177,5 +177,9 @@ public interface Parser<S extends SourceFile> {
         public int hashCode() {
             return Objects.hash(path);
         }
+    }
+
+    default Path randomSourceName() {
+        return Paths.get(Long.toString(System.nanoTime()));
     }
 }

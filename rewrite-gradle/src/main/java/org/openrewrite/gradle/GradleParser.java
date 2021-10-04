@@ -22,7 +22,6 @@ import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Statement;
 
 import java.io.ByteArrayInputStream;
 import java.io.SequenceInputStream;
@@ -47,10 +46,19 @@ public class GradleParser implements Parser<G.CompilationUnit> {
         DefaultImportsReader reader = new DefaultImportsReader();
         preamble = Arrays.stream(reader.getImportPackages())
                 .map(i -> "import " + i + ".*")
-                .collect(Collectors.joining("\n", "",
-                        "\nclass RewriteGradleProject extends " +
-                                "org.gradle.api.internal.project.DefaultProject {" +
-                                "void __script__() {"));
+                .collect(Collectors.joining("\n", "", "\n" +
+                        "interface PluginSpec {\n" +
+                        "  Plugin id(String i)\n" +
+                        "}\n" +
+                        "interface Plugin {\n" +
+                        "  Plugin version(String v)\n" +
+                        "  Plugin apply(boolean a)\n" +
+                        "}\n" +
+                        "class RewriteGradleProject extends " +
+                        "org.gradle.api.internal.project.DefaultProject {\n" +
+                        "void plugins(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=PluginSpec) Closure cl) {}\n" +
+                        "void __script__() {")
+                );
     }
 
     @Override
@@ -63,7 +71,7 @@ public class GradleParser implements Parser<G.CompilationUnit> {
                                         Collections.enumeration(Arrays.asList(
                                                 new ByteArrayInputStream(preamble.getBytes(StandardCharsets.UTF_8)),
                                                 source.getSource(),
-                                                new ByteArrayInputStream(new byte[] { '}', '}' })
+                                                new ByteArrayInputStream(new byte[]{'}', '}'})
                                         ))
                                 ),
                                 source.isSynthetic()
@@ -73,7 +81,9 @@ public class GradleParser implements Parser<G.CompilationUnit> {
 
         return groovyParser.parseInputs(gradleWrapped, relativeTo, ctx).stream()
                 .map(cu -> {
-                    J.MethodDeclaration script = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+                    J.MethodDeclaration script = (J.MethodDeclaration) cu.getClasses()
+                            .get(cu.getClasses().size() - 1)
+                            .getBody().getStatements().get(1);
                     assert script.getBody() != null;
                     return cu.withStatements(script.getBody().getStatements());
                 })
@@ -83,5 +93,10 @@ public class GradleParser implements Parser<G.CompilationUnit> {
     @Override
     public boolean accept(Path path) {
         return path.toString().endsWith(".gradle");
+    }
+
+    @Override
+    public Path randomSourceName() {
+        return Parser.super.randomSourceName().resolve("/build.gradle");
     }
 }

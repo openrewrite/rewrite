@@ -13,14 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle
+@NonNullApi
+package org.openrewrite.gradle.search;
 
-import org.openrewrite.Parser
-import org.openrewrite.groovy.GroovyParser
-import org.openrewrite.groovy.GroovyRecipeTest
-import org.openrewrite.groovy.tree.G
-
-interface GradleRecipeTest : GroovyRecipeTest {
-    override val parser: Parser<G.CompilationUnit>
-        get() = GradleParser(GroovyParser.builder())
-}
+import org.openrewrite.internal.lang.NonNullApi;

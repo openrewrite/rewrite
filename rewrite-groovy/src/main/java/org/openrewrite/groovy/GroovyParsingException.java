@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2020 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,14 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle
+package org.openrewrite.groovy;
 
-import org.openrewrite.Parser
-import org.openrewrite.groovy.GroovyParser
-import org.openrewrite.groovy.GroovyRecipeTest
-import org.openrewrite.groovy.tree.G
-
-interface GradleRecipeTest : GroovyRecipeTest {
-    override val parser: Parser<G.CompilationUnit>
-        get() = GradleParser(GroovyParser.builder())
+public class GroovyParsingException extends Exception {
+    public GroovyParsingException(String message, Throwable t) {
+        super(message, t);
+    }
 }

@@ -28,10 +28,7 @@ import org.codehaus.groovy.transform.stc.StaticTypesMarker;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.groovy.marker.ImplicitReturn;
-import org.openrewrite.groovy.marker.NullSafe;
-import org.openrewrite.groovy.marker.OmitParentheses;
-import org.openrewrite.groovy.marker.Semicolon;
+import org.openrewrite.groovy.marker.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.Expression;
@@ -74,7 +71,7 @@ public class GroovyParserVisitor {
         this.ctx = ctx;
     }
 
-    public G.CompilationUnit visit(SourceUnit unit, ModuleNode ast) {
+    public G.CompilationUnit visit(SourceUnit unit, ModuleNode ast) throws GroovyParsingException {
         for (ClassNode aClass : ast.getClasses()) {
             new StaticTypeCheckingVisitor(unit, aClass).visitClass(aClass);
         }
@@ -122,8 +119,15 @@ public class GroovyParserVisitor {
 
         List<JRightPadded<Statement>> statements = new ArrayList<>(sortedByPosition.size());
         for (List<ASTNode> values : sortedByPosition.values()) {
-            for (ASTNode value : values) {
-                statements.add(convertTopLevelStatement(unit, value));
+            try {
+                for (ASTNode value : values) {
+                    statements.add(convertTopLevelStatement(unit, value));
+                }
+            } catch (Throwable t) {
+                throw new GroovyParsingException(
+                        "Failed to parse at cursor position " + cursor +
+                                ". The next 10 characters in the original source are `" +
+                                source.substring(cursor, Math.min(source.length(), cursor + 10)) + "`", t);
             }
         }
 
@@ -261,8 +265,43 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        protected void visitAnnotation(AnnotationNode annotation) {
+            RewriteGroovyVisitor bodyVisitor = new RewriteGroovyVisitor(annotation);
+
+            String lastArgKey = annotation.getMembers().keySet().stream().reduce("", (k1, k2) -> k2);
+
+            queue.add(
+                    new J.Annotation(randomId(), sourceBefore("@"), Markers.EMPTY,
+                            visitTypeTree(annotation.getClassNode()),
+                            JContainer.build(
+                                    sourceBefore("("),
+                                    annotation.getMembers().entrySet().stream()
+                                            .map(arg -> {
+                                                Space argPrefix = sourceBefore(arg.getKey());
+                                                J.Identifier argName = J.Identifier.build(randomId(), EMPTY, Markers.EMPTY, arg.getKey(), null);
+                                                J.Assignment assign = new J.Assignment(randomId(), argPrefix, Markers.EMPTY,
+                                                        argName, padLeft(sourceBefore("="), bodyVisitor.visit(arg.getValue())),
+                                                        null);
+                                                return JRightPadded.build((Expression) assign)
+                                                        .withAfter(arg.getKey().equals(lastArgKey) ? sourceBefore(")") : sourceBefore(","));
+                                            })
+                                            .collect(Collectors.toList()),
+                                    Markers.EMPTY
+                            )
+                    )
+            );
+        }
+
+        @Override
         public void visitMethod(MethodNode method) {
             Space fmt = whitespace();
+
+            List<J.Annotation> annotations = method.getAnnotations().stream()
+                    .map(a -> {
+                        visitAnnotation(a);
+                        return (J.Annotation) pollQueue();
+                    })
+                    .collect(Collectors.toList());
 
             List<J.Modifier> modifiers = visitModifiers(method.getModifiers());
 
@@ -282,6 +321,14 @@ public class GroovyParserVisitor {
             Parameter[] unparsedParams = method.getParameters();
             for (int i = 0; i < unparsedParams.length; i++) {
                 Parameter param = unparsedParams[i];
+
+                List<J.Annotation> paramAnnotations = param.getAnnotations().stream()
+                        .map(a -> {
+                            visitAnnotation(a);
+                            return (J.Annotation) pollQueue();
+                        })
+                        .collect(Collectors.toList());
+
                 TypeTree paramType = visitTypeTree(param.getOriginType());
                 JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
                         new J.VariableDeclarations.NamedVariable(randomId(), whitespace(), Markers.EMPTY,
@@ -293,7 +340,7 @@ public class GroovyParserVisitor {
                 Space rightPad = sourceBefore(i == unparsedParams.length - 1 ? ")" : ",");
 
                 params.add(JRightPadded.build((Statement) new J.VariableDeclarations(randomId(), paramType.getPrefix(),
-                        Markers.EMPTY, emptyList(), emptyList(), paramType.withPrefix(EMPTY),
+                        Markers.EMPTY, paramAnnotations, emptyList(), paramType.withPrefix(EMPTY),
                         null, emptyList(),
                         singletonList(paramName))).withAfter(rightPad));
             }
@@ -307,11 +354,13 @@ public class GroovyParserVisitor {
                     bodyVisitor.visitRightPadded(method.getExceptions(), ",", null),
                     Markers.EMPTY
             );
-            J.Block body = bodyVisitor.visit(method.getCode());
+
+            J.Block body = method.getCode() == null ? null :
+                    bodyVisitor.visit(method.getCode());
 
             queue.add(new J.MethodDeclaration(
                     randomId(), fmt, Markers.EMPTY,
-                    emptyList(),
+                    annotations,
                     modifiers,
                     null,
                     returnType,
@@ -734,16 +783,28 @@ public class GroovyParserVisitor {
         public void visitMethodCallExpression(MethodCallExpression call) {
             Space fmt = whitespace();
 
+            ImplicitDot implicitDot = null;
             JRightPadded<Expression> select = null;
             if (!call.isImplicitThis()) {
-                select = JRightPadded.build((Expression) visit(call.getObjectExpression()))
-                        .withAfter(sourceBefore(call.isSafe() ? "?." : "."));
+                Expression selectExpr = visit(call.getObjectExpression());
+                int saveCursor = cursor;
+                Space afterSelect = whitespace();
+                if (source.charAt(cursor) == '.' || source.charAt(cursor) == '?') {
+                    cursor = saveCursor;
+                    afterSelect = sourceBefore(call.isSafe() ? "?." : ".");
+                } else {
+                    implicitDot = new ImplicitDot(randomId());
+                }
+                select = JRightPadded.build(selectExpr).withAfter(afterSelect);
             }
 
             J.Identifier name = J.Identifier.build(randomId(), sourceBefore(call.getMethodAsString()), Markers.EMPTY,
                     call.getMethodAsString(), null);
             if (call.isSafe()) {
                 name = name.withMarkers(name.getMarkers().add(new NullSafe(randomId())));
+            }
+            if (implicitDot != null) {
+                name = name.withMarkers(name.getMarkers().add(implicitDot));
             }
 
             JContainer<Expression> args = visit(call.getArguments());

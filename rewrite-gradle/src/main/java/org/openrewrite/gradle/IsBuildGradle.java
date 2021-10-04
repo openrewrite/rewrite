@@ -13,14 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle
+package org.openrewrite.gradle;
 
-import org.openrewrite.Parser
-import org.openrewrite.groovy.GroovyParser
-import org.openrewrite.groovy.GroovyRecipeTest
-import org.openrewrite.groovy.tree.G
+import org.openrewrite.SourceFile;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 
-interface GradleRecipeTest : GroovyRecipeTest {
-    override val parser: Parser<G.CompilationUnit>
-        get() = GradleParser(GroovyParser.builder())
+public class IsBuildGradle<P> extends JavaIsoVisitor<P> {
+    @Override
+    public J visitJavaSourceFile(JavaSourceFile cu, P p) {
+        SourceFile sourceFile = (SourceFile) cu;
+        if ("build.gradle".equals(sourceFile.getSourcePath().toFile().getName())) {
+            return sourceFile.withMarkers(sourceFile.getMarkers().searchResult());
+        }
+        return super.visitJavaSourceFile(cu, p);
+    }
 }

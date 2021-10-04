@@ -13,14 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle
+package org.openrewrite.gradle.search
 
-import org.openrewrite.Parser
-import org.openrewrite.groovy.GroovyParser
-import org.openrewrite.groovy.GroovyRecipeTest
-import org.openrewrite.groovy.tree.G
+import org.junit.jupiter.api.Test
+import org.openrewrite.gradle.GradleRecipeTest
+import org.openrewrite.java.search.FindMethods
 
-interface GradleRecipeTest : GroovyRecipeTest {
-    override val parser: Parser<G.CompilationUnit>
-        get() = GradleParser(GroovyParser.builder())
+class FindPluginTest : GradleRecipeTest {
+    @Test
+    fun findPlugin() = assertChanged(
+        recipe = FindPlugin("com.jfrog.bintray"),
+        before = """
+            plugins {
+                id 'com.jfrog.bintray' version '1.8.5'
+            }
+        """,
+        after = """
+            plugins {
+                /*~~>*/id 'com.jfrog.bintray' version '1.8.5'
+            }
+        """
+    )
 }
