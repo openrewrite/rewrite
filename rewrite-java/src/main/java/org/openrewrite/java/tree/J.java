@@ -1162,7 +1162,7 @@ public interface J extends Serializable, Tree {
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
-            return v.visitCompilationUnit(this, p);
+            return v.visitJavaSourceFile(this, p);
         }
 
         public Set<NameTree> findType(String clazz) {
