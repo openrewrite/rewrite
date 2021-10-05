@@ -31,6 +31,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
             JRightPadded<? extends J> node = nodes.get(i);
             visit(node.getElement(), p);
             visitSpace(node.getAfter(), location.getAfterLocation(), p);
+            visitMarkers(node.getMarkers(), p);
             if (i < nodes.size() - 1) {
                 p.out.append(suffixBetween);
             }

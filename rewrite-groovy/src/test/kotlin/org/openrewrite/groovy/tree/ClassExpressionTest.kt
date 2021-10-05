@@ -17,13 +17,14 @@ package org.openrewrite.groovy.tree
 
 import org.junit.jupiter.api.Test
 
-class MapEntryTest : GroovyTreeTest {
+class ClassExpressionTest : GroovyTreeTest {
 
     @Test
-    fun mapEntryMethodArguments() = assertParsePrintAndProcess("apply plugin: 'java'")
-
-    @Test
-    fun multipleEntries() = assertParsePrintAndProcess("""
-        exclude(group: 'g', module: 'm')
-    """.trimIndent())
+    fun classExpressions() = assertParsePrintAndProcess(
+        """
+            maven( List , List ) {
+                from(components.java)
+            }
+        """
+    )
 }

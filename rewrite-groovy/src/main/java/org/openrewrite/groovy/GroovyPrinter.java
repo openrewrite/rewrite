@@ -151,7 +151,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             }
             if (lambda.getBody() instanceof J.Block) {
                 J.Block block = (J.Block) lambda.getBody();
-                visit(block.getStatements(), p);
+                visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
                 visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
             } else {
                 visit(lambda.getBody(), p);
@@ -194,12 +194,13 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
                 if (i == 0 && !omitParens) {
                     p.out.append('(');
+                } else if(i > 0 && omitParens) {
+                    p.out.append(')');
+                } else if(i > 0) {
+                    p.out.append(',');
                 }
 
                 visitRightPadded(arg, JRightPadded.Location.METHOD_INVOCATION_ARGUMENT, p);
-                if (i < args.size() - 1) {
-                    p.out.append(',');
-                }
 
                 if (i == args.size() - 1 && !omitParens) {
                     p.out.append(')');

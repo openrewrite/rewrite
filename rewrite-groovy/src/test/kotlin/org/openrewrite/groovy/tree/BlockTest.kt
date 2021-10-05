@@ -17,13 +17,13 @@ package org.openrewrite.groovy.tree
 
 import org.junit.jupiter.api.Test
 
-class MapEntryTest : GroovyTreeTest {
-
+class BlockTest: GroovyTreeTest {
     @Test
-    fun mapEntryMethodArguments() = assertParsePrintAndProcess("apply plugin: 'java'")
-
-    @Test
-    fun multipleEntries() = assertParsePrintAndProcess("""
-        exclude(group: 'g', module: 'm')
-    """.trimIndent())
+    fun block() = assertParsePrintAndProcess(
+        """
+            implementation ('org.thymeleaf:thymeleaf-spring4:3.0.6.RELEASE') {
+                force = true;
+            }
+        """.trimIndent()
+    )
 }
