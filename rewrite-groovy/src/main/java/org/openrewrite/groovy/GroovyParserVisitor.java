@@ -705,8 +705,7 @@ public class GroovyParserVisitor {
                 // def (a, b) = [1, 2]
                 throw new UnsupportedOperationException("FIXME");
             } else {
-                Object it = visit(expression.getVariableExpression());
-                J.Identifier name = (J.Identifier) it;
+                J.Identifier name = visit(expression.getVariableExpression());
                 namedVariable = new J.VariableDeclarations.NamedVariable(
                         randomId(),
                         name.getPrefix(),
@@ -767,6 +766,47 @@ public class GroovyParserVisitor {
                         new J.ForLoop.Control(randomId(), controlFmt,
                                 Markers.EMPTY, init, condition, update),
                         JRightPadded.build(visit(forLoop.getLoopBlock()))));
+            } else {
+                Parameter param = forLoop.getVariable();
+
+                // Only GroovyClassVisitor has a "visitAnnotations", need to do something to access that from here
+//                List<J.Annotation> paramAnnotations = param.getAnnotations().stream()
+//                        .map(a -> {
+//                            visitAnnotation(a);
+//                            return (J.Annotation) pollQueue();
+//                        })
+//                        .collect(Collectors.toList());
+
+                TypeTree paramType = visitTypeTree(param.getOriginType());
+                JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
+                        new J.VariableDeclarations.NamedVariable(randomId(), whitespace(), Markers.EMPTY,
+                                J.Identifier.build(randomId(), EMPTY, Markers.EMPTY, param.getName(), null),
+                                emptyList(), null, null)
+                );
+                cursor += param.getName().length();
+                Space rightPad = whitespace();
+                boolean javaStyleForEach = source.charAt(cursor) == ':';
+                Markers forEachMarkers = Markers.EMPTY;
+                if(javaStyleForEach) {
+                    cursor++; // Skip ":"
+                } else {
+                    cursor += 2; // Skip "in"
+                    forEachMarkers = forEachMarkers.add(new InStyleForEachLoop(randomId()));
+                }
+
+                JRightPadded<J.VariableDeclarations> variable = JRightPadded.build(new J.VariableDeclarations(randomId(), paramType.getPrefix(),
+                        Markers.EMPTY, emptyList(), emptyList(), paramType.withPrefix(EMPTY),
+                        null, emptyList(),
+                        singletonList(paramName))
+                ).withAfter(rightPad);
+
+                JRightPadded<Expression> iterable = JRightPadded.build((Expression)visit(forLoop.getCollectionExpression()))
+                        .withAfter(sourceBefore(")"));
+
+                queue.add(new J.ForEachLoop(randomId(), fmt, forEachMarkers,
+                        new J.ForEachLoop.Control(randomId(), EMPTY, Markers.EMPTY, variable, iterable),
+                        JRightPadded.build(visit(forLoop.getLoopBlock())))
+                );
             }
         }
 
