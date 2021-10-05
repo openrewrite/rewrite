@@ -358,6 +358,10 @@ class Java11NoEmptyCollectionWithRawTypeTest : Java11Test, NoEmptyCollectionWith
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11ObjectFinalizeCallsSuperTest : Java11Test, ObjectFinalizeCallsSuperTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11OperatorWrapTest : Java11Test, OperatorWrapTest
 
 @DebugOnly

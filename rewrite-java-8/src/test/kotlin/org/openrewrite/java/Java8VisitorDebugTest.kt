@@ -354,6 +354,10 @@ class Java8NoEmptyCollectionWithRawTypeTest : Java8Test, NoEmptyCollectionWithRa
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8ObjectFinalizeCallsSuperTest : Java8Test, ObjectFinalizeCallsSuperTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8OperatorWrapTest : Java8Test, OperatorWrapTest
 
 @DebugOnly

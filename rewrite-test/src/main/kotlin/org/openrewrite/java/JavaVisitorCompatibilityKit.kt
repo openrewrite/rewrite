@@ -286,6 +286,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class NoEmptyCollectionWithRawTypeTck : NoEmptyCollectionWithRawTypeTest
 
     @Nested
+    inner class ObjectFinalizeCallsSuperTck : ObjectFinalizeCallsSuperTest
+
+    @Nested
     inner class OperatorWrapTck : OperatorWrapTest
 
     @Nested
