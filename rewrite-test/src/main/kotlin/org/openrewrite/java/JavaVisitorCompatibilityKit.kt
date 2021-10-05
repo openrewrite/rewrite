@@ -145,18 +145,6 @@ abstract class JavaVisitorCompatibilityKit {
     inner class ForLoopIncrementInUpdateTck : ForLoopIncrementInUpdateTest
 
     @Nested
-    inner class LineCounterTck : LineCounterTest
-
-    @Nested
-    inner class NoBoubleBraceInitializationTck : NoDoubleBraceInitializationTest
-
-    @Nested
-    inner class StaticMethodNotFinalTck : StaticMethodNotFinalTest
-
-    @Nested
-    inner class TypeCacheTck : TypeCacheTest
-
-    @Nested
     inner class FindAnnotationsTck : FindAnnotationsTest
 
     @Nested
@@ -176,7 +164,6 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class FindInheritedFieldsTck : FindInheritedFieldsTest
-
 
     @Nested
     inner class FindDeprecatedMethodsTck : FindDeprecatedMethodsTest
@@ -230,6 +217,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class LambdaBlockToExpressionTck : LambdaBlockToExpressionTest
 
     @Nested
+    inner class LineCounterTck : LineCounterTest
+
+    @Nested
     inner class MaybeUsesImportTck : MaybeUsesImportTest
 
     @Nested
@@ -254,7 +244,16 @@ abstract class JavaVisitorCompatibilityKit {
     inner class NeedBracesTck : NeedBracesTest
 
     @Nested
+    inner class NestedEnumsAreNotStaticTck : NestedEnumsAreNotStaticTest
+
+    @Nested
+    inner class StringBuilderBUfferNotInstantiatedWithCharTck : NewStringBuilderBufferWithCharArgumentTest
+
+    @Nested
     inner class NoEqualityInForConditionTck : NoEqualityInForConditionTest
+
+    @Nested
+    inner class NoBoubleBraceInitializationTck : NoDoubleBraceInitializationTest
 
     @Nested
     inner class NoFinalizerTck : NoFinalizerTest
@@ -326,6 +325,12 @@ abstract class JavaVisitorCompatibilityKit {
     inner class RenameVariableTck : RenameVariableTest
 
     @Nested
+    inner class RenameLocalVariablesToCamelCaseTck : RenameLocalVariablesToCamelCaseTest
+
+    @Nested
+    inner class RenameMethodsNamedHashcodeEqualOrTostringTck : RenameMethodsNamedHashcodeEqualOrTostringTest
+
+    @Nested
     inner class ReorderMethodArgumentsTck : ReorderMethodArgumentsTest
 
     @Nested
@@ -347,22 +352,16 @@ abstract class JavaVisitorCompatibilityKit {
     inner class SingleLineCommentsTck : SingleLineCommentsTest
 
     @Nested
-    inner class NestedEnumsAreNotStaticTck : NestedEnumsAreNotStaticTest
-
-    @Nested
-    inner class StringBuilderBUfferNotInstantiatedWithCharTck : NewStringBuilderBufferWithCharArgumentTest
-
-    @Nested
-    inner class RenameLocalVariablesToCamelCaseTck : RenameLocalVariablesToCamelCaseTest
-
-    @Nested
-    inner class RenameMethodsNamedHashcodeEqualOrTostringTck : RenameMethodsNamedHashcodeEqualOrTostringTest
+    inner class StaticMethodNotFinalTck : StaticMethodNotFinalTest
 
     @Nested
     inner class SpacesTck : SpacesTest
 
     @Nested
     inner class TabsAndIndentsTck : TabsAndIndentsTest
+
+    @Nested
+    inner class TypeCacheTck : TypeCacheTest
 
     @Nested
     inner class TypeTreeTck : TypeTreeTest
