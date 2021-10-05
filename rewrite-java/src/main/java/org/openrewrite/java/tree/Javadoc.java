@@ -56,11 +56,6 @@ public interface Javadoc extends Serializable, Tree {
         return new JavadocPrinter<>();
     }
 
-    @Override
-    default <P> TreeVisitor<?, P> formatter(@Nullable Tree stopAfter, Cursor cursor) {
-        return TreeVisitor.noop();
-    }
-
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With

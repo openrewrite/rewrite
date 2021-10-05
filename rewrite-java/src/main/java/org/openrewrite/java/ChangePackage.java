@@ -172,12 +172,12 @@ public class ChangePackage extends Recipe {
 
             if (original.equals(oldPackageName)) {
                 getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, RENAME_TO_KEY, newPackageName);
-                pkg = pkg.withTemplate(pkg.template(getCursor(), newPackageName), pkg.getCoordinates().replace());
+                pkg = pkg.withTemplate(JavaTemplate.builder(this::getCursor, newPackageName).build(), pkg.getCoordinates().replace());
             } else if ((recursive == null || recursive)
                     && original.startsWith(oldPackageName) && !original.startsWith(newPackageName)) {
                 String changingTo = newPackageName + original.substring(oldPackageName.length());
                 getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, RENAME_TO_KEY, changingTo);
-                pkg = pkg.withTemplate(pkg.template(getCursor(), changingTo), pkg.getCoordinates().replace());
+                pkg = pkg.withTemplate(JavaTemplate.builder(this::getCursor, changingTo).build(), pkg.getCoordinates().replace());
             }
             return pkg;
         }
