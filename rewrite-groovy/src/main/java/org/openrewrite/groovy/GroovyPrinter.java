@@ -171,6 +171,22 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitForEachLoop(J.ForEachLoop forEachLoop, PrintOutputCapture<P> p) {
+            visitSpace(forEachLoop.getPrefix(), Space.Location.FOR_EACH_LOOP_PREFIX, p);
+            visitMarkers(forEachLoop.getMarkers(), p);
+            p.out.append("for");
+            J.ForEachLoop.Control ctrl = forEachLoop.getControl();
+            visitSpace(ctrl.getPrefix(), Space.Location.FOR_EACH_CONTROL_PREFIX, p);
+            p.out.append('(');
+            String suffix = forEachLoop.getMarkers().findFirst(InStyleForEachLoop.class).isPresent() ? "in" : ":";
+            visitRightPadded(ctrl.getPadding().getVariable(), JRightPadded.Location.FOREACH_VARIABLE, suffix, p);
+            visitRightPadded(ctrl.getPadding().getIterable(), JRightPadded.Location.FOREACH_ITERABLE, "", p);
+            p.out.append(')');
+            visitStatement(forEachLoop.getPadding().getBody(), JRightPadded.Location.FOR_BODY, p);
+            return forEachLoop;
+        }
+
+        @Override
         public J visitMethodInvocation(J.MethodInvocation method, PrintOutputCapture<P> p) {
             visitSpace(method.getPrefix(), Space.Location.METHOD_INVOCATION_PREFIX, p);
             visitMarkers(method.getMarkers(), p);

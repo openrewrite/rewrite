@@ -111,7 +111,6 @@ class ForLoopTest : GroovyTreeTest {
         """
     )
 
-    @Disabled
     @Test
     fun forEachWithColon() = assertParsePrintAndProcess(
         """
@@ -119,7 +118,6 @@ class ForLoopTest : GroovyTreeTest {
         """
     )
 
-    @Disabled
     @Test
     fun forEachWithIn() = assertParsePrintAndProcess(
         """
