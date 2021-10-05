@@ -912,12 +912,34 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        public void visitShortTernaryExpression(ElvisOperatorExpression ternary) {
+            Space fmt = whitespace();
+            Expression trueExpr = visit(ternary.getBooleanExpression());
+            J.Ternary elvis = new J.Ternary(randomId(), fmt, Markers.EMPTY,
+                    trueExpr,
+                    padLeft(sourceBefore("?"), trueExpr),
+                    padLeft(sourceBefore(":"), visit(ternary.getFalseExpression())),
+                    typeMapping.type(ternary.getType()));
+            elvis = elvis.withMarkers(elvis.getMarkers().add(new Elvis(randomId())));
+            queue.add(elvis);
+        }
+
+        @Override
         public void visitSynchronizedStatement(SynchronizedStatement statement) {
             Space fmt = sourceBefore("synchronized");
             queue.add(new J.Synchronized(randomId(), fmt, Markers.EMPTY,
                     new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
                             JRightPadded.build((Expression) visit(statement.getExpression())).withAfter(sourceBefore(")"))),
                     visit(statement.getCode())));
+        }
+
+        @Override
+        public void visitTernaryExpression(TernaryExpression ternary) {
+            queue.add(new J.Ternary(randomId(), whitespace(), Markers.EMPTY,
+                    visit(ternary.getBooleanExpression()),
+                    padLeft(sourceBefore("?"), visit(ternary.getTrueExpression())),
+                    padLeft(sourceBefore(":"), visit(ternary.getFalseExpression())),
+                    typeMapping.type(ternary.getType())));
         }
 
         @Override

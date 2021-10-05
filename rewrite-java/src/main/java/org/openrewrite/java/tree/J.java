@@ -4156,7 +4156,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class Ternary implements J, Expression, TypedTree {
+    final class Ternary implements J, Expression, Statement, TypedTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -4221,6 +4221,11 @@ public interface J extends Serializable, Tree {
                 }
             }
             return p;
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
 
         @RequiredArgsConstructor

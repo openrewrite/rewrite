@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.*;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -601,6 +602,8 @@ public interface JavaType extends Serializable {
 
         @JsonCreator
         public static Parameterized build(FullyQualified type, List<JavaType> typeParameters) {
+            ObjectMapper mapper;
+
             return flyweight.find(type, typeParameters);
         }
 

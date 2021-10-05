@@ -210,9 +210,9 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
                 if (i == 0 && !omitParens) {
                     p.out.append('(');
-                } else if(i > 0 && omitParens) {
+                } else if (i > 0 && omitParens) {
                     p.out.append(')');
-                } else if(i > 0) {
+                } else if (i > 0) {
                     p.out.append(',');
                 }
 
@@ -243,6 +243,22 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
                 visitSpace(paddedStat.getAfter(), location.getAfterLocation(), p);
                 visitMarkers(paddedStat.getMarkers(), p);
             }
+        }
+
+        @Override
+        public J visitTernary(J.Ternary ternary, PrintOutputCapture<P> p) {
+            visitSpace(ternary.getPrefix(), Space.Location.TERNARY_PREFIX, p);
+            visitMarkers(ternary.getMarkers(), p);
+            visit(ternary.getCondition(), p);
+            if (ternary.getMarkers().findFirst(Elvis.class).isPresent()) {
+                visitSpace(ternary.getPadding().getTruePart().getBefore(), Space.Location.TERNARY_TRUE, p);
+                p.out.append("?:");
+                visit(ternary.getFalsePart(), p);
+            } else {
+                visitLeftPadded("?", ternary.getPadding().getTruePart(), JLeftPadded.Location.TERNARY_TRUE, p);
+                visitLeftPadded(":", ternary.getPadding().getFalsePart(), JLeftPadded.Location.TERNARY_FALSE, p);
+            }
+            return ternary;
         }
 
         @Override
