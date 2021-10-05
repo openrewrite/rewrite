@@ -769,14 +769,6 @@ public class GroovyParserVisitor {
             } else {
                 Parameter param = forLoop.getVariable();
 
-                // Only GroovyClassVisitor has a "visitAnnotations", need to do something to access that from here
-//                List<J.Annotation> paramAnnotations = param.getAnnotations().stream()
-//                        .map(a -> {
-//                            visitAnnotation(a);
-//                            return (J.Annotation) pollQueue();
-//                        })
-//                        .collect(Collectors.toList());
-
                 TypeTree paramType = visitTypeTree(param.getOriginType());
                 JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
                         new J.VariableDeclarations.NamedVariable(randomId(), whitespace(), Markers.EMPTY,
