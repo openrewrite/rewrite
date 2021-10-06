@@ -22,7 +22,7 @@ public class NoPrimitiveWrappersForToStringOrCompareTo extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "No primitive wrappers for #toString() or #compareTo()";
+        return "No primitive wrappers for #toString() or #compareTo(..)";
     }
 
     @Override
