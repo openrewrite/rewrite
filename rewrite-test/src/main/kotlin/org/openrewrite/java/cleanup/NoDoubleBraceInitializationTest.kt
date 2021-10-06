@@ -41,6 +41,30 @@ interface NoDoubleBraceInitializationTest : JavaRecipeTest {
     )
 
     @Test
+    fun doubleBranchInitializationForNewClassArg() = assertUnchanged(
+        dependsOn = arrayOf("""
+            package abc;
+            import java.util.List;
+            
+            public class Thing {
+                private final List<String> stuff;
+                public Thing(List<String> stuff) {
+                    this.stuff = stuff;
+                }
+            }
+        """),
+        before = """
+            package abc;
+            import java.util.ArrayList;
+            import java.util.List;
+            
+            class A {
+                Thing t = new Thing(new ArrayList<String>(){{add("abc"); add("def");}});
+            }
+        """
+    )
+
+    @Test
     fun doubleBraceInitWithinConstructorArg() = assertUnchanged(
         before = """
             import java.util.List;
@@ -163,6 +187,33 @@ interface NoDoubleBraceInitializationTest : JavaRecipeTest {
                     String s = "x";
                     Map<String, String> bMap = new HashMap();
                     s.concat("z");
+                    bMap.put("a", "A");
+                    bMap.put("b", "B");
+                }
+            }
+        """
+    )
+
+    @Test
+    fun selectIsThis() = assertChanged(
+        before = """
+            import java.util.HashMap;
+            import java.util.Map;
+            class A {
+                void example() {
+                    Map<String, String> bMap = new HashMap(){{
+                        this.put("a", "A");
+                        this.put("b", "B");
+                    }};
+                }
+            }
+        """,
+        after = """
+            import java.util.HashMap;
+            import java.util.Map;
+            class A {
+                void example() {
+                    Map<String, String> bMap = new HashMap();
                     bMap.put("a", "A");
                     bMap.put("b", "B");
                 }

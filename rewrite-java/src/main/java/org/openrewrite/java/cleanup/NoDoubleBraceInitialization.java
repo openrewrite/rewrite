@@ -74,7 +74,8 @@ public class NoDoubleBraceInitialization extends Recipe {
 
         private boolean isSupportedDoubleBraceInitialization(J.NewClass nc) {
             if (getCursor().getParent() == null
-                    || getCursor().getParent().firstEnclosing(J.class) instanceof J.MethodInvocation) {
+                    || getCursor().getParent().firstEnclosing(J.class) instanceof J.MethodInvocation
+                    || getCursor().getParent().firstEnclosing(J.class) instanceof J.NewClass) {
                 return false;
             }
             if (nc.getBody() != null && !nc.getBody().getStatements().isEmpty()
@@ -141,8 +142,11 @@ public class NoDoubleBraceInitialization extends Recipe {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                 J.MethodInvocation mi = super.visitMethodInvocation(method, executionContext);
-                if (mi.getSelect() == null && mi.getType() != null && TypeUtils.isAssignableTo(identifier.getType(), mi.getType().getDeclaringType())) {
-                    return mi.withSelect(identifier);
+                if (mi.getType() != null && TypeUtils.isAssignableTo(identifier.getType(), mi.getType().getDeclaringType())) {
+                    if (mi.getSelect() == null
+                        || (mi.getSelect() instanceof J.Identifier && "this".equals(((J.Identifier)mi.getSelect()).getSimpleName()))) {
+                        return mi.withSelect(identifier);
+                    }
                 }
                 return mi;
             }
