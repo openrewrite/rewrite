@@ -14,7 +14,8 @@ repositories {
 dependencies {
     api(project(":rewrite-groovy"))
 
-    compileOnly("org.codehaus.groovy:groovy-ant:latest.release")
+    runtimeOnly("org.codehaus.groovy:groovy-ant:latest.release")
+
     compileOnly("org.gradle:gradle-base-services:latest.release")
     compileOnly("org.gradle:gradle-core-api:latest.release")
     compileOnly("org.gradle:gradle-logging:latest.release")
@@ -33,7 +34,6 @@ dependencies {
         exclude("ch.qos.logback", "logback-classic")
     }
 
-    testRuntimeOnly("org.codehaus.groovy:groovy-ant:latest.release")
     testRuntimeOnly("org.gradle:gradle-base-services:latest.release")
     testRuntimeOnly("org.gradle:gradle-core-api:latest.release")
     testRuntimeOnly("org.gradle:gradle-logging:latest.release")
