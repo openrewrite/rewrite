@@ -155,7 +155,12 @@ public class MavenProjectParser {
     private void parseResources(List<Path> resources, Path projectDirectory, List<SourceFile> sourceFiles, List<Marker> projectProvenance, JavaSourceSet sourceSet) {
         sourceFiles.addAll(ListUtils.map(new XmlParser().parse(
                 resources.stream()
-                        .filter(p -> p.getFileName().toString().endsWith(".xml"))
+                        .filter(p -> p.getFileName().toString().endsWith(".xml") ||
+                                p.getFileName().toString().endsWith(".wsdl") ||
+                                p.getFileName().toString().endsWith(".xhtml") ||
+                                p.getFileName().toString().endsWith(".xsd") ||
+                                p.getFileName().toString().endsWith(".xsl") ||
+                                p.getFileName().toString().endsWith(".xslt"))
                         .collect(Collectors.toList()),
                 projectDirectory,
                 ctx
