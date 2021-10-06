@@ -20,6 +20,8 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
@@ -50,12 +52,17 @@ public class FindDependency extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Find Gradle Dependency";
+        return "Find Gradle dependency";
     }
 
     @Override
     public String getDescription() {
-        return "Finds dependencies declared in build.gradle files. Does not yet support detection of transitive dependencies.";
+        return "Finds dependencies declared in `build.gradle` files.";
+    }
+
+    @Override
+    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return new IsBuildGradle<>();
     }
 
     @Override
