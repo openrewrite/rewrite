@@ -27,6 +27,7 @@ import org.openrewrite.java.tree.Statement;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ObjectFinalizeCallsSuper extends Recipe {
     private static final MethodMatcher FINALIZE_METHOD_MATCHER = new MethodMatcher("java.lang.Object finalize()", true);
@@ -80,15 +81,21 @@ public class ObjectFinalizeCallsSuper extends Recipe {
             }
 
             private boolean hasSuperFinalizeMethodInvocation(J.MethodDeclaration md) {
-                if (md.getBody() != null) {
-                    for (Statement stmt : md.getBody().getStatements()) {
-                        if (stmt instanceof J.MethodInvocation && FINALIZE_METHOD_MATCHER.matches((J.MethodInvocation) stmt)) {
-                            return true;
-                        }
-                    }
-                }
-                return false;
+                AtomicBoolean hasSuperFinalize = new AtomicBoolean(Boolean.FALSE);
+                new FindSuperFinalizeVisitor().visit(md, hasSuperFinalize);
+                return hasSuperFinalize.get();
             }
         };
+    }
+
+    private static class FindSuperFinalizeVisitor extends JavaIsoVisitor<AtomicBoolean> {
+        @Override
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean exists) {
+            J.MethodInvocation mi = super.visitMethodInvocation(method, exists);
+            if (FINALIZE_METHOD_MATCHER.matches(mi)) {
+                exists.set(Boolean.TRUE);
+            }
+            return mi;
+        }
     }
 }
