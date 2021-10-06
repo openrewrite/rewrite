@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,17 +21,17 @@ import org.junit.jupiter.api.Test
 class XRangeTest {
     @Test
     fun pattern() {
-        assertThat(XRange.build("*", null).isValid).isTrue()
-        assertThat(XRange.build("*.0.0", null).isValid).isFalse()
-        assertThat(XRange.build("1.x", null).isValid).isTrue()
-        assertThat(XRange.build("1.x.0", null).isValid).isFalse()
-        assertThat(XRange.build("1.1.X", null).isValid).isTrue()
-        assertThat(XRange.build("a", null).isValid).isFalse()
+        assertThat(XRange.build("*", null).isValid).isTrue
+        assertThat(XRange.build("*.0.0", null).isValid).isFalse
+        assertThat(XRange.build("1.x", null).isValid).isTrue
+        assertThat(XRange.build("1.x.0", null).isValid).isFalse
+        assertThat(XRange.build("1.1.X", null).isValid).isTrue
+        assertThat(XRange.build("a", null).isValid).isFalse
     }
 
     @Test
     fun doesNotMatchFixedVersion() {
-        assertThat(XRange.build("5.3.0", null).isValid).isFalse()
+        assertThat(XRange.build("5.3.0", null).isValid).isFalse
     }
 
     /**
@@ -39,9 +39,9 @@ class XRangeTest {
      */
     @Test
     fun anyVersion() {
-        val xRange: XRange = XRange.build("X", null).getValue()
+        val xRange: XRange = XRange.build("X", null).getValue()!!
 
-        assertThat(xRange.isValid("0.0.0")).isTrue()
+        assertThat(xRange.isValid("0.0.0")).isTrue
     }
 
     /**
@@ -49,12 +49,12 @@ class XRangeTest {
      */
     @Test
     fun matchingMajorVersion() {
-        val xRange: XRange = XRange.build("1.*", null).getValue()
+        val xRange: XRange = XRange.build("1.*", null).getValue()!!
 
-        assertThat(xRange.isValid("1.0.0")).isTrue()
-        assertThat(xRange.isValid("1.2.3.RELEASE")).isTrue()
-        assertThat(xRange.isValid("1.9.9")).isTrue()
-        assertThat(xRange.isValid("2.0.0")).isFalse()
+        assertThat(xRange.isValid("1.0.0")).isTrue
+        assertThat(xRange.isValid("1.2.3.RELEASE")).isTrue
+        assertThat(xRange.isValid("1.9.9")).isTrue
+        assertThat(xRange.isValid("2.0.0")).isFalse
     }
 
     /**
@@ -62,17 +62,17 @@ class XRangeTest {
      */
     @Test
     fun matchingMajorAndMinorVersions() {
-        val xRange: XRange = XRange.build("1.2.X", null).getValue()
+        val xRange: XRange = XRange.build("1.2.X", null).getValue()!!
 
-        assertThat(xRange.isValid("1.2.0")).isTrue()
-        assertThat(xRange.isValid("1.3.0")).isFalse()
+        assertThat(xRange.isValid("1.2.0")).isTrue
+        assertThat(xRange.isValid("1.3.0")).isFalse
     }
 
     @Test
     fun matchingJavaxValidation() {
-        val xRange: XRange = XRange.build("2.X", null).getValue()
+        val xRange: XRange = XRange.build("2.X", null).getValue()!!
 
         // The version pattern of javax.validation:validation-api
-        assertThat(xRange.isValid("2.0.1.Final")).isTrue()
+        assertThat(xRange.isValid("2.0.1.Final")).isTrue
     }
 }

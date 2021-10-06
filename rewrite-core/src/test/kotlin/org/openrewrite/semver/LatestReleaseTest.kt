@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -64,9 +64,9 @@ class LatestReleaseTest {
 
     @Test
     fun matchMetadata() {
-        assertThat(LatestRelease("-jre").isValid("29.0-jre")).isTrue()
-        assertThat(LatestRelease("-jre").isValid("29.0")).isFalse()
-        assertThat(LatestRelease("-jre").isValid("29.0-android")).isFalse()
+        assertThat(LatestRelease("-jre").isValid("29.0-jre")).isTrue
+        assertThat(LatestRelease("-jre").isValid("29.0")).isFalse
+        assertThat(LatestRelease("-jre").isValid("29.0-android")).isFalse
     }
 
     @Test

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,13 +24,13 @@ class HyphenRangeTest {
      */
     @Test
     fun inclusiveSet() {
-        val hyphenRange: HyphenRange = HyphenRange.build("1.2.3 - 2.3.4", null).getValue()
+        val hyphenRange: HyphenRange = HyphenRange.build("1.2.3 - 2.3.4", null).getValue()!!
 
-        assertThat(hyphenRange.isValid("1.2.2")).isFalse()
-        assertThat(hyphenRange.isValid("1.2.3.RELEASE")).isTrue()
-        assertThat(hyphenRange.isValid("1.2.3")).isTrue()
-        assertThat(hyphenRange.isValid("2.3.4")).isTrue()
-        assertThat(hyphenRange.isValid("2.3.5")).isFalse()
+        assertThat(hyphenRange.isValid("1.2.2")).isFalse
+        assertThat(hyphenRange.isValid("1.2.3.RELEASE")).isTrue
+        assertThat(hyphenRange.isValid("1.2.3")).isTrue
+        assertThat(hyphenRange.isValid("2.3.4")).isTrue
+        assertThat(hyphenRange.isValid("2.3.5")).isFalse
     }
 
     /**
@@ -38,11 +38,11 @@ class HyphenRangeTest {
      */
     @Test
     fun partialVersion() {
-        val hyphenRange: HyphenRange = HyphenRange.build("1.2 - 2", null).getValue()
+        val hyphenRange: HyphenRange = HyphenRange.build("1.2 - 2", null).getValue()!!
 
-        assertThat(hyphenRange.isValid("1.1.9")).isFalse()
-        assertThat(hyphenRange.isValid("1.2.0")).isTrue()
-        assertThat(hyphenRange.isValid("2.0.0")).isTrue()
-        assertThat(hyphenRange.isValid("2.0.1")).isFalse()
+        assertThat(hyphenRange.isValid("1.1.9")).isFalse
+        assertThat(hyphenRange.isValid("1.2.0")).isTrue
+        assertThat(hyphenRange.isValid("2.0.0")).isTrue
+        assertThat(hyphenRange.isValid("2.0.1")).isFalse
     }
 }

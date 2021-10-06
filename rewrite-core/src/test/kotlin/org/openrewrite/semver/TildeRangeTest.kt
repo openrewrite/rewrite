@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,12 +24,12 @@ class TildeRangeTest {
      */
     @Test
     fun updatePatch() {
-        val tildeRange: TildeRange = TildeRange.build("~1.2.3", null).getValue()
+        val tildeRange: TildeRange = TildeRange.build("~1.2.3", null).getValue()!!
 
-        assertThat(tildeRange.isValid("1.2.3")).isTrue()
-        assertThat(tildeRange.isValid("1.2.3.RELEASE")).isTrue()
-        assertThat(tildeRange.isValid("1.2.4")).isTrue()
-        assertThat(tildeRange.isValid("1.3.0")).isFalse()
+        assertThat(tildeRange.isValid("1.2.3")).isTrue
+        assertThat(tildeRange.isValid("1.2.3.RELEASE")).isTrue
+        assertThat(tildeRange.isValid("1.2.4")).isTrue
+        assertThat(tildeRange.isValid("1.3.0")).isFalse
     }
 
     /**
@@ -37,11 +37,11 @@ class TildeRangeTest {
      */
     @Test
     fun updatePatchImplicitZeroPatch() {
-        val tildeRange: TildeRange = TildeRange.build("~1.2", null).getValue()
+        val tildeRange: TildeRange = TildeRange.build("~1.2", null).getValue()!!
 
-        assertThat(tildeRange.isValid("1.2.0")).isTrue()
-        assertThat(tildeRange.isValid("1.2.4")).isTrue()
-        assertThat(tildeRange.isValid("1.3.0")).isFalse()
+        assertThat(tildeRange.isValid("1.2.0")).isTrue
+        assertThat(tildeRange.isValid("1.2.4")).isTrue
+        assertThat(tildeRange.isValid("1.3.0")).isFalse
     }
 
     /**
@@ -49,10 +49,10 @@ class TildeRangeTest {
      */
     @Test
     fun updateMajor() {
-        val tildeRange: TildeRange = TildeRange.build("~1", null).getValue()
+        val tildeRange: TildeRange = TildeRange.build("~1", null).getValue()!!
 
-        assertThat(tildeRange.isValid("1.0.1")).isTrue()
-        assertThat(tildeRange.isValid("1.9.9")).isTrue()
-        assertThat(tildeRange.isValid("2.0.0")).isFalse()
+        assertThat(tildeRange.isValid("1.0.1")).isTrue
+        assertThat(tildeRange.isValid("1.9.9")).isTrue
+        assertThat(tildeRange.isValid("2.0.0")).isFalse
     }
 }

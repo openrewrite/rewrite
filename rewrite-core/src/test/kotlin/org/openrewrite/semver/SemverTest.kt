@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,14 +22,14 @@ class SemverTest {
     @Test
     fun validToVersion() {
         assertThat(Semver.validate("latest.release", null).getValue<VersionComparator>())
-                .isInstanceOf(LatestRelease::class.java)
+            .isInstanceOf(LatestRelease::class.java)
         assertThat(Semver.validate("1.5 - 2", null).getValue<VersionComparator>())
-                .isInstanceOf(HyphenRange::class.java)
+            .isInstanceOf(HyphenRange::class.java)
         assertThat(Semver.validate("1.x", null).getValue<VersionComparator>())
-                .isInstanceOf(XRange::class.java)
+            .isInstanceOf(XRange::class.java)
         assertThat(Semver.validate("~1.5", null).getValue<VersionComparator>())
-                .isInstanceOf(TildeRange::class.java)
+            .isInstanceOf(TildeRange::class.java)
         assertThat(Semver.validate("^1.5", null).getValue<VersionComparator>())
-                .isInstanceOf(CaretRange::class.java)
+            .isInstanceOf(CaretRange::class.java)
     }
 }
