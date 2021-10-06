@@ -64,6 +64,7 @@ recipeList:
   - org.openrewrite.java.cleanup.UnnecessaryParentheses
   - org.openrewrite.java.cleanup.UnnecessaryPrimitiveAnnotations
   - org.openrewrite.java.cleanup.UnnecessaryThrows
+  - org.openrewrite.java.cleanup.UseFilesCreateTempDirectory
   - org.openrewrite.java.cleanup.UseJavaStyleArrayDeclarations
   - org.openrewrite.java.cleanup.UseDiamondOperator
   - org.openrewrite.java.cleanup.WhileInsteadOfFor
