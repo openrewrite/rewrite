@@ -181,6 +181,11 @@ interface Plugin {
 
 interface DependencyHandlerSpec {
     Dependency api(String dependencyNotation)
+    Dependency implementation(String dependencyNotation)
+    Dependency runtimeClasspath(String dependencyNotation)
+    Dependency compileOnly(String dependencyNotation)
+    Dependency testImplementation(String dependencyNotation)
+    Dependency testRunitmeOnly(String dependencyNotation)
 }
 
 abstract class RewriteGradleProject implements Project {

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle.search;
+package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
@@ -21,18 +21,18 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
-public class FindDependency extends Recipe {
+public class UpgradeDependencyVersion extends Recipe {
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
             example = "com.google.guava")
@@ -43,6 +43,11 @@ public class FindDependency extends Recipe {
             example = "guava")
     String artifactId;
 
+    @Option(displayName = "New Version",
+            description = "The version number to update the dependency to",
+            example = "1.0")
+    String newVersion;
+
     @Option(displayName = "Dependency configuration",
             description = "The dependency configuration to search for dependencies in.",
             example = "api",
@@ -52,12 +57,12 @@ public class FindDependency extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Find Gradle dependency";
+        return "Update Gradle Dependency Version";
     }
 
     @Override
     public String getDescription() {
-        return "Finds dependencies declared in `build.gradle` files.";
+        return "Finds dependencies declared in build.gradle files. Does not yet support detection of transitive dependencies.";
     }
 
     @Override
@@ -75,10 +80,15 @@ public class FindDependency extends Recipe {
                     if (configuration == null || method.getSimpleName().equals(configuration)) {
                         List<Expression> depArgs = method.getArguments();
                         if (depArgs.get(0) instanceof J.Literal) {
-                            String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
+                            J.Literal firstArg = (J.Literal)depArgs.get(0);
+                            String gav = (String) firstArg.getValue();
                             assert gav != null;
-                            if (gav.startsWith(groupId + ":" + artifactId + ":")) {
-                                return method.withMarkers(method.getMarkers().searchResult());
+                            if (gav.startsWith(groupId + ":" + artifactId + ":") && !gav.endsWith(newVersion)) {
+                                String newGav = groupId + ":" + artifactId + ":" + newVersion;
+                                List<Expression> newArgs = new ArrayList<>(method.getArguments().size());
+                                newArgs.add(firstArg.withValue(newGav).withValueSource("'" + newGav + "'"));
+                                newArgs.addAll(method.getArguments().subList(1, method.getArguments().size()));
+                                method = method.withArguments(newArgs);
                             }
                         }
                     }
