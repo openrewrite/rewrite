@@ -33,4 +33,19 @@ class UpgradePluginVersionTest : GradleRecipeTest {
             }
         """
     )
+
+    @Test
+    fun upgradePluginGlob() = assertChanged(
+        recipe = UpgradePluginVersion("com.jfrog.*", "1.8.X", null),
+        before = """
+            plugins {
+                id 'com.jfrog.bintray' version '1.8.2'
+            }
+        """,
+        after = """
+            plugins {
+                id 'com.jfrog.bintray' version '1.8.5'
+            }
+        """
+    )
 }

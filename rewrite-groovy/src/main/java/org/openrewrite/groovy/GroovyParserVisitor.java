@@ -1283,6 +1283,17 @@ public class GroovyParserVisitor {
         if (primitiveType != null) {
             return new J.Primitive(randomId(), sourceBefore(classNode.getUnresolvedName()), Markers.EMPTY, primitiveType);
         }
+
+        int saveCursor = cursor;
+        Space fmt = whitespace();
+        if(cursor < source.length() && source.startsWith("def", cursor)) {
+            cursor += 3;
+            return J.Identifier.build(randomId(), fmt, Markers.EMPTY, "def",
+                    JavaType.Class.build("java.lang.Object"));
+        } else {
+            cursor = saveCursor;
+        }
+
         return buildName(classNode.getUnresolvedName());
     }
 

@@ -38,6 +38,8 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
 import java.net.SocketTimeoutException;
+import java.nio.file.PathMatcher;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
@@ -64,9 +66,9 @@ public class UpgradePluginVersion extends Recipe {
             (request) -> httpClient.newCall(request).execute());
 
     @Option(displayName = "Plugin id",
-            description = "The `ID` part of `plugin { ID }`.",
+            description = "The `ID` part of `plugin { ID }`, as a glob expression.",
             example = "`com.jfrog.bintray`")
-    String pluginId;
+    String pluginIdPattern;
 
     @Option(displayName = "New version",
             description = "An exact version number, or node-style semver selector used to select the version number.",
@@ -119,20 +121,25 @@ public class UpgradePluginVersion extends Recipe {
                         method.getSelect() instanceof J.MethodInvocation &&
                         pluginMatcher.matches(method.getSelect())) {
                     List<Expression> pluginArgs = ((J.MethodInvocation) method.getSelect()).getArguments();
-                    if (pluginArgs.get(0) instanceof J.Literal && pluginId.equals(((J.Literal) pluginArgs.get(0)).getValue())) {
-                        List<Expression> versionArgs = method.getArguments();
-                        if (versionArgs.get(0) instanceof J.Literal) {
-                            String currentVersion = (String) ((J.Literal) versionArgs.get(0)).getValue();
-                            if (currentVersion != null) {
-                                return findNewerVersion(versionComparator, currentVersion)
-                                        .map(upgradeVersion -> method.withArguments(ListUtils.map(versionArgs, v -> {
-                                            J.Literal versionLiteral = (J.Literal) v;
-                                            assert versionLiteral.getValueSource() != null;
-                                            return versionLiteral
-                                                    .withValue(upgradeVersion)
-                                                    .withValueSource(versionLiteral.getValueSource().replace(currentVersion, upgradeVersion));
-                                        })))
-                                        .orElse(method);
+                    if (pluginArgs.get(0) instanceof J.Literal) {
+                        String pluginId = (String) ((J.Literal) pluginArgs.get(0)).getValue();
+                        assert pluginId != null;
+                        PathMatcher pathMatcher = Paths.get(pluginId).getFileSystem().getPathMatcher("glob:" + pluginId);
+                        if (pathMatcher.matches(Paths.get(pluginId))) {
+                            List<Expression> versionArgs = method.getArguments();
+                            if (versionArgs.get(0) instanceof J.Literal) {
+                                String currentVersion = (String) ((J.Literal) versionArgs.get(0)).getValue();
+                                if (currentVersion != null) {
+                                    return findNewerVersion(versionComparator, pluginId, currentVersion)
+                                            .map(upgradeVersion -> method.withArguments(ListUtils.map(versionArgs, v -> {
+                                                J.Literal versionLiteral = (J.Literal) v;
+                                                assert versionLiteral.getValueSource() != null;
+                                                return versionLiteral
+                                                        .withValue(upgradeVersion)
+                                                        .withValueSource(versionLiteral.getValueSource().replace(currentVersion, upgradeVersion));
+                                            })))
+                                            .orElse(method);
+                                }
                             }
                         }
                     }
@@ -142,7 +149,7 @@ public class UpgradePluginVersion extends Recipe {
         };
     }
 
-    private Optional<String> findNewerVersion(VersionComparator versionComparator, String currentVersion) {
+    private Optional<String> findNewerVersion(VersionComparator versionComparator, String pluginId, String currentVersion) {
         LatestRelease latestRelease = new LatestRelease(versionPattern);
         return availablePluginVersions(pluginId).stream()
                 .filter(v -> latestRelease.compare(currentVersion, v) < 0)
