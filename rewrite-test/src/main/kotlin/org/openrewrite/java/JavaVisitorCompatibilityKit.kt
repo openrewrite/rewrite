@@ -259,6 +259,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class NoFinalizerTck : NoFinalizerTest
 
     @Nested
+    inner class NoPrimitiveWrappersForToStringOrCompareToTck : NoPrimitiveWrappersForToStringOrCompareToTest
+
+    @Nested
     inner class NoRedundantJumpStatementsTck : NoRedundantJumpStatementsTest
 
     @Nested
