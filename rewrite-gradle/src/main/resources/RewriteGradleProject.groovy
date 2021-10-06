@@ -185,7 +185,7 @@ interface DependencyHandlerSpec {
     Dependency runtimeClasspath(String dependencyNotation)
     Dependency compileOnly(String dependencyNotation)
     Dependency testImplementation(String dependencyNotation)
-    Dependency testRunitmeOnly(String dependencyNotation)
+    Dependency testRuntimeOnly(String dependencyNotation)
 }
 
 abstract class RewriteGradleProject implements Project {

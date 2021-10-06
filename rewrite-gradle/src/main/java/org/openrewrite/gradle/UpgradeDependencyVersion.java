@@ -57,7 +57,7 @@ public class UpgradeDependencyVersion extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Update Gradle Dependency Version";
+        return "Update Gradle dependency version";
     }
 
     @Override
