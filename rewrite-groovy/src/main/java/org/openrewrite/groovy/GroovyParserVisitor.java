@@ -686,10 +686,12 @@ public class GroovyParserVisitor {
 
             cursor += text.length();
 
-            char c = Character.toLowerCase(source.charAt(cursor));
-            if(c == 'f' || c == 'd' || c == 'l') {
-                text = text + source.charAt(cursor);
-                cursor++;
+            if(jType == JavaType.Primitive.Double || jType == JavaType.Primitive.Float || jType == JavaType.Primitive.Long) {
+                char c = Character.toLowerCase(source.charAt(cursor));
+                if (c == 'f' || c == 'd' || c == 'l') {
+                    text = text + source.charAt(cursor);
+                    cursor++;
+                }
             }
             queue.add(new J.Literal(randomId(), prefix, Markers.EMPTY, expression.getValue(), text,
                     null, jType));
