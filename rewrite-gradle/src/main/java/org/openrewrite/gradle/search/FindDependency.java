@@ -58,8 +58,8 @@ public class FindDependency extends Recipe {
     @Override
     public String getDescription() {
         return "Finds dependencies declared in `build.gradle` files. See the [reference](https://docs.gradle.org/current/userguide/java_library_plugin.html#sec:java_library_configurations_graph) on Gradle configurations or the diagram below for a description of what configuration to use." +
-                " A project's compile and runtime classpath is based on these configurations. ![Gradle compile classpath](https://docs.gradle.org/current/userguide/img/java-library-ignore-deprecated-main.png)" +
-                " A project's test classpath is based on these configurations. ![Gradle test classpath](https://docs.gradle.org/current/userguide/img/java-library-ignore-deprecated-test.png)";
+                " A project's compile and runtime classpath is based on these configurations.\n![Gradle compile classpath](https://docs.gradle.org/current/userguide/img/java-library-ignore-deprecated-main.png)\n" +
+                " A project's test classpath is based on these configurations.\n![Gradle test classpath](https://docs.gradle.org/current/userguide/img/java-library-ignore-deprecated-test.png)";
     }
 
     @Override
