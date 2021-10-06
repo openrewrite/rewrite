@@ -20,5 +20,5 @@ displayName: Find Gradle `dependencies` blocks
 description: Find the dependency handler containing any number of dependency definitions.
 recipeList:
   - org.openrewrite.java.search.FindMethods:
-      methodPattern: org.gradle.api.Project dependencies(groovy.lang.Closure)
-      matchOverrides: true
+      methodPattern: RewriteGradleProject dependencies(groovy.lang.Closure)
+      matchOverrides: false

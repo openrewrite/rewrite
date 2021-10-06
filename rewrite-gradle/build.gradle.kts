@@ -1,10 +1,7 @@
 dependencies {
     api(project(":rewrite-groovy"))
-    implementation("dev.gradleplugins:gradle-api:latest.release")
-    implementation("org.gradle:gradle-tooling-api:latest.release")
+    implementation("dev.gradleplugins:gradle-api:6.7")
 
-    implementation("dev.gradleplugins:gradle-api:latest.release")
-    implementation("org.gradle:gradle-tooling-api:latest.release")
     implementation("com.squareup.okhttp3:okhttp:latest.release")
 
     // FIXME: switch to `latest.release`
