@@ -38,12 +38,17 @@ public class GradleParser implements Parser<G.CompilationUnit> {
     private static final byte[] PREAMBLE = StringUtils.readFully(GroovyParser.class.getResourceAsStream("/RewriteGradleProject.groovy"))
             .trim().getBytes(StandardCharsets.UTF_8);
 
-    private final GroovyParser groovyParser;
+    private GroovyParser groovyParser;
 
     public GradleParser(GroovyParser.Builder groovyParser) {
-        this.groovyParser = groovyParser
-                .classpath("gradle-core-api")
-                .build();
+        try {
+            this.groovyParser = groovyParser
+                    .classpath("gradle-core-api")
+                    .build();
+        } catch(IllegalArgumentException e) {
+            // when gradle API has been fatjared into the rewrite-gradle distribution
+            this.groovyParser = groovyParser.build();
+        }
     }
 
     @Override
