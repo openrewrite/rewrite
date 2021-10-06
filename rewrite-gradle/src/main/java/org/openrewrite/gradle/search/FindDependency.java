@@ -18,14 +18,36 @@ package org.openrewrite.gradle.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+
+import java.util.List;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindDependency extends Recipe {
+    @Option(displayName = "Group",
+            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            example = "com.google.guava")
+    String groupId;
+
+    @Option(displayName = "Artifact",
+            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            example = "guava")
+    String artifactId;
+
+    @Option(displayName = "Dependency configuration",
+            description = "The dependency configuration to search for dependencies in.",
+            example = "api",
+            required = false)
+    @Nullable
+    String configuration;
+
     @Override
     public String getDisplayName() {
         return "Find Gradle Dependency";
@@ -38,13 +60,23 @@ public class FindDependency extends Recipe {
 
     @Override
     protected GroovyVisitor<ExecutionContext> getVisitor() {
-        MethodMatcher DEPENDENCIES_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
+        MethodMatcher dependency = new MethodMatcher("DependencyHandlerSpec *(..)");
         return new GroovyVisitor<ExecutionContext>() {
-
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
-                if(DEPENDENCIES_MATCHER.matches(method)) {
-                    return method.withMarkers(method.getMarkers().searchResult());
+
+
+                if (dependency.matches(method)) {
+                    if (configuration == null || method.getSimpleName().equals(configuration)) {
+                        List<Expression> depArgs = method.getArguments();
+                        if (depArgs.get(0) instanceof J.Literal) {
+                            String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
+                            assert gav != null;
+                            if (gav.startsWith(groupId + ":" + artifactId)) {
+                                return method.withMarkers(method.getMarkers().searchResult());
+                            }
+                        }
+                    }
                 }
                 return super.visitMethodInvocation(method, context);
             }

@@ -15,15 +15,14 @@
  */
 package org.openrewrite.gradle.search
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.gradle.GradleRecipeTest
 
 class FindDependencyTest : GradleRecipeTest {
-    @Disabled
+
     @Test
     fun findDependency() = assertChanged(
-        recipe = FindDependency(),
+        recipe = FindDependency("org.openrewrite", "rewrite-core", "api"),
         before = """
             dependencies {
                 api 'org.openrewrite:rewrite-core:latest.release'
