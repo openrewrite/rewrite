@@ -15,12 +15,14 @@
  */
 package org.openrewrite.properties;
 
+import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
 
 @Value
+@EqualsAndHashCode(callSuper = true)
 public class DeleteProperty extends Recipe {
 
     @Override
