@@ -26,6 +26,8 @@ class TernaryTest : GroovyTreeTest {
 
     @Test
     fun elvis() = assertParsePrintAndProcess("""
-        project.findProperty("newVersion") ?: project.findProperty("defaultVersion")        
+        void test() {
+            p = project.findProperty("newVersion") ?: project.findProperty("defaultVersion")
+        }
     """)
 }

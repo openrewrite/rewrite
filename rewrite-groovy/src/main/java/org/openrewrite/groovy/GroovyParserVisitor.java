@@ -1279,15 +1279,11 @@ public class GroovyParserVisitor {
     }
 
     private TypeTree visitTypeTree(ClassNode classNode) {
-        if (classNode.getLineNumber() >= 0) {
-            JavaType.Primitive primitiveType = JavaType.Primitive.fromKeyword(classNode.getUnresolvedName());
-            if (primitiveType == null) {
-                return buildName(classNode.getUnresolvedName());
-            }
+        JavaType.Primitive primitiveType = JavaType.Primitive.fromKeyword(classNode.getUnresolvedName());
+        if (primitiveType != null) {
             return new J.Primitive(randomId(), sourceBefore(classNode.getUnresolvedName()), Markers.EMPTY, primitiveType);
         }
-        return J.Identifier.build(randomId(), sourceBefore("def"), Markers.EMPTY, "def",
-                JavaType.Class.build("java.lang.Object"));
+        return buildName(classNode.getUnresolvedName());
     }
 
     private List<J.Modifier> visitModifiers(int modifiers) {
