@@ -777,9 +777,8 @@ public class GroovyParserVisitor {
                 );
                 cursor += param.getName().length();
                 Space rightPad = whitespace();
-                boolean javaStyleForEach = source.charAt(cursor) == ':';
                 Markers forEachMarkers = Markers.EMPTY;
-                if(javaStyleForEach) {
+                if(source.charAt(cursor) == ':') {
                     cursor++; // Skip ":"
                 } else {
                     cursor += 2; // Skip "in"

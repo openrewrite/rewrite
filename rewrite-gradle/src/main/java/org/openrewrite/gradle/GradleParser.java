@@ -54,10 +54,14 @@ public class GradleParser implements Parser<G.CompilationUnit> {
                         "  Plugin version(String v)\n" +
                         "  Plugin apply(boolean a)\n" +
                         "}\n" +
+                        "interface DependencyHandlerSpec {\n" +
+                        "  org.gradle.api.artifacts.Dependency api(String dependencyNotation)\n" +
+                        "}\n" +
                         "class RewriteGradleProject extends " +
                         "org.gradle.api.internal.project.DefaultProject {\n" +
-                        "void plugins(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=PluginSpec) Closure cl) {}\n" +
-                        "void __script__() {")
+                        "  void dependencies(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=DependencyHandlerSpec) Closure cl) {}\n" +
+                        "  void plugins(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=PluginSpec) Closure cl) {}\n" +
+                        "  void __script__() {")
                 );
     }
 
