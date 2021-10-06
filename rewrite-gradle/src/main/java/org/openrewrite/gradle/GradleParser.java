@@ -36,7 +36,9 @@ import java.util.stream.StreamSupport;
 
 public class GradleParser implements Parser<G.CompilationUnit> {
     private static final byte[] PREAMBLE = StringUtils.readFully(GroovyParser.class.getResourceAsStream("/RewriteGradleProject.groovy"))
-            .trim().getBytes(StandardCharsets.UTF_8);
+            .trim()
+            .replaceAll("\\n}}$", "")
+            .getBytes(StandardCharsets.UTF_8);
 
     private GroovyParser groovyParser;
 

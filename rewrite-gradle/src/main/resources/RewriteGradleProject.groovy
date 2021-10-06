@@ -118,22 +118,10 @@ import org.gradle.language.base.plugins.*
 import org.gradle.language.base.sources.*
 import org.gradle.language.java.artifact.*
 import org.gradle.language.jvm.tasks.*
-import org.gradle.language.nativeplatform.*
-import org.gradle.language.nativeplatform.tasks.*
-import org.gradle.language.objectivec.*
-import org.gradle.language.objectivec.plugins.*
-import org.gradle.language.objectivec.tasks.*
-import org.gradle.language.objectivecpp.*
-import org.gradle.language.objectivecpp.plugins.*
-import org.gradle.language.objectivecpp.tasks.*
 import org.gradle.language.plugins.*
 import org.gradle.language.rc.*
 import org.gradle.language.rc.plugins.*
 import org.gradle.language.rc.tasks.*
-import org.gradle.language.scala.tasks.*
-import org.gradle.language.swift.*
-import org.gradle.language.swift.plugins.*
-import org.gradle.language.swift.tasks.*
 import org.gradle.maven.*
 import org.gradle.model.*
 import org.gradle.normalization.*
@@ -193,3 +181,4 @@ abstract class RewriteGradleProject implements Project {
     abstract void plugins(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=PluginSpec) Closure cl)
 
     void __script__() {
+}}
