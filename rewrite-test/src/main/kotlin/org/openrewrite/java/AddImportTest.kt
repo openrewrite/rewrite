@@ -109,6 +109,18 @@ interface AddImportTest : JavaRecipeTest {
         """
     )
 
+    @Test
+    fun dontImportJavaLang(jp: JavaParser) = assertUnchanged(
+        jp,
+        recipe = addImports({ AddImport("java.lang.String", null, false) }),
+        before = """
+            package com.myorg;
+            
+            class A {
+            }
+        """
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/777")
     @Test
     fun dontImportFromSamePackage(jp: JavaParser) = assertUnchanged(
