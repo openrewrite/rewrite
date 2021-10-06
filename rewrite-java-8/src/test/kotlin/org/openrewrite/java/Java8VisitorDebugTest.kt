@@ -418,6 +418,10 @@ class Java8RenameMethodsNamedHashcodeEqualOrTostringTest : Java8Test, RenameMeth
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8ReplaceDuplicateStringLiteralsTest : Java8Test, ReplaceDuplicateStringLiteralsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8RenameVariableTest : Java8Test, RenameVariableTest
 
 @DebugOnly
