@@ -99,7 +99,7 @@ public class PolyglotRecipe extends Recipe {
 
     @Override
     public String toString() {
-        return "$classname{ value: " + value + " }";
+        return name + "{ value: " + value + " }";
     }
 
 }

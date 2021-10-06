@@ -82,6 +82,14 @@ public interface Polyglot extends Serializable, Tree {
 
         Member withValue(Value value);
 
+        default boolean canInvoke() {
+            return getValue().canInvokeMember(getName());
+        }
+
+        default boolean canInstantiate() {
+            return getValue().canInstantiate();
+        }
+
         @Override
         default @Nullable <P> Polyglot acceptPolyglot(PolyglotVisitor<P> pv, P p) {
             return pv.visitMember(this, p);
