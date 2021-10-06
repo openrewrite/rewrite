@@ -22,12 +22,12 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Value
@@ -80,15 +80,15 @@ public class UpgradeDependencyVersion extends Recipe {
                     if (configuration == null || method.getSimpleName().equals(configuration)) {
                         List<Expression> depArgs = method.getArguments();
                         if (depArgs.get(0) instanceof J.Literal) {
-                            J.Literal firstArg = (J.Literal)depArgs.get(0);
-                            String gav = (String) firstArg.getValue();
+                            String gav = (String) ((J.Literal)depArgs.get(0)).getValue();
                             assert gav != null;
                             if (gav.startsWith(groupId + ":" + artifactId + ":") && !gav.endsWith(newVersion)) {
                                 String newGav = groupId + ":" + artifactId + ":" + newVersion;
-                                List<Expression> newArgs = new ArrayList<>(method.getArguments().size());
-                                newArgs.add(firstArg.withValue(newGav).withValueSource("'" + newGav + "'"));
-                                newArgs.addAll(method.getArguments().subList(1, method.getArguments().size()));
-                                method = method.withArguments(newArgs);
+                                method = method.withArguments(ListUtils.map(method.getArguments(), (n, arg) ->
+                                        n == 0 ?
+                                        ((J.Literal)arg).withValue(newGav).withValueSource("'" + newGav + "'") :
+                                        arg
+                                ));
                             }
                         }
                     }

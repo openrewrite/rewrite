@@ -647,7 +647,9 @@ public class GroovyParserVisitor {
             String text = expression.getText();
 
             ClassNode type = expression.getType();
-            if (type == ClassHelper.boolean_TYPE) {
+            if (type == ClassHelper.BigDecimal_TYPE) {
+                jType = JavaType.Primitive.Double;
+            } else if (type == ClassHelper.boolean_TYPE) {
                 jType = JavaType.Primitive.Boolean;
             } else if (type == ClassHelper.byte_TYPE) {
                 jType = JavaType.Primitive.Byte;
@@ -683,6 +685,12 @@ public class GroovyParserVisitor {
             }
 
             cursor += text.length();
+
+            char c = Character.toLowerCase(source.charAt(cursor));
+            if(c == 'f' || c == 'd' || c == 'l') {
+                text = text + source.charAt(cursor);
+                cursor++;
+            }
             queue.add(new J.Literal(randomId(), prefix, Markers.EMPTY, expression.getValue(), text,
                     null, jType));
         }

@@ -56,4 +56,14 @@ class LiteralTest : GroovyTreeTest {
            def s = "uid: ${'$'}{UUID.randomUUID()}"
         """.trimIndent()
     )
+
+    @Test
+    fun numericLiterals() = assertParsePrintAndProcess(
+        """
+            float a = 0.1
+            def b = 0.1f
+            double c = 1.0d
+            long d = 1L
+        """
+    )
 }
