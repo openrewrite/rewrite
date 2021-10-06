@@ -195,10 +195,10 @@ subprojects {
 
     if(!name.contains("benchmark")) {
         configure<ContactsExtension> {
-            val j = Contact("jkschneider@gmail.com")
-            j.moniker("Jonathan Schneider")
+            val j = Contact("team@moderne.io")
+            j.moniker("Moderne")
 
-            people["jkschneider@gmail.com"] = j
+            people["team@moderne.io"] = j
         }
 
         configure<PublishingExtension> {

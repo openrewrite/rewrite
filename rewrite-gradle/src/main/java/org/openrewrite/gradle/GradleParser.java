@@ -15,11 +15,11 @@
  */
 package org.openrewrite.gradle;
 
-import org.gradle.configuration.DefaultImportsReader;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
@@ -35,35 +35,15 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 public class GradleParser implements Parser<G.CompilationUnit> {
-    private final GroovyParser groovyParser;
+    private static final byte[] PREAMBLE = StringUtils.readFully(GroovyParser.class.getResourceAsStream("/RewriteGradleProject.groovy"))
+            .trim().getBytes(StandardCharsets.UTF_8);
 
-    private final String preamble;
+    private final GroovyParser groovyParser;
 
     public GradleParser(GroovyParser.Builder groovyParser) {
         this.groovyParser = groovyParser
-                .classpath("gradle-api")
+                .classpath("gradle-core-api")
                 .build();
-
-        DefaultImportsReader reader = new DefaultImportsReader();
-        preamble = Arrays.stream(reader.getImportPackages())
-                .map(i -> "import " + i + ".*")
-                .collect(Collectors.joining("\n", "", "\n" +
-                        "interface PluginSpec {\n" +
-                        "  Plugin id(String i)\n" +
-                        "}\n" +
-                        "interface Plugin {\n" +
-                        "  Plugin version(String v)\n" +
-                        "  Plugin apply(boolean a)\n" +
-                        "}\n" +
-                        "interface DependencyHandlerSpec {\n" +
-                        "  org.gradle.api.artifacts.Dependency api(String dependencyNotation)\n" +
-                        "}\n" +
-                        "class RewriteGradleProject extends " +
-                        "org.gradle.api.internal.project.DefaultProject {\n" +
-                        "  void dependencies(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=DependencyHandlerSpec) Closure cl) {}\n" +
-                        "  void plugins(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=PluginSpec) Closure cl) {}\n" +
-                        "  void __script__() {")
-                );
     }
 
     @Override
@@ -74,7 +54,7 @@ public class GradleParser implements Parser<G.CompilationUnit> {
                                 source.getPath(),
                                 () -> new SequenceInputStream(
                                         Collections.enumeration(Arrays.asList(
-                                                new ByteArrayInputStream(preamble.getBytes(StandardCharsets.UTF_8)),
+                                                new ByteArrayInputStream(PREAMBLE),
                                                 source.getSource(),
                                                 new ByteArrayInputStream(new byte[]{'}', '}'})
                                         ))
