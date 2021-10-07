@@ -151,24 +151,16 @@ public class RawMavenResolver {
 
         for (RawPom.Dependency d : pom.getActiveDependencyManagementDependencies(activeProfiles)) {
             if (d.getVersion() == null) {
-                ctx.getOnError().accept(new MavenParsingException(
-                        "Problem with dependencyManagement section of %s:%s:%s. Unable to determine version of managed dependency %s:%s",
-                        pom.getGroupId(), pom.getArtifactId(), pom.getVersion(), d.getGroupId(), d.getArtifactId()));
+                return;
             }
-            assert d.getVersion() != null;
 
             String groupId = partialMaven.getRequiredValue(d.getGroupId());
             String artifactId = partialMaven.getRequiredValue(d.getArtifactId());
             String version = partialMaven.getValue(d.getVersion(), false);
 
             if (groupId == null || artifactId == null) {
-                ctx.getOnError().accept(new MavenParsingException(
-                        "Problem with dependencyManagement section of %s:%s:%s. Unable to determine groupId or " +
-                                "artifactId of managed dependency %s:%s.",
-                        pom.getGroupId(), pom.getArtifactId(), pom.getVersion(), d.getGroupId(), d.getArtifactId()));
+                return;
             }
-            assert groupId != null;
-            assert artifactId != null;
 
             // https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#importing-dependencies
             if (Objects.equals(d.getType(), "pom") && Objects.equals(d.getScope(), "import")) {
