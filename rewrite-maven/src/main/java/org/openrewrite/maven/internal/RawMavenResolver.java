@@ -151,7 +151,7 @@ public class RawMavenResolver {
 
         for (RawPom.Dependency d : pom.getActiveDependencyManagementDependencies(activeProfiles)) {
             if (d.getVersion() == null) {
-                return;
+                continue;
             }
 
             String groupId = partialMaven.getRequiredValue(d.getGroupId());
@@ -159,7 +159,7 @@ public class RawMavenResolver {
             String version = partialMaven.getValue(d.getVersion(), false);
 
             if (groupId == null || artifactId == null) {
-                return;
+                continue;
             }
 
             // https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#importing-dependencies
