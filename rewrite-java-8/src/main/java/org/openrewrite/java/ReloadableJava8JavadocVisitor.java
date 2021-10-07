@@ -678,14 +678,13 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         body.addAll(sourceBefore("<"));
         String name = node.getName().toString();
         cursor += name.length();
-        cursor += node.isSelfClosing() ? 1 : 0;
         return new Javadoc.StartElement(
                 randomId(),
                 Markers.EMPTY,
                 name,
                 convertMultiline(node.getAttributes()),
                 node.isSelfClosing(),
-                sourceBefore(">")
+                node.isSelfClosing() ? sourceBefore("/>") : sourceBefore(">")
         );
     }
 

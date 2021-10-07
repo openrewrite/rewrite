@@ -1062,6 +1062,28 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1089")
+    @Test
+    fun whitespaceBeforeSelfClosingElement(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            package org.foo;
+            
+            /**
+             * Type of an Opening Time.
+             * <ul>
+             * <li>DELIVERY (text a)</li>
+             * <li>PICKUP (text b)</li> <br />
+             * </ul>
+             */
+            public enum OpenTimeType {
+                DELIVERY,
+                PICKUP
+            }
+        """.trimIndent()
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/976")
     @Test
     fun multilineJavaDocWithCRLF(jp: JavaParser) = assertParsePrintAndProcess(
