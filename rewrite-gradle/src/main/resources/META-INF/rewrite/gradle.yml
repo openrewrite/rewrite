@@ -22,3 +22,13 @@ recipeList:
   - org.openrewrite.java.search.FindMethods:
       methodPattern: RewriteGradleProject dependencies(groovy.lang.Closure)
       matchOverrides: false
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.gradle.ReplaceJCenter
+displayName: Replace JCenter with Maven Central
+description: The JCenter public artifact repository has shut down. This recipe updates bulid.gradle repository declarations to use Maven Central instead.
+recipeList:
+  - org.openrewrite.gradle.RemoveRepository:
+      repository: jcenter
+  - org.openrewrite.gradle.AddRepository:
+      repository: mavenCentral
