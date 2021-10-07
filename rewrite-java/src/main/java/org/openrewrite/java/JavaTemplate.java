@@ -214,6 +214,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                         }
                                         return c;
                                     }
+
                                     //short circuiting navigation to methods and variables.
                                     @Override
                                     public JavaType visitMethod(JavaType.Method method, List<JavaType.FullyQualified> fullyQualifieds) {
@@ -245,11 +246,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                 if (loc.equals(LAMBDA_PARAMETERS_PREFIX) && lambda.getParameters().isScope(insertionPoint)) {
                     return lambda.withParameters(substitutions.unsubstitute(templateParser.parseLambdaParameters(substitutedTemplate)));
                 }
-                if (loc.equals(STATEMENT_PREFIX) && lambda.isScope(insertionPoint) && mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
-                    J gen = substitutions.unsubstitute(templateParser.parseExpression(substitutedTemplate));
-                    return autoFormat(gen.withPrefix(lambda.getPrefix()), p, getCursor().getParentOrThrow());
-                }
-                return super.visitLambda(lambda, p);
+                return visitStatement(lambda, 0);
             }
 
             @Override
@@ -414,11 +411,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                     m = autoFormat(m.withPrefix(method.getPrefix()), 0, getCursor().getParentOrThrow());
                     return m;
                 }
-                if (loc.equals(STATEMENT_PREFIX) && method.isScope(insertionPoint) && mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
-                    J gen = substitutions.unsubstitute(templateParser.parseExpression(substitutedTemplate));
-                    return autoFormat(gen.withPrefix(method.getPrefix()), integer, getCursor().getParentOrThrow());
-                }
-                return super.visitMethodInvocation(method, integer);
+                return visitStatement(method, 0);
             }
 
             @Override
@@ -444,7 +437,6 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                 }
                 return super.visitStatement(statement, p);
             }
-
 
             @Override
             public J visitVariableDeclarations(J.VariableDeclarations multiVariable, Integer p) {

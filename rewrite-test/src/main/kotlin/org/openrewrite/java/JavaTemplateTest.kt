@@ -16,7 +16,6 @@
 package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
@@ -28,7 +27,6 @@ import java.util.Comparator.comparing
 @Suppress("Convert2MethodRef")
 interface JavaTemplateTest : JavaRecipeTest {
 
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/1092")
     @Test
     fun methodInvocationReplacementHasContextAboutLocalVariables() = assertChanged(
@@ -40,7 +38,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                 ): J.MethodInvocation {
                     return if (method.simpleName == "clear") {
                         method.withTemplate(
-                            JavaTemplate.builder({ this.cursor }, """words.add("jon");""").build(),
+                            JavaTemplate.builder({ this.cursor }, """words.add("jon");""")
+                                .build(),
                             method.coordinates.replace()
                         )
                     } else method
