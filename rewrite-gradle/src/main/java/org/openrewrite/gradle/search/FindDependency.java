@@ -15,6 +15,9 @@
  */
 package org.openrewrite.gradle.search;
 
+import io.micrometer.core.instrument.Meter;
+import io.micrometer.core.instrument.config.MeterFilter;
+import io.micrometer.core.instrument.distribution.DistributionStatisticConfig;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
@@ -58,8 +61,8 @@ public class FindDependency extends Recipe {
     @Override
     public String getDescription() {
         return "Finds dependencies declared in `build.gradle` files. See the [reference](https://docs.gradle.org/current/userguide/java_library_plugin.html#sec:java_library_configurations_graph) on Gradle configurations or the diagram below for a description of what configuration to use." +
-                " A project's compile and runtime classpath is based on these configurations.\n![Gradle compile classpath](https://docs.gradle.org/current/userguide/img/java-library-ignore-deprecated-main.png)\n" +
-                " A project's test classpath is based on these configurations.\n![Gradle test classpath](https://docs.gradle.org/current/userguide/img/java-library-ignore-deprecated-test.png)";
+                " A project's compile and runtime classpath is based on these configurations.\n\n<img alt=\"Gradle compile classpath\" src=\"https://docs.gradle.org/current/userguide/img/java-library-ignore-deprecated-main.png\" width=\"200px\"></img>\n" +
+                " A project's test classpath is based on these configurations.\n\n<img alt=\"Gradle test classpath\" src=\"https://docs.gradle.org/current/userguide/img/java-library-ignore-deprecated-test.png\" width=\"200px\"></img>";
     }
 
     @Override
