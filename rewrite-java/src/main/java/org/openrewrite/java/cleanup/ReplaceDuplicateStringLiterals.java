@@ -119,7 +119,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
 
             /**
              * Convert a `String` value to a variable name with naming convention of all caps delimited by `_`.
-             * Special characters are filtered out to meet regex convention: ^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$:
+             * Special characters are filtered out to meet regex convention: ^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$
              */
             private String transformToVariableName(String valueOfLiteral) {
                 boolean prevIsLower = false;
@@ -127,6 +127,9 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
                 StringBuilder newName = new StringBuilder();
                 for (int i = 0; i < valueOfLiteral.length(); i++) {
                     char c = valueOfLiteral.charAt(i);
+                    if (i == 0 && Character.isDigit(c)) {
+                        newName.append("A");
+                    }
                     if (i > 0 && newName.lastIndexOf("_") != newName.length() - 1 &&
                             (Character.isUpperCase(c) && prevIsLower || !prevIsCharacter)) {
                         newName.append("_");
