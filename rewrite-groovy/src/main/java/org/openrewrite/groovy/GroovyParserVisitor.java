@@ -175,7 +175,12 @@ public class GroovyParserVisitor {
 
             JContainer<TypeTree> implementings = null;
             if (clazz.getInterfaces().length > 0) {
-                Space implPrefix = sourceBefore("implements");
+                Space implPrefix;
+                if(kindType == J.ClassDeclaration.Kind.Type.Interface) {
+                    implPrefix = sourceBefore("extends");
+                } else {
+                    implPrefix = sourceBefore("implements");
+                }
                 List<JRightPadded<TypeTree>> implTypes = new ArrayList<>(clazz.getInterfaces().length);
                 ClassNode[] interfaces = clazz.getInterfaces();
                 for (int i = 0; i < interfaces.length; i++) {

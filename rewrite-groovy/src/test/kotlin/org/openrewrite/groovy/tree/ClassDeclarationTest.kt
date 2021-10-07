@@ -56,4 +56,13 @@ class ClassDeclarationTest : GroovyTreeTest {
             public abstract class A {}
         """
     )
+
+    @Test
+    fun interfaceExtendsInterface() = assertParsePrintAndProcess(
+        """
+            interface A {}
+            interface C {}
+            interface B extends A , C {}
+        """
+    )
 }
