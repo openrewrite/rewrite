@@ -140,7 +140,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 val t = JavaTemplate.builder({ cursor }, "b").build()
 
                 override fun visitPackage(pkg: J.Package, p: ExecutionContext): J.Package {
-                    if (pkg.expression.print(cursor) == "a") {
+                    if (pkg.expression.printTrimmed(cursor) == "a") {
                         return pkg.withTemplate(t, pkg.coordinates.replace())
                     }
                     return super.visitPackage(pkg, p)
@@ -678,6 +678,76 @@ interface JavaTemplateTest : JavaRecipeTest {
                 void test() {
                     assert n == 0;
                     n = 1;
+                }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1093")
+    @Test
+    fun firstStatementInClassBlock(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = toRecipe {
+            object : JavaVisitor<ExecutionContext>() {
+                val t = JavaTemplate.builder({ cursor }, "int m;")
+                    .build()
+
+                override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J {
+                    if (classDecl.body.statements.size == 1) {
+                        return classDecl.withTemplate(t, classDecl.body.coordinates.firstStatement())
+                    }
+                    return classDecl
+                }
+            }
+        },
+        before = """
+            class Test {
+                // comment
+                int n;
+            }
+        """,
+        after = """
+            class Test {
+                int m;
+                // comment
+                int n;
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1093")
+    @Test
+    fun firstStatementInMethodBlock(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = toRecipe {
+            object : JavaVisitor<ExecutionContext>() {
+                val t = JavaTemplate.builder({ cursor }, "int m = 0;")
+                    .build()
+
+                override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
+                    if (method.body!!.statements.size == 1) {
+                        return method.withTemplate(t, method.body!!.coordinates.firstStatement())
+                    }
+                    return method
+                }
+            }
+        },
+        before = """
+            class Test {
+                int n;
+                void test() {
+                    // comment
+                    int n = 1;
+                }
+            }
+        """,
+        after = """
+            class Test {
+                int n;
+                void test() {
+                    int m = 0;
+                    // comment
+                    int n = 1;
                 }
             }
         """

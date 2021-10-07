@@ -136,7 +136,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                 Cursor parent = getCursor();
                                 for (int i = 0; i < gen.size(); i++) {
                                     Statement s = gen.get(i);
-                                    Statement formattedS = autoFormat(i == 0 ? s.withPrefix(statement.getPrefix()) : s, p, parent);
+                                    Statement formattedS = autoFormat(i == 0 ? s.withPrefix(statement.getPrefix().withComments(Collections.emptyList())) : s, p, parent);
                                     gen.set(i, formattedS);
                                 }
 
