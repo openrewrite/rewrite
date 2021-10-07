@@ -422,6 +422,10 @@ class Java11RenameMethodsNamedHashcodeEqualOrTostringTest : Java11Test, RenameMe
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11ReplaceDuplicateStringLiteralsTest : Java11Test, ReplaceDuplicateStringLiteralsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11RenameVariableTest : Java11Test, RenameVariableTest
 
 @DebugOnly
