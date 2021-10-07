@@ -167,7 +167,7 @@ interface Plugin {
     Plugin apply(boolean a)
 }
 
-interface DependencyHandlerSpec {
+interface DependencyHandlerSpec extends DependencyHandler {
     Dependency api(String dependencyNotation)
     Dependency implementation(String dependencyNotation)
     Dependency runtimeClasspath(String dependencyNotation)
@@ -176,9 +176,14 @@ interface DependencyHandlerSpec {
     Dependency testRuntimeOnly(String dependencyNotation)
 }
 
+interface RepositoryHandlerSpec extends RepositoryHandler {
+    MavenArtifactRepository maven(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=MavenArtifactRepository) Closure closure)
+    IvyArtifactRepository ivy(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=IvyArtifactRepository) Closure closure)
+}
+
 abstract class RewriteGradleProject implements Project {
     abstract void dependencies(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=DependencyHandlerSpec) Closure cl)
     abstract void plugins(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=PluginSpec) Closure cl)
-
+    abstract void repositories(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=RepositoryHandlerSpec) Closure cl)
     void __script__() {
 }}
