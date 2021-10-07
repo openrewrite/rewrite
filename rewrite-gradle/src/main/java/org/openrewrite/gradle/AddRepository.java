@@ -35,8 +35,7 @@ import java.util.Collections;
 import java.util.HashSet;
 
 import static java.util.Arrays.asList;
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -70,7 +69,7 @@ public class AddRepository extends Recipe {
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, context);
                 if(repositories.matches(m)) {
-                    if(FindMethods.find(method, "org.gradle.api.artifacts.dsl.RepositoryHandler " + repository + "()").size() > 0) {
+                    if(FindMethods.find(m, "org.gradle.api.artifacts.dsl.RepositoryHandler " + repository + "()").size() > 0) {
                         return m;
                     }
                 }
@@ -85,7 +84,7 @@ public class AddRepository extends Recipe {
 
                 JavaType.Method.Signature signature = new JavaType.Method.Signature(JavaType.Class.build("org.gradle.api.artifacts.repositories.MavenArtifactRepository"), emptyList());
                 JavaType.Method methodType = JavaType.Method.build(
-                        new HashSet<>(singletonList(Flag.Public)),
+                        singleton(Flag.Public),
                         JavaType.Class.build("org.gradle.api.artifacts.dsl.RepositoryHandler"),
                         repository,
                         signature,

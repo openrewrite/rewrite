@@ -26,4 +26,14 @@ class AssignmentTest : GroovyTreeTest {
             s = "foo";
         """
     )
+
+    @Test
+    fun negativeNumber() = assertParsePrintAndProcess(
+        """
+            def i = -1
+            def l = -1L
+            def f = -1.0f
+            def d = -1.0d
+        """
+    )
 }

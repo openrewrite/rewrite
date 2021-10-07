@@ -660,15 +660,15 @@ public class GroovyParserVisitor {
                 jType = JavaType.Primitive.Byte;
             } else if (type == ClassHelper.char_TYPE) {
                 jType = JavaType.Primitive.Char;
-            } else if (type == ClassHelper.double_TYPE) {
+            } else if (type == ClassHelper.double_TYPE || type.getName().equals("java.lang.Double")) {
                 jType = JavaType.Primitive.Double;
-            } else if (type == ClassHelper.float_TYPE) {
+            } else if (type == ClassHelper.float_TYPE || type.getName().equals("java.lang.Float")) {
                 jType = JavaType.Primitive.Float;
-            } else if (type == ClassHelper.int_TYPE) {
+            } else if (type == ClassHelper.int_TYPE || type.getName().equals("java.lang.Integer")) {
                 jType = JavaType.Primitive.Int;
-            } else if (type == ClassHelper.long_TYPE) {
+            } else if (type == ClassHelper.long_TYPE || type.getName().equals("java.lang.Long")) {
                 jType = JavaType.Primitive.Long;
-            } else if (type == ClassHelper.short_TYPE) {
+            } else if (type == ClassHelper.short_TYPE || type.getName().equals("java.lang.Short")) {
                 jType = JavaType.Primitive.Short;
             } else if (type == ClassHelper.STRING_TYPE) {
                 jType = JavaType.Primitive.String;
