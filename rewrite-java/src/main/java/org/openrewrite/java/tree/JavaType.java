@@ -602,8 +602,6 @@ public interface JavaType extends Serializable {
 
         @JsonCreator
         public static Parameterized build(FullyQualified type, List<JavaType> typeParameters) {
-            ObjectMapper mapper;
-
             return flyweight.find(type, typeParameters);
         }
 

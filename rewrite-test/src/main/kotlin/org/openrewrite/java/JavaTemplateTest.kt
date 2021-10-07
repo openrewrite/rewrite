@@ -16,6 +16,7 @@
 package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
@@ -27,6 +28,45 @@ import java.util.Comparator.comparing
 @Suppress("Convert2MethodRef")
 interface JavaTemplateTest : JavaRecipeTest {
 
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/1092")
+    @Test
+    fun methodInvocationReplacementHasContextAboutLocalVariables() = assertChanged(
+        recipe = toRecipe {
+            object : JavaIsoVisitor<ExecutionContext>() {
+                override fun visitMethodInvocation(
+                    method: J.MethodInvocation,
+                    ctx: ExecutionContext
+                ): J.MethodInvocation {
+                    return if (method.simpleName == "clear") {
+                        method.withTemplate(
+                            JavaTemplate.builder({ this.cursor }, """words.add("jon");""").build(),
+                            method.coordinates.replace()
+                        )
+                    } else method
+                }
+            }
+        },
+        before = """
+            import java.util.List;
+            class Test {
+                List<String> words;
+                void test() {
+                    words.clear();
+                }
+            }
+        """,
+        after = """
+            import java.util.List;
+            class Test {
+                List<String> words;
+                void test() {
+                    words.add("jon");
+                }
+            }
+        """
+    )
+
     @Test
     fun innerEnumWithStaticMethod(jp: JavaParser) = assertChanged(
         jp,
@@ -34,10 +74,11 @@ interface JavaTemplateTest : JavaRecipeTest {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "new A()").build()
 
-                override fun visitNewClass(newClass: J.NewClass, p: ExecutionContext): J = when(newClass.arguments!![0]) {
-                    is J.Empty -> newClass
-                    else -> newClass.withTemplate(t, newClass.coordinates.replace())
-                }
+                override fun visitNewClass(newClass: J.NewClass, p: ExecutionContext): J =
+                    when (newClass.arguments!![0]) {
+                        is J.Empty -> newClass
+                        else -> newClass.withTemplate(t, newClass.coordinates.replace())
+                    }
             }
         },
         typeValidation = {
@@ -99,7 +140,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 val t = JavaTemplate.builder({ cursor }, "b").build()
 
                 override fun visitPackage(pkg: J.Package, p: ExecutionContext): J.Package {
-                    if (pkg.expression.printTrimmed() == "a") {
+                    if (pkg.expression.print(cursor) == "a") {
                         return pkg.withTemplate(t, pkg.coordinates.replace())
                     }
                     return super.visitPackage(pkg, p)
