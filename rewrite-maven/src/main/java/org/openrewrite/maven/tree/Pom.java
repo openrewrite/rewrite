@@ -96,11 +96,27 @@ public class Pom {
     @Getter
     Collection<License> licenses;
 
+    /**
+     * A collection of all repositories declared within this pom. Does not include repositories from parent poms.
+     */
     @Getter
     Collection<MavenRepository> repositories;
 
     /**
-     * The properties parsed directly from this POM. The values may be different than the effective property values.
+     * @return a collection of all repositories known to this Pom, as declared in the pom itself or in any of its parent poms.
+     */
+    public Collection<MavenRepository> getEffectiveRepositories() {
+        List<MavenRepository> allRepositories = new ArrayList<>(repositories);
+        Pom ancestor = parent;
+        while (ancestor != null) {
+            allRepositories.addAll(ancestor.getRepositories());
+            ancestor = ancestor.getParent();
+        }
+        return allRepositories;
+    }
+
+    /**
+     * The properties parsed directly from this POM. These may differ from the effective property values.
      */
     @Getter
     Map<String, String> properties;

@@ -37,7 +37,6 @@ import java.util.Collection;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 
 /**
@@ -163,7 +162,7 @@ public class UpgradeDependencyVersion extends Recipe {
                                                             ExecutionContext ctx) {
             if (availableVersions == null) {
                 MavenMetadata mavenMetadata = new MavenPomDownloader(MavenPomCache.NOOP,
-                        emptyMap(), ctx).downloadMetadata(groupId, artifactId, emptyList());
+                        emptyMap(), ctx).downloadMetadata(groupId, artifactId, getCursor().firstEnclosingOrThrow(Maven.class).getModel().getEffectiveRepositories());
                 availableVersions = mavenMetadata.getVersioning().getVersions().stream()
                         .filter(versionComparator::isValid)
                         .collect(Collectors.toList());

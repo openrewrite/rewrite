@@ -25,7 +25,7 @@ class ChangeParentPomTest : MavenRecipeTest {
             "org.springframework.boot",
             "com.fasterxml.jackson",
             "spring-boot-starter-parent",
-        "jackson-parent",
+            "jackson-parent",
             "2.12",
             null
         ),

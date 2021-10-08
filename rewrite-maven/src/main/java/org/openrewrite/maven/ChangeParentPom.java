@@ -34,7 +34,6 @@ import java.util.Collection;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 
 @Value
@@ -132,9 +131,15 @@ public class ChangeParentPom extends Recipe {
                         tag.getChildValue("version")
                                 .flatMap(parentVersion -> findNewerDependencyVersion(targetGroupId, targetArtifactId, parentVersion, ctx))
                                 .ifPresent(newVersion -> {
-                                    doAfterVisit(new ChangeTagValueVisitor<>(tag.getChild("groupId").get(), targetGroupId));
-                                    doAfterVisit(new ChangeTagValueVisitor<>(tag.getChild("artifactId").get(), targetArtifactId));
-                                    doAfterVisit(new ChangeTagValueVisitor<>(tag.getChild("version").get(), newVersion));
+                                    if(!oldGroupId.equals(targetGroupId)) {
+                                        doAfterVisit(new ChangeTagValueVisitor<>(tag.getChild("groupId").get(), targetGroupId));
+                                    }
+                                    if(!oldArtifactId.equals(targetArtifactId)) {
+                                        doAfterVisit(new ChangeTagValueVisitor<>(tag.getChild("artifactId").get(), targetArtifactId));
+                                    }
+                                    if(!newVersion.equals(tag.getChildValue("version").orElse(null))) {
+                                        doAfterVisit(new ChangeTagValueVisitor<>(tag.getChild("version").get(), newVersion));
+                                    }
                                     doAfterVisit(new RemoveRedundantDependencyVersions());
                                 });
                     }
@@ -147,7 +152,7 @@ public class ChangeParentPom extends Recipe {
                                                                 ExecutionContext ctx) {
                 if (availableVersions == null) {
                     MavenMetadata mavenMetadata = new MavenPomDownloader(MavenPomCache.NOOP,
-                            emptyMap(), ctx).downloadMetadata(groupId, artifactId, emptyList());
+                            emptyMap(), ctx).downloadMetadata(groupId, artifactId, getCursor().firstEnclosingOrThrow(Maven.class).getModel().getEffectiveRepositories());
                     availableVersions = mavenMetadata.getVersioning().getVersions().stream()
                             .filter(versionComparator::isValid)
                             .collect(Collectors.toList());
