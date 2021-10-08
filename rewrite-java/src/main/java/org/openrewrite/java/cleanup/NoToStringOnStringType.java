@@ -19,10 +19,11 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.search.UsesType;
+import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
 
 import java.time.Duration;
@@ -30,7 +31,7 @@ import java.util.Collections;
 import java.util.Set;
 
 public class NoToStringOnStringType extends Recipe {
-    public static final MethodMatcher TO_STRING = new MethodMatcher("java.lang.String toString()");
+    private static final MethodMatcher TO_STRING = new MethodMatcher("java.lang.String toString()");
 
     @Override
     public String getDisplayName() {
@@ -45,7 +46,13 @@ public class NoToStringOnStringType extends Recipe {
     @Nullable
     @Override
     protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("java.lang.String");
+        return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+                doAfterVisit(new UsesMethod<>("java.lang.String toString()"));
+                return cu;
+            }
+        };
     }
 
     @Override

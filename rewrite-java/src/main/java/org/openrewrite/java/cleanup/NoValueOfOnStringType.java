@@ -19,10 +19,11 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.search.UsesType;
+import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -33,7 +34,7 @@ import java.util.Collections;
 import java.util.Set;
 
 public class NoValueOfOnStringType extends Recipe {
-    public static final MethodMatcher VALUE_OF = new MethodMatcher("java.lang.String valueOf(java.lang.Object)");
+    private static final MethodMatcher VALUE_OF = new MethodMatcher("java.lang.String valueOf(java.lang.Object)");
 
     @Override
     public String getDisplayName() {
@@ -48,7 +49,13 @@ public class NoValueOfOnStringType extends Recipe {
     @Nullable
     @Override
     protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("java.lang.String");
+        return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+                doAfterVisit(new UsesMethod<>("java.lang.String valueOf(java.lang.Object)"));
+                return cu;
+            }
+        };
     }
 
     @Override
