@@ -17,7 +17,6 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.java.tree.J
@@ -123,7 +122,6 @@ interface MethodMatcherTest {
     }
 
     @Test
-    @Disabled("Reproduces issue https://github.com/openrewrite/rewrite/issues/28")
     fun matchesPrimitiveArgument(jp: JavaParser) {
         assertTrue(argRegex("A foo(int)").matches("int"))
         assertTrue(argRegex("A foo(int[])").matches("int[]"))
