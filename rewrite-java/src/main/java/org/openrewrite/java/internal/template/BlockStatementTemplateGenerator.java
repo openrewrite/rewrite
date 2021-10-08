@@ -36,10 +36,23 @@ import static java.util.Collections.newSetFromMap;
 @RequiredArgsConstructor
 public class BlockStatementTemplateGenerator {
     private static final String TEMPLATE_COMMENT = "__TEMPLATE__";
+    private static final String EXPR_STATEMENT_PARAM = "" +
+            "class __P__ {" +
+            "  static native <T> T p();" +
+            "  static native <T> T[] arrp();" +
+            "  static native boolean booleanp();" +
+            "  static native byte bytep();" +
+            "  static native char charp();" +
+            "  static native double doublep();" +
+            "  static native int intp();" +
+            "  static native long longp();" +
+            "  static native short shortp();" +
+            "  static native float floatp();" +
+            "}";
 
     private final Set<String> imports;
 
-    public String template(Cursor cursor, String template, Space.Location location) {
+    public String template(Cursor cursor, String template, boolean mightBeUsedAsExpression, Space.Location location) {
         //noinspection ConstantConditions
         return Timer.builder("rewrite.template.generate.statement")
                 .register(Metrics.globalRegistry)
@@ -58,23 +71,19 @@ public class BlockStatementTemplateGenerator {
 
                     template(next(cursor), cursor.getValue(), before, after, newSetFromMap(new IdentityHashMap<>()));
 
-                    return before.toString().trim() + "\n/*" + TEMPLATE_COMMENT + "*/" + template + "\n" + after;
+                    return before.toString().trim() + (mightBeUsedAsExpression ? "Object o = " : "") +
+                            "\n/*" + TEMPLATE_COMMENT + "*/" + template + "\n" + after;
                 });
     }
 
-    public List<Statement> listTemplatedStatements(J.CompilationUnit cu) {
-        List<Statement> statements = new ArrayList<>();
+    public <J2 extends J> List<J2> listTemplatedTrees(JavaSourceFile cu, Class<J2> expected) {
+        List<J2> js = new ArrayList<>();
 
         new JavaIsoVisitor<Integer>() {
             boolean done = false;
 
             @Nullable
             J.Block blockEnclosingTemplateComment;
-
-            @Override
-            public Statement visitStatement(Statement statement, Integer integer) {
-                return statement;
-            }
 
             @Override
             public J.Block visitBlock(J.Block block, Integer p) {
@@ -92,19 +101,19 @@ public class BlockStatementTemplateGenerator {
                     return (J) tree;
                 }
 
-                if (tree instanceof Statement) {
-                    Statement statement = (Statement) tree;
+                if (expected.isInstance(tree)) {
+                    @SuppressWarnings("unchecked") J2 t = (J2) tree;
 
                     if (blockEnclosingTemplateComment != null) {
-                        statements.add(statement);
-                        return statement;
+                        js.add(t);
+                        return t;
                     }
 
-                    for (Comment comment : statement.getPrefix().getComments()) {
+                    for (Comment comment : t.getPrefix().getComments()) {
                         if(comment instanceof TextComment && ((TextComment) comment).getText().equals(TEMPLATE_COMMENT)) {
                             blockEnclosingTemplateComment = getCursor().firstEnclosing(J.Block.class);
-                            statements.add(statement.withPrefix(Space.EMPTY));
-                            return statement;
+                            js.add(t.withPrefix(Space.EMPTY));
+                            return t;
                         }
                     }
                 }
@@ -113,15 +122,17 @@ public class BlockStatementTemplateGenerator {
             }
         }.visit(cu, 0);
 
-        return statements;
+        return js;
     }
 
     @SuppressWarnings("ConstantConditions")
     private void template(Cursor cursor, J prior, StringBuilder before, StringBuilder after, Set<J> templated) {
         templated.add(cursor.getValue());
         J j = cursor.getValue();
-        if (j instanceof J.CompilationUnit) {
-            J.CompilationUnit cu = (J.CompilationUnit) j;
+        if (j instanceof JavaSourceFile) {
+            before.insert(0, EXPR_STATEMENT_PARAM);
+
+            JavaSourceFile cu = (JavaSourceFile) j;
             for (J.Import anImport : cu.getImports()) {
                 before.insert(0, anImport.withPrefix(Space.EMPTY).printTrimmed(cursor) + ";\n");
             }
@@ -132,6 +143,7 @@ public class BlockStatementTemplateGenerator {
             if (cu.getPackageDeclaration() != null) {
                 before.insert(0, cu.getPackageDeclaration().withPrefix(Space.EMPTY).printTrimmed(cursor) + ";\n");
             }
+
             return;
         } else if (j instanceof J.Block) {
             J parent = next(cursor).getValue();

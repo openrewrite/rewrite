@@ -180,7 +180,7 @@ public abstract class CoordinateBuilder {
         }
     }
 
-    public static class Package extends CoordinateBuilder {
+    public static class Package extends Statement {
         Package(J.Package tree) {
             super(tree);
         }

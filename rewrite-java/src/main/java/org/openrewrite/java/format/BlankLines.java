@@ -17,11 +17,12 @@ package org.openrewrite.java.format;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.BlankLinesStyle;
 import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 
 public class BlankLines extends Recipe {
     @Override
@@ -41,8 +42,8 @@ public class BlankLines extends Recipe {
 
     private static class BlankLinesFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
-        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-            BlankLinesStyle style = cu.getStyle(BlankLinesStyle.class);
+        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
+            BlankLinesStyle style = ((SourceFile) cu).getStyle(BlankLinesStyle.class);
             if(style == null) {
                 style = IntelliJ.blankLines();
             }

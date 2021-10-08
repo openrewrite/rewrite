@@ -20,6 +20,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
 
 public class RemoveTrailingWhitespaceVisitor<P> extends JavaIsoVisitor<P> {
@@ -36,13 +37,13 @@ public class RemoveTrailingWhitespaceVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
+    public J visitJavaSourceFile(JavaSourceFile cu, P p) {
         String eof = cu.getEof().getWhitespace();
         eof = eof.chars().filter(c -> c == '\n' || c == '\r')
                 .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
                 .toString();
 
-        J.CompilationUnit c = super.visitCompilationUnit(cu, p);
+        JavaSourceFile c = (JavaSourceFile) super.visitJavaSourceFile(cu, p);
         return c.withEof(c.getEof().withWhitespace(eof));
     }
 
@@ -71,7 +72,7 @@ public class RemoveTrailingWhitespaceVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
-            getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "stop", true);
+            getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }

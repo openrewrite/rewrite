@@ -22,6 +22,7 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
@@ -1215,7 +1216,7 @@ public interface J extends Serializable, Tree {
         }
 
         @RequiredArgsConstructor
-        public static class Padding {
+        public static class Padding implements JavaSourceFile.Padding {
             private final CompilationUnit t;
 
             @Nullable
@@ -1227,10 +1228,12 @@ public interface J extends Serializable, Tree {
                 return t.packageDeclaration == packageDeclaration ? t : new CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, packageDeclaration, t.imports, t.classes, t.eof);
             }
 
+            @Override
             public List<JRightPadded<Import>> getImports() {
                 return t.imports;
             }
 
+            @Override
             public CompilationUnit withImports(List<JRightPadded<Import>> imports) {
                 return t.imports == imports ? t : new CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.packageDeclaration, imports, t.classes, t.eof);
             }
@@ -3720,7 +3723,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    final class Package implements J {
+    final class Package implements Statement, J {
         @With
         @EqualsAndHashCode.Include
         UUID id;

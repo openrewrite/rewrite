@@ -17,11 +17,12 @@ package org.openrewrite.java.format;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
-import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -56,8 +57,8 @@ public class WrappingAndBraces extends Recipe {
 
     private static class WrappingAndBracesCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
-        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-            WrappingAndBracesStyle style = cu.getStyle(WrappingAndBracesStyle.class);
+        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
+            WrappingAndBracesStyle style = ((SourceFile) cu).getStyle(WrappingAndBracesStyle.class);
             if(style == null) {
                 style = IntelliJ.wrappingAndBraces();
             }

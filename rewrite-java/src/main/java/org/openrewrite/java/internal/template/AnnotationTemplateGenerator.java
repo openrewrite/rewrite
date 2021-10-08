@@ -58,7 +58,7 @@ public class AnnotationTemplateGenerator {
                     }
 
                     if (cursor.getParentOrThrow().getValue() instanceof J.ClassDeclaration &&
-                            cursor.getParentOrThrow().getParentOrThrow().getValue() instanceof J.CompilationUnit) {
+                            cursor.getParentOrThrow().getParentOrThrow().getValue() instanceof JavaSourceFile) {
                         after.append("class $Template {}");
                     }
 
@@ -66,7 +66,7 @@ public class AnnotationTemplateGenerator {
                 });
     }
 
-    public List<J.Annotation> listAnnotations(J.CompilationUnit cu) {
+    public List<J.Annotation> listAnnotations(JavaSourceFile cu) {
         List<J.Annotation> annotations = new ArrayList<>();
 
         new JavaIsoVisitor<Integer>() {
@@ -94,8 +94,8 @@ public class AnnotationTemplateGenerator {
     private void template(Cursor cursor, J prior, StringBuilder before, StringBuilder after, Set<J> templated) {
         templated.add(cursor.getValue());
         J j = cursor.getValue();
-        if (j instanceof J.CompilationUnit) {
-            J.CompilationUnit cu = (J.CompilationUnit) j;
+        if (j instanceof JavaSourceFile) {
+            JavaSourceFile cu = (JavaSourceFile) j;
             for (J.Import anImport : cu.getImports()) {
                 before.insert(0, anImport.withPrefix(Space.EMPTY).printTrimmed(cursor) + ";\n");
             }

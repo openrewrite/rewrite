@@ -22,6 +22,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
 
 @RequiredArgsConstructor
@@ -196,7 +197,7 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
-            getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "stop", true);
+            getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }

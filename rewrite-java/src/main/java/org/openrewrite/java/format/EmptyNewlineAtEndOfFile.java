@@ -17,11 +17,12 @@ package org.openrewrite.java.format;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Comment;
-import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.GeneralFormatStyle;
 
@@ -56,8 +57,8 @@ public class EmptyNewlineAtEndOfFile extends Recipe {
     protected JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                GeneralFormatStyle generalFormatStyle = Optional.ofNullable(cu.getStyle(GeneralFormatStyle.class))
+            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
+                GeneralFormatStyle generalFormatStyle = Optional.ofNullable(((SourceFile) cu).getStyle(GeneralFormatStyle.class))
                         .orElse(GeneralFormatStyle.DEFAULT);
 
                 Space eof = cu.getEof();

@@ -16,11 +16,13 @@
 package org.openrewrite.java.format;
 
 import org.openrewrite.Cursor;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.style.GeneralFormatStyle;
 
 import java.util.Optional;
@@ -39,7 +41,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J visit(@Nullable Tree tree, P p, Cursor cursor) {
-        J.CompilationUnit cu = cursor.firstEnclosingOrThrow(J.CompilationUnit.class);
+        JavaSourceFile cu = cursor.firstEnclosingOrThrow(JavaSourceFile.class);
 
         J t = new NormalizeFormatVisitor<>(stopAfter).visit(tree, p, cursor.fork());
 
@@ -47,30 +49,30 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
 
         t = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(t, p, cursor.fork());
 
-        t = new BlankLinesVisitor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
+        t = new BlankLinesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(BlankLinesStyle.class))
                 .orElse(IntelliJ.blankLines()), stopAfter)
                 .visit(t, p, cursor.fork());
 
         t = new SpacesVisitor<>(
-                Optional.ofNullable(cu.getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces()),
-                cu.getStyle(EmptyForInitializerPadStyle.class),
-                cu.getStyle(EmptyForIteratorPadStyle.class),
+                Optional.ofNullable(((SourceFile) cu).getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces()),
+                ((SourceFile) cu).getStyle(EmptyForInitializerPadStyle.class),
+                ((SourceFile) cu).getStyle(EmptyForIteratorPadStyle.class),
                 stopAfter
         ).visit(t, p, cursor.fork());
 
-        t = new WrappingAndBracesVisitor<>(Optional.ofNullable(cu.getStyle(WrappingAndBracesStyle.class))
+        t = new WrappingAndBracesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(WrappingAndBracesStyle.class))
                 .orElse(IntelliJ.wrappingAndBraces()), stopAfter)
                 .visit(t, p, cursor.fork());
 
-        t = new NormalizeTabsOrSpacesVisitor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
+        t = new NormalizeTabsOrSpacesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class))
                 .orElse(IntelliJ.tabsAndIndents()), stopAfter)
                 .visit(t, p, cursor.fork());
 
-        t = new TabsAndIndentsVisitor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
+        t = new TabsAndIndentsVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class))
                 .orElse(IntelliJ.tabsAndIndents()), stopAfter)
                 .visit(t, p, cursor.fork());
 
-        t = new NormalizeLineBreaksVisitor<>(Optional.ofNullable(cu.getStyle(GeneralFormatStyle.class))
+        t = new NormalizeLineBreaksVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(GeneralFormatStyle.class))
                 .orElse(GeneralFormatStyle.DEFAULT), stopAfter)
                 .visit(t, p, cursor.fork());
 
@@ -78,29 +80,29 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
-        J.CompilationUnit t = (J.CompilationUnit) new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(cu, p);
+    public J visitJavaSourceFile(JavaSourceFile cu, P p) {
+        JavaSourceFile t = (JavaSourceFile) new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(cu, p);
 
-        t = (J.CompilationUnit) new BlankLinesVisitor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
+        t = (JavaSourceFile) new BlankLinesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(BlankLinesStyle.class))
                 .orElse(IntelliJ.blankLines()), stopAfter)
                 .visit(t, p);
 
-        t = (J.CompilationUnit) new SpacesVisitor<P>(Optional.ofNullable(
-                cu.getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces()),
-                cu.getStyle(EmptyForInitializerPadStyle.class),
-                cu.getStyle(EmptyForIteratorPadStyle.class),
+        t = (JavaSourceFile) new SpacesVisitor<P>(Optional.ofNullable(
+                ((SourceFile) cu).getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces()),
+                ((SourceFile) cu).getStyle(EmptyForInitializerPadStyle.class),
+                ((SourceFile) cu).getStyle(EmptyForIteratorPadStyle.class),
                 stopAfter)
                 .visit(t, p);
 
-        t = (J.CompilationUnit) new WrappingAndBracesVisitor<>(Optional.ofNullable(cu.getStyle(WrappingAndBracesStyle.class))
+        t = (JavaSourceFile) new WrappingAndBracesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(WrappingAndBracesStyle.class))
                 .orElse(IntelliJ.wrappingAndBraces()), stopAfter)
                 .visit(t, p);
 
-        t = (J.CompilationUnit) new NormalizeTabsOrSpacesVisitor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
+        t = (JavaSourceFile) new NormalizeTabsOrSpacesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class))
                 .orElse(IntelliJ.tabsAndIndents()), stopAfter)
                 .visit(t, p);
 
-        t = (J.CompilationUnit) new TabsAndIndentsVisitor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
+        t = (JavaSourceFile) new TabsAndIndentsVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class))
                 .orElse(IntelliJ.tabsAndIndents()), stopAfter)
                 .visit(t, p);
 

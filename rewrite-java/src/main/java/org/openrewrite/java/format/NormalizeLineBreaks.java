@@ -17,9 +17,10 @@ package org.openrewrite.java.format;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.style.GeneralFormatStyle;
 
 public class NormalizeLineBreaks extends Recipe {
@@ -41,8 +42,8 @@ public class NormalizeLineBreaks extends Recipe {
 
     private static class LineBreaksFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
-        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-            GeneralFormatStyle style = cu.getStyle(GeneralFormatStyle.class);
+        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
+            GeneralFormatStyle style = ((SourceFile) cu).getStyle(GeneralFormatStyle.class);
             if (style == null) {
                 style = GeneralFormatStyle.DEFAULT;
             }

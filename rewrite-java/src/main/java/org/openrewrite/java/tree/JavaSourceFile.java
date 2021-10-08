@@ -15,9 +15,30 @@
  */
 package org.openrewrite.java.tree;
 
+import org.openrewrite.internal.lang.Nullable;
+
+import java.util.List;
 import java.util.Set;
 
 public interface JavaSourceFile extends J {
     Set<JavaType> getTypesInUse();
     Set<JavaType.Method> getDeclaredMethods();
+
+    @Nullable
+    J.Package getPackageDeclaration();
+
+    List<Import> getImports();
+
+    List<J.ClassDeclaration> getClasses();
+
+    Space getEof();
+
+    JavaSourceFile withEof(Space eof);
+
+    Padding getPadding();
+
+    interface Padding {
+        List<JRightPadded<Import>> getImports();
+        JavaSourceFile withImports(List<JRightPadded<Import>> imports);
+    }
 }

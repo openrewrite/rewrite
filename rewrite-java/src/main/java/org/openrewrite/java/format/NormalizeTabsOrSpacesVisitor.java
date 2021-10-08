@@ -126,7 +126,7 @@ public class NormalizeTabsOrSpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
-            getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "stop", true);
+            getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }

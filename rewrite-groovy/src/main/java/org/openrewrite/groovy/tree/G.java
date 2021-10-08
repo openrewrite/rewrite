@@ -243,7 +243,7 @@ public interface G extends J {
         }
 
         @RequiredArgsConstructor
-        public static class Padding {
+        public static class Padding implements JavaSourceFile.Padding {
             private final G.CompilationUnit t;
 
             @Nullable
@@ -255,6 +255,7 @@ public interface G extends J {
                 return t.packageDeclaration == packageDeclaration ? t : new G.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, packageDeclaration, t.statements, t.eof);
             }
 
+            @Override
             public List<JRightPadded<Import>> getImports() {
                 //noinspection unchecked
                 return t.statements.stream()
@@ -263,6 +264,7 @@ public interface G extends J {
                         .collect(Collectors.toList());
             }
 
+            @Override
             public G.CompilationUnit withImports(List<JRightPadded<Import>> imports) {
                 // TODO implement me!
                 return t;

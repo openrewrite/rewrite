@@ -41,8 +41,8 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
-        J.CompilationUnit j = cu;
+    public J visitJavaSourceFile(JavaSourceFile cu, P p) {
+        JavaSourceFile j = cu;
         if (j.getPackageDeclaration() != null) {
             if (!j.getPrefix().getComments().isEmpty()) {
                 j = j.withComments(ListUtils.mapLast(j.getComments(), c -> {
@@ -74,7 +74,7 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
             j = j.getPadding().withImports(ListUtils.mapFirst(j.getPadding().getImports(), i ->
                     minimumLines(i, style.getMinimum().getAfterPackage())));
         }
-        return super.visitCompilationUnit(j, p);
+        return super.visitJavaSourceFile(j, p);
     }
 
     @Override
@@ -96,7 +96,7 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
                     style.getMinimum().getBeforeClassEnd())));
         }
 
-        J.CompilationUnit cu = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
+        JavaSourceFile cu = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
         boolean hasImports = !cu.getImports().isEmpty();
         boolean firstClass = j.equals(cu.getClasses().get(0));
 
@@ -120,7 +120,7 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.Import visitImport(J.Import impoort, P p) {
         J.Import i = super.visitImport(impoort, p);
-        J.CompilationUnit cu = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
+        JavaSourceFile cu = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
         if (i.equals(cu.getImports().get(0)) && cu.getPackageDeclaration() == null && cu.getPrefix().equals(Space.EMPTY)) {
             i = i.withPrefix(i.getPrefix().withWhitespace(""));
         }
@@ -270,7 +270,7 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
-            getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "stop", true);
+            getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }

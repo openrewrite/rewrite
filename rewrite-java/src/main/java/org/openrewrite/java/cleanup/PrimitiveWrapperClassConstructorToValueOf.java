@@ -75,46 +75,43 @@ public class PrimitiveWrapperClassConstructorToValueOf extends Recipe {
         return new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitNewClass(J.NewClass newClass, ExecutionContext executionContext) {
-                J j = super.visitNewClass(newClass, executionContext);
-                J.NewClass nc = (J.NewClass) j;
+                J.NewClass nc = (J.NewClass) super.visitNewClass(newClass, executionContext);
                 JavaType.FullyQualified type = TypeUtils.asFullyQualified(nc.getType());
                 if (type != null && nc.getArguments() != null && nc.getArguments().size() == 1) {
-                    JavaTemplate.Builder valueOf = null;
+                    JavaTemplate.Builder valueOf;
                     switch (type.getFullyQualifiedName()) {
                         case "java.lang.Boolean":
-                            valueOf = JavaTemplate.builder(this::getCursor, "#{}.valueOf(#{any(boolean)});");
+                            valueOf = JavaTemplate.builder(this::getCursor, "Boolean.valueOf(#{any(boolean)});");
                             break;
                         case "java.lang.Byte":
-                            valueOf = JavaTemplate.builder(this::getCursor, "#{}.valueOf(#{any(byte)});");
+                            valueOf = JavaTemplate.builder(this::getCursor, "Byte.valueOf(#{any(byte)});");
                             break;
                         case "java.lang.Character":
-                            valueOf = JavaTemplate.builder(this::getCursor, "#{}.valueOf(#{any(char)});");
+                            valueOf = JavaTemplate.builder(this::getCursor, "Character.valueOf(#{any(char)});");
                             break;
                         case "java.lang.Double":
-                            valueOf = JavaTemplate.builder(this::getCursor, "#{}.valueOf(#{any(double)});");
+                            valueOf = JavaTemplate.builder(this::getCursor, "Double.valueOf(#{any(double)});");
                             break;
                         case "java.lang.Float":
-                            valueOf = JavaTemplate.builder(this::getCursor, "#{}.valueOf(#{any(float)});");
+                            valueOf = JavaTemplate.builder(this::getCursor, "Float.valueOf(#{any(float)});");
                             break;
                         case "java.lang.Integer":
-                            valueOf = JavaTemplate.builder(this::getCursor, "#{}.valueOf(#{any(int)});");
+                            valueOf = JavaTemplate.builder(this::getCursor, "Integer.valueOf(#{any(int)});");
                             break;
                         case "java.lang.Long":
-                            valueOf = JavaTemplate.builder(this::getCursor, "#{}.valueOf(#{any(long)});");
+                            valueOf = JavaTemplate.builder(this::getCursor, "Long.valueOf(#{any(long)});");
                             break;
                         case "java.lang.Short":
-                            valueOf = JavaTemplate.builder(this::getCursor, "#{}.valueOf(#{any(short)});");
+                            valueOf = JavaTemplate.builder(this::getCursor, "Short.valueOf(#{any(short)});");
                             break;
                         default:
-                            break;
+                            return nc;
                     }
 
-                    if(valueOf != null) {
-                        j = nc.withTemplate(valueOf.build(), nc.getCoordinates().replace(),
-                                type.getClassName(), nc.getArguments().get(0));
-                    }
+                    return nc.withTemplate(valueOf.build(), nc.getCoordinates().replace(),
+                            nc.getArguments().get(0));
                 }
-                return j;
+                return nc;
             }
         };
     }

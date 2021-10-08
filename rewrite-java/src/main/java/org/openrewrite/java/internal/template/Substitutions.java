@@ -42,7 +42,7 @@ public class Substitutions {
     public String substitute() {
         AtomicInteger index = new AtomicInteger(0);
         String substituted = code;
-        while(true) {
+        while (true) {
             String previous = substituted;
             substituted = propertyPlaceholderHelper.replacePlaceholders(substituted, key -> {
                 int i = index.getAndIncrement();
@@ -104,37 +104,11 @@ public class Substitutions {
                         }
 
                         JavaType.Primitive primitive = JavaType.Primitive.fromKeyword(fqn);
-                        if (primitive != null) {
-                            s = "(/*__p" + i + "__*/";
-                            switch (primitive) {
-                                case Boolean:
-                                    s += "true";
-                                    break;
-                                case Double:
-                                case Float:
-                                case Int:
-                                case Long:
-                                    s += "0";
-                                    break;
-                                case Short:
-                                    s += "(short)0";
-                                    break;
-                                case Byte:
-                                    s += "(byte)0";
-                                    break;
-                                case Char:
-                                    s += "'\0'";
-                                    break;
-                                case String:
-                                    s += "\"\"";
-                                    break;
-                            }
-                            s += ")";
-                        } else if ("Object".equals(fqn)) {
-                            s = "(/*__p" + i + "__*/null)";
-                        } else {
-                            s = "(/*__p" + i + "__*/(" + fqn + ")null)";
-                        }
+                        s = "__P__." + (primitive == null || primitive.equals(JavaType.Primitive.String) ?
+                                "<" + fqn + ">/*__p" + i + "__*/p()" :
+                                "/*__p" + i + "__*/" + fqn + "p()"
+                        );
+
                         parameters[i] = ((J) parameter).withPrefix(Space.EMPTY);
                     } else {
                         throw new IllegalArgumentException("Invalid template matcher '" + key + "'");
@@ -146,7 +120,7 @@ public class Substitutions {
                 return s;
             });
 
-            if(previous.equals(substituted)) {
+            if (previous.equals(substituted)) {
                 break;
             }
         }
@@ -161,7 +135,7 @@ public class Substitutions {
             return ((JavaType.FullyQualified) type).getFullyQualifiedName();
         } else if (type instanceof JavaType.Primitive) {
             return ((JavaType.Primitive) type).getKeyword();
-        } else if(type instanceof JavaType.Method) {
+        } else if (type instanceof JavaType.Method) {
             return getTypeName(((JavaType.Method) type).getResolvedSignature().getReturnType());
         } else {
             return "java.lang.Object";
@@ -219,6 +193,15 @@ public class Substitutions {
             }
 
             @Override
+            public J visitMethodInvocation(J.MethodInvocation method, Integer integer) {
+                J param = maybeParameter(method.getName());
+                if (param != null) {
+                    return param;
+                }
+                return super.visitMethodInvocation(method, integer);
+            }
+
+            @Override
             public <T extends J> J visitParentheses(J.Parentheses<T> parens, Integer integer) {
                 J param = maybeParameter(parens.getTree());
                 if (param != null) {
@@ -249,7 +232,7 @@ public class Substitutions {
             @Nullable
             private Integer parameterIndex(Space space) {
                 for (Comment comment : space.getComments()) {
-                    if(comment instanceof TextComment) {
+                    if (comment instanceof TextComment) {
                         Matcher matcher = PATTERN_COMMENT.matcher(((TextComment) comment).getText());
                         if (matcher.matches()) {
                             return Integer.valueOf(matcher.group(1));

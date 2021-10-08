@@ -16,11 +16,13 @@
 package org.openrewrite.java.format;
 
 import org.openrewrite.Cursor;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
 
 import java.util.Objects;
@@ -36,8 +38,8 @@ public class ShiftFormat {
     }
 
     public static <J2 extends J> J2 indent(J j, Cursor cursor, int shift) {
-        J.CompilationUnit cu = cursor.firstEnclosingOrThrow(J.CompilationUnit.class);
-        TabsAndIndentsStyle tabsAndIndents = Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
+        JavaSourceFile cu = cursor.firstEnclosingOrThrow(JavaSourceFile.class);
+        TabsAndIndentsStyle tabsAndIndents = Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class))
                 .orElse(IntelliJ.tabsAndIndents());
 
         //noinspection unchecked
