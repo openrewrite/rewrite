@@ -22,33 +22,26 @@ interface ChangeStaticFieldToMethodTest : JavaRecipeTest {
         get() = ChangeStaticFieldToMethod("java.util.Collections", "EMPTY_LIST",
                 "com.acme.Lists", "of")
 
-    companion object {
-        private val list: String = """
-            package com.acme;
-            public class Lists {
-               public static <T> java.util.List<T> of() { return null; }
-            }
-        """.trimIndent()
-    }
-
     @Test
     fun migratesQualifiedField(jp: JavaParser) = assertChanged(
             jp,
-            dependsOn = arrayOf(list),
             before = """
             import java.util.Collections;
+            import java.util.List;
             
             class A {
-                public Object empty() {
+                public List<String> empty() {
                     return Collections.EMPTY_LIST;
                 }
             }
             """,
             after = """
             import com.acme.Lists;
+
+            import java.util.List;
             
             class A {
-                public Object empty() {
+                public List<String> empty() {
                     return Lists.of();
                 }
             }
@@ -58,7 +51,6 @@ interface ChangeStaticFieldToMethodTest : JavaRecipeTest {
     @Test
     fun migratesStaticImportedField(jp: JavaParser) = assertChanged(
             jp,
-            dependsOn = arrayOf(list),
             before = """
             import static java.util.Collections.EMPTY_LIST;
             
@@ -82,7 +74,6 @@ interface ChangeStaticFieldToMethodTest : JavaRecipeTest {
     @Test
     fun migratesFullyQualifiedField(jp: JavaParser) = assertChanged(
             jp,
-            dependsOn = arrayOf(list),
             before = """
             class A {
                 public Object empty() {
@@ -120,7 +111,6 @@ interface ChangeStaticFieldToMethodTest : JavaRecipeTest {
     @Test
     fun ignoresUnrelatedFields(jp: JavaParser) = assertUnchanged(
             jp,
-            dependsOn = arrayOf(list),
             before = """
             import java.util.Collections;
             

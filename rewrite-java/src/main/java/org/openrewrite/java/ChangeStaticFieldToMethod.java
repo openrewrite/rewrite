@@ -76,7 +76,7 @@ public class ChangeStaticFieldToMethod extends Recipe {
                 if (getCursor().firstEnclosing(J.Import.class) == null &&
                         TypeUtils.isOfClassType(fieldAccess.getTarget().getType(), oldClassName) &&
                         fieldAccess.getSimpleName().equals(oldFieldName)) {
-                    return useSystemLineSeparator(fieldAccess);
+                    return useNewMethod(fieldAccess);
                 }
                 return super.visitFieldAccess(fieldAccess, ctx);
             }
@@ -87,31 +87,43 @@ public class ChangeStaticFieldToMethod extends Recipe {
                 if (varType != null &&
                         TypeUtils.isOfClassType(varType.getOwner(), oldClassName) &&
                         varType.getName().equals(oldFieldName)) {
-                    return useSystemLineSeparator(ident);
+                    return useNewMethod(ident);
                 }
                 return ident;
             }
 
             @NotNull
-            private J useSystemLineSeparator(J j) {
+            private J useNewMethod(J j) {
                 final String newClass = newClassName == null ? oldClassName : newClassName;
 
                 maybeRemoveImport(oldClassName);
-                // We don't need imports for java.lang - maybe AddImport should know that?
-                if (!newClass.startsWith("java.lang.")) {
-                    maybeAddImport(newClass);
-                }
-                final String simpleClassName = StringUtils.substringAfterLast(newClass, ".");
-                final String methodInvocationTemplate = simpleClassName + "." + newMethodName + "()";
+                maybeAddImport(newClass);
 
                 Cursor statementCursor = getCursor().dropParentUntil(Statement.class::isInstance);
                 Statement statement = statementCursor.getValue();
-                JavaTemplate template = JavaTemplate
-                        .builder(() -> statementCursor, methodInvocationTemplate)
-                        .imports(newClass)
-                        .build();
+                JavaTemplate template = makeNewMethod(newClass, statementCursor);
                 return statement.withTemplate(template, statement.getCoordinates().replace())
                         .withPrefix(j.getPrefix());
+            }
+
+            @NotNull
+            private JavaTemplate makeNewMethod(String newClass, Cursor statementCursor) {
+                final String packageName = StringUtils.substringBeforeLast(newClass, ".");
+                final String simpleClassName = StringUtils.substringAfterLast(newClass, ".");
+                final String methodInvocationTemplate = simpleClassName + "." + newMethodName + "()";
+                // TODO generic (or better raw?) type of new method, ideally based on the old field type
+                final String fieldType = "java.util.List";
+                String methodStub = "package " + packageName + ";" +
+                        " public class " + simpleClassName + " {" +
+                        " public static " + fieldType + " " + newMethodName + "() { return null; }" +
+                        " }";
+                return JavaTemplate
+                        .builder(() -> statementCursor, methodInvocationTemplate)
+                        .javaParser(() -> JavaParser.fromJavaVersion()
+                                .dependsOn(methodStub)
+                                .build())
+                        .imports(newClass)
+                        .build();
             }
         };
     }
