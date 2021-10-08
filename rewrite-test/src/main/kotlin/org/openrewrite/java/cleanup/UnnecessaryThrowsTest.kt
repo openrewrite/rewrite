@@ -128,4 +128,22 @@ interface UnnecessaryThrowsTest : JavaRecipeTest {
             }
         """
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/897")
+    @Test
+    fun necessaryThrowsOnInterface(jp: JavaParser) = assertUnchanged(
+        dependsOn = arrayOf("""
+            public interface Foo {
+                void bar() throws Exception;
+            }
+        """),
+        before = """
+            public class FooImpl implements Foo {
+                @Override
+                public void bar() throws Exception {
+                    // no-op
+                }
+            }
+        """
+    )
 }

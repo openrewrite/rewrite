@@ -21,6 +21,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 
@@ -54,11 +55,13 @@ public class UnnecessaryThrows extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        final AnnotationMatcher OVERRIDE_ANNOTATION = new AnnotationMatcher("@java.lang.Override");
+
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                 J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
-                if (m.getThrows() != null && !m.isAbstract()) {
+                if (m.getThrows() != null && !m.isAbstract() && method.getLeadingAnnotations().stream().noneMatch(OVERRIDE_ANNOTATION::matches)) {
                     Set<JavaType.FullyQualified> unusedThrows = new TreeSet<>(Comparator.comparing(JavaType.FullyQualified::getFullyQualifiedName));
                     for (NameTree nameTree : m.getThrows()) {
                         if (!TypeUtils.isAssignableTo(JavaType.Class.build("java.lang.RuntimeException"), nameTree.getType())) {
