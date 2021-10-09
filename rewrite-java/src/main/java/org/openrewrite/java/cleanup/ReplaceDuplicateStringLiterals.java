@@ -107,8 +107,9 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
             private String getNameWithoutShadow(String name, Set<String> variableNames) {
                 int append = 0;
                 String newName;
+                String transformedName = transformToVariableName(name);
                 while (true) {
-                    newName = transformToVariableName(name) + (append == 0 ? "" : "_" + append);
+                    newName = transformedName + (append == 0 ? "" : "_" + append);
                     if (!variableNames.contains(newName)) {
                         break;
                     }
