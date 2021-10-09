@@ -17,11 +17,13 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.format.SpacesVisitor;
 import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 
 public class TypecastParenPad extends Recipe {
     @Override
@@ -51,14 +53,15 @@ public class TypecastParenPad extends Recipe {
         EmptyForIteratorPadStyle emptyForIteratorPadStyle;
 
         @Override
-        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+        public JavaSourceFile visitJavaSourceFile(JavaSourceFile javaSourceFile, ExecutionContext ctx) {
+            SourceFile cu = (SourceFile)javaSourceFile;
             spacesStyle = cu.getStyle(SpacesStyle.class) == null ? IntelliJ.spaces() : cu.getStyle(SpacesStyle.class);
             typecastParenPadStyle = cu.getStyle(TypecastParenPadStyle.class) == null ? Checkstyle.typecastParenPadStyle() : cu.getStyle(TypecastParenPadStyle.class);
             emptyForInitializerPadStyle = cu.getStyle(EmptyForInitializerPadStyle.class);
             emptyForIteratorPadStyle = cu.getStyle(EmptyForIteratorPadStyle.class);
 
             spacesStyle = spacesStyle.withWithin(spacesStyle.getWithin().withTypeCastParentheses(typecastParenPadStyle.getSpace()));
-            return super.visitCompilationUnit(cu, ctx);
+            return super.visitJavaSourceFile((JavaSourceFile)cu, ctx);
         }
 
         @Override

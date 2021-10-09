@@ -17,11 +17,13 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.style.DefaultComesLastStyle;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -56,8 +58,8 @@ public class DefaultComesLast extends Recipe {
 
     private static class DefaultComesLastFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
-        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
-            DefaultComesLastStyle style = cu.getStyle(DefaultComesLastStyle.class);
+        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
+            DefaultComesLastStyle style = ((SourceFile)cu).getStyle(DefaultComesLastStyle.class);
             if (style == null) {
                 style = Checkstyle.defaultComesLast();
             }

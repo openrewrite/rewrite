@@ -23,10 +23,7 @@ import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.java.search.UsesMethod;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Statement;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
 import java.time.Duration;
 import java.util.*;
@@ -68,12 +65,12 @@ public class UseFilesCreateTempDirectory extends Recipe {
         private static final MethodMatcher MKDIR_MATCHER = new MethodMatcher("java.io.File mkdir()");
 
         @Override
-        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
             Optional<JavaVersion> javaVersion = cu.getMarkers().findFirst(JavaVersion.class);
             if (javaVersion.isPresent() && javaVersion.get().getMajorVersion() < 7) {
                 return cu;
             }
-            return super.visitCompilationUnit(cu, executionContext);
+            return super.visitJavaSourceFile(cu, executionContext);
         }
 
         @Override

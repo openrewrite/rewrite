@@ -24,6 +24,7 @@ import org.openrewrite.java.UnwrapParentheses;
 import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
 
 @Incubating(since = "7.0.0")
@@ -31,8 +32,8 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
     private static final String MAYBE_AUTO_FORMAT_ME = "MAYBE_AUTO_FORMAT_ME";
 
     @Override
-    public J visitCompilationUnit(J.CompilationUnit cu, P p) {
-        J.CompilationUnit c = visitAndCast(cu, p, super::visitCompilationUnit);
+    public J visitJavaSourceFile(JavaSourceFile cu, P p) {
+        JavaSourceFile c = visitAndCast(cu, p, super::visitJavaSourceFile);
         if (c != cu) {
             doAfterVisit(new SimplifyBooleanExpressionVisitor<>());
         }

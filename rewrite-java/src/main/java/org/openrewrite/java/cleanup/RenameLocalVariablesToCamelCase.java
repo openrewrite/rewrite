@@ -22,6 +22,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.RenameVariable;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 
 import java.time.Duration;
 import java.util.*;
@@ -76,13 +77,13 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
         private final Pattern namingConvention = Pattern.compile("^[a-z][a-zA-Z0-9]*$");
 
         @Override
-        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
             Map<J.VariableDeclarations.NamedVariable, String> renameVariablesMap = new LinkedHashMap<>();
             Set<String> hasNameSet = new HashSet<>();
 
             getCursor().putMessage("RENAME_VARIABLES_KEY", renameVariablesMap);
             getCursor().putMessage("HAS_NAME_KEY", hasNameSet);
-            super.visitCompilationUnit(cu, ctx);
+            super.visitJavaSourceFile(cu, ctx);
 
             renameVariablesMap.forEach((key, value) -> {
                 if (!hasNameSet.contains(value)) {

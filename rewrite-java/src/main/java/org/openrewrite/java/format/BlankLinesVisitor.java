@@ -41,7 +41,7 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J visitJavaSourceFile(JavaSourceFile cu, P p) {
+    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
         JavaSourceFile j = cu;
         if (j.getPackageDeclaration() != null) {
             if (!j.getPrefix().getComments().isEmpty()) {

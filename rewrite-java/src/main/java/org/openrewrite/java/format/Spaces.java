@@ -46,7 +46,7 @@ public class Spaces extends Recipe {
 
     private static class SpacesFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
-        public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
+        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
             SpacesStyle style = ((SourceFile) cu).getStyle(SpacesStyle.class);
             if (style == null) {
                 style = IntelliJ.spaces();

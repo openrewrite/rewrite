@@ -80,7 +80,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J visitJavaSourceFile(JavaSourceFile cu, P p) {
+    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
         JavaSourceFile t = (JavaSourceFile) new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(cu, p);
 
         t = (JavaSourceFile) new BlankLinesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(BlankLinesStyle.class))

@@ -56,7 +56,7 @@ public class NoDoubleBraceInitialization extends Recipe {
     protected JavaIsoVisitor<ExecutionContext> getSingleSourceApplicableTest() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
                 doAfterVisit(new UsesType<>("java.util.Map"));
                 doAfterVisit(new UsesType<>("java.util.List"));
                 doAfterVisit(new UsesType<>("java.util.Set"));

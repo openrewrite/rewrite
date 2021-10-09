@@ -37,13 +37,13 @@ public class RemoveTrailingWhitespaceVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J visitJavaSourceFile(JavaSourceFile cu, P p) {
+    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
         String eof = cu.getEof().getWhitespace();
         eof = eof.chars().filter(c -> c == '\n' || c == '\r')
                 .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
                 .toString();
 
-        JavaSourceFile c = (JavaSourceFile) super.visitJavaSourceFile(cu, p);
+        JavaSourceFile c = super.visitJavaSourceFile(cu, p);
         return c.withEof(c.getEof().withWhitespace(eof));
     }
 

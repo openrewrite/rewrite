@@ -64,7 +64,7 @@ public class NoPrimitiveWrappersForToStringOrCompareTo extends Recipe {
     protected JavaIsoVisitor<ExecutionContext> getSingleSourceApplicableTest() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
+            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
                 doAfterVisit(new UsesMethod<>(NUMBER_COMPARE_TO_MATCHER));
                 doAfterVisit(new UsesMethod<>(NUMBER_TO_STRING_MATCHER));
                 doAfterVisit(new UsesMethod<>(BOOLEAN_COMPARE_TO_MATCHER));

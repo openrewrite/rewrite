@@ -44,7 +44,7 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J visitJavaSourceFile(JavaSourceFile cu, P p) {
+    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
         Set<JavaType> types = cu.getTypesInUse();
         for (JavaType type : types) {
             if (type instanceof JavaType.Method) {

@@ -17,12 +17,14 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.EmptyForInitializerPadStyle;
 import org.openrewrite.java.style.EmptyForIteratorPadStyle;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.SearchResult;
 
@@ -47,11 +49,12 @@ public class PadEmptyForLoopComponents extends Recipe {
     protected @Nullable JavaIsoVisitor<ExecutionContext> getSingleSourceApplicableTest() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+            public JavaSourceFile visitJavaSourceFile(JavaSourceFile javaSourceFile, ExecutionContext executionContext) {
+                SourceFile cu = (SourceFile) javaSourceFile;
                 if(cu.getStyle(EmptyForIteratorPadStyle.class) != null || cu.getStyle(EmptyForInitializerPadStyle.class) != null) {
                     return cu.withMarkers(cu.getMarkers().add(new SearchResult(randomId(), null)));
                 }
-                return cu;
+                return (JavaSourceFile) cu;
             }
         };
     }
@@ -67,10 +70,11 @@ public class PadEmptyForLoopComponents extends Recipe {
             EmptyForInitializerPadStyle emptyForInitializerPadStyle;
 
             @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+            public JavaSourceFile visitJavaSourceFile(JavaSourceFile javaSourceFile, ExecutionContext executionContext) {
+                SourceFile cu = (SourceFile)javaSourceFile;
                 emptyForInitializerPadStyle = cu.getStyle(EmptyForInitializerPadStyle.class);
                 emptyForIteratorPadStyle = cu.getStyle(EmptyForIteratorPadStyle.class);
-                return super.visitCompilationUnit(cu, executionContext);
+                return super.visitJavaSourceFile((JavaSourceFile)cu, executionContext);
             }
 
             @Override

@@ -22,6 +22,7 @@ import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 
 import java.time.Duration;
@@ -57,7 +58,7 @@ public class UnnecessaryPrimitiveAnnotations extends Recipe {
     protected JavaIsoVisitor<ExecutionContext> getSingleSourceApplicableTest() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
                 doAfterVisit(new UsesType<>("javax.annotation.CheckForNull"));
                 doAfterVisit(new UsesType<>("javax.annotation.Nullable"));
                 return cu;
@@ -70,8 +71,8 @@ public class UnnecessaryPrimitiveAnnotations extends Recipe {
 
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
-                J.CompilationUnit c = super.visitCompilationUnit(cu, executionContext);
+            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
+                JavaSourceFile c = super.visitJavaSourceFile(cu, executionContext);
                 if (cu != c) {
                     maybeRemoveImport("javax.annotation.CheckForNull");
                     maybeRemoveImport("javax.annotation.Nullable");

@@ -22,7 +22,7 @@ import org.openrewrite.java.tree.JavaSourceFile;
 
 public class IsBuildGradle<P> extends JavaIsoVisitor<P> {
     @Override
-    public J visitJavaSourceFile(JavaSourceFile cu, P p) {
+    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
         SourceFile sourceFile = (SourceFile) cu;
         if ("build.gradle".equals(sourceFile.getSourcePath().toFile().getName())) {
             return sourceFile.withMarkers(sourceFile.getMarkers().searchResult());

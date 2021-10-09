@@ -17,12 +17,14 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.format.TabsAndIndentsVisitor;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Loop;
 import org.openrewrite.java.tree.Statement;
 
@@ -60,13 +62,13 @@ public class ControlFlowIndentation extends Recipe {
             TabsAndIndentsStyle tabsAndIndentsStyle;
 
             @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
-                TabsAndIndentsStyle style = cu.getStyle(TabsAndIndentsStyle.class);
+            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
+                TabsAndIndentsStyle style = ((SourceFile)cu).getStyle(TabsAndIndentsStyle.class);
                 if (style == null) {
                     style = IntelliJ.tabsAndIndents();
                 }
                 tabsAndIndentsStyle = style;
-                return super.visitCompilationUnit(cu, executionContext);
+                return super.visitJavaSourceFile(cu, executionContext);
             }
 
             @Override

@@ -17,12 +17,14 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.style.OperatorWrapStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.TypeTree;
 
 public class OperatorWrap extends Recipe {
@@ -45,9 +47,10 @@ public class OperatorWrap extends Recipe {
         OperatorWrapStyle operatorWrapStyle;
 
         @Override
-        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+        public JavaSourceFile visitJavaSourceFile(JavaSourceFile javaSourceFile, ExecutionContext ctx) {
+            SourceFile cu = (SourceFile)javaSourceFile;
             operatorWrapStyle = cu.getStyle(OperatorWrapStyle.class) == null ? Checkstyle.operatorWrapStyle() : cu.getStyle(OperatorWrapStyle.class);
-            return super.visitCompilationUnit(cu, ctx);
+            return super.visitJavaSourceFile((JavaSourceFile) cu, ctx);
         }
 
         @Override
