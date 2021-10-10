@@ -55,7 +55,7 @@ public class MavenArtifactDownloader {
 
     private static final CheckedFunction1<Request, Response> sendRequest = Retry.decorateCheckedFunction(
             mavenDownloaderRetry,
-            (request) -> httpClient.newCall(request).execute());
+            request -> httpClient.newCall(request).execute());
 
     private final MavenArtifactCache mavenArtifactCache;
     private final Map<String, MavenSettings.Server> serverIdToServer;

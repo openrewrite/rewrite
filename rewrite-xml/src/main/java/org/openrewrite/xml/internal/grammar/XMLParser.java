@@ -225,7 +225,7 @@ public class XMLParser extends Parser {
 			setState(38);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << COMMENT) | (1L << SPECIAL_OPEN) | (1L << ELEMENT_OPEN))) != 0)) {
+			while (((_la & ~0x3f) == 0 && ((1L << _la) & ((1L << COMMENT) | (1L << SPECIAL_OPEN) | (1L << ELEMENT_OPEN))) != 0)) {
 				{
 				{
 				setState(35);

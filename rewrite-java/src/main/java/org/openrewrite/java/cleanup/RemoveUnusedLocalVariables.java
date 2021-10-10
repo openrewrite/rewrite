@@ -217,7 +217,7 @@ public class RemoveUnusedLocalVariables extends Recipe {
                 @Override
                 public J.Assignment visitAssignment(J.Assignment assignment, List<Statement> ctx) {
                     if (assignment.getVariable() instanceof J.Identifier) {
-                        J.Identifier i = ((J.Identifier) assignment.getVariable());
+                        J.Identifier i = (J.Identifier) assignment.getVariable();
                         if (i.getSimpleName().equals(target.getSimpleName())) {
                             ctx.add(assignment);
                         }
@@ -228,7 +228,7 @@ public class RemoveUnusedLocalVariables extends Recipe {
                 @Override
                 public J.AssignmentOperation visitAssignmentOperation(J.AssignmentOperation assignOp, List<Statement> ctx) {
                     if (assignOp.getVariable() instanceof J.Identifier) {
-                        J.Identifier i = ((J.Identifier) assignOp.getVariable());
+                        J.Identifier i = (J.Identifier) assignOp.getVariable();
                         if (i.getSimpleName().equals(target.getSimpleName())) {
                             ctx.add(assignOp);
                         }
@@ -239,7 +239,7 @@ public class RemoveUnusedLocalVariables extends Recipe {
                 @Override
                 public J.Unary visitUnary(J.Unary unary, List<Statement> ctx) {
                     if (unary.getExpression() instanceof J.Identifier) {
-                        J.Identifier i = ((J.Identifier) unary.getExpression());
+                        J.Identifier i = (J.Identifier) unary.getExpression();
                         if (i.getSimpleName().equals(target.getSimpleName())) {
                             ctx.add(unary);
                         }

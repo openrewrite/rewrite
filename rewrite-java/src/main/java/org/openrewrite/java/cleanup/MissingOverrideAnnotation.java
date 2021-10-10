@@ -128,9 +128,9 @@ public class MissingOverrideAnnotation extends Recipe {
                     MethodMatcher matcher = new MethodMatcher(mPattern);
                     Predicate<JavaType.Method> filtering;
                     if (typeToSearch.getKind() == JavaType.Class.Kind.Class) {
-                        filtering = (m) -> !(m.hasFlags(Flag.Abstract) || m.hasFlags(Flag.Abstract)) && matcher.matches(m);
+                        filtering = m -> !(m.hasFlags(Flag.Abstract) || m.hasFlags(Flag.Abstract)) && matcher.matches(m);
                     } else {
-                        filtering = (m) -> !m.hasFlags(Flag.Static) && matcher.matches(m);
+                        filtering = m -> !m.hasFlags(Flag.Static) && matcher.matches(m);
                     }
 
                     if (typeToSearch.getMethods().stream().anyMatch(filtering)) {

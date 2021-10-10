@@ -63,7 +63,7 @@ public class UpgradePluginVersion extends Recipe {
 
     private static final CheckedFunction1<Request, Response> sendRequest = Retry.decorateCheckedFunction(
             gradlePluginPortalRetry,
-            (request) -> httpClient.newCall(request).execute());
+            request -> httpClient.newCall(request).execute());
 
     @Option(displayName = "Plugin id",
             description = "The `ID` part of `plugin { ID }`, as a glob expression.",

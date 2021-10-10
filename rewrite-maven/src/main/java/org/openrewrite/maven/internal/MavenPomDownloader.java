@@ -65,7 +65,7 @@ public class MavenPomDownloader {
 
     private static final CheckedFunction1<Request, Response> sendRequest = Retry.decorateCheckedFunction(
             mavenDownloaderRetry,
-            (request) -> httpClient.newCall(request).execute());
+            request -> httpClient.newCall(request).execute());
 
     // https://maven.apache.org/ref/3.6.3/maven-model-builder/super-pom.html
     private static final MavenRepository SUPER_POM_REPOSITORY = new MavenRepository("central",

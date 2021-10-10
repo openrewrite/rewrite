@@ -76,7 +76,7 @@ public class AddRepository extends Recipe {
                 if(m.getArguments().size() < 1 || !(m.getArguments().get(0) instanceof J.Lambda)) {
                     return m;
                 }
-                J.Lambda arg = ((J.Lambda)m.getArguments().get(0));
+                J.Lambda arg = (J.Lambda)m.getArguments().get(0);
                 if(!(arg.getBody() instanceof J.Block)) {
                     return m;
                 }

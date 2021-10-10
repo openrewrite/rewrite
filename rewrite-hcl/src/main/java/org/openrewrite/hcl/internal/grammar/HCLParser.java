@@ -1118,7 +1118,7 @@ public class HCLParser extends Parser {
 			{
 			setState(157);
 			_la = _input.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << NumericLiteral) | (1L << BooleanLiteral) | (1L << NULL))) != 0)) ) {
+			if ( !((_la & ~0x3f) == 0 && ((1L << _la) & ((1L << NumericLiteral) | (1L << BooleanLiteral) | (1L << NULL))) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
@@ -1246,7 +1246,7 @@ public class HCLParser extends Parser {
 			setState(175);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << FOR_BRACE) | (1L << FOR_BRACK) | (1L << LBRACE) | (1L << Identifier) | (1L << NumericLiteral) | (1L << BooleanLiteral) | (1L << QUOTE) | (1L << NULL) | (1L << HEREDOC_START) | (1L << LBRACK) | (1L << LPAREN) | (1L << MINUS) | (1L << NOT))) != 0)) {
+			if (((_la & ~0x3f) == 0 && ((1L << _la) & ((1L << FOR_BRACE) | (1L << FOR_BRACK) | (1L << LBRACE) | (1L << Identifier) | (1L << NumericLiteral) | (1L << BooleanLiteral) | (1L << QUOTE) | (1L << NULL) | (1L << HEREDOC_START) | (1L << LBRACK) | (1L << LPAREN) | (1L << MINUS) | (1L << NOT))) != 0)) {
 				{
 				setState(164);
 				expression(0);
@@ -1894,7 +1894,7 @@ public class HCLParser extends Parser {
 			setState(247);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << FOR_BRACE) | (1L << FOR_BRACK) | (1L << LBRACE) | (1L << Identifier) | (1L << NumericLiteral) | (1L << BooleanLiteral) | (1L << QUOTE) | (1L << NULL) | (1L << HEREDOC_START) | (1L << LBRACK) | (1L << LPAREN) | (1L << MINUS) | (1L << NOT))) != 0)) {
+			if (((_la & ~0x3f) == 0 && ((1L << _la) & ((1L << FOR_BRACE) | (1L << FOR_BRACK) | (1L << LBRACE) | (1L << Identifier) | (1L << NumericLiteral) | (1L << BooleanLiteral) | (1L << QUOTE) | (1L << NULL) | (1L << HEREDOC_START) | (1L << LBRACK) | (1L << LPAREN) | (1L << MINUS) | (1L << NOT))) != 0)) {
 				{
 				setState(246);
 				arguments();
@@ -2623,7 +2623,7 @@ public class HCLParser extends Parser {
 			{
 			setState(307);
 			_la = _input.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << EQ) | (1L << LT) | (1L << NEQ) | (1L << GT) | (1L << LEQ) | (1L << GEQ))) != 0)) ) {
+			if ( !((_la & ~0x3f) == 0 && ((1L << _la) & ((1L << EQ) | (1L << LT) | (1L << NEQ) | (1L << GT) | (1L << LEQ) | (1L << GEQ))) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
@@ -2678,7 +2678,7 @@ public class HCLParser extends Parser {
 			{
 			setState(309);
 			_la = _input.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << PLUS) | (1L << MINUS) | (1L << MUL) | (1L << DIV) | (1L << MOD))) != 0)) ) {
+			if ( !((_la & ~0x3f) == 0 && ((1L << _la) & ((1L << PLUS) | (1L << MINUS) | (1L << MUL) | (1L << DIV) | (1L << MOD))) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {

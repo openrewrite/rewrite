@@ -284,7 +284,7 @@ public class StringUtils {
     }
 
     public static int indexOfNonWhitespace(String text) {
-        return indexOf(text, (it) -> !(it == ' ' || it == '\t' || it == '\n' || it == '\r'));
+        return indexOf(text, it -> !(it == ' ' || it == '\t' || it == '\n' || it == '\r'));
     }
 
     /**

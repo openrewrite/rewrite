@@ -220,7 +220,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
         }
 
         //noinspection unchecked
-        return (isAcceptable) ? t : (T) tree;
+        return isAcceptable ? t : (T) tree;
     }
 
     public void visit(@Nullable List<? extends T> nodes, P p) {

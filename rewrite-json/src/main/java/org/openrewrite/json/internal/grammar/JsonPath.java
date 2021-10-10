@@ -931,7 +931,7 @@ public class JsonPath extends Parser {
 						if (!(precpred(_ctx, 6))) throw new FailedPredicateException(this, "precpred(_ctx, 6)");
 						setState(90);
 						_la = _input.LA(1);
-						if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << EQ) | (1L << NE) | (1L << MATCHES))) != 0)) ) {
+						if ( !((_la & ~0x3f) == 0 && ((1L << _la) & ((1L << EQ) | (1L << NE) | (1L << MATCHES))) != 0) ) {
 						_errHandler.recoverInline(this);
 						}
 						else {
@@ -997,7 +997,7 @@ public class JsonPath extends Parser {
 			{
 			setState(97);
 			_la = _input.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << StringLiteral) | (1L << NumericLiteral) | (1L << TRUE) | (1L << FALSE) | (1L << NULL))) != 0)) ) {
+			if ( !((_la & ~0x3f) == 0 && ((1L << _la) & ((1L << StringLiteral) | (1L << NumericLiteral) | (1L << TRUE) | (1L << FALSE) | (1L << NULL))) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {

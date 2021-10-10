@@ -255,7 +255,7 @@ public class MethodSignatureParser extends Parser {
 			setState(36);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << LPAREN) | (1L << DOT) | (1L << BANG) | (1L << WILDCARD) | (1L << DOTDOT) | (1L << Identifier))) != 0)) {
+			if (((_la & ~0x3f) == 0 && ((1L << _la) & ((1L << LPAREN) | (1L << DOT) | (1L << BANG) | (1L << WILDCARD) | (1L << DOTDOT) | (1L << Identifier))) != 0)) {
 				{
 				setState(35);
 				formalsPattern();
@@ -972,7 +972,7 @@ public class MethodSignatureParser extends Parser {
 					{
 					setState(135);
 					_la = _input.LA(1);
-					if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << DOT) | (1L << WILDCARD) | (1L << DOTDOT) | (1L << Identifier))) != 0)) ) {
+					if ( !((_la & ~0x3f) == 0 && ((1L << _la) & ((1L << DOT) | (1L << WILDCARD) | (1L << DOTDOT) | (1L << Identifier))) != 0) ) {
 					_errHandler.recoverInline(this);
 					}
 					else {

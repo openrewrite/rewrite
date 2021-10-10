@@ -267,7 +267,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
                     declaration != null && isPrivateStaticFinalVariable(declaration) &&
                     variable.getInitializer() instanceof J.Literal &&
                     ((J.Literal) variable.getInitializer()).getValue() instanceof String) {
-                String value = ((String) (((J.Literal) variable.getInitializer()).getValue()));
+                String value = (String) (((J.Literal) variable.getInitializer()).getValue());
                 stringStringMap.putIfAbsent(value, variable.getSimpleName());
             }
             return super.visitVariable(variable, stringStringMap);

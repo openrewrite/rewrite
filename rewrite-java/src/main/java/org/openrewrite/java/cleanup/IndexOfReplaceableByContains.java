@@ -82,7 +82,7 @@ public class IndexOfReplaceableByContains extends Recipe {
             J j = super.visitBinary(binary, ctx);
             J.Binary asBinary = (J.Binary) j;
             if (asBinary.getLeft() instanceof J.MethodInvocation) {
-                J.MethodInvocation mi = ((J.MethodInvocation) asBinary.getLeft());
+                J.MethodInvocation mi = (J.MethodInvocation) asBinary.getLeft();
                 if (STRING_INDEX_MATCHER.matches(mi) || LIST_INDEX_MATCHER.matches(mi)) {
                     if (asBinary.getRight() instanceof J.Literal) {
                         String valueSource = ((J.Literal) asBinary.getRight()).getValueSource();

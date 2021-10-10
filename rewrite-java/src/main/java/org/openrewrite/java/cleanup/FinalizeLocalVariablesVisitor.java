@@ -83,10 +83,10 @@ public class FinalizeLocalVariablesVisitor<P> extends JavaIsoVisitor<P> {
         Predicate<J.VariableDeclarations.NamedVariable> hasReassignment;
         if (isDeclaredInForEachLoop()) {
             // ForEach loops (aka "enhanced for-loop") will always have the variable initialized
-            hasReassignment = (v) -> !FindAssignmentReferencesToVariable.find(getCursor().firstEnclosingOrThrow(J.ForEachLoop.class), v).isEmpty();
+            hasReassignment = v -> !FindAssignmentReferencesToVariable.find(getCursor().firstEnclosingOrThrow(J.ForEachLoop.class), v).isEmpty();
         } else {
             // off-sets number of acceptable "reassignments" depending on whether there's an initializer at declaration
-            hasReassignment = (v) -> FindAssignmentReferencesToVariable.find(getCursor().dropParentUntil(J.class::isInstance).getValue(), v).size() + (v.getInitializer() == null ? -1 : 0) > 0;
+            hasReassignment = v -> FindAssignmentReferencesToVariable.find(getCursor().dropParentUntil(J.class::isInstance).getValue(), v).size() + (v.getInitializer() == null ? -1 : 0) > 0;
         }
 
         if (mv.getVariables().stream().noneMatch(hasReassignment)) {
@@ -151,7 +151,7 @@ public class FinalizeLocalVariablesVisitor<P> extends JavaIsoVisitor<P> {
                 public J.Assignment visitAssignment(J.Assignment assignment, Set<NameTree> ctx) {
                     J.Assignment a = super.visitAssignment(assignment, ctx);
                     if (a.getVariable() instanceof J.Identifier) {
-                        J.Identifier i = ((J.Identifier) a.getVariable());
+                        J.Identifier i = (J.Identifier) a.getVariable();
                         if (i.getSimpleName().equals(variable.getSimpleName())) {
                             ctx.add(i);
                         }
@@ -163,7 +163,7 @@ public class FinalizeLocalVariablesVisitor<P> extends JavaIsoVisitor<P> {
                 public J.AssignmentOperation visitAssignmentOperation(J.AssignmentOperation assignOp, Set<NameTree> ctx) {
                     J.AssignmentOperation a = super.visitAssignmentOperation(assignOp, ctx);
                     if (a.getVariable() instanceof J.Identifier) {
-                        J.Identifier i = ((J.Identifier) a.getVariable());
+                        J.Identifier i = (J.Identifier) a.getVariable();
                         if (i.getSimpleName().equals(variable.getSimpleName())) {
                             ctx.add(i);
                         }
@@ -175,7 +175,7 @@ public class FinalizeLocalVariablesVisitor<P> extends JavaIsoVisitor<P> {
                 public J.Unary visitUnary(J.Unary unary, Set<NameTree> ctx) {
                     J.Unary u = super.visitUnary(unary, ctx);
                     if (u.getExpression() instanceof J.Identifier) {
-                        J.Identifier i = ((J.Identifier) u.getExpression());
+                        J.Identifier i = (J.Identifier) u.getExpression();
                         if (i.getSimpleName().equals(variable.getSimpleName())) {
                             ctx.add(i);
                         }

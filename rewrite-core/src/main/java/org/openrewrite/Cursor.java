@@ -69,7 +69,7 @@ public class Cursor {
     private static class CursorIterator implements Iterator<Object> {
         private Cursor cursor;
 
-        private Predicate<Object> filter = (v) -> true;
+        private Predicate<Object> filter = v -> true;
 
         private CursorIterator(Cursor cursor) {
             this.cursor = cursor;

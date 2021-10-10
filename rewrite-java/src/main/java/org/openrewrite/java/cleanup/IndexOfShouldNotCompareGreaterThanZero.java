@@ -81,7 +81,7 @@ public class IndexOfShouldNotCompareGreaterThanZero extends Recipe {
             J.Binary b = super.visitBinary(binary, ctx);
             if (b.getOperator() == J.Binary.Type.GreaterThan) {
                 if (b.getLeft() instanceof J.MethodInvocation) {
-                    J.MethodInvocation mi = ((J.MethodInvocation) b.getLeft());
+                    J.MethodInvocation mi = (J.MethodInvocation) b.getLeft();
                     if (STRING_INDEX_MATCHER.matches(mi) || LIST_INDEX_MATCHER.matches(mi)) {
                         if (b.getRight() instanceof J.Literal && "0".equals(((J.Literal) b.getRight()).getValueSource())) {
                             b = b.withRight(((J.Literal) b.getRight()).withValueSource("1")).withOperator(J.Binary.Type.GreaterThanOrEqual);

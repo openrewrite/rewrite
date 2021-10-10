@@ -143,7 +143,7 @@ public class JSON5Parser extends Parser {
 			setState(15);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << T__0) | (1L << T__4) | (1L << LITERAL) | (1L << STRING) | (1L << NUMBER) | (1L << NUMERIC_LITERAL) | (1L << SYMBOL))) != 0)) {
+			if (((_la & ~0x3f) == 0 && ((1L << _la) & ((1L << T__0) | (1L << T__4) | (1L << LITERAL) | (1L << STRING) | (1L << NUMBER) | (1L << NUMERIC_LITERAL) | (1L << SYMBOL))) != 0)) {
 				{
 				setState(14);
 				value();

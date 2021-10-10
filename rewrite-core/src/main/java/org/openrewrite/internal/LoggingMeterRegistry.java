@@ -58,7 +58,7 @@ public class LoggingMeterRegistry extends MeterRegistry {
     }
 
     private Function<Meter, String> defaultMeterIdPrinter() {
-        return (meter) -> getConventionName(meter.getId()) + getConventionTags(meter.getId()).stream()
+        return meter -> getConventionName(meter.getId()) + getConventionTags(meter.getId()).stream()
                 .map(t -> t.getKey() + "=" + t.getValue())
                 .collect(joining(",", "{", "}"));
     }
