@@ -154,9 +154,9 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     @Test
     fun upgradeVersion() = assertChanged(
         recipe = UpgradeDependencyVersion(
-            "org.springframework.boot",
+            "com.google.guava",
             null,
-            "~1.5",
+            "latest.patch",
             null,
             null
         ),
@@ -170,9 +170,9 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
               
               <dependencies>
                 <dependency>
-                  <groupId>org.springframework.boot</groupId>
-                  <artifactId>spring-boot</artifactId>
-                  <version>1.5.1.RELEASE</version>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>13.0</version>
                 </dependency>
               </dependencies>
             </project>
@@ -187,9 +187,9 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
               
               <dependencies>
                 <dependency>
-                  <groupId>org.springframework.boot</groupId>
-                  <artifactId>spring-boot</artifactId>
-                  <version>1.5.22.RELEASE</version>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>13.0.1</version>
                 </dependency>
               </dependencies>
             </project>
@@ -253,9 +253,9 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/565")
     fun handlesPropertiesInDependencyGroupIdAndArtifactId() = assertChanged(
         recipe = UpgradeDependencyVersion(
-            "org.springframework.boot",
+            "com.google.guava",
             null,
-            "~1.5",
+            "latest.patch",
             null,
             null
         ),
@@ -268,16 +268,16 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                 <version>1</version>
 
                 <properties>
-                    <dependency.group-id>org.springframework.boot</dependency.group-id>
-                    <dependency.artifact-id>spring-boot</dependency.artifact-id>
-                    <dependency.version>1.5.1.RELEASE</dependency.version>
+                    <dependency.group-id>com.google.guava</dependency.group-id>
+                    <dependency.artifact-id>guava</dependency.artifact-id>
+                    <dependency.version>13.0</dependency.version>
                 </properties>
 
                 <dependencies>
                     <dependency>
-                        <groupId>${"$"}{dependency.group-id}</groupId>
-                        <artifactId>${"$"}{dependency.artifact-id}</artifactId>
-                        <version>${"$"}{dependency.version}</version>
+                        <groupId>${'$'}{dependency.group-id}</groupId>
+                        <artifactId>${'$'}{dependency.artifact-id}</artifactId>
+                        <version>${'$'}{dependency.version}</version>
                     </dependency>
                 </dependencies>
             </project>
@@ -291,16 +291,16 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                 <version>1</version>
 
                 <properties>
-                    <dependency.group-id>org.springframework.boot</dependency.group-id>
-                    <dependency.artifact-id>spring-boot</dependency.artifact-id>
-                    <dependency.version>1.5.22.RELEASE</dependency.version>
+                    <dependency.group-id>com.google.guava</dependency.group-id>
+                    <dependency.artifact-id>guava</dependency.artifact-id>
+                    <dependency.version>13.0.1</dependency.version>
                 </properties>
 
                 <dependencies>
                     <dependency>
-                        <groupId>${"$"}{dependency.group-id}</groupId>
-                        <artifactId>${"$"}{dependency.artifact-id}</artifactId>
-                        <version>${"$"}{dependency.version}</version>
+                        <groupId>${'$'}{dependency.group-id}</groupId>
+                        <artifactId>${'$'}{dependency.artifact-id}</artifactId>
+                        <version>${'$'}{dependency.version}</version>
                     </dependency>
                 </dependencies>
             </project>
@@ -394,7 +394,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                     <dependency>
                       <groupId>com.google.guava</groupId>
                       <artifactId>guava</artifactId>
-                      <version>${"$"}{guava.version}</version>
+                      <version>${'$'}{guava.version}</version>
                     </dependency>
                   </dependencies>
                 </project>
@@ -469,12 +469,12 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                     <dependency>
                       <groupId>com.google.guava</groupId>
                       <artifactId>guava</artifactId>
-                      <version>${"$"}{guava.version}</version>
+                      <version>${'$'}{guava.version}</version>
                     </dependency>
                     <dependency>
                         <groupId>org.springframework</groupId>
-                        <artifactId>${"$"}{spring.artifact-id}</artifactId>
-                        <version>${"$"}{spring.version}</version>
+                        <artifactId>${'$'}{spring.artifact-id}</artifactId>
+                        <version>${'$'}{spring.version}</version>
                     </dependency>
                   </dependencies>
                 </project>
@@ -599,7 +599,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                       <dependency>
                         <groupId>io.micronaut</groupId>
                         <artifactId>micronaut-bom</artifactId>
-                        <version>${"$"}{micronaut.version}</version>
+                        <version>${'$'}{micronaut.version}</version>
                         <type>pom</type>
                         <scope>import</scope>
                       </dependency>
@@ -609,8 +609,8 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                   <dependencies>
                     <dependency>
                         <groupId>org.springframework</groupId>
-                        <artifactId>${"$"}{spring.artifact-id}</artifactId>
-                        <version>${"$"}{spring.version}</version>
+                        <artifactId>${'$'}{spring.artifact-id}</artifactId>
+                        <version>${'$'}{spring.version}</version>
                     </dependency>
                   </dependencies>
                 </project>

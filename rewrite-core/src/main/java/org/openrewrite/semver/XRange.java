@@ -41,8 +41,8 @@ public class XRange extends LatestRelease {
 
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @Override
-    public boolean isValid(String version) {
-        if (!super.isValid(version)) {
+    public boolean isValid(@Nullable String currentVersion, String version) {
+        if (!super.isValid(currentVersion, version)) {
             return false;
         }
 

@@ -44,10 +44,10 @@ public class HyphenRange extends LatestRelease {
     }
 
     @Override
-    public boolean isValid(String version) {
-        return super.isValid(version) &&
-                super.compare(version, upper) <= 0 &&
-                super.compare(version, lower) >= 0;
+    public boolean isValid(@Nullable String currentVersion, String version) {
+        return super.isValid(currentVersion, version) &&
+                super.compare(currentVersion, version, upper) <= 0 &&
+                super.compare(currentVersion, version, lower) >= 0;
     }
 
     public static Validated build(String pattern, @Nullable String metadataPattern) {

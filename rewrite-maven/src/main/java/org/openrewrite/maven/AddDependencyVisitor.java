@@ -127,9 +127,9 @@ public class AddDependencyVisitor extends MavenVisitor {
 
                 LatestRelease latest = new LatestRelease(versionPattern);
                 resolvedVersion = mavenMetadata.getVersioning().getVersions().stream()
-                        .filter(versionComparator::isValid)
-                        .filter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(v))
-                        .max(versionComparator)
+                        .filter(v -> versionComparator.isValid(null, v))
+                        .filter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
+                        .max((v1, v2) -> versionComparator.compare(null, v1, v2))
                         .orElse(version);
             }
         }

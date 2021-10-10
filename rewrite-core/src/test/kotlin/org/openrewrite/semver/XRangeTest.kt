@@ -41,7 +41,7 @@ class XRangeTest {
     fun anyVersion() {
         val xRange: XRange = XRange.build("X", null).getValue()!!
 
-        assertThat(xRange.isValid("0.0.0")).isTrue
+        assertThat(xRange.isValid("1.0", "0.0.0")).isTrue
     }
 
     /**
@@ -51,10 +51,10 @@ class XRangeTest {
     fun matchingMajorVersion() {
         val xRange: XRange = XRange.build("1.*", null).getValue()!!
 
-        assertThat(xRange.isValid("1.0.0")).isTrue
-        assertThat(xRange.isValid("1.2.3.RELEASE")).isTrue
-        assertThat(xRange.isValid("1.9.9")).isTrue
-        assertThat(xRange.isValid("2.0.0")).isFalse
+        assertThat(xRange.isValid("1.0", "1.0.0")).isTrue
+        assertThat(xRange.isValid("1.0", "1.2.3.RELEASE")).isTrue
+        assertThat(xRange.isValid("1.0", "1.9.9")).isTrue
+        assertThat(xRange.isValid("1.0", "2.0.0")).isFalse
     }
 
     /**
@@ -64,8 +64,8 @@ class XRangeTest {
     fun matchingMajorAndMinorVersions() {
         val xRange: XRange = XRange.build("1.2.X", null).getValue()!!
 
-        assertThat(xRange.isValid("1.2.0")).isTrue
-        assertThat(xRange.isValid("1.3.0")).isFalse
+        assertThat(xRange.isValid("1.0", "1.2.0")).isTrue
+        assertThat(xRange.isValid("1.0", "1.3.0")).isFalse
     }
 
     @Test
@@ -73,6 +73,6 @@ class XRangeTest {
         val xRange: XRange = XRange.build("2.X", null).getValue()!!
 
         // The version pattern of javax.validation:validation-api
-        assertThat(xRange.isValid("2.0.1.Final")).isTrue
+        assertThat(xRange.isValid("1.0", "2.0.1.Final")).isTrue
     }
 }

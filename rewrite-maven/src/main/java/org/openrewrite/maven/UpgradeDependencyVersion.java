@@ -26,7 +26,6 @@ import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.DependencyManagementDependency;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
-import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
@@ -164,14 +163,10 @@ public class UpgradeDependencyVersion extends Recipe {
                 MavenMetadata mavenMetadata = new MavenPomDownloader(MavenPomCache.NOOP,
                         emptyMap(), ctx).downloadMetadata(groupId, artifactId, getCursor().firstEnclosingOrThrow(Maven.class).getModel().getEffectiveRepositories());
                 availableVersions = mavenMetadata.getVersioning().getVersions().stream()
-                        .filter(versionComparator::isValid)
+                        .filter(v -> versionComparator.isValid(currentVersion, v))
                         .collect(Collectors.toList());
             }
-
-            LatestRelease latestRelease = new LatestRelease(versionPattern);
-            return availableVersions.stream()
-                    .filter(v -> latestRelease.compare(currentVersion, v) < 0)
-                    .max(versionComparator);
+            return versionComparator.upgrade(currentVersion, availableVersions);
         }
     }
 

@@ -32,7 +32,7 @@ public class LatestRelease implements VersionComparator {
     }
 
     @Override
-    public boolean isValid(String version) {
+    public boolean isValid(@Nullable String currentVersion, String version) {
         Matcher matcher = VersionComparator.RELEASE_PATTERN.matcher(normalizeVersion(version));
         if (!matcher.matches() || PRE_RELEASE_ENDING.matcher(version).find()) {
             return false;
@@ -73,7 +73,7 @@ public class LatestRelease implements VersionComparator {
 
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @Override
-    public int compare(String v1, String v2) {
+    public int compare(@Nullable String currentVersion, String v1, String v2) {
         Matcher v1Gav = VersionComparator.RELEASE_PATTERN.matcher(normalizeVersion(v1));
         Matcher v2Gav = VersionComparator.RELEASE_PATTERN.matcher(normalizeVersion(v2));
 
@@ -99,8 +99,8 @@ public class LatestRelease implements VersionComparator {
     }
 
     public static Validated build(String toVersion, @Nullable String metadataPattern) {
-        return toVersion.equals("latest.release") ?
+        return toVersion.equalsIgnoreCase("latest.release") ?
                 Validated.valid("latestRelease", new LatestRelease(metadataPattern)) :
-                Validated.invalid("latestRelease", toVersion, "not a hyphen range");
+                Validated.invalid("latestRelease", toVersion, "not latest release");
     }
 }

@@ -20,34 +20,29 @@ import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 
 @Value
-public class ExactVersion implements VersionComparator {
-    String version;
+public class LatestPatch implements VersionComparator {
+    @Nullable
+    String metadataPattern;
 
     @Override
     public boolean isValid(@Nullable String currentVersion, String version) {
-        return this.version.equals(version);
+        //noinspection ConstantConditions
+        return TildeRange.build("~" + Semver.majorVersion(currentVersion) + "." + Semver.minorVersion(currentVersion), metadataPattern)
+                .<VersionComparator>getValue()
+                .isValid(currentVersion, version);
     }
 
     @Override
     public int compare(@Nullable String currentVersion, String v1, String v2) {
-        return 0;
+        //noinspection ConstantConditions
+        return TildeRange.build("~" + Semver.majorVersion(currentVersion) + "." + Semver.minorVersion(currentVersion), metadataPattern)
+                .<VersionComparator>getValue()
+                .compare(currentVersion, v1, v2);
     }
 
-    public static Validated build(String pattern) {
-        String versionOnly;
-        int hyphenIndex = pattern.indexOf('-');
-        if(hyphenIndex == -1) {
-            versionOnly = pattern;
-        } else {
-            versionOnly = pattern.substring(0, hyphenIndex);
-        }
-        if(versionOnly.startsWith("latest") ||
-                versionOnly.contains("x") ||
-                versionOnly.contains("^") ||
-                versionOnly.contains("~") ||
-                versionOnly.contains(" ")) {
-            return Validated.invalid("exactVersion", pattern, "not an exact version number");
-        }
-        return Validated.valid("exactVersion", new ExactVersion(pattern));
+    public static Validated build(String toVersion, @Nullable String metadataPattern) {
+        return toVersion.equalsIgnoreCase("latest.patch") ?
+                Validated.valid("latestPatch", new LatestPatch(metadataPattern)) :
+                Validated.invalid("latestPatch", toVersion, "not latest release");
     }
 }

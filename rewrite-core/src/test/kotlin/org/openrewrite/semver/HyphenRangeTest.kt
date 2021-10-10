@@ -26,11 +26,11 @@ class HyphenRangeTest {
     fun inclusiveSet() {
         val hyphenRange: HyphenRange = HyphenRange.build("1.2.3 - 2.3.4", null).getValue()!!
 
-        assertThat(hyphenRange.isValid("1.2.2")).isFalse
-        assertThat(hyphenRange.isValid("1.2.3.RELEASE")).isTrue
-        assertThat(hyphenRange.isValid("1.2.3")).isTrue
-        assertThat(hyphenRange.isValid("2.3.4")).isTrue
-        assertThat(hyphenRange.isValid("2.3.5")).isFalse
+        assertThat(hyphenRange.isValid("1.0", "1.2.2")).isFalse
+        assertThat(hyphenRange.isValid("1.0", "1.2.3.RELEASE")).isTrue
+        assertThat(hyphenRange.isValid("1.0", "1.2.3")).isTrue
+        assertThat(hyphenRange.isValid("1.0", "2.3.4")).isTrue
+        assertThat(hyphenRange.isValid("1.0", "2.3.5")).isFalse
     }
 
     /**
@@ -40,9 +40,9 @@ class HyphenRangeTest {
     fun partialVersion() {
         val hyphenRange: HyphenRange = HyphenRange.build("1.2 - 2", null).getValue()!!
 
-        assertThat(hyphenRange.isValid("1.1.9")).isFalse
-        assertThat(hyphenRange.isValid("1.2.0")).isTrue
-        assertThat(hyphenRange.isValid("2.0.0")).isTrue
-        assertThat(hyphenRange.isValid("2.0.1")).isFalse
+        assertThat(hyphenRange.isValid("1.0", "1.1.9")).isFalse
+        assertThat(hyphenRange.isValid("1.0", "1.2.0")).isTrue
+        assertThat(hyphenRange.isValid("1.0", "2.0.0")).isTrue
+        assertThat(hyphenRange.isValid("1.0", "2.0.1")).isFalse
     }
 }

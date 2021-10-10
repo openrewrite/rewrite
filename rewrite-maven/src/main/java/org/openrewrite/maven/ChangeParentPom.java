@@ -154,14 +154,13 @@ public class ChangeParentPom extends Recipe {
                     MavenMetadata mavenMetadata = new MavenPomDownloader(MavenPomCache.NOOP,
                             emptyMap(), ctx).downloadMetadata(groupId, artifactId, getCursor().firstEnclosingOrThrow(Maven.class).getModel().getEffectiveRepositories());
                     availableVersions = mavenMetadata.getVersioning().getVersions().stream()
-                            .filter(versionComparator::isValid)
+                            .filter(v -> versionComparator.isValid(currentVersion, v))
                             .collect(Collectors.toList());
                 }
 
-                LatestRelease latestRelease = new LatestRelease(versionPattern);
                 return availableVersions.stream()
-                        .filter(v -> latestRelease.compare(currentVersion, v) < 0)
-                        .max(versionComparator);
+                        .filter(v -> versionComparator.isValid(currentVersion, v))
+                        .max((v1, v2) -> versionComparator.compare(currentVersion, v1, v2));
             }
         };
     }

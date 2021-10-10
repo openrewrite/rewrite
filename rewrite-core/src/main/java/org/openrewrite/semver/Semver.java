@@ -15,9 +15,11 @@
  */
 package org.openrewrite.semver;
 
+import org.openrewrite.Incubating;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.util.Scanner;
 import java.util.regex.Pattern;
 
 import static org.openrewrite.Validated.test;
@@ -41,11 +43,35 @@ public class Semver {
                     }
                 }
         ).and(LatestRelease.build(toVersion, metadataPattern)
+                .or(LatestPatch.build(toVersion, metadataPattern))
                 .or(HyphenRange.build(toVersion, metadataPattern))
                 .or(XRange.build(toVersion, metadataPattern))
                 .or(TildeRange.build(toVersion, metadataPattern))
                 .or(CaretRange.build(toVersion, metadataPattern))
                 .or(ExactVersion.build(toVersion))
         );
+    }
+
+    @Incubating(since = "7.16.0")
+    public static String majorVersion(String version) {
+        Scanner scanner = new Scanner(version);
+        scanner.useDelimiter("[.$]");
+        if (scanner.hasNext()) {
+            return scanner.next();
+        }
+        return version;
+    }
+
+    @Incubating(since = "7.16.0")
+    public static String minorVersion(String version) {
+        Scanner scanner = new Scanner(version);
+        scanner.useDelimiter("[.$]");
+        if (scanner.hasNext()) {
+            scanner.next();
+        }
+        if (scanner.hasNext()) {
+            return scanner.next();
+        }
+        return version;
     }
 }

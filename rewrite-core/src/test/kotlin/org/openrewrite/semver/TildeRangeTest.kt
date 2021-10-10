@@ -26,10 +26,10 @@ class TildeRangeTest {
     fun updatePatch() {
         val tildeRange: TildeRange = TildeRange.build("~1.2.3", null).getValue()!!
 
-        assertThat(tildeRange.isValid("1.2.3")).isTrue
-        assertThat(tildeRange.isValid("1.2.3.RELEASE")).isTrue
-        assertThat(tildeRange.isValid("1.2.4")).isTrue
-        assertThat(tildeRange.isValid("1.3.0")).isFalse
+        assertThat(tildeRange.isValid("1.0", "1.2.3")).isTrue
+        assertThat(tildeRange.isValid("1.0", "1.2.3.RELEASE")).isTrue
+        assertThat(tildeRange.isValid("1.0", "1.2.4")).isTrue
+        assertThat(tildeRange.isValid("1.0", "1.3.0")).isFalse
     }
 
     /**
@@ -39,9 +39,9 @@ class TildeRangeTest {
     fun updatePatchImplicitZeroPatch() {
         val tildeRange: TildeRange = TildeRange.build("~1.2", null).getValue()!!
 
-        assertThat(tildeRange.isValid("1.2.0")).isTrue
-        assertThat(tildeRange.isValid("1.2.4")).isTrue
-        assertThat(tildeRange.isValid("1.3.0")).isFalse
+        assertThat(tildeRange.isValid("1.0", "1.2.0")).isTrue
+        assertThat(tildeRange.isValid("1.0", "1.2.4")).isTrue
+        assertThat(tildeRange.isValid("1.0", "1.3.0")).isFalse
     }
 
     /**
@@ -51,8 +51,8 @@ class TildeRangeTest {
     fun updateMajor() {
         val tildeRange: TildeRange = TildeRange.build("~1", null).getValue()!!
 
-        assertThat(tildeRange.isValid("1.0.1")).isTrue
-        assertThat(tildeRange.isValid("1.9.9")).isTrue
-        assertThat(tildeRange.isValid("2.0.0")).isFalse
+        assertThat(tildeRange.isValid("1.0", "1.0.1")).isTrue
+        assertThat(tildeRange.isValid("1.0", "1.9.9")).isTrue
+        assertThat(tildeRange.isValid("1.0", "2.0.0")).isFalse
     }
 }

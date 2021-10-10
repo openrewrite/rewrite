@@ -80,14 +80,14 @@ public class UpgradeDependencyVersion extends Recipe {
                     if (configuration == null || method.getSimpleName().equals(configuration)) {
                         List<Expression> depArgs = method.getArguments();
                         if (depArgs.get(0) instanceof J.Literal) {
-                            String gav = (String) ((J.Literal)depArgs.get(0)).getValue();
+                            String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                             assert gav != null;
                             if (gav.startsWith(groupId + ":" + artifactId + ":") && !gav.endsWith(newVersion)) {
                                 String newGav = groupId + ":" + artifactId + ":" + newVersion;
                                 method = method.withArguments(ListUtils.map(method.getArguments(), (n, arg) ->
                                         n == 0 ?
-                                        ((J.Literal)arg).withValue(newGav).withValueSource("'" + newGav + "'") :
-                                        arg
+                                                ((J.Literal) arg).withValue(newGav).withValueSource("'" + newGav + "'") :
+                                                arg
                                 ));
                             }
                         }

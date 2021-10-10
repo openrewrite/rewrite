@@ -33,7 +33,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
@@ -130,7 +129,7 @@ public class UpgradePluginVersion extends Recipe {
                             if (versionArgs.get(0) instanceof J.Literal) {
                                 String currentVersion = (String) ((J.Literal) versionArgs.get(0)).getValue();
                                 if (currentVersion != null) {
-                                    return findNewerVersion(versionComparator, pluginId, currentVersion)
+                                    return versionComparator.upgrade(currentVersion, availablePluginVersions(pluginId))
                                             .map(upgradeVersion -> method.withArguments(ListUtils.map(versionArgs, v -> {
                                                 J.Literal versionLiteral = (J.Literal) v;
                                                 assert versionLiteral.getValueSource() != null;
@@ -147,13 +146,6 @@ public class UpgradePluginVersion extends Recipe {
                 return super.visitMethodInvocation(method, executionContext);
             }
         };
-    }
-
-    private Optional<String> findNewerVersion(VersionComparator versionComparator, String pluginId, String currentVersion) {
-        LatestRelease latestRelease = new LatestRelease(versionPattern);
-        return availablePluginVersions(pluginId).stream()
-                .filter(v -> latestRelease.compare(currentVersion, v) < 0)
-                .max(versionComparator);
     }
 
     public static List<String> availablePluginVersions(String pluginId) {

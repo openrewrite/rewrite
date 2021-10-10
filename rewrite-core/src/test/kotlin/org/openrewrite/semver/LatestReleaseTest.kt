@@ -25,48 +25,48 @@ class LatestReleaseTest {
     @Test
     fun onlyNumericPartsValid() {
         assertAll(
-            { assertThat(latestRelease.isValid("1.1.1")).isTrue },
-            { assertThat(latestRelease.isValid("1.1")).isTrue },
-            { assertThat(latestRelease.isValid("1")).isTrue },
-            { assertThat(latestRelease.isValid("1.1.a")).isFalse },
-            { assertThat(latestRelease.isValid("1.1.0-SNAPSHOT")).isFalse }
+            { assertThat(latestRelease.isValid("1.0", "1.1.1")).isTrue },
+            { assertThat(latestRelease.isValid("1.0", "1.1")).isTrue },
+            { assertThat(latestRelease.isValid("1.0", "1")).isTrue },
+            { assertThat(latestRelease.isValid("1.0", "1.1.a")).isFalse },
+            { assertThat(latestRelease.isValid("1.0", "1.1.0-SNAPSHOT")).isFalse }
         )
     }
 
     @Test
     fun differentPatchVersions() {
-        assertThat(latestRelease.compare("1.1.1", "1.1.2")).isLessThan(0)
+        assertThat(latestRelease.compare("1.0", "1.1.1", "1.1.2")).isLessThan(0)
     }
 
     @Test
     fun differentMinorVersions() {
-        assertThat(latestRelease.compare("1.1.1", "1.2.1")).isLessThan(0)
-        assertThat(latestRelease.compare("1.1", "1.2")).isLessThan(0)
+        assertThat(latestRelease.compare("1.0", "1.1.1", "1.2.1")).isLessThan(0)
+        assertThat(latestRelease.compare("1.0", "1.1", "1.2")).isLessThan(0)
     }
 
     @Test
     fun differentMajorVersions() {
-        assertThat(latestRelease.compare("1.1.1", "2.1.1")).isLessThan(0)
-        assertThat(latestRelease.compare("1.1", "2.1")).isLessThan(0)
-        assertThat(latestRelease.compare("1", "2")).isLessThan(0)
+        assertThat(latestRelease.compare("1.0", "1.1.1", "2.1.1")).isLessThan(0)
+        assertThat(latestRelease.compare("1.0", "1.1", "2.1")).isLessThan(0)
+        assertThat(latestRelease.compare("1.0", "1", "2")).isLessThan(0)
     }
 
     @Test
     fun differentNumberOfParts() {
-        assertThat(latestRelease.compare("1.1", "1.1.1")).isLessThan(0)
-        assertThat(latestRelease.compare("1", "1.1")).isLessThan(0)
+        assertThat(latestRelease.compare("1.0", "1.1", "1.1.1")).isLessThan(0)
+        assertThat(latestRelease.compare("1.0", "1", "1.1")).isLessThan(0)
     }
 
     @Test
     fun guavaVariants() {
-        assertThat(latestRelease.compare("25.0-jre", "29.0-jre")).isLessThan(0)
+        assertThat(latestRelease.compare("1.0", "25.0-jre", "29.0-jre")).isLessThan(0)
     }
 
     @Test
     fun matchMetadata() {
-        assertThat(LatestRelease("-jre").isValid("29.0-jre")).isTrue
-        assertThat(LatestRelease("-jre").isValid("29.0")).isFalse
-        assertThat(LatestRelease("-jre").isValid("29.0-android")).isFalse
+        assertThat(LatestRelease("-jre").isValid("1.0", "29.0-jre")).isTrue
+        assertThat(LatestRelease("-jre").isValid("1.0", "29.0")).isFalse
+        assertThat(LatestRelease("-jre").isValid("1.0", "29.0-android")).isFalse
     }
 
     @Test
