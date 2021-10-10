@@ -36,6 +36,34 @@ class MavenParserTest {
     private val parser = MavenParser.builder().build()
     private val ctx = InMemoryExecutionContext { t -> throw t }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1085")
+    @Test
+    fun parseDependencyManagementWithNoVersion() {
+        val parser = MavenParser.builder().build()
+
+        parser.parse("""
+            <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <exclusions>
+                                  <exclusion>
+                                      <groupId>org.springframework</groupId>
+                                      <artifactId>spring-core</artifactId>
+                                  </exclusion>
+                              </exclusions>
+                          </dependency>
+                      </dependencies>
+                </dependencyManagement>
+            </project>
+        """)
+    }
+
     @Suppress("CheckDtdRefs")
     @Test
     fun parse() {
