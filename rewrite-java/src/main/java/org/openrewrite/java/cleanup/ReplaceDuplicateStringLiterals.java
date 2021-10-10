@@ -26,7 +26,6 @@ import org.openrewrite.java.tree.*;
 
 import java.time.Duration;
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class ReplaceDuplicateStringLiterals extends Recipe {
 
@@ -62,40 +61,40 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
 
             @Override
             public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
-                J.ClassDeclaration cd = (J.ClassDeclaration) super.visitClassDeclaration(classDecl, executionContext);
-                if (cd.getType() == null) {
+                if (classDecl.getType() == null) {
                     return classDecl;
                 }
 
-                Map<String, Set<J.Literal>> duplicateLiteralsMap = FindDuplicateStringLiterals.find(cd);
+                Map<String, Set<J.Literal>> duplicateLiteralsMap = FindDuplicateStringLiterals.find(classDecl);
                 if (duplicateLiteralsMap.isEmpty()) {
-                    return cd;
+                    return classDecl;
                 }
 
-                Set<String> variableNames = FindVariableNames.find(cd);
-                Map<String, String> fieldValueToFieldName = FindExistingPrivateStaticFinalFields.find(cd, cd);
+                Set<String> variableNames = FindVariableNames.find(classDecl);
+                Map<String, String> fieldValueToFieldName = FindExistingPrivateStaticFinalFields.find(classDecl);
 
+                String classFqn = classDecl.getType().getFullyQualifiedName();
                 for (String valueOfLiteral : duplicateLiteralsMap.keySet()) {
                     String variableName;
                     if (fieldValueToFieldName.containsKey(valueOfLiteral)) {
                         String classFieldName = fieldValueToFieldName.get(valueOfLiteral);
                         variableName = getNameWithoutShadow(classFieldName, variableNames);
                         if (!classFieldName.equals(variableName)) {
-                            assert cd.getType() != null;
-                            doAfterVisit(new ChangeFieldName<>(JavaType.Class.build(cd.getType().getFullyQualifiedName()), classFieldName, variableName));
+                            doAfterVisit(new ChangeFieldName<>(JavaType.Class.build(classFqn), classFieldName, variableName));
                         }
                     } else {
                         variableName = getNameWithoutShadow(transformToVariableName(valueOfLiteral), variableNames);
                         J.Literal replaceLiteral = ((J.Literal) duplicateLiteralsMap.get(valueOfLiteral).toArray()[0]).withId(Tree.randomId());
-                        cd = cd.withBody(
-                                cd.getBody().withTemplate(
-                                        JavaTemplate.builder(this::getCursor, "private static final String " + variableName + " = #{any(String)}").build(),
-                                        cd.getBody().getCoordinates().firstStatement(), replaceLiteral));
+                        String insertStatement = "private static final String " + variableName + " = #{any(String)}";
+                        classDecl = classDecl.withBody(
+                                classDecl.getBody().withTemplate(
+                                        JavaTemplate.builder(this::getCursor, insertStatement).build(),
+                                        classDecl.getBody().getCoordinates().firstStatement(), replaceLiteral));
                     }
 
-                    doAfterVisit(new ReplaceStringLiterals(cd, variableName, duplicateLiteralsMap.get(valueOfLiteral)));
+                    doAfterVisit(new ReplaceStringLiterals(classDecl, variableName, duplicateLiteralsMap.get(valueOfLiteral)));
                 }
-                return cd;
+                return classDecl;
             }
 
             /**
@@ -105,15 +104,12 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
              * @return unique variable name.
              */
             private String getNameWithoutShadow(String name, Set<String> variableNames) {
-                int append = 0;
-                String newName;
                 String transformedName = transformToVariableName(name);
-                while (true) {
-                    newName = transformedName + (append == 0 ? "" : "_" + append);
-                    if (!variableNames.contains(newName)) {
-                        break;
-                    }
+                String newName = transformedName;
+                int append = 0;
+                while (variableNames.contains(newName)) {
                     append++;
+                    newName = transformedName + "_" + append;
                 }
                 return newName;
             }
@@ -148,11 +144,6 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
     }
 
     private static class FindDuplicateStringLiterals extends JavaIsoVisitor<Map<String, Set<J.Literal>>> {
-        private final J.ClassDeclaration searchInClass;
-
-        private FindDuplicateStringLiterals(J.ClassDeclaration searchInClass) {
-            this.searchInClass = searchInClass;
-        }
 
         /**
          * Find duplicate `String` literals repeated 3 or more times and with a length of at least 3.
@@ -160,20 +151,15 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
          * @return `Map` of `String` literal values to the `J.Literal` AST elements.
          */
         public static Map<String, Set<J.Literal>> find(J.ClassDeclaration inClass) {
-            // Comparator is reversed to add constants in alphabetical order.
-            Map<String, Set<J.Literal>> literalsMap = new TreeMap<>(Comparator.reverseOrder());
-            new FindDuplicateStringLiterals(inClass).visit(inClass, literalsMap);
-            return literalsMap.entrySet().stream()
-                    .filter(m -> literalsMap.get(m.getKey()).size() >= 3)
-                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-        }
-
-        @Override
-        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Map<String, Set<J.Literal>> literalsMap) {
-            if (classDecl.equals(searchInClass)) {
-                return super.visitClassDeclaration(classDecl, literalsMap);
+            Map<String, Set<J.Literal>> literalsMap = new HashMap<>();
+            Map<String, Set<J.Literal>> filteredMap = new TreeMap<>(Comparator.reverseOrder());
+            new FindDuplicateStringLiterals().visit(inClass, literalsMap);
+            for (String valueOfLiteral : literalsMap.keySet()) {
+                if (literalsMap.get(valueOfLiteral).size() >= 3) {
+                    filteredMap.put(valueOfLiteral, literalsMap.get(valueOfLiteral));
+                }
             }
-            return classDecl;
+            return filteredMap;
         }
 
         @Override
@@ -193,6 +179,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
                         !(((J.VariableDeclarations) parent.getValue()).hasModifier(J.Modifier.Type.Private) && ((J.VariableDeclarations) parent.getValue()).hasModifier(J.Modifier.Type.Static))) ||
                         parent.getValue() instanceof J.NewClass ||
                         parent.getValue() instanceof J.MethodInvocation) {
+
                     literalsMap.computeIfAbsent(((String) literal.getValue()), k -> new HashSet<>());
                     literalsMap.get((String) literal.getValue()).add(literal);
                 }
@@ -224,44 +211,33 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Set<String> variableNames) {
             Cursor parentScope = getCursor().dropParentUntil(is -> is instanceof J.ClassDeclaration || is instanceof J.MethodDeclaration);
             J.VariableDeclarations declaration = getCursor().firstEnclosing(J.VariableDeclarations.class);
-            // `private static final String`(s) are handled separately by `FindExistingPrivateStaticFinalFields`.
-            if ((parentScope.getValue() instanceof J.ClassDeclaration && declaration != null &&
-                    !(isPrivateStaticFinalVariable(declaration) && variable.getInitializer() instanceof J.Literal &&
-                            ((J.Literal) variable.getInitializer()).getValue() instanceof String)) ||
-                    parentScope.getValue() instanceof J.MethodDeclaration) {
+            if (parentScope.getValue() instanceof J.MethodDeclaration ||
+                    (parentScope.getValue() instanceof J.ClassDeclaration && declaration != null &&
+                            // `private static final String`(s) are handled separately by `FindExistingPrivateStaticFinalFields`.
+                            !(isPrivateStaticFinalVariable(declaration) && variable.getInitializer() instanceof J.Literal &&
+                                    ((J.Literal) variable.getInitializer()).getValue() instanceof String))) {
                 variableNames.add(variable.getSimpleName());
             }
-            return super.visitVariable(variable, variableNames);
+            return variable;
         }
     }
 
     private static class FindExistingPrivateStaticFinalFields extends JavaIsoVisitor<Map<String, String>> {
-        private final J.ClassDeclaration searchInClass;
-
-        private FindExistingPrivateStaticFinalFields(J.ClassDeclaration searchInClass) {
-            this.searchInClass = searchInClass;
-        }
 
         /**
          * Find existing `private static final String`(s) in a class.
          */
-        public static Map<String, String> find(J j, J.ClassDeclaration searchInClass) {
+        public static Map<String, String> find(J j) {
             Map<String, String> fieldValueToFieldName = new LinkedHashMap<>();
-            new FindExistingPrivateStaticFinalFields(searchInClass).visit(j, fieldValueToFieldName);
+            new FindExistingPrivateStaticFinalFields().visit(j, fieldValueToFieldName);
             return fieldValueToFieldName;
         }
 
         @Override
-        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Map<String, String> stringStringMap) {
-            if (classDecl.equals(searchInClass)) {
-                return super.visitClassDeclaration(classDecl, stringStringMap);
-            }
-            return classDecl;
-        }
-
-        @Override
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Map<String, String> stringStringMap) {
-            Cursor parentScope = getCursor().dropParentUntil(is -> is instanceof J.ClassDeclaration || is instanceof J.MethodDeclaration);
+            Cursor parentScope = getCursor().dropParentUntil(is -> is instanceof J.ClassDeclaration ||
+                    // Prevent checks on most of the literals.
+                    is instanceof J.MethodDeclaration);
             J.VariableDeclarations declaration = getCursor().firstEnclosing(J.VariableDeclarations.class);
             if (parentScope.getValue() instanceof J.ClassDeclaration &&
                     declaration != null && isPrivateStaticFinalVariable(declaration) &&
@@ -270,7 +246,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
                 String value = (String) (((J.Literal) variable.getInitializer()).getValue());
                 stringStringMap.putIfAbsent(value, variable.getSimpleName());
             }
-            return super.visitVariable(variable, stringStringMap);
+            return variable;
         }
     }
 
@@ -289,31 +265,23 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
         }
 
         @Override
-        public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
-            if (classDecl.equals(isClass)) {
-                return super.visitClassDeclaration(classDecl, executionContext);
-            }
-            return classDecl;
-        }
-
-        @Override
         public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
-            J.Literal l = (J.Literal) super.visitLiteral(literal, executionContext);
             if (literals.contains(literal)) {
                 assert isClass.getType() != null;
                 return J.Identifier.build(
                         Tree.randomId(),
-                        l.getPrefix(),
-                        l.getMarkers(),
+                        literal.getPrefix(),
+                        literal.getMarkers(),
                         variableName,
                         JavaType.Primitive.String,
-                        JavaType.Variable.build(variableName,
+                        JavaType.Variable.build(
+                                variableName,
                                 isClass.getType(),
                                 JavaType.Primitive.String,
                                 Collections.emptyList(),
                                 Flag.flagsToBitMap(new HashSet<>(Arrays.asList(Flag.Private, Flag.Static, Flag.Final)))));
             }
-            return l;
+            return literal;
         }
     }
 }

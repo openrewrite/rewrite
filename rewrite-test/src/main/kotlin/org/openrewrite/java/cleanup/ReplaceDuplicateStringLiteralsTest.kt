@@ -314,6 +314,25 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
     )
 
     @Test
+    fun multiVariableDeclaration() = assertChanged(
+        before = """
+            class A {
+                final String val1 = "value", val2 = "value", diff = "here";
+                final String val3 = "value";
+                final String VALUE = "whyyyy";
+            }
+        """,
+        after = """
+            class A {
+                private static final String VALUE_1 = "value";
+                final String val1 = VALUE_1, val2 = VALUE_1, diff = "here";
+                final String val3 = VALUE_1;
+                final String VALUE = "whyyyy";
+            }
+        """
+    )
+
+    @Test
     fun replaceMixedRedundantLiterals() = assertChanged(
         before = """
             class A {
