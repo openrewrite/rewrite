@@ -25,11 +25,13 @@ class UpgradePluginVersionTest : GradleRecipeTest {
         before = """
             plugins {
                 id 'com.jfrog.bintray' version '1.8.2'
+                id 'com.github.johnrengelman.shadow' version '6.1.0'
             }
         """,
         after = """
             plugins {
                 id 'com.jfrog.bintray' version '1.8.5'
+                id 'com.github.johnrengelman.shadow' version '6.1.0'
             }
         """
     )

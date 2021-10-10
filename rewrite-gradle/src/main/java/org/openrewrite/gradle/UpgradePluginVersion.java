@@ -67,7 +67,7 @@ public class UpgradePluginVersion extends Recipe {
 
     @Option(displayName = "Plugin id",
             description = "The `ID` part of `plugin { ID }`, as a glob expression.",
-            example = "`com.jfrog.bintray`")
+            example = "com.jfrog.bintray")
     String pluginIdPattern;
 
     @Option(displayName = "New version",
@@ -124,7 +124,7 @@ public class UpgradePluginVersion extends Recipe {
                     if (pluginArgs.get(0) instanceof J.Literal) {
                         String pluginId = (String) ((J.Literal) pluginArgs.get(0)).getValue();
                         assert pluginId != null;
-                        PathMatcher pathMatcher = Paths.get(pluginId).getFileSystem().getPathMatcher("glob:" + pluginId);
+                        PathMatcher pathMatcher = Paths.get(pluginId).getFileSystem().getPathMatcher("glob:" + pluginIdPattern);
                         if (pathMatcher.matches(Paths.get(pluginId))) {
                             List<Expression> versionArgs = method.getArguments();
                             if (versionArgs.get(0) instanceof J.Literal) {
