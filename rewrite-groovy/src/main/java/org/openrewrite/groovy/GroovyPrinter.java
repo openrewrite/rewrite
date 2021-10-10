@@ -165,8 +165,16 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             visitSpace(fieldAccess.getPrefix(), Space.Location.FIELD_ACCESS_PREFIX, p);
             visitMarkers(fieldAccess.getMarkers(), p);
             visit(fieldAccess.getTarget(), p);
-            visitLeftPadded(fieldAccess.getName().getMarkers().findFirst(NullSafe.class).isPresent() ? "?." : ".",
-                    fieldAccess.getPadding().getName(), JLeftPadded.Location.FIELD_ACCESS_NAME, p);
+
+            Markers nameMarkers = fieldAccess.getName().getMarkers();
+            if (nameMarkers.findFirst(NullSafe.class).isPresent()) {
+                p.out.append('?');
+            }
+            if (nameMarkers.findFirst(StarDot.class).isPresent()) {
+                p.out.append('*');
+            }
+
+            visitLeftPadded(".", fieldAccess.getPadding().getName(), JLeftPadded.Location.FIELD_ACCESS_NAME, p);
             return fieldAccess;
         }
 
@@ -193,8 +201,9 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
             Markers nameMarkers = method.getName().getMarkers();
             visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT,
-                    nameMarkers.findFirst(ImplicitDot.class).isPresent() ? "" :
-                            nameMarkers.findFirst(NullSafe.class).isPresent() ? "?." : ".", p);
+                    nameMarkers.findFirst(NullSafe.class).isPresent() ? "?." :
+                            nameMarkers.findFirst(StarDot.class).isPresent() ? "*." :
+                                    nameMarkers.findFirst(ImplicitDot.class).isPresent() ? "" : ".", p);
 
             visitContainer("<", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
             visit(method.getName(), p);
@@ -203,6 +212,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
             visitSpace(argContainer.getBefore(), Space.Location.METHOD_INVOCATION_ARGUMENTS, p);
             List<JRightPadded<Expression>> args = argContainer.getPadding().getElements();
+
             for (int i = 0; i < args.size(); i++) {
                 JRightPadded<Expression> arg = args.get(i);
                 boolean omitParens = arg.getElement().getMarkers()
@@ -210,7 +220,8 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
                 if (i == 0 && !omitParens) {
                     p.out.append('(');
-                } else if (i > 0 && omitParens) {
+                } else if (i > 0 && omitParens && !args.get(0).getElement().getMarkers()
+                        .findFirst(OmitParentheses.class).isPresent()) {
                     p.out.append(')');
                 } else if (i > 0) {
                     p.out.append(',');

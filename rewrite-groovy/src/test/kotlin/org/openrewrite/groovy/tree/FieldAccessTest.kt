@@ -20,6 +20,13 @@ import org.junit.jupiter.api.Test
 class FieldAccessTest : GroovyTreeTest {
 
     @Test
+    fun starAccess() = assertParsePrintAndProcess(
+        """
+            all*.exclude group: 'com.netflix.archaius', module: 'archaius-core'
+        """
+    )
+
+    @Test
     fun fieldAccess() = assertParsePrintAndProcess(
         """
             class Test {

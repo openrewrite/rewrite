@@ -176,7 +176,7 @@ public class GroovyParserVisitor {
             JContainer<TypeTree> implementings = null;
             if (clazz.getInterfaces().length > 0) {
                 Space implPrefix;
-                if(kindType == J.ClassDeclaration.Kind.Type.Interface) {
+                if (kindType == J.ClassDeclaration.Kind.Type.Interface) {
                     implPrefix = sourceBefore("extends");
                 } else {
                     implPrefix = sourceBefore("implements");
@@ -637,7 +637,7 @@ public class GroovyParserVisitor {
             List<JRightPadded<Object>> results = new ArrayList<>(closureListExpression.getExpressions().size());
             for (int i = 0, expressionsSize = expressions.size(); i < expressionsSize; i++) {
                 results.add(JRightPadded.build(visit(expressions.get(i))).withAfter(whitespace()));
-                if(i < expressionsSize - 1) {
+                if (i < expressionsSize - 1) {
                     cursor++; // ","
                 }
             }
@@ -691,7 +691,7 @@ public class GroovyParserVisitor {
 
             cursor += text.length();
 
-            if(jType == JavaType.Primitive.Double || jType == JavaType.Primitive.Float || jType == JavaType.Primitive.Long) {
+            if (jType == JavaType.Primitive.Double || jType == JavaType.Primitive.Float || jType == JavaType.Primitive.Long) {
                 char c = Character.toLowerCase(source.charAt(cursor));
                 if (c == 'f' || c == 'd' || c == 'l') {
                     text = text + source.charAt(cursor);
@@ -763,7 +763,7 @@ public class GroovyParserVisitor {
         public void visitForLoop(ForStatement forLoop) {
             Space fmt = sourceBefore("for");
             Space controlFmt = sourceBefore("(");
-            if(forLoop.getCollectionExpression() instanceof ClosureListExpression) {
+            if (forLoop.getCollectionExpression() instanceof ClosureListExpression) {
                 List<JRightPadded<?>> controls = visit(forLoop.getCollectionExpression());
                 // There will always be exactly three elements in a for loop's ClosureListExpression
                 List<JRightPadded<Statement>> init = controls.get(0).getElement() instanceof List ?
@@ -793,7 +793,7 @@ public class GroovyParserVisitor {
                 cursor += param.getName().length();
                 Space rightPad = whitespace();
                 Markers forEachMarkers = Markers.EMPTY;
-                if(source.charAt(cursor) == ':') {
+                if (source.charAt(cursor) == ':') {
                     cursor++; // Skip ":"
                 } else {
                     cursor += 2; // Skip "in"
@@ -806,7 +806,7 @@ public class GroovyParserVisitor {
                         singletonList(paramName))
                 ).withAfter(rightPad);
 
-                JRightPadded<Expression> iterable = JRightPadded.build((Expression)visit(forLoop.getCollectionExpression()))
+                JRightPadded<Expression> iterable = JRightPadded.build((Expression) visit(forLoop.getCollectionExpression()))
                         .withAfter(sourceBefore(")"));
 
                 queue.add(new J.ForEachLoop(randomId(), fmt, forEachMarkers,
@@ -876,9 +876,9 @@ public class GroovyParserVisitor {
                 Expression selectExpr = visit(call.getObjectExpression());
                 int saveCursor = cursor;
                 Space afterSelect = whitespace();
-                if (source.charAt(cursor) == '.' || source.charAt(cursor) == '?') {
+                if (source.charAt(cursor) == '.' || source.charAt(cursor) == '?' || source.charAt(cursor) == '*') {
                     cursor = saveCursor;
-                    afterSelect = sourceBefore(call.isSafe() ? "?." : ".");
+                    afterSelect = sourceBefore(call.isSpreadSafe() ? "*." : call.isSafe() ? "?." : ".");
                 } else {
                     implicitDot = new ImplicitDot(randomId());
                 }
@@ -887,6 +887,10 @@ public class GroovyParserVisitor {
 
             J.Identifier name = J.Identifier.build(randomId(), sourceBefore(call.getMethodAsString()), Markers.EMPTY,
                     call.getMethodAsString(), null);
+
+            if (call.isSpreadSafe()) {
+                name = name.withMarkers(name.getMarkers().add(new StarDot(randomId())));
+            }
             if (call.isSafe()) {
                 name = name.withMarkers(name.getMarkers().add(new NullSafe(randomId())));
             }
@@ -906,12 +910,16 @@ public class GroovyParserVisitor {
         public void visitPropertyExpression(PropertyExpression prop) {
             Space fmt = whitespace();
             Expression target = visit(prop.getObjectExpression());
-            Space beforeDot = sourceBefore(prop.isSafe() ? "?." : ".");
+            Space beforeDot = prop.isSafe() ? sourceBefore("?.") :
+                    sourceBefore(prop.isSpreadSafe() ? "*." : ".");
             J name = visit(prop.getProperty());
             if (name instanceof J.Literal) {
                 String nameStr = ((J.Literal) name).getValueSource();
                 assert nameStr != null;
                 name = J.Identifier.build(randomId(), name.getPrefix(), Markers.EMPTY, nameStr, null);
+            }
+            if (prop.isSpreadSafe()) {
+                name = name.withMarkers(name.getMarkers().add(new StarDot(randomId())));
             }
             if (prop.isSafe()) {
                 name = name.withMarkers(name.getMarkers().add(new NullSafe(randomId())));
@@ -1300,7 +1308,7 @@ public class GroovyParserVisitor {
 
         int saveCursor = cursor;
         Space fmt = whitespace();
-        if(cursor < source.length() && source.startsWith("def", cursor)) {
+        if (cursor < source.length() && source.startsWith("def", cursor)) {
             cursor += 3;
             return J.Identifier.build(randomId(), fmt, Markers.EMPTY, "def",
                     JavaType.Class.build("java.lang.Object"));
