@@ -20,6 +20,16 @@ import org.junit.jupiter.api.Test
 class AssignmentTest : GroovyTreeTest {
 
     @Test
+    fun concat() = assertParsePrintAndProcess(
+        """
+            android {
+                // specify the artifactId as module-name for kotlin
+                kotlinOptions.freeCompilerArgs += ["-module-name", POM_ARTIFACT_ID]
+            }
+        """.trimIndent()
+    )
+
+    @Test
     fun assignment() = assertParsePrintAndProcess(
         """
             String s;

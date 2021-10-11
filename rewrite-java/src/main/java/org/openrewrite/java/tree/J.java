@@ -499,15 +499,15 @@ public interface J extends Serializable, Tree {
 
         public enum Type {
             Addition,
-            Subtraction,
-            Multiplication,
-            Division,
-            Modulo,
             BitAnd,
             BitOr,
             BitXor,
+            Division,
             LeftShift,
+            Modulo,
+            Multiplication,
             RightShift,
+            Subtraction,
             UnsignedRightShift
         }
 

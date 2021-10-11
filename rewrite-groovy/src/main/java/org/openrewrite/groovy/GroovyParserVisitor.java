@@ -490,13 +490,13 @@ public class GroovyParserVisitor {
                 case "&&":
                     binaryOp = J.Binary.Type.And;
                     break;
-                case "&=":
+                case "&":
                     binaryOp = J.Binary.Type.BitAnd;
                     break;
-                case "|=":
+                case "|":
                     binaryOp = J.Binary.Type.BitOr;
                     break;
-                case "^=":
+                case "^":
                     binaryOp = J.Binary.Type.BitXor;
                     break;
                 case "/":
@@ -511,7 +511,7 @@ public class GroovyParserVisitor {
                 case ">=":
                     binaryOp = J.Binary.Type.GreaterThanOrEqual;
                     break;
-                case "<<=":
+                case "<<":
                     binaryOp = J.Binary.Type.LeftShift;
                     break;
                 case "<":
@@ -532,29 +532,50 @@ public class GroovyParserVisitor {
                 case "||":
                     binaryOp = J.Binary.Type.Or;
                     break;
-                case ">>=":
+                case ">>":
                     binaryOp = J.Binary.Type.RightShift;
                     break;
                 case "-":
                     binaryOp = J.Binary.Type.Subtraction;
                     break;
-                case ">>>=":
+                case ">>>":
                     binaryOp = J.Binary.Type.UnsignedRightShift;
                     break;
                 case "=":
                     assignment = true;
                     break;
+                case "+=":
+                    assignOp = J.AssignmentOperation.Type.Addition;
+                    break;
                 case "-=":
-                    assignOp = J.AssignmentOperation.Type.Subtraction;
+                    assignOp = J.AssignmentOperation.Type.BitAnd;
+                    break;
+                case "&=":
+                    assignOp = J.AssignmentOperation.Type.BitOr;
+                    break;
+                case "|=":
+                    assignOp = J.AssignmentOperation.Type.BitXor;
                     break;
                 case "/=":
                     assignOp = J.AssignmentOperation.Type.Division;
                     break;
-                case "*=":
-                    assignOp = J.AssignmentOperation.Type.Multiplication;
+                case "<<=":
+                    assignOp = J.AssignmentOperation.Type.LeftShift;
                     break;
                 case "%=":
                     assignOp = J.AssignmentOperation.Type.Modulo;
+                    break;
+                case "*=":
+                    assignOp = J.AssignmentOperation.Type.Multiplication;
+                    break;
+                case ">>=":
+                    assignOp = J.AssignmentOperation.Type.RightShift;
+                    break;
+                case "^=":
+                    assignOp = J.AssignmentOperation.Type.Subtraction;
+                    break;
+                case ">>>=":
+                    assignOp = J.AssignmentOperation.Type.UnsignedRightShift;
                     break;
             }
 
