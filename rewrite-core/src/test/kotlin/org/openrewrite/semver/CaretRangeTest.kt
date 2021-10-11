@@ -19,6 +19,28 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
 class CaretRangeTest {
+    @Test
+    fun pattern() {
+        assertThat(CaretRange.build("^1", null).isValid).isTrue
+        assertThat(CaretRange.build("^1.2", null).isValid).isTrue
+        assertThat(CaretRange.build("^1.2.3", null).isValid).isTrue
+        assertThat(CaretRange.build("^1.2.3.4", null).isValid).isTrue
+        assertThat(CaretRange.build("^1.2.3.4.5", null).isValid).isFalse
+    }
+
+    @Test
+    fun updateMicro() {
+        val caretRange: CaretRange = CaretRange.build("^1.2.3.4", null).getValue()!!
+
+        assertThat(caretRange.isValid("1.0", "1.2.3.4")).isTrue
+        assertThat(caretRange.isValid("1.0", "1.2.3.4.RELEASE")).isTrue
+        assertThat(caretRange.isValid("1.0", "1.2.3.5")).isTrue
+        assertThat(caretRange.isValid("1.0", "1.2.4")).isTrue
+        assertThat(caretRange.isValid("1.0", "1.9.0")).isTrue
+        assertThat(caretRange.isValid("1.0", "1.2.3.3")).isFalse
+        assertThat(caretRange.isValid("1.0", "2.0.0")).isFalse
+    }
+
     /**
      * ^1.2.3 := >=1.2.3 <2.0.0
      */

@@ -26,6 +26,9 @@ class XRangeTest {
         assertThat(XRange.build("1.x", null).isValid).isTrue
         assertThat(XRange.build("1.x.0", null).isValid).isFalse
         assertThat(XRange.build("1.1.X", null).isValid).isTrue
+        assertThat(XRange.build("1.1.1.X", null).isValid).isTrue
+        assertThat(XRange.build("1.1.1.1.X", null).isValid).isFalse
+        assertThat(XRange.build("1.1.x.1", null).isValid).isFalse
         assertThat(XRange.build("a", null).isValid).isFalse
     }
 
@@ -41,6 +44,7 @@ class XRangeTest {
     fun anyVersion() {
         val xRange: XRange = XRange.build("X", null).getValue()!!
 
+        assertThat(xRange.isValid("1.0", "0.0.0.0")).isTrue
         assertThat(xRange.isValid("1.0", "0.0.0")).isTrue
     }
 
@@ -52,6 +56,7 @@ class XRangeTest {
         val xRange: XRange = XRange.build("1.*", null).getValue()!!
 
         assertThat(xRange.isValid("1.0", "1.0.0")).isTrue
+        assertThat(xRange.isValid("1.0", "1.0.0.1")).isTrue
         assertThat(xRange.isValid("1.0", "1.2.3.RELEASE")).isTrue
         assertThat(xRange.isValid("1.0", "1.9.9")).isTrue
         assertThat(xRange.isValid("1.0", "2.0.0")).isFalse
@@ -66,6 +71,16 @@ class XRangeTest {
 
         assertThat(xRange.isValid("1.0", "1.2.0")).isTrue
         assertThat(xRange.isValid("1.0", "1.3.0")).isFalse
+    }
+
+    @Test
+    fun matchingMicroVersions() {
+        val xRange: XRange = XRange.build("1.2.3.X", null).getValue()!!
+
+        assertThat(xRange.isValid("1.0", "1.2.3.0")).isTrue
+        assertThat(xRange.isValid("1.0", "1.2.3")).isTrue
+        assertThat(xRange.isValid("1.0", "1.2.4.0")).isFalse
+        assertThat(xRange.isValid("1.0", "1.2.4")).isFalse
     }
 
     @Test

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 public interface VersionComparator extends Comparator<String> {
-    Pattern RELEASE_PATTERN = Pattern.compile("(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?([-+].*)?");
+    Pattern RELEASE_PATTERN = Pattern.compile("(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?([-+].*)?");
     Pattern PRE_RELEASE_ENDING = Pattern.compile("[.-](SNAPSHOT|RC|rc|M|m|beta|alpha)[.-]?\\d*$");
 
     @Deprecated

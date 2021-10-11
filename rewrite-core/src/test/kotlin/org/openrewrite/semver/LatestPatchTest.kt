@@ -24,6 +24,7 @@ class LatestPatchTest {
     @Test
     fun isValid() {
         assertThat(latestPatch.isValid("1.0.0", "1.0.0")).isTrue
+        assertThat(latestPatch.isValid("1.0.0", "1.0.0.1")).isTrue
         assertThat(latestPatch.isValid("1.0.0", "1.0.1")).isTrue
         assertThat(latestPatch.isValid("1.0", "1.0.1")).isTrue
         assertThat(latestPatch.isValid("1.0.0", "1.1.0")).isFalse
@@ -33,5 +34,6 @@ class LatestPatchTest {
     @Test
     fun compare() {
         assertThat(latestPatch.compare("1.0", "1.0.1", "1.0.2")).isLessThan(0)
+        assertThat(latestPatch.compare("1.0", "1.0.0.1", "1.0.1")).isLessThan(0)
     }
 }

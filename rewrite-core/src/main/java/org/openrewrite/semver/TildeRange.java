@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import static java.lang.Integer.parseInt;
  * <a href="https://github.com/npm/node-semver#tilde-ranges-123-12-1">Tilde ranges</a>.
  */
 public class TildeRange extends LatestRelease {
-    private static final Pattern TILDE_RANGE_PATTERN = Pattern.compile("~(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?");
+    private static final Pattern TILDE_RANGE_PATTERN = Pattern.compile("~(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?");
 
     private final String upperExclusive;
     private final String lower;
@@ -55,19 +55,23 @@ public class TildeRange extends LatestRelease {
         String major = matcher.group(1);
         String minor = matcher.group(2);
         String patch = matcher.group(3);
+        String micro = matcher.group(4);
 
         String lower;
         String upper;
 
         if (minor == null) {
-            lower = major + ".0.0";
-            upper = (parseInt(major) + 1) + ".0.0";
+            lower = major;
+            upper = Integer.toString(parseInt(major) + 1);
         } else if (patch == null) {
-            lower = major + "." + minor + ".0";
-            upper = major + "." + (parseInt(minor) + 1) + ".0";
-        } else {
+            lower = major + "." + minor;
+            upper = major + "." + (parseInt(minor) + 1);
+        } else if (micro == null) {
             lower = major + "." + minor + "." + patch;
-            upper = major + "." + (parseInt(minor) + 1) + ".0";
+            upper = major + "." + (parseInt(minor) + 1);
+        } else {
+            lower = major + "." + minor + "." + patch + "." + micro;
+            upper = major + "." + minor + "." + (parseInt(patch) + 1);
         }
 
         return Validated.valid("tildeRange", new TildeRange(lower, upper, metadataPattern));

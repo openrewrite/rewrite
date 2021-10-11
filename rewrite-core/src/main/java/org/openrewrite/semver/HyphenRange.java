@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,22 +25,15 @@ import java.util.regex.Pattern;
  * <a href="https://github.com/npm/node-semver#hyphen-ranges-xyz---abc">Hyphen ranges</a>.
  */
 public class HyphenRange extends LatestRelease {
-    private static final Pattern HYPHEN_RANGE_PATTERN = Pattern.compile("(\\d+(\\.\\d+)?(\\.\\d+)?)\\s*-\\s*(\\d+(\\.\\d+)?(\\.\\d+)?)");
+    private static final Pattern HYPHEN_RANGE_PATTERN = Pattern.compile("(\\d+(\\.\\d+)?(\\.\\d+)?(\\.\\d+)?)\\s*-\\s*(\\d+(\\.\\d+)?(\\.\\d+)?(\\.\\d+)?)");
 
     private final String upper;
     private final String lower;
 
     private HyphenRange(String lower, String upper, @Nullable String metadataPattern) {
         super(metadataPattern);
-        this.lower = fillPartialVersionWithZeroes(lower);
-        this.upper = fillPartialVersionWithZeroes(upper);
-    }
-
-    private static String fillPartialVersionWithZeroes(String version) {
-        if (version.chars().filter(c -> c == '.').count() < 2) {
-            return fillPartialVersionWithZeroes(version + ".0");
-        }
-        return version;
+        this.lower = lower;
+        this.upper = upper;
     }
 
     @Override
@@ -55,6 +48,6 @@ public class HyphenRange extends LatestRelease {
         if (!matcher.matches()) {
             return Validated.invalid("hyphenRange", pattern, "not a hyphen range");
         }
-        return Validated.valid("hyphenRange", new HyphenRange(matcher.group(1), matcher.group(4), metadataPattern));
+        return Validated.valid("hyphenRange", new HyphenRange(matcher.group(1), matcher.group(5), metadataPattern));
     }
 }

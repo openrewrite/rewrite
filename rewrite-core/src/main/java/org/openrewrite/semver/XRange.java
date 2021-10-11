@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,17 +26,19 @@ import java.util.regex.Pattern;
  * <a href="https://github.com/npm/node-semver#x-ranges-12x-1x-12-">X-Ranges</a>.
  */
 public class XRange extends LatestRelease {
-    private static final Pattern X_RANGE_PATTERN = Pattern.compile("([*xX]|\\d+)(?:\\.([*xX]|\\d+)(?:\\.([*xX]|\\d+))?)?");
+    private static final Pattern X_RANGE_PATTERN = Pattern.compile("([*xX]|\\d+)(?:\\.([*xX]|\\d+)(?:\\.([*xX]|\\d+))?(?:\\.([*xX]|\\d+))?)?");
 
     private final String major;
     private final String minor;
     private final String patch;
+    private final String micro;
 
-    XRange(String major, String minor, String patch, @Nullable String metadataPattern) {
+    XRange(String major, String minor, String patch, String micro, @Nullable String metadataPattern) {
         super(metadataPattern);
         this.major = major;
         this.minor = minor;
         this.patch = patch;
+        this.micro = micro;
     }
 
     @SuppressWarnings("ResultOfMethodCallIgnored")
@@ -65,9 +67,11 @@ public class XRange extends LatestRelease {
 
         if (patch.equals("*")) {
             return true;
+        } else if (gav.group(3) == null || !gav.group(3).equals(patch)) {
+            return false;
         }
 
-        return gav.group(3) == null || !gav.group(3).equals(patch);
+        return gav.group(4) == null || !gav.group(4).equals(micro);
     }
 
     public static Validated build(String pattern, @Nullable String metadataPattern) {
@@ -79,14 +83,17 @@ public class XRange extends LatestRelease {
         String major = normalizeWildcard(matcher.group(1));
         String minor = normalizeWildcard(matcher.group(2) == null ? "0" : matcher.group(2));
         String patch = normalizeWildcard(matcher.group(3) == null ? "0" : matcher.group(3));
+        String micro = normalizeWildcard(matcher.group(4) == null ? "0" : matcher.group(4));
 
-        if (major.equals("*") && (matcher.group(2) != null || matcher.group(3) != null)) {
+        if (major.equals("*") && (matcher.group(2) != null || matcher.group(3) != null || matcher.group(4) != null)) {
             return Validated.invalid("xRange", pattern, "not an x-range: nothing can follow a wildcard");
-        } else if (minor.equals("*") && matcher.group(3) != null) {
+        } else if (minor.equals("*") && (matcher.group(3) != null || matcher.group(4) != null)) {
+            return Validated.invalid("xRange", pattern, "not an x-range: nothing can follow a wildcard");
+        } else if (patch.equals("*") && matcher.group(4) != null) {
             return Validated.invalid("xRange", pattern, "not an x-range: nothing can follow a wildcard");
         }
 
-        return Validated.valid("xRange", new XRange(major, minor, patch, metadataPattern));
+        return Validated.valid("xRange", new XRange(major, minor, patch, micro, metadataPattern));
     }
 
     private static String normalizeWildcard(String part) {

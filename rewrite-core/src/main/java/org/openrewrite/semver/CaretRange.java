@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import static java.lang.Integer.parseInt;
  * <a href="https://github.com/npm/node-semver#caret-ranges-123-025-004">Caret ranges</a>.
  */
 public class CaretRange extends LatestRelease {
-    private static final Pattern CARET_RANGE_PATTERN = Pattern.compile("\\^(\\d+)(?:\\.([*xX]|\\d+))?(?:\\.([*xX]|\\d+))?");
+    private static final Pattern CARET_RANGE_PATTERN = Pattern.compile("\\^(\\d+)(?:\\.([*xX]|\\d+))?(?:\\.([*xX]|\\d+))?(?:\\.([*xX]|\\d+))?");
 
     private final String upperExclusive;
     private final String lower;
@@ -55,8 +55,11 @@ public class CaretRange extends LatestRelease {
         String major = matcher.group(1);
         String minor = normalizeWildcard(matcher.group(2));
         String patch = normalizeWildcard(matcher.group(3));
+        String micro = normalizeWildcard(matcher.group(4));
 
-        if ("*".equals(minor) && matcher.group(3) != null) {
+        if ("*".equals(minor) && (matcher.group(3) != null || matcher.group(4) != null)) {
+            return Validated.invalid("caretRange", pattern, "not a caret range: nothing can follow a wildcard");
+        } else if ("*".equals(patch) && (matcher.group(4) != null)) {
             return Validated.invalid("caretRange", pattern, "not a caret range: nothing can follow a wildcard");
         }
 
@@ -64,23 +67,27 @@ public class CaretRange extends LatestRelease {
         String upper;
 
         if (minor == null) {
-            // A missing patch value desugars to the number 0, but will allow flexibility
+            // A missing patch value will desugar to the number 0, but will allow flexibility
             // within that value, even if the major and minor versions are both 0.
-            lower = major + ".0.0";
+            lower = major;
         } else if (patch == null) {
             // A missing minor and patch values will desugar to zero, but also allow flexibility
             // within those values, even if the major version is zero.
-            lower = major + "." + minor + ".0";
-        } else {
+            lower = major + "." + minor;
+        } else if (micro == null) {
             lower = major + "." + minor + "." + patch;
+        } else {
+            lower = major + "." + minor + "." + patch + "." + micro;
         }
 
         if (!"0".equals(major) || minor == null) {
             upper = Integer.toString(parseInt(major) + 1);
         } else if (!"0".equals(minor) || patch == null) {
             upper = major + "." + (parseInt(minor) + 1);
-        } else {
+        } else if (!"0".equals(patch) && micro == null) {
             upper = major + "." + minor + "." + patch;
+        } else {
+            upper = major + "." + minor + "." + patch + "." + micro;
         }
 
         return Validated.valid("caretRange", new CaretRange(lower, upper, metadataPattern));

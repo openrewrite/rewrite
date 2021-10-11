@@ -25,27 +25,41 @@ class LatestReleaseTest {
     @Test
     fun onlyNumericPartsValid() {
         assertAll(
+            { assertThat(latestRelease.isValid("1.0", "1.1.1.1")).isTrue },
             { assertThat(latestRelease.isValid("1.0", "1.1.1")).isTrue },
             { assertThat(latestRelease.isValid("1.0", "1.1")).isTrue },
             { assertThat(latestRelease.isValid("1.0", "1")).isTrue },
             { assertThat(latestRelease.isValid("1.0", "1.1.a")).isFalse },
+            { assertThat(latestRelease.isValid("1.0", "1.1.1.1.a")).isFalse },
+            { assertThat(latestRelease.isValid("1.0", "1.1.1.1.1")).isFalse },
+            { assertThat(latestRelease.isValid("1.0", "1.1.1.1.1-SNAPSHOT")).isFalse },
             { assertThat(latestRelease.isValid("1.0", "1.1.0-SNAPSHOT")).isFalse }
         )
     }
 
     @Test
+    fun differentMicroVersions() {
+        assertThat(latestRelease.compare("1.0", "1.1.1.1", "1.1.1.2")).isLessThan(0)
+        assertThat(latestRelease.compare("1.0", "1", "1.1.1.1")).isLessThan(0)
+        assertThat(latestRelease.compare("1.0", "1.1.1.1", "2")).isLessThan(0)
+    }
+
+    @Test
     fun differentPatchVersions() {
+        assertThat(latestRelease.compare("1.0", "1.1.1.1", "1.1.2.1")).isLessThan(0)
         assertThat(latestRelease.compare("1.0", "1.1.1", "1.1.2")).isLessThan(0)
     }
 
     @Test
     fun differentMinorVersions() {
+        assertThat(latestRelease.compare("1.0", "1.1.1.1", "1.2.1.1")).isLessThan(0)
         assertThat(latestRelease.compare("1.0", "1.1.1", "1.2.1")).isLessThan(0)
         assertThat(latestRelease.compare("1.0", "1.1", "1.2")).isLessThan(0)
     }
 
     @Test
     fun differentMajorVersions() {
+        assertThat(latestRelease.compare("1.0", "1.1.1.1", "2.1.1.1")).isLessThan(0)
         assertThat(latestRelease.compare("1.0", "1.1.1", "2.1.1")).isLessThan(0)
         assertThat(latestRelease.compare("1.0", "1.1", "2.1")).isLessThan(0)
         assertThat(latestRelease.compare("1.0", "1", "2")).isLessThan(0)
@@ -53,6 +67,7 @@ class LatestReleaseTest {
 
     @Test
     fun differentNumberOfParts() {
+        assertThat(latestRelease.compare("1.0", "1.1.1", "1.1.1.1")).isLessThan(0)
         assertThat(latestRelease.compare("1.0", "1.1", "1.1.1")).isLessThan(0)
         assertThat(latestRelease.compare("1.0", "1", "1.1")).isLessThan(0)
     }
@@ -64,6 +79,7 @@ class LatestReleaseTest {
 
     @Test
     fun matchMetadata() {
+        assertThat(LatestRelease("-jre").isValid("1.0", "29.0.0.0-jre")).isTrue
         assertThat(LatestRelease("-jre").isValid("1.0", "29.0-jre")).isTrue
         assertThat(LatestRelease("-jre").isValid("1.0", "29.0")).isFalse
         assertThat(LatestRelease("-jre").isValid("1.0", "29.0-android")).isFalse
@@ -71,6 +87,7 @@ class LatestReleaseTest {
 
     @Test
     fun normalizeVersionStripReleaseSuffix() {
+        assertThat(LatestRelease.normalizeVersion("1.5.1.2.RELEASE")).isEqualTo("1.5.1.2")
         assertThat(LatestRelease.normalizeVersion("1.5.1.RELEASE")).isEqualTo("1.5.1")
         assertThat(LatestRelease.normalizeVersion("1.5.1.FINAL")).isEqualTo("1.5.1")
         assertThat(LatestRelease.normalizeVersion("1.5.1.Final")).isEqualTo("1.5.1")
