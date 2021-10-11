@@ -25,6 +25,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.TypeMatcher;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -63,7 +64,7 @@ public class FindDeprecatedFields extends Recipe {
 
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
                 for (JavaType javaType : cu.getTypesInUse()) {
                     JavaType.Variable variable = TypeUtils.asVariable(javaType);
                     if (variable != null && (typeMatcher == null || typeMatcher.matches(variable.getOwner()))) {

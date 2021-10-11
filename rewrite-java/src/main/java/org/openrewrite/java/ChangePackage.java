@@ -18,10 +18,7 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesType;
@@ -73,7 +70,7 @@ public class ChangePackage extends Recipe {
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
                 if (cu.getPackageDeclaration() != null) {
                     String original = cu.getPackageDeclaration().getExpression()
                             .printTrimmed(getCursor()).replaceAll("\\s", "");
@@ -99,22 +96,22 @@ public class ChangePackage extends Recipe {
         private final JavaType.Class newPackageType = JavaType.Class.build(newPackageName);
 
         @Override
-        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-            J.CompilationUnit c = super.visitCompilationUnit(cu, ctx);
+        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
+            JavaSourceFile c = super.visitJavaSourceFile(cu, ctx);
 
             String changingTo = getCursor().getMessage(RENAME_TO_KEY);
             if (changingTo != null) {
-                String path = c.getSourcePath().toString().replace('\\', '/');
+                String path = ((SourceFile)c).getSourcePath().toString().replace('\\', '/');
                 String changingFrom = getCursor().getMessage(RENAME_FROM_KEY);
                 assert changingFrom != null;
-                c = c.withSourcePath(Paths.get(path.replaceFirst(
+                c = (JavaSourceFile) ((SourceFile)c).withSourcePath(Paths.get(path.replaceFirst(
                         changingFrom.replace('.', '/'),
                         changingTo.replace('.', '/')
                 )));
 
                 for (J.Import anImport : c.getImports()) {
                     if (anImport.getPackageName().equals(newPackageName)) {
-                        c = new RemoveImport<ExecutionContext>(anImport.getTypeName(),true).visitCompilationUnit(c, ctx);
+                        c = new RemoveImport<ExecutionContext>(anImport.getTypeName(),true).visitJavaSourceFile(c, ctx);
                     }
                 }
             }

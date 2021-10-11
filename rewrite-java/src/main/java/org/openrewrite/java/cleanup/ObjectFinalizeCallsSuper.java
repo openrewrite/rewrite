@@ -21,8 +21,8 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Statement;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -56,7 +56,7 @@ public class ObjectFinalizeCallsSuper extends Recipe {
     protected JavaIsoVisitor<ExecutionContext> getSingleSourceApplicableTest() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
                 for (JavaType.Method md : cu.getDeclaredMethods()) {
                     if (FINALIZE_METHOD_MATCHER.matches(md)) {
                         return cu.withMarkers(cu.getMarkers().searchResult());

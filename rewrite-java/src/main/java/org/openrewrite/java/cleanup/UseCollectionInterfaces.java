@@ -84,10 +84,10 @@ public class UseCollectionInterfaces extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
 
             @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
                 for (JavaType type : cu.getTypesInUse()) {
                     if (type instanceof JavaType.Class && rspecRulesReplaceTypeMap.containsKey(((JavaType.Class) type).getFullyQualifiedName())) {
-                        return super.visitCompilationUnit(cu, executionContext);
+                        return super.visitJavaSourceFile(cu, executionContext);
                     }
                 }
                 return cu;

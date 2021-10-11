@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -29,7 +30,7 @@ public class HasTypeOnClasspathSourceSet<P> extends JavaIsoVisitor<P> {
     String fullyQualifiedTypeName;
 
     @Override
-    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
+    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
         return cu.getMarkers().findFirst(JavaSourceSet.class)
                 .filter(sourceSet -> {
                     for (JavaType.FullyQualified classpath : sourceSet.getClasspath()) {

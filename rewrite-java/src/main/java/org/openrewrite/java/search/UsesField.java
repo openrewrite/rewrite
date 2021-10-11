@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -31,7 +32,7 @@ public class UsesField<P> extends JavaIsoVisitor<P> {
     private final String field;
 
     @Override
-    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
+    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
         Set<JavaType> types = cu.getTypesInUse();
         for (JavaType type : types) {
             if (type instanceof JavaType.Variable) {

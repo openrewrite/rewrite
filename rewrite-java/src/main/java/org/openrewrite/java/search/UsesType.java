@@ -17,10 +17,7 @@ package org.openrewrite.java.search;
 
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.Flag;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,8 +40,8 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
-        J.CompilationUnit c = cu;
+    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
+        JavaSourceFile c = cu;
         Set<JavaType> types = c.getTypesInUse();
         for (JavaType type : types) {
             if (type instanceof JavaType.FullyQualified) {
@@ -75,7 +72,7 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
         return c;
     }
 
-    private J.CompilationUnit maybeMark(J.CompilationUnit c, @Nullable JavaType.FullyQualified fq) {
+    private JavaSourceFile maybeMark(JavaSourceFile c, @Nullable JavaType.FullyQualified fq) {
         if (fq == null) {
             return c;
         }
