@@ -299,7 +299,7 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                 final String val1 = "value";
                 final String val2 = "value";
                 final String val3 = "value";
-                final String VALUE = "whyyyy";
+                final String VALUE = "name space conflict";
             }
         """,
         after = """
@@ -308,7 +308,26 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                 final String val1 = VALUE_1;
                 final String val2 = VALUE_1;
                 final String val3 = VALUE_1;
-                final String VALUE = "whyyyy";
+                final String VALUE = "name space conflict";
+            }
+        """
+    )
+
+    @Test
+    fun multiVariableDeclaration() = assertChanged(
+        before = """
+            class A {
+                final String val1 = "value", val2 = "value", diff = "here";
+                final String val3 = "value";
+                final String VALUE = "name space conflict";
+            }
+        """,
+        after = """
+            class A {
+                private static final String VALUE_1 = "value";
+                final String val1 = VALUE_1, val2 = VALUE_1, diff = "here";
+                final String val3 = VALUE_1;
+                final String VALUE = "name space conflict";
             }
         """
     )
