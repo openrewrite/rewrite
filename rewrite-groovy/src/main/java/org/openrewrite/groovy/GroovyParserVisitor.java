@@ -41,9 +41,9 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.tree.Space.EMPTY;
 import static org.openrewrite.java.tree.Space.format;
@@ -431,6 +431,26 @@ public class GroovyParserVisitor {
             }
 
             List<org.codehaus.groovy.ast.expr.Expression> unparsedArgs = expression.getExpressions();
+
+            // If the first parameter to a function is a Map, then groovy allows "named parameters" style invocations, see:
+            //     https://docs.groovy-lang.org/latest/html/documentation/#_named_parameters_2
+            // When named parameters are in use they may appear before, after, or intermixed with any positional arguments
+            if(unparsedArgs.size() > 1 && unparsedArgs.get(0) instanceof MapExpression
+                    && (unparsedArgs.get(0).getLastLineNumber() > unparsedArgs.get(1).getLastLineNumber()
+                    || (unparsedArgs.get(0).getLastLineNumber() == unparsedArgs.get(1).getLastLineNumber()
+                    && unparsedArgs.get(0).getLastColumnNumber() > unparsedArgs.get(1).getLastColumnNumber()))) {
+
+                // Figure out the source-code ordering of the expressions
+                MapExpression namedArgExpressions = (MapExpression) unparsedArgs.get(0);
+                unparsedArgs =
+                        Stream.concat(
+                                        namedArgExpressions.getMapEntryExpressions().stream(),
+                                        unparsedArgs.subList(1, unparsedArgs.size()).stream())
+                                .sorted(Comparator.comparing(ASTNode::getLastLineNumber)
+                                        .thenComparing(ASTNode::getLastColumnNumber))
+                                .collect(Collectors.toList());
+            }
+
             for (int i = 0; i < unparsedArgs.size(); i++) {
                 Expression arg = visit(unparsedArgs.get(i));
                 if (omitParentheses != null) {

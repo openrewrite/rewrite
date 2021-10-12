@@ -52,4 +52,34 @@ class MethodInvocationTest : GroovyTreeTest {
             m?.clear()
         """
     )
+
+    @Test
+    fun namedArgumentsInDeclaredOrder() = assertParsePrintAndProcess("""
+        def acceptsNamedArguments (Map a, int i) { }
+        acceptsNamedArguments(foo: "bar", 1)
+    """)
+
+    @Test
+    fun namedArgumentsAfterPositionalArguments() = assertParsePrintAndProcess("""
+        def acceptsNamedArguments (Map a, int i) { }
+        acceptsNamedArguments(1, foo: "bar")
+    """)
+
+    @Test
+    fun namedArgumentsBeforeClosure() = assertParsePrintAndProcess("""
+        def acceptsNamedArguments(Map a, int i, Closure c) {}
+        acceptsNamedArguments(1, foo: "bar") { }
+    """)
+
+    @Test
+    fun namedArgumentsBetweenPositionalArguments() = assertParsePrintAndProcess("""
+        def acceptsNamedArguments(Map a, int n, int m) { }
+        acceptsNamedArguments(1, foo: "bar", 2)
+    """)
+
+    @Test
+    fun namedArgumentsAllOverThePlace() = assertParsePrintAndProcess("""
+        def acceptsNamedArguments(Map a, int n, int m) { }
+        acceptsNamedArguments(1, foo: "bar", 2, bar: "baz")
+    """.trimIndent())
 }

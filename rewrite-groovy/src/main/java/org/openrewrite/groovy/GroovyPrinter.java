@@ -212,7 +212,6 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
             visitSpace(argContainer.getBefore(), Space.Location.METHOD_INVOCATION_ARGUMENTS, p);
             List<JRightPadded<Expression>> args = argContainer.getPadding().getElements();
-
             for (int i = 0; i < args.size(); i++) {
                 JRightPadded<Expression> arg = args.get(i);
                 boolean omitParens = arg.getElement().getMarkers()
