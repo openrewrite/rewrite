@@ -98,7 +98,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
                                         JavaTemplate.builder(this::getCursor, insertStatement).build(),
                                         classDecl.getBody().getCoordinates().firstStatement(), replaceLiteral));
                     }
-
+                    variableNames.add(variableName);
                     doAfterVisit(new ReplaceStringLiterals(classDecl, variableName, duplicateLiteralsMap.get(valueOfLiteral)));
                 }
                 return classDecl;
