@@ -228,6 +228,6 @@ class RecipeLifecycleTest {
         assertThat(results.size)
             .isEqualTo(1)
         assertThat(results.first().recipesThatMadeChanges.map { it.name })
-            .containsExactly("Change1", "Change2")
+            .containsExactlyInAnyOrder("Change1", "Change2")
     }
 }

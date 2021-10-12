@@ -33,7 +33,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Set;
+import java.util.Stack;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
@@ -53,7 +55,7 @@ public class Result {
     private final SourceFile after;
 
     @Getter
-    private final Set<Recipe> recipesThatMadeChanges;
+    private final Collection<Stack<Recipe>> recipes;
 
     @Getter
     @Nullable
@@ -62,14 +64,19 @@ public class Result {
     @Nullable
     private transient WeakReference<String> diff;
 
-    public Result(@Nullable SourceFile before, @Nullable SourceFile after, Set<Recipe> recipesThatMadeChanges) {
+    @Deprecated
+    public Set<Recipe> getRecipesThatMadeChanges() {
+        return recipes.stream().map(Stack::peek).collect(Collectors.toSet());
+    }
+
+    public Result(@Nullable SourceFile before, @Nullable SourceFile after, Collection<Stack<Recipe>> recipes) {
         this.before = before;
         this.after = after;
-        this.recipesThatMadeChanges = recipesThatMadeChanges;
+        this.recipes = recipes;
 
         Duration timeSavings = null;
-        for (Recipe recipesThatMadeChange : recipesThatMadeChanges) {
-            Duration perOccurrence = recipesThatMadeChange.getEstimatedEffortPerOccurrence();
+        for (Stack<Recipe> recipesStack : recipes) {
+            Duration perOccurrence = recipesStack.peek().getEstimatedEffortPerOccurrence();
             if(perOccurrence != null) {
                 timeSavings = timeSavings == null ? perOccurrence : timeSavings.plus(perOccurrence);
             }
@@ -125,7 +132,7 @@ public class Result {
                 relativeTo,
                 before == null ? "" : before.printAll(),
                 after == null ? "" : after.printAll(),
-                recipesThatMadeChanges
+                recipes.stream().map(Stack::peek).collect(Collectors.toSet())
         )) {
             return diffEntry.getDiff();
         }

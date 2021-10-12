@@ -279,29 +279,6 @@ public abstract class Recipe {
         return getClass().getName();
     }
 
-    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-    static class RecipeThatMadeChanges implements Marker {
-        private final Set<Recipe> recipes;
-
-        @EqualsAndHashCode.Include
-        private final UUID id;
-
-        RecipeThatMadeChanges(Recipe recipe) {
-            this.recipes = new LinkedHashSet<>();
-            this.recipes.add(recipe);
-            id = randomId();
-        }
-
-        public Set<Recipe> getRecipes() {
-            return recipes;
-        }
-
-        @Override
-        public UUID getId() {
-            return id;
-        }
-    }
-
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

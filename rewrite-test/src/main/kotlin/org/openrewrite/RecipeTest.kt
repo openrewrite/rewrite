@@ -316,13 +316,13 @@ interface RecipeTest<T : SourceFile> {
         }
 
         override fun <S : SourceFile?> scheduleVisit(
-            recipe: Recipe,
+            recipeStack: Stack<Recipe>,
             before: MutableList<S>,
             ctx: ExecutionContext,
-            recipeThatDeletedSourceFile: MutableMap<UUID, Recipe>
+            recipeThatDeletedSourceFile: MutableMap<UUID, Stack<Recipe>>
         ): MutableList<S> {
             ctx.putMessage("cyclesThatResultedInChanges", cyclesThatResultedInChanges)
-            val afterList = delegate.scheduleVisit(recipe, before, ctx, recipeThatDeletedSourceFile)
+            val afterList = delegate.scheduleVisit(recipeStack, before, ctx, recipeThatDeletedSourceFile)
             if (afterList !== before) {
                 cyclesThatResultedInChanges = cyclesThatResultedInChanges.inc()
                 if (cyclesThatResultedInChanges > expectedCyclesThatMakeChanges &&

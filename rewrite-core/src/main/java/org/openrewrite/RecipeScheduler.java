@@ -22,6 +22,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.scheduling.WatchableExecutionContext;
 
 import java.time.Duration;
@@ -32,10 +33,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singleton;
+import static java.util.Collections.*;
 import static java.util.stream.Collectors.*;
 import static org.openrewrite.Recipe.PANIC;
+import static org.openrewrite.Tree.randomId;
 
 public interface RecipeScheduler {
     default <T> List<T> mapAsync(List<T> input, UnaryOperator<T> mapFn) {
@@ -64,13 +65,16 @@ public interface RecipeScheduler {
                 .register(Metrics.globalRegistry)
                 .record(before.size());
 
-        Map<UUID, Recipe> recipeThatDeletedSourceFile = new HashMap<>();
+        Map<UUID, Stack<Recipe>> recipeThatDeletedSourceFile = new HashMap<>();
         List<? extends SourceFile> acc = before;
         List<? extends SourceFile> after = acc;
 
         WatchableExecutionContext ctxWithWatch = new WatchableExecutionContext(ctx);
         for (int i = 0; i < maxCycles; i++) {
-            after = scheduleVisit(recipe, acc, ctxWithWatch, recipeThatDeletedSourceFile);
+            Stack<Recipe> recipeStack = new Stack<>();
+            recipeStack.push(recipe);
+
+            after = scheduleVisit(recipeStack, acc, ctxWithWatch, recipeThatDeletedSourceFile);
             if (i + 1 >= minCycles && ((after == acc && !ctxWithWatch.hasNewMessages()) || !recipe.causesAnotherCycle())) {
                 break;
             }
@@ -101,7 +105,7 @@ public interface RecipeScheduler {
                             public Tree visit(@Nullable Tree tree, PrintOutputCapture<ExecutionContext> p) {
                                 if (tree instanceof Markers) {
                                     String markerIds = ((Markers) tree).entries().stream()
-                                            .filter(marker -> !(marker instanceof Recipe.RecipeThatMadeChanges))
+                                            .filter(marker -> !(marker instanceof RecipesThatMadeChanges))
                                             .map(marker -> String.valueOf(marker.hashCode()))
                                             .collect(joining(","));
                                     if (!markerIds.isEmpty()) {
@@ -124,7 +128,7 @@ public interface RecipeScheduler {
 
                     if (isChanged) {
                         results.add(new Result(original, s, s.getMarkers()
-                                .findFirst(Recipe.RecipeThatMadeChanges.class)
+                                .findFirst(RecipesThatMadeChanges.class)
                                 .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe reported making a change?"))
                                 .getRecipes()));
                     }
@@ -146,13 +150,13 @@ public interface RecipeScheduler {
         return results;
     }
 
-    default <S extends SourceFile> List<S> scheduleVisit(Recipe recipe,
+    default <S extends SourceFile> List<S> scheduleVisit(Stack<Recipe> recipeStack,
                                                          List<S> before,
                                                          ExecutionContext ctx,
-                                                         Map<UUID, Recipe> recipeThatDeletedSourceFile) {
+                                                         Map<UUID, Stack<Recipe>> recipeThatDeletedSourceFile) {
         long startTime = System.nanoTime();
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean(false);
-
+        Recipe recipe = recipeStack.peek();
         if (recipe.getApplicableTest() != null) {
             boolean applicable = false;
             for (S s : before) {
@@ -198,15 +202,17 @@ public interface RecipeScheduler {
                     try {
                         @SuppressWarnings("unchecked") S afterFile = (S) recipe.getVisitor().visit(s, ctx);
                         if (afterFile != null && afterFile != s) {
+                            List<Stack<Recipe>> recipeStackList = new ArrayList<>(1);
+                            recipeStackList.add(recipeStack);
                             afterFile = afterFile.withMarkers(afterFile.getMarkers().computeByType(
-                                    new Recipe.RecipeThatMadeChanges(recipe),
+                                    new RecipesThatMadeChanges(randomId(), recipeStackList),
                                     (r1, r2) -> {
                                         r1.getRecipes().addAll(r2.getRecipes());
                                         return r1;
                                     }));
                             sample.stop(MetricsHelper.successTags(timer, s, "changed").register(Metrics.globalRegistry));
                         } else if (afterFile == null) {
-                            recipeThatDeletedSourceFile.put(s.getId(), recipe);
+                            recipeThatDeletedSourceFile.put(s.getId(), recipeStack);
                             sample.stop(MetricsHelper.successTags(timer, s, "deleted").register(Metrics.globalRegistry));
                         } else {
                             sample.stop(MetricsHelper.successTags(timer, s, "unchanged").register(Metrics.globalRegistry));
@@ -235,11 +241,12 @@ public interface RecipeScheduler {
                 SourceFile original = originalMap.get(s.getId());
                 if (original == null) {
                     // a new source file generated
-                    recipeThatDeletedSourceFile.put(s.getId(), recipe);
+                    recipeThatDeletedSourceFile.put(s.getId(), recipeStack);
                 } else if (s != original) {
-                    //Mark the item changed.
+                    List<Stack<Recipe>> recipeStackList = new ArrayList<>(1);
+                    recipeStackList.add(recipeStack);
                     return s.withMarkers(s.getMarkers().computeByType(
-                            new Recipe.RecipeThatMadeChanges(recipe),
+                            new RecipesThatMadeChanges(randomId(), recipeStackList),
                             (r1, r2) -> {
                                 r1.getRecipes().addAll(r2.getRecipes());
                                 return r1;
@@ -251,7 +258,7 @@ public interface RecipeScheduler {
             for (SourceFile maybeDeleted : after) {
                 if (!afterWidened.contains(maybeDeleted)) {
                     // a source file deleted
-                    recipeThatDeletedSourceFile.put(maybeDeleted.getId(), recipe);
+                    recipeThatDeletedSourceFile.put(maybeDeleted.getId(), recipeStack);
                 }
             }
         }
@@ -261,7 +268,12 @@ public interface RecipeScheduler {
                 //noinspection unchecked
                 return (List<S>) afterWidened;
             }
-            afterWidened = scheduleVisit(r, afterWidened, ctx, recipeThatDeletedSourceFile);
+
+            Stack<Recipe> nextStack = new Stack<>();
+            nextStack.addAll(recipeStack);
+            nextStack.push(r);
+
+            afterWidened = scheduleVisit(nextStack, afterWidened, ctx, recipeThatDeletedSourceFile);
         }
 
         //noinspection unchecked
