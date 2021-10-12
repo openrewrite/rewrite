@@ -170,10 +170,10 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
         source = javadocContent.toString();
 
         if (marginBuilder != null && marginBuilder.length() > 0) {
-            if (javadocContent.length() > 0 && javadocContent.charAt(0) != '\n' && javadocContent.charAt(0) != '\r') {
+            if (javadocContent.length() > 0 && javadocContent.charAt(0) != '\n') {
                 lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(),
                         marginBuilder.toString(), Markers.EMPTY));
-                source = source.substring(0, source.length() - (marginBuilder.toString().startsWith("\n") ? 1 : 2)); // strip trailing newline
+                source = source.substring(0, source.length() - 1); // strip trailing newline
             } else {
                 lineBreaks.put(source.length(), new Javadoc.LineBreak(randomId(),
                         marginBuilder.toString(), Markers.EMPTY));

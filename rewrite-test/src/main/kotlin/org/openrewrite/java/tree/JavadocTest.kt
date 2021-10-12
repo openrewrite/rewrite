@@ -1118,4 +1118,19 @@ interface JavadocTest : JavaTreeTest {
                 "    void method() throws IOException {}\r\n" +
                 "}"
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1090")
+    @Test
+    fun paramNoDescriptionWithCRLF(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit, "" +
+                "import org.foo;\r\n" +
+                "\r\n" +
+                "public class A {\r\n" +
+                "    /**\r\n" +
+                "     * @param arg0\r\n" +
+                "     */\r\n" +
+                "    void method(String arg0) {}\r\n" +
+                "}"
+    )
 }
