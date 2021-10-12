@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.*;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.ChangeFieldName;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -79,11 +80,17 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
                     if (fieldValueToFieldName.containsKey(valueOfLiteral)) {
                         String classFieldName = fieldValueToFieldName.get(valueOfLiteral);
                         variableName = getNameWithoutShadow(classFieldName, variableNames);
+                        if (StringUtils.isBlank(variableName)) {
+                            continue;
+                        }
                         if (!classFieldName.equals(variableName)) {
                             doAfterVisit(new ChangeFieldName<>(JavaType.Class.build(classFqn), classFieldName, variableName));
                         }
                     } else {
                         variableName = getNameWithoutShadow(transformToVariableName(valueOfLiteral), variableNames);
+                        if (StringUtils.isBlank(variableName)) {
+                            continue;
+                        }
                         J.Literal replaceLiteral = ((J.Literal) duplicateLiteralsMap.get(valueOfLiteral).toArray()[0]).withId(Tree.randomId());
                         String insertStatement = "private static final String " + variableName + " = #{any(String)}";
                         classDecl = classDecl.withBody(
