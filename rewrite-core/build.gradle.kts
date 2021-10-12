@@ -16,7 +16,7 @@ dependencies {
 
     implementation("org.graalvm.sdk:graal-sdk:latest.release")
     testImplementation("org.graalvm.sdk:graal-sdk:latest.release")
-    implementation("org.apache.commons:commons-io:latest.release")
+    implementation("commons-io:commons-io:latest.release")
     implementation("org.apache.commons:commons-compress:latest.release")
 
     implementation("io.micrometer:micrometer-core:latest.release")
