@@ -57,6 +57,23 @@ public class ClasspathScanningLoader implements ResourceLoader {
         scanYaml(new ClassGraph().acceptPaths("META-INF/rewrite"), properties, null);
     }
 
+    /**
+     * Construct a ClasspathScanningLoader scans the provided classload for recipes
+     *
+     * @param properties Yaml placeholder properties
+     * @param classLoader Limit scan to classes loadable by this classloader
+     */
+    public ClasspathScanningLoader(Properties properties, ClassLoader classLoader) {
+        scanClasses(new ClassGraph()
+                 .ignoreParentClassLoaders()
+                 .overrideClassLoaders(classLoader), classLoader);
+
+        scanYaml(new ClassGraph()
+                 .ignoreParentClassLoaders()
+                 .overrideClassLoaders(classLoader)
+                 .acceptPaths("META-INF/rewrite"), properties, classLoader);
+    }
+
     public ClasspathScanningLoader(Path jar, Properties properties, ClassLoader classLoader) {
         String jarName = jar.toFile().getName();
 
