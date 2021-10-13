@@ -79,7 +79,7 @@ public class ChangeType extends Recipe {
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
                 for (J.ClassDeclaration it : cu.getClasses()) {
                     if (TypeUtils.isOfClassType(it.getType(), oldFullyQualifiedTypeName)) {
                         return cu.withMarkers(cu.getMarkers().searchResult());
