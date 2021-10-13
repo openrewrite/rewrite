@@ -184,6 +184,9 @@ interface DependencyHandlerSpec extends DependencyHandler {
     Dependency compileOnly(String dependencyNotation)
     Dependency compileOnly(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
     Dependency compileOnly(Map<String, String> dependencyNotation)
+    Dependency classpath(String dependencyNotation)
+    Dependency classpath(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
+    Dependency classpath(Map<String, String> dependencyNotation)
     Dependency testCompile(String dependencyNotation)
     Dependency testCompile(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
     Dependency testCompile(Map<String, String> dependencyNotation)
@@ -200,7 +203,13 @@ interface RepositoryHandlerSpec extends RepositoryHandler {
     IvyArtifactRepository ivy(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=IvyArtifactRepository) Closure closure)
 }
 
+//interface TaskContainerSpec extends TaskContainer {
+//    public <T extends Task> DomainObjectCollection withType(Class<T> type, @DelegatesTo(strategy=Closure.DELEGATE_FIRST, genericTypeIndex=0) Closure<T> closure)
+//}
+
 abstract class RewriteGradleProject implements Project {
+    Map ext;
+
     abstract void dependencies(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=DependencyHandlerSpec) Closure cl)
     abstract void plugins(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=PluginSpec) Closure cl)
     abstract void repositories(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=RepositoryHandlerSpec) Closure cl)

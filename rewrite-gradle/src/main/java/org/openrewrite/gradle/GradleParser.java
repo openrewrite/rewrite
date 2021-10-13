@@ -45,7 +45,7 @@ public class GradleParser implements Parser<G.CompilationUnit> {
     public GradleParser(GroovyParser.Builder groovyParser) {
         try {
             this.groovyParser = groovyParser
-                    .classpath("gradle-core-api")
+                    .classpath("gradle-core-api", "gradle-language-groovy", "gradle-language-java")
                     .build();
         } catch(IllegalArgumentException e) {
             // when gradle API has been fatjared into the rewrite-gradle distribution

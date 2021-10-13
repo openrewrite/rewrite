@@ -102,7 +102,7 @@ class TypeMapping {
             return node.getGenericsTypes() != null && node.getGenericsTypes().length > 0 ?
                     parameterizedType(node.getTypeClass(), node.getGenericsTypes(), stack) :
                     type(node.getTypeClass(), stack);
-        } catch (GroovyBugError ignored) {
+        } catch (GroovyBugError | NoClassDefFoundError ignored) {
             return JavaType.Class.build(node.getName());
         }
     }

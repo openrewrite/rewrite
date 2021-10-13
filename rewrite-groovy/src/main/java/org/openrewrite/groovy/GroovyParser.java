@@ -32,8 +32,7 @@ import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.style.NamedStyles;
 
-import java.io.ByteArrayInputStream;
-import java.io.PrintWriter;
+import java.io.*;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -88,7 +87,6 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
         for (Input input : sources) {
             CompilerConfiguration configuration = new CompilerConfiguration();
             configuration.setTolerance(Integer.MAX_VALUE);
-            configuration.setDebug(true);
             configuration.setClasspathList(classpath == null ? emptyList() : classpath.stream()
                     .map(cp -> cp.toFile().toString())
                     .collect(toList()));
@@ -120,9 +118,14 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
             } catch (Throwable t) {
                 ctx.getOnError().accept(t);
             } finally {
-                if(errorCollector.hasErrors() || errorCollector.hasWarnings()) {
-//                    org.slf4j.LoggerFactory.getLogger(GroovyParser.class).warn(log);
-                    errorCollector.write(new PrintWriter(System.out), new Janitor());
+                if (errorCollector.hasErrors() || errorCollector.hasWarnings()) {
+                    try (StringWriter sw = new StringWriter();
+                         PrintWriter pw = new PrintWriter(sw)) {
+                        errorCollector.write(pw, new Janitor());
+                        org.slf4j.LoggerFactory.getLogger(GroovyParser.class).warn(sw.toString());
+                    } catch(IOException ignored) {
+                        // unreachable
+                    }
                 }
             }
         }

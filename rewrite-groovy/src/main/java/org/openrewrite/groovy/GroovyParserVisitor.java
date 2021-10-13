@@ -43,7 +43,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.tree.Space.EMPTY;
 import static org.openrewrite.java.tree.Space.format;
@@ -73,7 +74,10 @@ public class GroovyParserVisitor {
 
     public G.CompilationUnit visit(SourceUnit unit, ModuleNode ast) throws GroovyParsingException {
         for (ClassNode aClass : ast.getClasses()) {
-            new StaticTypeCheckingVisitor(unit, aClass).visitClass(aClass);
+            try {
+                new StaticTypeCheckingVisitor(unit, aClass).visitClass(aClass);
+            } catch (NoClassDefFoundError ignored) {
+            }
         }
 
         NavigableMap<LineColumn, List<ASTNode>> sortedByPosition = new TreeMap<>();
@@ -435,7 +439,7 @@ public class GroovyParserVisitor {
             // If the first parameter to a function is a Map, then groovy allows "named parameters" style invocations, see:
             //     https://docs.groovy-lang.org/latest/html/documentation/#_named_parameters_2
             // When named parameters are in use they may appear before, after, or intermixed with any positional arguments
-            if(unparsedArgs.size() > 1 && unparsedArgs.get(0) instanceof MapExpression
+            if (unparsedArgs.size() > 1 && unparsedArgs.get(0) instanceof MapExpression
                     && (unparsedArgs.get(0).getLastLineNumber() > unparsedArgs.get(1).getLastLineNumber()
                     || (unparsedArgs.get(0).getLastLineNumber() == unparsedArgs.get(1).getLastLineNumber()
                     && unparsedArgs.get(0).getLastColumnNumber() > unparsedArgs.get(1).getLastColumnNumber()))) {
@@ -672,8 +676,32 @@ public class GroovyParserVisitor {
         public void visitClosureExpression(ClosureExpression expression) {
             Space prefix = sourceBefore("{");
 
-            J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), EMPTY, Markers.EMPTY, false,
-                    visitRightPadded(expression.getParameters(), ",", null));
+            List<JRightPadded<J>> paramExprs = emptyList();
+            if (expression.getParameters().length > 0) {
+                paramExprs = new ArrayList<>(expression.getParameters().length);
+                Parameter[] parameters = expression.getParameters();
+                for (int i = 0; i < parameters.length; i++) {
+                    Parameter p = parameters[i];
+                    JavaType type = typeMapping.type(p.getType());
+                    J expr = new J.VariableDeclarations(randomId(), whitespace(), Markers.EMPTY,
+                            emptyList(), emptyList(), p.isDynamicTyped() ? null : visitTypeTree(p.getType()),
+                            null, emptyList(),
+                            singletonList(
+                                    JRightPadded.build(
+                                            new J.VariableDeclarations.NamedVariable(randomId(), sourceBefore(p.getName()), Markers.EMPTY,
+                                                    J.Identifier.build(randomId(), EMPTY, Markers.EMPTY, p.getName(), type),
+                                                    emptyList(), null, type)
+                                    )
+                            ));
+                    JRightPadded<J> param = JRightPadded.build(expr);
+                    if (i != parameters.length - 1) {
+                        param = param.withAfter(sourceBefore(","));
+                    }
+                    paramExprs.add(param);
+                }
+            }
+
+            J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), EMPTY, Markers.EMPTY, false, paramExprs);
             Space arrow = params.getParameters().isEmpty() ? EMPTY : sourceBefore("->");
 
             queue.add(new J.Lambda(randomId(), prefix, Markers.EMPTY, params, arrow, visit(expression.getCode()), null));

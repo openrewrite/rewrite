@@ -18,6 +18,8 @@ dependencies {
 
     compileOnly("org.gradle:gradle-base-services:latest.release")
     compileOnly("org.gradle:gradle-core-api:latest.release")
+    compileOnly("org.gradle:gradle-language-groovy:latest.release")
+    compileOnly("org.gradle:gradle-language-java:latest.release")
     compileOnly("org.gradle:gradle-logging:latest.release")
     compileOnly("org.gradle:gradle-messaging:latest.release")
     compileOnly("org.gradle:gradle-native:latest.release")
@@ -36,6 +38,8 @@ dependencies {
 
     testRuntimeOnly("org.gradle:gradle-base-services:latest.release")
     testRuntimeOnly("org.gradle:gradle-core-api:latest.release")
+    testRuntimeOnly("org.gradle:gradle-language-groovy:latest.release")
+    testRuntimeOnly("org.gradle:gradle-language-java:latest.release")
     testRuntimeOnly("org.gradle:gradle-logging:latest.release")
     testRuntimeOnly("org.gradle:gradle-messaging:latest.release")
     testRuntimeOnly("org.gradle:gradle-native:latest.release")
