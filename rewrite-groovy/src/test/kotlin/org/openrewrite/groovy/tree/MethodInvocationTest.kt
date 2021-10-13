@@ -66,9 +66,15 @@ class MethodInvocationTest : GroovyTreeTest {
     """)
 
     @Test
-    fun namedArgumentsBeforeClosure() = assertParsePrintAndProcess("""
+    fun namedArgumentBeforeClosure() = assertParsePrintAndProcess("""
         def acceptsNamedArguments(Map a, int i, Closure c) {}
         acceptsNamedArguments(1, foo: "bar") { }
+    """)
+
+    @Test
+    fun namedArgumentsBeforeClosure() = assertParsePrintAndProcess("""
+        def acceptsNamedArguments(Map a, Closure c) {}
+        acceptsNamedArguments(foo: "bar", bar: "baz") { }
     """)
 
     @Test

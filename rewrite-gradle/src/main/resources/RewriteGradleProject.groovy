@@ -169,11 +169,30 @@ interface Plugin {
 
 interface DependencyHandlerSpec extends DependencyHandler {
     Dependency api(String dependencyNotation)
+    Dependency api(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
+    Dependency api(Map<String, String> dependencyNotation)
+    Dependency api(Map<String, String> dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
     Dependency implementation(String dependencyNotation)
+    Dependency implementation(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
+    Dependency implementation(Map<String, String> dependencyNotation)
     Dependency runtimeClasspath(String dependencyNotation)
+    Dependency runtimeClasspath(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
+    Dependency runtimeClasspath(Map<String, String> dependencyNotation)
+    Dependency compile(String dependencyNotation)
+    Dependency compile(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
+    Dependency compile(Map<String, String> dependencyNotation)
     Dependency compileOnly(String dependencyNotation)
+    Dependency compileOnly(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
+    Dependency compileOnly(Map<String, String> dependencyNotation)
+    Dependency testCompile(String dependencyNotation)
+    Dependency testCompile(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
+    Dependency testCompile(Map<String, String> dependencyNotation)
     Dependency testImplementation(String dependencyNotation)
+    Dependency testImplementation(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
+    Dependency testImplementation(Map<String, String> dependencyNotation)
     Dependency testRuntimeOnly(String dependencyNotation)
+    Dependency testRuntimeOnly(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
+    Dependency testRuntimeOnly(Map<String, String> dependencyNotation)
 }
 
 interface RepositoryHandlerSpec extends RepositoryHandler {
@@ -185,6 +204,7 @@ abstract class RewriteGradleProject implements Project {
     abstract void dependencies(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=DependencyHandlerSpec) Closure cl)
     abstract void plugins(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=PluginSpec) Closure cl)
     abstract void repositories(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=RepositoryHandlerSpec) Closure cl)
-
+    abstract void subprojects(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=RewriteGradleProject) Closure cl)
+    abstract void allprojects(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=RewriteGradleProject) Closure cl)
     void __script__() {
 }}

@@ -449,6 +449,14 @@ public class GroovyParserVisitor {
                                 .sorted(Comparator.comparing(ASTNode::getLastLineNumber)
                                         .thenComparing(ASTNode::getLastColumnNumber))
                                 .collect(Collectors.toList());
+            } else if(unparsedArgs.size() > 0 && unparsedArgs.get(0) instanceof MapExpression) {
+                // Bring named parameters out of their containing MapExpression so that they can be parsed correctly
+                MapExpression namedArgExpressions = (MapExpression) unparsedArgs.get(0);
+                unparsedArgs =
+                        Stream.concat(
+                                        namedArgExpressions.getMapEntryExpressions().stream(),
+                                        unparsedArgs.subList(1, unparsedArgs.size()).stream())
+                                .collect(Collectors.toList());
             }
 
             for (int i = 0; i < unparsedArgs.size(); i++) {
