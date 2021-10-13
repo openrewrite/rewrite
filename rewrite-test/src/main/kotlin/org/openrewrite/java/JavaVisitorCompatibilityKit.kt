@@ -94,6 +94,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class ChangePackageTck : ChangePackageTest
 
     @Nested
+    inner class ChangeStaticFieldToMethodTestTck : ChangeStaticFieldToMethodTest
+
+    @Nested
     inner class ChangeTypeTck : ChangeTypeTest
 
     @Nested
