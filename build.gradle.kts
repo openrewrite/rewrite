@@ -117,6 +117,9 @@ subprojects {
         "compileOnly"("org.projectlombok:lombok:latest.release")
         "annotationProcessor"("org.projectlombok:lombok:latest.release")
 
+        "compileOnly"("org.openrewrite:rewrite-polyglot:latest.integration")
+        "annotationProcessor"("org.openrewrite:rewrite-polyglot:latest.integration")
+
         "testImplementation"("org.junit.jupiter:junit-jupiter-api:latest.release")
         "testImplementation"("org.junit.jupiter:junit-jupiter-params:latest.release")
         "testRuntimeOnly"("org.junit.jupiter:junit-jupiter-engine:latest.release")
