@@ -27,13 +27,29 @@ public class ShiftFormatLeftVisitor<P> extends YamlIsoVisitor<P> {
     }
 
     @Override
+    public Yaml.Sequence.Entry visitSequenceEntry(Yaml.Sequence.Entry entry, P p) {
+        Yaml.Sequence.Entry e = super.visitSequenceEntry(entry, p);
+        if (getCursor().isScopeInPath(scope)) {
+            if (e.isDash()) {
+                e = e.withPrefix(shiftPrefix(e.getPrefix()));
+            }
+        }
+        return e;
+    }
+
+    @Override
     public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, P p) {
         Yaml.Mapping.Entry e = super.visitMappingEntry(entry, p);
         if (getCursor().isScopeInPath(scope)) {
-            String prefix = e.getPrefix();
-            e = e.withPrefix(prefix.substring(0, prefix.indexOf('\n') + 1) +
-                    prefix.substring(prefix.indexOf('\n') + shift + 1));
+            if (e.getPrefix().contains("\n")) {
+                e = e.withPrefix(shiftPrefix(e.getPrefix()));
+            }
         }
         return e;
+    }
+
+    private String shiftPrefix(String prefix) {
+        return prefix.substring(0, prefix.indexOf('\n') + 1) +
+                prefix.substring(prefix.indexOf('\n') + shift + 1);
     }
 }

@@ -17,12 +17,16 @@ package org.openrewrite.yaml
 
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
+import org.openrewrite.Recipe
 
 class CoalescePropertiesTest : YamlRecipeTest {
 
+    override val recipe: Recipe
+        get() = CoalesceProperties()
+
     @Test
     fun fold() = assertChanged(
-        recipe = CoalesceProperties(),
         before = """
             management:
                 metrics:
@@ -41,10 +45,59 @@ class CoalescePropertiesTest : YamlRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1103")
+    @Test
+    fun foldSequenceOfObjects() = assertChanged(
+        before = """
+          foo:
+            bar:
+              scalar: value
+              sequence:
+                - name: name
+                  propertyA: fieldA
+                  propertyB: fieldB
+                - name: name
+                  propertyA: fieldA
+                  propertyB: fieldB
+        """,
+        after = """
+          foo.bar:
+            scalar: value
+            sequence:
+              - name: name
+                propertyA: fieldA
+                propertyB: fieldB
+              - name: name
+                propertyA: fieldA
+                propertyB: fieldB
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1103")
+    @Test
+    fun foldSequence() = assertChanged(
+        before = """
+          foo:
+            bar:
+              baz: value
+              buz:
+                - item1
+                - item2
+                - item3
+        """,
+        after = """
+          foo.bar:
+            baz: value
+            buz:
+              - item1
+              - item2
+              - item3
+        """
+    )
+
     @Test
     @Disabled
     fun group() = assertChanged(
-        recipe = CoalesceProperties(),
         before = """
             management.metrics.enable.process.files: true
             management.metrics.enable.jvm: true
