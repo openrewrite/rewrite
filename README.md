@@ -14,5 +14,11 @@ Feel free to join us on [Slack](https://join.slack.com/t/rewriteoss/shared_invit
 
 Follow us on [Twitter](https://twitter.com/moderneinc) and [LinkedIn](https://www.linkedin.com/company/moderneinc).
 
+## Refactoring at Scale
+
+[![Moderne](video_preview.png)](https://youtu.be/BCWyMm7WFCI)
+ 
+Try it yourself at https://app.moderne.io, now in open beta. 
+
 This project is maintained by [Moderne](https://moderne.io/).
 Visit us at https://moderne.io to learn how to remove the tedium, technical debt, and inefficiency from your organization's software development.
