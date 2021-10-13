@@ -15,6 +15,8 @@
  */
 package org.openrewrite;
 
+import org.intellij.lang.annotations.Language;
+
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -23,8 +25,8 @@ import java.lang.annotation.Target;
 @Target({ElementType.FIELD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Option {
-    String displayName() default "";
-    String description() default "";
+    @Language("markdown") String displayName() default "";
+    @Language("markdown") String description() default "";
     String example() default "";
     String[] valid() default "";
     boolean required() default true;

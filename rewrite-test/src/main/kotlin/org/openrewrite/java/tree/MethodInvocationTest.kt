@@ -41,7 +41,7 @@ interface MethodInvocationTest {
         val (inv) = a.allInvs()
 
         // check assumptions about the call site
-        assertEquals("foo", inv.name.printTrimmed())
+        assertEquals("foo", inv.simpleName)
         assertEquals("java.lang.Integer", inv.returnType.asFullyQualified()?.fullyQualifiedName)
         assertEquals(listOf(JavaType.Primitive.Int, JavaType.Primitive.Int, JavaType.Primitive.Int),
             inv.arguments.filterIsInstance<J.Literal>().map { it.type })
@@ -105,7 +105,7 @@ interface MethodInvocationTest {
 
         val (staticInv, parameterlessStaticInv) = a.allInvs()
 
-        assertEquals("staticFoo", staticInv.name.printTrimmed())
+        assertEquals("staticFoo", staticInv.simpleName)
         assertEquals("A", staticInv.type?.declaringType?.fullyQualifiedName)
         assertEquals("staticFoo ( 0 )", staticInv.printTrimmed())
         assertEquals("staticFoo ( )", parameterlessStaticInv.printTrimmed())

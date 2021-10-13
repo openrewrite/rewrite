@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import lombok.EqualsAndHashCode;
+import org.intellij.lang.annotations.Language;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.NullUtils;
@@ -76,6 +77,7 @@ public abstract class Recipe {
      *
      * @return The display name.
      */
+    @Language("markdown")
     public abstract String getDisplayName();
 
     /**
@@ -89,6 +91,7 @@ public abstract class Recipe {
      *
      * @return The display name.
      */
+    @Language("markdown")
     public String getDescription() {
         return "";
     }
