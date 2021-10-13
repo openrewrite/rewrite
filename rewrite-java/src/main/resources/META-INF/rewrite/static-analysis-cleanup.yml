@@ -19,6 +19,7 @@ name: org.openrewrite.java.cleanup.CommonStaticAnalysis
 displayName: Common static analysis issues
 description: Resolve common static analysis issues discovered through 3rd party tools
 recipeList:
+  - org.openrewrite.java.cleanup.AddSerialVersionUidToSerializable
   - org.openrewrite.java.cleanup.BigDecimalRoundingConstantsToEnums
   - org.openrewrite.java.cleanup.BooleanChecksNotInverted
   - org.openrewrite.java.cleanup.CatchClauseOnlyRethrows
