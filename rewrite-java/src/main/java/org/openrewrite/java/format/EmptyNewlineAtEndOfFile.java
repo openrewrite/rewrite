@@ -29,8 +29,9 @@ import org.openrewrite.style.GeneralFormatStyle;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
+
+import static org.openrewrite.java.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
 
 public class EmptyNewlineAtEndOfFile extends Recipe {
     @Override
@@ -58,17 +59,20 @@ public class EmptyNewlineAtEndOfFile extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-                GeneralFormatStyle generalFormatStyle = Optional.ofNullable(((SourceFile) cu).getStyle(GeneralFormatStyle.class))
-                        .orElse(GeneralFormatStyle.DEFAULT);
+                GeneralFormatStyle generalFormatStyle = ((SourceFile) cu).getStyle(GeneralFormatStyle.class);
+                if (generalFormatStyle == null) {
+                    generalFormatStyle = autodetectGeneralFormatStyle(cu);
+                }
+                String lineEnding = generalFormatStyle.isUseCRLFNewLines() ? "\r\n" : "\n";
 
                 Space eof = cu.getEof();
                 if (eof.getLastWhitespace().chars().filter(c -> c == '\n').count() != 1) {
                     if (eof.getComments().isEmpty()) {
-                        return cu.withEof(Space.format(generalFormatStyle.isUseCRLFNewLines() ? "\r\n" : "\n"));
+                        return cu.withEof(Space.format(lineEnding));
                     } else {
                         List<Comment> comments = cu.getEof().getComments();
                         return cu.withEof(cu.getEof().withComments(ListUtils.map(comments,
-                                (i, comment) -> i == comments.size() - 1 ? comment.withSuffix(generalFormatStyle.isUseCRLFNewLines() ? "\r\n" : "\n") : comment)));
+                                (i, comment) -> i == comments.size() - 1 ? comment.withSuffix(lineEnding) : comment)));
                     }
                 }
                 return cu;

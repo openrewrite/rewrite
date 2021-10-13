@@ -19,9 +19,5 @@ import lombok.Value;
 
 @Value
 public class GeneralFormatStyle implements Style{
-    public static GeneralFormatStyle DEFAULT = new GeneralFormatStyle(
-            System.lineSeparator().equals("\r\n")
-    );
-
     boolean useCRLFNewLines;
 }

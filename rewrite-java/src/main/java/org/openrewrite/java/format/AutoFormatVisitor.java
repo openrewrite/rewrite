@@ -27,6 +27,8 @@ import org.openrewrite.style.GeneralFormatStyle;
 
 import java.util.Optional;
 
+import static org.openrewrite.java.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
+
 public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
     @Nullable
     private final Tree stopAfter;
@@ -73,7 +75,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
                 .visit(t, p, cursor.fork());
 
         t = new NormalizeLineBreaksVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(GeneralFormatStyle.class))
-                .orElse(GeneralFormatStyle.DEFAULT), stopAfter)
+                .orElse(autodetectGeneralFormatStyle(cu)), stopAfter)
                 .visit(t, p, cursor.fork());
 
         return t;

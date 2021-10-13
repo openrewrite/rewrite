@@ -15,13 +15,12 @@
  */
 package org.openrewrite.java.format;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.style.GeneralFormatStyle;
+
+import static org.openrewrite.java.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
 
 public class NormalizeLineBreaks extends Recipe {
 
@@ -32,7 +31,8 @@ public class NormalizeLineBreaks extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Consistently use either Windows or Linux line breaks.";
+        return "Consistently use either Windows style (CRLF) or Linux style (LF) line breaks. " +
+                "If no `GeneralFormatStyle` is specified this will use whichever style of line endings are more common.";
     }
 
     @Override
@@ -43,11 +43,12 @@ public class NormalizeLineBreaks extends Recipe {
     private static class LineBreaksFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
         public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-            GeneralFormatStyle style = ((SourceFile) cu).getStyle(GeneralFormatStyle.class);
-            if (style == null) {
-                style = GeneralFormatStyle.DEFAULT;
+            GeneralFormatStyle generalFormatStyle = ((SourceFile) cu).getStyle(GeneralFormatStyle.class);
+            if (generalFormatStyle == null) {
+                generalFormatStyle = autodetectGeneralFormatStyle(cu);
             }
-            doAfterVisit(new NormalizeLineBreaksVisitor<>(style));
+
+            doAfterVisit(new NormalizeLineBreaksVisitor<>(generalFormatStyle));
             return cu;
         }
     }

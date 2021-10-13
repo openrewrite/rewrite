@@ -104,4 +104,18 @@ interface NormalizeLineBreaksTest: JavaRecipeTest {
         before = linuxJavadoc,
         after = windowsJavadoc
     )
+
+    @Issue("https://github.com/openrewrite/rewrite-docs/issues/67")
+    @Test
+    fun preservesExistingWindowsEndingsByDefault(jp: JavaParser) = assertUnchanged(
+        recipe = NormalizeLineBreaks(),
+        before = windows
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite-docs/issues/67")
+    @Test
+    fun preservesExistingLinuxEndingsByDefault(jp: JavaParser) = assertUnchanged(
+        recipe = NormalizeLineBreaks(),
+        before = linux
+    )
 }

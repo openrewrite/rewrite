@@ -43,6 +43,22 @@ interface EmptyNewlineAtEndOfFileTest {
     }
 
     @Test
+    fun autodetectCRLF(jp: JavaParser.Builder<*, *>) {
+        assertThat(EmptyNewlineAtEndOfFile().run(
+            jp.build().parse("class Test {\r\n}"))[0].after!!.printAll()).isEqualTo(
+            "class Test {\r\n}\r\n"
+        )
+    }
+
+    @Test
+    fun autodetectLF(jp: JavaParser.Builder<*, *>) {
+        assertThat(EmptyNewlineAtEndOfFile().run(
+            jp.build().parse("class Test {\n}"))[0].after!!.printAll()).isEqualTo(
+            "class Test {\n}\n"
+        )
+    }
+
+    @Test
     fun noComments(jp: JavaParser.Builder<*, *>) {
         assertThat(EmptyNewlineAtEndOfFile().run(
             jp.styles(generalFormat(false)).build()
