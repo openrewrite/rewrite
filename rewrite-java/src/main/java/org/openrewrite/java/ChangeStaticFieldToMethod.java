@@ -22,10 +22,7 @@ import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesField;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Statement;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
 @EqualsAndHashCode(callSuper = true)
 @Value
@@ -93,8 +90,8 @@ public class ChangeStaticFieldToMethod extends Recipe {
             }
 
             @NotNull
-            private J useNewMethod(J j) {
-                final String newClass = newClassName == null ? oldClassName : newClassName;
+            private J useNewMethod(TypeTree tree) {
+                String newClass = newClassName == null ? oldClassName : newClassName;
 
                 maybeRemoveImport(oldClassName);
                 maybeAddImport(newClass);
@@ -102,20 +99,22 @@ public class ChangeStaticFieldToMethod extends Recipe {
                 Cursor statementCursor = getCursor().dropParentUntil(Statement.class::isInstance);
                 Statement statement = statementCursor.getValue();
                 JavaTemplate template = makeNewMethod(newClass, statementCursor);
-                return statement.withTemplate(template, statement.getCoordinates().replace())
-                        .withPrefix(j.getPrefix());
+                J.Block block = statement.withTemplate(template, statement.getCoordinates().replace());
+                J.MethodInvocation method = block.getStatements().get(0).withPrefix(tree.getPrefix());
+                //noinspection ConstantConditions
+                return tree.getType() == null ? method :
+                        method.withType(method.getType().withResolvedSignature(method.getType().getResolvedSignature().withReturnType(tree.getType())));
             }
 
             @NotNull
             private JavaTemplate makeNewMethod(String newClass, Cursor statementCursor) {
-                final String packageName = StringUtils.substringBeforeLast(newClass, ".");
-                final String simpleClassName = StringUtils.substringAfterLast(newClass, ".");
-                final String methodInvocationTemplate = simpleClassName + "." + newMethodName + "()";
-                // TODO generic (or better raw?) type of new method, ideally based on the old field type
-                final String fieldType = "java.util.List";
+
+                String packageName = StringUtils.substringBeforeLast(newClass, ".");
+                String simpleClassName = StringUtils.substringAfterLast(newClass, ".");
+                String methodInvocationTemplate = "{" + simpleClassName + "." + newMethodName + "();}";
                 String methodStub = "package " + packageName + ";" +
                         " public class " + simpleClassName + " {" +
-                        " public static " + fieldType + " " + newMethodName + "() { return null; }" +
+                        " public static void " + newMethodName + "() { return null; }" +
                         " }";
                 return JavaTemplate
                         .builder(() -> statementCursor, methodInvocationTemplate)
