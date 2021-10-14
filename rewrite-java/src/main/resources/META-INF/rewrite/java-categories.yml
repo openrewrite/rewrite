@@ -20,11 +20,6 @@ packageName: org.openrewrite.java
 description: Basic building blocks for transforming Java code.
 ---
 type: specs.openrewrite.org/v1beta/category
-name: Security
-packageName: org.openrewrite.java.security
-description: Recipes that find and eliminate vulnerable patterns in Java code.
----
-type: specs.openrewrite.org/v1beta/category
 name: Cleanup
 packageName: org.openrewrite.java.cleanup
 description: Format and cleanup Java code to ensure a consistent style is used.
