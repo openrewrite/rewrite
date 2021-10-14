@@ -21,6 +21,7 @@ import io.micrometer.core.instrument.Timer;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Generated;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.scheduling.WatchableExecutionContext;
@@ -33,7 +34,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singleton;
 import static java.util.stream.Collectors.*;
 import static org.openrewrite.Recipe.PANIC;
 import static org.openrewrite.Tree.randomId;
@@ -98,8 +100,12 @@ public interface RecipeScheduler {
                 if (original == null) {
                     results.add(new Result(null, s, singleton(recipeThatDeletedSourceFile.get(s.getId()))));
                 } else {
+                    if (original.getMarkers().findFirst(Generated.class).isPresent()) {
+                        continue;
+                    }
+
                     boolean isChanged = !original.getSourcePath().equals(s.getSourcePath());
-                    if(!isChanged) {
+                    if (!isChanged) {
                         TreeVisitor<Tree, PrintOutputCapture<ExecutionContext>> markerIdPrinter = new TreeVisitor<Tree, PrintOutputCapture<ExecutionContext>>() {
                             @Override
                             public Tree visit(@Nullable Tree tree, PrintOutputCapture<ExecutionContext> p) {
@@ -142,7 +148,7 @@ public interface RecipeScheduler {
 
         // removed files
         for (SourceFile s : before) {
-            if (!afterIds.contains(s.getId())) {
+            if (!afterIds.contains(s.getId()) && !s.getMarkers().findFirst(Generated.class).isPresent()) {
                 results.add(new Result(s, null, singleton(recipeThatDeletedSourceFile.get(s.getId()))));
             }
         }
