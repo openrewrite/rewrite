@@ -23,6 +23,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
@@ -33,14 +34,16 @@ import java.util.List;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class UpgradeDependencyVersion extends Recipe {
+
     @Option(displayName = "Group",
-            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
-            example = "com.google.guava")
+            description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
+            example = "com.fasterxml.jackson*")
     String groupId;
 
     @Option(displayName = "Artifact",
-            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
-            example = "guava")
+            description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
+            example = "jackson-module*")
+    @Nullable
     String artifactId;
 
     @Option(displayName = "New Version",
@@ -81,14 +84,20 @@ public class UpgradeDependencyVersion extends Recipe {
                         List<Expression> depArgs = method.getArguments();
                         if (depArgs.get(0) instanceof J.Literal) {
                             String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
-                            assert gav != null;
-                            if (gav.startsWith(groupId + ":" + artifactId + ":") && !gav.endsWith(newVersion)) {
-                                String newGav = groupId + ":" + artifactId + ":" + newVersion;
-                                method = method.withArguments(ListUtils.map(method.getArguments(), (n, arg) ->
-                                        n == 0 ?
-                                                ((J.Literal) arg).withValue(newGav).withValueSource("'" + newGav + "'") :
-                                                arg
-                                ));
+                            if (gav != null) {
+                                String[] gavs = gav.split(":");
+
+                                if (gavs.length >= 3 &&
+                                        StringUtils.matchesGlob(gavs[0], groupId) &&
+                                        StringUtils.matchesGlob(gavs[1], artifactId) &&
+                                        !StringUtils.matchesGlob(gavs[2], newVersion)) {
+                                    String newGav = gavs[0] + ":" + gavs[1] + ":" + newVersion;
+                                    method = method.withArguments(ListUtils.map(method.getArguments(), (n, arg) ->
+                                            n == 0 ?
+                                                    ((J.Literal) arg).withValue(newGav).withValueSource("'" + newGav + "'") :
+                                                    arg
+                                    ));
+                                }
                             }
                         }
                     }

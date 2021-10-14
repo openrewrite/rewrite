@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
@@ -49,7 +50,7 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
         this.model = maven.getModel();
 
         //noinspection ConstantConditions
-        if(model == null) {
+        if (model == null) {
             return maven;
         }
 
@@ -109,7 +110,7 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
             if (tag.getChildValue("groupId").isPresent() && tag.getChildValue("groupId").get().trim().startsWith("${")) {
                 String propertyKey = tag.getChildValue("groupId").get().trim();
                 String value = model.getValue(propertyKey);
-                isGroupIdFound = value != null && value.equals(groupId);
+                isGroupIdFound = value != null && StringUtils.matchesGlob(value, groupId);
             }
         }
         return isGroupIdFound;
@@ -125,7 +126,7 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
             if (tag.getChildValue("artifactId").isPresent() && tag.getChildValue("artifactId").get().trim().startsWith("${")) {
                 String propertyKey = tag.getChildValue("artifactId").get().trim();
                 String value = model.getValue(propertyKey);
-                isArtifactIdFound = value != null && value.equals(artifactId);
+                isArtifactIdFound = value != null && StringUtils.matchesGlob(value, artifactId);
             }
         }
         return isArtifactIdFound;
@@ -143,13 +144,12 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
     /**
      * Finds dependencies in the model that match the provided group and artifact ids.
      *
-     *
      * @param groupId    The groupId to match
      * @param artifactId The artifactId to match.
      * @return dependencies (including transitive dependencies) with any version matching the provided group and artifact id, if any.
      */
     public Collection<Pom.Dependency> findDependencies(String groupId, String artifactId) {
-        return findDependencies(d -> d.getGroupId().equals(groupId) && d.getArtifactId().equals(artifactId));
+        return findDependencies(d -> StringUtils.matchesGlob(d.getGroupId(), groupId) && StringUtils.matchesGlob(d.getArtifactId(), artifactId));
     }
 
     /**

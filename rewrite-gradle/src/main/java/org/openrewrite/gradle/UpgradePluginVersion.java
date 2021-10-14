@@ -29,6 +29,7 @@ import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
@@ -37,9 +38,10 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
 import java.net.SocketTimeoutException;
-import java.nio.file.PathMatcher;
-import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -123,8 +125,7 @@ public class UpgradePluginVersion extends Recipe {
                     if (pluginArgs.get(0) instanceof J.Literal) {
                         String pluginId = (String) ((J.Literal) pluginArgs.get(0)).getValue();
                         assert pluginId != null;
-                        PathMatcher pathMatcher = Paths.get(pluginId).getFileSystem().getPathMatcher("glob:" + pluginIdPattern);
-                        if (pathMatcher.matches(Paths.get(pluginId))) {
+                        if (StringUtils.matchesGlob(pluginId, pluginIdPattern)) {
                             List<Expression> versionArgs = method.getArguments();
                             if (versionArgs.get(0) instanceof J.Literal) {
                                 String currentVersion = (String) ((J.Literal) versionArgs.get(0)).getValue();

@@ -435,7 +435,7 @@ public class StringUtils {
                 if (i < charArray.length - 1 && charArray[i + 1] == '\n') {
                     i++;
                     continue;
-                } else if(i > 0) {
+                } else if (i > 0) {
                     if (margin.length() == 0) {
                         return "";
                     } else {

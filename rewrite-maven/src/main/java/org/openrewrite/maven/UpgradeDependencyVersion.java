@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenMetadata;
@@ -48,13 +49,13 @@ import static java.util.Collections.emptyMap;
 public class UpgradeDependencyVersion extends Recipe {
 
     @Option(displayName = "Group",
-            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
-            example = "com.google.guava")
+            description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
+            example = "com.fasterxml.jackson*")
     String groupId;
 
     @Option(displayName = "Artifact",
-            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
-            example = "guava")
+            description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
+            example = "jackson-module*")
     @Nullable
     String artifactId;
 
@@ -126,14 +127,15 @@ public class UpgradeDependencyVersion extends Recipe {
         private Pom maybeChangeDependencyVersion(Pom model, ExecutionContext ctx) {
             return model
                     .withDependencies(ListUtils.map(model.getDependencies(), dependency -> {
-                        if (dependency.getGroupId().equals(groupId) && (artifactId == null || dependency.getArtifactId().equals(artifactId))) {
+                        if (StringUtils.matchesGlob(dependency.getGroupId(), groupId) && (artifactId == null ||
+                                StringUtils.matchesGlob(dependency.getArtifactId(), artifactId))) {
                             if (model.getParent() != null) {
                                 String managedVersion = model.getParent().getManagedVersion(groupId, dependency.getArtifactId());
                                 if (managedVersion != null) {
                                     return dependency;
                                 }
                             }
-                            return findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion(), ctx)
+                            return findNewerDependencyVersion(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), ctx)
                                     .map(newer -> {
                                         ChangeDependencyVersionVisitor changeDependencyVersion = new ChangeDependencyVersionVisitor(newer, dependency.getArtifactId());
                                         doAfterVisit(changeDependencyVersion);
@@ -144,8 +146,9 @@ public class UpgradeDependencyVersion extends Recipe {
                         return dependency;
                     }))
                     .withDependencyManagement(model.getDependencyManagement().withDependencies(ListUtils.map(model.getDependencyManagement().getDependencies(), dependency -> {
-                        if (dependency.getGroupId().equals(groupId) && (artifactId == null || dependency.getArtifactId().equals(artifactId))) {
-                            return findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion(), ctx)
+                        if (StringUtils.matchesGlob(dependency.getGroupId(), groupId) && (artifactId == null ||
+                                StringUtils.matchesGlob(dependency.getArtifactId(), artifactId))) {
+                            return findNewerDependencyVersion(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), ctx)
                                     .map(newer -> {
                                         ChangeDependencyVersionVisitor changeDependencyVersion = new ChangeDependencyVersionVisitor(newer, dependency.getArtifactId());
                                         doAfterVisit(changeDependencyVersion);
