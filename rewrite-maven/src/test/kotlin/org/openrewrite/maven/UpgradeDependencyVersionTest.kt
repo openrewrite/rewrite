@@ -23,7 +23,7 @@ import org.junit.jupiter.params.provider.ValueSource
 import org.openrewrite.Issue
 import java.nio.file.Path
 
-class ChangeDependencyVersionTest : MavenRecipeTest {
+class UpgradeDependencyVersionTest : MavenRecipeTest {
     @ParameterizedTest
     @ValueSource(strings = ["com.google.guava:guava", "*:*"])
     fun upgradeVersion(ga: String) = assertChanged(
