@@ -18,11 +18,11 @@ package org.openrewrite.gradle
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 
-class UpgradeDependencyVersionTest : GradleRecipeTest {
+class ChangeDependencyVersionTest : GradleRecipeTest {
     @ParameterizedTest
     @ValueSource(strings = ["org.openrewrite:rewrite-core", "*:*"])
     fun findDependency(ga: String) = assertChanged(
-        recipe = UpgradeDependencyVersion(
+        recipe = ChangeDependencyVersion(
             ga.substringBefore(':'),
             ga.substringAfter(':'),
             "latest.integration",

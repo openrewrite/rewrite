@@ -33,7 +33,7 @@ import java.util.List;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
-public class UpgradeDependencyVersion extends Recipe {
+public class ChangeDependencyVersion extends Recipe {
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
@@ -60,12 +60,12 @@ public class UpgradeDependencyVersion extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Update Gradle dependency version";
+        return "Change a Gradle dependency version";
     }
 
     @Override
     public String getDescription() {
-        return "Finds dependencies declared in build.gradle files. Does not yet support detection of transitive dependencies.";
+        return "Finds dependencies declared in `build.gradle` files.";
     }
 
     @Override
