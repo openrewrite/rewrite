@@ -19,6 +19,17 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
 class HyphenRangeTest {
+    @Test
+    fun pattern() {
+        assertThat(HyphenRange.build("1 - 2", null).isValid).isTrue
+        assertThat(HyphenRange.build("1.0.0.0 - 2", null).isValid).isTrue
+        assertThat(HyphenRange.build("1 - 2.0.0.0", null).isValid).isTrue
+        assertThat(HyphenRange.build("1.0.0.0 - 2.0.0.0", null).isValid).isTrue
+        assertThat(HyphenRange.build("1", null).isValid).isFalse
+        assertThat(HyphenRange.build("1 - 2.x", null).isValid).isFalse
+        assertThat(HyphenRange.build("1.0.0.0.0 - 2", null).isValid).isFalse
+    }
+
     /**
      * 1.2.3 - 2.3.4 := >=1.2.3 <=2.3.4
      */
@@ -27,10 +38,17 @@ class HyphenRangeTest {
         val hyphenRange: HyphenRange = HyphenRange.build("1.2.3 - 2.3.4", null).getValue()!!
 
         assertThat(hyphenRange.isValid("1.0", "1.2.2")).isFalse
+        assertThat(hyphenRange.isValid("1.0", "1.2.2.0")).isFalse
         assertThat(hyphenRange.isValid("1.0", "1.2.3.RELEASE")).isTrue
+        assertThat(hyphenRange.isValid("1.0", "1.2.3.0.RELEASE")).isTrue
         assertThat(hyphenRange.isValid("1.0", "1.2.3")).isTrue
+        assertThat(hyphenRange.isValid("1.0", "1.2.3.0")).isTrue
+        assertThat(hyphenRange.isValid("1.0", "1.2.3.0.0")).isFalse
         assertThat(hyphenRange.isValid("1.0", "2.3.4")).isTrue
+        assertThat(hyphenRange.isValid("1.0", "2.3.4.0")).isTrue
+        assertThat(hyphenRange.isValid("1.0", "2.3.4.1")).isFalse
         assertThat(hyphenRange.isValid("1.0", "2.3.5")).isFalse
+        assertThat(hyphenRange.isValid("1.0", "2.3.5.0")).isFalse
     }
 
     /**
@@ -41,8 +59,13 @@ class HyphenRangeTest {
         val hyphenRange: HyphenRange = HyphenRange.build("1.2 - 2", null).getValue()!!
 
         assertThat(hyphenRange.isValid("1.0", "1.1.9")).isFalse
+        assertThat(hyphenRange.isValid("1.0", "1.1.9.9")).isFalse
         assertThat(hyphenRange.isValid("1.0", "1.2.0")).isTrue
+        assertThat(hyphenRange.isValid("1.0", "1.2.0.0")).isTrue
+        assertThat(hyphenRange.isValid("1.0", "1.2.0.0.0")).isFalse
         assertThat(hyphenRange.isValid("1.0", "2.0.0")).isTrue
+        assertThat(hyphenRange.isValid("1.0", "2.0.0.0")).isTrue
         assertThat(hyphenRange.isValid("1.0", "2.0.1")).isFalse
+        assertThat(hyphenRange.isValid("1.0", "2.0.0.1")).isFalse
     }
 }

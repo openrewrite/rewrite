@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ public class LatestRelease implements VersionComparator {
             return false;
         }
         return metadataPattern == null ||
-                (matcher.group(4) != null && matcher.group(4).matches(metadataPattern));
+                (matcher.group(5) != null && matcher.group(5).matches(metadataPattern));
     }
 
     static String normalizeVersion(String version) {
@@ -48,16 +48,7 @@ public class LatestRelease implements VersionComparator {
             return version.substring(0, version.length() - ".FINAL".length());
         }
 
-        AtomicBoolean beforeMetadata = new AtomicBoolean(true);
-        long versionParts = version.chars()
-                .filter(c -> {
-                    if (c == '-' || c == '+') {
-                        beforeMetadata.set(false);
-                    }
-                    return beforeMetadata.get();
-                })
-                .filter(c -> c == '.')
-                .count();
+        long versionParts = countVersionParts(version);
 
         if (versionParts < 2) {
             String[] versionAndMetadata = version.split("(?=[-+])");
@@ -71,16 +62,46 @@ public class LatestRelease implements VersionComparator {
         return version;
     }
 
+    static long countVersionParts(String version) {
+        AtomicBoolean beforeMetadata = new AtomicBoolean(true);
+        return version.chars()
+                .filter(c -> {
+                    if (c == '-' || c == '+') {
+                        beforeMetadata.set(false);
+                    }
+                    return beforeMetadata.get();
+                })
+                .filter(c -> c == '.')
+                .count();
+    }
+
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @Override
     public int compare(@Nullable String currentVersion, String v1, String v2) {
-        Matcher v1Gav = VersionComparator.RELEASE_PATTERN.matcher(normalizeVersion(v1));
-        Matcher v2Gav = VersionComparator.RELEASE_PATTERN.matcher(normalizeVersion(v2));
+        StringBuilder nv1 = new StringBuilder(normalizeVersion(v1));
+        StringBuilder nv2 = new StringBuilder(normalizeVersion(v2));
+
+        long vp1 = countVersionParts(nv1.toString());
+        long vp2 = countVersionParts(nv2.toString());
+
+        long abs = Math.abs(vp1 - vp2);
+        if (vp1 > vp2) {
+            for (int i = 1; i <= abs; i++) {
+                nv2.append(".0");
+            }
+        } else if (vp2 > vp1) {
+            for (int i = 1; i <= abs; i++) {
+                nv1.append(".0");
+            }
+        }
+
+        Matcher v1Gav = VersionComparator.RELEASE_PATTERN.matcher(nv1.toString());
+        Matcher v2Gav = VersionComparator.RELEASE_PATTERN.matcher(nv2.toString());
 
         v1Gav.matches();
         v2Gav.matches();
 
-        for (int i = 1; i <= 3; i++) {
+        for (int i = 1; i < nv1.length(); i++) {
             String v1Part = v1Gav.group(i);
             String v2Part = v2Gav.group(i);
             if (v1Part == null) {
@@ -95,7 +116,7 @@ public class LatestRelease implements VersionComparator {
             }
         }
 
-        return v1.compareTo(v2);
+        return nv1.toString().compareTo(nv2.toString());
     }
 
     public static Validated build(String toVersion, @Nullable String metadataPattern) {

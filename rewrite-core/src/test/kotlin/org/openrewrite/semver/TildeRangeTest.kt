@@ -19,6 +19,15 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
 class TildeRangeTest {
+    @Test
+    fun pattern() {
+        assertThat(TildeRange.build("~1", null).isValid).isTrue
+        assertThat(TildeRange.build("~1.2", null).isValid).isTrue
+        assertThat(TildeRange.build("~1.2.3", null).isValid).isTrue
+        assertThat(TildeRange.build("~1.2.3.4", null).isValid).isTrue
+        assertThat(TildeRange.build("~1.2.3.4.5", null).isValid).isFalse
+    }
+
     /**
      * ~1.2.3 := >=1.2.3 <1.(2+1).0 := >=1.2.3 <1.3.0
      */
@@ -26,9 +35,24 @@ class TildeRangeTest {
     fun updatePatch() {
         val tildeRange: TildeRange = TildeRange.build("~1.2.3", null).getValue()!!
 
+        assertThat(tildeRange.isValid("1.0", "1.2.3.0")).isTrue
+        assertThat(tildeRange.isValid("1.0", "1.2.3.1")).isTrue
         assertThat(tildeRange.isValid("1.0", "1.2.3")).isTrue
         assertThat(tildeRange.isValid("1.0", "1.2.3.RELEASE")).isTrue
         assertThat(tildeRange.isValid("1.0", "1.2.4")).isTrue
+        assertThat(tildeRange.isValid("1.0", "1.3.0")).isFalse
+    }
+
+    @Test
+    fun updateMicro() {
+        val tildeRange: TildeRange = TildeRange.build("~1.2.3.4", null).getValue()!!
+
+        assertThat(tildeRange.isValid("1.0", "1.2.3.5")).isTrue
+        assertThat(tildeRange.isValid("1.0", "1.2.3.0")).isFalse
+        assertThat(tildeRange.isValid("1.0", "1.2.3.5.0")).isFalse
+        assertThat(tildeRange.isValid("1.0", "1.2.3")).isFalse
+        assertThat(tildeRange.isValid("1.0", "1.2.4")).isFalse
+        assertThat(tildeRange.isValid("1.0", "1.2.4.0")).isFalse
         assertThat(tildeRange.isValid("1.0", "1.3.0")).isFalse
     }
 
