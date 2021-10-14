@@ -18,10 +18,58 @@ package org.openrewrite.maven
 import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import org.openrewrite.Issue
 import java.nio.file.Path
 
 class UpgradeDependencyVersionTest : MavenRecipeTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["com.google.guava:guava", "*:*"])
+    fun upgradeVersion(ga: String) = assertChanged(
+        recipe = UpgradeDependencyVersion(
+            ga.substringBefore(':'),
+            ga.substringAfter(':'),
+            "latest.patch",
+            null,
+            null
+        ),
+        before = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>13.0</version>
+                </dependency>
+              </dependencies>
+            </project>
+        """,
+        after = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>13.0.1</version>
+                </dependency>
+              </dependencies>
+            </project>
+        """
+    )
+
     @Test
     fun trustParent() = assertUnchanged(
         recipe = UpgradeDependencyVersion(
@@ -147,51 +195,6 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                         <version>0.4</version>
                     </dependency>
                 </dependencies>
-            </project>
-        """
-    )
-
-    @Test
-    fun upgradeVersion() = assertChanged(
-        recipe = UpgradeDependencyVersion(
-            "com.google.guava",
-            null,
-            "latest.patch",
-            null,
-            null
-        ),
-        before = """
-            <project>
-              <modelVersion>4.0.0</modelVersion>
-              
-              <groupId>com.mycompany.app</groupId>
-              <artifactId>my-app</artifactId>
-              <version>1</version>
-              
-              <dependencies>
-                <dependency>
-                  <groupId>com.google.guava</groupId>
-                  <artifactId>guava</artifactId>
-                  <version>13.0</version>
-                </dependency>
-              </dependencies>
-            </project>
-        """,
-        after = """
-            <project>
-              <modelVersion>4.0.0</modelVersion>
-              
-              <groupId>com.mycompany.app</groupId>
-              <artifactId>my-app</artifactId>
-              <version>1</version>
-              
-              <dependencies>
-                <dependency>
-                  <groupId>com.google.guava</groupId>
-                  <artifactId>guava</artifactId>
-                  <version>13.0.1</version>
-                </dependency>
-              </dependencies>
             </project>
         """
     )

@@ -15,12 +15,19 @@
  */
 package org.openrewrite.gradle
 
-import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 class UpgradeDependencyVersionTest : GradleRecipeTest {
-    @Test
-    fun findDependency() = assertChanged(
-        recipe = UpgradeDependencyVersion("org.openrewrite", "rewrite-core", "latest.integration", null),
+    @ParameterizedTest
+    @ValueSource(strings = ["org.openrewrite:rewrite-core", "*:*"])
+    fun findDependency(ga: String) = assertChanged(
+        recipe = UpgradeDependencyVersion(
+            ga.substringBefore(':'),
+            ga.substringAfter(':'),
+            "latest.integration",
+            null
+        ),
         before = """
             dependencies {
                 api 'org.openrewrite:rewrite-core:latest.release'

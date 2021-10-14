@@ -56,7 +56,6 @@ public class UpgradeDependencyVersion extends Recipe {
     @Option(displayName = "Artifact",
             description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
             example = "jackson-module*")
-    @Nullable
     String artifactId;
 
     @Option(displayName = "New version",
@@ -127,17 +126,17 @@ public class UpgradeDependencyVersion extends Recipe {
         private Pom maybeChangeDependencyVersion(Pom model, ExecutionContext ctx) {
             return model
                     .withDependencies(ListUtils.map(model.getDependencies(), dependency -> {
-                        if (StringUtils.matchesGlob(dependency.getGroupId(), groupId) && (artifactId == null ||
-                                StringUtils.matchesGlob(dependency.getArtifactId(), artifactId))) {
+                        if (StringUtils.matchesGlob(dependency.getGroupId(), groupId) &&
+                                StringUtils.matchesGlob(dependency.getArtifactId(), artifactId)) {
                             if (model.getParent() != null) {
-                                String managedVersion = model.getParent().getManagedVersion(groupId, dependency.getArtifactId());
+                                String managedVersion = model.getParent().getManagedVersion(dependency.getGroupId(), dependency.getArtifactId());
                                 if (managedVersion != null) {
                                     return dependency;
                                 }
                             }
                             return findNewerDependencyVersion(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), ctx)
                                     .map(newer -> {
-                                        ChangeDependencyVersionVisitor changeDependencyVersion = new ChangeDependencyVersionVisitor(newer, dependency.getArtifactId());
+                                        ChangeDependencyVersionVisitor changeDependencyVersion = new ChangeDependencyVersionVisitor(newer, dependency.getGroupId(), dependency.getArtifactId());
                                         doAfterVisit(changeDependencyVersion);
                                         return dependency.withVersion(newer);
                                     })
@@ -146,11 +145,11 @@ public class UpgradeDependencyVersion extends Recipe {
                         return dependency;
                     }))
                     .withDependencyManagement(model.getDependencyManagement().withDependencies(ListUtils.map(model.getDependencyManagement().getDependencies(), dependency -> {
-                        if (StringUtils.matchesGlob(dependency.getGroupId(), groupId) && (artifactId == null ||
-                                StringUtils.matchesGlob(dependency.getArtifactId(), artifactId))) {
+                        if (StringUtils.matchesGlob(dependency.getGroupId(), groupId) &&
+                                StringUtils.matchesGlob(dependency.getArtifactId(), artifactId)) {
                             return findNewerDependencyVersion(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), ctx)
                                     .map(newer -> {
-                                        ChangeDependencyVersionVisitor changeDependencyVersion = new ChangeDependencyVersionVisitor(newer, dependency.getArtifactId());
+                                        ChangeDependencyVersionVisitor changeDependencyVersion = new ChangeDependencyVersionVisitor(newer, dependency.getGroupId(), dependency.getArtifactId());
                                         doAfterVisit(changeDependencyVersion);
                                         return (DependencyManagementDependency) dependency.withVersion(newer);
                                     })
@@ -175,10 +174,12 @@ public class UpgradeDependencyVersion extends Recipe {
 
     private class ChangeDependencyVersionVisitor extends MavenVisitor {
         private final String newVersion;
+        private final String groupId;
         private final String artifactId;
 
-        private ChangeDependencyVersionVisitor(String newVersion, String artifactId) {
+        private ChangeDependencyVersionVisitor(String newVersion, String groupId, String artifactId) {
             this.newVersion = newVersion;
+            this.groupId = groupId;
             this.artifactId = artifactId;
         }
 
