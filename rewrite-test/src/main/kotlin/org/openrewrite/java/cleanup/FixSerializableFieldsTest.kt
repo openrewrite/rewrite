@@ -25,9 +25,7 @@ interface FixSerializableFieldsTest : JavaRecipeTest {
         get() = FixSerializableFields(false, null)
 
     override val parser: JavaParser
-        get() = JavaParser.fromJavaVersion()
-            .logCompilationWarningsAndErrors(true)
-            .build()
+        get() = JavaParser.fromJavaVersion().build()
 
     val models get() =
         """
@@ -331,7 +329,7 @@ interface FixSerializableFieldsTest : JavaRecipeTest {
                 public void test() {
                 }
             }
-        """.trimIndent(),
+        """,
         after = """
             import java.io.Serializable;
             
@@ -341,7 +339,20 @@ interface FixSerializableFieldsTest : JavaRecipeTest {
                 public void test() {
                 }
             }
-        """.trimIndent()
+        """
     )
 
+    @Test
+    fun doNotChangeSerializableGenerics(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            import java.io.Serializable;
+            import java.util.Map;
+            
+            class A<T extends Serializable> implements Serializable {
+                private Map<String, T> items;
+                private T item;
+            }
+        """
+    )
 }

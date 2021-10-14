@@ -246,6 +246,12 @@ public class FixSerializableFields extends Recipe {
 
         JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type);
         boolean serializable = SERIALIZABLE_FQ.isAssignableFrom(TypeUtils.asFullyQualified(type));
+        if (!serializable && fq instanceof JavaType.GenericTypeVariable) {
+            JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) fq;
+            if (generic.getBound() != null) {
+                serializable = TypeUtils.isOfClassType(SERIALIZABLE_FQ, generic.getBound().getFullyQualifiedName());
+            }
+        }
         if (fq != null && notSerializableAction != null && !serializable) {
             notSerializableAction.accept(fq.getFullyQualifiedName());
         }
