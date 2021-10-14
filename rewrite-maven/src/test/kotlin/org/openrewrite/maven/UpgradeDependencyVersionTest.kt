@@ -203,14 +203,14 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     fun upgradeVersionSuccessively() = assertChanged(
         recipe = UpgradeDependencyVersion(
             "com.google.guava",
-            null,
+            "*",
             "28.x",
             "-jre",
             null
         ).doNext(
             UpgradeDependencyVersion(
                 "com.google.guava",
-                null,
+                "*",
                 "29.x",
                 "-jre",
                 null
@@ -257,7 +257,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     fun handlesPropertiesInDependencyGroupIdAndArtifactId() = assertChanged(
         recipe = UpgradeDependencyVersion(
             "com.google.guava",
-            null,
+            "*",
             "latest.patch",
             null,
             null
@@ -314,7 +314,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     fun upgradeGuava() = assertChanged(
         recipe = UpgradeDependencyVersion(
             "com.google.guava",
-            null as String?,
+            "*",
             "25-28",
             "-jre",
             null
@@ -407,7 +407,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         assertChanged(
             recipe = UpgradeDependencyVersion(
                 "com.google.guava",
-                null,
+                "*",
                 "25-28",
                 "-jre",
                 null
@@ -486,7 +486,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         assertChanged(
             recipe = UpgradeDependencyVersion(
                 "com.google.guava",
-                null,
+                "*",
                 "25-28",
                 "-jre",
                 null
@@ -696,7 +696,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = UpgradeDependencyVersion(null, null, null, null, null)
+        var recipe = UpgradeDependencyVersion(null, "*", null, null, null)
         var valid = recipe.validate()
         Assertions.assertThat(valid.isValid).isFalse
         Assertions.assertThat(valid.failures()).hasSize(2)
@@ -709,7 +709,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         Assertions.assertThat(valid.failures()).hasSize(1)
         Assertions.assertThat(valid.failures()[0].property).isEqualTo("groupId")
 
-        recipe = UpgradeDependencyVersion("org.openrewrite", null, null, null, null)
+        recipe = UpgradeDependencyVersion("org.openrewrite", "*", null, null, null)
         valid = recipe.validate()
         Assertions.assertThat(valid.isValid).isFalse
         Assertions.assertThat(valid.failures()).hasSize(1)
