@@ -18,6 +18,7 @@ package org.openrewrite.properties
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 
+@Suppress("UnusedProperty")
 class Issue1020 : PropertiesRecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1020")

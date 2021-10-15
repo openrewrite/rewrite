@@ -18,6 +18,7 @@ package org.openrewrite.properties
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 
+@Suppress("UnusedProperty")
 class DeletePropertyTest : PropertiesRecipeTest {
 
     override val recipe: Recipe

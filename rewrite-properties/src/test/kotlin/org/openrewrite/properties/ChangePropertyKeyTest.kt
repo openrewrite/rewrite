@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,12 +21,13 @@ import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Issue
 import java.nio.file.Path
 
+@Suppress("UnusedProperty")
 class ChangePropertyKeyTest : PropertiesRecipeTest {
 
     override val recipe = ChangePropertyKey(
         "management.metrics.binders.files.enabled",
-            "management.metrics.enable.process.files",
-            null
+        "management.metrics.enable.process.files",
+        null
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/575")
@@ -68,26 +69,30 @@ class ChangePropertyKeyTest : PropertiesRecipeTest {
     fun checkValidation() {
         var recipe = ChangePropertyKey(null, null, null)
         var valid = recipe.validate()
-        assertThat(valid.isValid).isFalse()
+        assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("newPropertyKey")
         assertThat(valid.failures()[1].property).isEqualTo("oldPropertyKey")
 
         recipe = ChangePropertyKey(null, "management.metrics.enable.process.files", null)
         valid = recipe.validate()
-        assertThat(valid.isValid).isFalse()
+        assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("oldPropertyKey")
 
         recipe = ChangePropertyKey("management.metrics.binders.files.enabled", null, null)
         valid = recipe.validate()
-        assertThat(valid.isValid).isFalse()
+        assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("newPropertyKey")
 
         recipe =
-            ChangePropertyKey("management.metrics.binders.files.enabled", "management.metrics.enable.process.files", null)
+            ChangePropertyKey(
+                "management.metrics.binders.files.enabled",
+                "management.metrics.enable.process.files",
+                null
+            )
         valid = recipe.validate()
-        assertThat(valid.isValid).isTrue()
+        assertThat(valid.isValid).isTrue
     }
 }

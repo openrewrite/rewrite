@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,12 +19,15 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.properties.tree.Properties
 
+@Suppress("UnusedProperty")
 class PropertiesParserTest {
     @Test
     fun noEndOfLine() {
-        val props = PropertiesParser().parse("""
+        val props = PropertiesParser().parse(
+            """
             key=value
-        """.trimIndent())[0]
+        """.trimIndent()
+        )[0]
 
         val entries = props.content.map { it as Properties.Entry }
         assertThat(entries).hasSize(1)
@@ -58,6 +61,7 @@ class PropertiesParserTest {
     }
 
     @Test
+    @Suppress("WrongPropertyKeyValueDelimiter")
     fun garbageEndOfFile() {
         val props = PropertiesParser().parse("key=value\nasdf\n")[0]
         val entries = props.content.map { it as Properties.Entry }
@@ -70,10 +74,12 @@ class PropertiesParserTest {
 
     @Test
     fun commentThenEntry() {
-        val props = PropertiesParser().parse("""
+        val props = PropertiesParser().parse(
+            """
             # this is a comment
             key=value
-        """.trimIndent())[0]
+        """.trimIndent()
+        )[0]
 
         val comment = props.content[0] as Properties.Comment
         assertThat(comment.message).isEqualTo(" this is a comment")
@@ -85,11 +91,13 @@ class PropertiesParserTest {
 
     @Test
     fun entryCommentEntry() {
-        val props = PropertiesParser().parse("""
+        val props = PropertiesParser().parse(
+            """
             key1=value1
             # comment
             key2=value2
-        """.trimIndent())[0]
+        """.trimIndent()
+        )[0]
 
         assertThat(props.content).hasSize(3)
         val entry1 = props.content[0] as Properties.Entry
@@ -107,14 +115,16 @@ class PropertiesParserTest {
 
     @Test
     fun multipleEntries() {
-        val props = PropertiesParser().parse("""
+        val props = PropertiesParser().parse(
+            """
             key=value
             key2 = value2
-        """.trimIndent())[0]
+        """.trimIndent()
+        )[0]
 
         assertThat(props.content.map { it as Properties.Entry }.map { it.key })
-                .hasSize(2).containsExactly("key", "key2")
+            .hasSize(2).containsExactly("key", "key2")
         assertThat(props.content.map { it as Properties.Entry }.map { it.value.text })
-                .hasSize(2).containsExactly("value", "value2")
+            .hasSize(2).containsExactly("value", "value2")
     }
 }
