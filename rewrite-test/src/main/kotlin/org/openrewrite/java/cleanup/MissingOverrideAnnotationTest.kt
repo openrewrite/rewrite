@@ -23,34 +23,60 @@ import org.openrewrite.java.JavaRecipeTest
 
 @Suppress("MethodMayBeStatic", "FunctionName")
 interface MissingOverrideAnnotationTest : JavaRecipeTest {
-    override val recipe: Recipe?
-        get() = MissingOverrideAnnotation(null, null)
+    override val recipe: Recipe
+        get() = MissingOverrideAnnotation(null)
 
     companion object {
         @Language("java")
-        private const val supportingParents: String = """
+        const val testInterface = """
+            package com.example;
+            
             interface TestInterface {
                 void testInterface();
             }
-
+        """
+        @Language("java")
+        const val testInterface0 = """
+            package com.example;
+            
             interface TestInterface0 {
                 void testInterface0();
             }
+        """
 
+        @Language("java")
+        const val testInterfaceExtension = """
+            package com.example;
+            
             interface TestInterfaceExtension extends TestInterface0 {
                 void testInterfaceExtension();
             }
+        """
 
+        @Language("java")
+        const val testParentParent = """
+            package com.example;
+            
             class TestParentParent {
                 public void testParentParent() {
                 }
             }
+        """
 
+        @Language("java")
+        const val testParent = """
+            package com.example;
+            
             class TestParent extends TestParentParent {
                 public void testParent() {
                 }
             }
+        """
 
+        @Language("java")
+        const val abstractTestParent = """
+            package com.example;
+            
             abstract class AbstractTestParent {
                 abstract boolean isAbstractBoolean();
 
@@ -63,8 +89,10 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
 
     @Test
     fun `when a method overrides from a parent`() = assertChanged(
-        dependsOn = arrayOf(supportingParents),
+        dependsOn = arrayOf(testParentParent),
         before = """
+            package com.example;
+            
             class Test extends TestParentParent {
                 public void testParentParent() {
                 }
@@ -74,6 +102,8 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
             }
         """,
         after = """
+            package com.example;
+            
             class Test extends TestParentParent {
                 @Override
                 public void testParentParent() {
@@ -87,8 +117,10 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
 
     @Test
     fun `when a method overrides multiple layers of parents`() = assertChanged(
-        dependsOn = arrayOf(supportingParents),
+        dependsOn = arrayOf(testParent),
         before = """
+            package com.example;
+            
             class Test extends TestParent {
                 public void testParent() {
                 }
@@ -98,6 +130,8 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
             }
         """,
         after = """
+            package com.example;
+            
             class Test extends TestParent {
                 @Override
                 public void testParent() {
@@ -111,8 +145,10 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
 
     @Test
     fun `when a method implements an interface`() = assertChanged(
-        dependsOn = arrayOf(supportingParents),
+        dependsOn = arrayOf(testInterface),
         before = """
+            package com.example;
+            
             class Test implements TestInterface {
                 public void testInterface() {
                 }
@@ -122,6 +158,8 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
             }
         """,
         after = """
+            package com.example;
+            
             class Test implements TestInterface {
                 @Override
                 public void testInterface() {
@@ -135,8 +173,10 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
 
     @Test
     fun `when methods are implemented from multiple interfaces`() = assertChanged(
-        dependsOn = arrayOf(supportingParents),
+        dependsOn = arrayOf(testInterface, testInterface0),
         before = """
+            package com.example;
+            
             class Test implements TestInterface, TestInterface0 {
                 public void testInterface() {
                 }
@@ -149,6 +189,8 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
             }
         """,
         after = """
+            package com.example;
+            
             class Test implements TestInterface, TestInterface0 {
                 @Override
                 public void testInterface() {
@@ -166,8 +208,10 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
 
     @Test
     fun `when methods are implemented from multiple layers of interfaces`() = assertChanged(
-        dependsOn = arrayOf(supportingParents),
+        dependsOn = arrayOf(testInterfaceExtension, testInterface0),
         before = """
+            package com.example;
+            
             class Test implements TestInterfaceExtension {
                 public void testInterfaceExtension() {
                 }
@@ -180,6 +224,8 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
             }
         """,
         after = """
+            package com.example;
+            
             class Test implements TestInterfaceExtension {
                 @Override
                 public void testInterfaceExtension() {
@@ -197,8 +243,10 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
 
     @Test
     fun `when a method overrides from a parent and a method implements an interface`() = assertChanged(
-        dependsOn = arrayOf(supportingParents),
+        dependsOn = arrayOf(testParent, testInterface),
         before = """
+            package com.example;
+            
             class Test extends TestParent implements TestInterface {
                 public void testParent() {
                 }
@@ -211,6 +259,8 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
             }
         """,
         after = """
+            package com.example;
+            
             class Test extends TestParent implements TestInterface {
                 @Override
                 public void testParent() {
@@ -230,6 +280,8 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
     fun `when the method is static`() = assertUnchanged(
         dependsOn = arrayOf(
             """
+            package com.example;
+            
             import java.util.Collection;
             import java.util.Collections;
 
@@ -241,6 +293,8 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
         """.trimIndent()
         ),
         before = """
+            package com.example;
+            
             import java.util.Collection;
             import java.util.Collections;
 
@@ -253,21 +307,11 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
     )
 
     @Test
-    fun `when the parent is abstract and the method to override is abstract`() = assertUnchanged(
-        dependsOn = arrayOf(supportingParents),
+    fun `when the superclass has abstract and non-abstract methods`() = assertChanged(
+        dependsOn = arrayOf(abstractTestParent),
         before = """
-            class Test extends AbstractTestParent {
-                public boolean isAbstractBoolean() {
-                    return false;
-                }
-            }
-        """
-    )
-
-    @Test
-    fun `when the parent is abstract and the method to override is not abstract`() = assertChanged(
-        dependsOn = arrayOf(supportingParents),
-        before = """
+            package com.example;
+            
             class Test extends AbstractTestParent {
                 public boolean isAbstractBoolean() {
                     return false;
@@ -279,7 +323,10 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
             }
         """,
         after = """
+            package com.example;
+            
             class Test extends AbstractTestParent {
+                @Override
                 public boolean isAbstractBoolean() {
                     return false;
                 }
@@ -294,8 +341,10 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
 
     @Test
     fun `when a method already has an @Override annotation`() = assertUnchanged(
-        dependsOn = arrayOf(supportingParents),
+        dependsOn = arrayOf(testParent),
         before = """
+            package com.example;
+            
             class Test extends TestParent {
                 @Override
                 public void testParent() {
@@ -305,11 +354,12 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
     )
 
     @Test
-    @Disabled("Override annotation is not being attributed in Java 8, causing infinite cycles when adding annotations to anonymous classes. Only appears in Java 8.")
     fun `when ignoreAnonymousClassMethods is true and a method overrides within an anonymous class`() = assertUnchanged(
-        recipe = MissingOverrideAnnotation(null, true),
-        dependsOn = arrayOf(supportingParents),
+        recipe = MissingOverrideAnnotation(true),
+        dependsOn = arrayOf(testParent),
         before = """
+            package com.example;
+            
             class Test {
                 public void method() {
                     TestParent t = new TestParent() {
@@ -322,11 +372,13 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
     )
 
     @Test
-    @Disabled("Override annotation is not being attributed in Java 8, causing infinite cycles when adding annotations to anonymous classes. Only appears in Java 8.")
+    @Disabled("Override annotation is not being attributed in Java 8, causing infinite cycles when adding annotations to anonymous classes.")
     fun `when ignoreAnonymousClassMethods is false and a method overrides within an anonymous class`() = assertChanged(
-        recipe = MissingOverrideAnnotation(null, false),
-        dependsOn = arrayOf(supportingParents),
+        recipe = MissingOverrideAnnotation(false),
+        dependsOn = arrayOf(testParent, testParentParent),
         before = """
+            package com.example;
+            
             class Test {
                 public void method() {
                     TestParent t = new TestParent() {
@@ -337,6 +389,8 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
             }
         """,
         after = """
+            package com.example;
+            
             class Test {
                 public void method() {
                     TestParent t = new TestParent() {
@@ -350,21 +404,11 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
     )
 
     @Test
-    fun `when ignoreObjectMethods is true and a method overrides from the base Object class`() = assertUnchanged(
-        recipe = MissingOverrideAnnotation(true, null),
-        before = """
-            class Test {
-                public String toString() {
-                    return super.toString();
-                }
-            }
-        """
-    )
-
-    @Test
     fun `when ignoreObjectMethods is false and a method overrides from the base Object class`() = assertChanged(
-        recipe = MissingOverrideAnnotation(false, null),
+        recipe = MissingOverrideAnnotation(null),
         before = """
+            package com.example;
+            
             class Test {
                 public String toString() {
                     return super.toString();
@@ -372,6 +416,8 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
             }
         """,
         after = """
+            package com.example;
+            
             class Test {
                 @Override
                 public String toString() {
@@ -380,5 +426,4 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
             }
         """
     )
-
 }

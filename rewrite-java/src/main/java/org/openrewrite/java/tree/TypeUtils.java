@@ -182,7 +182,7 @@ public class TypeUtils {
             return false;
         }
         if(clazz.getMethods().stream()
-                .filter(m -> !m.getFlags().contains(Flag.Private))
+                .filter(m -> !m.getFlags().contains(Flag.Private) && !m.getFlags().contains(Flag.Static))
                 .anyMatch(m -> methodHasSignature(m, name, argTypes))) {
             return true;
         }

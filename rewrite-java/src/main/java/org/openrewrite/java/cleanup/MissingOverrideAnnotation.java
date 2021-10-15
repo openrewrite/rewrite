@@ -22,26 +22,17 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
-import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Set;
-import java.util.function.Predicate;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class MissingOverrideAnnotation extends Recipe {
-    @Option(displayName = "Ignore `Object` methods",
-            description = "When enabled, ignore missing annotations on methods which override methods from the base `java.lang.Object` class such as `equals()`, `hashCode()`, or `toString()`.",
-            required = false)
-    @Nullable
-    Boolean ignoreObjectMethods;
-
     @Option(displayName = "Ignore methods in anonymous classes",
             description = "When enabled, ignore missing annotations on methods which override methods when the class definition is within an anonymous class.",
             required = false)
@@ -84,72 +75,16 @@ public class MissingOverrideAnnotation extends Recipe {
 
         @Override
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-            // for efficiency, first check for type attribution and whether @Override is present.
-            if (method.getType() != null &&
-                    method.getType().getDeclaringType() != null &&
-                    !method.hasModifier(J.Modifier.Type.Static) &&
-                    method.getAllAnnotations().stream().noneMatch(OVERRIDE_ANNOTATION::matches)
+            if (!method.hasModifier(J.Modifier.Type.Static)
+                    && method.getAllAnnotations().stream().noneMatch(OVERRIDE_ANNOTATION::matches)
+                    && Boolean.TRUE.equals(TypeUtils.isAnOverride(method.getType())
+                    && !(Boolean.TRUE.equals(ignoreAnonymousClassMethods) && getCursorToParentScope(getCursor()).getValue() instanceof J.NewClass))
             ) {
-                if (!(Boolean.TRUE.equals(ignoreAnonymousClassMethods) && getCursorToParentScope(getCursor()).getValue() instanceof J.NewClass)) {
-                    JavaType.FullyQualified declaringType = method.getType().getDeclaringType();
-                    if (new FindOverriddenAndImplementedMethodDeclarations(method, declaringType).hasAny()) {
-                        method = method.withTemplate(
-                                JavaTemplate.builder(this::getCursor, "@Override").build(),
-                                method.getCoordinates().addAnnotation(Comparator.comparing(J.Annotation::getSimpleName))
-                        );
-                    }
-                }
+                method = method.withTemplate(
+                        JavaTemplate.builder(this::getCursor, "@Override").build(),
+                        method.getCoordinates().addAnnotation(Comparator.comparing(J.Annotation::getSimpleName)));
             }
             return super.visitMethodDeclaration(method, ctx);
         }
-
-        private class FindOverriddenAndImplementedMethodDeclarations {
-            private final J.MethodDeclaration methodTarget;
-            private final JavaType.FullyQualified declaringType;
-
-            private FindOverriddenAndImplementedMethodDeclarations(J.MethodDeclaration methodTarget, JavaType.FullyQualified declaringType) {
-                this.methodTarget = methodTarget;
-                this.declaringType = declaringType;
-            }
-
-            private boolean hasAny() {
-                return hasAny(declaringType);
-            }
-
-            private boolean hasAny(@Nullable JavaType.FullyQualified typeToSearch) {
-                if (typeToSearch == null || methodTarget.getType() == null ||
-                        ((ignoreObjectMethods == null || Boolean.TRUE.equals(ignoreObjectMethods)) && "java.lang.Object".equals(typeToSearch.getFullyQualifiedName()))) {
-                    return false;
-                }
-
-                // base case: skip visiting the declaringType class methods, only visit the interfaces. otherwise, we add @Override to everything.
-                if (!declaringType.getFullyQualifiedName().equals(typeToSearch.getFullyQualifiedName())) {
-                    String mPattern = MethodMatcher.methodPattern(methodTarget.withType(methodTarget.getType().withDeclaringType(typeToSearch)));
-                    MethodMatcher matcher = new MethodMatcher(mPattern);
-                    Predicate<JavaType.Method> filtering;
-                    if (typeToSearch.getKind() == JavaType.Class.Kind.Class) {
-                        filtering = m -> !(m.hasFlags(Flag.Abstract) || m.hasFlags(Flag.Abstract)) && matcher.matches(m);
-                    } else {
-                        filtering = m -> !m.hasFlags(Flag.Static) && matcher.matches(m);
-                    }
-
-                    if (typeToSearch.getMethods().stream().anyMatch(filtering)) {
-                        return true;
-                    }
-                }
-
-                if (typeToSearch.getInterfaces().stream().anyMatch(this::hasAny)) {
-                    return true;
-                }
-                if (typeToSearch.getSupertype() != null) {
-                    return hasAny(typeToSearch.getSupertype());
-                }
-                return false;
-            }
-
-        }
-
     }
-
-
 }
