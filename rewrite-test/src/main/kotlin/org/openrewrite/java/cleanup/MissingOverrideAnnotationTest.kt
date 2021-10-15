@@ -35,6 +35,7 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
                 void testInterface();
             }
         """
+
         @Language("java")
         const val testInterface0 = """
             package com.example;
@@ -117,7 +118,7 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
 
     @Test
     fun `when a method overrides multiple layers of parents`() = assertChanged(
-        dependsOn = arrayOf(testParent),
+        dependsOn = arrayOf(testParent, testParentParent),
         before = """
             package com.example;
             
@@ -243,7 +244,7 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
 
     @Test
     fun `when a method overrides from a parent and a method implements an interface`() = assertChanged(
-        dependsOn = arrayOf(testParent, testInterface),
+        dependsOn = arrayOf(testParent, testParentParent, testInterface),
         before = """
             package com.example;
             
@@ -341,7 +342,7 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
 
     @Test
     fun `when a method already has an @Override annotation`() = assertUnchanged(
-        dependsOn = arrayOf(testParent),
+        dependsOn = arrayOf(testParent, testParentParent),
         before = """
             package com.example;
             
@@ -356,7 +357,7 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
     @Test
     fun `when ignoreAnonymousClassMethods is true and a method overrides within an anonymous class`() = assertUnchanged(
         recipe = MissingOverrideAnnotation(true),
-        dependsOn = arrayOf(testParent),
+        dependsOn = arrayOf(testParent, testParentParent),
         before = """
             package com.example;
             
