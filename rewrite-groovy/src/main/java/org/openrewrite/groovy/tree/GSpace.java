@@ -24,6 +24,9 @@ public class GSpace {
         MAP_ENTRY,
         MAP_ENTRY_PREFIX,
         MAP_ENTRY_KEY_SUFFIX,
+        MAP_LITERAL,
+        MAP_LITERAL_ELEMENT_SUFFIX,
+        MAP_LITERAL_ELEMENTS,
         TOP_LEVEL_STATEMENT,
     }
 }

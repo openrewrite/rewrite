@@ -24,7 +24,6 @@ import org.openrewrite.groovy.tree.GRightPadded;
 import org.openrewrite.groovy.tree.GSpace;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
@@ -77,15 +76,21 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitGStringValue(G.GString.Value value, PrintOutputCapture<P> p) {
         visitMarkers(value.getMarkers(), p);
-        p.out.append("${");
+        if(value.isEnclosedInBraces()) {
+            p.out.append("${");
+        } else {
+            p.out.append("$");
+        }
         visit(value.getTree(), p);
-        p.out.append('}');
+        if(value.isEnclosedInBraces()) {
+            p.out.append('}');
+        }
         return value;
     }
 
     @Override
     public J visitListLiteral(G.ListLiteral listLiteral, PrintOutputCapture<P> p) {
-        visitSpace(listLiteral.getPrefix(), GSpace.Location.MAP_ENTRY, p);
+        visitSpace(listLiteral.getPrefix(), GSpace.Location.LIST_LITERAL, p);
         visitMarkers(listLiteral.getMarkers(), p);
         visitContainer("[", listLiteral.getPadding().getElements(), GContainer.Location.LIST_LITERAL_ELEMENTS,
                 ",", "]", p);
@@ -100,6 +105,14 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         p.out.append(':');
         visit(mapEntry.getValue(), p);
         return mapEntry;
+    }
+
+    @Override
+    public J visitMapLiteral(G.MapLiteral mapLiteral, PrintOutputCapture<P> p) {
+        visitSpace(mapLiteral.getPrefix(), GSpace.Location.MAP_LITERAL, p);
+        visitMarkers(mapLiteral.getMarkers(), p);
+        visitContainer("[", mapLiteral.getPadding().getElements(), GContainer.Location.MAP_LITERAL_ELEMENTS, ",", "]", p);
+        return mapLiteral;
     }
 
     @Override

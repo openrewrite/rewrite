@@ -58,6 +58,29 @@ class LiteralTest : GroovyTreeTest {
     )
 
     @Test
+    fun gStringNoCurlyBraces() = assertParsePrintAndProcess(
+        """
+            def foo = 1
+            def s = "foo: ${'$'}foo"
+        """
+    )
+
+    @Test
+    fun gStringPropertyAccessNoCurlyBraces() = assertParsePrintAndProcess(
+        """
+            def person = [name: 'sam']
+            def s = "name: ${'$'}person.name"
+        """
+    )
+
+    @Test
+    fun mapLiteral() = assertParsePrintAndProcess(
+        """
+            def person = [ name: 'sam' , age: 9000 ]
+        """
+    )
+
+    @Test
     fun numericLiterals() = assertParsePrintAndProcess(
         """
             float a = 0.1

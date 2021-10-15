@@ -99,6 +99,20 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         return m;
     }
 
+    public J visitMapLiteral(G.MapLiteral mapLiteral, P p) {
+        G.MapLiteral m = mapLiteral;
+        m = m.withPrefix(visitSpace(m.getPrefix(), GSpace.Location.MAP_LITERAL, p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(m, p);
+        if (!(temp instanceof G.MapLiteral)) {
+            return temp;
+        } else {
+            m = (G.MapLiteral) temp;
+        }
+        m = m.getPadding().withElements(visitContainer(m.getPadding().getElements(), GContainer.Location.MAP_LITERAL_ELEMENTS, p));
+        return m;
+    }
+
     public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, GRightPadded.Location loc, P p) {
         return super.visitRightPadded(right, JRightPadded.Location.LANGUAGE_EXTENSION, p);
     }

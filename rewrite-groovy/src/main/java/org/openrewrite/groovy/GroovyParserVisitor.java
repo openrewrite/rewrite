@@ -128,6 +128,9 @@ public class GroovyParserVisitor {
                     statements.add(convertTopLevelStatement(unit, value));
                 }
             } catch (Throwable t) {
+                if(t instanceof StringIndexOutOfBoundsException) {
+                    throw new GroovyParsingException("Failed to parse, cursor position likely inaccurate.",t);
+                }
                 throw new GroovyParsingException(
                         "Failed to parse at cursor position " + cursor +
                                 ". The next 10 characters in the original source are `" +
@@ -913,9 +916,16 @@ public class GroovyParserVisitor {
             int valueIndex = 0;
             for (ConstantExpression string : gstring.getStrings()) {
                 if (string.getValue().equals("")) {
-                    cursor += 2; // skip ${
-                    strings.add(new G.GString.Value(randomId(), Markers.EMPTY, visit(gstring.getValue(valueIndex++))));
-                    cursor++; // skip }
+                    boolean inCurlies = source.charAt(cursor + 1) == '{';
+                    if(inCurlies) {
+                        cursor += 2; // skip ${
+                    } else {
+                        cursor += 1; // skip $
+                    }
+                    strings.add(new G.GString.Value(randomId(), Markers.EMPTY, visit(gstring.getValue(valueIndex++)), inCurlies));
+                    if(inCurlies) {
+                        cursor++; // skip }
+                    }
                 } else {
                     strings.add(visit(string));
                 }
@@ -941,6 +951,14 @@ public class GroovyParserVisitor {
                     null
             );
             queue.add(mapEntry);
+        }
+
+        @Override
+        public void visitMapExpression(MapExpression map) {
+            queue.add(new G.MapLiteral(randomId(), sourceBefore("["), Markers.EMPTY,
+                    JContainer.build(visitRightPadded(map.getMapEntryExpressions().toArray(new ASTNode[0]), ",", "]")),
+                    typeMapping.type(map.getType())
+            ));
         }
 
         @Override

@@ -357,6 +357,79 @@ public interface G extends J {
         }
     }
 
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class MapLiteral implements G, Expression, TypedTree {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        JContainer<G.MapEntry> elements;
+
+        public List<G.MapEntry> getElements() {
+            return elements.getElements();
+        }
+
+        public MapLiteral withElements(List<G.MapEntry> elements) {
+            return getPadding().withElements(JContainer.withElements(this.elements, elements));
+        }
+
+        @Getter
+        @With
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
+            return v.visitMapLiteral(this, p);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final MapLiteral t;
+
+            public JContainer<G.MapEntry> getElements() {
+                return t.elements;
+            }
+
+            public MapLiteral withElements(JContainer<G.MapEntry> elements) {
+                return t.elements == elements ? t : new MapLiteral(t.id, t.prefix, t.markers, elements, t.type);
+            }
+        }
+    }
+
+
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -459,6 +532,7 @@ public interface G extends J {
             UUID id;
             Markers markers;
             J tree;
+            boolean enclosedInBraces;
 
             @Override
             public <J2 extends J> J2 withPrefix(Space space) {
