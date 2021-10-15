@@ -40,7 +40,7 @@ public class ForLoopIncrementInUpdate extends Recipe {
 
     @Override
     public String getDescription() {
-        return "The increment should be moved to the loop’s increment clause if possible.";
+        return "The increment should be moved to the loop's increment clause if possible.";
     }
 
     @Override
