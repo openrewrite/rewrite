@@ -139,6 +139,12 @@ public class MavenSettings {
 
         @Nullable
         String mirrorOf;
+
+        @Nullable
+        Boolean releases;
+
+        @Nullable
+        Boolean snapshots;
     }
 
     @FieldDefaults(level = AccessLevel.PRIVATE)

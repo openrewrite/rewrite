@@ -91,7 +91,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
 
         if (settings.getMirrors() != null) {
             setMirrors(settings.getMirrors().getMirrors().stream()
-                    .map(mirror -> new MavenRepositoryMirror(mirror.getId(), mirror.getUrl(), mirror.getMirrorOf()))
+                    .map(mirror -> new MavenRepositoryMirror(mirror.getId(), mirror.getUrl(), mirror.getMirrorOf(), mirror.getReleases(), mirror.getSnapshots()))
                     .collect(Collectors.toList()));
         }
 

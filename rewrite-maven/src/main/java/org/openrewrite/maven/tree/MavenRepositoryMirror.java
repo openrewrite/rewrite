@@ -18,6 +18,7 @@ package org.openrewrite.maven.tree;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.experimental.FieldDefaults;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.net.URI;
 import java.util.*;
@@ -42,6 +43,12 @@ public class MavenRepositoryMirror {
      */
     String mirrorOf;
 
+    @Nullable
+    Boolean releases;
+
+    @Nullable
+    Boolean snapshots;
+
     public static MavenRepository apply(Collection<MavenRepositoryMirror> mirrors, MavenRepository repo) {
         MavenRepository mapped = repo;
         MavenRepository next = null;
@@ -59,8 +66,8 @@ public class MavenRepositoryMirror {
         if (matches(repo) && !(repo.getUri().equals(uri) && repo.getId().equals(id))) {
             return repo.withUri(uri)
                     .withId(id)
-                    .withReleases(repo.isReleases())
-                    .withSnapshots(repo.isSnapshots());
+                    .withReleases(!Boolean.FALSE.equals(releases))
+                    .withSnapshots(Boolean.TRUE.equals(snapshots));
         } else {
             return repo;
         }
