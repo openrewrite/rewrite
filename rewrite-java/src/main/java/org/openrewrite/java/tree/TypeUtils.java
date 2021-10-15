@@ -140,6 +140,66 @@ public class TypeUtils {
         return false;
     }
 
+    /**
+     * Determine if a method overrides a method from a superclass or interface.
+     *
+     * @return `true` if a superclass or implemented interface declares a non-private method with matching signature.
+     *         `null` if the supplied method is `null` if it is missing its generic signature.
+     */
+    @Nullable
+    public static Boolean isAnOverride(@Nullable JavaType.Method method) {
+        if(method == null || method.getGenericSignature() == null) {
+            return null;
+        }
+        JavaType.FullyQualified dt = method.getDeclaringType();
+        List<JavaType> argTypes = method.getGenericSignature().getParamTypes();
+        return declaresOverridableMethod(dt.getSupertype(), method.getName(), argTypes)
+                || dt.getInterfaces().stream().anyMatch(i -> declaresOverridableMethod(i, method.getName(), argTypes));
+    }
+
+    private static boolean methodHasSignature(JavaType.Method m, String name, List<JavaType> argTypes) {
+        if(!name.equals(m.getName())) {
+            return false;
+        }
+        if(m.getGenericSignature() == null) {
+            return false;
+        }
+        List<JavaType> mArgs = m.getGenericSignature().getParamTypes();
+        if(mArgs.size() != argTypes.size()) {
+            return false;
+        }
+        for(int i = 0; i < mArgs.size(); i++) {
+            if(!TypeUtils.isOfType(mArgs.get(i), argTypes.get(i))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static boolean declaresOverridableMethod(@Nullable JavaType.FullyQualified clazz, String name, List<JavaType> argTypes) {
+        if(clazz == null) {
+            return false;
+        }
+        if(clazz.getMethods().stream()
+                .filter(m -> !m.getFlags().contains(Flag.Private))
+                .anyMatch(m -> methodHasSignature(m, name, argTypes))) {
+            return true;
+        }
+        JavaType.FullyQualified supertype = clazz.getSupertype();
+        if(declaresOverridableMethod(supertype, name, argTypes)) {
+            return true;
+        }
+
+        for(JavaType.FullyQualified i : clazz.getInterfaces()) {
+            if(declaresOverridableMethod(i, name, argTypes)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     static boolean deepEquals(@Nullable List<? extends JavaType> ts1, @Nullable List<? extends JavaType> ts2) {
 
         if (ts1 == null || ts2 == null) {
