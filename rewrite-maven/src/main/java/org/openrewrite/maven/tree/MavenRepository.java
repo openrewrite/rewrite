@@ -36,7 +36,10 @@ public class MavenRepository {
     @With
     URI uri;
 
+    @With
     boolean releases;
+
+    @With
     boolean snapshots;
 
     @NonFinal
