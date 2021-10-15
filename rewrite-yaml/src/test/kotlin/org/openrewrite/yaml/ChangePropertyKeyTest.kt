@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 package org.openrewrite.yaml
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Issue
@@ -71,8 +70,7 @@ class ChangePropertyKeyTest : YamlRecipeTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1114")
-    @Disabled
-    fun singleEntryChangingSubpathToOneMoreNestedKey() = assertChanged(
+    fun `change path to one path longer`() = assertChanged(
         recipe = ChangePropertyKey(
             "a.b.c",
             "a.b.c.d",
@@ -80,6 +78,17 @@ class ChangePropertyKeyTest : YamlRecipeTest {
         ),
         before = "a.b.c: true",
         after = "a.b.c.d: true"
+    )
+
+    @Test
+    fun `change path to one path shorter`() = assertChanged(
+        recipe = ChangePropertyKey(
+            "a.b.c.d",
+            "a.b.c",
+            null
+        ),
+        before = "a.b.c.d: true",
+        after = "a.b.c: true"
     )
 
     @Test
