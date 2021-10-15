@@ -15,7 +15,9 @@
  */
 package org.openrewrite.java.cleanup
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
@@ -27,14 +29,17 @@ import org.openrewrite.java.JavaRecipeTest
     "ExcessiveRangeCheck",
     "ConstantOnWrongSideOfComparison",
     "StatementWithEmptyBody",
-    "BooleanMethodNameMustStartWithQuestion"
+    "BooleanMethodNameMustStartWithQuestion",
+    "PointlessBooleanExpression",
+    "ResultOfMethodCallIgnored",
+    "Convert2MethodRef"
 )
 interface IsEmptyCallOnCollectionsTest : JavaRecipeTest {
     override val recipe: Recipe
         get() = IsEmptyCallOnCollections()
 
     @Test
-    fun indexOfOnList(jp: JavaParser) = assertChanged(
+    fun isEmptyCallOnCollections(jp: JavaParser) = assertChanged(
         jp,
         before = """
             import java.util.List;
@@ -63,4 +68,61 @@ interface IsEmptyCallOnCollectionsTest : JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1112")
+    @Disabled // note, can merge these into the test above after fixing // todo
+    fun formatting(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import java.util.List;
+
+            class Test {
+                static boolean method(List<String> l, List<List<String>> ll) {
+                    if (true || l.size() == 0) {
+                        //ll.stream().filter(p -> p.size() == 0).findAny();
+                    }
+                    return l.size() == 0;
+                }
+            }
+        """,
+        after = """
+            import java.util.List;
+
+            class Test {
+                static boolean method(List<String> l, List<List<String>> ll) {
+                    if (true || l.isEmpty()) {
+                        ll.stream().filter(p -> p.isEmpty()).findAny();
+                    }
+                    return l.isEmpty();
+                }
+            }
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1112")
+    @Disabled // note, can merge these into the test above after fixing // todo
+    fun handleLambda(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import java.util.List;
+
+            class Test {
+                static void method(List<List<String>> ll) {
+                    ll.stream().filter(p -> p.size() == 0).findAny();
+                }
+            }
+        """,
+        after = """
+            import java.util.List;
+
+            class Test {
+                static void method(List<List<String>> ll) {
+                    ll.stream().filter(p -> p.isEmpty()).findAny();
+                }
+            }
+        """
+    )
+
 }
