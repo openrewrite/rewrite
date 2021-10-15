@@ -63,7 +63,7 @@ public class IsEmptyCallOnCollections extends Recipe {
             final JavaTemplate isEmpty = JavaTemplate.builder(this::getCursor, "#{}#{any(java.util.Collection)}.isEmpty()").build();
 
             @Override
-            public J visitBinary(J.Binary binary, ExecutionContext executionContext) {
+            public J visitBinary(J.Binary binary, ExecutionContext ctx) {
                 if (binary.getOperator() == J.Binary.Type.Equal || binary.getOperator() == J.Binary.Type.NotEqual) {
                     if (COLLECTION_SIZE.matches(binary.getLeft()) || COLLECTION_SIZE.matches(binary.getRight())) {
                         if (isZero(binary.getLeft()) || isZero(binary.getRight())) {
@@ -75,12 +75,12 @@ public class IsEmptyCallOnCollections extends Recipe {
                         }
                     }
                 }
-                return super.visitBinary(binary, executionContext);
+                return super.visitBinary(binary, ctx);
             }
         };
     }
 
-    private boolean isZero(Expression expression) {
+    private static boolean isZero(Expression expression) {
         return expression instanceof J.Literal && Integer.valueOf(0).equals(((J.Literal) expression).getValue());
     }
 }

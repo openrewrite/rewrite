@@ -20,6 +20,15 @@ import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 
+@Suppress(
+    "SizeReplaceableByIsEmpty",
+    "DuplicateCondition",
+    "ConstantConditions",
+    "ExcessiveRangeCheck",
+    "ConstantOnWrongSideOfComparison",
+    "StatementWithEmptyBody",
+    "BooleanMethodNameMustStartWithQuestion"
+)
 interface IsEmptyCallOnCollectionsTest : JavaRecipeTest {
     override val recipe: Recipe
         get() = IsEmptyCallOnCollections()
@@ -31,10 +40,11 @@ interface IsEmptyCallOnCollectionsTest : JavaRecipeTest {
             import java.util.List;
 
             class Test {
-                void test(List<String> l) {
+                static void method(List<String> l) {
                     if (l.size() == 0 || 0 == l.size()) {
-                    }
-                    else if(l.size() != 0 || 0 != l.size()) {
+                        // empty body
+                    } else if (l.size() != 0 || 0 != l.size()) {
+                        // empty body
                     }
                 }
             }
@@ -43,10 +53,11 @@ interface IsEmptyCallOnCollectionsTest : JavaRecipeTest {
             import java.util.List;
 
             class Test {
-                void test(List<String> l) {
+                static void method(List<String> l) {
                     if (l.isEmpty() || l.isEmpty()) {
-                    }
-                    else if(!l.isEmpty() || !l.isEmpty()) {
+                        // empty body
+                    } else if (!l.isEmpty() || !l.isEmpty()) {
+                        // empty body
                     }
                 }
             }
