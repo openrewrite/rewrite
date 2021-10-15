@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -106,7 +106,7 @@ public class ChangePropertyKey extends Recipe {
                     Yaml.Mapping.Entry propertyEntry = propertyEntriesLeftToRight.next();
                     String value = propertyEntry.getKey().getValue();
 
-                    if (!propertyToTest.startsWith(value)) {
+                    if (!propertyToTest.startsWith(value) || (propertyToTest.startsWith(value) && !propertyEntriesLeftToRight.hasNext())) {
                         doAfterVisit(new InsertSubpropertyVisitor<>(
                                 propertyEntry,
                                 propertyToTest,
