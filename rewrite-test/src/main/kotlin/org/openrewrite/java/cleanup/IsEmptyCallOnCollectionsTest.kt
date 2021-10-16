@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
-import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 
 @Suppress(
@@ -39,8 +38,7 @@ interface IsEmptyCallOnCollectionsTest : JavaRecipeTest {
         get() = IsEmptyCallOnCollections()
 
     @Test
-    fun isEmptyCallOnCollections(jp: JavaParser) = assertChanged(
-        jp,
+    fun isEmptyCallOnCollections() = assertChanged(
         before = """
             import java.util.List;
 
@@ -71,16 +69,14 @@ interface IsEmptyCallOnCollectionsTest : JavaRecipeTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1112")
-    @Disabled // note, can merge these into the test above after fixing // todo
-    fun formatting(jp: JavaParser) = assertChanged(
-        jp,
+    fun formatting() = assertChanged(
         before = """
             import java.util.List;
 
             class Test {
-                static boolean method(List<String> l, List<List<String>> ll) {
+                static boolean method(List<String> l) {
                     if (true || l.size() == 0) {
-                        //ll.stream().filter(p -> p.size() == 0).findAny();
+                        // empty body
                     }
                     return l.size() == 0;
                 }
@@ -90,9 +86,9 @@ interface IsEmptyCallOnCollectionsTest : JavaRecipeTest {
             import java.util.List;
 
             class Test {
-                static boolean method(List<String> l, List<List<String>> ll) {
+                static boolean method(List<String> l) {
                     if (true || l.isEmpty()) {
-                        ll.stream().filter(p -> p.isEmpty()).findAny();
+                        // empty body
                     }
                     return l.isEmpty();
                 }
@@ -102,24 +98,25 @@ interface IsEmptyCallOnCollectionsTest : JavaRecipeTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1112")
-    @Disabled // note, can merge these into the test above after fixing // todo
-    fun handleLambda(jp: JavaParser) = assertChanged(
-        jp,
+    @Disabled
+    fun lambda() = assertChanged(
         before = """
             import java.util.List;
+            import java.util.stream.Stream;
 
             class Test {
-                static void method(List<List<String>> ll) {
-                    ll.stream().filter(p -> p.size() == 0).findAny();
+                static <T> Stream<List<T>> method(Stream<List<T>> stream) {
+                    return stream.filter(s -> s.size() == 0);
                 }
             }
         """,
         after = """
             import java.util.List;
+            import java.util.stream.Stream;
 
             class Test {
-                static void method(List<List<String>> ll) {
-                    ll.stream().filter(p -> p.isEmpty()).findAny();
+                static <T> Stream<List<T>> method(Stream<List<T>> stream) {
+                    return stream.filter(s -> s.isEmpty());
                 }
             }
         """

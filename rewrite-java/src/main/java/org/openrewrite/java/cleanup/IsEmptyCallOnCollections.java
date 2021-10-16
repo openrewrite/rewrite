@@ -70,8 +70,9 @@ public class IsEmptyCallOnCollections extends Recipe {
                             J.MethodInvocation sizeCall = (J.MethodInvocation) (COLLECTION_SIZE.matches(binary.getLeft()) ?
                                     binary.getLeft() : binary.getRight());
                             return sizeCall.withTemplate(isEmpty, sizeCall.getCoordinates().replace(),
-                                    binary.getOperator() == J.Binary.Type.Equal ? "" : "!",
-                                    sizeCall.getSelect());
+                                            binary.getOperator() == J.Binary.Type.Equal ? "" : "!",
+                                            sizeCall.getSelect())
+                                    .withPrefix(binary.getPrefix());
                         }
                     }
                 }
