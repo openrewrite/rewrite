@@ -31,11 +31,13 @@ class ChangeDependencyVersionTest : GradleRecipeTest {
         before = """
             dependencies {
                 api 'org.openrewrite:rewrite-core:latest.release'
+                api "org.openrewrite:rewrite-core:latest.release"
             }
         """,
         after = """
             dependencies {
                 api 'org.openrewrite:rewrite-core:latest.integration'
+                api "org.openrewrite:rewrite-core:latest.integration"
             }
         """
     )
@@ -52,11 +54,13 @@ class ChangeDependencyVersionTest : GradleRecipeTest {
         before = """
             dependencies {
                 api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
+                api group: "org.openrewrite", name: "rewrite-core", version: "latest.release"
             }
         """,
         after = """
             dependencies {
                 api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.integration'
+                api group: "org.openrewrite", name: "rewrite-core", version: "latest.integration"
             }
         """
     )

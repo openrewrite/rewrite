@@ -84,6 +84,7 @@ public class ChangeDependencyVersion extends Recipe {
                 if (dependency.matches(m)) {
                     if (configuration == null || m.getSimpleName().equals(configuration)) {
                         List<Expression> depArgs = m.getArguments();
+                        String versionStringDelimiter = "'";
                         if (depArgs.get(0) instanceof J.Literal) {
                             String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                             if (gav != null) {
@@ -93,10 +94,14 @@ public class ChangeDependencyVersion extends Recipe {
                                         StringUtils.matchesGlob(gavs[0], groupId) &&
                                         StringUtils.matchesGlob(gavs[1], artifactId) &&
                                         !StringUtils.matchesGlob(gavs[2], newVersion)) {
+                                    String valueSource = ((J.Literal) depArgs.get(0)).getValueSource();
+                                    String delimiter = (valueSource == null) ? versionStringDelimiter
+                                            : valueSource.substring(0, valueSource.indexOf(gav));
+
                                     String newGav = gavs[0] + ":" + gavs[1] + ":" + newVersion;
                                     m = m.withArguments(ListUtils.map(m.getArguments(), (n, arg) ->
                                             n == 0 ?
-                                                    ((J.Literal) arg).withValue(newGav).withValueSource("'" + newGav + "'") :
+                                                    ((J.Literal) arg).withValue(newGav).withValueSource(delimiter + newGav + delimiter) :
                                                     arg
                                     ));
                                 }
@@ -105,7 +110,7 @@ public class ChangeDependencyVersion extends Recipe {
                             G.MapEntry groupEntry = null;
                             G.MapEntry artifactEntry = null;
                             G.MapEntry versionEntry = null;
-                            String versionStringDelimiter = "'";
+
                             for(Expression e : depArgs) {
                                 if(!(e instanceof G.MapEntry)) {
                                     continue;
@@ -125,8 +130,10 @@ public class ChangeDependencyVersion extends Recipe {
                                     groupEntry = arg;
                                 } else if("name".equals(keyValue) && StringUtils.matchesGlob(valueValue, artifactId)) {
                                     artifactEntry = arg;
-                                } else if("version".equals(keyValue) && !valueValue.equals(newVersion) && value.getValueSource() != null) {
-                                    versionStringDelimiter = value.getValueSource().substring(0, value.getValueSource().indexOf(valueValue));
+                                } else if("version".equals(keyValue) && !valueValue.equals(newVersion)) {
+                                    if(value.getValueSource() != null) {
+                                        versionStringDelimiter = value.getValueSource().substring(0, value.getValueSource().indexOf(valueValue));
+                                    }
                                     versionEntry = arg;
                                 }
                             }
