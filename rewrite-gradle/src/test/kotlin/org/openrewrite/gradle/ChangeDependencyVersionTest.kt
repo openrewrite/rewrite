@@ -39,4 +39,25 @@ class ChangeDependencyVersionTest : GradleRecipeTest {
             }
         """
     )
+
+    @ParameterizedTest
+    @ValueSource(strings = ["org.openrewrite:rewrite-core", "*:*"])
+    fun findMapStyleDependency(ga: String) = assertChanged(
+        recipe = ChangeDependencyVersion(
+            ga.substringBefore(':'),
+            ga.substringAfter(':'),
+            "latest.integration",
+            null
+        ),
+        before = """
+            dependencies {
+                api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
+            }
+        """,
+        after = """
+            dependencies {
+                api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.integration'
+            }
+        """
+    )
 }

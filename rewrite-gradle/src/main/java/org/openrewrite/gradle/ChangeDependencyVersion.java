@@ -22,6 +22,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -79,9 +80,10 @@ public class ChangeDependencyVersion extends Recipe {
         return new GroovyVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
-                if (dependency.matches(method)) {
-                    if (configuration == null || method.getSimpleName().equals(configuration)) {
-                        List<Expression> depArgs = method.getArguments();
+                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, context);
+                if (dependency.matches(m)) {
+                    if (configuration == null || m.getSimpleName().equals(configuration)) {
+                        List<Expression> depArgs = m.getArguments();
                         if (depArgs.get(0) instanceof J.Literal) {
                             String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                             if (gav != null) {
@@ -92,17 +94,59 @@ public class ChangeDependencyVersion extends Recipe {
                                         StringUtils.matchesGlob(gavs[1], artifactId) &&
                                         !StringUtils.matchesGlob(gavs[2], newVersion)) {
                                     String newGav = gavs[0] + ":" + gavs[1] + ":" + newVersion;
-                                    method = method.withArguments(ListUtils.map(method.getArguments(), (n, arg) ->
+                                    m = m.withArguments(ListUtils.map(m.getArguments(), (n, arg) ->
                                             n == 0 ?
                                                     ((J.Literal) arg).withValue(newGav).withValueSource("'" + newGav + "'") :
                                                     arg
                                     ));
                                 }
                             }
+                        } else if(depArgs.get(0) instanceof G.MapEntry) {
+                            G.MapEntry groupEntry = null;
+                            G.MapEntry artifactEntry = null;
+                            G.MapEntry versionEntry = null;
+                            String versionStringDelimiter = "'";
+                            for(Expression e : depArgs) {
+                                if(!(e instanceof G.MapEntry)) {
+                                    continue;
+                                }
+                                G.MapEntry arg = (G.MapEntry)e;
+                                if(!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
+                                    continue;
+                                }
+                                J.Literal key = (J.Literal) arg.getKey();
+                                J.Literal value = (J.Literal) arg.getValue();
+                                if(!(key.getValue() instanceof String) || !(value.getValue() instanceof String)) {
+                                    continue;
+                                }
+                                String keyValue = (String)key.getValue();
+                                String valueValue = (String)value.getValue();
+                                if("group".equals(keyValue) && StringUtils.matchesGlob(valueValue, groupId)) {
+                                    groupEntry = arg;
+                                } else if("name".equals(keyValue) && StringUtils.matchesGlob(valueValue, artifactId)) {
+                                    artifactEntry = arg;
+                                } else if("version".equals(keyValue) && !valueValue.equals(newVersion) && value.getValueSource() != null) {
+                                    versionStringDelimiter = value.getValueSource().substring(0, value.getValueSource().indexOf(valueValue));
+                                    versionEntry = arg;
+                                }
+                            }
+                            if(groupEntry == null || artifactEntry == null || versionEntry == null) {
+                                return m;
+                            }
+                            G.MapEntry finalVersion = versionEntry;
+                            String delimiter = versionStringDelimiter;
+                            m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
+                                if(arg == finalVersion) {
+                                    return finalVersion.withValue(((J.Literal)finalVersion.getValue())
+                                            .withValue(newVersion)
+                                            .withValueSource(delimiter + newVersion + delimiter));
+                                }
+                                return arg;
+                            }));
                         }
                     }
                 }
-                return super.visitMethodInvocation(method, context);
+                return m;
             }
         };
     }
