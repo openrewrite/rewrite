@@ -16,6 +16,7 @@
 package org.openrewrite.maven
 
 import org.intellij.lang.annotations.Language
+import org.junit.jupiter.api.BeforeEach
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.maven.cache.InMemoryMavenPomCache

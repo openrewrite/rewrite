@@ -48,6 +48,7 @@ public class InMemoryMavenPomCache implements MavenPomCache {
     }
 
     private void fillUnresolvablePoms() {
+        //noinspection ConstantConditions
         new BufferedReader(new InputStreamReader(MavenPomDownloader.class.getResourceAsStream("/unresolvable.txt"), StandardCharsets.UTF_8))
                 .lines()
                 .filter(line -> !line.isEmpty())
@@ -126,5 +127,12 @@ public class InMemoryMavenPomCache implements MavenPomCache {
         return normalizedRepository
                 .map(pom -> new CacheResult<>(CacheResult.State.Cached, pom))
                 .orElse(UNAVAILABLE_REPOSITORY);
+    }
+
+    @Override
+    public void clear() {
+        pomCache.clear();
+        mavenMetadataCache.clear();
+        normalizedRepositoryUrls.clear();
     }
 }

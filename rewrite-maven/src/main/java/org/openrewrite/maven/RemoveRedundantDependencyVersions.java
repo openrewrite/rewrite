@@ -62,7 +62,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                 DependencyManagementDependency.Defined managedVersion = findManagedVersion(maven.getModel(), dependency);
                 Scope scope = managedVersion != null ? managedVersion.getScope() : null;
 
-                if (managedVersion != null
+                if (managedVersion != null && managedVersion.getVersion() != null
                         && dependency.getRequestedVersion() != null
                         && dependency.getVersion().equals(dependency.getRequestedVersion())
                         && managedVersion.getVersion().equals(dependency.getRequestedVersion())
@@ -159,6 +159,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     Xml.Tag contentTag = (Xml.Tag) content;
                     if (contentTag.getName().equals("version")
                             && contentTag.getValue().isPresent()
+                            && managedVersion.getVersion() != null
                             && managedVersion.getVersion().equals(contentTag.getValue().get())) {
                         versionTag = contentTag;
                     } else if (contentTag.getName().equals("scope") && contentTag.getValue().isPresent()) {

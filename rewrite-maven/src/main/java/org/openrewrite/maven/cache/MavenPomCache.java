@@ -25,6 +25,10 @@ import java.util.concurrent.Callable;
 public interface MavenPomCache extends AutoCloseable {
     MavenPomCache NOOP = new MavenPomCache() {
         @Override
+        public void clear() {
+        }
+
+        @Override
         public CacheResult<MavenMetadata> computeMavenMetadata(URI repo, String groupId, String artifactId,
                                                                Callable<MavenMetadata> orElseGet) throws Exception {
             return new CacheResult<>(CacheResult.State.Updated, orElseGet.call());
@@ -60,6 +64,8 @@ public interface MavenPomCache extends AutoCloseable {
      */
     CacheResult<MavenRepository> computeRepository(MavenRepository repository,
                                                    Callable<MavenRepository> orElseGet) throws Exception;
+
+    void clear();
 
     @Override
     default void close() {

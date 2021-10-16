@@ -23,18 +23,26 @@ import okhttp3.Credentials
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.intellij.lang.annotations.Language
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.Parser
+import org.openrewrite.maven.cache.InMemoryMavenPomCache
 import org.openrewrite.maven.tree.Maven
 import org.openrewrite.maven.tree.Pom
 import org.openrewrite.maven.tree.Scope
 import java.nio.file.Paths
 
 class MavenParserTest {
-    private val parser = MavenParser.builder().build()
+    private val cache = InMemoryMavenPomCache()
+    private val parser = MavenParser.builder().cache(cache).build()
     private val ctx = InMemoryExecutionContext { t -> throw t }
+
+    @BeforeEach
+    fun before() {
+        cache.clear()
+    }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1085")
     @Test

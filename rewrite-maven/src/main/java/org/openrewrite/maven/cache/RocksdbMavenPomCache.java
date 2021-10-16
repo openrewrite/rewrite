@@ -53,18 +53,18 @@ import java.util.concurrent.Callable;
 /**
  * Implementation of the maven cache that leverages Rocksdb. The keys and values are serialized to/from byte arrays
  * using jackson. Things to know about this cache implementation:
- * <P>
+ * <p>
  * <li> It will create a rocks db in the workspace directory passed to it.</li>
  * <li> If two caches are pointed to the same workspace folder, they will "share" the same underlying rocks database,
- *      it is thread-safe.</li>
+ * it is thread-safe.</li>
  * <li> Because multiple caches can share the same database, the close on this cache implementation does nothing.</li>
  * <li> The database is closed via a system shutdown hook registered by this class. Any unexpected process termination
- *      is non-fatal, any non-flushed data is lost, but the database will not be corrupted.</li>
+ * is non-fatal, any non-flushed data is lost, but the database will not be corrupted.</li>
  * <li> The database is configured to auto-flush when the in-memory size reaches 1MB.</li>
  * <li> Rocksdb's write ahead log has been disabled because we are using this as a cache and do not need to recover any
- *      "lost" data.</li>
+ * "lost" data.</li>
  * <li> Rocksdb computes checksums for all of its files, normally it checks those on startup, this has been disabled as
- *      well.</li>
+ * well.</li>
  */
 public class RocksdbMavenPomCache implements MavenPomCache {
 
@@ -113,14 +113,14 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         assert workspace != null;
 
         File pomCacheDir = new File(workspace.toFile(), ".rewrite-cache");
-        if(!pomCacheDir.exists() && !pomCacheDir.mkdirs()) {
+        if (!pomCacheDir.exists() && !pomCacheDir.mkdirs()) {
             throw new IllegalStateException("Unable to find or create maven pom cache at " + pomCacheDir);
         } else if (!pomCacheDir.isDirectory()) {
             throw new IllegalStateException("The maven pom cache workspace must be a directory at " + pomCacheDir);
         }
         // In case a stale lock file is left over from a previous run that was interrupted
         File lock = new File(pomCacheDir, "LOCK");
-        if(lock.exists()) {
+        if (lock.exists()) {
             //noinspection ResultOfMethodCallIgnored
             lock.delete();
         }
@@ -209,6 +209,11 @@ public class RocksdbMavenPomCache implements MavenPomCache {
                 .orElse(UNAVAILABLE_REPOSITORY);
     }
 
+    @Override
+    public void clear() {
+        throw new UnsupportedOperationException("RocksDB POM cache does not support clear.");
+    }
+
     private void fillUnresolvablePoms() {
         new BufferedReader(new InputStreamReader(MavenPomDownloader.class.getResourceAsStream("/unresolvable.txt"), StandardCharsets.UTF_8))
                 .lines()
@@ -234,7 +239,8 @@ public class RocksdbMavenPomCache implements MavenPomCache {
             return null;
         }
         try {
-            return mapper.readValue(bytes, new TypeReference<Optional<MavenRepository>>() {});
+            return mapper.readValue(bytes, new TypeReference<Optional<MavenRepository>>() {
+            });
         } catch (Exception e) {
             //Treat deserialization errors as a cache miss, this will force rewrite to re-download and re-cache the
             //results.
@@ -248,7 +254,8 @@ public class RocksdbMavenPomCache implements MavenPomCache {
             return null;
         }
         try {
-            return mapper.readValue(bytes, new TypeReference<Optional<RawMaven>>() {});
+            return mapper.readValue(bytes, new TypeReference<Optional<RawMaven>>() {
+            });
         } catch (Exception e) {
             //Treat deserialization errors as a cache miss, this will force rewrite to re-download and re-cache the
             //results.
@@ -262,7 +269,8 @@ public class RocksdbMavenPomCache implements MavenPomCache {
             return null;
         }
         try {
-            return mapper.readValue(bytes, new TypeReference<Optional<MavenMetadata>>() {});
+            return mapper.readValue(bytes, new TypeReference<Optional<MavenMetadata>>() {
+            });
         } catch (Exception e) {
             //Treat deserialization errors as a cache miss, this will force rewrite to re-download and re-cache the
             //results.
@@ -334,6 +342,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         private byte[] get(byte[] key) throws RocksDBException {
             return database.get(key);
         }
+
         private void close() {
             //Called by a shutdown hook, this will flush any in-memory memtables to disk and free up resources held
             //by the underlying C++ code. The worse case scenario is that this is not called because the system exits

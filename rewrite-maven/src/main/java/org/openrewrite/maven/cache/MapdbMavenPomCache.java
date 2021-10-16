@@ -217,4 +217,11 @@ public class MapdbMavenPomCache implements MavenPomCache {
         mavenMetadataCache.close();
         normalizedRepositoryUrls.close();
     }
+
+    @Override
+    public void clear() {
+        pomCache.clear();
+        mavenMetadataCache.clear();
+        normalizedRepositoryUrls.clear();
+    }
 }

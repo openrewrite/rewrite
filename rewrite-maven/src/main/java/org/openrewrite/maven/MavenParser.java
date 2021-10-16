@@ -26,8 +26,10 @@ import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.RawMaven;
 import org.openrewrite.maven.internal.RawMavenResolver;
 import org.openrewrite.maven.tree.Maven;
+import org.openrewrite.maven.tree.MavenModel;
 import org.openrewrite.maven.tree.Modules;
 import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 
 import java.io.IOException;
@@ -39,9 +41,8 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static java.util.stream.Collectors.toList;
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toMap;
-import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;
 
 public class MavenParser implements Parser<Maven> {
@@ -67,15 +68,28 @@ public class MavenParser implements Parser<Maven> {
         return parse(new InMemoryExecutionContext(), sources);
     }
 
+    private static class MavenXmlParser extends XmlParser {
+        @Override
+        public boolean accept(Path path) {
+            return super.accept(path) || path.toString().endsWith(".pom");
+        }
+    }
+
     @Override
     public List<Maven> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
                                    ExecutionContext ctx) {
-        Collection<RawMaven> projectPoms = stream(sources.spliterator(), false)
-                .map(source -> RawMaven.parse(source, relativeTo, null, ctx))
-                .collect(toList());
+        Map<RawMaven, Xml.Document> projectPoms = new LinkedHashMap<>();
+        for (Input source : sources) {
+            projectPoms.put(
+                    RawMaven.parse(source, relativeTo, null, ctx),
+                    new MavenXmlParser()
+                            .parseInputs(singletonList(source), relativeTo, ctx)
+                            .iterator().next()
+            );
+        }
 
         MavenPomDownloader downloader = new MavenPomDownloader(mavenPomCache,
-                projectPoms.stream().collect(toMap(RawMaven::getSourcePath, Function.identity())), ctx);
+                projectPoms.keySet().stream().collect(toMap(RawMaven::getSourcePath, Function.identity())), ctx);
 
         List<Maven> parsed = new ArrayList<>();
         Map<String, String> effectiveProperties = new HashMap<>();
@@ -84,13 +98,13 @@ public class MavenParser implements Parser<Maven> {
             effectiveProperties.put("basedir", relativeTo.toString());
         }
 
-        for (RawMaven raw : projectPoms) {
-            raw = raw.withProjectPom(true);
-            Xml.Document resolve = new RawMavenResolver(downloader, activeProfiles, resolveOptional, ctx, relativeTo)
+        for (Map.Entry<RawMaven, Xml.Document> rawToDoc : projectPoms.entrySet()) {
+            RawMaven raw = rawToDoc.getKey().withProjectPom(true);
+            MavenModel model = new RawMavenResolver(downloader, activeProfiles, resolveOptional, ctx, relativeTo)
                     .resolve(raw, effectiveProperties);
-            if (resolve != null) {
-                Maven maven1 = new Maven(resolve);
-                parsed.add(maven1);
+            if (model != null) {
+                parsed.add(new Maven(rawToDoc.getValue().withMarkers(rawToDoc.getValue().getMarkers()
+                        .compute(model, (old, n) -> n))));
             }
         }
 

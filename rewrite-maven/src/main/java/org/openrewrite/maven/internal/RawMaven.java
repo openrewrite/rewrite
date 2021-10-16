@@ -26,8 +26,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.MavenRepository;
-import org.openrewrite.xml.XmlParser;
-import org.openrewrite.xml.tree.Xml;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -37,8 +35,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import static java.util.Collections.singletonList;
-
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @AllArgsConstructor
 @Getter
@@ -47,7 +43,7 @@ public class RawMaven {
     @JsonIgnore
     final Timer.Sample sample = Timer.start();
 
-    final Xml.Document document;
+    final Path sourcePath;
     final RawPom pom;
 
     @With
@@ -68,10 +64,6 @@ public class RawMaven {
         return getSourceUri().equals(rawMaven.getSourceUri());
     }
 
-    public Path getSourcePath() {
-        return document.getSourcePath();
-    }
-
     @Override
     public int hashCode() {
         return Objects.hash(getSourceUri());
@@ -79,16 +71,12 @@ public class RawMaven {
 
     public static RawMaven parse(Parser.Input source, @Nullable Path relativeTo, @Nullable String snapshotVersion,
                                  ExecutionContext ctx) {
-        Xml.Document document = new MavenXmlParser()
-                .parseInputs(singletonList(source), relativeTo, ctx)
-                .iterator().next();
-
         try {
             RawPom pom = MavenXmlMapper.readMapper().readValue(source.getSource(), RawPom.class);
             if (snapshotVersion != null) {
                 pom.setSnapshotVersion(snapshotVersion);
             }
-            return new RawMaven(document, pom, false, null);
+            return new RawMaven(source.getPath(), pom, false, null);
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to parse " + source.getPath(), e);
         }
@@ -102,13 +90,6 @@ public class RawMaven {
         return pom.getActiveDependencies(activeProfiles);
     }
 
-    private static class MavenXmlParser extends XmlParser {
-        @Override
-        public boolean accept(Path path) {
-            return super.accept(path) || path.toString().endsWith(".pom");
-        }
-    }
-
     public String getSourceUri() {
         String sourceUri;
         if (repository != null) {
@@ -119,7 +100,7 @@ public class RawMaven {
                     pom.getArtifactId() + '-' +
                     (pom.getSnapshotVersion() == null ? pom.getVersion() : pom.getSnapshotVersion()) + ".pom";
         } else {
-            sourceUri = "file://" + document.getSourcePath().toString();
+            sourceUri = "file://" + sourcePath.toString();
         }
         return sourceUri;
     }

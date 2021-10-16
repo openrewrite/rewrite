@@ -25,7 +25,6 @@ import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.tree.*;
-import org.openrewrite.xml.tree.Xml;
 
 import java.net.URI;
 import java.nio.file.Path;
@@ -73,15 +72,14 @@ public class RawMavenResolver {
     }
 
     @Nullable
-    public Xml.Document resolve(RawMaven rawMaven, Map<String, String> effectiveProperties) {
+    public MavenModel resolve(RawMaven rawMaven, Map<String, String> effectiveProperties) {
         Pom pom = resolve(rawMaven, Scope.None, rawMaven.getPom().getVersion(), effectiveProperties, ctx.getRepositories());
         assert pom != null;
         rawMaven.getSample().stop(MetricsHelper.successTags(Timer.builder("rewrite.parse")
                 .description("The time spent parsing a Maven POM file")
                 .tag("file.type", "Maven"))
                 .register(Metrics.globalRegistry));
-        return rawMaven.getDocument().withMarkers(rawMaven.getDocument().getMarkers()
-                .compute(new MavenModel(randomId(), pom), (old, n) -> n));
+        return new MavenModel(randomId(), pom);
     }
 
     /**
@@ -136,7 +134,6 @@ public class RawMavenResolver {
     }
 
     private void processProperties(ResolutionTask task, PartialMaven partialMaven) {
-
         task.getRawMaven().getActiveProperties(activeProfiles).forEach(task.getEffectiveProperties()::putIfAbsent);
         if (task.getRawMaven().getPom().getProperties() != null) {
             partialMaven.setProperties(task.getRawMaven().getPom().getProperties());

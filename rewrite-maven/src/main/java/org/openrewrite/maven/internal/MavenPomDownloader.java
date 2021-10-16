@@ -220,8 +220,7 @@ public class MavenPomDownloader {
         }
 
         if (containingPom != null && !StringUtils.isBlank(relativePath)) {
-            Path folderContainingPom = containingPom.getSourcePath()
-                    .getParent();
+            Path folderContainingPom = containingPom.getSourcePath().getParent();
             if (folderContainingPom != null) {
                 RawMaven maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath, "pom.xml"))
                         .normalize());
