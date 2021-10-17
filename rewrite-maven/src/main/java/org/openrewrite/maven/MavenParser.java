@@ -100,7 +100,7 @@ public class MavenParser implements Parser<Maven> {
 
         for (Map.Entry<RawMaven, Xml.Document> rawToDoc : projectPoms.entrySet()) {
             RawMaven raw = rawToDoc.getKey().withProjectPom(true);
-            MavenModel model = new RawMavenResolver(downloader, activeProfiles, resolveOptional, ctx, relativeTo)
+            MavenModel model = new RawMavenResolver(downloader, activeProfiles, resolveOptional, ctx)
                     .resolve(raw, effectiveProperties);
             if (model != null) {
                 parsed.add(new Maven(rawToDoc.getValue().withMarkers(rawToDoc.getValue().getMarkers()

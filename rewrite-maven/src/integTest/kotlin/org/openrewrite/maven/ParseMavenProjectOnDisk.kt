@@ -18,8 +18,8 @@ package org.openrewrite.maven
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.java.JavaParser
 import org.openrewrite.maven.cache.LocalMavenArtifactCache
-import org.openrewrite.maven.cache.MapdbMavenPomCache
 import org.openrewrite.maven.cache.ReadOnlyLocalMavenArtifactCache
+import org.openrewrite.maven.cache.RocksdbMavenPomCache
 import org.openrewrite.maven.internal.MavenParsingException
 import org.openrewrite.maven.utilities.MavenArtifactDownloader
 import org.openrewrite.maven.utilities.MavenProjectParser
@@ -47,9 +47,8 @@ object ParseMavenProjectOnDisk {
             errorConsumer
         )
 
-        val pomCache = MapdbMavenPomCache(
-            Paths.get(System.getProperty("user.home"), ".rewrite", "cache", "poms").toFile(),
-            null
+        val pomCache = RocksdbMavenPomCache(
+            Paths.get(System.getProperty("user.home"), ".rewrite", "cache", "poms"),
         )
 
         val mavenParserBuilder = MavenParser.builder()

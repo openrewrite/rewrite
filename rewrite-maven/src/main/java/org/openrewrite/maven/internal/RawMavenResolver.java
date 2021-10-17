@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.internal;
 
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import lombok.*;
@@ -27,7 +28,6 @@ import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.tree.*;
 
 import java.net.URI;
-import java.nio.file.Path;
 import java.util.*;
 
 import static java.util.Collections.*;
@@ -36,6 +36,9 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 public class RawMavenResolver {
+    private static final Counter parentsResolved = Counter.builder("rewrite.maven.resolve.parents").register(Metrics.globalRegistry);
+    private static final Counter dependencyManagementResolved = Counter.builder("rewrite.maven.resolve.dependency.management").register(Metrics.globalRegistry);
+
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
 
     // This is used to keep track of what versions have been seen further up the tree so we don't unnecessarily
@@ -55,11 +58,8 @@ public class RawMavenResolver {
 
     private final MavenExecutionContextView ctx;
 
-    @Nullable
-    private final Path projectDir;
-
     public RawMavenResolver(MavenPomDownloader downloader, Collection<String> activeProfiles,
-                            boolean resolveOptional, ExecutionContext ctx, @Nullable Path projectDir) {
+                            boolean resolveOptional, ExecutionContext ctx) {
         this.versionSelection = new TreeMap<>();
         for (Scope scope : Scope.values()) {
             versionSelection.putIfAbsent(scope, new HashMap<>());
@@ -68,7 +68,6 @@ public class RawMavenResolver {
         this.activeProfiles = activeProfiles;
         this.resolveOptional = resolveOptional;
         this.ctx = new MavenExecutionContextView(ctx);
-        this.projectDir = projectDir;
     }
 
     @Nullable
@@ -76,8 +75,8 @@ public class RawMavenResolver {
         Pom pom = resolve(rawMaven, Scope.None, rawMaven.getPom().getVersion(), effectiveProperties, ctx.getRepositories());
         assert pom != null;
         rawMaven.getSample().stop(MetricsHelper.successTags(Timer.builder("rewrite.parse")
-                .description("The time spent parsing a Maven POM file")
-                .tag("file.type", "Maven"))
+                        .description("The time spent parsing a Maven POM file")
+                        .tag("file.type", "Maven"))
                 .register(Metrics.globalRegistry));
         return new MavenModel(randomId(), pom);
     }
@@ -170,9 +169,8 @@ public class RawMavenResolver {
                     RawMaven rawMaven = downloader.download(groupId, artifactId, version, null, null,
                             partialMaven.getRepositories(), ctx);
                     if (rawMaven != null) {
-                        Pom maven = new RawMavenResolver(downloader, activeProfiles, resolveOptional, ctx, projectDir)
-                                .resolve(rawMaven, Scope.Compile, d.getVersion(), new HashMap<>(), partialMaven.getRepositories());
-
+                        dependencyManagementResolved.increment();
+                        Pom maven = resolve(rawMaven, Scope.Compile, d.getVersion(), new HashMap<>(), partialMaven.getRepositories());
                         if (maven != null) {
                             managedDependencies.add(new DependencyManagementDependency.Imported(groupId, artifactId,
                                     version, d.getVersion(), maven));
@@ -434,8 +432,8 @@ public class RawMavenResolver {
 
                 //noinspection OptionalAssignedToNull
                 if (maybeParent == null) {
-                    parent = new RawMavenResolver(downloader, activeProfiles, resolveOptional, ctx, projectDir)
-                            .resolve(rawParentModel, Scope.None, rawParent.getVersion(), partialMaven.getEffectiveProperties(), task.getProjectPom(), partialMaven.getRepositories(), parentPomSightings);
+                    parentsResolved.increment();
+                    parent = resolve(rawParentModel, Scope.None, rawParent.getVersion(), partialMaven.getEffectiveProperties(), task.getProjectPom(), partialMaven.getRepositories(), parentPomSightings);
                     resolved.put(parentKey, Optional.ofNullable(parent));
                 } else {
                     parent = maybeParent.orElse(null);
@@ -709,6 +707,7 @@ public class RawMavenResolver {
         @EqualsAndHashCode.Include
         List<MavenRepository> repositories;
 
+        @EqualsAndHashCode.Include
         PartialMaven projectPom;
 
         @Nullable

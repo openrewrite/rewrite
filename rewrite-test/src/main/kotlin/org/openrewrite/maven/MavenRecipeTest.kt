@@ -15,10 +15,15 @@
  */
 package org.openrewrite.maven
 
+import io.micrometer.core.instrument.Metrics
+import io.micrometer.core.instrument.config.MeterFilter
 import org.intellij.lang.annotations.Language
-import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeAll
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
+import org.openrewrite.internal.LoggingMeterRegistry
 import org.openrewrite.maven.cache.InMemoryMavenPomCache
 import org.openrewrite.maven.tree.Maven
 import java.io.File
@@ -28,6 +33,28 @@ import java.nio.file.Path
 interface MavenRecipeTest : RecipeTest<Maven> {
     companion object {
         private val mavenCache = InMemoryMavenPomCache()
+        private val meterRegistry = LoggingMeterRegistry.builder().build()
+
+        @BeforeAll
+        @JvmStatic
+        fun setMeterRegistry() {
+            meterRegistry.config()
+                .meterFilter(MeterFilter.acceptNameStartsWith("rewrite.maven"))
+                .meterFilter(MeterFilter.deny())
+                .meterFilter(MeterFilter.ignoreTags("group.id", "artifact.id"))
+            Metrics.globalRegistry.add(meterRegistry)
+        }
+
+        @AfterAll
+        @JvmStatic
+        fun unsetMeterRegistry() {
+            Metrics.globalRegistry.remove(meterRegistry)
+        }
+    }
+
+    @AfterEach
+    fun printMetrics() {
+        meterRegistry.print()
     }
 
     override val parser: MavenParser
@@ -44,7 +71,15 @@ interface MavenRecipeTest : RecipeTest<Maven> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Maven) -> Unit = { }
     ) {
-        super.assertChangedBase(recipe, moderneAstLink, moderneApiBearerToken, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        super.assertChangedBase(
+            recipe,
+            moderneAstLink,
+            moderneApiBearerToken,
+            after,
+            cycles,
+            expectedCyclesThatMakeChanges,
+            afterConditions
+        )
     }
 
     fun assertChanged(
@@ -57,7 +92,16 @@ interface MavenRecipeTest : RecipeTest<Maven> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Maven) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        super.assertChangedBase(
+            parser,
+            recipe,
+            before,
+            dependsOn,
+            after,
+            cycles,
+            expectedCyclesThatMakeChanges,
+            afterConditions
+        )
     }
 
     fun assertChanged(
@@ -71,7 +115,17 @@ interface MavenRecipeTest : RecipeTest<Maven> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Maven) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, before, relativeTo, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        super.assertChangedBase(
+            parser,
+            recipe,
+            before,
+            relativeTo,
+            dependsOn,
+            after,
+            cycles,
+            expectedCyclesThatMakeChanges,
+            afterConditions
+        )
     }
 
     fun assertUnchanged(

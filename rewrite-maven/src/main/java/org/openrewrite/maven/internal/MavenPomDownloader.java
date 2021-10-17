@@ -195,10 +195,6 @@ public class MavenPomDownloader {
         Map<MavenRepository, Exception> errors = new HashMap<>();
 
         String versionMaybeDatedSnapshot = datedSnapshotVersion(groupId, artifactId, version, repositories, ctx);
-        if (versionMaybeDatedSnapshot == null) {
-            return null;
-        }
-
         Timer.Sample sample = Timer.start();
 
         // The pom being examined might be from a remote repository or a local filesystem.
@@ -302,7 +298,6 @@ public class MavenPomDownloader {
         return null;
     }
 
-    @Nullable
     private String datedSnapshotVersion(String groupId, String artifactId, String version, Collection<MavenRepository> repositories, ExecutionContext ctx) {
         if (version.endsWith("-SNAPSHOT")) {
             for (GroupArtifactVersion pinnedSnapshotVersion : new MavenExecutionContextView(ctx).getPinnedSnapshotVersions()) {

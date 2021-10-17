@@ -88,7 +88,7 @@ public class LoggingMeterRegistry extends MeterRegistry {
                                 long count = snapshot.count();
                                 if (count == 0) return;
                                 loggingSink.accept(print.id() +
-                                        "\n    sum=" + print.value(count) +
+                                        "\n    sum=" + count +
                                         "\n    rate=" + print.unitlessRate(count) +
                                         "\n    mean=" + print.time(snapshot.mean(getBaseTimeUnit())) +
                                         "\n    max=" + print.time(snapshot.max(getBaseTimeUnit())));
@@ -98,7 +98,7 @@ public class LoggingMeterRegistry extends MeterRegistry {
                                 long count = snapshot.count();
                                 if (count == 0) return;
                                 loggingSink.accept(print.id() +
-                                        "\n    sum=" + print.value(count) +
+                                        "\n    sum=" + count +
                                         "\n    rate=" + print.unitlessRate(count) +
                                         "\n    mean=" + print.value(snapshot.mean()) +
                                         "\n    max=" + print.value(snapshot.max()));
