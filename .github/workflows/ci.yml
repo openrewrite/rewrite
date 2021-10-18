@@ -34,7 +34,7 @@ jobs:
           fetch-depth: 0
       - name: install-graalvm
         run: |
-          wget -O $RUNNER_TEMP/graalvm.tgz https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-${{ matrix.graal }}/graalvm-ce-${{ matrix.java }}-linux-amd64-${{ matrix.graal }}.tar.gz && \
+          curl -L -o $RUNNER_TEMP/graalvm.tgz https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-${{ matrix.graal }}/graalvm-ce-${{ matrix.java }}-linux-amd64-${{ matrix.graal }}.tar.gz && \
           mkdir -p /opt && cd /opt && tar -zxf $RUNNER_TEMP/graalvm.tgz
       - name: install-polyglot-languages
         run: |
