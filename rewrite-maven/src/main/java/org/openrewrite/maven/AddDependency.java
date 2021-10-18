@@ -197,7 +197,7 @@ public class AddDependency extends Recipe {
                         }
 
                         return (SourceFile) new AddDependencyVisitor(
-                                groupId, artifactId, version, versionPattern, scope, releasesOnly,
+                                groupId, artifactId, version, versionPattern, resolvedScope, releasesOnly,
                                 type, classifier, optional, familyPatternCompiled).visit(s, ctx);
                     }
                     return s;

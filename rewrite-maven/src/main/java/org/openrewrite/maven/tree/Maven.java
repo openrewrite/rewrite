@@ -146,6 +146,10 @@ public class Maven extends Xml.Document {
         return mavenModel.getPom();
     }
 
+    public String getCoordinates() {
+        return mavenModel.getPom().getCoordinates();
+    }
+
     @SuppressWarnings("unchecked")
     @Override
     @Nullable
