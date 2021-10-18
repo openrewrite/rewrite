@@ -142,36 +142,37 @@ public class EmptyBlockVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         // invert top-level if
+        // Ideally should also add support for other types of expression
         J.ControlParentheses<Expression> cond = i.getIfCondition();
-        if (cond.getTree() instanceof J.Binary) {
-            J.Binary binary = (J.Binary) cond.getTree();
-
-            // only boolean operators are valid for if conditions
-            switch (binary.getOperator()) {
-                case Equal:
-                    cond = cond.withTree(binary.withOperator(J.Binary.Type.NotEqual));
-                    break;
-                case NotEqual:
-                    cond = cond.withTree(binary.withOperator(J.Binary.Type.Equal));
-                    break;
-                case LessThan:
-                    cond = cond.withTree(binary.withOperator(J.Binary.Type.GreaterThanOrEqual));
-                    break;
-                case LessThanOrEqual:
-                    cond = cond.withTree(binary.withOperator(J.Binary.Type.GreaterThan));
-                    break;
-                case GreaterThan:
-                    cond = cond.withTree(binary.withOperator(J.Binary.Type.LessThanOrEqual));
-                    break;
-                case GreaterThanOrEqual:
-                    cond = cond.withTree(binary.withOperator(J.Binary.Type.LessThan));
-                    break;
-                default:
-                    break;
-            }
-
-            i = i.withIfCondition(cond);
+        if (!(cond.getTree() instanceof J.Binary)) {
+            return i;
         }
+        J.Binary binary = (J.Binary) cond.getTree();
+
+        // only boolean operators are valid for if conditions
+        switch (binary.getOperator()) {
+            case Equal:
+                cond = cond.withTree(binary.withOperator(J.Binary.Type.NotEqual));
+                break;
+            case NotEqual:
+                cond = cond.withTree(binary.withOperator(J.Binary.Type.Equal));
+                break;
+            case LessThan:
+                cond = cond.withTree(binary.withOperator(J.Binary.Type.GreaterThanOrEqual));
+                break;
+            case LessThanOrEqual:
+                cond = cond.withTree(binary.withOperator(J.Binary.Type.GreaterThan));
+                break;
+            case GreaterThan:
+                cond = cond.withTree(binary.withOperator(J.Binary.Type.LessThanOrEqual));
+                break;
+            case GreaterThanOrEqual:
+                cond = cond.withTree(binary.withOperator(J.Binary.Type.LessThan));
+                break;
+            default:
+                break;
+        }
+        i = i.withIfCondition(cond);
 
         if (i.getElsePart() == null) {
             return i.withThenPart(new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY))
