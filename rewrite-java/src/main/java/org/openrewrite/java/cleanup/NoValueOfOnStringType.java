@@ -31,28 +31,21 @@ import java.util.Collections;
 import java.util.Set;
 
 public class NoValueOfOnStringType extends Recipe {
-    private static final MethodMatcher VALUE_OF = new MethodMatcher("java.lang.String valueOf(java.lang.Object)");
+    private static final MethodMatcher VALUE_OF = new MethodMatcher("java.lang.String valueOf(..)");
 
     @Override
     public String getDisplayName() {
-        return "Use `String`";
+        return "Unnecessary String#valueOf(..)";
     }
 
     @Override
     public String getDescription() {
-        return "Replaces`#valueOf(..)` with the argument if the type is already a String.";
+        return "Replaces unnecessary `String#valueOf(..)` method invocations with the argument.";
     }
 
-    @Nullable
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                doAfterVisit(new UsesMethod<>("java.lang.String valueOf(java.lang.Object)"));
-                return cu;
-            }
-        };
+    protected UsesMethod<ExecutionContext> getSingleSourceApplicableTest() {
+        return new UsesMethod<>("java.lang.String valueOf(..)");
     }
 
     @Override
@@ -73,9 +66,8 @@ public class NoValueOfOnStringType extends Recipe {
                 J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, executionContext);
                 if (VALUE_OF.matches(mi)) {
                     Expression argument = mi.getArguments().get(0);
-                    if ((argument instanceof J.MethodInvocation &&
-                            TypeUtils.isOfType(((J.MethodInvocation) argument).getReturnType(), JavaType.Primitive.String)) ||
-                            TypeUtils.isOfType(argument.getType(), JavaType.Primitive.String)) {
+                    if ((argument instanceof J.Literal && TypeUtils.isOfType(argument.getType(), JavaType.Primitive.String))
+                        || getCursor().firstEnclosing(J.Binary.class) != null) {
                         return mi.withTemplate(JavaTemplate.builder(this::getCursor, "#{any(java.lang.String)}").build(),
                                 mi.getCoordinates().replace(),
                                 argument);

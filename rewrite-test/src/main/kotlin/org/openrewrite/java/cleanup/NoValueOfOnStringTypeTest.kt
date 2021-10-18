@@ -35,11 +35,11 @@ interface NoValueOfOnStringTypeTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("UnnecessaryCallToStringValueOf")
     @Test
     fun valueOfOnString() = assertChanged(
         before = """
             class Test {
-                @SuppressWarnings("all")
                 String method() {
                     return String.valueOf("hello");
                 }
@@ -47,7 +47,6 @@ interface NoValueOfOnStringTypeTest : JavaRecipeTest {
         """,
         after = """
             class Test {
-                @SuppressWarnings("all")
                 String method() {
                     return "hello";
                 }
@@ -55,40 +54,42 @@ interface NoValueOfOnStringTypeTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("UnnecessaryCallToStringValueOf")
     @Test
-    fun valueOfOnStringVariable() = assertChanged(
+    fun valueOfOnPrimitiveForBinary() = assertChanged(
         before = """
             class Test {
-                String method(String val) {
-                    return String.valueOf(val);
+                public void count(int i){
+                  System.out.println("Count: " + String.valueOf(i));
                 }
             }
         """,
         after = """
             class Test {
-                String method(String val) {
-                    return val;
+                public void count(int i){
+                  System.out.println("Count: " + i);
                 }
             }
         """
     )
 
     @Test
-    fun valueOfOnMethodInvocation() = assertChanged(
+    fun valueOfOnStringVariable() = assertUnchanged(
+        before = """
+            class Test {
+                String method(String val) {
+                    return String.valueOf(val);
+                }
+            }
+        """
+    )
+
+    @Test
+    fun valueOfOnMethodInvocation() = assertUnchanged(
         before = """
             class Test {
                 void method1() {
                     String a = String.valueOf(method2());
-                }
-                String method2() {
-                    return "";
-                }
-            }
-        """,
-        after = """
-            class Test {
-                void method1() {
-                    String a = method2();
                 }
                 String method2() {
                     return "";
