@@ -1150,6 +1150,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1111")
     @Test
     fun addMethodAnnotations(jp: JavaParser) = assertChanged(
         jp,
@@ -1176,7 +1177,7 @@ interface JavaTemplateTest : JavaRecipeTest {
 
                 static final String WARNINGS = "ALL";
 
-                public void test1() {
+                void test1() {
                 }
             }
         """,
@@ -1189,7 +1190,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 static final String WARNINGS = "ALL";
 
                 @SuppressWarnings("other")
-                public void test1() {
+                void test1() {
                 }
             }
         """

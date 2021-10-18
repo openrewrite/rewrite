@@ -275,7 +275,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                             coordinates.getComparator()));
                                 }
                             }
-                            return autoFormat(m, m.getLeadingAnnotations().get(m.getLeadingAnnotations().size() - 1), p,
+                            return autoFormat(m, m.getName(), p,
                                     getCursor().getParentOrThrow());
                         }
                         case BLOCK_PREFIX: {
