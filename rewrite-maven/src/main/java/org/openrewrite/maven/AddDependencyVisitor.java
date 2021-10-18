@@ -138,6 +138,8 @@ public class AddDependencyVisitor extends MavenVisitor {
 
     @RequiredArgsConstructor
     private class InsertDependencyInOrder extends MavenVisitor {
+
+        @Nullable
         private final String scope;
 
         @Override
@@ -165,7 +167,7 @@ public class AddDependencyVisitor extends MavenVisitor {
                                         "<version>" + versionToUse + "</version>\n") +
                                 (classifier == null ? "" :
                                         "<classifier>" + classifier + "</classifier>\n") +
-                                (scope.equals("compile") ? "" :
+                                (scope == null || scope.equals("compile") ? "" :
                                         "<scope>" + scope + "</scope>\n") +
                                 (Boolean.TRUE.equals(optional) ? "<optional>true</optional>\n" : "") +
                                 "</dependency>"

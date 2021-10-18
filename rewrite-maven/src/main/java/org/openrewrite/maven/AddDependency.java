@@ -174,6 +174,11 @@ public class AddDependency extends Recipe {
         return ListUtils.map(before, s -> s.getMarkers().findFirst(JavaProject.class)
                 .map(javaProject -> {
                     if (s instanceof Maven) {
+                        String resolvedScope = this.scope == null ? scopeByProject.get(javaProject) : this.scope;
+                        if (resolvedScope == null) {
+                            return s;
+                        }
+                        //If the dependency is already in scope, no need to continue.
                         Pom ancestor = ((Maven) s).getMavenModel().getPom();
                         while (ancestor != null) {
                             for (Pom.Dependency d : ancestor.getDependencies(Scope.Compile)) {
@@ -181,17 +186,18 @@ public class AddDependency extends Recipe {
                                     return s;
                                 }
                             }
-                            for (Pom.Dependency d : ancestor.getDependencies(Scope.Test)) {
-                                if (groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
-                                    return s;
+                            if (resolvedScope.equals("test")) {
+                                for (Pom.Dependency d : ancestor.getDependencies(Scope.Test)) {
+                                    if (groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                                        return s;
+                                    }
                                 }
                             }
                             ancestor = ancestor.getParent();
                         }
 
-                        String scope = this.scope == null ? scopeByProject.get(javaProject) : this.scope;
-                        return scope == null ? s : (SourceFile) new AddDependencyVisitor(
-                                groupId, artifactId, version, versionPattern, scope, releasesOnly,
+                        return (SourceFile) new AddDependencyVisitor(
+                                groupId, artifactId, version, versionPattern, resolvedScope, releasesOnly,
                                 type, classifier, optional, familyPatternCompiled).visit(s, ctx);
                     }
                     return s;

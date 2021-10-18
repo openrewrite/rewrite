@@ -295,6 +295,10 @@ public class Pom {
         return version;
     }
 
+    public String getCoordinates() {
+        return getGroupId() + ":" + getArtifactId() + ":" + getVersion();
+    }
+
     public String getPackaging() {
         return packaging == null ? "jar" : packaging;
     }
