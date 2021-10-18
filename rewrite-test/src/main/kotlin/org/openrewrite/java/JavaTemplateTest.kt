@@ -16,6 +16,7 @@
 package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
@@ -606,6 +607,52 @@ interface JavaTemplateTest : JavaRecipeTest {
                     n = 1;
                     n = 2;
                     n = 3;
+                }
+            }
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1120")
+    @Disabled
+    @Suppress("UnusedAssignment", "CodeBlock2Expr")
+    fun replaceStatementInLambdaBodyBlock(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.logCompilationWarningsAndErrors(true).build(),
+        recipe = toRecipe {
+            object : JavaVisitor<ExecutionContext>() {
+                val t = JavaTemplate.builder({ cursor }, "n = 1;").build()
+
+                override fun visitAssignment(assignment: J.Assignment, p: ExecutionContext): J {
+                    if (assignment.assignment is J.Literal && Integer.valueOf(0) == (assignment.assignment as J.Literal).value) {
+                        return assignment.withTemplate(t, assignment.coordinates.replace())
+                    }
+                    return assignment
+                }
+            }
+        },
+        before = """
+            import java.util.stream.Stream;
+
+            class Test {
+                int n;
+
+                void method(Stream<Object> obj) {
+                    obj.forEach(o -> {
+                        n = 0;
+                    });
+                }
+            }
+        """,
+        after = """
+            import java.util.stream.Stream;
+
+            class Test {
+                int n;
+
+                void method(Stream<Object> obj) {
+                    obj.forEach(o -> {
+                        n = 1;
+                    });
                 }
             }
         """
