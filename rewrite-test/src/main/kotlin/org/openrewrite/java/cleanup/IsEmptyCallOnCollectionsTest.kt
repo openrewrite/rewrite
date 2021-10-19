@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.cleanup
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
@@ -97,8 +96,7 @@ interface IsEmptyCallOnCollectionsTest : JavaRecipeTest {
     )
 
     @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/1112")
-    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/1120")
     fun lambda() = assertChanged(
         before = """
             import java.util.List;

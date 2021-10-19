@@ -195,6 +195,19 @@ public class BlockStatementTemplateGenerator {
                     before.insert(0, "static");
                 }
             } else if (parent instanceof J.Lambda) {
+                J.Block b = (J.Block) j;
+
+                // variable declarations up to the point of insertion
+                for (Statement statement : b.getStatements()) {
+                    if (statement == prior) {
+                        break;
+                    } else if (statement instanceof J.VariableDeclarations) {
+                        before.insert(0, "\n" +
+                                variable((J.VariableDeclarations) statement, true, cursor) +
+                                ";\n");
+                    }
+                }
+
                 before.insert(0, "{\n");
             } else {
                 before.insert(0, "{\n");
@@ -231,12 +244,12 @@ public class BlockStatementTemplateGenerator {
                 after.append("catch(Throwable t) { throw new RuntimeException(t); }");
             }
         } else if (j instanceof J.Lambda) {
-            // lambda with a single statement and no block
             J.Lambda l = (J.Lambda) j;
             before.insert(0, "{ if(true) {");
             after.append("}\nreturn ").append(valueOfType(l.getType())).append(";\n};\n");
 
             before.insert(0, l.withBody(null).withPrefix(Space.EMPTY).printTrimmed(cursor).trim());
+            before.insert(0, "Object o = ");
         } else if (j instanceof J.VariableDeclarations) {
             before.insert(0, variable((J.VariableDeclarations) j, false, cursor) + '=');
         }
