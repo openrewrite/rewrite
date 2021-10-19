@@ -50,6 +50,8 @@ jobs:
             ${{ runner.os }}-gradle-
       - name: build
         run: JAVA_HOME=/opt/graalvm-ce-${{ matrix.java }}-${{ matrix.graal }} ./gradlew ${GRADLE_SWITCHES} build test
+        env:
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
       - name: publish-tests
         uses: EnricoMi/publish-unit-test-result-action@v1
         if: always()
