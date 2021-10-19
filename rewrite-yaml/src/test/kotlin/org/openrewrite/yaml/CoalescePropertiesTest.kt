@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import org.openrewrite.Issue
 import org.openrewrite.Recipe
 
 class CoalescePropertiesTest : YamlRecipeTest {
-
     override val recipe: Recipe
         get() = CoalesceProperties()
 
@@ -106,6 +105,29 @@ class CoalescePropertiesTest : YamlRecipeTest {
             management.metrics.enable:
                 process.files: true
                 jvm: true
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1125")
+    @Disabled
+    fun foldWithComments() = assertChanged(
+        before = """
+            com:
+              company:
+                other:
+                  logging:
+                    kafka:
+                      uniqueTopic: a-topic
+            #TODO bug pending          topic: a-topic #This property disappear
+                      properties:
+                        one.other: true
+        """,
+        after = """
+            com.company.other.logging.kafka:
+              uniqueTopic: a-topic
+            #TODO bug pending          topic: a-topic #This property disappear
+              properties.one.other: true
         """
     )
 
