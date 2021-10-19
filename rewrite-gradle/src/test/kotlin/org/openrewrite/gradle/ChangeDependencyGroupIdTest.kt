@@ -18,17 +18,11 @@ package org.openrewrite.gradle
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 
-class ChangeDependencyGroupIdAndArtifactIdTest : GradleRecipeTest {
+class ChangeDependencyGroupIdTest : GradleRecipeTest {
     @ParameterizedTest
     @ValueSource(strings = ["org.openrewrite:rewrite-core", "*:*"])
-    fun findDependency(ga: String) = assertChanged(
-        recipe = ChangeDependencyGroupIdAndArtifactId(
-            ga.substringBefore(':'),
-            ga.substringAfter(':'),
-            "org.dewrite",
-            "dewrite-core",
-            null
-        ),
+    fun findDependency(gav: String) = assertChanged(
+        recipe = ChangeDependencyGroupId(gav, "org.dewrite", null),
         before = """
             dependencies {
                 api 'org.openrewrite:rewrite-core:latest.release'
@@ -37,22 +31,16 @@ class ChangeDependencyGroupIdAndArtifactIdTest : GradleRecipeTest {
         """,
         after = """
             dependencies {
-                api 'org.dewrite:dewrite-core:latest.release'
-                api "org.dewrite:dewrite-core:latest.release"
+                api 'org.dewrite:rewrite-core:latest.release'
+                api "org.dewrite:rewrite-core:latest.release"
             }
         """
     )
 
     @ParameterizedTest
     @ValueSource(strings = ["org.openrewrite:rewrite-core", "*:*"])
-    fun findMapStyleDependency(ga: String) = assertChanged(
-        recipe = ChangeDependencyGroupIdAndArtifactId(
-            ga.substringBefore(':'),
-            ga.substringAfter(':'),
-            "org.dewrite",
-            "dewrite-core",
-            null
-        ),
+    fun findMapStyleDependency(gav: String) = assertChanged(
+        recipe = ChangeDependencyGroupId(gav, "org.dewrite", null),
         before = """
             dependencies {
                 api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
@@ -61,8 +49,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest : GradleRecipeTest {
         """,
         after = """
             dependencies {
-                api group: 'org.dewrite', name: 'dewrite-core', version: 'latest.release'
-                api group: "org.dewrite", name: "dewrite-core", version: "latest.release"
+                api group: 'org.dewrite', name: 'rewrite-core', version: 'latest.release'
+                api group: "org.dewrite", name: "rewrite-core", version: "latest.release"
             }
         """
     )
