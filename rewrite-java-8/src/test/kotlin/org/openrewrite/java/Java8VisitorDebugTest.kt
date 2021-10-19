@@ -230,6 +230,10 @@ class Java8FindTypesTest : Java8Test, FindTypesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8FindTypesByPackageTest : Java8Test, FindTypesByPackageTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8HiddenFieldTest : Java8Test, HiddenFieldTest
 
 @DebugOnly
