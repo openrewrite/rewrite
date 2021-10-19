@@ -43,6 +43,7 @@ jobs:
           ORG_GRADLE_PROJECT_sonatypePassword: ${{ secrets.OSSRH_TOKEN }}
           ORG_GRADLE_PROJECT_signingKey: ${{ secrets.OSSRH_SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.OSSRH_SIGNING_PASSWORD }}
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
 
       - name: publish-release
         if: (!contains(github.ref, '-rc.'))
