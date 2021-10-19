@@ -234,7 +234,7 @@ public class BlockStatementTemplateGenerator {
             after.append("}\nreturn ").append(valueOfType(l.getType())).append(";\n};\n");
 
             before.insert(0, l.withBody(null).withPrefix(Space.EMPTY).printTrimmed(cursor).trim());
-            before.insert(0, "Object o = ");
+            before.insert(0, "Object lambda = ");
         } else if (j instanceof J.VariableDeclarations) {
             before.insert(0, variable((J.VariableDeclarations) j, false, cursor) + '=');
         }
