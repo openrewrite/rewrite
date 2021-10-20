@@ -18,6 +18,7 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.ChangeMethodName;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -74,14 +75,18 @@ public class MethodNameCasing extends Recipe {
                                 while (i < name.length && (!Character.isLetterOrDigit(name[i]) || name[i] > 'z')) {
                                     i++;
                                 }
-                                standardized.append(Character.toUpperCase(name[i]));
+                                if (i < name.length) {
+                                    standardized.append(Character.toUpperCase(name[i]));
+                                }
                             } else {
                                 standardized.append(c);
                             }
                         }
                     }
 
-                    doNext(new ChangeMethodName(MethodMatcher.methodPattern(method), standardized.toString(), null));
+                    if (!StringUtils.isBlank(standardized.toString())) {
+                        doNext(new ChangeMethodName(MethodMatcher.methodPattern(method), standardized.toString(), null));
+                    }
                 }
 
                 return super.visitMethodDeclaration(method, executionContext);
