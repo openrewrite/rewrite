@@ -33,7 +33,7 @@ recipeList:
   - org.openrewrite.java.cleanup.FallThrough
   - org.openrewrite.java.cleanup.FinalClass
   - org.openrewrite.java.cleanup.ForLoopIncrementInUpdate
-  - org.openrewrite.java.cleanup.HiddenField
+#  - org.openrewrite.java.cleanup.HiddenField
   - org.openrewrite.java.cleanup.HideUtilityClassConstructor
   - org.openrewrite.java.cleanup.IndexOfReplaceableByContains
   - org.openrewrite.java.cleanup.IndexOfShouldNotCompareGreaterThanZero
@@ -53,9 +53,9 @@ recipeList:
   - org.openrewrite.java.cleanup.NoValueOfOnStringType
   - org.openrewrite.java.cleanup.PrimitiveWrapperClassConstructorToValueOf
   - org.openrewrite.java.cleanup.RemoveExtraSemicolons
-  - org.openrewrite.java.RemoveUnusedImports
+#  - org.openrewrite.java.RemoveUnusedImports
   - org.openrewrite.java.cleanup.RemoveUnusedLocalVariables
-  - org.openrewrite.java.cleanup.RemoveUnusedPrivateMethods
+#  - org.openrewrite.java.cleanup.RemoveUnusedPrivateMethods
   - org.openrewrite.java.cleanup.RenameLocalVariablesToCamelCase
   - org.openrewrite.java.cleanup.SimplifyBooleanExpression
   - org.openrewrite.java.cleanup.SimplifyBooleanReturn
