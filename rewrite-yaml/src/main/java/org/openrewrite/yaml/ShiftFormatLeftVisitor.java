@@ -15,7 +15,11 @@
  */
 package org.openrewrite.yaml;
 
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.yaml.tree.Yaml;
+
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 public class ShiftFormatLeftVisitor<P> extends YamlIsoVisitor<P> {
     private final Yaml scope;
@@ -48,8 +52,18 @@ public class ShiftFormatLeftVisitor<P> extends YamlIsoVisitor<P> {
         return e;
     }
 
+    @SuppressWarnings("DynamicRegexReplaceableByCompiledPattern")
     private String shiftPrefix(String prefix) {
-        return prefix.substring(0, prefix.indexOf('\n') + 1) +
-                prefix.substring(prefix.indexOf('\n') + shift + 1);
+        return Arrays.stream(prefix.split("\\n"))
+                .map(s -> {
+                    // Only remove the "shift"-amount of whitespace if there is enough available in the prefix on this line.
+                    // Specifically, we're trying to avoid comments in a prefix from being formatted in a way that mangles the yaml.
+                    // Otherwise, just leave this line be. It's worse to remove an overrun of whitespace than it is to do nothing to this prefix line.
+                    // If the prefix line only contains whitespace, make sure there's enough room to remove it as well.
+                    if (StringUtils.indexOfNonWhitespace(s) > shift || (StringUtils.indexOfNonWhitespace(s) == -1 && s.length() > shift)) {
+                        return s.substring(shift);
+                    }
+                    return s;
+                }).collect(Collectors.joining("\n"));
     }
 }
