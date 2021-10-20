@@ -111,23 +111,39 @@ class CoalescePropertiesTest : YamlRecipeTest {
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1125")
     @Disabled
-    fun foldWithComments() = assertChanged(
+    fun foldWithCommentsInPrefix() = assertChanged(
         before = """
-            com:
-              company:
-                other:
-                  logging:
-                    kafka:
-                      uniqueTopic: a-topic
-            #TODO bug pending          topic: a-topic #This property disappear
-                      properties:
-                        one.other: true
+            a:
+              b:
+                # d-comment
+                d:
+                  e.f: true
+                c: c-value
         """,
         after = """
-            com.company.other.logging.kafka:
-              uniqueTopic: a-topic
-            #TODO bug pending          topic: a-topic #This property disappear
-              properties.one.other: true
+            a.b:
+              # d-comment
+              d.e.f: true
+              c: c-value
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1125")
+    @Disabled
+    fun foldWithCommentsAfterKey() = assertChanged(
+        before = """
+            a:
+              b:
+                d: # d-comment
+                  e.f: true
+                c: c-value
+        """,
+        after = """
+            a.b:
+              d: # d-comment
+                e.f: true
+              c: c-value
         """
     )
 
