@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@file:Suppress("UnnecessaryLocalVariable")
 
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.Tree
 import org.openrewrite.java.JavaParser
@@ -26,6 +26,7 @@ import org.openrewrite.java.style.Checkstyle
 import org.openrewrite.java.style.HiddenFieldStyle
 import org.openrewrite.style.NamedStyles
 
+@Suppress("UnnecessaryLocalVariable")
 interface HiddenFieldTest : JavaRecipeTest {
     override val recipe: Recipe?
         get() = HiddenField()
@@ -40,19 +41,15 @@ interface HiddenFieldTest : JavaRecipeTest {
         )
 
     @Test
-    fun ignoreUnaffectedVariables(jp: JavaParser) = assertUnchanged(
-        // basic check to ensure this recipe doesn't rename every variable no matter what
-        jp,
+    fun ignoreUnaffectedVariables() = assertUnchanged(
         before = """
-            package org.openrewrite;
-
-            public class A {
+            class Test {
                 private String field;
 
-                public A(String someField) {
+                public Test(String someField) {
                 }
 
-                public void method(String someField) {
+                static void method(String someField) {
                     String localVariable = someField;
                 }
             }
@@ -60,12 +57,9 @@ interface HiddenFieldTest : JavaRecipeTest {
     )
 
     @Test
-    fun renameHiddenFields(jp: JavaParser) = assertChanged(
-        jp,
+    fun renameHiddenFields() = assertChanged(
         dependsOn = arrayOf(
             """
-            package org.openrewrite;
-
             public class B {
                 protected int n2;
                 int n3;
@@ -74,8 +68,6 @@ interface HiddenFieldTest : JavaRecipeTest {
             """
         ),
         before = """
-            package org.openrewrite;
-
             public class A extends B {
                 int n;
                 int n1;
@@ -93,8 +85,6 @@ interface HiddenFieldTest : JavaRecipeTest {
             }
         """,
         after = """
-            package org.openrewrite;
-
             public class A extends B {
                 int n;
                 int n1;
@@ -119,8 +109,6 @@ interface HiddenFieldTest : JavaRecipeTest {
             withIgnoreConstructorParameter(false)
         }).build(),
         before = """
-            package org.openrewrite;
-
             public class A {
                 private String field;
 
@@ -129,8 +117,6 @@ interface HiddenFieldTest : JavaRecipeTest {
             }
         """,
         after = """
-            package org.openrewrite;
-
             public class A {
                 private String field;
 
@@ -146,8 +132,6 @@ interface HiddenFieldTest : JavaRecipeTest {
             withIgnoreConstructorParameter(true)
         }).build(),
         before = """
-            package org.openrewrite;
-
             public class A {
                 private String field;
 
@@ -161,8 +145,6 @@ interface HiddenFieldTest : JavaRecipeTest {
     fun methodParameter(jp: JavaParser) = assertChanged(
         jp,
         before = """
-            package org.openrewrite;
-
             public class A {
                 private String field;
 
@@ -171,8 +153,6 @@ interface HiddenFieldTest : JavaRecipeTest {
             }
         """,
         after = """
-            package org.openrewrite;
-
             public class A {
                 private String field;
 
@@ -186,8 +166,6 @@ interface HiddenFieldTest : JavaRecipeTest {
     fun methodBodyLocalVariable(jp: JavaParser) = assertChanged(
         jp,
         before = """
-            package org.openrewrite;
-
             public class A {
                 private String field;
 
@@ -197,8 +175,6 @@ interface HiddenFieldTest : JavaRecipeTest {
             }
         """,
         after = """
-            package org.openrewrite;
-
             public class A {
                 private String field;
 
@@ -213,8 +189,6 @@ interface HiddenFieldTest : JavaRecipeTest {
     fun forLoops(jp: JavaParser) = assertChanged(
         jp,
         before = """
-            package org.openrewrite;
-
             public class A {
                 int n;
 
@@ -232,8 +206,6 @@ interface HiddenFieldTest : JavaRecipeTest {
             }
         """,
         after = """
-            package org.openrewrite;
-
             public class A {
                 int n;
 
@@ -257,8 +229,6 @@ interface HiddenFieldTest : JavaRecipeTest {
     fun lambdaWithTypedParameterHides(jp: JavaParser) = assertChanged(
         jp,
         before = """
-            package org.openrewrite;
-            
             import java.util.List;
             import java.util.Arrays;
 
@@ -271,8 +241,6 @@ interface HiddenFieldTest : JavaRecipeTest {
             }
         """,
         after = """
-            package org.openrewrite;
-
             import java.util.List;
             import java.util.Arrays;
 
@@ -290,8 +258,6 @@ interface HiddenFieldTest : JavaRecipeTest {
     fun nestedClasses(jp: JavaParser) = assertChanged(
         jp,
         before = """
-            package org.openrewrite;
-
             public class Outer {
                 int outer;
 
@@ -312,8 +278,6 @@ interface HiddenFieldTest : JavaRecipeTest {
             }
         """,
         after = """
-            package org.openrewrite;
-
             public class Outer {
                 int outer;
 
@@ -339,8 +303,6 @@ interface HiddenFieldTest : JavaRecipeTest {
     fun incrementRenamedVariableNameUntilUnique(jp: JavaParser) = assertChanged(
         jp,
         before = """
-            package org.openrewrite;
-
             public class A {
                 int n, n1;
 
@@ -350,8 +312,6 @@ interface HiddenFieldTest : JavaRecipeTest {
             }
         """,
         after = """
-            package org.openrewrite;
-
             public class A {
                 int n, n1;
 
@@ -366,8 +326,6 @@ interface HiddenFieldTest : JavaRecipeTest {
     fun incrementRenamedVariableNameShouldNotCollideWithExistingVariablesInUse(jp: JavaParser) = assertChanged(
         jp,
         before = """
-            package org.openrewrite;
-
             public class A {
                 int n, n1;
 
@@ -377,8 +335,6 @@ interface HiddenFieldTest : JavaRecipeTest {
             }
         """,
         after = """
-            package org.openrewrite;
-
             public class A {
                 int n, n1;
 
@@ -393,8 +349,6 @@ interface HiddenFieldTest : JavaRecipeTest {
     fun ignoreEnums(jp: JavaParser) = assertUnchanged(
         jp,
         before = """
-            package org.openrewrite;
-
             enum ExampleEnum {
                 A(0),
                 B(1),
@@ -428,8 +382,6 @@ interface HiddenFieldTest : JavaRecipeTest {
     fun ignoreStaticMethodsAndInitializers(jp: JavaParser) = assertUnchanged(
         jp,
         before = """
-            package org.openrewrite;
-
             public class StaticMethods {
                 private int notHidden;
 
@@ -463,8 +415,6 @@ interface HiddenFieldTest : JavaRecipeTest {
     fun ignoreInterfaces(jp: JavaParser) = assertUnchanged(
         jp,
         before = """
-            package org.openrewrite;
-
             interface A {
                 int n = 0;
 
@@ -479,8 +429,6 @@ interface HiddenFieldTest : JavaRecipeTest {
             withIgnoreSetter(false)
         }).build(),
         before = """
-            package org.openrewrite;
-
             class A {
                 int n;
 
@@ -499,8 +447,6 @@ interface HiddenFieldTest : JavaRecipeTest {
             }
         """,
         after = """
-            package org.openrewrite;
-
             class A {
                 int n;
 
@@ -521,14 +467,12 @@ interface HiddenFieldTest : JavaRecipeTest {
     )
 
     @Test
-    fun ignoreSetter(jp: JavaParser.Builder<*, *>) = assertChanged(
+    fun ignoreVoidSettersAndChangeSettersThatReturnItsClass(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(hiddenFieldStyle {
             withIgnoreSetter(true)
                 .withSetterCanReturnItsClass(false)
         }).build(),
         before = """
-            package org.openrewrite;
-
             class A {
                 int n;
 
@@ -547,8 +491,6 @@ interface HiddenFieldTest : JavaRecipeTest {
             }
         """,
         after = """
-            package org.openrewrite;
-
             class A {
                 int n;
 
@@ -569,14 +511,21 @@ interface HiddenFieldTest : JavaRecipeTest {
     )
 
     @Test
-    fun ignoreSetterThatReturnsItsClass(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+    @Issue("https://github.com/openrewrite/rewrite/issues/1129")
+    fun ignoreVoidSettersAndSettersThatReturnItsClass(jp: JavaParser.Builder<*, *>) = assertUnchanged(
         jp.styles(hiddenFieldStyle {
             withIgnoreSetter(true)
                 .withSetterCanReturnItsClass(true)
         }).build(),
         before = """
-            package org.openrewrite;
+            class A {
+                int n;
 
+                public void setN(int n) {
+                    this.n = n;
+                }
+            }
+    
             class B {
                 int n;
 
@@ -592,8 +541,6 @@ interface HiddenFieldTest : JavaRecipeTest {
     fun renamesAbstractMethodParameters(jp: JavaParser) = assertChanged(
         jp,
         before = """
-            package org.openrewrite;
-
             public abstract class A {
                 int n;
 
@@ -601,8 +548,6 @@ interface HiddenFieldTest : JavaRecipeTest {
             }
         """,
         after = """
-            package org.openrewrite;
-
             public abstract class A {
                 int n;
 
@@ -617,8 +562,6 @@ interface HiddenFieldTest : JavaRecipeTest {
             withIgnoreAbstractMethods(true)
         }).build(),
         before = """
-            package org.openrewrite;
-
             public abstract class A {
                 int n;
 
@@ -632,8 +575,6 @@ interface HiddenFieldTest : JavaRecipeTest {
         jp,
         dependsOn = arrayOf(
             """
-            package org.openrewrite;
-
             public class B {
                 protected Integer n2;
                 Integer n3;
@@ -642,8 +583,6 @@ interface HiddenFieldTest : JavaRecipeTest {
         """
         ),
         before = """
-            package org.openrewrite;
-
             public class A extends B {
                 Integer n;
                 Integer n1;
@@ -656,8 +595,6 @@ interface HiddenFieldTest : JavaRecipeTest {
             }
         """,
         after = """
-            package org.openrewrite;
-
             public class A extends B {
                 Integer n;
                 Integer n1;

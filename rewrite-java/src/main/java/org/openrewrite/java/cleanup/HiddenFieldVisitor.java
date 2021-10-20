@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import org.openrewrite.java.RenameVariable;
 import org.openrewrite.java.style.HiddenFieldStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.HashSet;
 import java.util.List;
@@ -221,15 +222,13 @@ public class HiddenFieldVisitor<P> extends JavaIsoVisitor<P> {
 
                 boolean isIgnorableSetter = hiddenFieldStyle.getIgnoreSetter();
                 if (isIgnorableSetter &= maybeMethodDecl instanceof J.MethodDeclaration) {
-                    J.MethodDeclaration methodDecl = (J.MethodDeclaration) maybeMethodDecl;
-                    String methodName = methodDecl.getSimpleName();
+                    J.MethodDeclaration md = (J.MethodDeclaration) maybeMethodDecl;
 
-                    isIgnorableSetter = methodName.startsWith("set") &&
-                            methodDecl.getReturnTypeExpression() != null &&
-                            (hiddenFieldStyle.getSetterCanReturnItsClass() ?
-                                    (targetVariableEnclosingClass.getType() != null && targetVariableEnclosingClass.getType().equals(methodDecl.getReturnTypeExpression().getType())) :
-                                    JavaType.Primitive.Void.equals(methodDecl.getReturnTypeExpression().getType())) &&
-                            (methodName.length() > 3 && variable.getSimpleName().equalsIgnoreCase(methodName.substring(3)));
+                    boolean doesSetterReturnItsClass = md.getReturnTypeExpression() != null && TypeUtils.isOfType(targetVariableEnclosingClass.getType(), md.getReturnTypeExpression().getType());
+                    boolean isSetterVoid = md.getReturnTypeExpression() != null && JavaType.Primitive.Void.equals(md.getReturnTypeExpression().getType());
+                    boolean doesMethodNameCorrespondToVariable = md.getSimpleName().startsWith("set") && md.getSimpleName().toLowerCase().endsWith(variable.getSimpleName().toLowerCase());
+                    isIgnorableSetter = doesMethodNameCorrespondToVariable &&
+                            (hiddenFieldStyle.getSetterCanReturnItsClass() ? (doesSetterReturnItsClass || isSetterVoid) : isSetterVoid);
                 }
 
                 boolean isIgnorableAbstractMethod = hiddenFieldStyle.getIgnoreAbstractMethods();
