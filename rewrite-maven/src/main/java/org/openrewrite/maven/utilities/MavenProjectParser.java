@@ -74,8 +74,6 @@ public class MavenProjectParser {
     public List<SourceFile> parse(Path projectDirectory) {
         GitProvenance gitProvenance = GitProvenance.fromProjectDirectory(projectDirectory);
         List<Maven> mavens = mavenParser.parse(Maven.getMavenPoms(projectDirectory, ctx), projectDirectory, ctx);
-        List<SourceFile> sourceFiles = new ArrayList<>(mavens);
-
         mavens = sort(mavens);
 
         JavaParser javaParser = javaParserBuilder
@@ -86,8 +84,10 @@ public class MavenProjectParser {
             logger.info("  {}:{}", maven.getModel().getGroupId(), maven.getModel().getArtifactId());
         }
 
+        List<SourceFile> sourceFiles = new ArrayList<>();
         for (Maven maven : mavens) {
             List<Marker> projectProvenance = getJavaProvenance(maven, projectDirectory);
+            sourceFiles.add(addProjectProvenance(maven, projectProvenance));
 
             List<Path> dependencies = downloadArtifacts(maven.getModel().getDependencies(Scope.Compile));
             JavaSourceSet mainProvenance = JavaSourceSet.build("main", dependencies, ctx);
@@ -183,11 +183,16 @@ public class MavenProjectParser {
         ), addProvenance(projectProvenance, sourceSet)));
     }
 
+    private <S extends SourceFile> S addProjectProvenance(S s, List<Marker> projectProvenance) {
+        for (Marker marker : projectProvenance) {
+            s = s.withMarkers(s.getMarkers().addIfAbsent(marker));
+        }
+        return s;
+    }
+
     private <S extends SourceFile> UnaryOperator<S> addProvenance(List<Marker> projectProvenance, JavaSourceSet sourceSet) {
         return s -> {
-            for (Marker marker : projectProvenance) {
-                s = s.withMarkers(s.getMarkers().addIfAbsent(marker));
-            }
+            s = addProjectProvenance(s, projectProvenance);
             s = s.withMarkers(s.getMarkers().addIfAbsent(sourceSet));
             return s;
         };
