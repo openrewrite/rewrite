@@ -110,7 +110,7 @@ public class BlockStatementTemplateGenerator {
                     }
 
                     for (Comment comment : t.getPrefix().getComments()) {
-                        if(comment instanceof TextComment && ((TextComment) comment).getText().equals(TEMPLATE_COMMENT)) {
+                        if (comment instanceof TextComment && ((TextComment) comment).getText().equals(TEMPLATE_COMMENT)) {
                             blockEnclosingTemplateComment = getCursor().firstEnclosing(J.Block.class);
                             js.add(t.withPrefix(Space.EMPTY));
                             return t;
@@ -176,7 +176,7 @@ public class BlockStatementTemplateGenerator {
                         .withLeadingAnnotations(emptyList())
                         .withPrefix(Space.EMPTY)
                         .printTrimmed(cursor).trim() + '{');
-            } else if (parent instanceof J.Block) {
+            } else if (parent instanceof J.Block || parent instanceof J.Lambda) {
                 J.Block b = (J.Block) j;
 
                 // variable declarations up to the point of insertion
@@ -194,8 +194,6 @@ public class BlockStatementTemplateGenerator {
                 if (b.isStatic()) {
                     before.insert(0, "static");
                 }
-            } else if (parent instanceof J.Lambda) {
-                before.insert(0, "{\n");
             } else {
                 before.insert(0, "{\n");
             }
@@ -206,7 +204,7 @@ public class BlockStatementTemplateGenerator {
             }
         } else if (j instanceof J.NewClass) {
             J.NewClass n = (J.NewClass) j;
-            if (n.getArguments() != null && n.getArguments().stream().noneMatch(arg -> arg==prior)) {
+            if (n.getArguments() != null && n.getArguments().stream().noneMatch(arg -> arg == prior)) {
                 n = n.withBody(null).withPrefix(Space.EMPTY);
                 before.insert(0, n.printTrimmed(cursor).trim());
                 after.append(';');
@@ -231,12 +229,12 @@ public class BlockStatementTemplateGenerator {
                 after.append("catch(Throwable t) { throw new RuntimeException(t); }");
             }
         } else if (j instanceof J.Lambda) {
-            // lambda with a single statement and no block
             J.Lambda l = (J.Lambda) j;
             before.insert(0, "{ if(true) {");
             after.append("}\nreturn ").append(valueOfType(l.getType())).append(";\n};\n");
 
             before.insert(0, l.withBody(null).withPrefix(Space.EMPTY).printTrimmed(cursor).trim());
+            before.insert(0, "Object lambda = ");
         } else if (j instanceof J.VariableDeclarations) {
             before.insert(0, variable((J.VariableDeclarations) j, false, cursor) + '=');
         }
