@@ -27,6 +27,7 @@ plugins {
 }
 
 gradleEnterprise {
+    val isCiServer = System.getenv("CI")?.equals("true") ?: false
     server = "https://ge.openrewrite.org/"
 
     buildCache {
@@ -35,14 +36,13 @@ gradleEnterprise {
         }
 
         remote(HttpBuildCache::class) {
-            isPush = true
             url = uri("https://ge.openrewrite.org/cache/")
+            isPush = isCiServer
         }
-
     }
 
     buildScan {
         publishAlways()
-        isUploadInBackground = false
+        isUploadInBackground = !isCiServer
     }
 }
