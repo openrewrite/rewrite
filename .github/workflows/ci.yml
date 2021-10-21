@@ -25,6 +25,7 @@ jobs:
       matrix:
         java: ["java11"]
         graal: ["21.2.0"]
+        gu-binary: ["gu"]
         os: ["ubuntu-latest"]
     runs-on: ${{ matrix.os }}
     if: github.repository_owner == 'openrewrite'
@@ -32,24 +33,15 @@ jobs:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      - name: install-graalvm
-        run: |
-          curl -L -o $RUNNER_TEMP/graalvm.tgz https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-${{ matrix.graal }}/graalvm-ce-${{ matrix.java }}-linux-amd64-${{ matrix.graal }}.tar.gz && \
-          mkdir -p /opt && cd /opt && tar -zxf $RUNNER_TEMP/graalvm.tgz
+      - uses: DeLaGuardo/setup-graalvm@5.0
+        with:
+          java: ${{ matrix.java }}
+          graalvm: ${{ matrix.graal }}
       - name: install-polyglot-languages
         run: |
-          /opt/graalvm-ce-${{ matrix.java }}-${{ matrix.graal }}/bin/gu install nodejs python ruby R llvm-toolchain native-image
-      - name: setup-cache
-        uses: actions/cache@v2.1.6
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+          ${{ matrix.gu-binary }} install nodejs python ruby R llvm-toolchain
       - name: build
-        run: JAVA_HOME=/opt/graalvm-ce-${{ matrix.java }}-${{ matrix.graal }} ./gradlew ${GRADLE_SWITCHES} build test
+        run: ./gradlew ${GRADLE_SWITCHES} build test
         env:
           GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
       - name: publish-tests
