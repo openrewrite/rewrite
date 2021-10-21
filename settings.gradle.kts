@@ -44,5 +44,10 @@ gradleEnterprise {
     buildScan {
         publishAlways()
         isUploadInBackground = !isCiServer
+
+        capture {
+            isTaskInputFiles = true
+        }
     }
+
 }
