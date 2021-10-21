@@ -43,7 +43,7 @@ interface FindTypesByPackageTest : JavaRecipeTest {
             
             public class T {
                 void doSomething(/*~~>*/AtomicBoolean[] booleans) {
-                    /*~~>*/AtomicBoolean /*~~>*/b = new /*~~>*/AtomicBoolean(true);
+                    /*~~>*/AtomicBoolean b = new /*~~>*/AtomicBoolean(true);
                     Map<String, String> m = new /*~~>*/ConcurrentHashMap<>();
                     m.put("a", "b");
                     /*~~>*/booleans[1].set(true);

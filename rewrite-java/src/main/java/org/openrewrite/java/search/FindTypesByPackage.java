@@ -56,7 +56,6 @@ public class FindTypesByPackage extends Recipe {
     }
 
     private static class FindPackageVisitor extends JavaVisitor<ExecutionContext> {
-        private static final HasSearchMarkerVisitor HAS_SEARCH_MARKER_VISITOR = new HasSearchMarkerVisitor();
         private final String pkgName;
 
         public FindPackageVisitor(String pkgName) {
@@ -67,16 +66,19 @@ public class FindTypesByPackage extends Recipe {
         public @Nullable J postVisit(J tree, ExecutionContext executionContext) {
             J j = super.postVisit(tree, executionContext);
             if (j instanceof TypedTree) {
-                j = maybeAddMarker((TypedTree) j);
+                j = maybeAddMarker((TypedTree) j, executionContext);
             }
             return j;
         }
 
-        private J maybeAddMarker(TypedTree tree) {
+        private J maybeAddMarker(TypedTree tree, ExecutionContext executionContext) {
+            if (getCursor().getParent() != null && getCursor().getParent().getValue() instanceof J.VariableDeclarations.NamedVariable) {
+                return tree;
+            }
             if (isSearchPackage(tree.getType())) {
-                AtomicBoolean b = new AtomicBoolean(false);
-                HAS_SEARCH_MARKER_VISITOR.visit(tree, b);
-                if (!b.get()) {
+                AtomicBoolean markerExists = new AtomicBoolean(false);
+                new HasSearchMarkerVisitor(markerExists).visit(tree, executionContext);
+                if (!markerExists.get()) {
                     tree = tree.withMarkers(tree.getMarkers().searchResult());
                 }
             }
@@ -96,12 +98,18 @@ public class FindTypesByPackage extends Recipe {
             return false;
         }
 
-        private static class HasSearchMarkerVisitor extends JavaIsoVisitor<AtomicBoolean> {
+        private static class HasSearchMarkerVisitor extends JavaIsoVisitor<ExecutionContext> {
+            private final AtomicBoolean markerExists;
+
+            private HasSearchMarkerVisitor(AtomicBoolean markerExists) {
+                this.markerExists = markerExists;
+            }
+
             @Override
-            public <M extends Marker> M visitMarker(Marker marker, AtomicBoolean atomicBoolean) {
-                M m = super.visitMarker(marker, atomicBoolean);
+            public <M extends Marker> M visitMarker(Marker marker, ExecutionContext executionContext) {
+                M m = super.visitMarker(marker, executionContext);
                 if (m instanceof SearchResult) {
-                    atomicBoolean.set(true);
+                    markerExists.set(true);
                 }
                 return m;
             }
