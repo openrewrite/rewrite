@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,12 +15,14 @@
  */
 package org.openrewrite.java.cleanup
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 
-interface UnnecessaryExplicitTypeArgumentsTest: JavaRecipeTest {
+@Suppress("RedundantTypeArguments", "InfiniteRecursion", "CodeBlock2Expr")
+interface UnnecessaryExplicitTypeArgumentsTest : JavaRecipeTest {
     override val recipe: Recipe?
         get() = UnnecessaryExplicitTypeArguments()
 
@@ -28,32 +30,63 @@ interface UnnecessaryExplicitTypeArgumentsTest: JavaRecipeTest {
     fun unnecessaryExplicitTypeArguments(jp: JavaParser) = assertChanged(
         jp,
         before = """
-            import java.util.ArrayList;
             class Test {
                 <T> T test() {
                     String s = this.<String>test();
                     Object o = this.<String>test();
                     return this.<T>test();
                 }
-                
+
                 Object o() {
                     return this.<String>test();
                 }
             }
         """,
         after = """
-            import java.util.ArrayList;
             class Test {
                 <T> T test() {
                     String s = this.test();
                     Object o = this.<String>test();
                     return this.test();
                 }
-                
+
                 Object o() {
                     return this.<String>test();
                 }
             }
         """
     )
+
+    @Test
+    @Disabled
+    fun withinLambda(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import java.util.function.Function;
+
+            class Test {
+                Function<Object, Object> f = (d1) -> {
+                    return this.<Object>test();
+                };
+
+                <T> T test() {
+                    return this.test();
+                }
+            }
+        """,
+        after = """
+            import java.util.function.Function;
+
+            class Test {
+                Function<Object, Object> f = (d1) -> {
+                    return this.test();
+                };
+
+                <T> T test() {
+                    return this.test();
+                }
+            }
+        """
+    )
+
 }

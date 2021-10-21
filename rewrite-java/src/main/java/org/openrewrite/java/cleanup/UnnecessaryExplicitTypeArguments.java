@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,14 +52,21 @@ public class UnnecessaryExplicitTypeArguments extends Recipe {
                     } else if (enclosing instanceof NameTree) {
                         enclosingType = ((NameTree) enclosing).getType();
                     } else if (enclosing instanceof J.Return) {
-                        J.MethodDeclaration methodDeclaration = getCursor().dropParentUntil(J.MethodDeclaration.class::isInstance).getValue();
-                        if (methodDeclaration.getReturnTypeExpression() != null) {
-                            enclosingType = methodDeclaration.getReturnTypeExpression().getType();
+                        Object e = getCursor().dropParentUntil(p -> p instanceof J.MethodDeclaration || p instanceof J.Lambda).getValue();
+                        if (e instanceof J.MethodDeclaration) {
+                            J.MethodDeclaration methodDeclaration = (J.MethodDeclaration) e;
+                            if (methodDeclaration.getReturnTypeExpression() != null) {
+                                enclosingType = methodDeclaration.getReturnTypeExpression().getType();
+                            }
+                        } else if (e instanceof J.Lambda) {
+                            enclosingType = ((J.Lambda) e).getType();
                         }
                     }
 
-                    if (enclosingType != null && enclosingType
-                            .equals(m.getType().getResolvedSignature().getReturnType())) {
+                    if (enclosingType != null &&
+                            m.getType().getResolvedSignature() != null &&
+                            enclosingType.equals(m.getType().getResolvedSignature().getReturnType())
+                    ) {
                         m = m.withTypeParameters(null);
                     }
                 }
