@@ -50,7 +50,6 @@ class CoalescePropertiesTest : YamlRecipeTest {
         before = """
           foo:
             bar:
-              scalar: value
               sequence:
                 - name: name
                   propertyA: fieldA
@@ -58,10 +57,10 @@ class CoalescePropertiesTest : YamlRecipeTest {
                 - name: name
                   propertyA: fieldA
                   propertyB: fieldB
+              scalar: value
         """,
         after = """
           foo.bar:
-            scalar: value
             sequence:
               - name: name
                 propertyA: fieldA
@@ -69,6 +68,35 @@ class CoalescePropertiesTest : YamlRecipeTest {
               - name: name
                 propertyA: fieldA
                 propertyB: fieldB
+            scalar: value
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1133")
+    fun foldSequenceOfObjectsFormattedWithDashDirectlyUnderMappingKey() = assertChanged(
+        before = """
+          matrix:
+            include:
+            # comment-a
+            # comment-b
+            - name: entry-0-name # comment-c
+                # comment-d
+              value: entry-0-value
+              # comment-e
+            - name: entry-1-name
+              value: entry-1-value
+        """,
+        after = """
+          matrix.include:
+          # comment-a
+          # comment-b
+          - name: entry-0-name # comment-c
+              # comment-d
+            value: entry-0-value
+            # comment-e
+          - name: entry-1-name
+            value: entry-1-value
         """
     )
 
@@ -78,19 +106,19 @@ class CoalescePropertiesTest : YamlRecipeTest {
         before = """
           foo:
             bar:
-              baz: value
               buz:
                 - item1
                 - item2
                 - item3
+              baz: value
         """,
         after = """
           foo.bar:
-            baz: value
             buz:
               - item1
               - item2
               - item3
+            baz: value
         """
     )
 
@@ -142,7 +170,7 @@ class CoalescePropertiesTest : YamlRecipeTest {
         """,
         after = """
             a.b:
-              # d-comment
+            # d-comment
               d.e.f: true
              # c-comment
               c.d: d-value
