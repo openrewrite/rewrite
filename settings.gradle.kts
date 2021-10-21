@@ -43,5 +43,6 @@ gradleEnterprise {
 
     buildScan {
         publishAlways()
+        isUploadInBackground = false
     }
 }
