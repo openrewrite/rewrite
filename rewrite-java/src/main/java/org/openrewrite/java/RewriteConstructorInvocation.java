@@ -1,3 +1,9 @@
+/*
+ * Copyright 2021 VMware, Inc.
+ * SPDX-License-Identifier: Apache License 2.0
+ *
+ * @author: Alex Boyko
+ */
 package org.openrewrite.java;
 
 import org.openrewrite.ExecutionContext;
@@ -28,7 +34,7 @@ public class RewriteConstructorInvocation extends Recipe {
 	
 	@Override
 	protected TreeVisitor<?, ExecutionContext> getVisitor() {
-		return new JavaVisitor<>() {
+		return new JavaVisitor<ExecutionContext>() {
 
 			
 			@Override
