@@ -23,10 +23,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class CoalescePropertiesVisitor<P> extends YamlIsoVisitor<P> {
+    private final FindIndentYamlVisitor<P> findIndent = new FindIndentYamlVisitor<>(0);
+
     public CoalescePropertiesVisitor() {
     }
-
-    private final FindIndentYamlVisitor<P> findIndent = new FindIndentYamlVisitor<>(0);
 
     @Override
     public Yaml.Document visitDocument(Yaml.Document document, P p) {
@@ -46,16 +46,20 @@ public class CoalescePropertiesVisitor<P> extends YamlIsoVisitor<P> {
                 Yaml.Mapping valueMapping = (Yaml.Mapping) entry.getValue();
                 if (valueMapping.getEntries().size() == 1) {
                     Yaml.Mapping.Entry subEntry = valueMapping.getEntries().iterator().next();
-                    Yaml.Scalar coalescedKey = entry.getKey().withValue(entry.getKey().getValue() + "." + subEntry.getKey().getValue());
+                    if (!subEntry.getPrefix().contains("#")) {
+                        Yaml.Scalar coalescedKey = entry.getKey().withValue(entry.getKey().getValue() + "." + subEntry.getKey().getValue());
 
-                    entries.add(entry.withKey(coalescedKey)
-                            .withValue(subEntry.getValue()));
+                        entries.add(entry.withKey(coalescedKey)
+                                .withValue(subEntry.getValue()));
 
-                    int indentToUse = findIndent.getMostCommonIndent() > 0 ?
-                            findIndent.getMostCommonIndent() : 4;
-                    doAfterVisit(new ShiftFormatLeftVisitor<>(subEntry.getValue(), indentToUse));
+                        int indentToUse = findIndent.getMostCommonIndent() > 0 ?
+                                findIndent.getMostCommonIndent() : 4;
+                        doAfterVisit(new ShiftFormatLeftVisitor<>(subEntry.getValue(), indentToUse));
 
-                    changed = true;
+                        changed = true;
+                    } else {
+                        entries.add(entry);
+                    }
                 } else {
                     entries.add(entry);
                 }

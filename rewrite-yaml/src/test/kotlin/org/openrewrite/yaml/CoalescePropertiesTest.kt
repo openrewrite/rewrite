@@ -110,7 +110,6 @@ class CoalescePropertiesTest : YamlRecipeTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1125")
-    @Disabled
     fun foldWithCommentsInPrefix() = assertChanged(
         before = """
             a:
@@ -130,20 +129,47 @@ class CoalescePropertiesTest : YamlRecipeTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1125")
-    @Disabled
-    fun foldWithCommentsAfterKey() = assertChanged(
+    fun foldWithCommentsInPrefixWhenCommentsHaveDifferentIndentThanTheirElement() = assertChanged(
+        before = """
+            a:
+              b:
+              # d-comment
+                d:
+                  e.f: true
+               # c-comment
+                c:
+                  d: d-value
+        """,
+        after = """
+            a.b:
+              # d-comment
+              d.e.f: true
+             # c-comment
+              c.d: d-value
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1125")
+    fun doNotFoldKeysWithCommentsInPrefix() = assertChanged(
         before = """
             a:
               b:
                 d: # d-comment
-                  e.f: true
-                c: c-value
+                  e:
+                    f: f-value # f-comment
+                c:
+                  # g-comment
+                  g: 
+                    h: h-value
         """,
         after = """
             a.b:
               d: # d-comment
-                e.f: true
-              c: c-value
+                e.f: f-value # f-comment
+              c:
+                # g-comment
+                g.h: h-value
         """
     )
 
