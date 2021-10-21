@@ -1,3 +1,9 @@
+/*
+ * Copyright 2021 VMware, Inc.
+ * SPDX-License-Identifier: Apache License 2.0
+ *
+ * @author: Alex Boyko
+ */
 package org.openrewrite.maven;
 
 import lombok.AllArgsConstructor;
@@ -6,6 +12,7 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.maven.DependencyExistVisitor;
 import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
 import org.openrewrite.xml.AddToTagVisitor;
