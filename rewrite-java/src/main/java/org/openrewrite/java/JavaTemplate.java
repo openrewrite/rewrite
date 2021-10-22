@@ -385,12 +385,12 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                 if ((loc.equals(METHOD_INVOCATION_ARGUMENTS) || loc.equals(METHOD_INVOCATION_NAME)) && method.isScope(insertionPoint)) {
                     J.MethodInvocation m;
                     if(loc.equals(METHOD_INVOCATION_ARGUMENTS)) {
-                        m = substitutions.unsubstitute(templateParser.parseMethod(getCursor(), substitutedTemplate, loc));
+                        m = substitutions.unsubstitute(templateParser.parseMethodArguments(getCursor(), substitutedTemplate, loc));
                         m = autoFormat(m, 0, getCursor().getParentOrThrow());
                         m = method.withArguments(m.getArguments())
                                 .withType(m.getType());
                     } else {
-                        m = substitutions.unsubstitute(templateParser.parseMethodNameAndArguments(getCursor(), substitutedTemplate, loc));
+                        m = substitutions.unsubstitute(templateParser.parseMethod(getCursor(), substitutedTemplate, loc));
                         m = autoFormat(m, 0, getCursor().getParentOrThrow());
                         m = method.withName(m.getName())
                                 .withArguments(m.getArguments())

@@ -164,7 +164,7 @@ public class JavaTemplateParser {
         });
     }
 
-    public J.MethodInvocation parseMethodNameAndArguments(Cursor cursor, String template, Space.Location location) {
+    public J.MethodInvocation parseMethod(Cursor cursor, String template, Space.Location location) {
         J.MethodInvocation method = cursor.getValue();
         String methodWithReplacedNameAndArgs;
         if(method.getSelect() == null) {
@@ -183,7 +183,7 @@ public class JavaTemplateParser {
         return (J.MethodInvocation) invocations.get(0);
     }
 
-    public J.MethodInvocation parseMethod(Cursor cursor, String template, Space.Location location) {
+    public J.MethodInvocation parseMethodArguments(Cursor cursor, String template, Space.Location location) {
         J.MethodInvocation method = cursor.getValue();
         String methodWithReplacementArgs = method.withArguments(Collections.emptyList()).printTrimmed(cursor)
                 .replaceAll("\\)$", template + ");");
