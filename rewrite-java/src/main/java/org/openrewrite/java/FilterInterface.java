@@ -15,7 +15,7 @@ import org.openrewrite.marker.SearchResult;
 
 import java.util.UUID;
 
-public class FilterInterfaceVisitor extends Recipe {
+public class FilterInterface extends Recipe {
 
     private final UUID id = Tree.randomId();
 
@@ -25,7 +25,7 @@ public class FilterInterfaceVisitor extends Recipe {
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
                 J.ClassDeclaration a = super.visitClassDeclaration(classDecl, executionContext);
                 if(classDecl.getKind() == J.ClassDeclaration.Kind.Type.Interface) {
-                    a = a.withMarkers(a.getMarkers().addIfAbsent(new SearchResult(FilterInterfaceVisitor.this.id, FilterInterfaceVisitor.this)));
+                    a = a.withMarkers(a.getMarkers().addIfAbsent(new SearchResult(FilterInterface.this.id, "FilterInterfaceVisitor")));
                 }
 
                 return a;

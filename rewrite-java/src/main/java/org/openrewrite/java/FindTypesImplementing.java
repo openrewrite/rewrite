@@ -34,7 +34,7 @@ public class FindTypesImplementing extends Recipe {
                 J.ClassDeclaration a = super.visitClassDeclaration(classDecl, executionContext);
                 if(classDecl.getKind() == J.ClassDeclaration.Kind.Type.Class &&
                 implementsInterface(classDecl)) {
-                    a = a.withMarkers(a.getMarkers().addIfAbsent(new SearchResult(FindTypesImplementing.this.id, FindTypesImplementing.this)));
+                    a = a.withMarkers(a.getMarkers().addIfAbsent(new SearchResult(FindTypesImplementing.this.id, "FindTypesImplementing")));
                 }
                 return a;
             }
@@ -48,10 +48,12 @@ public class FindTypesImplementing extends Recipe {
 
         List<String> fqns = interfaces.stream().map(fqn -> fqn.getFullyQualifiedName()).collect(Collectors.toList());
 
-        return classDecl.getType().getInterfaces().stream()
-                .filter(fqn -> !fqns.contains(fqn.getFullyQualifiedName()))
-                .findFirst()
-                .isEmpty();
+        for(FullyQualified interf : classDecl.getType().getInterfaces()) {
+            if(fqns.contains(interf.getFullyQualifiedName())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

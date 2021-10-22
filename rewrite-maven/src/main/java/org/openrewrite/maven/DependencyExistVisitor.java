@@ -7,11 +7,14 @@
 package org.openrewrite.maven;
 
 import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
-@Data
+@Getter
+@Setter
 public class DependencyExistVisitor extends MavenVisitor {
 
     private static final XPathMatcher DEPENDENCY_MATCHER = new XPathMatcher("//dependency");

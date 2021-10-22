@@ -6,6 +6,7 @@
  */
 package org.openrewrite.maven;
 
+import org.eclipse.collections.impl.utility.internal.ReflectionHelper;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
@@ -18,7 +19,6 @@ import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
-import org.springframework.util.ReflectionUtils;
 
 import java.lang.reflect.Field;
 import java.util.Map;
@@ -69,10 +69,6 @@ public class SetPackaging extends Recipe {
         public Maven visitMaven(Maven maven, ExecutionContext ctx) {
             Maven m = super.visitMaven(maven, ctx);
             Pom pom = m.getModel();
-            // TODO: Remove reflective access, pom.getEffectiveProperties() has been removed in 7.14.0
-            Field reflectionOverridesField = ReflectionUtils.findField(Pom.class, "propertyOverrides");
-            ReflectionUtils.makeAccessible(reflectionOverridesField);
-            Map<String, String> effectiveProperties = (Map<String, String>) ReflectionUtils.getField(reflectionOverridesField, pom);
             Pom recreatedPom = Pom.build(
                     pom.getGroupId(),
                     pom.getArtifactId(),
@@ -88,7 +84,7 @@ public class SetPackaging extends Recipe {
                     pom.getLicenses(),
                     pom.getRepositories(),
                     pom.getProperties(),
-                    effectiveProperties,
+                    pom.getPropertyOverrides(),
                     false
             );
             return m.withModel(recreatedPom);
@@ -126,7 +122,7 @@ public class SetPackaging extends Recipe {
                         .filter(Xml.CharData.class::isInstance)
                         .filter(cd -> packaging.equalsIgnoreCase(((Xml.CharData) cd).getText()))
                         .findFirst();
-                if (presentPackaging.isEmpty()) {
+                if (!presentPackaging.isPresent()) {
                     doAfterVisit(new ChangeTagValueVisitor(tag, packaging));
                 }
             }

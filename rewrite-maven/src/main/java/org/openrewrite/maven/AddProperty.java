@@ -6,7 +6,6 @@
  */
 package org.openrewrite.maven;
 
-import com.sun.org.apache.xerces.internal.impl.xs.identity.XPathMatcher;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
@@ -15,6 +14,7 @@ import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
+import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 public final class AddProperty extends Recipe {

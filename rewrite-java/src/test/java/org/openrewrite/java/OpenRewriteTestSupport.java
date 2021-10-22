@@ -1,3 +1,9 @@
+/*
+ * Copyright 2021 VMware, Inc.
+ * SPDX-License-Identifier: Apache License 2.0
+ *
+ * @author: Fabian Krüger
+ */
 package org.openrewrite.java;
 
 import org.assertj.core.api.Assertions;
@@ -119,11 +125,11 @@ public class OpenRewriteTestSupport {
         final Collection<Result> newChanges = refactor(given, visitor);
         Assertions.assertThat(newChanges.iterator().hasNext()).as("No change was found.").isTrue();
         Assertions.assertThat(given.print())
-                .as(TestDiff.of(given.print(), newChanges.iterator().next().getBefore().print()))
-                .isEqualTo(newChanges.iterator().next().getBefore().print());
+                .as(TestDiff.of(given.print(), newChanges.iterator().next().getBefore().printAll()))
+                .isEqualTo(newChanges.iterator().next().getBefore().printAll());
 
-        Assertions.assertThat(newChanges.iterator().next().getAfter().print())
-                .as(TestDiff.of(newChanges.iterator().next().getAfter().print(), expected))
+        Assertions.assertThat(newChanges.iterator().next().getAfter().printAll())
+                .as(TestDiff.of(newChanges.iterator().next().getAfter().printAll(), expected))
                 .isEqualTo(expected);
     }
 
@@ -203,10 +209,10 @@ public class OpenRewriteTestSupport {
                                                     .logCompilationWarningsAndErrors(true)
                                                     .relaxedClassTypeMatching(false);
 
-        List<Path> collect = getClasspathFiles(classpath);
-        if (classpath.length > 0) {
-            jp.classpath(collect);
-        }
+//        List<Path> collect = getClasspathFiles(classpath);
+//        if (classpath.length > 0) {
+//            jp.classpath(collect);
+//        }
 
         return jp.build();
     }
@@ -214,15 +220,14 @@ public class OpenRewriteTestSupport {
     /**
      * Retrieve the <code>Path</code>s of jars for given classpath
      *
-     * @param classpath in 'groupId:artifactId:version' format
      */
-    public static List<Path> getClasspathFiles(String... classpath) {
-        if (classpath.length == 0) return List.of();
-        File[] as = Maven.resolver().resolve(classpath).withTransitivity().as(File.class);
-        return Arrays.stream(as)
-                .map(File::toPath)
-                .collect(Collectors.toList());
-    }
+//    public static List<Path> getClasspathFiles(String... classpath) {
+//        if (classpath.length == 0) return List.of();
+//        File[] as = Maven.resolver().resolve(classpath).withTransitivity().as(File.class);
+//        return Arrays.stream(as)
+//                .map(File::toPath)
+//                .collect(Collectors.toList());
+//    }
 
     private static <P> Collection<Result> refactor(J.CompilationUnit given, JavaVisitor<ExecutionContext> visitor) {
         GenericOpenRewriteTestRecipe<JavaVisitor<ExecutionContext>> recipe = new GenericOpenRewriteTestRecipe<>(visitor);
