@@ -81,6 +81,17 @@ public class RemoveUnusedImports extends Recipe {
                         methodsAndFieldsByTypeName.computeIfAbsent(method.getDeclaringType().getFullyQualifiedName(), t -> new HashSet<>())
                                 .add(method.getName());
                     }
+                } else if (javaType instanceof JavaType.Parameterized) {
+                    JavaType.Parameterized parameterized = (JavaType.Parameterized)javaType;
+                    typesByPackage.computeIfAbsent(packageKey(parameterized.getType().getPackageName(), parameterized.getType().getClassName()), f -> new HashSet<>())
+                            .add(parameterized.getType());
+                    for (JavaType typeParameter : parameterized.getTypeParameters()) {
+                        JavaType.FullyQualified fq = TypeUtils.asFullyQualified(typeParameter);
+                        if (fq != null) {
+                            typesByPackage.computeIfAbsent(packageKey(fq.getPackageName(), fq.getClassName()), f -> new HashSet<>())
+                                    .add(fq);
+                        }
+                    }
                 } else if (javaType instanceof JavaType.FullyQualified) {
                     JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) javaType;
                     typesByPackage.computeIfAbsent(packageKey(fullyQualified.getPackageName(), fullyQualified.getClassName()), f -> new HashSet<>())
