@@ -409,6 +409,72 @@ interface JavaTemplateTest : JavaRecipeTest {
     )
 
     @Test
+    fun replaceMethodNameAndArgumentsSimultaneously(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = toRecipe {
+            object : JavaIsoVisitor<ExecutionContext>() {
+                val t = JavaTemplate.builder({ cursor }, "acceptString(#{any()}.toString())")
+                    .javaParser { JavaParser.fromJavaVersion()
+                        .dependsOn("""
+                            package org.openrewrite;
+                            public class A {
+                                public A acceptInteger(Integer i) { return this; }
+                                public A acceptString(String s) { return this; }
+                                public A someOtherMethod() { return this; }
+                            }
+                        """)
+                        .build() }
+                    .build()
+
+                override fun visitMethodInvocation(
+                    method: J.MethodInvocation,
+                    p: ExecutionContext
+                ): J.MethodInvocation {
+                    var m: J.MethodInvocation = super.visitMethodInvocation(method, p)
+                    if (m.simpleName.equals("acceptInteger")) {
+                        m = m.withTemplate(t, m.coordinates.replaceMethod(), m.arguments[0])
+                    }
+                    return m
+                }
+            }
+        },
+        dependsOn = arrayOf(
+            """
+                package org.openrewrite;
+                public class A {
+                    public A acceptInteger(Integer i) { return this; }
+                    public A acceptString(String s) { return this; }
+                    public A someOtherMethod() { return this; }
+                }
+            """
+        ),
+        before = """
+            package org.openrewrite;
+            
+            public class Foo {
+                {
+                    Integer i = 1;
+                    new A().someOtherMethod()
+                            .acceptInteger(i)
+                            .someOtherMethod();
+                }
+            }
+        """,
+        after = """
+            package org.openrewrite;
+            
+            public class Foo {
+                {
+                    Integer i = 1;
+                    new A().someOtherMethod()
+                            .acceptString(i.toString())
+                            .someOtherMethod();
+                }
+            }
+        """
+    )
+
+    @Test
     fun replaceMethodInvocationWithArray(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(

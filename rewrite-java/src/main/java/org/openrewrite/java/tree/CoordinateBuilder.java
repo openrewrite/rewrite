@@ -178,6 +178,13 @@ public abstract class CoordinateBuilder {
         public JavaCoordinates replaceArguments() {
             return replace(Space.Location.METHOD_INVOCATION_ARGUMENTS);
         }
+
+        /**
+         * Indicates replacement of the invocation's name and argument list, while preserving its select.
+         */
+        public JavaCoordinates replaceMethod() {
+            return replace(Space.Location.METHOD_INVOCATION_NAME);
+        }
     }
 
     public static class Package extends Statement {

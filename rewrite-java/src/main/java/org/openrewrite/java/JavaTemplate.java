@@ -382,8 +382,20 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, Integer integer) {
-                if (loc.equals(METHOD_INVOCATION_ARGUMENTS) && method.isScope(insertionPoint)) {
-                    J.MethodInvocation m = substitutions.unsubstitute(templateParser.parseMethodArguments(getCursor(), substitutedTemplate, loc));
+                if ((loc.equals(METHOD_INVOCATION_ARGUMENTS) || loc.equals(METHOD_INVOCATION_NAME)) && method.isScope(insertionPoint)) {
+                    J.MethodInvocation m;
+                    if(loc.equals(METHOD_INVOCATION_ARGUMENTS)) {
+                        m = substitutions.unsubstitute(templateParser.parseMethod(getCursor(), substitutedTemplate, loc));
+                        m = autoFormat(m, 0, getCursor().getParentOrThrow());
+                        m = method.withArguments(m.getArguments())
+                                .withType(m.getType());
+                    } else {
+                        m = substitutions.unsubstitute(templateParser.parseMethodNameAndArguments(getCursor(), substitutedTemplate, loc));
+                        m = autoFormat(m, 0, getCursor().getParentOrThrow());
+                        m = method.withName(m.getName())
+                                .withArguments(m.getArguments())
+                                .withType(m.getType());
+                    }
                     // This will only happen if the template encountered non-fatal errors during parsing
                     // Make a best-effort attempt to recover by patching together a new Method type from the old one
                     // There are many ways this type could be not quite right, but leaving the type alone is likely to cause MethodMatcher false-positives
@@ -412,7 +424,6 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                 .withGenericSignature(mt.getGenericSignature().withParamTypes(argTypes));
                         m = m.withType(mt);
                     }
-                    m = autoFormat(m.withPrefix(method.getPrefix()), 0, getCursor().getParentOrThrow());
                     return m;
                 }
                 return maybeReplaceStatement(method, J.class, true, 0);
