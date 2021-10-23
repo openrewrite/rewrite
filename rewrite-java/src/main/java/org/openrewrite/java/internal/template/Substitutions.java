@@ -114,7 +114,7 @@ public class Substitutions {
                         throw new IllegalArgumentException("Invalid template matcher '" + key + "'");
                     }
                 } else {
-                    s = substituteSingle(parameter, i);
+                    s = substituteUntyped(parameter, i);
                 }
 
                 return s;
@@ -142,7 +142,7 @@ public class Substitutions {
         }
     }
 
-    private String substituteSingle(Object parameter, int index) {
+    private String substituteUntyped(Object parameter, int index) {
         if (parameter instanceof J) {
             if (parameter instanceof J.Annotation) {
                 return "@SubAnnotation(" + index + ")";
@@ -151,14 +151,37 @@ public class Substitutions {
             } else if (parameter instanceof J.Literal || parameter instanceof J.VariableDeclarations) {
                 return ((J) parameter).printTrimmed();
             } else {
-                throw new IllegalArgumentException("'" + parameter.getClass().getSimpleName() + "' cannot be a parameter to a template.");
+                throw new IllegalArgumentException("Template parameter " + index + " cannot be used in an untyped template substitution. " +
+                        "Instead of \"#{}\", indicate the template parameter's type with \"#{any(" + typeHintFor(parameter) + ")}\".");
             }
         } else if (parameter instanceof JRightPadded) {
-            return substituteSingle(((JRightPadded<?>) parameter).getElement(), index);
+            return substituteUntyped(((JRightPadded<?>) parameter).getElement(), index);
         } else if (parameter instanceof JLeftPadded) {
-            return substituteSingle(((JLeftPadded<?>) parameter).getElement(), index);
+            return substituteUntyped(((JLeftPadded<?>) parameter).getElement(), index);
         }
         return parameter.toString();
+    }
+
+    private static String typeHintFor(Object j) {
+        if(j instanceof TypedTree) {
+            return typeHintFor(((TypedTree) j).getType());
+        }
+        return "";
+    }
+    private static String typeHintFor(@Nullable JavaType t) {
+        if (t instanceof JavaType.Primitive) {
+            return ((JavaType.Primitive) t).getKeyword();
+        } else if (t instanceof JavaType.FullyQualified) {
+            return ((JavaType.FullyQualified) t).getFullyQualifiedName();
+        } else if(t instanceof JavaType.Method) {
+            JavaType.Method m = (JavaType.Method)t;
+            if(m.getGenericSignature() != null) {
+                return typeHintFor(m.getGenericSignature().getReturnType());
+            } else if(m.getResolvedSignature() != null) {
+                return typeHintFor(m.getResolvedSignature().getReturnType());
+            }
+        }
+        return "";
     }
 
     public <J2 extends J> List<J2> unsubstitute(List<J2> js) {
