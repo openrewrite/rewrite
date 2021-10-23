@@ -141,13 +141,35 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
     )
 
     @Test
-    fun leaveStarImportInPlaceIfThreeOrMoreTypesStillReferredTo(jp: JavaParser) = assertUnchanged(
+    fun unfoldIfLessThanStarCount(jp: JavaParser) = assertChanged(
         jp,
         before = """
             import java.util.*;
             class A {
                Collection<Integer> c;
                Set<Integer> s = new HashSet<>();
+            }
+        """,
+        after = """
+            import java.util.Collection;
+            import java.util.HashSet;
+            import java.util.Set;
+            class A {
+               Collection<Integer> c;
+               Set<Integer> s = new HashSet<>();
+            }
+        """
+    )
+
+    @Test
+    fun leaveStarImportInPlaceIfMoreThanStarCount(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            import java.util.*;
+            class A {
+               Collection<Integer> c;
+               Set<Integer> s = new HashSet<>();
+               List<String> l = Arrays.asList("a","b","c");
             }
         """
     )
