@@ -23,7 +23,9 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.search.UsesType;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Flag;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 
 import java.time.Duration;
 import java.util.*;
@@ -37,7 +39,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Replaces `String` literals with a length of 5 or greater repeated a minimum of 3 times. Qualified `String` literals include final Strings, method invocations, and new class invocations. Adds a new `private static final String` or uses an existing equivalent class field. A new variable name will be generated based on the literal value if an existing field does not exist. The generated name will appends a numeric value to the variable name if a name already exists in the compilation unit.";
+        return "Replaces `String` literals with a length of 5 or greater repeated a minimum of 3 times. Qualified `String` literals include final Strings, method invocations, and new class invocations. Adds a new `private static final String` or uses an existing equivalent class field. A new variable name will be generated based on the literal value if an existing field does not exist. The generated name will append a numeric value to the variable name if a name already exists in the compilation unit.";
     }
 
     @Override
@@ -84,7 +86,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
                             continue;
                         }
                         if (!classFieldName.equals(variableName)) {
-                            doAfterVisit(new ChangeFieldName<>(JavaType.Class.build(classFqn), classFieldName, variableName));
+                            doAfterVisit(new ChangeFieldName<>(classFqn, classFieldName, variableName));
                         }
                     } else {
                         variableName = getNameWithoutShadow(transformToVariableName(valueOfLiteral), variableNames);
@@ -154,6 +156,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
 
         /**
          * Find duplicate `String` literals repeated 3 or more times and with a length of at least 3.
+         *
          * @param inClass subtree to search in.
          * @return `Map` of `String` literal values to the `J.Literal` AST elements.
          */
@@ -205,6 +208,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
 
         /**
          * Find all the variable names that exist in the provided subtree.
+         *
          * @param inClass subtree to search in.
          * @return variable names that exist in the subtree.
          */
@@ -281,12 +285,14 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
                         literal.getMarkers(),
                         variableName,
                         JavaType.Primitive.String,
-                        JavaType.Variable.build(
-                                variableName,
+                        new JavaType.Variable(
+                                Flag.flagsToBitMap(new HashSet<>(Arrays.asList(Flag.Private, Flag.Static, Flag.Final))),
                                 isClass.getType(),
+                                variableName,
                                 JavaType.Primitive.String,
-                                Collections.emptyList(),
-                                Flag.flagsToBitMap(new HashSet<>(Arrays.asList(Flag.Private, Flag.Static, Flag.Final)))));
+                                Collections.emptyList()
+                        )
+                );
             }
             return literal;
         }

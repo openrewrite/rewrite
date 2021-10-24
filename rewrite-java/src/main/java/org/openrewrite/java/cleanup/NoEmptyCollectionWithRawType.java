@@ -23,6 +23,8 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
@@ -80,7 +82,7 @@ public class NoEmptyCollectionWithRawType extends Recipe {
             @Override
             public J visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
                 J.Identifier id = (J.Identifier) super.visitIdentifier(identifier, ctx);
-                JavaType.Variable varType = TypeUtils.asVariable(id.getFieldType());
+                JavaType.Variable varType = id.getFieldType();
                 if (varType != null && varType.getOwner().getFullyQualifiedName().equals("java.util.Collections") &&
                         varType.getName().startsWith("EMPTY_")) {
 

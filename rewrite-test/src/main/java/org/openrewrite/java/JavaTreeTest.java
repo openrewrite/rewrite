@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.BeforeEach;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
@@ -40,7 +41,7 @@ public interface JavaTreeTest {
 
     default void assertParsePrintAndProcess(JavaParser parser, NestingLevel nestingLevel, String code,
                                             String... imports) {
-        String source = Arrays.stream(imports).map(i -> "import " + i + ";").collect(joining(""));
+        @Language("java") String source = Arrays.stream(imports).map(i -> "import " + i + ";").collect(joining(""));
 
         switch (nestingLevel) {
             case Block:
@@ -59,8 +60,9 @@ public interface JavaTreeTest {
         J processed = new JavaVisitor<>().visit(cu, new Object());
         assertThat(processed).as("Processing is idempotent").isSameAs(cu);
 
-        TreeSerializer<J.CompilationUnit> treeSerializer = new TreeSerializer<>();
-        J.CompilationUnit roundTripCu = treeSerializer.read(treeSerializer.write(cu));
+        TreeSerializer<J.CompilationUnit> treeSerializer = new TreeSerializer<>(true);
+        byte[] write = treeSerializer.write(cu);
+        J.CompilationUnit roundTripCu = treeSerializer.read(write);
 
         assertThat(JavaParserTestUtil.print(nestingLevel, cu))
                 .as("Source code is printed the same after parsing")

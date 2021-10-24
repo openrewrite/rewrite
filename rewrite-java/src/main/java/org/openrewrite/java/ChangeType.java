@@ -111,7 +111,7 @@ public class ChangeType extends Recipe {
             JavaType.FullyQualified fullyQualifiedTarget = TypeUtils.asFullyQualified(targetType);
             if (fullyQualifiedTarget != null) {
                 if (fullyQualifiedTarget.getOwningClass() != null && !fullyQualifiedTarget.getPackageName().equals("java.lang")) {
-                    c = (J.CompilationUnit)  new AddImport(fullyQualifiedTarget.getOwningClass().getFullyQualifiedName(), null, true).visit(c, ctx);
+                    c = (J.CompilationUnit) new AddImport(fullyQualifiedTarget.getOwningClass().getFullyQualifiedName(), null, true).visit(c, ctx);
                 }
                 if (!fullyQualifiedTarget.getPackageName().equals("java.lang")) {
                     c = (J.CompilationUnit) new AddImport(fullyQualifiedTarget.getFullyQualifiedName(), null, true).visit(c, ctx);
@@ -133,7 +133,25 @@ public class ChangeType extends Recipe {
 
         @Override
         public @Nullable J postVisit(J tree, ExecutionContext executionContext) {
+            if (tree instanceof J.MethodDeclaration) {
+                J.MethodDeclaration method = (J.MethodDeclaration) tree;
+                tree = method.withMethodType(updateType(method.getMethodType()));
+            } else if (tree instanceof J.MethodInvocation) {
+                J.MethodInvocation method = (J.MethodInvocation) tree;
+                tree = method.withMethodType(updateType(method.getMethodType()));
+            }
+
             if (tree instanceof TypedTree) {
+                if(tree instanceof J.MethodDeclaration) {
+                    J.MethodDeclaration m = (J.MethodDeclaration) tree;
+                    return m.withMethodType(updateType(m.getMethodType()));
+                } else if(tree instanceof J.MethodInvocation) {
+                    J.MethodInvocation m = (J.MethodInvocation) tree;
+                    return m.withMethodType(updateType(m.getMethodType()));
+                } else if(tree instanceof J.NewClass) {
+                    J.NewClass n = (J.NewClass) tree;
+                    return n.withConstructorType(updateType(n.getConstructorType()));
+                }
                 return ((TypedTree) tree).withType(updateType(((TypedTree) tree).getType()));
             }
             return tree;
@@ -174,7 +192,7 @@ public class ChangeType extends Recipe {
                     Expression e = updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getClassName())
                             .withPrefix(fieldAccess.getPrefix()));
                     // If a FieldAccess like Map.Entry has been replaced with an Identifier, ensure that identifier has the correct type
-                    if(e instanceof J.Identifier && e.getType() == null) {
+                    if (e instanceof J.Identifier && e.getType() == null) {
                         J.Identifier i = (J.Identifier) e;
                         e = i.withType(targetType);
                     }
@@ -216,8 +234,8 @@ public class ChangeType extends Recipe {
 
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            if (method.getType() != null && method.getType().hasFlags(Flag.Static)) {
-                if (method.getType().getDeclaringType().isAssignableFrom(originalType)) {
+            if (method.getMethodType() != null && method.getMethodType().hasFlags(Flag.Static)) {
+                if (method.getMethodType().getDeclaringType().isAssignableFrom(originalType)) {
                     J.CompilationUnit cu = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
 
                     for (J.Import anImport : cu.getImports()) {
@@ -239,7 +257,7 @@ public class ChangeType extends Recipe {
             if (typeTree instanceof J.FieldAccess) {
                 JavaType.FullyQualified type = (JavaType.FullyQualified) targetType;
 
-                if(type.getOwningClass() == null) {
+                if (type.getOwningClass() == null) {
                     // just a performance shortcut when this isn't an inner class
                     typeTree.withType(updateType(targetType));
                 }
@@ -254,14 +272,14 @@ public class ChangeType extends Recipe {
                     typeStack.push(t);
                     if (t instanceof J.FieldAccess) {
                         if (Character.isUpperCase(((J.FieldAccess) t).getSimpleName().charAt(0))) {
-                            if(attrStack.peek().getOwningClass() != null) {
+                            if (attrStack.peek().getOwningClass() != null) {
                                 attrStack.push(attrStack.peek().getOwningClass());
                             }
                         }
                         t = ((J.FieldAccess) t).getTarget();
                     } else if (t instanceof J.Identifier) {
                         if (Character.isUpperCase(((J.Identifier) t).getSimpleName().charAt(0))) {
-                            if(attrStack.peek().getOwningClass() != null) {
+                            if (attrStack.peek().getOwningClass() != null) {
                                 attrStack.push(attrStack.peek().getOwningClass());
                             }
                         }
@@ -297,7 +315,6 @@ public class ChangeType extends Recipe {
         }
 
         private JavaType updateType(@Nullable JavaType type) {
-
             JavaType.GenericTypeVariable gtv = TypeUtils.asGeneric(type);
             if (gtv != null && gtv.getBound() != null
                     && gtv.getBound().getFullyQualifiedName().equals(oldFullyQualifiedTypeName)
@@ -307,18 +324,21 @@ public class ChangeType extends Recipe {
 
             JavaType.FullyQualified fqt = TypeUtils.asFullyQualified(type);
             if (fqt != null && fqt.getFullyQualifiedName().equals(oldFullyQualifiedTypeName)) {
-                    return targetType;
+                return targetType;
             }
 
-            JavaType.Method mt = TypeUtils.asMethod(type);
+            //noinspection ConstantConditions
+            return type;
+        }
+
+        @Nullable
+        private JavaType.Method updateType(@Nullable JavaType.Method mt) {
             if (mt != null) {
                 return mt.withDeclaringType((JavaType.FullyQualified) updateType(mt.getDeclaringType()))
                         .withResolvedSignature(updateSignature(mt.getResolvedSignature()))
                         .withGenericSignature(updateSignature(mt.getGenericSignature()));
             }
-
-            //noinspection ConstantConditions
-            return type;
+            return null;
         }
 
         private JavaType.Method.Signature updateSignature(@Nullable JavaType.Method.Signature signature) {

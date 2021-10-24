@@ -108,17 +108,15 @@ public class MethodMatcher {
         this(method, false);
     }
 
-    public boolean matches(@Nullable JavaType type) {
-        if (!(type instanceof JavaType.Method)) {
+    public boolean matches(@Nullable JavaType.Method type) {
+        if (type == null) {
             return false;
         }
 
-        JavaType.Method methodType = (JavaType.Method) type;
-
-        return matchesTargetType(methodType.getDeclaringType()) &&
-                methodNamePattern.matcher(methodType.getName()).matches() &&
-                methodType.getGenericSignature() != null &&
-                argumentPattern.matcher(methodType.getGenericSignature().getParamTypes().stream()
+        return matchesTargetType(type.getDeclaringType()) &&
+                methodNamePattern.matcher(type.getName()).matches() &&
+                type.getGenericSignature() != null &&
+                argumentPattern.matcher(type.getGenericSignature().getParamTypes().stream()
                         .map(MethodMatcher::typePattern)
                         .filter(Objects::nonNull)
                         .collect(joining(","))).matches();
@@ -157,18 +155,18 @@ public class MethodMatcher {
     }
 
     public boolean matches(J.MethodInvocation method) {
-        if (method.getType() == null || method.getType().getDeclaringType() == null) {
+        if (method.getMethodType() == null || method.getMethodType().getDeclaringType() == null) {
             return false;
         }
 
-        if (method.getType().getResolvedSignature() == null) {
+        if (method.getMethodType().getResolvedSignature() == null) {
             // no way to verify the parameter list
             return false;
         }
 
-        return matchesTargetType(method.getType().getDeclaringType()) &&
+        return matchesTargetType(method.getMethodType().getDeclaringType()) &&
                 methodNamePattern.matcher(method.getSimpleName()).matches() &&
-                argumentPattern.matcher(method.getType().getResolvedSignature().getParamTypes().stream()
+                argumentPattern.matcher(method.getMethodType().getResolvedSignature().getParamTypes().stream()
                         .map(MethodMatcher::typePattern)
                         .filter(Objects::nonNull)
                         .collect(joining(","))).matches();
@@ -197,7 +195,7 @@ public class MethodMatcher {
 
         if (targetTypePattern.matcher(type.getFullyQualifiedName()).matches()) {
             return true;
-        } else if (type != JavaType.Class.OBJECT && (matchesTargetType(type.getSupertype() == null ? JavaType.Class.OBJECT : type.getSupertype()))) {
+        } else if (!type.getFullyQualifiedName().equals("java.lang.Object") && matchesTargetType(type.getSupertype() == null ? JavaType.Class.build("java.lang.Object") : type.getSupertype())) {
             return true;
         }
 
@@ -245,9 +243,9 @@ public class MethodMatcher {
     }
 
     public static String methodPattern(J.MethodDeclaration method) {
-        assert method.getType() != null;
+        assert method.getMethodType() != null;
 
-        JavaType.Method.Signature signature = method.getType().getResolvedSignature();
+        JavaType.Method.Signature signature = method.getMethodType().getResolvedSignature();
         String signatureStr;
         if (signature == null) {
             signatureStr = "";
@@ -262,7 +260,7 @@ public class MethodMatcher {
             signatureStr = joiner.toString();
         }
 
-        return method.getType().getDeclaringType().getFullyQualifiedName() + " " +
+        return method.getMethodType().getDeclaringType().getFullyQualifiedName() + " " +
                 method.getSimpleName() + "(" + signatureStr + ")";
     }
 }

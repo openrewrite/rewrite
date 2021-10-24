@@ -299,7 +299,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
                 for (int j = cursor; j < source.length(); j++) {
                     char ch = source.charAt(j);
                     if (ch == '\r') {
-                        cursor ++;
+                        cursor++;
                         continue;
                     }
 
@@ -563,7 +563,9 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
 
             cursor += ref.memberName.toString().length();
 
-            JavaType refType = referenceType(ref, qualifierType);
+            JavaType.Method methodRefType = methodReferenceType(ref, qualifierType);
+            JavaType.Variable fieldRefType = methodRefType == null ?
+                    fieldReferenceType(ref, qualifierType) : null;
 
             if (ref.paramTypes != null) {
                 JContainer<Expression> paramContainer;
@@ -600,7 +602,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
                         null,
                         name,
                         paramContainer,
-                        TypeUtils.asMethod(refType)
+                        methodRefType
                 );
             } else {
                 return new J.MemberReference(
@@ -611,7 +613,8 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
                         JContainer.empty(),
                         JLeftPadded.build(name),
                         null,
-                        refType
+                        methodRefType,
+                        fieldRefType
                 );
             }
         }
@@ -621,7 +624,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     }
 
     @Nullable
-    private JavaType referenceType(DCTree.DCReference ref, @Nullable JavaType type) {
+    private JavaType.Method methodReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
         JavaType.Class classType = TypeUtils.asClass(type);
         if (classType == null) {
             return null;
@@ -653,9 +656,20 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
             }
         }
 
+        // a member reference, but not matching anything on type attribution
+        return null;
+    }
+
+    @Nullable
+    private JavaType.Variable fieldReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
+        JavaType.Class classType = TypeUtils.asClass(type);
+        if (classType == null) {
+            return null;
+        }
+
         for (JavaType.Variable member : classType.getMembers()) {
             if (member.getName().equals(ref.memberName.toString())) {
-                return member.getType();
+                return member;
             }
         }
 

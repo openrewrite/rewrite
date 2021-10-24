@@ -25,6 +25,7 @@ import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
@@ -205,11 +206,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, AtomicReference<Boolean> found) {
             // If the type isn't used there's no need to proceed further
-            for (JavaType ty : cu.getTypesInUse()) {
-                if (!(ty instanceof JavaType.Variable)) {
-                    continue;
-                }
-                JavaType.Variable varType = (JavaType.Variable) ty;
+            for (JavaType.Variable varType : cu.getTypesInUse().getVariables()) {
                 if (varType.getName().equals(statik) && isOfClassType(varType.getType(), type)) {
                     return super.visitCompilationUnit(cu, found);
                 }

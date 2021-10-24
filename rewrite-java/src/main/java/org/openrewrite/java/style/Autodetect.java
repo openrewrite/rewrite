@@ -22,8 +22,8 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.NamedStyles;
@@ -160,8 +160,7 @@ public class Autodetect extends NamedStyles {
 
             int indent = 0;
             // Note: new lines in multiline comments will not be counted.
-            for (int i = 0; i < chars.length; i++) {
-                char c = chars[i];
+            for (char c : chars) {
                 if (c == '\n' || c == '\r') {
                     indent = 0;
                     continue;
@@ -382,7 +381,7 @@ public class Autodetect extends NamedStyles {
                                         }
                                     }
                                     continue;
-                                } else if (i > insertAllOtherAtIndex){
+                                } else if (i > insertAllOtherAtIndex) {
                                     if (countOfBlocksInNonStaticGroups.get(i) == 0) {
                                         continue;
                                     } else {
@@ -462,7 +461,7 @@ public class Autodetect extends NamedStyles {
                                     if (i == insertStaticAllOtherAtIndex) {
                                         builder = builder.importStaticAllOthers();
                                         continue;
-                                    } else if (i > insertStaticAllOtherAtIndex){
+                                    } else if (i > insertStaticAllOtherAtIndex) {
                                         if (countOfBlocksInStaticGroups.get(i) == 0) {
                                             continue;
                                         } else {
@@ -612,7 +611,7 @@ public class Autodetect extends NamedStyles {
                                 containsNewLine);
 
                         javaPos = block.pattern.equals("java.*") && javaPos > blockStart ? blockStart : javaPos;
-                        javaxPos = block.pattern.equals("javax.*") && javaxPos > blockStart ? blockStart: javaxPos;
+                        javaxPos = block.pattern.equals("javax.*") && javaxPos > blockStart ? blockStart : javaxPos;
 
                         if (blocks.contains(block) && previousPkgCount > referenceCount.get(block)) {
                             blocks.remove(block);
@@ -628,12 +627,10 @@ public class Autodetect extends NamedStyles {
                 if (anImport.getQualid().getSimpleName().equals("*")) {
                     if (anImport.isStatic()) {
                         int count = 0;
-                        for (JavaType type : cu.getTypesInUse()) {
-                            if (type instanceof JavaType.Variable) {
-                                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(((JavaType.Variable) type).getType());
-                                if (fq != null && anImport.getTypeName().equals(fq.getFullyQualifiedName())) {
-                                    count++;
-                                }
+                        for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
+                            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getType());
+                            if (fq != null && anImport.getTypeName().equals(fq.getFullyQualifiedName())) {
+                                count++;
                             }
                         }
 
@@ -643,7 +640,7 @@ public class Autodetect extends NamedStyles {
                         );
                     } else {
                         Set<String> fqns = new HashSet<>();
-                        for (JavaType type : cu.getTypesInUse()) {
+                        for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
                             if (type instanceof JavaType.FullyQualified) {
                                 JavaType.FullyQualified fq = (JavaType.FullyQualified) type;
                                 if (anImport.getPackageName().equals(fq.getPackageName())) {
@@ -782,7 +779,7 @@ public class Autodetect extends NamedStyles {
 
         @Override
         public J.Try visitTry(J.Try _try, SpacesStatistics stats) {
-            if(_try.getPadding().getResources() != null) {
+            if (_try.getPadding().getResources() != null) {
                 stats.beforeTry += hasSpace(_try.getPadding().getResources().getBefore());
             }
             return super.visitTry(_try, stats);

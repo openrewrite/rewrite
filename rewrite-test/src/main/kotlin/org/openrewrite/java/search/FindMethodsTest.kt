@@ -182,12 +182,12 @@ interface FindMethodsTest : JavaRecipeTest {
     fun checkValidation() {
         var recipe = FindMethods(null, false)
         var valid = recipe.validate()
-        assertThat(valid.isValid).isFalse()
+        assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
 
         recipe = FindMethods("com.foo.Foo bar()", false)
         valid = recipe.validate()
-        assertThat(valid.isValid).isTrue()
+        assertThat(valid.isValid).isTrue
     }
 }

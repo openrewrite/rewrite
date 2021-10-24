@@ -65,9 +65,8 @@ public class FindDeprecatedMethods extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-                for (JavaType javaType : cu.getTypesInUse()) {
-                    JavaType.Method method = TypeUtils.asMethod(javaType);
-                    if (method != null && (methodMatcher == null || methodMatcher.matches(method))) {
+                for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
+                    if (methodMatcher == null || methodMatcher.matches(method)) {
                         for (JavaType.FullyQualified annotation : method.getAnnotations()) {
                             if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
                                 return cu.withMarkers(cu.getMarkers().searchResult());
@@ -86,8 +85,8 @@ public class FindDeprecatedMethods extends Recipe {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                if (method.getType() != null) {
-                    for (JavaType.FullyQualified annotation : method.getType().getAnnotations()) {
+                if (method.getMethodType() != null) {
+                    for (JavaType.FullyQualified annotation : method.getMethodType().getAnnotations()) {
                         if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
                             if (Boolean.TRUE.equals(ignoreDeprecatedScopes)) {
                                 Iterator<Object> cursorPath = getCursor().getPath();

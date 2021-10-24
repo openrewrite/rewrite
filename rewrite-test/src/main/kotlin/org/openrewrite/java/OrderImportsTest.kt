@@ -22,7 +22,6 @@ import org.openrewrite.Issue
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.marker.JavaSourceSet
 import org.openrewrite.java.style.ImportLayoutStyle
-import org.openrewrite.java.tree.Flag
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 import org.openrewrite.style.NamedStyles
@@ -59,23 +58,10 @@ interface OrderImportsTest : JavaRecipeTest {
         jp,
         before = """
             import static java.util.stream.Collectors.joining;
-            import java.util.ArrayList;
-            import java.util.regex.Pattern;
-            import java.util.Objects;
-            import java.util.Set;
-            import org.openrewrite.java.tree.JavaType;
-            import org.openrewrite.java.tree.TypeUtils;
             
             class A {}
         """,
         after = """
-            import org.openrewrite.java.tree.JavaType;
-            import org.openrewrite.java.tree.TypeUtils;
-            
-            import java.util.ArrayList;
-            import java.util.Objects;
-            import java.util.Set;
-            import java.util.regex.Pattern;
             
             import static java.util.stream.Collectors.joining;
             
@@ -97,11 +83,7 @@ interface OrderImportsTest : JavaRecipeTest {
         jp,
         before = """
             import org.another.Comment;
-            import org.openrewrite.java.tree.Comment;
             import org.openrewrite.java.tree.CoordinatesBuilder;
-            import org.openrewrite.java.tree.Expression;
-            import org.openrewrite.java.tree.Flag;
-            import org.openrewrite.java.tree.JavaType;
             
             class Test {}
         """,
@@ -113,48 +95,14 @@ interface OrderImportsTest : JavaRecipeTest {
         )
     )
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/352")
-    @Test
-    fun innerClasses(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
-            import org.openrewrite.java.tree.Comment;
-            import org.openrewrite.java.tree.CoordinatesBuilder;
-            import org.openrewrite.java.tree.Expression;
-            import org.openrewrite.java.tree.Flag;
-            import org.openrewrite.java.tree.J.Assert;
-            import org.openrewrite.java.tree.J.ClassDeclaration;
-            import org.openrewrite.java.tree.J.MethodDeclaration;
-            import org.openrewrite.java.tree.J.NewArray;
-            import org.openrewrite.java.tree.J.NewClass;
-            import org.openrewrite.java.tree.JavaType;
-            
-            class Test {}
-        """,
-        after = """
-            import org.openrewrite.java.tree.*;
-            import org.openrewrite.java.tree.J.*;
-            
-            class Test {}
-        """
-    )
-
     @Test
     fun blankLineThenEmptyBlockThenNonEmptyBlock(jp: JavaParser) = assertChanged(
         jp,
         before = """
-            import java.util.ArrayList;
-            import java.util.Objects;
-
-            import org.openrewrite.java.tree.JavaType;
             
             class A {}
         """,
         after = """
-            import org.openrewrite.java.tree.JavaType;
-            
-            import java.util.ArrayList;
-            import java.util.Objects;
             
             class A {}
         """
@@ -917,149 +865,6 @@ interface OrderImportsTest : JavaRecipeTest {
         classNames.forEach { fqns.add(JavaType.Class.build(it)) }
         val sourceSet = JavaSourceSet(randomId(),"main", fqns)
         val markedFiles: MutableList<J.CompilationUnit> = mutableListOf()
-        sourceFiles.forEach { markedFiles.add(it.withMarkers(it.markers.addIfAbsent(sourceSet))) }
-
-        val recipe = OrderImports(false).visitor
-        val result = recipe.visit(markedFiles[0], InMemoryExecutionContext())
-        assertThat((result as J.CompilationUnit).imports.size == 6).isTrue
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/860")
-    @Test
-    fun orderAndDoNotFoldStaticConstants(jp: JavaParser) {
-        val inputs = arrayOf(
-            """
-            package org.test;
-            
-            import static org.fiz.Fiz.FOO_A;
-            import static org.fiz.Fiz.FOO_B;
-            import static org.fiz.Fiz.FOO_C;
-            import static org.biz.Biz.BAR_A;
-            import static org.biz.Biz.BAR_B;
-            import static org.biz.Biz.BAR_C;
-            
-            public class Test {
-                int fooA = FOO_A;
-                int fooB = FOO_B;
-                int fooC = FOO_C;
-                int barA = BAR_A;
-                int barB = BAR_B;
-                int barC = BAR_C;
-            }
-            """.trimIndent(),
-            """
-            package org.fiz;
-            public class Fiz {
-                public static int SHARED = 1;
-                public static int FOO_A = 2;
-                public static int FOO_B = 3;
-                public static int FOO_C = 4;
-            }
-            """.trimIndent()
-            ,
-            """
-            package org.biz;
-            public class Biz {
-                public static int SHARED = 1;
-                public static int BAR_A = 2;
-                public static int BAR_B = 3;
-                public static int BAR_C = 4;
-            }
-            """.trimIndent(),
-        )
-
-        val sourceFiles = parser.parse(executionContext, *inputs)
-        val classNames = arrayOf("org.fiz.Fiz", "org.biz.Biz")
-        val variableNames = arrayOf(
-            "SHARED", "FOO_A", "FOO_B", "FOO_C",
-            "SHARED", "BAR_A", "BAR_B", "BAR_C")
-
-        val fqns: MutableSet<JavaType.FullyQualified> = mutableSetOf()
-        val flags = setOf(Flag.Public, Flag.Static)
-
-        val variables: MutableList<JavaType.Variable> = mutableListOf()
-        variableNames.forEach { variables.add(JavaType.Variable.build(it, null, JavaType.buildType("int"), emptyList(), Flag.flagsToBitMap(flags))) }
-
-        classNames.forEach { fqns.add(JavaType.Class.build(flags, it, JavaType.Class.Kind.Class, variables, listOf(), listOf(), null, null, null)) }
-        val sourceSet = JavaSourceSet(randomId(),"main", fqns)
-        val markedFiles: MutableList<J.CompilationUnit> = mutableListOf()
-        sourceFiles.forEach { markedFiles.add(it.withMarkers(it.markers.addIfAbsent(sourceSet))) }
-
-        val recipe = OrderImports(false).visitor
-        val result = recipe.visit(markedFiles[0], InMemoryExecutionContext())
-        assertThat((result as J.CompilationUnit).imports.size == 6).isTrue
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/860")
-    @Test
-    fun orderAndDoNotFoldStaticMethods(jp: JavaParser) {
-        val classNames = arrayOf("org.fuz.Fuz", "org.buz.Buz")
-
-        val fqns: MutableSet<JavaType.FullyQualified> = mutableSetOf()
-        val flags = setOf(Flag.Public, Flag.Static)
-        val methodSignature: JavaType.Method.Signature = JavaType.Method.Signature(JavaType.buildType("boolean"), listOf())
-        val variables: MutableList<JavaType.Variable> = mutableListOf()
-
-        val methodsFoo: MutableList<JavaType.Method> = mutableListOf()
-        val methodNamesFoo = arrayOf("assertShared", "assertA", "assertB", "assertC")
-        methodNamesFoo.forEach { methodsFoo.add(
-            JavaType.Method.build(flags, JavaType.Class.build("declClass"), it, null, methodSignature, listOf(), listOf(), listOf())) }
-        fqns.add(JavaType.Class.build(Flag.flagsToBitMap(flags), classNames[0], JavaType.Class.Kind.Class, variables,
-            listOf(), methodsFoo, null, null, listOf(), null, false))
-
-        val methodsBar: MutableList<JavaType.Method> = mutableListOf()
-        val methodNamesBar = arrayOf("assertShared", "assertThatA", "assertThatB", "assertThatC")
-        methodNamesBar.forEach { methodsBar.add(
-            JavaType.Method.build(flags, JavaType.Class.build("declClass"), it, null, methodSignature, listOf(), listOf(), listOf())) }
-        fqns.add(JavaType.Class.build(Flag.flagsToBitMap(flags), classNames[1], JavaType.Class.Kind.Class, variables,
-            listOf(), methodsBar, null, null, listOf(), null, false))
-
-        val sourceSet = JavaSourceSet(randomId(),"main", fqns)
-        val markedFiles: MutableList<J.CompilationUnit> = mutableListOf()
-
-        val inputs = arrayOf(
-            """
-            package org.test;
-            
-            import static org.fuz.Fuz.assertA;
-            import static org.fuz.Fuz.assertB;
-            import static org.fuz.Fuz.assertC;
-            import static org.buz.Buz.assertThatA;
-            import static org.buz.Buz.assertThatB;
-            import static org.buz.Buz.assertThatC;
-            
-            public class Test {
-                boolean fooA = assertA();
-                boolean fooB = assertB();
-                boolean fooC = assertC();
-                boolean barA = assertThatA();
-                boolean barB = assertThatB();
-                boolean barC = assertThatC();
-            }
-            """.trimIndent(),
-            """
-            package org.fuz;
-            public class Fuz {
-                public static boolean assertShared() { return true; }
-                public static boolean assertA() { return true; }
-                public static boolean assertB() { return true; }
-                public static boolean assertC() { return true; }
-            }
-            """.trimIndent()
-            ,
-            """
-            package org.buz;
-            public class Buz {
-                public static boolean assertShared() { return true; }
-                public static boolean assertThatA() { return true; }
-                public static boolean assertThatB() { return true; }
-                public static boolean assertThatC() { return true; }
-            }
-            """.trimIndent(),
-        )
-
-        // Inputs are processed last so that fqns are setup properly in flyweights.
-        val sourceFiles = parser.parse(executionContext, *inputs)
         sourceFiles.forEach { markedFiles.add(it.withMarkers(it.markers.addIfAbsent(sourceSet))) }
 
         val recipe = OrderImports(false).visitor

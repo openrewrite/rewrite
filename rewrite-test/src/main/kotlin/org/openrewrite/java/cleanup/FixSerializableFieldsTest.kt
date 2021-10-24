@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.cleanup
 
+import org.intellij.lang.annotations.Language
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
@@ -27,10 +28,10 @@ interface FixSerializableFieldsTest : JavaRecipeTest {
     override val parser: JavaParser
         get() = JavaParser.fromJavaVersion().build()
 
-    val models get() =
+    val models @Language("java") get() =
         """
             import java.io.Serializable;
-
+            
             public class A {
                 int value1;
             }
@@ -231,7 +232,8 @@ interface FixSerializableFieldsTest : JavaRecipeTest {
                     public void test() {
                     }
                 }
-            """),
+            """
+        ),
         before= models,
         after = """
             import java.io.Serializable;
@@ -297,7 +299,8 @@ interface FixSerializableFieldsTest : JavaRecipeTest {
                     public void test() {
                     }
                 }
-            """),
+            """
+        ),
         before= models,
         after = """
             import java.io.Serializable;
@@ -349,9 +352,9 @@ interface FixSerializableFieldsTest : JavaRecipeTest {
             import java.io.Serializable;
             import java.util.Map;
             
-            class A<T extends Serializable> implements Serializable {
-                private Map<String, T> items;
-                private T item;
+            class A<TTTT extends Serializable> implements Serializable {
+                private Map<String, TTTT> items;
+                private TTTT item;
             }
         """
     )

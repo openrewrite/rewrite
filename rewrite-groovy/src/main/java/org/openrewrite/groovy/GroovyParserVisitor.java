@@ -31,9 +31,12 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.groovy.marker.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.internal.cache.JavaTypeCache;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 
 import java.nio.file.Path;
@@ -63,12 +66,10 @@ public class GroovyParserVisitor {
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
-    public GroovyParserVisitor(Path sourcePath, String source,
-                               Map<String, JavaType.Class> sharedClassTypes,
-                               ExecutionContext ctx) {
+    public GroovyParserVisitor(Path sourcePath, String source, JavaTypeCache typeCache, ExecutionContext ctx) {
         this.sourcePath = sourcePath;
         this.source = source;
-        this.typeMapping = new TypeMapping(sharedClassTypes);
+        this.typeMapping = new TypeMapping(typeCache);
         this.ctx = ctx;
     }
 
@@ -128,8 +129,8 @@ public class GroovyParserVisitor {
                     statements.add(convertTopLevelStatement(unit, value));
                 }
             } catch (Throwable t) {
-                if(t instanceof StringIndexOutOfBoundsException) {
-                    throw new GroovyParsingException("Failed to parse, cursor position likely inaccurate.",t);
+                if (t instanceof StringIndexOutOfBoundsException) {
+                    throw new GroovyParsingException("Failed to parse, cursor position likely inaccurate.", t);
                 }
                 throw new GroovyParsingException(
                         "Failed to parse at cursor position " + cursor +
@@ -456,7 +457,7 @@ public class GroovyParserVisitor {
                                 .sorted(Comparator.comparing(ASTNode::getLastLineNumber)
                                         .thenComparing(ASTNode::getLastColumnNumber))
                                 .collect(Collectors.toList());
-            } else if(unparsedArgs.size() > 0 && unparsedArgs.get(0) instanceof MapExpression) {
+            } else if (unparsedArgs.size() > 0 && unparsedArgs.get(0) instanceof MapExpression) {
                 // Bring named parameters out of their containing MapExpression so that they can be parsed correctly
                 MapExpression namedArgExpressions = (MapExpression) unparsedArgs.get(0);
                 unparsedArgs =
@@ -787,8 +788,9 @@ public class GroovyParserVisitor {
             Space fmt = sourceBefore("new");
             TypeTree clazz = visitTypeTree(ctor.getType());
             JContainer<Expression> args = visit(ctor.getArguments());
+            MethodNode methodNode = (MethodNode) ctor.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
             queue.add(new J.NewClass(randomId(), fmt, Markers.EMPTY, null, EMPTY,
-                    clazz, args, null, null, typeMapping.type(ctor.getType())));
+                    clazz, args, null, typeMapping.type(methodNode)));
         }
 
         @Override
@@ -917,13 +919,13 @@ public class GroovyParserVisitor {
             for (ConstantExpression string : gstring.getStrings()) {
                 if (string.getValue().equals("")) {
                     boolean inCurlies = source.charAt(cursor + 1) == '{';
-                    if(inCurlies) {
+                    if (inCurlies) {
                         cursor += 2; // skip ${
                     } else {
                         cursor += 1; // skip $
                     }
                     strings.add(new G.GString.Value(randomId(), Markers.EMPTY, visit(gstring.getValue(valueIndex++)), inCurlies));
-                    if(inCurlies) {
+                    if (inCurlies) {
                         cursor++; // skip }
                     }
                 } else {

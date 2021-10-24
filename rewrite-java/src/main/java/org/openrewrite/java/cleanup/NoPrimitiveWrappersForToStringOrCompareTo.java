@@ -23,6 +23,8 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
@@ -82,7 +84,7 @@ public class NoPrimitiveWrappersForToStringOrCompareTo extends Recipe {
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
             J.MethodInvocation mi = super.visitMethodInvocation(method, executionContext);
-            JavaType.Class clazz = mi.getType() != null ? TypeUtils.asClass(mi.getType().getDeclaringType()) : null;
+            JavaType.Class clazz = mi.getMethodType() != null ? TypeUtils.asClass(mi.getMethodType().getDeclaringType()) : null;
             if (clazz != null && "java.lang".equals(clazz.getPackageName())) {
                 if (NUMBER_TO_STRING_MATCHER.matches(mi) || BOOLEAN_TO_STRING_MATCHER.matches(mi)) {
                     Expression arg = null;
@@ -95,7 +97,7 @@ public class NoPrimitiveWrappersForToStringOrCompareTo extends Recipe {
                         }
                     }
                     if (arg != null && !TypeUtils.isString(arg.getType()) && mi.getSelect() != null) {
-                        JavaType.FullyQualified fq = mi.getType().getDeclaringType();
+                        JavaType.FullyQualified fq = mi.getMethodType().getDeclaringType();
                         mi = mi.withSelect(J.Identifier.build(UUID.randomUUID(), mi.getSelect().getPrefix(), Markers.EMPTY, fq.getClassName(), fq));
                         //noinspection ArraysAsListWithZeroOrOneArgument
                         mi = mi.withArguments(Arrays.asList(arg));
@@ -112,7 +114,7 @@ public class NoPrimitiveWrappersForToStringOrCompareTo extends Recipe {
                     }
 
                     if (arg != null && !TypeUtils.isString(arg.getType()) && mi.getSelect() != null) {
-                        JavaType.FullyQualified fq = mi.getType().getDeclaringType();
+                        JavaType.FullyQualified fq = mi.getMethodType().getDeclaringType();
                         mi = mi.withSelect(J.Identifier.build(UUID.randomUUID(), mi.getSelect().getPrefix(), Markers.EMPTY, fq.getClassName(), fq));
                         mi = mi.withArguments(ListUtils.concat(arg, mi.getArguments()));
                         mi = maybeAutoFormat(mi, mi.withName(mi.getName().withName("compare")), executionContext);

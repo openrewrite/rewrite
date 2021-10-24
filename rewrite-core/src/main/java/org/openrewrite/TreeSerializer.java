@@ -26,6 +26,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.jsontype.SubtypeResolver;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import com.fasterxml.jackson.dataformat.smile.SmileFactory;
@@ -39,28 +40,36 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.List;
 
-public class TreeSerializer<S extends SourceFile> {
+public class TreeSerializer<S extends Tree> {
     private final TypeReference<S> sourceType = new TypeReference<S>() {
     };
 
     private final TypeReference<List<S>> sourceListType = new TypeReference<List<S>>() {
     };
 
+    private final boolean pretty;
     private final ObjectMapper mapper;
 
-    public TreeSerializer() {
-        SmileFactory f = new SmileFactory();
-        f.configure(SmileGenerator.Feature.CHECK_SHARED_STRING_VALUES, true);
+    public TreeSerializer(boolean pretty) {
+        this.pretty = pretty;
+        JsonMapper.Builder mBuilder;
+        if (pretty) {
+            mBuilder = JsonMapper.builder();
+        } else {
+            SmileFactory f = new SmileFactory();
+            f.configure(SmileGenerator.Feature.CHECK_SHARED_STRING_VALUES, true);
+            mBuilder = JsonMapper.builder(f);
+        }
 
-        ObjectMapper m = JsonMapper.builder(f)
-                // to be able to construct classes that have @Data and a single field
-                // see https://cowtowncoder.medium.com/jackson-2-12-most-wanted-3-5-246624e2d3d0
-                .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
+        // to be able to construct classes that have @Data and a single field
+        // see https://cowtowncoder.medium.com/jackson-2-12-most-wanted-3-5-246624e2d3d0
+        ObjectMapper m = mBuilder.constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
                 .build()
                 .registerModule(new RelativePathModule())
                 .registerModule(new ParameterNamesModule())
                 .configure(MapperFeature.PROPAGATE_TRANSIENT_MARKER, true)
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .disable(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE)
                 .setSerializationInclusion(JsonInclude.Include.NON_NULL);
 
         this.mapper = m.setVisibility(m.getSerializationConfig().getDefaultVisibilityChecker()
@@ -68,6 +77,10 @@ public class TreeSerializer<S extends SourceFile> {
                 .withGetterVisibility(JsonAutoDetect.Visibility.NONE)
                 .withIsGetterVisibility(JsonAutoDetect.Visibility.NONE)
                 .withFieldVisibility(JsonAutoDetect.Visibility.ANY));
+    }
+
+    public TreeSerializer() {
+        this(false);
     }
 
     public void write(Iterable<S> sources, OutputStream out) {
@@ -96,7 +109,11 @@ public class TreeSerializer<S extends SourceFile> {
 
     public byte[] write(S source) {
         try {
-            return mapper.writeValueAsBytes(source);
+            if(pretty) {
+                return mapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(source);
+            } else {
+                return mapper.writeValueAsBytes(source);
+            }
         } catch (JsonProcessingException e) {
             throw new UncheckedIOException(e);
         }
@@ -150,5 +167,4 @@ public class TreeSerializer<S extends SourceFile> {
             }
         }
     }
-
 }

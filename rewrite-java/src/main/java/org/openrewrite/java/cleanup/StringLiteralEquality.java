@@ -22,6 +22,8 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
@@ -86,8 +88,8 @@ public class StringLiteralEquality extends Recipe {
                     null,
                     J.Identifier.build(Tree.randomId(), Space.EMPTY, Markers.EMPTY, "equals", JavaType.Primitive.Boolean),
                     JContainer.build(Collections.singletonList(new JRightPadded<>(binary.getRight().withPrefix(Space.EMPTY), Space.EMPTY, Markers.EMPTY))),
-                    JavaType.Method.build(
-                            Collections.singleton(Flag.Public),
+                    new JavaType.Method(
+                            Flag.Public.getBitMask(),
                             Objects.requireNonNull(TYPE_STRING),
                             "equals",
                             INVOCATION_SIGNATURE,

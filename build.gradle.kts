@@ -152,6 +152,7 @@ subprojects {
     }
 
     tasks.named<Test>("test").configure {
+        maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).takeIf { it > 0 } ?: 1
         useJUnitPlatform {
             excludeTags("debug")
         }

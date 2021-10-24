@@ -28,11 +28,14 @@ import org.openrewrite.Parser;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaExecutionContextView;
 import org.openrewrite.java.JavaParser;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.style.NamedStyles;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -47,6 +50,9 @@ import static java.util.stream.Collectors.toList;
 public class GroovyParser implements Parser<G.CompilationUnit> {
     @Nullable
     private final Collection<Path> classpath;
+
+    private final List<NamedStyles> styles;
+    private final boolean logCompilationWarningsAndErrors;
 
     @Override
     public List<G.CompilationUnit> parse(@Language("groovy") String... sources) {
@@ -81,8 +87,9 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
 
     @Override
     public List<G.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
+        JavaExecutionContextView ctxView = new JavaExecutionContextView(ctx);
+
         List<G.CompilationUnit> cus = new ArrayList<>();
-        Map<String, JavaType.Class> sharedClassTypes = new HashMap<>();
 
         for (Input input : sources) {
             CompilerConfiguration configuration = new CompilerConfiguration();
@@ -111,19 +118,19 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
                 GroovyParserVisitor mappingVisitor = new GroovyParserVisitor(
                         input.getPath(),
                         StringUtils.readFully(input.getSource()),
-                        sharedClassTypes,
+                        ctxView.getTypeCache(),
                         ctx
                 );
                 cus.add(mappingVisitor.visit(unit, ast));
             } catch (Throwable t) {
                 ctx.getOnError().accept(t);
             } finally {
-                if (errorCollector.hasErrors() || errorCollector.hasWarnings()) {
+                if (logCompilationWarningsAndErrors && (errorCollector.hasErrors() || errorCollector.hasWarnings())) {
                     try (StringWriter sw = new StringWriter();
                          PrintWriter pw = new PrintWriter(sw)) {
                         errorCollector.write(pw, new Janitor());
                         org.slf4j.LoggerFactory.getLogger(GroovyParser.class).warn(sw.toString());
-                    } catch(IOException ignored) {
+                    } catch (IOException ignored) {
                         // unreachable
                     }
                 }
@@ -149,23 +156,13 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
 
     public static class Builder {
         @Nullable
-        protected Collection<Path> classpath = JavaParser.runtimeClasspath();
+        private Collection<Path> classpath = JavaParser.runtimeClasspath();
 
-        protected Collection<byte[]> classBytesClasspath = emptyList();
-
-        @Nullable
-        protected Collection<Parser.Input> dependsOn;
-
-        protected boolean logCompilationWarningsAndErrors = false;
-        protected final List<NamedStyles> styles = new ArrayList<>();
+        private boolean logCompilationWarningsAndErrors = false;
+        private final List<NamedStyles> styles = new ArrayList<>();
 
         public Builder logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
             this.logCompilationWarningsAndErrors = logCompilationWarningsAndErrors;
-            return this;
-        }
-
-        public Builder dependsOn(Collection<Input> inputs) {
-            this.dependsOn = inputs;
             return this;
         }
 
@@ -179,11 +176,6 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
             return this;
         }
 
-        public Builder classpath(byte[]... classpath) {
-            this.classBytesClasspath = Arrays.asList(classpath);
-            return this;
-        }
-
         public Builder styles(Iterable<? extends NamedStyles> styles) {
             for (NamedStyles style : styles) {
                 this.styles.add(style);
@@ -192,7 +184,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
         }
 
         public GroovyParser build() {
-            return new GroovyParser(classpath);
+            return new GroovyParser(classpath, styles, logCompilationWarningsAndErrors);
         }
     }
 }

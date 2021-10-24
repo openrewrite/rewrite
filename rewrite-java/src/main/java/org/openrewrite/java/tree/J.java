@@ -22,14 +22,12 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.openrewrite.*;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
-import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.internal.TypeCache;
+import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.internal.template.JavaTemplateParser;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.marker.Markers;
@@ -54,7 +52,6 @@ import static java.util.stream.Collectors.toList;
 public interface J extends Serializable, Tree {
     static void clearCaches() {
         Identifier.flyweights.clear();
-        JavaType.clearCaches();
         JavaTemplateParser.clearCache();
     }
 
@@ -1108,7 +1105,7 @@ public interface J extends Serializable, Tree {
     final class CompilationUnit implements J, JavaSourceFile, SourceFile {
         @Nullable
         @NonFinal
-        transient SoftReference<TypeCache> typesInUse;
+        transient SoftReference<TypesInUse> typesInUse;
 
         @Nullable
         @NonFinal
@@ -1171,29 +1168,19 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Set<JavaType> getTypesInUse() {
-            return typeCache().getTypesInUse();
-        }
-
-        @Override
-        public Set<JavaType.Method> getDeclaredMethods() {
-            return typeCache().getDeclaredMethods();
-        }
-
-        @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
             return new JavaPrinter<>();
         }
 
-        private TypeCache typeCache() {
-            TypeCache cache;
+        public TypesInUse getTypesInUse() {
+            TypesInUse cache;
             if (this.typesInUse == null) {
-                cache = TypeCache.build(this);
+                cache = TypesInUse.build(this);
                 this.typesInUse = new SoftReference<>(cache);
             } else {
                 cache = this.typesInUse.get();
                 if (cache == null || cache.getCu() != this) {
-                    cache = TypeCache.build(this);
+                    cache = TypesInUse.build(this);
                     this.typesInUse = new SoftReference<>(cache);
                 }
             }
@@ -1564,12 +1551,9 @@ public interface J extends Serializable, Tree {
         public NameTree asClassReference() {
             if (target instanceof NameTree) {
                 String fqn = null;
-                if (type instanceof JavaType.Class) {
-                    fqn = ((JavaType.Class) type).getFullyQualifiedName();
-                } else if (type instanceof JavaType.ShallowClass) {
-                    fqn = ((JavaType.ShallowClass) type).getFullyQualifiedName();
+                if (type instanceof JavaType.FullyQualified) {
+                    fqn = ((JavaType.FullyQualified) type).getFullyQualifiedName();
                 }
-
                 return "java.lang.Class".equals(fqn) ? (NameTree) target : null;
             }
             return null;
@@ -1972,15 +1956,8 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     final class Identifier implements J, TypeTree, Expression {
-        private static final JavaType NONE = new JavaType() {
-            @Override
-            public boolean deepEquals(@Nullable JavaType type) {
-                return type == NONE;
-            }
-        };
-
         // keyed by name, type, and then field type
-        private static final Map<String, Map<JavaType, Map<JavaType, IdentifierFlyweight>>> flyweights = new WeakHashMap<>();
+        private static final Map<String, Map<JavaType, Map<JavaType.Variable, IdentifierFlyweight>>> flyweights = new WeakHashMap<>();
 
         @Getter
         @EqualsAndHashCode.Include
@@ -2007,7 +1984,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Nullable
-        public JavaType getFieldType() {
+        public JavaType.Variable getFieldType() {
             return identifier.getFieldType();
         }
 
@@ -2075,7 +2052,7 @@ public interface J extends Serializable, Tree {
                                        Markers markers,
                                        String simpleName,
                                        @Nullable JavaType type,
-                                       @Nullable JavaType fieldType) {
+                                       @Nullable JavaType.Variable fieldType) {
             synchronized (flyweights) {
                 return new Identifier(
                         id,
@@ -2098,7 +2075,7 @@ public interface J extends Serializable, Tree {
             JavaType type;
 
             @Nullable
-            JavaType fieldType;
+            JavaType.Variable fieldType;
         }
     }
 
@@ -2793,7 +2770,15 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         @Getter
-        JavaType referenceType;
+        JavaType.Method methodType;
+
+        /**
+         * In the case of a field reference, this is the field pointed to by {@link #reference}.
+         */
+        @With
+        @Nullable
+        @Getter
+        JavaType.Variable variableType;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -2824,7 +2809,7 @@ public interface J extends Serializable, Tree {
             }
 
             public MemberReference withContaining(JRightPadded<Expression> containing) {
-                return t.containing == containing ? t : new MemberReference(t.id, t.prefix, t.markers, containing, t.typeParameters, t.reference, t.type, t.referenceType);
+                return t.containing == containing ? t : new MemberReference(t.id, t.prefix, t.markers, containing, t.typeParameters, t.reference, t.type, t.methodType, t.variableType);
             }
 
             @Nullable
@@ -2833,7 +2818,7 @@ public interface J extends Serializable, Tree {
             }
 
             public MemberReference withTypeParameters(@Nullable JContainer<Expression> typeParameters) {
-                return t.typeParameters == typeParameters ? t : new MemberReference(t.id, t.prefix, t.markers, t.containing, typeParameters, t.reference, t.type, t.referenceType);
+                return t.typeParameters == typeParameters ? t : new MemberReference(t.id, t.prefix, t.markers, t.containing, typeParameters, t.reference, t.type, t.methodType, t.variableType);
             }
 
             public JLeftPadded<Identifier> getReference() {
@@ -2841,7 +2826,7 @@ public interface J extends Serializable, Tree {
             }
 
             public MemberReference withReference(JLeftPadded<Identifier> reference) {
-                return t.reference == reference ? t : new MemberReference(t.id, t.prefix, t.markers, t.containing, t.typeParameters, reference, t.type, t.referenceType);
+                return t.reference == reference ? t : new MemberReference(t.id, t.prefix, t.markers, t.containing, t.typeParameters, reference, t.type, t.methodType, t.variableType);
             }
         }
     }
@@ -2971,12 +2956,10 @@ public interface J extends Serializable, Tree {
 
         @Getter
         @Nullable
-        JavaType.Method type;
+        JavaType.Method methodType;
 
-        @SuppressWarnings("unchecked")
-        @Override
-        public MethodDeclaration withType(@Nullable JavaType type) {
-            if (type == this.type) {
+        public MethodDeclaration withMethodType(@Nullable JavaType.Method type) {
+            if (type == this.methodType) {
                 return this;
             }
 
@@ -2985,6 +2968,18 @@ public interface J extends Serializable, Tree {
             }
 
             return new MethodDeclaration(id, prefix, markers, leadingAnnotations, modifiers, typeParameters, returnTypeExpression, name, parameters, throwz, body, defaultValue, (JavaType.Method) type);
+        }
+
+        public JavaType getType() {
+            return methodType == null ? null :
+                    methodType.getGenericSignature() == null ? null :
+                            methodType.getGenericSignature().getReturnType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public MethodDeclaration withType(@Nullable JavaType type) {
+            throw new UnsupportedOperationException("To change the return type of this method declaration, use withMethodType(..)");
         }
 
         @Override
@@ -3066,7 +3061,7 @@ public interface J extends Serializable, Tree {
             }
 
             public MethodDeclaration withParameters(JContainer<Statement> parameters) {
-                return t.parameters == parameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, parameters, t.throwz, t.body, t.defaultValue, t.type);
+                return t.parameters == parameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, parameters, t.throwz, t.body, t.defaultValue, t.methodType);
             }
 
             @Nullable
@@ -3075,7 +3070,7 @@ public interface J extends Serializable, Tree {
             }
 
             public MethodDeclaration withThrows(@Nullable JContainer<NameTree> throwz) {
-                return t.throwz == throwz ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, throwz, t.body, t.defaultValue, t.type);
+                return t.throwz == throwz ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, throwz, t.body, t.defaultValue, t.methodType);
             }
 
             @Nullable
@@ -3084,7 +3079,7 @@ public interface J extends Serializable, Tree {
             }
 
             public MethodDeclaration withDefaultValue(@Nullable JLeftPadded<Expression> defaultValue) {
-                return t.defaultValue == defaultValue ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, defaultValue, t.type);
+                return t.defaultValue == defaultValue ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, defaultValue, t.methodType);
             }
 
             @Nullable
@@ -3093,7 +3088,7 @@ public interface J extends Serializable, Tree {
             }
 
             public MethodDeclaration withTypeParameters(@Nullable TypeParameters typeParameters) {
-                return t.typeParameters == typeParameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, t.defaultValue, t.type);
+                return t.typeParameters == typeParameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, t.defaultValue, t.methodType);
             }
         }
 
@@ -3122,7 +3117,7 @@ public interface J extends Serializable, Tree {
             }
 
             public MethodDeclaration withTypeParameters(@Nullable TypeParameters typeParameters) {
-                return t.typeParameters == typeParameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, t.defaultValue, t.type);
+                return t.typeParameters == typeParameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, t.defaultValue, t.methodType);
             }
 
             public IdentifierWithAnnotations getName() {
@@ -3130,7 +3125,7 @@ public interface J extends Serializable, Tree {
             }
 
             public MethodDeclaration withName(IdentifierWithAnnotations name) {
-                return t.name == name ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, name, t.parameters, t.throwz, t.body, t.defaultValue, t.type);
+                return t.name == name ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, name, t.parameters, t.throwz, t.body, t.defaultValue, t.methodType);
             }
         }
     }
@@ -3189,8 +3184,8 @@ public interface J extends Serializable, Tree {
                 return this;
             }
             JavaType.Method newType = null;
-            if (this.type != null) {
-                newType = this.type.withName(name.getSimpleName());
+            if (this.methodType != null) {
+                newType = this.methodType.withName(name.getSimpleName());
             }
             return new MethodInvocation(id, prefix, markers, select, typeParameters, name, arguments, newType);
         }
@@ -3210,12 +3205,10 @@ public interface J extends Serializable, Tree {
 
         @Nullable
         @Getter
-        JavaType.Method type;
+        JavaType.Method methodType;
 
-        @SuppressWarnings("unchecked")
-        @Override
-        public MethodInvocation withType(@Nullable JavaType type) {
-            if (type == this.type) {
+        public MethodInvocation withMethodType(@Nullable JavaType.Method type) {
+            if (type == this.methodType) {
                 return this;
             }
             if (type instanceof JavaType.Method) {
@@ -3224,11 +3217,17 @@ public interface J extends Serializable, Tree {
             return this;
         }
 
+        @SuppressWarnings("unchecked")
+        @Override
+        public MethodInvocation withType(@Nullable JavaType type) {
+            throw new UnsupportedOperationException("To change the return type of this method invocation, use withMethodType(..)");
+        }
+
         public MethodInvocation withDeclaringType(JavaType.FullyQualified type) {
-            if (this.type == null) {
+            if (this.methodType == null) {
                 return this;
             } else {
-                return withType(this.type.withDeclaringType(type));
+                return withMethodType(this.methodType.withDeclaringType(type));
             }
         }
 
@@ -3242,10 +3241,11 @@ public interface J extends Serializable, Tree {
             return new CoordinateBuilder.MethodInvocation(this);
         }
 
+        @Override
         @Nullable
-        public JavaType getReturnType() {
-            return type == null ? null : type.getResolvedSignature() == null ? null :
-                    type.getResolvedSignature().getReturnType();
+        public JavaType getType() {
+            return methodType == null ? null : methodType.getResolvedSignature() == null ? null :
+                    methodType.getResolvedSignature().getReturnType();
         }
 
         public String getSimpleName() {
@@ -3282,7 +3282,7 @@ public interface J extends Serializable, Tree {
             }
 
             public MethodInvocation withSelect(@Nullable JRightPadded<Expression> select) {
-                return t.select == select ? t : new MethodInvocation(t.id, t.prefix, t.markers, select, t.typeParameters, t.name, t.arguments, t.type);
+                return t.select == select ? t : new MethodInvocation(t.id, t.prefix, t.markers, select, t.typeParameters, t.name, t.arguments, t.methodType);
             }
 
             @Nullable
@@ -3291,7 +3291,7 @@ public interface J extends Serializable, Tree {
             }
 
             public MethodInvocation withTypeParameters(@Nullable JContainer<Expression> typeParameters) {
-                return t.typeParameters == typeParameters ? t : new MethodInvocation(t.id, t.prefix, t.markers, t.select, typeParameters, t.name, t.arguments, t.type);
+                return t.typeParameters == typeParameters ? t : new MethodInvocation(t.id, t.prefix, t.markers, t.select, typeParameters, t.name, t.arguments, t.methodType);
             }
 
             public JContainer<Expression> getArguments() {
@@ -3299,7 +3299,7 @@ public interface J extends Serializable, Tree {
             }
 
             public MethodInvocation withArguments(JContainer<Expression> arguments) {
-                return t.arguments == arguments ? t : new MethodInvocation(t.id, t.prefix, t.markers, t.select, t.typeParameters, t.name, arguments, t.type);
+                return t.arguments == arguments ? t : new MethodInvocation(t.id, t.prefix, t.markers, t.select, t.typeParameters, t.name, arguments, t.methodType);
             }
         }
     }
@@ -3631,7 +3631,7 @@ public interface J extends Serializable, Tree {
             if (nooh == this.nooh) {
                 return this;
             }
-            return new NewClass(id, prefix, markers, enclosing, nooh, clazz, arguments, body, constructorType, type);
+            return new NewClass(id, prefix, markers, enclosing, nooh, clazz, arguments, body, constructorType);
         }
 
         @Nullable
@@ -3661,10 +3661,17 @@ public interface J extends Serializable, Tree {
         @Getter
         JavaType.Method constructorType;
 
-        @With
         @Nullable
-        @Getter
-        JavaType type;
+        @Override
+        public JavaType getType() {
+            return constructorType == null ? null : constructorType.getDeclaringType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public NewClass withType(@Nullable JavaType type) {
+            throw new UnsupportedOperationException("To change the return type of this new class, use withConstructorType(..)");
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -3706,7 +3713,7 @@ public interface J extends Serializable, Tree {
             }
 
             public NewClass withEnclosing(@Nullable JRightPadded<Expression> enclosing) {
-                return t.enclosing == enclosing ? t : new NewClass(t.id, t.prefix, t.markers, enclosing, t.nooh, t.clazz, t.arguments, t.body, t.constructorType, t.type);
+                return t.enclosing == enclosing ? t : new NewClass(t.id, t.prefix, t.markers, enclosing, t.nooh, t.clazz, t.arguments, t.body, t.constructorType);
             }
 
             @Nullable
@@ -3715,7 +3722,7 @@ public interface J extends Serializable, Tree {
             }
 
             public NewClass withArguments(@Nullable JContainer<Expression> arguments) {
-                return t.arguments == arguments ? t : new NewClass(t.id, t.prefix, t.markers, t.enclosing, t.nooh, t.clazz, arguments, t.body, t.constructorType, t.type);
+                return t.arguments == arguments ? t : new NewClass(t.id, t.prefix, t.markers, t.enclosing, t.nooh, t.clazz, arguments, t.body, t.constructorType);
             }
         }
     }

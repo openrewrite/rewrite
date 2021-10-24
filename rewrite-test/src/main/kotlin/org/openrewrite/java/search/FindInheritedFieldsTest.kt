@@ -17,9 +17,23 @@ package org.openrewrite.java.search
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.ExecutionContext
+import org.openrewrite.InMemoryExecutionContext
+import org.openrewrite.java.JavaExecutionContextView
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.internal.cache.ClasspathJavaTypeCache
+import org.openrewrite.java.internal.cache.JavaTypeCache
 
 interface FindInheritedFieldsTest {
+    val typeCache: JavaTypeCache
+        get() = ClasspathJavaTypeCache()
+
+    val executionContext: ExecutionContext
+        get() {
+            val ctx = JavaExecutionContextView(InMemoryExecutionContext())
+            ctx.typeCache = typeCache
+            return ctx
+        }
 
     @Test
     fun findInheritedField(jp: JavaParser) {
@@ -31,7 +45,7 @@ interface FindInheritedFieldsTest {
             }
         """
 
-        val b = jp.parse("public class B extends A { }", a)[0]
+        val b = jp.parse(executionContext,"public class B extends A { }", a)[0]
 
         assertThat(FindInheritedFields.find(b.classes[0], "java.util.List").firstOrNull()?.name)
             .isEqualTo("list")
@@ -51,7 +65,7 @@ interface FindInheritedFieldsTest {
             }
         """
 
-        val b = jp.parse("public class B extends A { }", a)[0]
+        val b = jp.parse(executionContext, "public class B extends A { }", a)[0]
 
         assertThat(FindInheritedFields.find(b.classes[0], "java.lang.String").firstOrNull()?.name)
             .isEqualTo("s")

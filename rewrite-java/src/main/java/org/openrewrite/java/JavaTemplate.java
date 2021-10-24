@@ -25,6 +25,8 @@ import org.openrewrite.java.internal.template.JavaTemplateParser;
 import org.openrewrite.java.internal.template.Substitutions;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.Space.Location;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.template.SourceTemplate;
 
@@ -218,14 +220,15 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                         return c;
                                     }
 
-                                    //short circuiting navigation to methods and variables.
                                     @Override
-                                    public JavaType visitMethod(JavaType.Method method, List<JavaType.FullyQualified> fullyQualifieds) {
+                                    public JavaType.Method visitMethod(JavaType.Method method, List<JavaType.FullyQualified> fullyQualifieds) {
+                                        // short-circuiting navigation to methods and variables.
                                         return method;
                                     }
 
                                     @Override
-                                    public JavaType visitVariable(JavaType.Variable variable, List<JavaType.FullyQualified> fullyQualifieds) {
+                                    public JavaType.Variable visitVariable(JavaType.Variable variable, List<JavaType.FullyQualified> fullyQualifieds) {
+                                        // short-circuiting navigation to methods and variables.
                                         return variable;
                                     }
                                 }.visitNonNull(c.getType(), implementsTypes));
@@ -249,7 +252,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                 if (loc.equals(LAMBDA_PARAMETERS_PREFIX) && lambda.getParameters().isScope(insertionPoint)) {
                     return lambda.withParameters(substitutions.unsubstitute(templateParser.parseLambdaParameters(substitutedTemplate)));
                 }
-                return maybeReplaceStatement(lambda, J.class, true,0);
+                return maybeReplaceStatement(lambda, J.class, true, 0);
             }
 
             @Override
@@ -292,7 +295,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                             List<Statement> parameters = substitutions.unsubstitute(templateParser.parseParameters(substitutedTemplate));
 
                             // Update the J.MethodDeclaration's type information to reflect its new parameter list
-                            JavaType.Method type = method.getType();
+                            JavaType.Method type = method.getMethodType();
                             if (type != null) {
                                 List<String> paramNames = new ArrayList<>();
                                 List<JavaType> paramTypes = new ArrayList<>();
@@ -323,7 +326,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                                 List<TypeTree> bounds = typeParameter.getBounds();
                                                 JavaType.FullyQualified bound;
                                                 if (bounds == null || bounds.isEmpty()) {
-                                                    bound = JavaType.Class.OBJECT;
+                                                    bound = JavaType.Class.build("java.lang.Object");
                                                 } else {
                                                     bound = (JavaType.FullyQualified) bounds.get(0);
                                                 }
@@ -338,20 +341,19 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                         paramTypes.add(namedVariable.getType());
                                     }
                                 }
-                                type = JavaType.Method.build(type.getFlags(), type.getDeclaringType(), type.getName(),
+                                type = new JavaType.Method(Flag.flagsToBitMap(type.getFlags()), type.getDeclaringType(), type.getName(),
                                         type.getGenericSignature().withParamTypes(paramTypes),
                                         type.getResolvedSignature().withParamTypes(paramTypes),
                                         paramNames, type.getThrownExceptions(), type.getAnnotations());
                             }
 
-                            return method.withParameters(parameters)
-                                    .withType(type);
+                            return method.withParameters(parameters).withMethodType(type);
                         }
                         case THROWS: {
                             J.MethodDeclaration m = method.withThrows(substitutions.unsubstitute(templateParser.parseThrows(substitutedTemplate)));
 
                             // Update method type information to reflect the new checked exceptions
-                            JavaType.Method type = m.getType();
+                            JavaType.Method type = m.getMethodType();
                             if (type != null) {
                                 List<JavaType.FullyQualified> newThrows = new ArrayList<>();
                                 List<NameTree> throwz = (m.getThrows() == null) ? emptyList() : m.getThrows();
@@ -359,14 +361,14 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                     J.Identifier exceptionIdent = (J.Identifier) t;
                                     newThrows.add((JavaType.FullyQualified) exceptionIdent.getType());
                                 }
-                                type = JavaType.Method.build(type.getFlags(), type.getDeclaringType(), type.getName(),
+                                type = new JavaType.Method(Flag.flagsToBitMap(type.getFlags()), type.getDeclaringType(), type.getName(),
                                         type.getGenericSignature(), type.getResolvedSignature(), type.getParamNames(), newThrows,
                                         type.getAnnotations());
                             }
 
                             //noinspection ConstantConditions
                             m = m.getPadding().withThrows(m.getPadding().getThrows().withBefore(Space.format(" ")))
-                                    .withType(type);
+                                    .withMethodType(type);
                             return m;
                         }
                         case TYPE_PARAMETERS: {
@@ -399,20 +401,11 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                     // This will only happen if the template encountered non-fatal errors during parsing
                     // Make a best-effort attempt to recover by patching together a new Method type from the old one
                     // There are many ways this type could be not quite right, but leaving the type alone is likely to cause MethodMatcher false-positives
-                    JavaType.Method mt = method.getType();
-                    if (m.getType() == null && mt != null && mt.getGenericSignature() != null) {
+                    JavaType.Method mt = method.getMethodType();
+                    if (m.getMethodType() == null && mt != null && mt.getGenericSignature() != null) {
                         List<JavaType> argTypes = m.getArguments().stream()
                                 .map(Expression::getType)
                                 .map(it -> {
-                                    // If an argument to the method invocation is itself an invocation, use its return type
-                                    if (it instanceof JavaType.Method) {
-                                        JavaType.Method argType = (JavaType.Method) it;
-                                        if (argType.getGenericSignature() != null) {
-                                            return argType.getGenericSignature().getReturnType();
-                                        } else {
-                                            return argType.getResolvedSignature().getReturnType();
-                                        }
-                                    }
                                     // Invoking a method with a string literal still means the invocation has the class type
                                     if (it == JavaType.Primitive.String) {
                                         return JavaType.Class.build("java.lang.String");
@@ -422,7 +415,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                 .collect(toList());
                         mt = mt.withResolvedSignature(mt.getResolvedSignature().withParamTypes(argTypes))
                                 .withGenericSignature(mt.getGenericSignature().withParamTypes(argTypes));
-                        m = m.withType(mt);
+                        m = m.withMethodType(mt);
                     }
                     return m;
                 }

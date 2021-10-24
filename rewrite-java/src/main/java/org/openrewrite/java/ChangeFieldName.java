@@ -17,15 +17,22 @@ package org.openrewrite.java;
 
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 
 import static org.openrewrite.Tree.randomId;
 
 public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
-    private final JavaType.Class classType;
+    private final String classType;
     private final String hasName;
     private final String toName;
 
+    @Deprecated
     public ChangeFieldName(JavaType.Class classType, String hasName, String toName) {
+        this(classType.getFullyQualifiedName(), hasName, toName);
+    }
+
+    public ChangeFieldName(String classType, String hasName, String toName) {
         this.classType = classType;
         this.hasName = hasName;
         this.toName = toName;
@@ -60,28 +67,31 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
     public J.Identifier visitIdentifier(J.Identifier ident, P p) {
         J.Identifier i = super.visitIdentifier(ident, p);
 
-        if(i.getFieldType() instanceof JavaType.Variable) {
+        if (i.getFieldType() instanceof JavaType.Variable) {
             JavaType.Variable varType = (JavaType.Variable) i.getFieldType();
-            if(varType.getName().equals(hasName) && TypeUtils.isOfType(varType.getOwner(), classType)) {
+            if (varType.getName().equals(hasName) && TypeUtils.isOfClassType(varType.getOwner(), classType)) {
                 i = J.Identifier.build(
                         randomId(),
                         i.getPrefix(),
                         i.getMarkers(),
                         toName,
                         i.getType(),
-                        JavaType.Variable.build(
-                                toName,
+                        new JavaType.Variable(
+                                Flag.flagsToBitMap(varType.getFlags()),
                                 varType.getOwner(),
+                                toName,
                                 varType.getType(),
-                                varType.getAnnotations(),
-                                Flag.flagsToBitMap(varType.getFlags())));
+                                varType.getAnnotations()
+                        )
+                );
             }
         }
+
         return i;
     }
 
     private boolean matchesClass(@Nullable JavaType test) {
         JavaType.FullyQualified testClassType = TypeUtils.asFullyQualified(test);
-        return testClassType != null && testClassType.getFullyQualifiedName().equals(classType.getFullyQualifiedName());
+        return testClassType != null && testClassType.getFullyQualifiedName().equals(classType);
     }
 }

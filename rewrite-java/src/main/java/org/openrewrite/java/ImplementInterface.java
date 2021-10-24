@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Markers;
 
 import static org.openrewrite.Tree.randomId;

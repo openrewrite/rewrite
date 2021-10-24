@@ -21,7 +21,7 @@ import org.openrewrite.java.JavaRecipeTest
 
 @Suppress("MethodMayBeStatic", "MisspelledEquals", "BooleanMethodNameMustStartWithQuestion")
 interface RenameMethodsNamedHashcodeEqualOrTostringTest : JavaRecipeTest {
-    override val recipe: Recipe?
+    override val recipe: Recipe
         get() = RenameMethodsNamedHashcodeEqualOrTostring()
 
     @Test

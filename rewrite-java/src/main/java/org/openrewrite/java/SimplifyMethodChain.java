@@ -88,10 +88,10 @@ public class SimplifyMethodChain extends Recipe {
                 }
 
                 if (select instanceof J.MethodInvocation) {
-                    assert m.getType() != null;
+                    assert m.getMethodType() != null;
                     return m.withSelect(((J.MethodInvocation) select).getSelect())
                             .withName(m.getName().withName(newMethodName))
-                            .withType(m.getType().withName(newMethodName));
+                            .withMethodType(m.getMethodType().withName(newMethodName));
                 }
 
                 return m;

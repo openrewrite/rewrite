@@ -20,9 +20,8 @@ import org.openrewrite.Recipe;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.JavaType;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -34,12 +33,12 @@ public class ObjectFinalizeCallsSuper extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Object#finalize() invokes super#finalize()";
+        return "`finalize()` calls super";
     }
 
     @Override
     public String getDescription() {
-        return "`Object#finalize()` methods should invoke `super.finalize()`";
+        return "Overrides of `Object#finalize()` should call super.";
     }
 
     @Override
@@ -54,17 +53,7 @@ public class ObjectFinalizeCallsSuper extends Recipe {
 
     @Override
     protected JavaIsoVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                for (JavaType.Method md : cu.getDeclaredMethods()) {
-                    if (FINALIZE_METHOD_MATCHER.matches(md)) {
-                        return cu.withMarkers(cu.getMarkers().searchResult());
-                    }
-                }
-                return cu;
-            }
-        };
+        return new DeclaresMethod<>(FINALIZE_METHOD_MATCHER);
     }
 
     @Override
@@ -73,7 +62,7 @@ public class ObjectFinalizeCallsSuper extends Recipe {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
                 J.MethodDeclaration md = super.visitMethodDeclaration(method, executionContext);
-                if (FINALIZE_METHOD_MATCHER.matches(md.getType()) && !hasSuperFinalizeMethodInvocation(md)) {
+                if (FINALIZE_METHOD_MATCHER.matches(md.getMethodType()) && !hasSuperFinalizeMethodInvocation(md)) {
                     //noinspection ConstantConditions
                     md = md.withTemplate(JavaTemplate.builder(this::getCursor, "super.finalize()").build(), md.getBody().getCoordinates().lastStatement());
                 }

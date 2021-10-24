@@ -101,17 +101,17 @@ public class ChangePackage extends Recipe {
 
             String changingTo = getCursor().getMessage(RENAME_TO_KEY);
             if (changingTo != null) {
-                String path = ((SourceFile)c).getSourcePath().toString().replace('\\', '/');
+                String path = ((SourceFile) c).getSourcePath().toString().replace('\\', '/');
                 String changingFrom = getCursor().getMessage(RENAME_FROM_KEY);
                 assert changingFrom != null;
-                c = (JavaSourceFile) ((SourceFile)c).withSourcePath(Paths.get(path.replaceFirst(
+                c = (JavaSourceFile) ((SourceFile) c).withSourcePath(Paths.get(path.replaceFirst(
                         changingFrom.replace('.', '/'),
                         changingTo.replace('.', '/')
                 )));
 
                 for (J.Import anImport : c.getImports()) {
                     if (anImport.getPackageName().equals(newPackageName)) {
-                        c = new RemoveImport<ExecutionContext>(anImport.getTypeName(),true).visitJavaSourceFile(c, ctx);
+                        c = new RemoveImport<ExecutionContext>(anImport.getTypeName(), true).visitJavaSourceFile(c, ctx);
                     }
                 }
             }
@@ -119,10 +119,19 @@ public class ChangePackage extends Recipe {
         }
 
         @Override
-        public @Nullable J postVisit(J tree, ExecutionContext executionContext) {
+        public J postVisit(J tree, ExecutionContext executionContext) {
             J j = super.postVisit(tree, executionContext);
-            if (j instanceof TypedTree) {
-                j = ((TypedTree) j).withType(updateType(((TypedTree) j).getType()));
+            if (j instanceof J.MethodDeclaration) {
+                J.MethodDeclaration m = (J.MethodDeclaration) j;
+                return m.withMethodType(updateType(m.getMethodType()));
+            } else if (j instanceof J.MethodInvocation) {
+                J.MethodInvocation m = (J.MethodInvocation) j;
+                return m.withMethodType(updateType(m.getMethodType()));
+            } else if (j instanceof J.NewClass) {
+                J.NewClass n = (J.NewClass) j;
+                return n.withConstructorType(updateType(n.getConstructorType()));
+            } else if (j instanceof TypedTree) {
+                return ((TypedTree) j).withType(updateType(((TypedTree) j).getType()));
             }
             return j;
         }
@@ -134,7 +143,7 @@ public class ChangePackage extends Recipe {
             String changingTo = getCursor().getNearestMessage(RENAME_TO_KEY);
             if (changingTo != null && classDecl.getType() != null) {
                 JavaType.FullyQualified type = c.getType();
-                if(type != null) {
+                if (type != null) {
                     c = c.withType(type.withFullyQualifiedName(changingTo + "." + c.getType().getClassName()));
                 }
             }
@@ -176,34 +185,23 @@ public class ChangePackage extends Recipe {
             return pkg;
         }
 
-        @Override
-        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-            J.MethodInvocation mi = super.visitMethodInvocation(method, executionContext);
-            mi = mi.withType(updateType(mi.getType()));
-            return mi;
+        @Nullable
+        private JavaType updateType(@Nullable JavaType javaType) {
+            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(javaType);
+            if (fq != null && fq.getPackageName().equals(oldPackageName) && !fq.getClassName().isEmpty()) {
+                return TypeUtils.asFullyQualified(JavaType.buildType(newPackageName + "." + fq.getClassName()));
+            }
+            return javaType;
         }
 
-        private JavaType updateType(@Nullable JavaType type) {
-            JavaType.GenericTypeVariable gtv = TypeUtils.asGeneric(type);
-            if (gtv != null && gtv.getBound() != null
-                    && gtv.getBound().getPackageName().equals(oldPackageName)) {
-                return gtv.withBound(TypeUtils.asFullyQualified(buildNewType(gtv.getBound().getClassName())));
-            }
-
-            JavaType.FullyQualified fqt = TypeUtils.asFullyQualified(type);
-            if (fqt != null && fqt.getPackageName().equals(oldPackageName)) {
-                return buildNewType(fqt.getClassName());
-            }
-
-            JavaType.Method mt = TypeUtils.asMethod(type);
+        @Nullable
+        private JavaType.Method updateType(@Nullable JavaType.Method mt) {
             if (mt != null) {
                 return mt.withDeclaringType((JavaType.FullyQualified) updateType(mt.getDeclaringType()))
                         .withResolvedSignature(updateSignature(mt.getResolvedSignature()))
                         .withGenericSignature(updateSignature(mt.getGenericSignature()));
             }
-
-            //noinspection ConstantConditions
-            return type;
+            return null;
         }
 
         private JavaType.Method.Signature updateSignature(@Nullable JavaType.Method.Signature signature) {
@@ -215,11 +213,5 @@ public class ChangePackage extends Recipe {
             return signature.withReturnType(updateType(signature.getReturnType()))
                     .withParamTypes(ListUtils.map(signature.getParamTypes(), this::updateType));
         }
-
-        private JavaType buildNewType(String className) {
-            //noinspection ConstantConditions
-            return TypeUtils.asFullyQualified(JavaType.buildType(newPackageName + "." + className));
-        }
-
     }
 }

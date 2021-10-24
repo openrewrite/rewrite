@@ -21,7 +21,11 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Flag;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -63,32 +67,34 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         Set<String> originalImports = new HashSet<>();
         for (J.Import cuImport : cu.getImports()) {
             if (cuImport.getQualid().getType() != null) {
-                originalImports.add(((JavaType.Class) cuImport.getQualid().getType()).getFullyQualifiedName());
+                originalImports.add(((JavaType.FullyQualified) cuImport.getQualid().getType()).getFullyQualifiedName());
             }
         }
 
-        for (JavaType javaType : cu.getTypesInUse()) {
-            if (javaType instanceof JavaType.Variable) {
-                JavaType.Variable variable = (JavaType.Variable) javaType;
-                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
-                if (fq != null && (fq.getFullyQualifiedName().equals(type) || fq.getFullyQualifiedName().equals(owner))) {
-                    methodsAndFieldsUsed.add(variable.getName());
-                }
-            } else if (javaType instanceof JavaType.Method) {
-                JavaType.Method method = (JavaType.Method) javaType;
-                if (method.hasFlags(Flag.Static)) {
-                    String declaringType = method.getDeclaringType().getFullyQualifiedName();
-                    if (declaringType.equals(type)) {
+        for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
+            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
+            if (fq != null && (fq.getFullyQualifiedName().equals(type) || fq.getFullyQualifiedName().equals(owner))) {
+                methodsAndFieldsUsed.add(variable.getName());
+            }
+        }
+
+        for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
+            if (method.hasFlags(Flag.Static)) {
+                String declaringType = method.getDeclaringType().getFullyQualifiedName();
+                if (declaringType.equals(type)) {
+                    methodsAndFieldsUsed.add(method.getName());
+                } else if (declaringType.equals(owner)) {
+                    if (method.getName().equals(type.substring(type.lastIndexOf('.') + 1))) {
                         methodsAndFieldsUsed.add(method.getName());
-                    } else if (declaringType.equals(owner)) {
-                        if (method.getName().equals(type.substring(type.lastIndexOf('.') + 1))) {
-                            methodsAndFieldsUsed.add(method.getName());
-                        } else {
-                            otherMethodsAndFieldsInTypeUsed.add(method.getName());
-                        }
+                    } else {
+                        otherMethodsAndFieldsInTypeUsed.add(method.getName());
                     }
                 }
-            } else if (javaType instanceof JavaType.FullyQualified) {
+            }
+        }
+
+        for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
+            if (javaType instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) javaType;
                 if (fullyQualified.getFullyQualifiedName().equals(type)) {
                     typeUsed = true;
@@ -121,7 +127,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                     if (methodsAndFieldsUsed.isEmpty() && otherMethodsAndFieldsInTypeUsed.isEmpty()) {
                         spaceForNextImport.set(impoort.getPrefix());
                         return null;
-                    } else if (methodsAndFieldsUsed.size() + otherMethodsAndFieldsInTypeUsed.size() < importLayoutStyle.getNameCountToUseStarImport()){
+                    } else if (methodsAndFieldsUsed.size() + otherMethodsAndFieldsInTypeUsed.size() < importLayoutStyle.getNameCountToUseStarImport()) {
                         methodsAndFieldsUsed.addAll(otherMethodsAndFieldsInTypeUsed);
                         return unfoldStarImport(impoort, methodsAndFieldsUsed);
                     }

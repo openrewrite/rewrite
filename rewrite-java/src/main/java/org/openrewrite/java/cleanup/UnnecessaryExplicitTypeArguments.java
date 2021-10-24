@@ -43,7 +43,7 @@ public class UnnecessaryExplicitTypeArguments extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-                if (m.getType() != null) {
+                if (m.getMethodType() != null) {
                     Object enclosing = getCursor().dropParentUntil(J.class::isInstance).getValue();
                     JavaType enclosingType = null;
 
@@ -64,9 +64,8 @@ public class UnnecessaryExplicitTypeArguments extends Recipe {
                     }
 
                     if (enclosingType != null &&
-                            m.getType().getResolvedSignature() != null &&
-                            enclosingType.equals(m.getType().getResolvedSignature().getReturnType())
-                    ) {
+                            m.getMethodType().getResolvedSignature() != null &&
+                            enclosingType.equals(m.getMethodType().getResolvedSignature().getReturnType())) {
                         m = m.withTypeParameters(null);
                     }
                 }

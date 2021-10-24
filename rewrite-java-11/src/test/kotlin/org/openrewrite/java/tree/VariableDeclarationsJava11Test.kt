@@ -55,15 +55,19 @@ class VariableDeclarationsJava11Test : JavaTreeTest, Java11Test {
         var inferred = typeTree(statements[0])
         assertThat(TypeUtils.isOfClassType(inferred.type, "java.lang.String")).isTrue()
         inferred = typeTree(statements[1])
-        assertThat(TypeUtils.asPrimitive(inferred.type)).isEqualTo(JavaType.Primitive.Char)
+        assertThat(TypeUtils.asPrimitive(inferred.type)).isEqualTo(
+            JavaType.Primitive.Char)
         inferred = typeTree(statements[2])
         assertThat(TypeUtils.isOfClassType(inferred.type, "java.util.Date")).isTrue()
         inferred = typeTree(statements[3])
-        assertThat(TypeUtils.asPrimitive(inferred.type)).isEqualTo(JavaType.Primitive.Float)
+        assertThat(TypeUtils.asPrimitive(inferred.type)).isEqualTo(
+            JavaType.Primitive.Float)
         val variableDeclarations = statements[4] as J.VariableDeclarations
-        assertThat(TypeUtils.asPrimitive(variableDeclarations.typeExpression!!.type)).isEqualTo(JavaType.Primitive.Long)
+        assertThat(TypeUtils.asPrimitive(variableDeclarations.typeExpression!!.type)).isEqualTo(
+            JavaType.Primitive.Long)
         val secondVariable = variableDeclarations.variables[1]
-        assertThat(TypeUtils.asPrimitive(secondVariable.type)).isEqualTo(JavaType.Primitive.Long)
+        assertThat(TypeUtils.asPrimitive(secondVariable.type)).isEqualTo(
+            JavaType.Primitive.Long)
         assertThat((secondVariable.prefix.comments[0] as TextComment).text).isEqualTo(" hello ")
         assertThat(secondVariable.prefix.comments[0].suffix).isEqualTo("   ")
     }

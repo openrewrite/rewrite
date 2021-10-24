@@ -21,7 +21,10 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.ChangeMethodName;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.search.DeclaresMethod;
+import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -30,6 +33,9 @@ import java.util.Collections;
 import java.util.Set;
 
 public class RenameMethodsNamedHashcodeEqualOrTostring extends Recipe {
+    private static final MethodMatcher NO_ARGS = new MethodMatcher("*..* *()");
+    private static final MethodMatcher OBJECT_ARG = new MethodMatcher("*..* *(java.lang.Object)");
+
     @Override
     public String getDisplayName() {
         return "Rename methods named `hashcode`, `equal`, or `tostring`.";
@@ -52,33 +58,40 @@ public class RenameMethodsNamedHashcodeEqualOrTostring extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new RenameMethodsNamedHashcodeEqualOrTostringVisitor();
+    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
+                doAfterVisit(new DeclaresMethod<>(NO_ARGS));
+                doAfterVisit(new DeclaresMethod<>(OBJECT_ARG));
+                return cu;
+            }
+        };
     }
 
-    private static class RenameMethodsNamedHashcodeEqualOrTostringVisitor extends JavaIsoVisitor<ExecutionContext> {
-        private static final MethodMatcher NO_ARGS = new MethodMatcher("*..* *()");
-        private static final MethodMatcher OBJECT_ARG = new MethodMatcher("*..* *(java.lang.Object)");
-
-        private static boolean equalsIgnoreCaseExclusive(String inputToCheck, String targetToCheck) {
-            return inputToCheck.equalsIgnoreCase(targetToCheck) && !inputToCheck.equals(targetToCheck);
-        }
-
-        @Override
-        public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-            if (method.getType() != null && method.getReturnTypeExpression() != null) {
-                String sn = method.getSimpleName();
-                JavaType rte = method.getReturnTypeExpression().getType();
-                JavaType t = method.getType();
-                if (equalsIgnoreCaseExclusive(sn, "hashCode") && JavaType.Primitive.Int.equals(rte) && NO_ARGS.matches(t)) {
-                    doAfterVisit(new ChangeMethodName(MethodMatcher.methodPattern(method), "hashCode", true));
-                } else if (sn.equalsIgnoreCase("equal") && JavaType.Primitive.Boolean.equals(rte) && OBJECT_ARG.matches(t)) {
-                    doAfterVisit(new ChangeMethodName(MethodMatcher.methodPattern(method), "equals", true));
-                } else if (equalsIgnoreCaseExclusive(sn, "toString") && TypeUtils.isString(rte) && NO_ARGS.matches(t)) {
-                    doAfterVisit(new ChangeMethodName(MethodMatcher.methodPattern(method), "toString", true));
+    @Override
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                if (method.getMethodType() != null && method.getReturnTypeExpression() != null) {
+                    String sn = method.getSimpleName();
+                    JavaType rte = method.getReturnTypeExpression().getType();
+                    JavaType.Method t = method.getMethodType();
+                    if (equalsIgnoreCaseExclusive(sn, "hashCode") && JavaType.Primitive.Int.equals(rte) && NO_ARGS.matches(t)) {
+                        doAfterVisit(new ChangeMethodName(MethodMatcher.methodPattern(method), "hashCode", true));
+                    } else if (sn.equalsIgnoreCase("equal") && JavaType.Primitive.Boolean.equals(rte) && OBJECT_ARG.matches(t)) {
+                        doAfterVisit(new ChangeMethodName(MethodMatcher.methodPattern(method), "equals", true));
+                    } else if (equalsIgnoreCaseExclusive(sn, "toString") && TypeUtils.isString(rte) && NO_ARGS.matches(t)) {
+                        doAfterVisit(new ChangeMethodName(MethodMatcher.methodPattern(method), "toString", true));
+                    }
                 }
+                return super.visitMethodDeclaration(method, ctx);
             }
-            return super.visitMethodDeclaration(method, ctx);
-        }
+
+            private boolean equalsIgnoreCaseExclusive(String inputToCheck, String targetToCheck) {
+                return inputToCheck.equalsIgnoreCase(targetToCheck) && !inputToCheck.equals(targetToCheck);
+            }
+        };
     }
 }

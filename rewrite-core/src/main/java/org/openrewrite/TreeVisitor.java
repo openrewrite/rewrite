@@ -44,11 +44,9 @@ public abstract class TreeVisitor<T extends Tree, P> {
     private static final boolean IS_DEBUGGING = System.getProperty("org.openrewrite.debug") != null ||
             ManagementFactory.getRuntimeMXBean().getInputArguments().toString().contains("-agentlib:jdwp");
 
-    private Cursor cursor;
+    private static final Cursor ROOT = new Cursor(null, "root");
 
-    {
-        setCursor(new Cursor(null, "root"));
-    }
+    private Cursor cursor = ROOT;
 
     public static <T extends Tree, P> TreeVisitor<T, P> noop() {
         return new TreeVisitor<T, P>() {
@@ -181,6 +179,9 @@ public abstract class TreeVisitor<T extends Tree, P> {
             topLevel = true;
             visitCount = 0;
             sample = Timer.start();
+            if(p instanceof ExecutionContext) {
+                cursor.putMessage("org.openrewrite.ExecutionContext", p);
+            }
             afterVisit = new ArrayList<>();
         }
 

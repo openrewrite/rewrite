@@ -24,6 +24,7 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.time.Duration;
 import java.util.*;

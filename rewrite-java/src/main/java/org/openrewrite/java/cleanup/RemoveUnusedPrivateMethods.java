@@ -39,7 +39,7 @@ public class RemoveUnusedPrivateMethods extends Recipe {
 
     @Override
     public String getDescription() {
-        return "`private` methods that are never executed are dead code: unnecessary, inoperative code that should be removed.";
+        return "`private` methods that are never executed are dead code and should be removed.";
     }
 
     @Override
@@ -61,17 +61,16 @@ public class RemoveUnusedPrivateMethods extends Recipe {
     protected JavaIsoVisitor<ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
-                J.MethodDeclaration m = super.visitMethodDeclaration(method, executionContext);
-                JavaType.Method methodType = TypeUtils.asMethod(method.getType());
-
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
+                JavaType.Method methodType = method.getMethodType();
                 if (methodType != null && methodType.hasFlags(Flag.Private) &&
                         !method.isConstructor() &&
                         methodType.getGenericSignature() != null &&
                         method.getAllAnnotations().isEmpty()) {
 
                     J.ClassDeclaration classDeclaration = getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class);
-                    if (TypeUtils.isAssignableTo(JavaType.Class.build("java.io.Serializable"), classDeclaration.getType())) {
+                    if (TypeUtils.isAssignableTo("java.io.Serializable", classDeclaration.getType())) {
                         switch (m.getSimpleName()) {
                             case "readObject":
                             case "readObjectNoData":
@@ -82,14 +81,14 @@ public class RemoveUnusedPrivateMethods extends Recipe {
                     }
 
                     J.CompilationUnit cu = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
-                    for (JavaType type : cu.getTypesInUse()) {
-                        if(type instanceof JavaType.Method) {
-                            JavaType.Method usedMethodType = (JavaType.Method) type;
-                            if(methodType.getName().equals(usedMethodType.getName()) && methodType.getGenericSignature().equals(usedMethodType.getGenericSignature())) {
-                                return m;
-                            }
+                    for (JavaType.Method usedMethodType : cu.getTypesInUse().getUsedMethods()) {
+                        if (methodType.getName().equals(usedMethodType.getName()) && methodType.getGenericSignature().equals(usedMethodType.getGenericSignature())) {
+                            return m;
                         }
-                        if (TypeUtils.isOfClassType(type,  "org.junit.jupiter.params.provider.MethodSource")) {
+                    }
+
+                    for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
+                        if (TypeUtils.isOfClassType(javaType, "org.junit.jupiter.params.provider.MethodSource")) {
                             return m;
                         }
                     }

@@ -127,7 +127,7 @@ class TypeValidator(
         if(!options.methodInvocations) {
             return m
         }
-        val mt = method.type
+        val mt = method.methodType
         if(mt == null) {
             p.add(invalidTypeResult("J.MethodInvocation type is null"))
             return m
@@ -147,7 +147,7 @@ class TypeValidator(
         if(!options.methodDeclarations) {
             return m
         }
-        val mt = m.type
+        val mt = m.methodType
         if(mt == null) {
             p.add(invalidTypeResult("J.MethodDeclaration type is null"))
             return m

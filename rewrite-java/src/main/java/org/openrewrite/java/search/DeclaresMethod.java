@@ -18,11 +18,8 @@ package org.openrewrite.java.search;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
-
-import java.util.Set;
 
 public class DeclaresMethod<P> extends JavaIsoVisitor<P> {
     private final MethodMatcher methodMatcher;
@@ -45,8 +42,7 @@ public class DeclaresMethod<P> extends JavaIsoVisitor<P> {
 
     @Override
     public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
-        Set<JavaType.Method> methods = cu.getDeclaredMethods();
-        for (JavaType.Method method : methods) {
+        for (JavaType.Method method : cu.getTypesInUse().getDeclaredMethods()) {
             if (methodMatcher.matches(method)) {
                 return cu.withMarkers(cu.getMarkers().searchResult());
             }

@@ -103,21 +103,21 @@ public class ReorderMethodArguments extends Recipe {
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-            if (methodMatcher.matches(m) && m.getType() != null) {
+            if (methodMatcher.matches(m) && m.getMethodType() != null) {
                 @SuppressWarnings("ConstantConditions") List<String> paramNames =
                         oldParameterNames == null || oldParameterNames.length == 0 ?
-                                m.getType().getParamNames() :
+                                m.getMethodType().getParamNames() :
                                 Arrays.asList(oldParameterNames);
 
                 if (paramNames == null) {
-                    throw new IllegalStateException("There is no source attachment for method " + m.getType().getDeclaringType().getFullyQualifiedName() +
+                    throw new IllegalStateException("There is no source attachment for method " + m.getMethodType().getDeclaringType().getFullyQualifiedName() +
                             "." + m.getSimpleName() + "(..). Provide a reference for original parameter names by calling setOriginalParamNames(..)");
                 }
 
                 List<JRightPadded<Expression>> originalArgs = m.getPadding().getArguments().getPadding().getElements();
 
-                int resolvedParamCount = m.getType().getResolvedSignature() == null ? originalArgs.size() :
-                        m.getType().getResolvedSignature().getParamTypes().size();
+                int resolvedParamCount = m.getMethodType().getResolvedSignature() == null ? originalArgs.size() :
+                        m.getMethodType().getResolvedSignature().getParamTypes().size();
 
                 int i = 0;
                 List<JRightPadded<Expression>> reordered = new ArrayList<>(originalArgs.size());

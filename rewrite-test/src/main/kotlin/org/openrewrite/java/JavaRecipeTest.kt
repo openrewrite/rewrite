@@ -16,22 +16,40 @@
 package org.openrewrite.java
 
 import org.intellij.lang.annotations.Language
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
+import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
+import org.openrewrite.java.internal.cache.ClasspathJavaTypeCache
+import org.openrewrite.java.internal.cache.JavaTypeCache
 import org.openrewrite.java.tree.J
 import java.io.File
 import java.nio.file.Path
 
 interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
+    val typeCache: JavaTypeCache
+        get() = ClasspathJavaTypeCache()
+
     override val parser: JavaParser
-        get() = JavaParser.fromJavaVersion()
-            .logCompilationWarningsAndErrors(true)
-            .build()
+        get() = JavaParser.fromJavaVersion().build()
+
+    override val executionContext: ExecutionContext
+        get() {
+            val ctx = JavaExecutionContextView(super.executionContext)
+            ctx.typeCache = typeCache
+            return ctx
+        }
 
     @BeforeEach
     fun beforeRecipe() {
+        typeCache.clear()
         J.clearCaches()
+    }
+
+    @AfterEach
+    fun afterRecipe() {
+        parser.reset()
     }
 
     fun assertChanged(
@@ -43,7 +61,15 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (J.CompilationUnit) -> Unit = { }
     ) {
-        super.assertChangedBase(recipe, moderneAstLink, moderneApiBearerToken, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        super.assertChangedBase(
+            recipe,
+            moderneAstLink,
+            moderneApiBearerToken,
+            after,
+            cycles,
+            expectedCyclesThatMakeChanges,
+            afterConditions
+        )
     }
 
     fun assertChanged(
@@ -54,15 +80,24 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
         @Language("java") after: String,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,
-        typeValidation: TypeValidator.ValidationOptions.Companion.Builder.()->Unit = {},
+        typeValidation: TypeValidator.ValidationOptions.Companion.Builder.() -> Unit = {},
         afterConditions: (J.CompilationUnit) -> Unit = { }
     ) {
         val typeValidatingAfterConditions: (J.CompilationUnit) -> Unit = { cu ->
-                TypeValidator.assertTypesValid(cu, TypeValidator.ValidationOptions.builder(typeValidation))
-                afterConditions(cu)
-            }
+            TypeValidator.assertTypesValid(cu, TypeValidator.ValidationOptions.builder(typeValidation))
+            afterConditions(cu)
+        }
 
-        super.assertChangedBase(parser, recipe, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, typeValidatingAfterConditions)
+        super.assertChangedBase(
+            parser,
+            recipe,
+            before,
+            dependsOn,
+            after,
+            cycles,
+            expectedCyclesThatMakeChanges,
+            typeValidatingAfterConditions
+        )
     }
 
     fun assertChanged(
@@ -74,14 +109,24 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
         @Language("java") after: String,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,
-        typeValidation: TypeValidator.ValidationOptions.Companion.Builder.()->Unit = {},
+        typeValidation: TypeValidator.ValidationOptions.Companion.Builder.() -> Unit = {},
         afterConditions: (J.CompilationUnit) -> Unit = { }
     ) {
         val typeValidatingAfterConditions: (J.CompilationUnit) -> Unit = { cu ->
-                TypeValidator.assertTypesValid(cu, TypeValidator.ValidationOptions.builder(typeValidation))
-                afterConditions(cu)
-            }
-        super.assertChangedBase(parser, recipe, before, relativeTo, dependsOn, after, cycles, expectedCyclesThatMakeChanges, typeValidatingAfterConditions)
+            TypeValidator.assertTypesValid(cu, TypeValidator.ValidationOptions.builder(typeValidation))
+            afterConditions(cu)
+        }
+        super.assertChangedBase(
+            parser,
+            recipe,
+            before,
+            relativeTo,
+            dependsOn,
+            after,
+            cycles,
+            expectedCyclesThatMakeChanges,
+            typeValidatingAfterConditions
+        )
     }
 
     fun assertUnchanged(
@@ -94,7 +139,7 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
     }
 
     fun assertUnchanged(
-        parser:JavaParser = this.parser,
+        parser: JavaParser = this.parser,
         recipe: Recipe = this.recipe!!,
         @Language("java") before: File,
         relativeTo: Path? = null,

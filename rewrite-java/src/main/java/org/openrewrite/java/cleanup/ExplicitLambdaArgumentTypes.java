@@ -98,7 +98,8 @@ public class ExplicitLambdaArgumentTypes extends Recipe {
             // if the type expression is null, it implies the types on the lambda arguments are implicit.
             if (multiVariable.getTypeExpression() == null && getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.Lambda) {
                 J.VariableDeclarations.NamedVariable nv = multiVariable.getVariables().get(0);
-                String name = buildName(nv.getType());
+                String name = nv.getType() instanceof JavaType.GenericTypeVariable ?
+                        ((JavaType.GenericTypeVariable) nv.getType()).getName() : buildName(nv.getType());
                 assert name != null;
                 multiVariable = multiVariable.withTypeExpression(
                         J.Identifier.build(Tree.randomId(),

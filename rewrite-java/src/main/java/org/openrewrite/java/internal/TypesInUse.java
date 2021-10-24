@@ -21,37 +21,25 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.JavaType;
 
 import java.util.HashSet;
 import java.util.Set;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 @Getter
-public class TypeCache {
+public class TypesInUse {
     private final JavaSourceFile cu;
     private final Set<JavaType> typesInUse;
     private final Set<JavaType.Method> declaredMethods;
+    private final Set<JavaType.Method> usedMethods;
+    private final Set<JavaType.Variable> variables;
 
-    public static TypeCache build(JavaSourceFile cu) {
-        Set<JavaType> types = new HashSet<JavaType>() {
-            @Override
-            public boolean add(@Nullable JavaType javaType) {
-                if (javaType != null) {
-                    return super.add(javaType);
-                }
-                return false;
-            }
-        };
-
-        Set<JavaType.Method> declaredMethods = new HashSet<JavaType.Method>() {
-            @Override
-            public boolean add(@Nullable JavaType.Method javaType) {
-                if (javaType != null) {
-                    return super.add(javaType);
-                }
-                return false;
-            }
-        };
+    public static TypesInUse build(JavaSourceFile cu) {
+        Set<JavaType> types = new NullSkippingSet<>();
+        Set<JavaType.Method> declaredMethods = new NullSkippingSet<>();
+        Set<JavaType.Method> usedMethods = new NullSkippingSet<>();
+        Set<JavaType.Variable> variables = new NullSkippingSet<>();
 
         JavaIsoVisitor<Integer> findTypes = new JavaIsoVisitor<Integer>() {
             @Override
@@ -59,6 +47,7 @@ public class TypeCache {
                 if (tree instanceof TypedTree) {
                     if (!(tree instanceof J.ClassDeclaration) &&
                             !(tree instanceof J.MethodDeclaration) &&
+                            !(tree instanceof J.MethodInvocation) &&
                             !(tree instanceof J.VariableDeclarations)) {
                         types.add(((TypedTree) tree).getType());
                     }
@@ -87,7 +76,7 @@ public class TypeCache {
 
             @Override
             public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
-                types.add(identifier.getFieldType());
+                variables.add(identifier.getFieldType());
                 return super.visitIdentifier(identifier, p);
             }
 
@@ -106,31 +95,42 @@ public class TypeCache {
 
             @Override
             public J.MemberReference visitMemberReference(J.MemberReference memberRef, Integer p) {
-                types.add(memberRef.getReferenceType());
+                usedMethods.add(memberRef.getMethodType());
+                variables.add(memberRef.getVariableType());
                 return super.visitMemberReference(memberRef, p);
             }
 
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Integer p) {
-                declaredMethods.add(method.getType());
+                declaredMethods.add(method.getMethodType());
                 return super.visitMethodDeclaration(method, p);
             }
 
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
-                types.add(method.getReturnType());
+                usedMethods.add(method.getMethodType());
                 return super.visitMethodInvocation(method, p);
             }
 
             @Override
             public J.NewClass visitNewClass(J.NewClass newClass, Integer integer) {
-                types.add(newClass.getConstructorType());
+                usedMethods.add(newClass.getConstructorType());
                 return super.visitNewClass(newClass, integer);
             }
         };
 
         findTypes.visit(cu, 0);
 
-        return new TypeCache(cu, types, declaredMethods);
+        return new TypesInUse(cu, types, declaredMethods, usedMethods, variables);
+    }
+
+    private static class NullSkippingSet<T> extends HashSet<T> {
+        @Override
+        public boolean add(@Nullable T t) {
+            if (t != null) {
+                return super.add(t);
+            }
+            return false;
+        }
     }
 }

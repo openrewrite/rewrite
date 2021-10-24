@@ -118,9 +118,9 @@ interface MethodDeclarationTest : JavaTreeTest {
         )[0]
 
         val inv = a.classes[0].body.statements.filterIsInstance<J.MethodDeclaration>().first()
-        assertThat(inv.type!!.thrownExceptions).hasSize(3)
+        assertThat(inv.methodType!!.thrownExceptions).hasSize(3)
 
-        val fullyQualifiedNames = inv.type!!.thrownExceptions.stream()
+        val fullyQualifiedNames = inv.methodType!!.thrownExceptions.stream()
             .map(JavaType.FullyQualified::getFullyQualifiedName)
             .collect(Collectors.toList())
         assertThat(fullyQualifiedNames).contains("java.io.IOException", "java.lang.ArithmeticException", "org.example.WhatTypeOfExceptionIsThis")

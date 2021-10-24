@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -25,6 +26,12 @@ import java.util.UUID;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
 public interface Tree {
+    @SuppressWarnings("unused")
+    @JsonProperty("@c")
+    default String getJacksonPolymorphicTypeTag() {
+        return getClass().getName();
+    }
+
     static UUID randomId() {
         return UUID.randomUUID();
     }

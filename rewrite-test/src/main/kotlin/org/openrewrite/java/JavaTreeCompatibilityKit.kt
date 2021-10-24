@@ -101,9 +101,6 @@ abstract class JavaTreeCompatibilityKit {
     inner class JavaParserTck : JavaParserTest
 
     @Nested
-    inner class JavaTypeSerializerTck : JavaTypeSerializerTest
-
-    @Nested
     inner class LabelTck : LabelTest
 
     @Nested

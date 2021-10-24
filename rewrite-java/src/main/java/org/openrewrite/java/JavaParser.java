@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.style.NamedStyles;
 
@@ -115,7 +116,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     }
 
     @Override
-    default List<J.CompilationUnit> parse(ExecutionContext ctx, String... sources) {
+    default List<J.CompilationUnit> parse(ExecutionContext ctx, @Language("java") String... sources) {
         Pattern packagePattern = Pattern.compile("^package\\s+([^;]+);");
         Pattern classPattern = Pattern.compile("(class|interface|enum)\\s*(<[^>]*>)?\\s+(\\w+)");
 
@@ -169,18 +170,26 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
      */
     void setClasspath(Collection<Path> classpath);
 
+    /**
+     * Changes the source set on the parser. Intended for use in multiple pass parsing, where we want to keep the
+     * compiler symbol table intact for type attribution on later parses, i.e. for maven multi-module projects.
+     *
+     * @param sourceSet source set used to set {@link org.openrewrite.java.marker.JavaSourceSet} markers on
+     *                  subsequently parsed {@link J.CompilationUnit}
+     */
+    void setSourceSet(String sourceSet);
+
+    JavaSourceSet getSourceSet(ExecutionContext ctx);
+
     @SuppressWarnings("unchecked")
     abstract class Builder<P extends JavaParser, B extends Builder<P, B>> {
-        @Nullable
         protected Collection<Path> classpath = Collections.emptyList();
-
         protected Collection<byte[]> classBytesClasspath = Collections.emptyList();
 
         @Nullable
         protected Collection<Input> dependsOn;
 
         protected Charset charset = Charset.defaultCharset();
-        protected boolean relaxedClassTypeMatching = false;
         protected boolean logCompilationWarningsAndErrors = false;
         protected final List<NamedStyles> styles = new ArrayList<>();
 
@@ -191,11 +200,6 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
 
         public B charset(Charset charset) {
             this.charset = charset;
-            return (B) this;
-        }
-
-        public B relaxedClassTypeMatching(boolean relaxedClassTypeMatching) {
-            this.relaxedClassTypeMatching = relaxedClassTypeMatching;
             return (B) this;
         }
 

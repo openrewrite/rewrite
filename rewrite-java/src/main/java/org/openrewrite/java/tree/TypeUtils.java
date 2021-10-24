@@ -55,7 +55,7 @@ public class TypeUtils {
             return isOfType(((JavaType.Array)type1).getElemType(), ((JavaType.Array)type2).getElemType());
         }
 
-        return type1.deepEquals(type2);
+        return type1.equals(type2);
     }
 
     public static boolean isOfClassType(@Nullable JavaType type, String fqn) {
@@ -64,18 +64,21 @@ public class TypeUtils {
     }
 
     public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from) {
-        if (from == JavaType.Class.OBJECT) {
-            return to == JavaType.Class.OBJECT;
+        JavaType.FullyQualified toFq = TypeUtils.asFullyQualified(to);
+        if(toFq == null) {
+            return false;
         }
+        return isAssignableTo(toFq.getFullyQualifiedName(), from);
+    }
 
-        JavaType.FullyQualified classTo = asFullyQualified(to);
+    public static boolean isAssignableTo(String to, @Nullable JavaType from) {
         JavaType.FullyQualified classFrom = asFullyQualified(from);
 
-        if (classTo == null || classFrom == null) {
+        if (classFrom == null) {
             return false;
         }
 
-        return classTo.getFullyQualifiedName().equals(classFrom.getFullyQualifiedName()) ||
+        return to.equals(classFrom.getFullyQualifiedName()) ||
                 isAssignableTo(to, classFrom.getSupertype()) ||
                 classFrom.getInterfaces().stream().anyMatch(i -> isAssignableTo(to, i));
     }
@@ -98,16 +101,6 @@ public class TypeUtils {
     @Nullable
     public static JavaType.GenericTypeVariable asGeneric(@Nullable JavaType type) {
         return type instanceof JavaType.GenericTypeVariable ? (JavaType.GenericTypeVariable) type : null;
-    }
-
-    @Nullable
-    public static JavaType.Method asMethod(@Nullable JavaType type) {
-        return type instanceof JavaType.Method ? (JavaType.Method) type : null;
-    }
-
-    @Nullable
-    public static JavaType.Variable asVariable(@Nullable JavaType type) {
-        return type instanceof JavaType.Variable ? (JavaType.Variable) type : null;
     }
 
     @Nullable
@@ -147,7 +140,7 @@ public class TypeUtils {
      *         `null` if the supplied method is `null` if it is missing its generic signature.
      */
     @Nullable
-    public static Boolean isAnOverride(@Nullable JavaType.Method method) {
+    public static Boolean isOverride(@Nullable JavaType.Method method) {
         if(method == null || method.getGenericSignature() == null) {
             return null;
         }
@@ -225,6 +218,6 @@ public class TypeUtils {
         return true;
     }
     static boolean deepEquals(@Nullable JavaType t, @Nullable JavaType t2) {
-        return t == null ? t2 == null : t == t2 || t.deepEquals(t2);
+        return t == null ? t2 == null : t == t2 || t.equals(t2);
     }
 }

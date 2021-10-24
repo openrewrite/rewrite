@@ -23,9 +23,10 @@ import org.openrewrite.groovy.GroovyPrinter;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.internal.TypeCache;
+import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Markers;
 
 import java.lang.ref.SoftReference;
@@ -48,7 +49,7 @@ public interface G extends J {
 
     @Nullable
     default <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
-        return (G) v.defaultValue(this, p);
+        return v.defaultValue(this, p);
     }
 
     Space getPrefix();
@@ -65,7 +66,7 @@ public interface G extends J {
     final class CompilationUnit implements G, JavaSourceFile, SourceFile {
         @Nullable
         @NonFinal
-        transient SoftReference<TypeCache> typesInUse;
+        transient SoftReference<TypesInUse> typesInUse;
 
         @Nullable
         @NonFinal
@@ -198,29 +199,19 @@ public interface G extends J {
         }
 
         @Override
-        public Set<JavaType> getTypesInUse() {
-            return typeCache().getTypesInUse();
-        }
-
-        @Override
-        public Set<JavaType.Method> getDeclaredMethods() {
-            return typeCache().getDeclaredMethods();
-        }
-
-        @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
             return new GroovyPrinter<>();
         }
 
-        private TypeCache typeCache() {
-            TypeCache cache;
+        public TypesInUse getTypesInUse() {
+            TypesInUse cache;
             if (this.typesInUse == null) {
-                cache = TypeCache.build(this);
+                cache = TypesInUse.build(this);
                 this.typesInUse = new SoftReference<>(cache);
             } else {
                 cache = this.typesInUse.get();
                 if (cache == null || cache.getCu() != this) {
-                    cache = TypeCache.build(this);
+                    cache = TypesInUse.build(this);
                     this.typesInUse = new SoftReference<>(cache);
                 }
             }
@@ -536,6 +527,7 @@ public interface G extends J {
 
             @Override
             public <J2 extends J> J2 withPrefix(Space space) {
+                //noinspection unchecked
                 return (J2) this;
             }
 

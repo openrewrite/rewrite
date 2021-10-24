@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import lombok.EqualsAndHashCode;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
@@ -24,6 +25,8 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
@@ -159,13 +162,9 @@ public class FixSerializableFields extends Recipe {
         }
     }
 
+    @RequiredArgsConstructor
     private static class FixSerializableClassVisitor extends JavaVisitor<ExecutionContext> {
-
-        private Set<String> targets;
-
-        private FixSerializableClassVisitor(Set<String> targets) {
-            this.targets = targets;
-        }
+        private final Set<String> targets;
 
         @Override
         public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {

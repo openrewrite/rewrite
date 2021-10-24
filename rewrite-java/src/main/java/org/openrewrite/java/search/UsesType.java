@@ -17,20 +17,22 @@ package org.openrewrite.java.search;
 
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Flag;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
-import java.util.Set;
 
 public class UsesType<P> extends JavaIsoVisitor<P> {
-    private final JavaType.FullyQualified fullyQualifiedType;
+    private final String fullyQualifiedType;
     private final List<String> fullyQualifiedTypeSegments;
 
     public UsesType(String fullyQualifiedType) {
-        this.fullyQualifiedType = JavaType.Class.build(fullyQualifiedType);
-
+        this.fullyQualifiedType = fullyQualifiedType;
         Scanner scanner = new Scanner(fullyQualifiedType);
         scanner.useDelimiter("\\.");
         this.fullyQualifiedTypeSegments = new ArrayList<>();
@@ -42,20 +44,19 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
     @Override
     public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
         JavaSourceFile c = cu;
-        Set<JavaType> types = c.getTypesInUse();
-        for (JavaType type : types) {
-            if (type instanceof JavaType.FullyQualified) {
-                JavaType.FullyQualified fq = (JavaType.FullyQualified) type;
-                if ((c = maybeMark(c, fq)) != cu) {
+
+        for (JavaType.Method method : c.getTypesInUse().getUsedMethods()) {
+            if (method.hasFlags(Flag.Static)) {
+                if ((c = maybeMark(c, method.getDeclaringType())) != cu) {
                     return c;
                 }
-            } else if (type instanceof JavaType.Method) {
-                JavaType.Method method = (JavaType.Method) type;
-                if (method.hasFlags(Flag.Static)) {
-                    if ((c = maybeMark(c, method.getDeclaringType())) != cu) {
-                        return c;
-                    }
-                }
+            }
+        }
+
+        for (JavaType type : c.getTypesInUse().getTypesInUse()) {
+            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type);
+            if ((c = maybeMark(c, fq)) != cu) {
+                return c;
             }
         }
 
@@ -77,7 +78,7 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
             return c;
         }
 
-        if(fullyQualifiedType.isAssignableFrom(fq)) {
+        if (TypeUtils.isAssignableTo(fullyQualifiedType, fq)) {
             return c.withMarkers(c.getMarkers().searchResult());
         }
 

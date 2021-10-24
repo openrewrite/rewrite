@@ -17,8 +17,7 @@ package org.openrewrite.java.search;
 
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.Flag;
-import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -45,14 +44,15 @@ public class FindInheritedFields {
         }
 
         private Set<JavaType.Variable> superFields(@Nullable JavaType.FullyQualified type) {
-
             if (type == null || type.getSupertype() == null) {
                 return emptySet();
             }
             Set<JavaType.Variable> types = new HashSet<>();
-            type.getMembers().stream()
-                    .filter(m -> !m.hasFlags(Flag.Private) && TypeUtils.hasElementTypeAssignable(m.getType(), fullyQualifiedName))
-                    .forEach(types::add);
+            for (JavaType.Variable m : type.getMembers()) {
+                if (!m.hasFlags(Flag.Private) && TypeUtils.hasElementTypeAssignable(m.getType(), fullyQualifiedName)) {
+                    types.add(m);
+                }
+            }
             types.addAll(superFields(type.getSupertype()));
             return types;
         }

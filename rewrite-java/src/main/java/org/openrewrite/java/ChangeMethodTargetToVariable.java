@@ -97,12 +97,12 @@ public class ChangeMethodTargetToVariable extends Recipe {
             if (methodMatcher.matches(m)) {
 
                 JavaType.Method methodType = null;
-                if (m.getType() != null) {
-                    maybeRemoveImport(m.getType().getDeclaringType());
+                if (m.getMethodType() != null) {
+                    maybeRemoveImport(m.getMethodType().getDeclaringType());
 
-                    Set<Flag> flags = new LinkedHashSet<>(m.getType().getFlags());
+                    Set<Flag> flags = new LinkedHashSet<>(m.getMethodType().getFlags());
                     flags.remove(Flag.Static);
-                    methodType = m.getType().withDeclaringType(this.variableType).withFlags(flags);
+                    methodType = m.getMethodType().withDeclaringType(this.variableType).withFlags(flags);
                 }
 
                 m = m.withSelect(J.Identifier.build(randomId(),
@@ -112,7 +112,7 @@ public class ChangeMethodTargetToVariable extends Recipe {
                         Markers.EMPTY,
                         variableName,
                         this.variableType)
-                ).withType(methodType);
+                ).withMethodType(methodType);
             }
             return m;
         }

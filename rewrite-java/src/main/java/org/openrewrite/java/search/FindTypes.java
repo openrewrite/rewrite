@@ -161,7 +161,7 @@ public class FindTypes extends Recipe {
                                        @Nullable JavaType.FullyQualified test) {
         return test != null && (checkAssignability ?
                 match.isAssignableFrom(test) :
-                match.getFullyQualifiedName().equals(test.getFullyQualifiedName())
+                !(test instanceof JavaType.GenericTypeVariable) && match.getFullyQualifiedName().equals(test.getFullyQualifiedName())
         );
     }
 }

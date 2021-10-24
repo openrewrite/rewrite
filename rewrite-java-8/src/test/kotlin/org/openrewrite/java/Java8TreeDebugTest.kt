@@ -117,10 +117,6 @@ class Java8JavaParserTest: Java8Test, JavaParserTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java8JavaTypeSerializerTest: Java8Test, JavaTypeSerializerTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
 class Java8LabelTest: Java8Test, LabelTest
 
 @DebugOnly

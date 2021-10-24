@@ -18,11 +18,8 @@ package org.openrewrite.java.search;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
-
-import java.util.Set;
 
 public class UsesMethod<P> extends JavaIsoVisitor<P> {
     private final MethodMatcher methodMatcher;
@@ -45,12 +42,9 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
 
     @Override
     public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
-        Set<JavaType> types = cu.getTypesInUse();
-        for (JavaType type : types) {
-            if (type instanceof JavaType.Method) {
-                if(methodMatcher.matches(type)) {
-                    return cu.withMarkers(cu.getMarkers().searchResult());
-                }
+        for (JavaType.Method type : cu.getTypesInUse().getUsedMethods()) {
+            if (methodMatcher.matches(type)) {
+                return cu.withMarkers(cu.getMarkers().searchResult());
             }
         }
         return cu;

@@ -22,12 +22,13 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.java.tree.JavaType
 import org.openrewrite.java.tree.TypeUtils
 
-interface TypeCacheTest {
+interface TypesInUseTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/617")
     @Test
     fun findAnnotationArgumentType(jp: JavaParser.Builder<*, *>) {
-        val cus = jp.build().parse("""
+        val cus = jp.build().parse(
+            """
             package org.openrewrite.test;
             
             public @interface YesOrNo {
@@ -37,23 +38,24 @@ interface TypeCacheTest {
                 }
             }
         """,
-        """
+            """
             package org.openrewrite.test;
             
             import static org.openrewrite.test.YesOrNo.Status.YES;
             
             @YesOrNo(status = YES)
             public class Foo {}
-        """)
+        """
+        )
 
         val foo = cus.find { it.classes[0].name.simpleName == "Foo" }!!
-        val foundTypes = foo.typesInUse
-        assertThat(foundTypes.find { it is JavaType.Variable })
-                .isNotNull
-                .matches { it is JavaType.Variable && TypeUtils.asFullyQualified(it.type)!!.fullyQualifiedName.equals("org.openrewrite.test.YesOrNo.Status") }
+        val foundTypes = foo.typesInUse.variables
+        assertThat(foundTypes.isNotEmpty())
+        assertThat(foundTypes).anyMatch { TypeUtils.asFullyQualified(it.type)!!.fullyQualifiedName.equals("org.openrewrite.test.YesOrNo.Status") }
 
         assertThat(
-                foundTypes.filterIsInstance<JavaType.FullyQualified>().map { TypeUtils.asFullyQualified(it)!!.fullyQualifiedName }
+            foundTypes.filterIsInstance<JavaType.FullyQualified>()
+                .map { TypeUtils.asFullyQualified(it)!!.fullyQualifiedName }
         ).containsExactlyInAnyOrder("org.openrewrite.test.YesOrNo", "org.openrewrite.test.YesOrNo.Status")
     }
 }

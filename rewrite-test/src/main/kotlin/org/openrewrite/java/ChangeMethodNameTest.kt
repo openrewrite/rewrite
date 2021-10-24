@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Example
 import org.openrewrite.Issue
 import org.openrewrite.java.tree.J
-import org.openrewrite.java.tree.JavaType
+import org.openrewrite.java.tree.JavaType.Method
 
 interface ChangeMethodNameTest : JavaRecipeTest {
     companion object {
@@ -71,9 +71,9 @@ interface ChangeMethodNameTest : JavaRecipeTest {
             val statements = testMethodDecl.body!!.statements
             val barInvocation = statements[0] as J.MethodInvocation
             assertThat(barInvocation.name.simpleName).isEqualTo("bar")
-            assertThat(barInvocation.type!!.name).isEqualTo("bar")
+            assertThat(barInvocation.methodType!!.name).isEqualTo("bar")
             val barReference = (statements[1] as J.MethodInvocation).arguments[0] as J.MemberReference
-            val barRefType = barReference.referenceType as JavaType.Method
+            val barRefType = barReference.methodType as Method
             assertThat(barRefType.name).isEqualTo("bar")
         }
     )
@@ -278,20 +278,20 @@ interface ChangeMethodNameTest : JavaRecipeTest {
     fun checkValidation() {
         var recipe = ChangeMethodName(null, null, null)
         var valid = recipe.validate()
-        assertThat(valid.isValid).isFalse()
+        assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
         assertThat(valid.failures()[1].property).isEqualTo("newMethodName")
 
         recipe = ChangeMethodName(null, "hello", null)
         valid = recipe.validate()
-        assertThat(valid.isValid).isFalse()
+        assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
 
         recipe = ChangeMethodName("java.util.String emptyString(..)", null, null)
         valid = recipe.validate()
-        assertThat(valid.isValid).isFalse()
+        assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("newMethodName")
     }

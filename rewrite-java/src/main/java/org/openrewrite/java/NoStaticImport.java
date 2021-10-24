@@ -63,8 +63,8 @@ public class NoStaticImport extends Recipe {
                 MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if (methodMatcher.matches(m) && m.getSelect() == null) {
-                    if (m.getType() != null) {
-                        JavaType.FullyQualified receiverType = m.getType().getDeclaringType();
+                    if (m.getMethodType() != null) {
+                        JavaType.FullyQualified receiverType = m.getMethodType().getDeclaringType();
 
                         RemoveImport<ExecutionContext> op = new RemoveImport<>(receiverType.getFullyQualifiedName() + "." + method.getSimpleName(),
                                 true);

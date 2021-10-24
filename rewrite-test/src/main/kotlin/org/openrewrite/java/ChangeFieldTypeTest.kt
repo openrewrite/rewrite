@@ -16,12 +16,11 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.ExecutionContext
 import org.openrewrite.java.tree.JavaType
 
 interface ChangeFieldTypeTest : JavaRecipeTest {
     fun changeFieldType(from: String, to: String) = toRecipe {
-        ChangeFieldType<ExecutionContext>(JavaType.Class.build(from, JavaType.Class.Kind.Interface), JavaType.Class.build(to, JavaType.Class.Kind.Interface))
+        ChangeFieldType(JavaType.Class.build(from), JavaType.Class.build(to))
     }
 
     @Suppress("rawtypes")

@@ -86,7 +86,7 @@ public class TypeMatcher {
 
         if (targetTypePattern.matcher(type.getFullyQualifiedName()).matches()) {
             return true;
-        } else if (type != JavaType.Class.OBJECT && (matchesTargetType(type.getSupertype() == null ? JavaType.Class.OBJECT : type.getSupertype()))) {
+        } else if (!type.getFullyQualifiedName().equals("java.lang.Object") && matchesTargetType(type.getSupertype() == null ? JavaType.Class.build("java.lang.Object") : type.getSupertype())) {
             return true;
         }
 

@@ -29,11 +29,12 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Opcodes;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.NamedStyles;
 
@@ -49,22 +50,20 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
 class ReloadableJava8Parser implements JavaParser {
+    private String sourceSet = "main";
+
+    @Nullable
+    private transient JavaSourceSet sourceSetProvenance;
+
     @Nullable
     private Collection<Path> classpath;
 
     @Nullable
     private final Collection<Input> dependsOn;
-
-    /**
-     * When true, enables a parser to use class types from the in-memory type cache rather than performing
-     * a deep equality check. Useful when deep class types have already been built from a separate parsing phase
-     * and we want to parse some code snippet without requiring the classpath to be fully specified, using type
-     * information we've already learned about in a prior phase.
-     */
-    private final boolean relaxedClassTypeMatching;
 
     private final JavacFileManager pfm;
 
@@ -77,12 +76,10 @@ class ReloadableJava8Parser implements JavaParser {
                           Collection<byte[]> classBytesClasspath,
                           @Nullable Collection<Input> dependsOn,
                           Charset charset,
-                          boolean relaxedClassTypeMatching,
                           boolean logCompilationWarningsAndErrors,
                           Collection<NamedStyles> styles) {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
-        this.relaxedClassTypeMatching = relaxedClassTypeMatching;
         this.styles = styles;
 
         this.context = new Context();
@@ -117,7 +114,7 @@ class ReloadableJava8Parser implements JavaParser {
         compilerLog.setWriters(new PrintWriter(new Writer() {
             @Override
             public void write(char[] cbuf, int off, int len) {
-                if(logCompilationWarningsAndErrors) {
+                if (logCompilationWarningsAndErrors) {
                     String log = new String(Arrays.copyOfRange(cbuf, off, len));
                     if (!StringUtils.isBlank(log) && !log.contains("warning: a package-info.java file has already")) {
                         org.slf4j.LoggerFactory.getLogger(ReloadableJava8Parser.class).warn(log);
@@ -157,16 +154,14 @@ class ReloadableJava8Parser implements JavaParser {
                 .collect(Collectors.toMap(
                         Function.identity(),
                         input -> MetricsHelper.successTags(
-                                Timer.builder("rewrite.parse")
-                                        .description("The time spent by the JDK in parsing and tokenizing the source file")
-                                        .tag("file.type", "Java")
-                                        .tag("step", "(1) JDK parsing"))
+                                        Timer.builder("rewrite.parse")
+                                                .description("The time spent by the JDK in parsing and tokenizing the source file")
+                                                .tag("file.type", "Java")
+                                                .tag("step", "(1) JDK parsing"))
                                 .register(Metrics.globalRegistry)
                                 .record(() -> {
                                     try {
-                                        JCTree.JCCompilationUnit parsed = compiler.parse(new Java8ParserInputFileObject(input));
-                                        ctxView.increment(JavaExecutionContextView.EVENT_SOURCE_FILE_PARSED);
-                                        return parsed;
+                                        return compiler.parse(new Java8ParserInputFileObject(input));
                                     } catch (IllegalStateException e) {
                                         if (e.getMessage().equals("endPosTable already set")) {
                                             throw new IllegalStateException("Call reset() on JavaParser before parsing another" +
@@ -180,15 +175,13 @@ class ReloadableJava8Parser implements JavaParser {
         try {
             enterAll(cus.values());
             compiler.attribute(new TimedTodo(compiler.todo));
-            ctxView.increment(JavaExecutionContextView.EVENT_TYPE_ATTRIBUTION_COMPLETE);
         } catch (Throwable t) {
             // when symbol entering fails on problems like missing types, attribution can often times proceed
             // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
             ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
         }
 
-        Map<String, JavaType.Class> sharedClassTypes = new HashMap<>();
-        return cus.entrySet().stream()
+        List<J.CompilationUnit> mappedCus = cus.entrySet().stream()
                 .map(cuByPath -> {
                     Timer.Sample sample = Timer.start();
                     Input input = cuByPath.getKey();
@@ -196,26 +189,23 @@ class ReloadableJava8Parser implements JavaParser {
                         ReloadableJava8ParserVisitor parser = new ReloadableJava8ParserVisitor(
                                 input.getRelativePath(relativeTo),
                                 StringUtils.readFully(input.getSource()),
-                                relaxedClassTypeMatching,
                                 styles,
-                                sharedClassTypes,
                                 ctx,
                                 context);
                         J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
-                        ctxView.increment(JavaExecutionContextView.EVENT_SOURCE_FILE_MAPPED);
                         sample.stop(MetricsHelper.successTags(
-                                Timer.builder("rewrite.parse")
-                                        .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
-                                        .tag("file.type", "Java")
-                                        .tag("step", "(3) Map to Rewrite AST"))
+                                        Timer.builder("rewrite.parse")
+                                                .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
+                                                .tag("file.type", "Java")
+                                                .tag("step", "(3) Map to Rewrite AST"))
                                 .register(Metrics.globalRegistry));
                         return cu;
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(
-                                Timer.builder("rewrite.parse")
-                                        .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
-                                        .tag("file.type", "Java")
-                                        .tag("step", "(3) Map to Rewrite AST"), t)
+                                        Timer.builder("rewrite.parse")
+                                                .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
+                                                .tag("file.type", "Java")
+                                                .tag("step", "(3) Map to Rewrite AST"), t)
                                 .register(Metrics.globalRegistry));
 
                         ctx.getOnError().accept(t);
@@ -224,6 +214,8 @@ class ReloadableJava8Parser implements JavaParser {
                 })
                 .filter(Objects::nonNull)
                 .collect(toList());
+
+        return ListUtils.map(mappedCus, cu -> cu.withMarkers(cu.getMarkers().add(getSourceSet(ctx))));
     }
 
     @Override
@@ -237,6 +229,20 @@ class ReloadableJava8Parser implements JavaParser {
     @Override
     public void setClasspath(Collection<Path> classpath) {
         this.classpath = classpath;
+    }
+
+    @Override
+    public void setSourceSet(String sourceSet) {
+        this.sourceSetProvenance = null;
+        this.sourceSet = sourceSet;
+    }
+
+    @Override
+    public JavaSourceSet getSourceSet(ExecutionContext ctx) {
+        if (sourceSetProvenance == null) {
+            sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath, ctx);
+        }
+        return sourceSetProvenance;
     }
 
     private void compileDependencies() {
@@ -279,10 +285,10 @@ class ReloadableJava8Parser implements JavaParser {
         public boolean isEmpty() {
             if (sample != null) {
                 sample.stop(MetricsHelper.successTags(
-                        Timer.builder("rewrite.parse")
-                                .description("The time spent by the JDK in type attributing the source file")
-                                .tag("file.type", "Java")
-                                .tag("step", "(2) Type attribution"))
+                                Timer.builder("rewrite.parse")
+                                        .description("The time spent by the JDK in type attributing the source file")
+                                        .tag("file.type", "Java")
+                                        .tag("step", "(2) Type attribution"))
                         .register(Metrics.globalRegistry));
             }
             return todo.isEmpty();
@@ -350,7 +356,7 @@ class ReloadableJava8Parser implements JavaParser {
             classReader.accept(new ClassVisitor(Opcodes.ASM9) {
                 @Override
                 public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
-                    if(name.contains("/")) {
+                    if (name.contains("/")) {
                         pkgRef.set(name.substring(0, name.lastIndexOf('/'))
                                 .replace('/', '.'));
                         nameRef.set(name.substring(name.lastIndexOf('/') + 1));

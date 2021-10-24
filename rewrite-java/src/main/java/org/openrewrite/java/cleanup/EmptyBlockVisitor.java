@@ -25,6 +25,7 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.format.ShiftFormat;
 import org.openrewrite.java.style.EmptyBlockStyle;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;

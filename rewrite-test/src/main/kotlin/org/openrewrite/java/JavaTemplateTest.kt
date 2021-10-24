@@ -202,7 +202,7 @@ interface JavaTemplateTest : JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            val methodType = (cu.classes.first().body.statements.first() as J.MethodDeclaration).type!!
+            val methodType = (cu.classes.first().body.statements.first() as J.MethodDeclaration).methodType!!
             assertThat(methodType.resolvedSignature?.returnType).isEqualTo(JavaType.Primitive.Int)
             assertThat(methodType.resolvedSignature?.paramTypes).containsExactly(JavaType.Primitive.Int)
             assertThat(methodType.genericSignature?.returnType).isEqualTo(JavaType.Primitive.Int)
@@ -611,7 +611,7 @@ interface JavaTemplateTest : JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            val type = (cu.classes.first().body.statements.first() as J.MethodDeclaration).type!!
+            val type = (cu.classes.first().body.statements.first() as J.MethodDeclaration).methodType!!
 
             assertThat(type.paramNames)
                 .`as`("Changing the method's parameters should have also updated its type's parameter names")
@@ -620,13 +620,12 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .`as`("Changing the method's parameters should have resulted in the first parameter's type being 'int'")
                 .isEqualTo(JavaType.Primitive.Int)
             assertThat(type.resolvedSignature!!.paramTypes[1])
-                .`as`("Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'")
-                .matches {
+                .matches({
                     it is JavaType.Parameterized
                             && it.type.fullyQualifiedName == "java.util.List"
                             && it.typeParameters.size == 1
                             && it.typeParameters.first().asFullyQualified()!!.fullyQualifiedName == "java.lang.String"
-                }
+                }, "Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'")
         }
     )
 
@@ -676,7 +675,7 @@ interface JavaTemplateTest : JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            val type = (cu.classes.first().body.statements.first() as J.MethodDeclaration).type!!
+            val type = (cu.classes.first().body.statements.first() as J.MethodDeclaration).methodType!!
 
             assertThat(type.paramNames)
                 .`as`("Changing the method's parameters should have also updated its type's parameter names")
@@ -725,7 +724,7 @@ interface JavaTemplateTest : JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            val type = (cu.classes.first().body.statements.first() as J.MethodDeclaration).type!!
+            val type = (cu.classes.first().body.statements.first() as J.MethodDeclaration).methodType!!
 
             assertThat(type.paramNames)
                 .`as`("Changing the method's parameters should have also updated its type's parameter names")
@@ -1125,7 +1124,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         """,
         afterConditions = { cu ->
             val m = (cu.classes[0].body.statements[2] as J.MethodDeclaration).body!!.statements[0] as J.MethodInvocation
-            val type = m.type!!
+            val type = m.methodType!!
             assertThat(type.genericSignature!!.paramTypes[0]).isEqualTo(JavaType.Primitive.Int)
             assertThat(type.genericSignature!!.paramTypes[1]).isEqualTo(JavaType.Primitive.Int)
             assertThat(type.genericSignature!!.paramTypes[2])
@@ -1570,7 +1569,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         """,
         afterConditions = { cu ->
             val testMethodDecl = cu.classes.first().body.statements.first() as J.MethodDeclaration
-            assertThat(testMethodDecl.type!!.thrownExceptions.map { it.fullyQualifiedName })
+            assertThat(testMethodDecl.methodType!!.thrownExceptions.map { it.fullyQualifiedName })
                 .containsExactly("java.lang.Exception")
         }
     )
@@ -1624,7 +1623,7 @@ interface JavaTemplateTest : JavaRecipeTest {
             identifiers = false
         },
         afterConditions = { cu ->
-            val type = (cu.classes.first().body.statements.first() as J.MethodDeclaration).type!!
+            val type = (cu.classes.first().body.statements.first() as J.MethodDeclaration).methodType!!
             assertThat(type).isNotNull
             val paramTypes = type.genericSignature!!.paramTypes
 
@@ -1638,7 +1637,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .`as`("The method declaration's type's genericSignature second argument should have type 'U' with bound 'java.lang.Object'")
                 .matches { uType ->
                     uType is JavaType.GenericTypeVariable &&
-                            uType.fullyQualifiedName == "U" &&
+                            uType.name == "U" &&
                             uType.bound!!.fullyQualifiedName == "java.lang.Object"
                 }
         }

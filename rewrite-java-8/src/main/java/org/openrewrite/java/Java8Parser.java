@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 
 import java.io.File;
@@ -50,6 +51,16 @@ public class Java8Parser implements JavaParser {
     @Override
     public void setClasspath(Collection<Path> classpath) {
         delegate.setClasspath(classpath);
+    }
+
+    @Override
+    public void setSourceSet(String sourceSet) {
+        delegate.setSourceSet(sourceSet);
+    }
+
+    @Override
+    public JavaSourceSet getSourceSet(ExecutionContext ctx) {
+        return delegate.getSourceSet(ctx);
     }
 
     public static Builder builder() {
@@ -121,12 +132,12 @@ public class Java8Parser implements JavaParser {
 
                 Constructor<?> delegateParserConstructor = reloadableParser
                         .getDeclaredConstructor(Collection.class, Collection.class, Collection.class, Charset.class,
-                                Boolean.TYPE, Boolean.TYPE, Collection.class);
+                                Boolean.TYPE, Collection.class);
 
                 delegateParserConstructor.setAccessible(true);
 
                 JavaParser delegate = (JavaParser) delegateParserConstructor
-                        .newInstance(classpath, classBytesClasspath, dependsOn, charset, relaxedClassTypeMatching, logCompilationWarningsAndErrors, styles);
+                        .newInstance(classpath, classBytesClasspath, dependsOn, charset, logCompilationWarningsAndErrors, styles);
 
                 return new Java8Parser(delegate);
             } catch (Exception e) {

@@ -15,14 +15,12 @@
  */
 package org.openrewrite.java
 
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.*
-import org.openrewrite.Tree.randomId
-import org.openrewrite.java.marker.JavaSourceSet
-import org.openrewrite.java.tree.Flag
+import org.openrewrite.ExecutionContext
+import org.openrewrite.Issue
+import org.openrewrite.Recipe
+import org.openrewrite.TreeVisitor
 import org.openrewrite.java.tree.J
-import org.openrewrite.java.tree.JavaType
 
 interface AddImportTest : JavaRecipeTest {
     fun addImports(vararg adds: () -> TreeVisitor<*, ExecutionContext>): Recipe = adds
@@ -533,9 +531,12 @@ interface AddImportTest : JavaRecipeTest {
         recipe = object : Recipe() {
             override fun getDisplayName() = "test"
             override fun getVisitor() = object : JavaIsoVisitor<ExecutionContext>() {
-                override fun visitClassDeclaration(classDecl: J.ClassDeclaration, ctx: ExecutionContext): J.ClassDeclaration {
+                override fun visitClassDeclaration(
+                    classDecl: J.ClassDeclaration,
+                    ctx: ExecutionContext
+                ): J.ClassDeclaration {
                     var cd = classDecl
-                    if(cd.body.statements.isNotEmpty()) {
+                    if (cd.body.statements.isNotEmpty()) {
                         return cd
                     }
                     cd = cd.withTemplate(
@@ -572,7 +573,7 @@ interface AddImportTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1030")
     @Test
     fun dontAddImportToStaticFieldWithNamespaceConflict(jp: JavaParser) = assertUnchanged(
-        recipe = addImports({ AddImport("java.time.temporal.ChronoUnit", "MILLIS", true)}),
+        recipe = addImports({ AddImport("java.time.temporal.ChronoUnit", "MILLIS", true) }),
         before = """
             package a;
             
@@ -812,141 +813,40 @@ interface AddImportTest : JavaRecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/880")
     @Test
-    fun doNotFoldNormalImportWithNamespaceConflict(jp: JavaParser) {
-        val inputs = arrayOf(
-            """
-            package org.test;
+    fun doNotFoldNormalImportWithNamespaceConflict(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = addImports(
+            { AddImport("a.Shared", null, false) }
+        ),
+        dependsOn = (('A'..'D').map { clazz -> "package a; public class $clazz {}" } +
+                "package a; public class Shared {}" +
+                "package b; public class Shared {}").toTypedArray(),
+        before = """
+            import b.*;
+            import a.A;
+            import a.B;
+            import a.C;
+            import a.D;
             
-            import org.bar.*;
-            import org.foo.FooA;
-            import org.foo.FooB;
-            import org.foo.FooC;
-            import org.foo.FooD;
-            
-            public class Test {
-                FooA fooA = new FooA();
-                FooB fooB = new FooB();
-                FooC fooC = new FooC();
-                FooD fooD = new FooD();
+            class Test {
+                Object[] as = new Object[] { new A(), new B(), new C(), new D() };
                 Shared shared = new Shared();
-
-                BarA barA = new BarA();
-                BarB barB = new BarB();
-                BarC barC = new BarC();
-                BarD barD = new BarD();
-                BarE barE = new BarE();
             }
-            """.trimIndent(),
-            """package org.foo; public class Shared {}""".trimIndent(),
-            """package org.foo; public class FooA {}""".trimIndent(),
-            """package org.foo; public class FooB {}""".trimIndent(),
-            """package org.foo; public class FooC {}""".trimIndent(),
-            """package org.foo; public class FooD {}""".trimIndent(),
-            """package org.foo; public class FooE {}""".trimIndent(),
-            """package org.bar; public class Shared {}""".trimIndent(),
-            """package org.bar; public class BarA {}""".trimIndent(),
-            """package org.bar; public class BarB {}""".trimIndent(),
-            """package org.bar; public class BarC {}""".trimIndent(),
-            """package org.bar; public class BarD {}""".trimIndent(),
-            """package org.bar; public class BarE {}""".trimIndent()
-        )
-
-        val sourceFiles = parser.parse(executionContext, *inputs)
-
-        val classNames = arrayOf(
-            "org.foo.Shared", "org.foo.FooA", "org.foo.FooB", "org.foo.FooC", "org.foo.FooD", "org.foo.FooE",
-            "org.bar.Shared", "org.bar.BarA", "org.bar.BarB", "org.bar.BarC", "org.bar.BarD", "org.bar.BarE")
-
-        val fqns: MutableSet<JavaType.FullyQualified> = mutableSetOf()
-        classNames.forEach { fqns.add(JavaType.Class.build(it)) }
-        val sourceSet = JavaSourceSet(randomId(),"main", fqns)
-        val markedFiles: MutableList<J.CompilationUnit> = mutableListOf()
-        sourceFiles.forEach { markedFiles.add(it.withMarkers(it.markers.addIfAbsent(sourceSet))) }
-
-        val recipe: AddImport<ExecutionContext> = AddImport("org.foo.Shared", null, false)
-        val result = recipe.visit(markedFiles[0], InMemoryExecutionContext())
-        assertThat((result as J.CompilationUnit).imports.size == 6).isTrue
-        assertThat((result).imports[5].qualid.printTrimmed()).isEqualTo("org.foo.Shared")
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/880")
-    @Test
-    fun doNotFoldStaticsWithNamespaceConflict(jp: JavaParser) {
-        val classNames = arrayOf("org.fuz.Fuz", "org.buz.Buz")
-
-        val fqns: MutableSet<JavaType.FullyQualified> = mutableSetOf()
-        val flags = setOf(Flag.Public, Flag.Static)
-        val methodSignature: JavaType.Method.Signature = JavaType.Method.Signature(JavaType.buildType("boolean"), listOf())
-        val variables: MutableList<JavaType.Variable> = mutableListOf()
-
-        val methodsFoo: MutableList<JavaType.Method> = mutableListOf()
-        val methodNamesFoo = arrayOf("assertShared", "assertA", "assertB", "assertC")
-        methodNamesFoo.forEach { methodsFoo.add(
-            JavaType.Method.build(flags, JavaType.Class.build("org.fuz.Fuz"), it, null, methodSignature, listOf(), listOf(), listOf())) }
-        fqns.add(JavaType.Class.build(
-            Flag.flagsToBitMap(flags), classNames[0], JavaType.Class.Kind.Class, variables,
-            listOf(), methodsFoo, null, null, listOf(), null, false))
-
-        val methodsBar: MutableList<JavaType.Method> = mutableListOf()
-        val methodNamesBar = arrayOf("assertShared", "assertThatA", "assertThatB", "assertThatC")
-        methodNamesBar.forEach { methodsBar.add(
-            JavaType.Method.build(flags, JavaType.Class.build("org.buz.Buz"), it, null, methodSignature, listOf(), listOf(), listOf())) }
-        fqns.add(JavaType.Class.build(
-            Flag.flagsToBitMap(flags), classNames[1], JavaType.Class.Kind.Class, variables,
-            listOf(), methodsBar, null, null, listOf(), null, false))
-
-        val sourceSet = JavaSourceSet(randomId(),"main", fqns)
-        val markedFiles: MutableList<J.CompilationUnit> = mutableListOf()
-
-        val inputs = arrayOf(
-            """
-            package org.fuz;
-            public class Fuz {
-                public static boolean assertShared() { return true; }
-                public static boolean assertA() { return true; }
-                public static boolean assertB() { return true; }
-                public static boolean assertC() { return true; }
-            }
-            """.trimIndent()
-            ,
-            """
-            package org.buz;
-            public class Buz {
-                public static boolean assertShared() { return true; }
-                public static boolean assertThatA() { return true; }
-                public static boolean assertThatB() { return true; }
-                public static boolean assertThatC() { return true; }
-            }
-            """.trimIndent(),
-            """
-            package org.test;
+        """,
+        after = """
+            import b.*;
+            import a.A;
+            import a.B;
+            import a.C;
+            import a.D;
+            import a.Shared;
             
-            import static org.fuz.Fuz.assertA;
-            import static org.fuz.Fuz.assertB;
-            import static org.fuz.Fuz.assertC;
-            import static org.buz.Buz.assertThatA;
-            import static org.buz.Buz.assertThatB;
-            
-            public class Test {
-                boolean fooA = assertA();
-                boolean fooB = assertB();
-                boolean fooC = assertC();
-                boolean barA = assertThatA();
-                boolean barB = assertThatB();
-                boolean barC = org.buz.Buz.assertThatC();
+            class Test {
+                Object[] as = new Object[] { new A(), new B(), new C(), new D() };
+                Shared shared = new Shared();
             }
-            """.trimIndent()
-        )
-
-        // Inputs are processed last so that fqns are setup properly in flyweights.
-        val sourceFiles = parser.parse(executionContext, *inputs)
-        sourceFiles.forEach { markedFiles.add(it.withMarkers(it.markers.addIfAbsent(sourceSet))) }
-
-        val recipe: AddImport<ExecutionContext> = AddImport("org.buz.Buz", "assertThatC", false)
-        val result = recipe.visit(markedFiles[2], InMemoryExecutionContext())
-        assertThat((result as J.CompilationUnit).imports.size == 6).isTrue
-        assertThat((result).imports[5].qualid.printTrimmed()).isEqualTo("org.buz.Buz.assertThatC")
-    }
+        """
+    )
 
     /**
      * This visitor removes the "java.util.Collections" receiver from method invocations of "java.util.Collections.emptyList()".

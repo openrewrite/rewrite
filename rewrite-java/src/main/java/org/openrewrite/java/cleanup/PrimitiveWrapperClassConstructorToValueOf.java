@@ -105,11 +105,8 @@ public class PrimitiveWrapperClassConstructorToValueOf extends Recipe {
                                 arg = ((J.Literal) arg).withType(JavaType.Primitive.String);
                                 arg = ((J.Literal) arg).withValueSource("\"" + ((J.Literal) arg).getValue() + "\"");
                             }
+
                             JavaType argType = arg.getType();
-                            if (argType instanceof JavaType.Method && ((JavaType.Method)argType).getGenericSignature() != null) {
-                                //noinspection ConstantConditions
-                                argType = ((JavaType.Method)argType).getGenericSignature().getReturnType();
-                            }
                             if (TypeUtils.isOfClassType(argType, "java.lang.Double")) {
                                 valueOf = JavaTemplate.builder(this::getCursor, "Float.valueOf(#{any(java.lang.Double)}.floatValue());");
                             } else {

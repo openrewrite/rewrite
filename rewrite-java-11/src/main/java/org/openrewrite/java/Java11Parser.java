@@ -29,12 +29,13 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Opcodes;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.NamedStyles;
 
@@ -51,6 +52,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
 /**
@@ -58,6 +60,10 @@ import static java.util.stream.Collectors.toList;
  */
 @NonNullApi
 public class Java11Parser implements JavaParser {
+    private String sourceSet = "main";
+
+    @Nullable
+    private transient JavaSourceSet sourceSetProvenance;
 
     @Nullable
     private Collection<Path> classpath;
@@ -65,16 +71,7 @@ public class Java11Parser implements JavaParser {
     @Nullable
     private final Collection<Input> dependsOn;
 
-    /**
-     * When true, enables a parser to use class types from the in-memory type cache rather than performing
-     * a deep equality check. Useful when deep class types have already been built from a separate parsing phase
-     * and we want to parse some code snippet without requiring the classpath to be fully specified, using type
-     * information we've already learned about in a prior phase.
-     */
-    private final boolean relaxedClassTypeMatching;
-
     private final JavacFileManager pfm;
-
     private final Context context;
     private final JavaCompiler compiler;
     private final ResettableLog compilerLog;
@@ -84,12 +81,10 @@ public class Java11Parser implements JavaParser {
                          Collection<byte[]> classBytesClasspath,
                          @Nullable Collection<Input> dependsOn,
                          Charset charset,
-                         boolean relaxedClassTypeMatching,
                          boolean logCompilationWarningsAndErrors,
                          Collection<NamedStyles> styles) {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
-        this.relaxedClassTypeMatching = relaxedClassTypeMatching;
         this.styles = styles;
 
         this.context = new Context();
@@ -169,16 +164,14 @@ public class Java11Parser implements JavaParser {
         LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = new LinkedHashMap<>();
         for (Input input1 : acceptedInputs(sourceFiles)) {
             cus.put(input1, MetricsHelper.successTags(
-                    Timer.builder("rewrite.parse")
-                            .description("The time spent by the JDK in parsing and tokenizing the source file")
-                            .tag("file.type", "Java")
-                            .tag("step", "(1) JDK parsing"))
+                            Timer.builder("rewrite.parse")
+                                    .description("The time spent by the JDK in parsing and tokenizing the source file")
+                                    .tag("file.type", "Java")
+                                    .tag("step", "(1) JDK parsing"))
                     .register(Metrics.globalRegistry)
                     .record(() -> {
                         try {
-                            JCTree.JCCompilationUnit parsed = compiler.parse(new Java11ParserInputFileObject(input1));
-                            ctxView.increment(JavaExecutionContextView.EVENT_SOURCE_FILE_PARSED);
-                            return parsed;
+                            return compiler.parse(new Java11ParserInputFileObject(input1));
                         } catch (IllegalStateException e) {
                             if (e.getMessage().equals("endPosTable already set")) {
                                 throw new IllegalStateException("Call reset() on JavaParser before parsing another" +
@@ -193,7 +186,7 @@ public class Java11Parser implements JavaParser {
             initModules(cus.values());
             enterAll(cus.values());
 
-            // For some reason this is necessary in JDK 9+, where the the internal block counter that
+            // For some reason this is necessary in JDK 9+, where the internal block counter that
             // annotationsBlocked() tests against remains >0 after attribution.
             Annotate annotate = Annotate.instance(context);
             while (annotate.annotationsBlocked()) {
@@ -201,15 +194,13 @@ public class Java11Parser implements JavaParser {
             }
 
             compiler.attribute(compiler.todo);
-            ctxView.increment(JavaExecutionContextView.EVENT_TYPE_ATTRIBUTION_COMPLETE);
         } catch (Throwable t) {
             // when symbol entering fails on problems like missing types, attribution can often times proceed
             // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
             ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
         }
 
-        Map<String, JavaType.Class> sharedClassTypes = new HashMap<>();
-        return cus.entrySet().stream()
+        List<J.CompilationUnit> mappedCus = cus.entrySet().stream()
                 .map(cuByPath -> {
                     Timer.Sample sample = Timer.start();
                     Input input = cuByPath.getKey();
@@ -217,28 +208,25 @@ public class Java11Parser implements JavaParser {
                         Java11ParserVisitor parser = new Java11ParserVisitor(
                                 input.getRelativePath(relativeTo),
                                 StringUtils.readFully(input.getSource()),
-                                relaxedClassTypeMatching,
                                 styles,
-                                sharedClassTypes,
                                 ctx,
                                 context
                         );
-                        ctxView.increment(JavaExecutionContextView.EVENT_SOURCE_FILE_MAPPED);
 
                         J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
                         sample.stop(MetricsHelper.successTags(
-                                Timer.builder("rewrite.parse")
-                                        .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
-                                        .tag("file.type", "Java")
-                                        .tag("step", "(3) Map to Rewrite AST"))
+                                        Timer.builder("rewrite.parse")
+                                                .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
+                                                .tag("file.type", "Java")
+                                                .tag("step", "(3) Map to Rewrite AST"))
                                 .register(Metrics.globalRegistry));
                         return cu;
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(
-                                Timer.builder("rewrite.parse")
-                                        .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
-                                        .tag("file.type", "Java")
-                                        .tag("step", "(3) Map to Rewrite AST"), t)
+                                        Timer.builder("rewrite.parse")
+                                                .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
+                                                .tag("file.type", "Java")
+                                                .tag("step", "(3) Map to Rewrite AST"), t)
                                 .register(Metrics.globalRegistry));
 
                         ctx.getOnError().accept(t);
@@ -247,6 +235,8 @@ public class Java11Parser implements JavaParser {
                 })
                 .filter(Objects::nonNull)
                 .collect(toList());
+
+        return ListUtils.map(mappedCus, cu -> cu.withMarkers(cu.getMarkers().add(getSourceSet(ctx))));
     }
 
     @Override
@@ -263,6 +253,20 @@ public class Java11Parser implements JavaParser {
 
     public void setClasspath(Collection<Path> classpath) {
         this.classpath = classpath;
+    }
+
+    @Override
+    public void setSourceSet(String sourceSet) {
+        this.sourceSetProvenance = null;
+        this.sourceSet = sourceSet;
+    }
+
+    @Override
+    public JavaSourceSet getSourceSet(ExecutionContext ctx) {
+        if (sourceSetProvenance == null) {
+            sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath, ctx);
+        }
+        return sourceSetProvenance;
     }
 
     private void compileDependencies() {
@@ -316,10 +320,10 @@ public class Java11Parser implements JavaParser {
         public boolean isEmpty() {
             if (sample != null) {
                 sample.stop(MetricsHelper.successTags(
-                        Timer.builder("rewrite.parse")
-                                .description("The time spent by the JDK in type attributing the source file")
-                                .tag("file.type", "Java")
-                                .tag("step", "(2) Type attribution"))
+                                Timer.builder("rewrite.parse")
+                                        .description("The time spent by the JDK in type attributing the source file")
+                                        .tag("file.type", "Java")
+                                        .tag("step", "(2) Type attribution"))
                         .register(Metrics.globalRegistry));
             }
             return super.isEmpty();
@@ -335,8 +339,7 @@ public class Java11Parser implements JavaParser {
     public static class Builder extends JavaParser.Builder<Java11Parser, Builder> {
         @Override
         public Java11Parser build() {
-            return new Java11Parser(classpath, classBytesClasspath, dependsOn, charset, relaxedClassTypeMatching,
-                    logCompilationWarningsAndErrors, styles);
+            return new Java11Parser(classpath, classBytesClasspath, dependsOn, charset, logCompilationWarningsAndErrors, styles);
         }
     }
 
@@ -381,7 +384,7 @@ public class Java11Parser implements JavaParser {
         private final byte[] classBytes;
 
         private PackageAwareJavaFileObject(byte[] classBytes) {
-            super(URI.create("dontCare"), Kind.CLASS);
+            super(URI.create("file:///.byteArray"), Kind.CLASS);
 
             AtomicReference<String> pkgRef = new AtomicReference<>();
             AtomicReference<String> nameRef = new AtomicReference<>();

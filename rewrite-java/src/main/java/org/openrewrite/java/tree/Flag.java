@@ -51,6 +51,10 @@ public enum Flag {
 
     private static final Map<Long, Set<Flag>> flagSets = new HashMap<>(64);
 
+    public long getBitMask() {
+        return bitMask;
+    }
+
     /**
      * Convert the Java language specification's access flags bitmap into a set of Flag enumerations.
      *

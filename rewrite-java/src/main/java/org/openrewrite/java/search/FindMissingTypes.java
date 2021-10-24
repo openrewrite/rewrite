@@ -40,7 +40,7 @@ public class FindMissingTypes extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                JavaType.Method type = method.getType();
+                JavaType.Method type = method.getMethodType();
                 Expression select = method.getSelect();
                 if(select != null) {
                     if (type == null) {

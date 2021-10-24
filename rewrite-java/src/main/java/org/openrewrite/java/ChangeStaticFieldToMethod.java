@@ -23,6 +23,8 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesField;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 
 @EqualsAndHashCode(callSuper = true)
 @Value
@@ -80,7 +82,7 @@ public class ChangeStaticFieldToMethod extends Recipe {
 
             @Override
             public J visitIdentifier(J.Identifier ident, ExecutionContext executionContext) {
-                JavaType.Variable varType = TypeUtils.asVariable(ident.getFieldType());
+                JavaType.Variable varType = ident.getFieldType();
                 if (varType != null &&
                         TypeUtils.isOfClassType(varType.getOwner(), oldClassName) &&
                         varType.getName().equals(oldFieldName)) {
@@ -103,7 +105,7 @@ public class ChangeStaticFieldToMethod extends Recipe {
                 J.MethodInvocation method = block.getStatements().get(0).withPrefix(tree.getPrefix());
                 //noinspection ConstantConditions
                 return tree.getType() == null ? method :
-                        method.withType(method.getType().withResolvedSignature(method.getType().getResolvedSignature().withReturnType(tree.getType())));
+                        method.withMethodType(method.getMethodType().withResolvedSignature(method.getMethodType().getResolvedSignature().withReturnType(tree.getType())));
             }
 
             @NotNull

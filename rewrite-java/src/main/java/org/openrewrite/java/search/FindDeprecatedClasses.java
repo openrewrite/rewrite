@@ -71,7 +71,7 @@ public class FindDeprecatedClasses extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                for (JavaType javaType : cu.getTypesInUse()) {
+                for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
                     JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(javaType);
                     if (fqn != null && (typeMatcher == null || typeMatcher.matches(fqn))) {
                         for (JavaType.FullyQualified annotation : fqn.getAnnotations()) {

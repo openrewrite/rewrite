@@ -20,11 +20,19 @@ import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.TypeTree;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
 public class UseCollectionInterfaces extends Recipe {
 
@@ -49,6 +57,7 @@ public class UseCollectionInterfaces extends Recipe {
     }
 
     public static Map<String, String> rspecRulesReplaceTypeMap = new HashMap<>();
+
     static {
         rspecRulesReplaceTypeMap.put("java.util.ArrayDeque", "java.util.Deque");
         rspecRulesReplaceTypeMap.put("java.util.concurrent.ConcurrentLinkedDeque", "java.util.Deque");
@@ -85,8 +94,9 @@ public class UseCollectionInterfaces extends Recipe {
 
             @Override
             public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                for (JavaType type : cu.getTypesInUse()) {
-                    if (type instanceof JavaType.Class && rspecRulesReplaceTypeMap.containsKey(((JavaType.Class) type).getFullyQualifiedName())) {
+                for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
+                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type);
+                    if (fq != null && rspecRulesReplaceTypeMap.containsKey(fq.getFullyQualifiedName())) {
                         return super.visitJavaSourceFile(cu, executionContext);
                     }
                 }

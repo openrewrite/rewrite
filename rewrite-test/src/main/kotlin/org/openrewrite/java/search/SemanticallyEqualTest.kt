@@ -21,7 +21,10 @@ import org.openrewrite.Issue
 import org.openrewrite.Parser
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.tree.*
+import org.openrewrite.java.tree.J
+import org.openrewrite.java.tree.JLeftPadded
+import org.openrewrite.java.tree.JavaType
+import org.openrewrite.java.tree.Space
 import org.openrewrite.marker.Markers
 import java.util.*
 
@@ -402,40 +405,5 @@ interface SemanticallyEqualTest {
                     )
                 )
         ).isFalse
-    }
-
-    @Test
-    fun typeEqualityDependsOnlyOnFqn(jp: JavaParser) {
-        val nameA = J.Identifier.build(
-            randomId(),
-            Space.EMPTY,
-            Markers.EMPTY,
-            "name",
-            object : JavaType.ShallowClass("org.foo.Bar") {
-                override fun deepEquals(type: JavaType?): Boolean {
-                    return false
-                }
-
-            }
-        )
-        val nameB = J.Identifier.build(
-            randomId(),
-            Space.EMPTY,
-            Markers.EMPTY,
-            "name",
-            JavaType.Class.build(
-                Collections.singleton(Flag.Public),
-                "org.foo.Bar",
-                JavaType.Class.Kind.Class,
-                listOf(),
-                listOf(JavaType.Class.build("org.foo.Baz")),
-                listOf(),
-                null,
-                null,
-                null
-            )
-        )
-
-        assertThat(SemanticallyEqual.areEqual(nameA, nameB)).isTrue
     }
 }

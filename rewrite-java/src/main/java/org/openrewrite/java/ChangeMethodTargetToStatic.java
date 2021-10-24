@@ -23,6 +23,8 @@ import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 
 import java.util.LinkedHashSet;
@@ -92,7 +94,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            boolean isStatic = method.getType() != null && method.getType().hasFlags(Flag.Static);
+            boolean isStatic = method.getMethodType() != null && method.getMethodType().hasFlags(Flag.Static);
             boolean isSameReceiverType = method.getSelect() != null &&
                     TypeUtils.isOfClassType(method.getSelect().getType(), fullyQualifiedTargetTypeName);
 
@@ -111,11 +113,11 @@ public class ChangeMethodTargetToStatic extends Recipe {
                     );
                 }
                 JavaType.Method transformedType = null;
-                if (method.getType() != null) {
-                    maybeRemoveImport(method.getType().getDeclaringType());
-                    transformedType = method.getType().withDeclaringType(classType);
-                    if (!method.getType().hasFlags(Flag.Static)) {
-                        Set<Flag> flags = new LinkedHashSet<>(method.getType().getFlags());
+                if (method.getMethodType() != null) {
+                    maybeRemoveImport(method.getMethodType().getDeclaringType());
+                    transformedType = method.getMethodType().withDeclaringType(classType);
+                    if (!method.getMethodType().hasFlags(Flag.Static)) {
+                        Set<Flag> flags = new LinkedHashSet<>(method.getMethodType().getFlags());
                         flags.add(Flag.Static);
                         transformedType = transformedType.withFlags(flags);
                     }
@@ -127,7 +129,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
                                 .withReturnType(returnTypeType));
                     }
                 }
-                m = m.withType(transformedType);
+                m = m.withMethodType(transformedType);
             }
             return m;
         }

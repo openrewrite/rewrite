@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.format.*
-import org.openrewrite.java.internal.TypeCacheTest
+import org.openrewrite.java.internal.cache.JavaTypeCacheTest
 import org.openrewrite.java.search.*
 import org.openrewrite.java.style.AutodetectTest
 import org.openrewrite.java.tree.TypeTreeTest
@@ -182,9 +182,6 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class FindTypesTck : FindTypesTest
-
-    @Nested
-    inner class FindTypesByPackageTck : FindTypesByPackageTest
 
     @Nested
     inner class HiddenFieldTck : HiddenFieldTest
@@ -379,7 +376,7 @@ abstract class JavaVisitorCompatibilityKit {
     inner class TabsAndIndentsTck : TabsAndIndentsTest
 
     @Nested
-    inner class TypeCacheTck : TypeCacheTest
+    inner class JavaTypeCacheTck : JavaTypeCacheTest
 
     @Nested
     inner class TypeTreeTck : TypeTreeTest

@@ -23,6 +23,8 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -58,7 +60,7 @@ public class UnnecessaryThrows extends Recipe {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                 J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
-                if (m.getThrows() != null && !m.isAbstract() && Boolean.FALSE.equals(TypeUtils.isAnOverride(method.getType()))) {
+                if (m.getThrows() != null && !m.isAbstract() && Boolean.FALSE.equals(TypeUtils.isOverride(method.getMethodType()))) {
                     Set<JavaType.FullyQualified> unusedThrows = new TreeSet<>(Comparator.comparing(JavaType.FullyQualified::getFullyQualifiedName));
                     for (NameTree nameTree : m.getThrows()) {
                         if (!TypeUtils.isAssignableTo(JavaType.Class.build("java.lang.RuntimeException"), nameTree.getType())) {
@@ -103,7 +105,7 @@ public class UnnecessaryThrows extends Recipe {
 
                         @Override
                         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                            removeThrownTypes(method.getType());
+                            removeThrownTypes(method.getMethodType());
                             return super.visitMethodInvocation(method, ctx);
                         }
 

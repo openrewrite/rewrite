@@ -24,7 +24,6 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Loop;
-import org.openrewrite.java.tree.TypeUtils;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -95,7 +94,7 @@ public class NoRedundantJumpStatements extends Recipe {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
                 J.MethodDeclaration m = super.visitMethodDeclaration(method, executionContext);
-                JavaType.Method methodType = TypeUtils.asMethod(m.getType());
+                JavaType.Method methodType = m.getMethodType();
                 if (m.getBody() != null && methodType != null && methodType.getResolvedSignature() != null &&
                         JavaType.Primitive.Void.equals(methodType.getResolvedSignature().getReturnType())) {
                     return m.withBody(m.getBody().withStatements(ListUtils.mapLast(m.getBody().getStatements(), s -> s instanceof J.Return ? null : s)));

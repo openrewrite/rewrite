@@ -162,7 +162,7 @@ public class SemanticallyEqual {
                 return ((JavaType.FullyQualified) thisType).getFullyQualifiedName().equals(((JavaType.FullyQualified) otherType).getFullyQualifiedName());
             }
 
-            return thisType.deepEquals(otherType);
+            return thisType.equals(otherType);
         }
     }
 }

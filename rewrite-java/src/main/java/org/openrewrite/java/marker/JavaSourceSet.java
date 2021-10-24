@@ -24,12 +24,15 @@ import lombok.With;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaExecutionContextView;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Marker;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
 
@@ -45,6 +48,8 @@ public class JavaSourceSet implements Marker {
     Set<JavaType.FullyQualified> classpath;
 
     public static JavaSourceSet build(String sourceSetName, Iterable<Path> classpath, ExecutionContext ctx) {
+        Builder builder = new Builder(ctx);
+
         Set<JavaType.FullyQualified> fqns = new HashSet<>();
         if (classpath.iterator().hasNext()) {
             for (ClassInfo classInfo : new ClassGraph()
@@ -57,7 +62,7 @@ public class JavaSourceSet implements Marker {
                     .scan()
                     .getAllClasses()) {
                 try {
-                    fqns.add(fromClassInfo(classInfo, new Stack<>(), ctx));
+                    fqns.add(builder.type(classInfo, new HashMap<>()));
                 } catch (Exception e) {
                     ctx.getOnError().accept(e);
                 }
@@ -74,7 +79,7 @@ public class JavaSourceSet implements Marker {
                     .scan()
                     .getAllClasses()) {
                 try {
-                    fqns.add(fromClassInfo(classInfo, new Stack<>(), ctx));
+                    fqns.add(builder.type(classInfo, new HashMap<>()));
                 } catch (Exception e) {
                     ctx.getOnError().accept(e);
                 }
@@ -84,79 +89,116 @@ public class JavaSourceSet implements Marker {
         return new JavaSourceSet(Tree.randomId(), sourceSetName, fqns);
     }
 
-    private static JavaType.FullyQualified fromClassInfo(ClassInfo aClass, Stack<ClassInfo> stack, ExecutionContext ctx) {
-        JavaType.Class existing = JavaType.Class.find(aClass.getName());
-        if (existing != null) {
-            return existing;
+    private static class Builder {
+        private final JavaExecutionContextView ctx;
+
+        private Builder(ExecutionContext ctx) {
+            this.ctx = new JavaExecutionContextView(ctx);
         }
 
-        if (stack.contains(aClass)) {
-            return new JavaType.ShallowClass(aClass.getName());
-        }
+        public JavaType.Class type(@Nullable ClassInfo aClass, Map<String, JavaType.Class> stack) {
+            if(aClass == null) {
+                //noinspection ConstantConditions
+                return null;
+            }
 
-        stack.add(aClass);
+            JavaType.Class existingClass = stack.get(aClass.getName());
+            if (existingClass != null) {
+                return existingClass;
+            }
 
-        Set<Flag> flags = Flag.bitMapToFlags(aClass.getModifiers());
+            AtomicBoolean newlyCreated = new AtomicBoolean(false);
 
-        JavaType.Class.Kind kind;
-        if (aClass.isInterface()) {
-            kind = JavaType.Class.Kind.Interface;
-        } else if (aClass.isEnum()) {
-            kind = JavaType.Class.Kind.Enum;
-        } else if (aClass.isAnnotation()) {
-            kind = JavaType.Class.Kind.Annotation;
-        } else {
-            kind = JavaType.Class.Kind.Class;
-        }
+            JavaType.Class clazz = ctx.getTypeCache().computeClass(
+                    getClasspathElement(aClass),
+                    aClass.getName(),
+                    () -> {
+                        newlyCreated.set(true);
 
-        List<JavaType.Variable> variables = fromFieldInfo(aClass.getFieldInfo(), stack, ctx);
-        List<JavaType.Method> methods = fromMethodInfo(aClass.getMethodInfo(), stack, ctx);
+                        Set<Flag> flags = Flag.bitMapToFlags(aClass.getModifiers());
 
-        return JavaType.Class.build(
-                Flag.flagsToBitMap(flags),
-                aClass.getName(),
-                kind,
-                variables,
-                new ArrayList<>(),
-                methods,
-                null,
-                null,
-                new ArrayList<>(),
-                null,
-                false);
-    }
+                        JavaType.Class.Kind kind;
+                        if (aClass.isInterface()) {
+                            kind = JavaType.Class.Kind.Interface;
+                        } else if (aClass.isEnum()) {
+                            kind = JavaType.Class.Kind.Enum;
+                        } else if (aClass.isAnnotation()) {
+                            kind = JavaType.Class.Kind.Annotation;
+                        } else {
+                            kind = JavaType.Class.Kind.Class;
+                        }
 
-    private static List<JavaType.Variable> fromFieldInfo(@Nullable FieldInfoList fieldInfos, Stack<ClassInfo> stack, ExecutionContext ctx) {
-        if (fieldInfos != null) {
-            List<JavaType.Variable> variables = new ArrayList<>(fieldInfos.size());
-            for (FieldInfo fieldInfo : fieldInfos) {
-                JavaType.FullyQualified owner = fromClassInfo(fieldInfo.getClassInfo(), stack, ctx);
+                        return new JavaType.Class(
+                                Flag.flagsToBitMap(flags),
+                                aClass.getName(),
+                                kind,
+                                null, null, null, null,
+                                type(aClass.getSuperclass(), stack),
+                                null
+                        );
+                    }
+            );
 
-                List<JavaType.FullyQualified> annotations = new ArrayList<>(fieldInfo.getAnnotationInfo().size());
-                for (AnnotationInfo annotationInfo : fieldInfo.getAnnotationInfo()) {
-                    annotations.add(fromClassInfo(annotationInfo.getClassInfo(), stack, ctx));
+            if (newlyCreated.get()) {
+                Map<String, JavaType.Class> stackWithSym = new HashMap<>(stack);
+                stackWithSym.put(aClass.getName(), clazz);
+
+                List<JavaType.Variable> variables = null;
+                if (!aClass.getFieldInfo().isEmpty()) {
+                    variables = new ArrayList<>(aClass.getFieldInfo().size());
+                    for (FieldInfo fieldInfo : aClass.getFieldInfo()) {
+                        JavaType.Variable variable = variableType(fieldInfo, stackWithSym);
+                        variables.add(variable);
+                    }
                 }
 
-                Set<Flag> flags = Flag.bitMapToFlags(fieldInfo.getModifiers());
-                JavaType.Variable variable = JavaType.Variable.build(fieldInfo.getName(), owner,
-                        JavaType.buildType(fieldInfo.getTypeDescriptor().toString()), annotations, Flag.flagsToBitMap(flags));
-                variables.add(variable);
-            }
-            return variables;
-        }
-        return emptyList();
-    }
+                List<JavaType.Method> methods = null;
+                if (!aClass.getMethodInfo().isEmpty()) {
+                    methods = new ArrayList<>(aClass.getMethodInfo().size());
+                    for (MethodInfo methodInfo : aClass.getMethodInfo()) {
+                        JavaType.Method method = methodType(methodInfo, stackWithSym);
+                        if (method != null) {
+                            methods.add(method);
+                        }
+                    }
+                }
 
-    private static List<JavaType.Method> fromMethodInfo(MethodInfoList methodInfos, Stack<ClassInfo> stack, ExecutionContext ctx) {
-        List<JavaType.Method> methods = new ArrayList<>(methodInfos.size());
-        for (MethodInfo methodInfo : methodInfos) {
+                clazz.unsafeSet(null, null, variables, methods);
+            }
+
+            return clazz;
+        }
+
+        private JavaType.Variable variableType(FieldInfo fieldInfo, Map<String, JavaType.Class> stack) {
+            return ctx.getTypeCache().computeVariable(
+                    getClasspathElement(fieldInfo.getClassInfo()),
+                    fieldInfo.getClassName(),
+                    fieldInfo.getName(),
+                    () -> {
+                        JavaType.Class owner = type(fieldInfo.getClassInfo(), stack);
+
+                        List<JavaType.FullyQualified> annotations = emptyList();
+                        if (!fieldInfo.getAnnotationInfo().isEmpty()) {
+                            annotations = new ArrayList<>(fieldInfo.getAnnotationInfo().size());
+                            for (AnnotationInfo annotationInfo : fieldInfo.getAnnotationInfo()) {
+                                annotations.add(type(annotationInfo.getClassInfo(), stack));
+                            }
+                        }
+
+                        return new JavaType.Variable(fieldInfo.getModifiers(), owner, fieldInfo.getName(),
+                                JavaType.buildType(fieldInfo.getTypeDescriptor().toString()), annotations);
+                    });
+        }
+
+        @Nullable
+        private JavaType.Method methodType(MethodInfo methodInfo, Map<String, JavaType.Class> stack) {
             try {
                 Set<Flag> flags = Flag.bitMapToFlags(methodInfo.getModifiers());
                 // The field access modifier "volatile" corresponds to the "bridge" modifier on methods.
                 // We don't represent "bridge" because it is a compiler internal that cannot appear in source code.
                 // See https://github.com/openrewrite/rewrite/issues/995
-                if(flags.contains(Flag.Volatile)) {
-                    continue;
+                if (flags.contains(Flag.Volatile)) {
+                    return null;
                 }
 
                 List<JavaType> parameterTypes = new ArrayList<>(methodInfo.getParameterInfo().length);
@@ -175,28 +217,37 @@ public class JavaSourceSet implements Marker {
                         .getThrowsSignatures().size());
                 for (ClassRefOrTypeVariableSignature throwsSignature : methodInfo.getTypeDescriptor().getThrowsSignatures()) {
                     if (throwsSignature instanceof ClassRefTypeSignature) {
-                        thrownExceptions.add(fromClassInfo(((ClassRefTypeSignature) throwsSignature).getClassInfo(), stack, ctx));
+                        thrownExceptions.add(type(((ClassRefTypeSignature) throwsSignature).getClassInfo(), stack));
                     }
                 }
 
                 List<JavaType.FullyQualified> annotations = new ArrayList<>(methodInfo.getAnnotationInfo().size());
                 for (AnnotationInfo annotationInfo : methodInfo.getAnnotationInfo()) {
-                    annotations.add(fromClassInfo(annotationInfo.getClassInfo(), stack, ctx));
+                    annotations.add(type(annotationInfo.getClassInfo(), stack));
                 }
 
-                methods.add(JavaType.Method.build(
-                        flags,
-                        JavaType.Class.build(methodInfo.getClassName()),
+                return new JavaType.Method(
+                        methodInfo.getModifiers(),
+                        type(methodInfo.getClassInfo(), stack),
                         methodInfo.getName(),
                         null,
                         signature,
                         methodParams,
                         thrownExceptions,
-                        annotations));
-            } catch(Exception e) {
+                        annotations
+                );
+            } catch (Exception e) {
                 ctx.getOnError().accept(e);
+                return null;
             }
         }
-        return methods;
+
+        private Path getClasspathElement(ClassInfo classInfo) {
+            if (classInfo.getModuleInfo() != null) {
+                return Paths.get(classInfo.getModuleInfo().getLocation());
+            } else {
+                return Paths.get("__source_set__");
+            }
+        }
     }
 }

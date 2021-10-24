@@ -16,13 +16,12 @@
 package org.openrewrite.java.tree;
 
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.internal.TypesInUse;
 
 import java.util.List;
-import java.util.Set;
 
 public interface JavaSourceFile extends J {
-    Set<JavaType> getTypesInUse();
-    Set<JavaType.Method> getDeclaredMethods();
+    TypesInUse getTypesInUse();
 
     @Nullable
     J.Package getPackageDeclaration();

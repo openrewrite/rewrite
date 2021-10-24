@@ -52,12 +52,12 @@ public class RemoveRepository extends Recipe {
         MethodMatcher repositories = new MethodMatcher("org.gradle.api.artifacts.dsl.RepositoryHandler " + repository + "()");
         return new GroovyVisitor<ExecutionContext>() {
             @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if(repositories.matches(method)) {
                     //noinspection ConstantConditions
                     return null;
                 }
-                return super.visitMethodInvocation(method, context);
+                return super.visitMethodInvocation(method, ctx);
             }
         };
     }

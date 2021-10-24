@@ -32,6 +32,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
@@ -312,7 +313,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                 for (int j = cursor; j < source.length(); j++) {
                     char ch = source.charAt(j);
                     if (ch == '\r') {
-                        cursor ++;
+                        cursor++;
                         continue;
                     }
 
@@ -523,7 +524,9 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
 
             cursor += ref.memberName.toString().length();
 
-            JavaType refType = referenceType(ref, qualifierType);
+            JavaType.Method methodRefType = methodReferenceType(ref, qualifierType);
+            JavaType.Variable fieldRefType = methodRefType == null ?
+                    fieldReferenceType(ref, qualifierType) : null;
 
             if (ref.paramTypes != null) {
                 JContainer<Expression> paramContainer;
@@ -560,7 +563,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                         null,
                         name,
                         paramContainer,
-                        TypeUtils.asMethod(refType)
+                        methodRefType
                 );
             } else {
                 return new J.MemberReference(
@@ -571,7 +574,8 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                         JContainer.empty(),
                         JLeftPadded.build(name),
                         null,
-                        refType
+                        methodRefType,
+                        fieldRefType
                 );
             }
         }
@@ -581,7 +585,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
     }
 
     @Nullable
-    private JavaType referenceType(DCTree.DCReference ref, @Nullable JavaType type) {
+    private JavaType.Method methodReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
         JavaType.Class classType = TypeUtils.asClass(type);
         if (classType == null) {
             return null;
@@ -613,9 +617,20 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
             }
         }
 
+        // a member reference, but not matching anything on type attribution
+        return null;
+    }
+
+    @Nullable
+    private JavaType.Variable fieldReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
+        JavaType.Class classType = TypeUtils.asClass(type);
+        if (classType == null) {
+            return null;
+        }
+
         for (JavaType.Variable member : classType.getMembers()) {
             if (member.getName().equals(ref.memberName.toString())) {
-                return member.getType();
+                return member;
             }
         }
 

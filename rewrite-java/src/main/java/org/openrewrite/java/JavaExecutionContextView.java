@@ -17,18 +17,25 @@ package org.openrewrite.java;
 
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.java.internal.cache.ClasspathJavaTypeCache;
+import org.openrewrite.java.internal.cache.JavaTypeCache;
+
+import java.util.Collection;
 
 public class JavaExecutionContextView extends DelegatingExecutionContext {
-    public static final String EVENT_SOURCE_FILE_PARSED = "org.openrewrite.java.parsing.parsed";
-    public static final String EVENT_TYPE_ATTRIBUTION_COMPLETE = "org.openrewrite.java.parsing.attributed";
-    public static final String EVENT_SOURCE_FILE_MAPPED = "org.openrewrite.java.parsing.mapped";
+    private static final ClasspathJavaTypeCache GLOBAL_TYPE_CACHE = new ClasspathJavaTypeCache();
+
+    private static final String TYPE_CACHE = "org.openrewrite.java.typeCache";
 
     public JavaExecutionContextView(ExecutionContext delegate) {
         super(delegate);
     }
 
-    public void increment(String key) {
-        int value = getMessage(key, 0) + 1;
-        putMessage(key, value);
+    public void setTypeCache(JavaTypeCache typeCache) {
+        putMessage(TYPE_CACHE, typeCache);
+    }
+
+    public JavaTypeCache getTypeCache() {
+        return getMessage(TYPE_CACHE, GLOBAL_TYPE_CACHE);
     }
 }

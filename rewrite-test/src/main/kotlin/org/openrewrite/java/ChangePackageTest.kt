@@ -72,7 +72,7 @@ interface ChangePackageTest: JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
+            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
             assertThat(cu.sourcePath)
                 .isEqualTo(Paths.get("org", "openrewrite", "test", "Test.java"))
         }
@@ -94,7 +94,7 @@ interface ChangePackageTest: JavaRecipeTest {
         afterConditions = { cu ->
             assertThat(cu.sourcePath)
                 .isEqualTo(Paths.get("org/openrewrite/test/internal/Test.java"))
-            assertThat(cu.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
+            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
         }
     )
 
@@ -121,7 +121,7 @@ interface ChangePackageTest: JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue()
+            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue()
         }
     )
 
@@ -140,7 +140,7 @@ interface ChangePackageTest: JavaRecipeTest {
             public class B extends Test {}
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue()
+            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue()
         }
     )
 
@@ -155,7 +155,7 @@ interface ChangePackageTest: JavaRecipeTest {
             public class B extends org.openrewrite.test.Test {}
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue()
+            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue()
         }
     )
 
@@ -174,7 +174,7 @@ interface ChangePackageTest: JavaRecipeTest {
             @org.openrewrite.test.A public class B {}
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue()
+            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue()
         }
     )
 
@@ -194,7 +194,7 @@ interface ChangePackageTest: JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue()
+            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue()
         }
     )
 
@@ -209,7 +209,7 @@ interface ChangePackageTest: JavaRecipeTest {
             public class B extends org.openrewrite.test.Test implements I1 {}
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue()
+            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue()
         }
     )
 
@@ -316,7 +316,7 @@ interface ChangePackageTest: JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue()
+            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue()
         }
     )
 
@@ -362,7 +362,7 @@ interface ChangePackageTest: JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
+            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
         }
     )
 
@@ -387,7 +387,7 @@ interface ChangePackageTest: JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
+            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
         }
     )
 
@@ -406,7 +406,7 @@ interface ChangePackageTest: JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
+            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
         }
     )
 
@@ -430,7 +430,7 @@ interface ChangePackageTest: JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
+            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
         }
     )
 
@@ -449,7 +449,7 @@ interface ChangePackageTest: JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
+            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
         }
     )
 
@@ -468,7 +468,7 @@ interface ChangePackageTest: JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
+            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
         }
     )
 
@@ -487,7 +487,7 @@ interface ChangePackageTest: JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
+            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
         }
     )
 
@@ -506,7 +506,7 @@ interface ChangePackageTest: JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
+            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
         }
     )
 
@@ -527,7 +527,7 @@ interface ChangePackageTest: JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
+            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
         }
     )
 
@@ -554,7 +554,7 @@ interface ChangePackageTest: JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
+            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
         }
     )
 

@@ -22,6 +22,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Markers;
 
 import java.util.Iterator;
@@ -786,7 +787,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             m = (J.MethodInvocation) temp2;
         }
         if (m.getPadding().getSelect() != null && m.getPadding().getSelect().getElement() instanceof NameTree &&
-                method.getType() != null && method.getType().hasFlags(Flag.Static)) {
+                method.getMethodType() != null && method.getMethodType().hasFlags(Flag.Static)) {
             //noinspection unchecked
             m = m.getPadding().withSelect(
                     (JRightPadded<Expression>) (JRightPadded<?>)

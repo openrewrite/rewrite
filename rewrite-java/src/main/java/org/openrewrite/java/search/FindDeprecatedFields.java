@@ -65,9 +65,8 @@ public class FindDeprecatedFields extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-                for (JavaType javaType : cu.getTypesInUse()) {
-                    JavaType.Variable variable = TypeUtils.asVariable(javaType);
-                    if (variable != null && (typeMatcher == null || typeMatcher.matches(variable.getOwner()))) {
+                for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
+                    if (typeMatcher == null || typeMatcher.matches(variable.getOwner())) {
                         for (JavaType.FullyQualified annotation : variable.getAnnotations()) {
                             if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
                                 return cu.withMarkers(cu.getMarkers().searchResult());
@@ -88,7 +87,7 @@ public class FindDeprecatedFields extends Recipe {
             @Override
             public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
                 J.Identifier i = super.visitIdentifier(identifier, ctx);
-                JavaType.Variable varType = TypeUtils.asVariable(identifier.getFieldType());
+                JavaType.Variable varType = identifier.getFieldType();
                 if (varType != null && (typeMatcher == null || typeMatcher.matches(varType.getOwner()))) {
                     for (JavaType.FullyQualified annotation : varType.getAnnotations()) {
                         if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {

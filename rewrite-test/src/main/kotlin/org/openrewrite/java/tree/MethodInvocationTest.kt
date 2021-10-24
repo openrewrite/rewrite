@@ -42,18 +42,18 @@ interface MethodInvocationTest {
 
         // check assumptions about the call site
         assertEquals("foo", inv.simpleName)
-        assertEquals("java.lang.Integer", inv.returnType.asFullyQualified()?.fullyQualifiedName)
+        assertEquals("java.lang.Integer", inv.type.asFullyQualified()?.fullyQualifiedName)
         assertEquals(listOf(JavaType.Primitive.Int, JavaType.Primitive.Int, JavaType.Primitive.Int),
             inv.arguments.filterIsInstance<J.Literal>().map { it.type })
 
-        val effectParams = inv.type!!.resolvedSignature!!.paramTypes
+        val effectParams = inv.methodType!!.resolvedSignature!!.paramTypes
         assertEquals("java.lang.Integer", effectParams[0].asFullyQualified()?.fullyQualifiedName)
         assertTrue(effectParams[1].hasElementType("java.lang.Integer"))
 
         // for non-generic method signatures, resolvedSignature and genericSignature match
-        assertEquals(inv.type!!.resolvedSignature, inv.type!!.genericSignature)
+        assertEquals(inv.methodType!!.resolvedSignature, inv.methodType!!.genericSignature)
 
-        assertEquals("A", inv.type?.declaringType?.fullyQualifiedName)
+        assertEquals("A", inv.methodType?.declaringType?.fullyQualifiedName)
 
         assertEquals("foo ( 0, 1, 2 )", inv.printTrimmed())
     }
@@ -65,7 +65,7 @@ interface MethodInvocationTest {
                 Integer o = generic ( 0, 1, 2 );
                 Integer p = this . < Integer > generic ( 0, 1, 2 );
     
-                public <T> T generic(T n, T... ns) { return n; }
+                public <TTTT> TTTT generic(TTTT n, TTTT... ns) { return n; }
             }
         """)[0]
 
@@ -73,20 +73,18 @@ interface MethodInvocationTest {
 
         listOf(genericInv, explicitGenericInv).forEach { test: J.MethodInvocation ->
             // check assumptions about the call site
-            assertEquals("java.lang.Integer", test.returnType.asFullyQualified()?.fullyQualifiedName)
+            assertEquals("java.lang.Integer", test.type.asFullyQualified()?.fullyQualifiedName)
             assertEquals(listOf(JavaType.Primitive.Int, JavaType.Primitive.Int, JavaType.Primitive.Int),
                 test.arguments.filterIsInstance<J.Literal>().map { it.type })
 
-            val effectiveParams = test.type!!.resolvedSignature!!.paramTypes
+            val effectiveParams = test.methodType!!.resolvedSignature!!.paramTypes
             assertEquals("java.lang.Integer", effectiveParams[0].asFullyQualified()?.fullyQualifiedName)
             assertTrue(effectiveParams[1].hasElementType("java.lang.Integer"))
 
-            // check assumptions about the target method
-            // notice how, in the case of generic arguments, the generics are concretized to match the call site
-            val methType = test.type!!.genericSignature!!
-            assertEquals("T", methType.returnType.asGeneric()?.fullyQualifiedName)
-            assertEquals("T", methType.paramTypes[0].asGeneric()?.fullyQualifiedName)
-            assertTrue(methType.paramTypes[1].hasElementType("T"))
+            val methType = test.methodType!!.genericSignature!!
+            assertEquals("java.lang.Object", methType.returnType.asGeneric()?.fullyQualifiedName)
+            assertEquals("java.lang.Object", methType.paramTypes[0].asGeneric()?.fullyQualifiedName)
+            assertTrue(methType.paramTypes[1].hasElementType("java.lang.Object"))
         }
 
         assertEquals("this . < Integer > generic ( 0, 1, 2 )", explicitGenericInv.printTrimmed())
@@ -106,7 +104,7 @@ interface MethodInvocationTest {
         val (staticInv, parameterlessStaticInv) = a.allInvs()
 
         assertEquals("staticFoo", staticInv.simpleName)
-        assertEquals("A", staticInv.type?.declaringType?.fullyQualifiedName)
+        assertEquals("A", staticInv.methodType?.declaringType?.fullyQualifiedName)
         assertEquals("staticFoo ( 0 )", staticInv.printTrimmed())
         assertEquals("staticFoo ( )", parameterlessStaticInv.printTrimmed())
     }
@@ -121,7 +119,7 @@ interface MethodInvocationTest {
 
         val inv = a.classes[0].body.statements.filterIsInstance<J.VariableDeclarations>().first().variables[0]
             .initializer as J.MethodInvocation
-        assertNull(inv.type?.declaringType)
+        assertNull(inv.methodType?.declaringType)
         assertNull(inv.type)
         assertNull(inv.type)
     }

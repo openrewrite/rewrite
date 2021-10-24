@@ -24,6 +24,8 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.internal.grammar.TemplateParameterLexer;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -68,8 +70,7 @@ public class Substitutions {
                         JavaType type = ((TypedTree) parameter).getType();
                         JavaType.Array arrayType = TypeUtils.asArray(type);
                         if (arrayType == null) {
-                            JavaType.Method methodType = TypeUtils.asMethod(type);
-                            arrayType = TypeUtils.asArray(methodType == null ? null : methodType.getResolvedSignature().getReturnType());
+                            arrayType = TypeUtils.asArray(type);
                             if (arrayType == null) {
                                 throw new IllegalArgumentException("anyArray can only be used on parameters containing JavaType.Array type attribution");
                             }
@@ -135,8 +136,6 @@ public class Substitutions {
             return ((JavaType.FullyQualified) type).getFullyQualifiedName();
         } else if (type instanceof JavaType.Primitive) {
             return ((JavaType.Primitive) type).getKeyword();
-        } else if (type instanceof JavaType.Method) {
-            return getTypeName(((JavaType.Method) type).getResolvedSignature().getReturnType());
         } else {
             return "java.lang.Object";
         }
@@ -168,18 +167,12 @@ public class Substitutions {
         }
         return "";
     }
+
     private static String typeHintFor(@Nullable JavaType t) {
         if (t instanceof JavaType.Primitive) {
             return ((JavaType.Primitive) t).getKeyword();
         } else if (t instanceof JavaType.FullyQualified) {
             return ((JavaType.FullyQualified) t).getFullyQualifiedName();
-        } else if(t instanceof JavaType.Method) {
-            JavaType.Method m = (JavaType.Method)t;
-            if(m.getGenericSignature() != null) {
-                return typeHintFor(m.getGenericSignature().getReturnType());
-            } else if(m.getResolvedSignature() != null) {
-                return typeHintFor(m.getResolvedSignature().getReturnType());
-            }
         }
         return "";
     }

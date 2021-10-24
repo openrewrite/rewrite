@@ -19,8 +19,7 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureLexer;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureParser;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -118,7 +117,7 @@ public class AnnotationMatcher {
                     return false;
                 }
 
-                JavaType.Variable varType = TypeUtils.asVariable(fa.getName().getFieldType());
+                JavaType.Variable varType = fa.getName().getFieldType();
                 if (varType != null && matchText.equals(varType.getOwner().getFullyQualifiedName() + "." + varType.getName())) {
                     return true;
                 }

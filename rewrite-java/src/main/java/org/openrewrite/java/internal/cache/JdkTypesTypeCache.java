@@ -13,22 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle
+package org.openrewrite.java.internal.cache;
 
-import org.junit.jupiter.api.Test
-
-class AddRepositoryTest : GradleRecipeTest {
-    @Test
-    fun addMavenCentral() = assertChanged(
-        recipe = AddRepository("mavenCentral"),
-        before = """
-            repositories {
-            }
-        """,
-        after = """
-            repositories {
-                mavenCentral()
-            }
-        """
-    )
+/**
+ * Only caches types that are defined by the JDK itself.
+ */
+public class JdkTypesTypeCache {
 }

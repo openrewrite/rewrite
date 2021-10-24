@@ -31,12 +31,6 @@ public interface SourceFile extends Tree {
 
     SourceFile withSourcePath(Path path);
 
-    @SuppressWarnings("unused")
-    @JsonProperty("@c")
-    default String getJacksonPolymorphicTypeTag() {
-        return getClass().getName();
-    }
-
     Markers getMarkers();
 
     <T extends SourceFile> T withMarkers(Markers markers);

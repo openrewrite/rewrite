@@ -25,7 +25,6 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -63,7 +62,7 @@ public class FindFields extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext executionContext) {
-                JavaType.Variable varType = TypeUtils.asVariable(fieldAccess.getName().getFieldType());
+                JavaType.Variable varType = fieldAccess.getName().getFieldType();
                 if (varType != null && varType.getOwner().getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         varType.getName().equals(fieldName)) {
                     return fieldAccess.withMarkers(fieldAccess.getMarkers().searchResult());
@@ -74,7 +73,7 @@ public class FindFields extends Recipe {
             @Override
             public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext executionContext) {
                 J.Identifier i = super.visitIdentifier(identifier, executionContext);
-                JavaType.Variable varType = TypeUtils.asVariable(identifier.getFieldType());
+                JavaType.Variable varType = identifier.getFieldType();
                 if (varType != null && varType.getOwner().getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         varType.getName().equals(fieldName)) {
                     i = i.withMarkers(i.getMarkers().searchResult());
@@ -85,7 +84,7 @@ public class FindFields extends Recipe {
             @Override
             public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
                 J.MemberReference m = super.visitMemberReference(memberRef, ctx);
-                JavaType.Variable varType = TypeUtils.asVariable(memberRef.getReferenceType());
+                JavaType.Variable varType = memberRef.getVariableType();
                 if (varType != null && varType.getOwner().getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         varType.getName().equals(fieldName)) {
                     m = m.withReference(m.getReference().withMarkers(m.getReference().getMarkers().searchResult()));
@@ -100,7 +99,7 @@ public class FindFields extends Recipe {
             @Override
             public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Set<J> vs) {
                 J.FieldAccess f = super.visitFieldAccess(fieldAccess, vs);
-                JavaType.Variable varType = TypeUtils.asVariable(fieldAccess.getName().getFieldType());
+                JavaType.Variable varType = fieldAccess.getName().getFieldType();
                 if (varType != null && varType.getOwner().getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         varType.getName().equals(fieldName)) {
                     vs.add(f);
@@ -111,7 +110,7 @@ public class FindFields extends Recipe {
             @Override
             public J.Identifier visitIdentifier(J.Identifier identifier, Set<J> vs) {
                 J.Identifier i = super.visitIdentifier(identifier, vs);
-                JavaType.Variable varType = TypeUtils.asVariable(identifier.getFieldType());
+                JavaType.Variable varType = identifier.getFieldType();
                 if (varType != null && varType.getOwner().getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         varType.getName().equals(fieldName)) {
                     vs.add(i);
@@ -122,7 +121,7 @@ public class FindFields extends Recipe {
             @Override
             public J.MemberReference visitMemberReference(J.MemberReference memberRef, Set<J> vs) {
                 J.MemberReference m = super.visitMemberReference(memberRef, vs);
-                JavaType.Variable varType = TypeUtils.asVariable(memberRef.getReferenceType());
+                JavaType.Variable varType = memberRef.getVariableType();
                 if (varType != null && varType.getOwner().getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                         varType.getName().equals(fieldName)) {
                     vs.add(m);
