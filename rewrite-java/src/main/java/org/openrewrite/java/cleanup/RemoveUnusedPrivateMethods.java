@@ -17,7 +17,10 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.NoMissingTypes;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -47,6 +50,11 @@ public class RemoveUnusedPrivateMethods extends Recipe {
     @Override
     public Duration getEstimatedEffortPerOccurrence() {
         return Duration.ofMinutes(5);
+    }
+
+    @Override
+    protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return new NoMissingTypes();
     }
 
     @Override
