@@ -22,10 +22,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.search.UsesType;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -79,6 +76,7 @@ public class PrimitiveWrapperClassConstructorToValueOf extends Recipe {
                 J.NewClass nc = (J.NewClass) super.visitNewClass(newClass, executionContext);
                 JavaType.FullyQualified type = TypeUtils.asFullyQualified(nc.getType());
                 if (type != null && nc.getArguments() != null && nc.getArguments().size() == 1) {
+                    Expression arg = nc.getArguments().get(0);
                     JavaTemplate.Builder valueOf;
                     switch (type.getFullyQualifiedName()) {
                         case "java.lang.Boolean":
@@ -93,9 +91,6 @@ public class PrimitiveWrapperClassConstructorToValueOf extends Recipe {
                         case "java.lang.Double":
                             valueOf = JavaTemplate.builder(this::getCursor, "Double.valueOf(#{any(double)});");
                             break;
-                        case "java.lang.Float":
-                            valueOf = JavaTemplate.builder(this::getCursor, "Float.valueOf(#{any(float)});");
-                            break;
                         case "java.lang.Integer":
                             valueOf = JavaTemplate.builder(this::getCursor, "Integer.valueOf(#{any(int)});");
                             break;
@@ -105,12 +100,26 @@ public class PrimitiveWrapperClassConstructorToValueOf extends Recipe {
                         case "java.lang.Short":
                             valueOf = JavaTemplate.builder(this::getCursor, "Short.valueOf(#{any(short)});");
                             break;
+                        case "java.lang.Float":
+                            if (arg instanceof J.Literal && JavaType.Primitive.Double == ((J.Literal) arg).getType()) {
+                                arg = ((J.Literal) arg).withType(JavaType.Primitive.String);
+                                arg = ((J.Literal) arg).withValueSource("\"" + ((J.Literal) arg).getValue() + "\"");
+                            }
+                            JavaType argType = arg.getType();
+                            if (argType instanceof JavaType.Method && ((JavaType.Method)argType).getGenericSignature() != null) {
+                                //noinspection ConstantConditions
+                                argType = ((JavaType.Method)argType).getGenericSignature().getReturnType();
+                            }
+                            if (TypeUtils.isOfClassType(argType, "java.lang.Double")) {
+                                valueOf = JavaTemplate.builder(this::getCursor, "Float.valueOf(#{any(java.lang.Double)}.floatValue());");
+                            } else {
+                                valueOf = JavaTemplate.builder(this::getCursor, "Float.valueOf(#{any(float)});");
+                            }
+                            break;
                         default:
                             return nc;
                     }
-
-                    return nc.withTemplate(valueOf.build(), nc.getCoordinates().replace(),
-                            nc.getArguments().get(0));
+                    return nc.withTemplate(valueOf.build(), nc.getCoordinates().replace(), arg);
                 }
                 return nc;
             }

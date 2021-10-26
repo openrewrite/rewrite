@@ -28,6 +28,7 @@ interface PrimitiveWrapperClassConstructorToValueOfTest : JavaRecipeTest {
     override val recipe: Recipe
         get() = PrimitiveWrapperClassConstructorToValueOf()
 
+
     @Test
     fun integerValueOf(jp: JavaParser) = assertUnchanged(
         before = """
@@ -40,7 +41,7 @@ interface PrimitiveWrapperClassConstructorToValueOfTest : JavaRecipeTest {
     )
 
     @Test
-    fun newIntegerToValueOf(jp: JavaParser) = assertChanged(
+    fun newClassToValueOf(jp: JavaParser) = assertChanged(
         before = """
             class A {
                 Boolean bool = new Boolean(true);
@@ -117,6 +118,36 @@ interface PrimitiveWrapperClassConstructorToValueOfTest : JavaRecipeTest {
                 public static void main(String[] args) {
                     Date d = new Date(Long.valueOf(0));
                     Long l = Long.valueOf(Integer.valueOf(0));
+                }
+            }
+        """
+    )
+
+    @Test
+    fun doubleToFloat(jp: JavaParser) = assertChanged(
+        before = """
+            class T {
+                Double d1 = Double.valueOf(1.0);
+                void makeFloats() {
+                    Float f = new Float(2.0d);
+                    Float f2 = new Float(getD());
+                    Float f3 = new Float(d1);
+                }
+                Double getD() {
+                    return Double.valueOf(2.0d);
+                }
+            }
+        """,
+        after = """
+            class T {
+                Double d1 = Double.valueOf(1.0);
+                void makeFloats() {
+                    Float f = Float.valueOf("2.0");
+                    Float f2 = Float.valueOf(getD().floatValue());
+                    Float f3 = Float.valueOf(d1.floatValue());
+                }
+                Double getD() {
+                    return Double.valueOf(2.0d);
                 }
             }
         """
