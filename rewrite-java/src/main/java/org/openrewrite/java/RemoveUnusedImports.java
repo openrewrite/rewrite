@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
@@ -50,6 +51,11 @@ public class RemoveUnusedImports extends Recipe {
     @Override
     public Duration getEstimatedEffortPerOccurrence() {
         return Duration.ofMinutes(5);
+    }
+
+    @Override
+    protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return new NoMissingTypes();
     }
 
     @Override
