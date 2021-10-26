@@ -201,4 +201,21 @@ class CoalescePropertiesTest : YamlRecipeTest {
         """
     )
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1142")
+    @Disabled
+    fun doNotOverWrapYamlKeyPrefixComments() = assertChanged(
+        before = """
+          a:
+            b:
+              c: c-value  # c-comment
+              d: d-value
+        """,
+        after = """
+            a.b:
+              c: c-value  # c-comment
+              d: d-value
+        """
+    )
+
 }
