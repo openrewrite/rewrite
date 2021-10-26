@@ -73,6 +73,8 @@ public class GitProvenance implements Marker {
             return new GitProvenance(randomId(), getOrigin(repository), repository.getBranch(), getChangeset(repository));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        } catch (IllegalArgumentException e) {
+            return new GitProvenance(UUID.randomUUID(), "git@unspecified:unspecified/" + projectDir.getName(projectDir.getNameCount() - 1) + ".git", "unspecified", "unspecified");
         }
     }
 
