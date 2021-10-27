@@ -188,7 +188,11 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
             } else if (text.contains(".") || text.contains("e")) {
                 value = Double.parseDouble(text) * sign.get();
             } else {
-                value = Integer.parseInt(text) * sign.get();
+                try {
+                    value = Integer.parseInt(text) * sign.get();
+                } catch (NumberFormatException e) {
+                    value = Long.parseLong(text) * sign.get();
+                }
             }
         }
 

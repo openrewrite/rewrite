@@ -18,6 +18,7 @@ package org.openrewrite.json
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
+import org.openrewrite.Issue
 import org.openrewrite.internal.StringUtils
 
 class JsonParserTest {
@@ -84,6 +85,16 @@ class JsonParserTest {
                 key: "value",
                 // test
                 "key": 1,
+            }
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1145")
+    @Test
+    fun long() = assertUnchanged(
+        before = """
+            {
+                "timestamp": 1577000812973
             }
         """.trimIndent()
     )
