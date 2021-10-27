@@ -248,10 +248,15 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         return convert(ctx, (c, prefix) -> {
             skip(c.DOCTYPE());
             Xml.Ident name = convert(c.Name(), (n, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, n.getText()));
-            Xml.Ident externalId = convert(c.externalid(), (n, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, n.Name().getText()));
-            List<Xml.Ident> internalSubset = c.STRING().stream()
-                    .map(s -> convert(s, (attr, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, attr.getText())))
-                    .collect(toList());
+            Xml.Ident externalId = null;
+            List<Xml.Ident> internalSubset = null;
+            if (!c.externalid().getStart().equals(c.CLOSE().getSymbol())) {
+                externalId = convert(c.externalid(),
+                        (n, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, n.Name().getText()));
+                internalSubset = c.STRING().stream()
+                        .map(s -> convert(s, (attr, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, attr.getText())))
+                        .collect(toList());
+            }
             String beforeTagDelimiterPrefix = prefix(c.CLOSE());
             return new Xml.DocTypeDecl(randomId(),
                     prefix,

@@ -112,4 +112,20 @@ class XmlParserTest {
             </foo>
         """.trimIndent()
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1150")
+    @Test
+    fun parseDocTypeWithoutExternalId() = assertUnchanged(
+        before = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <!DOCTYPE configuration >
+
+            <configuration scan="true">
+                <root>
+                    <level>WARN</level>
+                    <appender-ref ref="CONSOLE"/>
+                </root>
+            </configuration>
+        """.trimIndent()
+    )
 }

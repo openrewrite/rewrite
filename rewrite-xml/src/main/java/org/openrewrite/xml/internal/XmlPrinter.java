@@ -135,6 +135,7 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
             visit(docTypeDecl.getExternalSubsets().getElements(), p);
             p.out.append(']');
         }
+        p.out.append(docTypeDecl.getBeforeTagDelimiterPrefix());
         p.out.append('>');
         return docTypeDecl;
     }
