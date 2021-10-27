@@ -122,10 +122,7 @@ public class ChangePackage extends Recipe {
         public @Nullable J postVisit(J tree, ExecutionContext executionContext) {
             J j = super.postVisit(tree, executionContext);
             if (j instanceof TypedTree) {
-                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(((TypedTree) j).getType());
-                if (fq != null && fq.getPackageName().equals(oldPackageName) && !fq.getClassName().isEmpty()) {
-                    j = ((TypedTree) j).withType(buildNewType(fq.getClassName()));
-                }
+                j = ((TypedTree) j).withType(updateType(((TypedTree) j).getType()));
             }
             return j;
         }
@@ -177,6 +174,13 @@ public class ChangePackage extends Recipe {
                 pkg = pkg.withTemplate(JavaTemplate.builder(this::getCursor, changingTo).build(), pkg.getCoordinates().replace());
             }
             return pkg;
+        }
+
+        @Override
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+            J.MethodInvocation mi = super.visitMethodInvocation(method, executionContext);
+            mi = mi.withType(updateType(mi.getType()));
+            return mi;
         }
 
         private JavaType updateType(@Nullable JavaType type) {
