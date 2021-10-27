@@ -15,11 +15,11 @@
  */
 package org.openrewrite.yaml;
 
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.Arrays;
-import java.util.stream.Collectors;
 
 public class ShiftFormatLeftVisitor<P> extends YamlIsoVisitor<P> {
     private final Yaml scope;
@@ -54,16 +54,19 @@ public class ShiftFormatLeftVisitor<P> extends YamlIsoVisitor<P> {
 
     @SuppressWarnings("DynamicRegexReplaceableByCompiledPattern")
     private String shiftPrefix(String prefix) {
-        return Arrays.stream(prefix.split("\\n"))
-                .map(s -> {
-                    // Only remove the "shift"-amount of whitespace if there is enough available in the prefix on this line.
-                    // Specifically, we're trying to avoid comments in a prefix from being formatted in a way that mangles the yaml.
-                    // Otherwise, just leave this line be. It's worse to remove an overrun of whitespace than it is to do nothing to this prefix line.
-                    // If the prefix line only contains whitespace, make sure there's enough room to remove it as well.
-                    if (StringUtils.indexOfNonWhitespace(s) >= shift || (StringUtils.indexOfNonWhitespace(s) == -1 && s.length() >= shift)) {
-                        return s.substring(shift);
-                    }
-                    return s;
-                }).collect(Collectors.joining("\n"));
+        return String.join("\n", ListUtils.map(Arrays.asList(prefix.split("\\n")), (index, s) -> {
+            // if the first line of "prefix" does not contain a newline character, it starts on the same line as an existing yaml object.
+            // in that case, we just leave it alone. we do not want to left-shift a comment on the same line following the previous yaml object.
+            if (index == 0 && !s.trim().isEmpty()) {
+                return s;
+                // Only remove the "shift"-amount of whitespace if there is enough available in the prefix on this line.
+                // Specifically, we're trying to avoid comments in a prefix from being formatted in a way that mangles the yaml.
+                // Otherwise, just leave this line be. It's worse to remove an overrun of whitespace than it is to do nothing to this prefix line.
+                // If the prefix line only contains whitespace, make sure there's enough room to remove it as well.
+            } else if (StringUtils.indexOfNonWhitespace(s) >= shift || (StringUtils.indexOfNonWhitespace(s) == -1 && s.length() >= shift)) {
+                return s.substring(shift);
+            }
+            return s;
+        }));
     }
 }

@@ -203,18 +203,25 @@ class CoalescePropertiesTest : YamlRecipeTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1142")
-    @Disabled
-    fun doNotOverWrapYamlKeyPrefixComments() = assertChanged(
+    fun doNotShiftYamlCommentsInPrefixFollowingPreviousYamlObject() = assertChanged(
         before = """
           a:
             b:
               c: c-value  # c-comment
-              d: d-value
+              d: d-value # d-comment
+              e: e-value   # e-comment
+              f: f-value
+
+              g: g-value
         """,
         after = """
             a.b:
               c: c-value  # c-comment
-              d: d-value
+              d: d-value # d-comment
+              e: e-value   # e-comment
+              f: f-value
+
+              g: g-value
         """
     )
 
