@@ -15,116 +15,181 @@
  */
 package org.openrewrite.java
 
+import org.intellij.lang.annotations.Language
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 
 interface ChangeStaticFieldToMethodTest : JavaRecipeTest {
     override val recipe: ChangeStaticFieldToMethod
-        get() = ChangeStaticFieldToMethod("java.util.Collections", "EMPTY_LIST",
-                "com.acme.Lists", "of")
+        get() = ChangeStaticFieldToMethod(
+            "java.util.Collections",
+            "EMPTY_LIST",
+            "com.acme.Lists",
+            "of"
+        )
 
-    @Test
-    fun migratesQualifiedField(jp: JavaParser) = assertChanged(
-            jp,
-            before = """
+    companion object {
+        @Language("java")
+        private const val acmeLists = """
+            package com.acme;
+
             import java.util.Collections;
             import java.util.List;
-            
+
+            class Lists {
+                static <E> List<E> of() {
+                    return Collections.emptyList();
+                }
+            }
+        """
+
+        @Language("java")
+        private const val staticStringClass = """
+            package com.acme;
+
+            public class Example {
+                public static final String EXAMPLE = "example";
+            }
+        """
+    }
+
+    @Test
+    @Suppress("unchecked")
+    fun migratesQualifiedField() = assertChanged(
+        dependsOn = arrayOf(acmeLists),
+        before = """
+            import java.util.Collections;
+            import java.util.List;
+
             class A {
-                public List<String> empty() {
+                static List<String> empty() {
                     return Collections.EMPTY_LIST;
                 }
             }
-            """,
-            after = """
+        """,
+        after = """
             import com.acme.Lists;
 
             import java.util.List;
-            
+
             class A {
-                public List<String> empty() {
+                static List<String> empty() {
                     return Lists.of();
                 }
             }
-            """
+        """
     )
 
     @Test
-    fun migratesStaticImportedField(jp: JavaParser) = assertChanged(
-            jp,
-            before = """
+    fun migratesStaticImportedField() = assertChanged(
+        dependsOn = arrayOf(acmeLists),
+        before = """
             import static java.util.Collections.EMPTY_LIST;
-            
+
             class A {
-                public Object empty() {
+                static Object empty() {
                     return EMPTY_LIST;
                 }
             }
-            """,
-            after = """
+        """,
+        after = """
             import com.acme.Lists;
-            
+
             class A {
-                public Object empty() {
+                static Object empty() {
                     return Lists.of();
                 }
             }
-            """
+        """
     )
 
     @Test
-    fun migratesFullyQualifiedField(jp: JavaParser) = assertChanged(
-            jp,
-            before = """
+    fun migratesFullyQualifiedField() = assertChanged(
+        dependsOn = arrayOf(acmeLists),
+        before = """
             class A {
-                public Object empty() {
+                static Object empty() {
                     return java.util.Collections.EMPTY_LIST;
                 }
             }
-            """,
-            after = """
+        """,
+        after = """
             import com.acme.Lists;
-            
+
             class A {
-                public Object empty() {
+                static Object empty() {
                     return Lists.of();
                 }
             }
-            """
+        """
     )
 
     @Test
     fun migratesFieldInitializer() = assertChanged(
-            before = """
+        dependsOn = arrayOf(acmeLists),
+        before = """
             import java.util.Collections;
 
             class A {
                 private final Object collection = Collections.EMPTY_LIST;
             }
-            """,
-            after = """
+        """,
+        after = """
             import com.acme.Lists;
 
             class A {
                 private final Object collection = Lists.of();
             }
-            """
+        """
     )
 
     @Test
-    fun ignoresUnrelatedFields(jp: JavaParser) = assertUnchanged(
-            jp,
-            before = """
+    fun ignoresUnrelatedFields() = assertUnchanged(
+        before = """
             import java.util.Collections;
-            
+
             class A {
                 static Object EMPTY_LIST = null;
-                public Object empty1() {
+
+                static Object empty1() {
                     return A.EMPTY_LIST;
                 }
-                public Object empty2() {
+
+                static Object empty2() {
                     return EMPTY_LIST;
                 }
             }
-            """
+        """
     )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1156")
+    @Disabled
+    fun migratesToJavaLangClass() = assertChanged(
+        recipe = ChangeStaticFieldToMethod(
+            "com.acme.Example",
+            "EXAMPLE",
+            "java.lang.System",
+            "lineSeparator"
+        ),
+        dependsOn = arrayOf(staticStringClass),
+        before = """
+            import com.acme.Example;
+
+            class A {
+                static String lineSeparator() {
+                    return Example.EXAMPLE;
+                }
+            }
+        """,
+        after = """
+            class A {
+                static String lineSeparator() {
+                    return System.lineSeparator();
+                }
+            }
+        """
+    )
+
 }

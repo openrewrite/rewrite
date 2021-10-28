@@ -57,7 +57,7 @@ public class ChangeStaticFieldToMethod extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Migrate accesses to a static field to invocations of a static method";
+        return "Migrate accesses to a static field to invocations of a static method.";
     }
 
     @Override
