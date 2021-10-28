@@ -205,6 +205,10 @@ public interface Yaml extends Serializable, Tree {
         @With
         Markers markers;
 
+        @Nullable
+        @With
+        Anchor anchor;
+
         @With
         Style style;
 
@@ -226,7 +230,7 @@ public interface Yaml extends Serializable, Tree {
 
         @Override
         public Scalar copyPaste() {
-            return new Scalar(randomId(), prefix, Markers.EMPTY, style, value);
+            return new Scalar(randomId(), prefix, Markers.EMPTY, anchor, style, value);
         }
 
         public String toString() {
@@ -409,6 +413,71 @@ public interface Yaml extends Serializable, Tree {
                 return new Entry(randomId(), prefix, Markers.EMPTY,
                         block.copyPaste(), dash, trailingCommaPrefix);
             }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    class Alias implements Block {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        String prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        Anchor anchor;
+
+        @Override
+        public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
+            return v.visitAlias(this, p);
+        }
+
+        @Override
+        public Alias copyPaste() {
+            return new Alias(randomId(), prefix, Markers.EMPTY, anchor);
+        }
+
+        public String toString() {
+            return "Yaml.Alias(" + anchor + ")";
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    class Anchor implements Yaml {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        String prefix;
+
+        @With
+        String postfix;
+
+        @With
+        Markers markers;
+
+        @With
+        String key;
+
+        @Override
+        public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
+            return v.visitAnchor(this, p);
+        }
+
+        @Override
+        public Anchor copyPaste() {
+            return new Anchor(randomId(), prefix, postfix, Markers.EMPTY, key);
+        }
+
+        public String toString() {
+            return "Yaml.Anchor(" + key + ")";
         }
     }
 

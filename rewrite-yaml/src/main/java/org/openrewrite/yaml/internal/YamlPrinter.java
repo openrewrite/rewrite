@@ -92,6 +92,9 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
     public Yaml visitScalar(Yaml.Scalar scalar, PrintOutputCapture<P> p) {
         p.out.append(scalar.getPrefix());
         visitMarkers(scalar.getMarkers(), p);
+        if (scalar.getAnchor() != null) {
+            visit(scalar.getAnchor(), p);
+        }
         switch (scalar.getStyle()) {
             case DOUBLE_QUOTED:
                 p.out.append('"')
@@ -118,6 +121,22 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
 
         }
         return scalar;
+    }
+
+    public Yaml visitAnchor(Yaml.Anchor anchor, PrintOutputCapture<P> p) {
+        visitMarkers(anchor.getMarkers(), p);
+        p.out.append("&");
+        p.out.append(anchor.getKey());
+        p.out.append(anchor.getPostfix());
+        return anchor;
+    }
+
+    public Yaml visitAlias(Yaml.Alias alias, PrintOutputCapture<P> p) {
+        p.out.append(alias.getPrefix());
+        visitMarkers(alias.getMarkers(), p);
+        p.out.append("*");
+        p.out.append(alias.getAnchor().getKey());
+        return alias;
     }
 
     @Override

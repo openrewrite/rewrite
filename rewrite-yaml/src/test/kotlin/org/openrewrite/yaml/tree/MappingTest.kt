@@ -144,7 +144,6 @@ class MappingTest: YamlParserTest {
             test : 0
     """)
 
-
     @Test
     fun literals() = assertRoundTrip("""
           data:
@@ -153,5 +152,71 @@ class MappingTest: YamlParserTest {
                 scrape_interval: 10s
                 scrape_timeout: 9s
                 evaluation_interval: 10s
+    """)
+
+    @Test
+    fun scalarValue() = assertRoundTrip("""
+        default: &default test
+        stage: *default
+    """)
+
+    @Test
+    fun scalarValueInBrackets() = assertRoundTrip("""
+        defaults: [&first A, &stage test, &last Z]
+        config: [first: *first, stage: *stage, last: *last]
+    """)
+
+    @Disabled
+    @Test
+    fun scalarKeyAnchor() = assertRoundTrip("""
+        foo:
+          - start: start
+          - &anchor buz: buz
+          - *anchor: baz
+          - end: end
+    """)
+
+    @Disabled
+    @Test
+    fun scalarKeyAnchorInBrackets() = assertRoundTrip("""
+        foo: [start: start, &anchor buz: buz, *anchor: baz, end: end]
+    """)
+
+    @Disabled
+    @Test
+    fun sequenceAnchor() = assertRoundTrip("""
+        defaults: &defaults
+          - A: 1
+          - B: 2
+        key: *defaults
+    """)
+
+    @Disabled
+    @Test
+    fun sequenceAnchorInBrackets() = assertRoundTrip("""
+      defaults: &defaults [A: 1, B: 2]
+      mapping: *defaults
+    """)
+
+    @Disabled
+    @Test
+    fun mappingAnchor() = assertRoundTrip("""
+        defaults: &defaults
+          A: 1
+          B: 2
+        mapping:
+          << : *defaults
+          A: 23
+          C: 99
+    """)
+
+    @Disabled
+    @Test
+    fun mappingKey() = assertRoundTrip("""
+      ? 
+        - key-1
+        - key-2
+      : 
+        - value
     """)
 }

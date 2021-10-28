@@ -89,7 +89,8 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
     }
 
     public Yaml visitScalar(Yaml.Scalar scalar, P p) {
-        return scalar.withMarkers(visitMarkers(scalar.getMarkers(), p));
+        return scalar.withAnchor(visitAndCast(scalar.getAnchor(), p))
+                .withMarkers(visitMarkers(scalar.getMarkers(), p));
     }
 
     public Yaml visitSequence(Yaml.Sequence sequence, P p) {
@@ -100,6 +101,15 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
     public Yaml visitSequenceEntry(Yaml.Sequence.Entry entry, P p) {
         return entry.withBlock(visitAndCast(entry.getBlock(), p))
                 .withMarkers(visitMarkers(entry.getMarkers(), p));
+    }
+
+    public Yaml visitAnchor(Yaml.Anchor anchor, P p) {
+        return anchor.withMarkers(visitMarkers(anchor.getMarkers(), p));
+    }
+
+    public Yaml visitAlias(Yaml.Alias alias, P p) {
+        return alias.withAnchor(visitAndCast(alias.getAnchor(), p))
+                .withMarkers(visitMarkers(alias.getMarkers(), p));
     }
 
     public void maybeCoalesceProperties() {
