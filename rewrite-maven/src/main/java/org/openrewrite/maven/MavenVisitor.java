@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Maven;
@@ -46,6 +47,11 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
         return "maven";
     }
 
+    @Override
+    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+        return sourceFile instanceof Maven;
+    }
+
     public Maven visitMaven(Maven maven, ExecutionContext ctx) {
         this.model = maven.getModel();
 
@@ -60,9 +66,6 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
 
     @Override
     public final Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
-        if (!(document instanceof Maven)) {
-            return document;
-        }
         Xml.Document refactored = (Xml.Document) super.visitDocument(document, ctx);
         if (refactored != document) {
             return new Maven(refactored);

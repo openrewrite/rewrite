@@ -74,6 +74,10 @@ public abstract class TreeVisitor<T extends Tree, P> {
             .tag("visitor.class", getClass().getName())
             .register(Metrics.globalRegistry);
 
+    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+        return true;
+    }
+
     protected void setCursor(@Nullable Cursor cursor) {
         this.cursor = cursor;
     }

@@ -15,11 +15,18 @@
  */
 package org.openrewrite.xml;
 
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.xml.tree.Xml;
 
 public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
+
+    @Override
+    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+        return sourceFile instanceof Xml.Document;
+    }
 
     @Override
     public String getLanguage() {

@@ -16,6 +16,8 @@
 package org.openrewrite.yaml;
 
 import org.openrewrite.Cursor;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -24,6 +26,11 @@ import org.openrewrite.yaml.format.AutoFormatVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
 public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
+
+    @Override
+    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+        return sourceFile instanceof Yaml.Documents;
+    }
 
     @Override
     public String getLanguage() {
@@ -58,7 +65,7 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
     public <Y2 extends Yaml> Y2 autoFormat(Y2 y, @Nullable Yaml stopAfter, P p, Cursor cursor) {
         return (Y2) new AutoFormatVisitor<>(stopAfter).visit(y, p, cursor);
     }
-    
+
     public Yaml visitDocuments(Yaml.Documents documents, P p) {
         return documents.withDocuments(ListUtils.map(documents.getDocuments(), d -> visitAndCast(d, p)))
                 .withMarkers(visitMarkers(documents.getMarkers(), p));
