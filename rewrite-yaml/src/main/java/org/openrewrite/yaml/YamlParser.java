@@ -177,14 +177,14 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                                     lastEnd + fmt.length() + scalar.getAnchor().length() + 1,
                                     event.getEndMark().getIndex());
 
-                            StringBuilder sb = new StringBuilder();
+                            StringBuilder postFix = new StringBuilder();
                             for (char c : whitespaceAndScalar.toCharArray()) {
                                 if (c != ' ' && c != '\t') {
                                     break;
                                 }
-                                sb.append(c);
+                                postFix.append(c);
                             }
-                            anchor = new Yaml.Anchor(randomId(), "", sb.toString(), Markers.EMPTY, scalar.getAnchor());
+                            anchor = new Yaml.Anchor(randomId(), "", postFix.toString(), Markers.EMPTY, scalar.getAnchor());
                             anchors.put(scalar.getAnchor(), anchor);
                         }
 
