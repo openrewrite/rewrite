@@ -205,12 +205,12 @@ public interface Yaml extends Serializable, Tree {
         @With
         Markers markers;
 
+        @With
+        Style style;
+
         @Nullable
         @With
         Anchor anchor;
-
-        @With
-        Style style;
 
         @With
         String value;
@@ -230,7 +230,7 @@ public interface Yaml extends Serializable, Tree {
 
         @Override
         public Scalar copyPaste() {
-            return new Scalar(randomId(), prefix, Markers.EMPTY, anchor, style, value);
+            return new Scalar(randomId(), prefix, Markers.EMPTY, style, anchor, value);
         }
 
         public String toString() {

@@ -226,10 +226,10 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
 
                             }
                             lastEnd = event.getEndMark().getIndex() + commaIndex + 1;
-                            sequenceBuilder.push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, anchor, style, scalarValue), commaPrefix);
+                            sequenceBuilder.push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, anchor, scalarValue), commaPrefix);
 
                         } else {
-                            builder.push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, anchor, style, scalarValue));
+                            builder.push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, anchor, scalarValue));
                             lastEnd = event.getEndMark().getIndex();
                         }
                         break;
