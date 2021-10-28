@@ -27,6 +27,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
+import org.yaml.snakeyaml.events.AliasEvent;
 import org.yaml.snakeyaml.events.DocumentEndEvent;
 import org.yaml.snakeyaml.events.Event;
 import org.yaml.snakeyaml.events.ScalarEvent;
@@ -116,6 +117,9 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
             int lastEnd = 0;
 
             List<Yaml.Document> documents = new ArrayList<>();
+            // https://yaml.org/spec/1.2.2/#3222-anchors-and-aliases, section: 3.2.2.2. Anchors and Aliases.
+            // An anchor key should always replace the previous value, since an alias refers to the most recent anchor key.
+            Map<String, Yaml.Anchor> anchors = new HashMap<>();
             Yaml.Document document = null;
             Stack<BlockBuilder> blockStack = new Stack<>();
             String newLine = "";
@@ -167,6 +171,23 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                             scalarValue = variableByUuid.get(scalarValue);
                         }
 
+                        Yaml.Anchor anchor = null;
+                        if (scalar.getAnchor() != null) {
+                            String whitespaceAndScalar = reader.prefix(
+                                    lastEnd + fmt.length() + scalar.getAnchor().length() + 1,
+                                    event.getEndMark().getIndex());
+
+                            StringBuilder postFix = new StringBuilder();
+                            for (char c : whitespaceAndScalar.toCharArray()) {
+                                if (c != ' ' && c != '\t') {
+                                    break;
+                                }
+                                postFix.append(c);
+                            }
+                            anchor = new Yaml.Anchor(randomId(), "", postFix.toString(), Markers.EMPTY, scalar.getAnchor());
+                            anchors.put(scalar.getAnchor(), anchor);
+                        }
+
                         Yaml.Scalar.Style style;
                         switch (scalar.getScalarStyle()) {
                             case DOUBLE_QUOTED:
@@ -205,10 +226,10 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
 
                             }
                             lastEnd = event.getEndMark().getIndex() + commaIndex + 1;
-                            sequenceBuilder.push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, scalarValue), commaPrefix);
+                            sequenceBuilder.push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, anchor, scalarValue), commaPrefix);
 
                         } else {
-                            builder.push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, scalarValue));
+                            builder.push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, anchor, scalarValue));
                             lastEnd = event.getEndMark().getIndex();
                         }
                         break;
@@ -248,7 +269,17 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                         blockStack.push(new SequenceBuilder(fmt, startBracketPrefix));
                         break;
                     }
-                    case Alias:
+                    case Alias: {
+                        String fmt = newLine + reader.prefix(lastEnd, event);
+                        newLine = "";
+
+                        AliasEvent alias = (AliasEvent) event;
+                        Yaml.Anchor anchor = anchors.get(alias.getAnchor());
+                        BlockBuilder builder = blockStack.peek();
+                        builder.push(new Yaml.Alias(randomId(), fmt, Markers.EMPTY, anchor));
+                        lastEnd = event.getEndMark().getIndex();
+                    }
+                        break;
                     case StreamEnd:
                     case StreamStart:
                         break;
