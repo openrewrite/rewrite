@@ -16,7 +16,6 @@
 package org.openrewrite.java
 
 import org.intellij.lang.annotations.Language
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 
@@ -165,7 +164,6 @@ interface ChangeStaticFieldToMethodTest : JavaRecipeTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1156")
-    @Disabled
     fun migratesToJavaLangClass() = assertChanged(
         recipe = ChangeStaticFieldToMethod(
             "com.acme.Example",
@@ -175,6 +173,8 @@ interface ChangeStaticFieldToMethodTest : JavaRecipeTest {
         ),
         dependsOn = arrayOf(staticStringClass),
         before = """
+            package example;
+
             import com.acme.Example;
 
             class A {
@@ -184,6 +184,8 @@ interface ChangeStaticFieldToMethodTest : JavaRecipeTest {
             }
         """,
         after = """
+            package example;
+
             class A {
                 static String lineSeparator() {
                     return System.lineSeparator();

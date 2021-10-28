@@ -115,7 +115,18 @@ interface AddImportTest : JavaRecipeTest {
         recipe = addImports({ AddImport("java.lang.String", null, false) }),
         before = """
             package com.myorg;
-            
+
+            class A {
+            }
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1156")
+    fun dontImportJavaLangWhenUsingDefaultPackage(jp: JavaParser) = assertUnchanged(
+        jp,
+        recipe = addImports({ AddImport("java.lang.String", null, false) }),
+        before = """
             class A {
             }
         """
