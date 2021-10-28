@@ -77,8 +77,8 @@ public class MissingOverrideAnnotation extends Recipe {
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
             if (!method.hasModifier(J.Modifier.Type.Static)
                     && method.getAllAnnotations().stream().noneMatch(OVERRIDE_ANNOTATION::matches)
-                    && Boolean.TRUE.equals(TypeUtils.isAnOverride(method.getType())
-                    && !(Boolean.TRUE.equals(ignoreAnonymousClassMethods) && getCursorToParentScope(getCursor()).getValue() instanceof J.NewClass))
+                    && Boolean.TRUE.equals(TypeUtils.isAnOverride(method.getType()))
+                    && !(Boolean.TRUE.equals(ignoreAnonymousClassMethods) && getCursorToParentScope(getCursor()).getValue() instanceof J.NewClass)
             ) {
                 method = method.withTemplate(
                         JavaTemplate.builder(this::getCursor, "@Override").build(),
