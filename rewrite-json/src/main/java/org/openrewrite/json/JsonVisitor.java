@@ -16,6 +16,8 @@
 package org.openrewrite.json;
 
 import org.openrewrite.Cursor;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -23,8 +25,14 @@ import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
 import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.json.tree.Space;
+import org.openrewrite.text.PlainText;
 
 public class JsonVisitor<P> extends TreeVisitor<Json, P> {
+
+    @Override
+    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+        return sourceFile instanceof Json.Document;
+    }
 
     @Override
     public String getLanguage() {

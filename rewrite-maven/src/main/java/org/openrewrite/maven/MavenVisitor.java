@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Maven;
@@ -44,6 +45,11 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
     @Override
     public String getLanguage() {
         return "maven";
+    }
+
+    @Override
+    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+        return sourceFile instanceof Maven;
     }
 
     public Maven visitMaven(Maven maven, ExecutionContext ctx) {

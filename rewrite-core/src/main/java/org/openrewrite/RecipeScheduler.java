@@ -205,8 +205,13 @@ public interface RecipeScheduler {
                         return s;
                     }
 
+                    TreeVisitor<?, ExecutionContext> visitor = recipe.getVisitor();
+                    if (!visitor.isAcceptable(s, ctx)) {
+                        return s;
+                    }
+
                     try {
-                        @SuppressWarnings("unchecked") S afterFile = (S) recipe.getVisitor().visit(s, ctx);
+                        @SuppressWarnings("unchecked") S afterFile = (S) visitor.visit(s, ctx);
                         if (afterFile != null && afterFile != s) {
                             List<Stack<Recipe>> recipeStackList = new ArrayList<>(1);
                             recipeStackList.add(recipeStack);

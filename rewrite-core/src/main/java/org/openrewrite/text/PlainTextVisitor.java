@@ -15,9 +15,17 @@
  */
 package org.openrewrite.text;
 
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 
 public class PlainTextVisitor<P> extends TreeVisitor<PlainText, P> {
+
+    @Override
+    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+        return sourceFile instanceof PlainText;
+    }
+
     public PlainText visitText(PlainText text, P p) {
         return text.withMarkers(visitMarkers(text.getMarkers(), p));
     }
