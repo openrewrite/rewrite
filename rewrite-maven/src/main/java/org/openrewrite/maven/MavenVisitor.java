@@ -60,6 +60,9 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
 
     @Override
     public final Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
+        if (!(document instanceof Maven)) {
+            return document;
+        }
         Xml.Document refactored = (Xml.Document) super.visitDocument(document, ctx);
         if (refactored != document) {
             return new Maven(refactored);
