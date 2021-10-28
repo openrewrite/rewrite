@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -76,12 +76,9 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         int dotIndex = classType.getFullyQualifiedName().lastIndexOf('.');
         if (dotIndex >= 0) {
             String packageName = classType.getFullyQualifiedName().substring(0, dotIndex);
-            // No need to add the import if the class is in java.lang
-            if (packageName.equals("java.lang")) {
-                return cu;
-            }
-            // No need to add imports for classes within the same package
-            if (cu.getPackageDeclaration() != null && packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()))) {
+            // No need to add imports if the class to import is in java.lang, or if the classes are within the same package
+            if (packageName.equals("java.lang") || (cu.getPackageDeclaration() != null &&
+                    packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor())))) {
                 return cu;
             }
         }
@@ -208,12 +205,12 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, AtomicReference<Boolean> found) {
             // If the type isn't used there's no need to proceed further
-            for(JavaType ty : cu.getTypesInUse()) {
-                if(!(ty instanceof JavaType.Variable)) {
+            for (JavaType ty : cu.getTypesInUse()) {
+                if (!(ty instanceof JavaType.Variable)) {
                     continue;
                 }
-                JavaType.Variable varType = (JavaType.Variable)ty;
-                if(varType.getName().equals(statik) && isOfClassType(varType.getType(), type)) {
+                JavaType.Variable varType = (JavaType.Variable) ty;
+                if (varType.getName().equals(statik) && isOfClassType(varType.getType(), type)) {
                     return super.visitCompilationUnit(cu, found);
                 }
             }
@@ -223,7 +220,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, AtomicReference<Boolean> found) {
             assert getCursor().getParent() != null;
-            if(identifier.getSimpleName().equals(statik) && isOfClassType(identifier.getType(), type) &&
+            if (identifier.getSimpleName().equals(statik) && isOfClassType(identifier.getType(), type) &&
                     !(getCursor().getParent().firstEnclosingOrThrow(J.class) instanceof J.FieldAccess)) {
                 found.set(true);
             }
