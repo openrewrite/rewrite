@@ -164,7 +164,7 @@ public class Maven extends Xml.Document {
 
     @Override
     public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return v instanceof MavenVisitor;
+        return v instanceof XmlVisitor;
     }
 
     @Override
