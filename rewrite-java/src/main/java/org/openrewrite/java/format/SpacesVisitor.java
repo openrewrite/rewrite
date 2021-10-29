@@ -575,6 +575,8 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                                                         spaceBefore(arg.getElement(), spaceWithinAnnotationParentheses)
                                                 );
                                             }
+                                        } else {
+                                            arg = arg.withElement(spaceBefore(arg.getElement(), style.getOther().getAfterComma()));
                                         }
                                         if (index == argsSize - 1) {
                                             arg = spaceAfter(arg, spaceWithinAnnotationParentheses);

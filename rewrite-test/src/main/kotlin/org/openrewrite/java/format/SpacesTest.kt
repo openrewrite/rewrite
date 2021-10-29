@@ -1924,6 +1924,7 @@ interface SpacesTest : JavaRecipeTest {
             """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1162")
     @Test
     fun beforeLeftBraceAnnotationArrayInitializerLeftBraceTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
@@ -1933,13 +1934,22 @@ interface SpacesTest : JavaRecipeTest {
                         })
                     }))
             ).build(),
+            dependsOn = arrayOf("""
+                package abc;
+                @interface MyAnno {
+                    String[] names;
+                    Integer[] counts;
+                }
+            """),
             before = """
-                @SuppressWarnings({"ALL"})
+                package abc;
+                @MyAnno(names={"a","b"},counts={1,2})
                 class Test {
                 }
             """,
             after = """
-                @SuppressWarnings( {"ALL"})
+                package abc;
+                @MyAnno(names = {"a", "b"}, counts = {1, 2})
                 class Test {
                 }
             """
