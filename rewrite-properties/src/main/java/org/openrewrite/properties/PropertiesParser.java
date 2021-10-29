@@ -113,7 +113,7 @@ public class PropertiesParser implements Parser<Properties.File> {
             StringBuilder trailingWhitespaceBuffer = new StringBuilder();
             content = entryFromLine(line, prefix.toString(), trailingWhitespaceBuffer);
             prefix.delete(0, prefix.length());
-            prefix.append(trailingWhitespaceBuffer.toString());
+            prefix.append(trailingWhitespaceBuffer);
         } else {
             prefix.append(line);
         }
@@ -209,7 +209,7 @@ public class PropertiesParser implements Parser<Properties.File> {
                 case 5:
                     if (!Character.isWhitespace(c)) {
                         // multi-word value
-                        value.append(trailingWhitespaceBuffer.toString());
+                        value.append(trailingWhitespaceBuffer);
                         trailingWhitespaceBuffer.delete(0, trailingWhitespaceBuffer.length());
                         value.append(c);
                         state--;
