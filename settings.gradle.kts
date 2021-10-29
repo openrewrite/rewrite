@@ -39,12 +39,15 @@ gradleEnterprise {
     }
 
     buildScan {
-        publishAlways()
-        isUploadInBackground = !isCiServer
-
         capture {
             isTaskInputFiles = true
         }
+
+        isUploadInBackground = !isCiServer
+
+        publishAlways()
+        this as com.gradle.enterprise.gradleplugin.internal.extension.BuildScanExtensionWithHiddenFeatures
+        publishIfAuthenticated()
     }
 
 }

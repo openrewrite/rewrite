@@ -2,9 +2,9 @@
 name: Moderne ingest
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
   push:
-    branches: [ main ]
+    branches: [main]
   schedule:
     - cron: "0 18 * * *"
 

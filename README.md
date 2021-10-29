@@ -6,7 +6,7 @@
 [![Maven Central](https://img.shields.io/maven-central/v/org.openrewrite/rewrite-java.svg)](https://mvnrepository.com/artifact/org.openrewrite/rewrite-java)
 
 OpenRewrite project is a mass refactoring ecosystem for Java and other source code, designed to eliminate technical debt across an engineering organization.
-This project delivers scalable automated code maintenance, best practices, vulnerability patching, API migrations, dependency management, and more. 
+This project delivers scalable automated code maintenance, best practices, vulnerability patching, API migrations, dependency management, and more.
 
 Start with our [quickstart guide](https://docs.openrewrite.org/getting-started/getting-started) and let OpenRewrite start handling the boring parts of software development for you. Full documentation available at [docs.openrewrite.org](https://docs.openrewrite.org/).
 
@@ -16,9 +16,9 @@ Follow us on [Twitter](https://twitter.com/moderneinc) and [LinkedIn](https://ww
 
 ## Refactoring at Scale
 
-[![Moderne](video_preview.png)](https://youtu.be/BCWyMm7WFCI)
- 
-Try it yourself at https://app.moderne.io, now in open beta. 
+[![Moderne](./doc/video_preview.png)](https://youtu.be/BCWyMm7WFCI)
+
+Try it yourself at https://app.moderne.io, now in open beta.
 
 This project is maintained by [Moderne](https://moderne.io/).
 Visit us at https://moderne.io to learn how to remove the tedium, technical debt, and inefficiency from your organization's software development.
