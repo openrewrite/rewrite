@@ -59,7 +59,19 @@ public class FixSerializableFields extends Recipe {
 
     @Override
     public String getDescription() {
-        return "The fields of a class that implements `Serializable` must also implement `Serializable` or be marked as `transient`.";
+        return "The fields of a class that implements `Serializable` must also implement `Serializable` or be marked as `transient`.\n" +
+                "\n" +
+                "This recipe will look for any classes that directly or indirectly implement `Serializable` and for any member fields that are not serializable it will do one of two things:\n" +
+                "\n" +
+                "- If a non-serializable field has a type that is represented by a `SourceFile` within the same project, that SourceFile will be changed to implement `Serializable`.\n" +
+                "\n" +
+                "- If a non-serializable field has a type that is not represented as a `SourceFile`, the field will be marked as `transient`\n" +
+                "\n" +
+                "NOTE: If `markAllAsTransient` is set to `true`, this recipe will mark all non-serializable fields as `transient`.\n" +
+                "\n" +
+                "NOTE: Any fullyQualified names listed in the `fullyQualifiedExclusions` will be marked as transient, even if that SourceFile exists in the same project.\n" +
+                "\n" +
+                "NOTE: This recipe does NOT recursively modify newly `Serilazable` classes to cut down on the graph of SourceFiles that may be impacted during a recipe run.";
     }
 
     @Override
