@@ -147,6 +147,10 @@ public class Environment {
             return load(new ClasspathScanningLoader(properties, acceptPackages));
         }
 
+        public Builder scanClassLoader(ClassLoader classLoader) {
+            return load(new ClasspathScanningLoader(properties, classLoader));
+        }
+
         /**
          * @param jar         A path to a jar file to scan.
          * @param classLoader A classloader that is populated with the transitive dependencies of the jar.

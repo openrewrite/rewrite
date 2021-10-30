@@ -121,7 +121,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
             for (ClassInfo classInfo : result.getSubclasses(Recipe.class.getName())) {
                 Class<?> recipeClass = classInfo.loadClass();
-                if (recipeClass.equals(DeclarativeRecipe.class) || recipeClass.equals(PolyglotRecipe.class) || recipeClass.getEnclosingClass() != null) {
+                if (recipeClass.getName().equals(DeclarativeRecipe.class.getName()) || recipeClass.getName().equals(PolyglotRecipe.class.getName()) || recipeClass.getEnclosingClass() != null) {
                     continue;
                 }
                 try {
