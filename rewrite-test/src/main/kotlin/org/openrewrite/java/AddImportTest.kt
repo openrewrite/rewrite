@@ -815,35 +815,28 @@ interface AddImportTest : JavaRecipeTest {
     @Test
     fun doNotFoldNormalImportWithNamespaceConflict(jp: JavaParser) = assertChanged(
         jp,
-        recipe = addImports(
-            { AddImport("a.Shared", null, false) }
-        ),
-        dependsOn = (('A'..'D').map { clazz -> "package a; public class $clazz {}" } +
-                "package a; public class Shared {}" +
-                "package b; public class Shared {}").toTypedArray(),
+        recipe = addImports({ AddImport("java.util.List", null, false) }),
         before = """
-            import b.*;
-            import a.A;
-            import a.B;
-            import a.C;
-            import a.D;
+            import java.awt.*; // contains a List class
+            import java.util.Collection;
+            import java.util.Collections;
+            import java.util.Map;
+            import java.util.Set;
             
             class Test {
-                Object[] as = new Object[] { new A(), new B(), new C(), new D() };
-                Shared shared = new Shared();
+                List list;
             }
         """,
         after = """
-            import b.*;
-            import a.A;
-            import a.B;
-            import a.C;
-            import a.D;
-            import a.Shared;
+            import java.awt.*; // contains a List class
+            import java.util.Collection;
+            import java.util.Collections;
+            import java.util.List;
+            import java.util.Map;
+            import java.util.Set;
             
             class Test {
-                Object[] as = new Object[] { new A(), new B(), new C(), new D() };
-                Shared shared = new Shared();
+                List list;
             }
         """
     )

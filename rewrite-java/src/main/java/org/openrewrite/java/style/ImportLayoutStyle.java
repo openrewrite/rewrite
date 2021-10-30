@@ -33,7 +33,6 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Markers;
 
 import java.io.IOException;
@@ -499,12 +498,15 @@ public class ImportLayoutStyle implements JavaStyle {
         }
 
         private Map<String, Set<String>> mapNamesInPackageToPackages() {
+            Map<String, Set<String>> nameToPackages = new HashMap<>();
             Set<String> checkPackageForClasses = new HashSet<>();
+
             for (JRightPadded<J.Import> anImport : originalImports) {
                 checkPackageForClasses.add(packageOrOuterClassName(anImport));
+                nameToPackages.computeIfAbsent(anImport.getElement().getClassName(), p -> new HashSet<>())
+                                .add(anImport.getElement().getPackageName());
             }
 
-            Map<String, Set<String>> nameToPackages = new HashMap<>();
             for (JavaType.FullyQualified classGraphFqn : classpath) {
                 // ClassGraph uses a '$' delimited to distinguish inner classes.
                 boolean containsClassGraphStaticDelimiter = classGraphFqn.getClassName().contains("$");
@@ -543,18 +545,14 @@ public class ImportLayoutStyle implements JavaStyle {
                         }
                     }
 
-                    if (classGraphFqn instanceof JavaType.Class) {
-                        List<JavaType.Method> methods = classGraphFqn.getMethods();
-                        for (JavaType.Method method : methods) {
-                            if (method.getFlags().contains(Flag.Static)) {
-                                Set<String> packages = nameToPackages.getOrDefault(method.getName(), new HashSet<>());
-                                packages.add(packageName);
-                                nameToPackages.put(method.getName(), packages);
-                            }
+                    for (JavaType.Method method : classGraphFqn.getMethods()) {
+                        if (method.getFlags().contains(Flag.Static)) {
+                            Set<String> packages = nameToPackages.getOrDefault(method.getName(), new HashSet<>());
+                            packages.add(packageName);
+                            nameToPackages.put(method.getName(), packages);
                         }
                     }
                 }
-
             }
             return nameToPackages;
         }

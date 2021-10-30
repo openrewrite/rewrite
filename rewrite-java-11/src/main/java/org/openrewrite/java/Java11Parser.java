@@ -36,6 +36,7 @@ import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.NamedStyles;
 
@@ -236,7 +237,18 @@ public class Java11Parser implements JavaParser {
                 .filter(Objects::nonNull)
                 .collect(toList());
 
-        return ListUtils.map(mappedCus, cu -> cu.withMarkers(cu.getMarkers().add(getSourceSet(ctx))));
+        JavaSourceSet sourceSet = getSourceSet(ctx);
+        Set<JavaType.FullyQualified> classpath = sourceSet.getClasspath();
+        for (J.CompilationUnit cu : mappedCus) {
+            for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
+                if(type instanceof JavaType.FullyQualified) {
+                    classpath.add((JavaType.FullyQualified) type);
+                }
+            }
+        }
+
+        JavaSourceSet finalSourceSet = sourceSet.withClasspath(classpath);
+        return ListUtils.map(mappedCus, cu -> cu.withMarkers(cu.getMarkers().add(finalSourceSet)));
     }
 
     @Override

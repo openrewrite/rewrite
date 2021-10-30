@@ -2306,7 +2306,6 @@ public interface J extends Serializable, Tree {
                     .collect(joining("."));
         }
 
-
         public String getClassName() {
             String pkg = getPackageName();
             return pkg.length() > 0 ? getTypeName().substring(pkg.length() + 1) : getTypeName();
