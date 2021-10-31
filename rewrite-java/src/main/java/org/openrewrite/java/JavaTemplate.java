@@ -389,15 +389,12 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                     if(loc.equals(METHOD_INVOCATION_ARGUMENTS)) {
                         m = substitutions.unsubstitute(templateParser.parseMethodArguments(getCursor(), substitutedTemplate, loc));
                         m = autoFormat(m, 0, getCursor().getParentOrThrow());
-                        m = method.withArguments(m.getArguments())
-                                .withType(m.getType());
                     } else {
                         m = substitutions.unsubstitute(templateParser.parseMethod(getCursor(), substitutedTemplate, loc));
                         m = autoFormat(m, 0, getCursor().getParentOrThrow());
-                        m = method.withName(m.getName())
-                                .withArguments(m.getArguments())
-                                .withType(m.getType());
+                        m = method.withName(m.getName()).withArguments(m.getArguments());
                     }
+
                     // This will only happen if the template encountered non-fatal errors during parsing
                     // Make a best-effort attempt to recover by patching together a new Method type from the old one
                     // There are many ways this type could be not quite right, but leaving the type alone is likely to cause MethodMatcher false-positives
