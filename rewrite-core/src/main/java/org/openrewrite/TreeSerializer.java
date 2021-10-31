@@ -26,7 +26,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.databind.json.JsonMapper;
-import com.fasterxml.jackson.databind.jsontype.SubtypeResolver;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import com.fasterxml.jackson.dataformat.smile.SmileFactory;
@@ -47,19 +46,13 @@ public class TreeSerializer<S extends Tree> {
     private final TypeReference<List<S>> sourceListType = new TypeReference<List<S>>() {
     };
 
-    private final boolean pretty;
     private final ObjectMapper mapper;
 
-    public TreeSerializer(boolean pretty) {
-        this.pretty = pretty;
+    public TreeSerializer() {
         JsonMapper.Builder mBuilder;
-        if (pretty) {
-            mBuilder = JsonMapper.builder();
-        } else {
-            SmileFactory f = new SmileFactory();
-            f.configure(SmileGenerator.Feature.CHECK_SHARED_STRING_VALUES, true);
-            mBuilder = JsonMapper.builder(f);
-        }
+        SmileFactory f = new SmileFactory();
+        f.configure(SmileGenerator.Feature.CHECK_SHARED_STRING_VALUES, true);
+        mBuilder = JsonMapper.builder(f);
 
         // to be able to construct classes that have @Data and a single field
         // see https://cowtowncoder.medium.com/jackson-2-12-most-wanted-3-5-246624e2d3d0
@@ -77,10 +70,6 @@ public class TreeSerializer<S extends Tree> {
                 .withGetterVisibility(JsonAutoDetect.Visibility.NONE)
                 .withIsGetterVisibility(JsonAutoDetect.Visibility.NONE)
                 .withFieldVisibility(JsonAutoDetect.Visibility.ANY));
-    }
-
-    public TreeSerializer() {
-        this(false);
     }
 
     public void write(Iterable<S> sources, OutputStream out) {
@@ -109,11 +98,7 @@ public class TreeSerializer<S extends Tree> {
 
     public byte[] write(S source) {
         try {
-            if(pretty) {
-                return mapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(source);
-            } else {
-                return mapper.writeValueAsBytes(source);
-            }
+            return mapper.writeValueAsBytes(source);
         } catch (JsonProcessingException e) {
             throw new UncheckedIOException(e);
         }

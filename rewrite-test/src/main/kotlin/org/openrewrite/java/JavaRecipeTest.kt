@@ -21,15 +21,17 @@ import org.junit.jupiter.api.BeforeEach
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
-import org.openrewrite.java.internal.cache.ClasspathJavaTypeCache
-import org.openrewrite.java.internal.cache.JavaTypeCache
+import org.openrewrite.java.cache.ClasspathJavaTypeCache
+import org.openrewrite.java.cache.JavaTypeCache
+import org.openrewrite.java.cache.JvmTypeCache
 import org.openrewrite.java.tree.J
 import java.io.File
 import java.nio.file.Path
+import java.util.function.Predicate
 
 interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
     val typeCache: JavaTypeCache
-        get() = ClasspathJavaTypeCache()
+        get() = JvmTypeCache.fromJavaVersion(ClasspathJavaTypeCache())
 
     override val parser: JavaParser
         get() = JavaParser.fromJavaVersion().build()
@@ -37,7 +39,7 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
     override val executionContext: ExecutionContext
         get() {
             val ctx = JavaExecutionContextView(super.executionContext)
-            ctx.typeCache = typeCache
+            ctx.typeCache = JvmTypeCache.fromJavaVersion(typeCache)
             return ctx
         }
 

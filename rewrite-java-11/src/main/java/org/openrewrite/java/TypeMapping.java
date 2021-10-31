@@ -20,7 +20,7 @@ import com.sun.tools.javac.code.*;
 import com.sun.tools.javac.tree.JCTree;
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.internal.cache.JavaTypeCache;
+import org.openrewrite.java.cache.JavaTypeCache;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;

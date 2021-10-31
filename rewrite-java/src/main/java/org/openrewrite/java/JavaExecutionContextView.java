@@ -17,13 +17,12 @@ package org.openrewrite.java;
 
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.java.internal.cache.ClasspathJavaTypeCache;
-import org.openrewrite.java.internal.cache.JavaTypeCache;
-
-import java.util.Collection;
+import org.openrewrite.java.cache.ClasspathJavaTypeCache;
+import org.openrewrite.java.cache.JavaTypeCache;
+import org.openrewrite.java.cache.JvmTypeCache;
 
 public class JavaExecutionContextView extends DelegatingExecutionContext {
-    private static final ClasspathJavaTypeCache GLOBAL_TYPE_CACHE = new ClasspathJavaTypeCache();
+    private static final JavaTypeCache GLOBAL_TYPE_CACHE = JvmTypeCache.fromJavaVersion(new ClasspathJavaTypeCache());
 
     private static final String TYPE_CACHE = "org.openrewrite.java.typeCache";
 

@@ -31,7 +31,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.groovy.marker.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.internal.cache.JavaTypeCache;
+import org.openrewrite.java.cache.JavaTypeCache;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.*;

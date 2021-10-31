@@ -13,27 +13,53 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.internal.cache;
+package org.openrewrite.java.cache;
 
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
+import lombok.With;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.JavaType;
 
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
+import static java.util.Collections.emptyMap;
+
+@RequiredArgsConstructor
 public class ClasspathJavaTypeCache implements JavaTypeCache {
-    private final Map<Path, Map<String, JavaType.Class>> classCache = new HashMap<>();
-    private final Map<Path, Map<ShallowMethodSignature, JavaType.Method>> methodCache = new HashMap<>();
-    private final Map<Path, Map<ShallowParameterizedSignature, JavaType.Parameterized>> parameterizedCache = new HashMap<>();
-    private final Map<Path, Map<ShallowVariable, JavaType.Variable>> variableCache = new HashMap<>();
-    private final Map<Path, Map<ShallowGeneric, JavaType.GenericTypeVariable>> genericCache = new HashMap<>();
+    @With
+    @Nullable
+    private final JavaTypeCache next;
+
+    @Nullable
+    private final Predicate<Path> pathPredicate;
+
+    private final Map<Path, Map<String, JavaType.Class>> classCache;
+    private final Map<Path, Map<ShallowMethodSignature, JavaType.Method>> methodCache;
+    private final Map<Path, Map<ShallowParameterizedSignature, JavaType.Parameterized>> parameterizedCache;
+    private final Map<Path, Map<ShallowVariable, JavaType.Variable>> variableCache;
+    private final Map<Path, Map<ShallowGeneric, JavaType.GenericTypeVariable>> genericCache;
+
+    public ClasspathJavaTypeCache(JavaTypeCache next, Predicate<Path> pathPredicate) {
+        this(next, pathPredicate, new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>());
+    }
+
+    public ClasspathJavaTypeCache() {
+        this(null, null);
+    }
 
     @Override
     public JavaType.Class computeClass(Path classpathElement, String fullyQualifiedName, Supplier<JavaType.Class> fq) {
+        if (pathPredicate != null && next != null && !pathPredicate.test(classpathElement)) {
+            return next.computeClass(classpathElement, fullyQualifiedName, fq);
+        }
+
         if (!classCache.containsKey(classpathElement)) {
             classCache.put(classpathElement, new HashMap<>());
         }
@@ -49,6 +75,11 @@ public class ClasspathJavaTypeCache implements JavaTypeCache {
     @Override
     public JavaType.Method computeMethod(Path classpathElement, String fullyQualifiedName, String method, String resolvedReturnType,
                                          List<String> resolvedArgumentTypeSignatures, Supplier<JavaType.Method> m) {
+        if (pathPredicate != null && next != null && !pathPredicate.test(classpathElement)) {
+            return next.computeMethod(classpathElement, fullyQualifiedName, method, resolvedReturnType,
+                    resolvedArgumentTypeSignatures, m);
+        }
+
         if (!methodCache.containsKey(classpathElement)) {
             methodCache.put(classpathElement, new HashMap<>());
         }
@@ -64,7 +95,12 @@ public class ClasspathJavaTypeCache implements JavaTypeCache {
     }
 
     @Override
-    public JavaType.GenericTypeVariable computeGeneric(Path classpathElement, String name, @Nullable String fullyQualifiedName, Supplier<JavaType.GenericTypeVariable> g) {
+    public JavaType.GenericTypeVariable computeGeneric(Path classpathElement, String name, @Nullable String fullyQualifiedName,
+                                                       Supplier<JavaType.GenericTypeVariable> g) {
+        if (pathPredicate != null && next != null && !pathPredicate.test(classpathElement)) {
+            return next.computeGeneric(classpathElement, name, fullyQualifiedName, g);
+        }
+
         if (!genericCache.containsKey(classpathElement)) {
             genericCache.put(classpathElement, new HashMap<>());
         }
@@ -80,6 +116,10 @@ public class ClasspathJavaTypeCache implements JavaTypeCache {
 
     @Override
     public JavaType.Parameterized computeParameterized(Path classpathElement, String fullyQualifiedName, List<String> typeVariableSignatures, Supplier<JavaType.Parameterized> p) {
+        if (pathPredicate != null && next != null && !pathPredicate.test(classpathElement)) {
+            return next.computeParameterized(classpathElement, fullyQualifiedName, typeVariableSignatures, p);
+        }
+
         if (!parameterizedCache.containsKey(classpathElement)) {
             parameterizedCache.put(classpathElement, new HashMap<>());
         }
@@ -95,6 +135,10 @@ public class ClasspathJavaTypeCache implements JavaTypeCache {
 
     @Override
     public JavaType.Variable computeVariable(Path classpathElement, String fullyQualifiedName, String variable, Supplier<JavaType.Variable> v) {
+        if (pathPredicate != null && next != null && !pathPredicate.test(classpathElement)) {
+            return next.computeVariable(classpathElement, fullyQualifiedName, variable, v);
+        }
+
         if (!variableCache.containsKey(classpathElement)) {
             variableCache.put(classpathElement, new HashMap<>());
         }

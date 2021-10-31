@@ -19,7 +19,6 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
 import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.format.*
-import org.openrewrite.java.internal.cache.JavaTypeCacheTest
 import org.openrewrite.java.search.*
 import org.openrewrite.java.style.AutodetectTest
 import org.openrewrite.java.tree.TypeTreeTest
@@ -467,10 +466,6 @@ class Java8SpacesTest : Java8Test, SpacesTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java8TabsAndIndentsTest : Java8Test, TabsAndIndentsTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
-class Java8JavaTypeCacheTest : Java8Test, JavaTypeCacheTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
