@@ -192,7 +192,7 @@ public class ReloadableTypeMapping {
                     if (classType.typarams_field == null || classType.typarams_field.length() == 0) {
                         return clazz;
                     } else {
-                        List<String> shallowGenericTypeVariables = new ArrayList<>(classType.typarams_field.length());
+                        StringJoiner shallowGenericTypeVariables = new StringJoiner(",");
                         for (Type typeParameter : classType.typarams_field) {
                             String typeParameterSignature = signature(typeParameter);
                             if (typeParameterSignature != null) {
@@ -202,7 +202,7 @@ public class ReloadableTypeMapping {
 
                         newlyCreated.set(false);
                         JavaType.Parameterized parameterized = typeCache.computeParameterized(getClasspathElement(sym), sym.className(),
-                                shallowGenericTypeVariables, () -> {
+                                shallowGenericTypeVariables.toString(), () -> {
                                     newlyCreated.set(true);
                                     return new JavaType.Parameterized(clazz, emptyList());
                                 });
@@ -333,11 +333,10 @@ public class ReloadableTypeMapping {
         Symbol.MethodSymbol methodSymbol = symbol instanceof Symbol.MethodSymbol ? (Symbol.MethodSymbol) symbol : null;
 
         if (methodSymbol != null && selectType != null) {
-            List<String> argumentTypeSignatures = emptyList();
+            StringJoiner argumentTypeSignatures = new StringJoiner(",");
             if (selectType instanceof Type.MethodType) {
                 Type.MethodType mt = (Type.MethodType) selectType;
                 if (!mt.argtypes.isEmpty()) {
-                    argumentTypeSignatures = new ArrayList<>(mt.argtypes.size());
                     for (com.sun.tools.javac.code.Type argtype : mt.argtypes) {
                         if (argtype != null) {
                             argumentTypeSignatures.add(signature(argtype));
@@ -347,7 +346,7 @@ public class ReloadableTypeMapping {
             }
 
             return typeCache.computeMethod(classfile(symbol.owner.type), signature(symbol.owner.type), methodName, signature(selectType.getReturnType()),
-                    argumentTypeSignatures, () -> {
+                    argumentTypeSignatures.toString(), () -> {
                         List<String> paramNames = emptyList();
                         if (!methodSymbol.params().isEmpty()) {
                             paramNames = new ArrayList<>(methodSymbol.params().size());
@@ -484,6 +483,10 @@ public class ReloadableTypeMapping {
             return classfile(((Type.ArrayType) type).elemtype);
         } else if (type instanceof Type.MethodType) {
             return classfile(type.getReceiverType());
+        } else if (type instanceof Type.TypeVar) {
+            return classfile(type.getUpperBound());
+        } else if (type == Type.noType || type == Type.stuckType) {
+            return Paths.get("__does_not_exist__");
         }
         throw new IllegalStateException("Attempted to get a classfile path from a type of " + type.getClass().getName());
     }

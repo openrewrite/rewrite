@@ -28,9 +28,9 @@ public interface JavaTypeCache {
 
     JavaType.GenericTypeVariable computeGeneric(Path classpathElement, String name, String fullyQualifiedName, Supplier<JavaType.GenericTypeVariable> g);
 
-    JavaType.Method computeMethod(Path classpathElement, String fullyQualifiedName, String method, String resolvedReturnType, List<String> resolvedArgumentTypeSignatures, Supplier<JavaType.Method> m);
+    JavaType.Method computeMethod(Path classpathElement, String fullyQualifiedName, String method, String resolvedReturnType, String resolvedArgumentTypeSignatures, Supplier<JavaType.Method> m);
 
-    JavaType.Parameterized computeParameterized(Path classpathElement, String fullyQualifiedName, List<String> typeVariableSignatures, Supplier<JavaType.Parameterized> m);
+    JavaType.Parameterized computeParameterized(Path classpathElement, String fullyQualifiedName, String typeVariableSignatures, Supplier<JavaType.Parameterized> m);
 
     JavaType.Variable computeVariable(Path classpathElement, String fullyQualifiedName, String variable, Supplier<JavaType.Variable> v);
 }

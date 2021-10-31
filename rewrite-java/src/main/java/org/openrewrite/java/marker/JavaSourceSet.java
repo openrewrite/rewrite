@@ -41,6 +41,9 @@ import static java.util.Collections.emptyList;
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @With
 public class JavaSourceSet implements Marker {
+    private static Collection<JavaType.FullyQualified> JAVA8_CLASSPATH;
+    private static Collection<JavaType.FullyQualified> JAVA11_CLASSPATH;
+
     @EqualsAndHashCode.Include
     UUID id;
 
@@ -69,7 +72,20 @@ public class JavaSourceSet implements Marker {
             }
         }
 
-        for (ClassInfo classInfo : new ClassGraph()
+        fqns.addAll(jvmClasses(ctx));
+        return new JavaSourceSet(Tree.randomId(), sourceSetName, fqns);
+    }
+
+    private static Collection<JavaType.FullyQualified> jvmClasses(ExecutionContext ctx) {
+        boolean java8 = System.getProperty("java.version").startsWith("1.8");
+
+        if (java8 && JAVA8_CLASSPATH != null) {
+            return JAVA8_CLASSPATH;
+        } else if (!java8 && JAVA11_CLASSPATH != null) {
+            return JAVA11_CLASSPATH;
+        }
+
+        ClassInfoList classInfos = new ClassGraph()
                 .enableMemoryMapping()
                 .enableAnnotationInfo()
                 .enableClassInfo()
@@ -78,7 +94,11 @@ public class JavaSourceSet implements Marker {
                 .enableSystemJarsAndModules()
                 .acceptPackages("java")
                 .scan()
-                .getAllClasses()) {
+                .getAllClasses();
+
+        Builder builder = new Builder(ctx);
+        Collection<JavaType.FullyQualified> fqns = new ArrayList<>(classInfos.size());
+        for (ClassInfo classInfo : classInfos) {
             try {
                 fqns.add(builder.type(classInfo, new HashMap<>()));
             } catch (Exception e) {
@@ -86,7 +106,13 @@ public class JavaSourceSet implements Marker {
             }
         }
 
-        return new JavaSourceSet(Tree.randomId(), sourceSetName, fqns);
+        if (java8) {
+            JAVA8_CLASSPATH = fqns;
+        } else {
+            JAVA11_CLASSPATH = fqns;
+        }
+
+        return fqns;
     }
 
     private static class Builder {

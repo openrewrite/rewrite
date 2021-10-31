@@ -50,9 +50,8 @@ class TypeMapping {
             return null;
         }
 
-        List<String> argumentTypeSignatures = emptyList();
+        StringJoiner argumentTypeSignatures = new StringJoiner(",");
         if (node.getParameters().length > 0) {
-            argumentTypeSignatures = new ArrayList<>(node.getParameters().length);
             for (org.codehaus.groovy.ast.Parameter parameter : node.getParameters()) {
                 argumentTypeSignatures.add(parameter.getOriginType().getName());
             }
@@ -63,7 +62,7 @@ class TypeMapping {
                 node.getDeclaringClass().getName(),
                 node.getName(),
                 node.getReturnType().getName(),
-                argumentTypeSignatures,
+                argumentTypeSignatures.toString(),
                 () -> {
                     JavaType.Method.Signature signature = new JavaType.Method.Signature(
                             type(node.getReturnType(), emptyMap()),
@@ -125,7 +124,7 @@ class TypeMapping {
     }
 
     private JavaType parameterizedType(Class<?> clazz, GenericsType[] generics, Map<String, JavaType.Class> stack) {
-        List<String> genericSignatures = new ArrayList<>();
+        StringJoiner genericSignatures = new StringJoiner(",");
         for (GenericsType generic : generics) {
             genericSignatures.add(generic.getType().getName());
         }
@@ -135,7 +134,7 @@ class TypeMapping {
         JavaType.Parameterized parameterized = typeCache.computeParameterized(
                 Paths.get("dontknow"),
                 clazz.getName(),
-                genericSignatures,
+                genericSignatures.toString(),
                 () -> new JavaType.Parameterized(type(clazz, stack), emptyList())
         );
 
@@ -241,9 +240,8 @@ class TypeMapping {
     }
 
     private JavaType.Method method(java.lang.reflect.Method method, Map<String, JavaType.Class> stack) {
-        List<String> argumentTypeSignatures = emptyList();
+        StringJoiner argumentTypeSignatures = new StringJoiner(",");
         if (method.getParameters().length > 0) {
-            argumentTypeSignatures = new ArrayList<>(method.getParameters().length);
             for (Parameter parameter : method.getParameters()) {
                 argumentTypeSignatures.add(method.getDeclaringClass().getName());
             }
@@ -254,7 +252,7 @@ class TypeMapping {
                 method.getDeclaringClass().getName(),
                 method.getName(),
                 method.getReturnType().getName(),
-                argumentTypeSignatures,
+                argumentTypeSignatures.toString(),
                 () -> new JavaType.Method(
                         method.getModifiers(),
                         type(method.getDeclaringClass(), stack),

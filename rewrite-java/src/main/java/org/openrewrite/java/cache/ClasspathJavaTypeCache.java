@@ -22,14 +22,10 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.JavaType;
 
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
-
-import static java.util.Collections.emptyMap;
 
 @RequiredArgsConstructor
 public class ClasspathJavaTypeCache implements JavaTypeCache {
@@ -74,7 +70,7 @@ public class ClasspathJavaTypeCache implements JavaTypeCache {
 
     @Override
     public JavaType.Method computeMethod(Path classpathElement, String fullyQualifiedName, String method, String resolvedReturnType,
-                                         List<String> resolvedArgumentTypeSignatures, Supplier<JavaType.Method> m) {
+                                         String resolvedArgumentTypeSignatures, Supplier<JavaType.Method> m) {
         if (pathPredicate != null && next != null && !pathPredicate.test(classpathElement)) {
             return next.computeMethod(classpathElement, fullyQualifiedName, method, resolvedReturnType,
                     resolvedArgumentTypeSignatures, m);
@@ -115,7 +111,7 @@ public class ClasspathJavaTypeCache implements JavaTypeCache {
     }
 
     @Override
-    public JavaType.Parameterized computeParameterized(Path classpathElement, String fullyQualifiedName, List<String> typeVariableSignatures, Supplier<JavaType.Parameterized> p) {
+    public JavaType.Parameterized computeParameterized(Path classpathElement, String fullyQualifiedName, String typeVariableSignatures, Supplier<JavaType.Parameterized> p) {
         if (pathPredicate != null && next != null && !pathPredicate.test(classpathElement)) {
             return next.computeParameterized(classpathElement, fullyQualifiedName, typeVariableSignatures, p);
         }
@@ -171,13 +167,13 @@ public class ClasspathJavaTypeCache implements JavaTypeCache {
         String fullyQualifiedName;
         String method;
         String returnType;
-        List<String> argumentTypes;
+        String argumentTypes;
     }
 
     @Value
     private static class ShallowParameterizedSignature {
         String fullyQualifiedName;
-        List<String> typeVariableSignatures;
+        String typeVariableSignatures;
     }
 
     @Value
