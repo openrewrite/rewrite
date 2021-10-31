@@ -22,6 +22,7 @@ import com.sun.tools.javac.tree.JCTree;
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.cache.JavaTypeCache;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -75,160 +76,159 @@ public class ReloadableTypeMapping {
                 return existingClass;
             }
 
-            switch (sym.className()) {
-                case "java.lang.Class":
-                    return JavaType.Class.CLASS;
-                case "java.lang.Enum":
-                    return JavaType.Class.ENUM;
-                default:
-                    AtomicBoolean newlyCreated = new AtomicBoolean(false);
+            if (sym.className().equals("java.lang.Class")) {
+                return JavaType.Class.CLASS;
+            } else if (sym.className().equals("java.lang.Enum")) {
+                return JavaType.Class.ENUM;
+            } else {
+                AtomicBoolean newlyCreated = new AtomicBoolean(false);
 
-                    JavaType.Class clazz = typeCache.computeClass(
-                            getClasspathElement(sym),
-                            sym.className(), () -> {
+                JavaType.Class clazz = typeCache.computeClass(
+                        getClasspathElement(sym),
+                        sym.className(), () -> {
+                            newlyCreated.set(true);
+
+                            try {
+                                String packageName = sym.packge().fullname.toString();
+                                if (!packageName.startsWith("com.sun.") &&
+                                        !packageName.startsWith("sun.") &&
+                                        !packageName.startsWith("jdk.")) {
+                                    sym.complete();
+                                }
+                            } catch (Symbol.CompletionFailure ignore) {
+                            }
+
+                            JavaType.Class.Kind kind;
+                            if ((sym.flags_field & KIND_BITMASK_ENUM) != 0) {
+                                kind = JavaType.Class.Kind.Enum;
+                            } else if ((sym.flags_field & KIND_BITMASK_ANNOTATION) != 0) {
+                                kind = JavaType.Class.Kind.Annotation;
+                            } else if ((sym.flags_field & KIND_BITMASK_INTERFACE) != 0) {
+                                kind = JavaType.Class.Kind.Interface;
+                            } else {
+                                kind = JavaType.Class.Kind.Class;
+                            }
+
+                            JavaType.FullyQualified owner = null;
+                            if (sym.owner instanceof Symbol.ClassSymbol) {
+                                owner = TypeUtils.asFullyQualified(type(sym.owner.type, stack));
+                            }
+
+                            return new JavaType.Class(
+                                    sym.flags_field,
+                                    sym.className(),
+                                    kind,
+                                    null, null, null, null,
+                                    TypeUtils.asFullyQualified(type(classType.supertype_field == null ? symType.supertype_field :
+                                            classType.supertype_field, stack)),
+                                    owner
+                            );
+                        });
+
+                // adding methods and fields after the class is created and cached is how we avoid
+                // infinite recursing due to the fact that e.g. the method declaration is the same
+                // class as the type on the class containing the method
+                if (newlyCreated.get()) {
+                    Map<String, JavaType.Class> stackWithSym = new HashMap<>(stack);
+                    stackWithSym.put(sym.className(), clazz);
+
+                    List<JavaType.Variable> fields = null;
+                    List<JavaType.Method> methods = null;
+
+                    if (sym.members_field != null) {
+                        for (Symbol elem : sym.members_field.getElements()) {
+                            if (elem instanceof Symbol.VarSymbol &&
+                                    (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
+                                            Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
+                                if (sym.className().equals("java.lang.String") && sym.name.toString().equals("serialPersistentFields")) {
+                                    // there is a "serialPersistentFields" member within the String class which is used in normal Java
+                                    // serialization to customize how the String field is serialized. This field is tripping up Jackson
+                                    // serialization and is intentionally filtered to prevent errors.
+                                    continue;
+                                }
+
+                                if (fields == null) {
+                                    fields = new ArrayList<>();
+                                }
+                                fields.add(variableType(elem, stackWithSym));
+                            } else if (elem instanceof Symbol.MethodSymbol &&
+                                    (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
+                                            Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
+                                if (methods == null) {
+                                    methods = new ArrayList<>();
+                                }
+                                methods.add(methodType(elem.type, elem, elem.getSimpleName().toString(), stackWithSym));
+                            }
+                        }
+                    }
+
+                    List<JavaType.FullyQualified> interfaces;
+                    if (symType.interfaces_field == null) {
+                        interfaces = null;
+                    } else {
+                        interfaces = new ArrayList<>(symType.interfaces_field.length());
+                        for (com.sun.tools.javac.code.Type iParam : symType.interfaces_field) {
+                            JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(iParam, stack));
+                            if (javaType != null) {
+                                interfaces.add(javaType);
+                            }
+                        }
+                    }
+
+                    List<JavaType.FullyQualified> annotations = null;
+                    if (!sym.getDeclarationAttributes().isEmpty()) {
+                        annotations = new ArrayList<>(sym.getDeclarationAttributes().size());
+                        for (Attribute.Compound a : sym.getDeclarationAttributes()) {
+                            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(a.type, stack));
+                            if (fq != null) {
+                                annotations.add(fq);
+                            }
+                        }
+                    }
+
+                    clazz.unsafeSet(annotations, interfaces, fields, methods);
+                }
+
+                if (classType.typarams_field == null || classType.typarams_field.length() == 0) {
+                    return clazz;
+                } else {
+                    StringJoiner shallowGenericTypeVariables = new StringJoiner(",");
+                    for (Type typeParameter : classType.typarams_field) {
+                        String typeParameterSignature = signature(typeParameter);
+                        if (typeParameterSignature != null) {
+                            shallowGenericTypeVariables.add(typeParameterSignature);
+                        }
+                    }
+
+                    newlyCreated.set(false);
+                    JavaType.Parameterized parameterized = typeCache.computeParameterized(getClasspathElement(sym), sym.className(),
+                            shallowGenericTypeVariables.toString(), () -> {
                                 newlyCreated.set(true);
-
-                                try {
-                                    String packageName = sym.packge().fullname.toString();
-                                    if (!packageName.startsWith("com.sun.") &&
-                                            !packageName.startsWith("sun.") &&
-                                            !packageName.startsWith("jdk.")) {
-                                        sym.complete();
-                                    }
-                                } catch (Symbol.CompletionFailure ignore) {
-                                }
-
-                                JavaType.Class.Kind kind;
-                                if ((sym.flags_field & KIND_BITMASK_ENUM) != 0) {
-                                    kind = JavaType.Class.Kind.Enum;
-                                } else if ((sym.flags_field & KIND_BITMASK_ANNOTATION) != 0) {
-                                    kind = JavaType.Class.Kind.Annotation;
-                                } else if ((sym.flags_field & KIND_BITMASK_INTERFACE) != 0) {
-                                    kind = JavaType.Class.Kind.Interface;
-                                } else {
-                                    kind = JavaType.Class.Kind.Class;
-                                }
-
-                                JavaType.FullyQualified owner = null;
-                                if (sym.owner instanceof Symbol.ClassSymbol) {
-                                    owner = TypeUtils.asFullyQualified(type(sym.owner.type, stack));
-                                }
-
-                                return new JavaType.Class(
-                                        sym.flags_field,
-                                        sym.className(),
-                                        kind,
-                                        null, null, null, null,
-                                        TypeUtils.asFullyQualified(type(classType.supertype_field == null ? symType.supertype_field :
-                                                classType.supertype_field, stack)),
-                                        owner
-                                );
+                                return new JavaType.Parameterized(clazz, emptyList());
                             });
 
-                    // adding methods and fields after the class is created and cached is how we avoid
-                    // infinite recursing due to the fact that e.g. the method declaration is the same
-                    // class as the type on the class containing the method
                     if (newlyCreated.get()) {
-                        Map<String, JavaType.Class> stackWithSym = new HashMap<>(stack);
-                        stackWithSym.put(sym.className(), clazz);
-
-                        List<JavaType.Variable> fields = null;
-                        List<JavaType.Method> methods = null;
-
-                        if (sym.members_field != null) {
-                            for (Symbol elem : sym.members_field.getElements()) {
-                                if (elem instanceof Symbol.VarSymbol &&
-                                        (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
-                                                Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
-                                    if (sym.className().equals("java.lang.String") && sym.name.toString().equals("serialPersistentFields")) {
-                                        // there is a "serialPersistentFields" member within the String class which is used in normal Java
-                                        // serialization to customize how the String field is serialized. This field is tripping up Jackson
-                                        // serialization and is intentionally filtered to prevent errors.
-                                        continue;
-                                    }
-
-                                    if (fields == null) {
-                                        fields = new ArrayList<>();
-                                    }
-                                    fields.add(variableType(elem, stackWithSym));
-                                } else if (elem instanceof Symbol.MethodSymbol &&
-                                        (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
-                                                Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
-                                    if (methods == null) {
-                                        methods = new ArrayList<>();
-                                    }
-                                    methods.add(methodType(elem.type, elem, elem.getSimpleName().toString(), stackWithSym));
-                                }
+                        List<JavaType> typeParameters = new ArrayList<>(classType.typarams_field.length());
+                        for (Type tParam : classType.typarams_field) {
+                            JavaType javaType = type(tParam, stack);
+                            if (javaType != null) {
+                                typeParameters.add(javaType);
                             }
                         }
 
-                        List<JavaType.FullyQualified> interfaces;
-                        if (symType.interfaces_field == null) {
-                            interfaces = null;
-                        } else {
-                            interfaces = new ArrayList<>(symType.interfaces_field.length());
-                            for (Type iParam : symType.interfaces_field) {
-                                JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(iParam, stack));
-                                if (javaType != null) {
-                                    interfaces.add(javaType);
-                                }
-                            }
-                        }
-
-                        List<JavaType.FullyQualified> annotations = null;
-                        if (!sym.getDeclarationAttributes().isEmpty()) {
-                            annotations = new ArrayList<>(sym.getDeclarationAttributes().size());
-                            for (Attribute.Compound a : sym.getDeclarationAttributes()) {
-                                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(a.type, stack));
-                                if (fq != null) {
-                                    annotations.add(fq);
-                                }
-                            }
-                        }
-
-                        clazz.unsafeSet(annotations, interfaces, fields, methods);
+                        parameterized.unsafeSet(typeParameters);
                     }
 
-                    if (classType.typarams_field == null || classType.typarams_field.length() == 0) {
-                        return clazz;
-                    } else {
-                        StringJoiner shallowGenericTypeVariables = new StringJoiner(",");
-                        for (Type typeParameter : classType.typarams_field) {
-                            String typeParameterSignature = signature(typeParameter);
-                            if (typeParameterSignature != null) {
-                                shallowGenericTypeVariables.add(typeParameterSignature);
-                            }
-                        }
-
-                        newlyCreated.set(false);
-                        JavaType.Parameterized parameterized = typeCache.computeParameterized(getClasspathElement(sym), sym.className(),
-                                shallowGenericTypeVariables.toString(), () -> {
-                                    newlyCreated.set(true);
-                                    return new JavaType.Parameterized(clazz, emptyList());
-                                });
-
-                        if (newlyCreated.get()) {
-                            List<JavaType> typeParameters = new ArrayList<>(classType.typarams_field.length());
-                            for (Type tParam : classType.typarams_field) {
-                                JavaType javaType = type(tParam, stack);
-                                if (javaType != null) {
-                                    typeParameters.add(javaType);
-                                }
-                            }
-
-                            parameterized.unsafeSet(typeParameters);
-                        }
-
-                        return parameterized;
-                    }
+                    return parameterized;
+                }
             }
         } else if (type instanceof Type.TypeVar) {
             return typeCache.computeGeneric(
                     classfile(type.getUpperBound()),
                     type.tsym.name.toString(),
-                    signature(type.getLowerBound()),
+                    signature(type.getUpperBound()),
                     () -> new JavaType.GenericTypeVariable(type.tsym.name.toString(),
-                            TypeUtils.asFullyQualified(type(type.getLowerBound(), stack)))
+                            TypeUtils.asFullyQualified(type(type.getUpperBound(), stack)))
             );
         } else if (type instanceof Type.JCPrimitiveType) {
             return primitiveType(type.getTag());
@@ -254,6 +254,7 @@ public class ReloadableTypeMapping {
         } else {
             return null;
         }
+
     }
 
     @Nullable
@@ -372,7 +373,8 @@ public class ReloadableTypeMapping {
                                         // been mapped to cyclic)
                                         if (exceptionType instanceof Type.ClassType) {
                                             Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
-                                            javaType = JavaType.Class.build(sym.className());
+                                            javaType = new JavaType.Class(Flag.Public.getBitMask(), sym.className(), JavaType.Class.Kind.Class,
+                                                    null, null, null, null, null, null);
                                         }
                                     }
                                     if (javaType != null) {
