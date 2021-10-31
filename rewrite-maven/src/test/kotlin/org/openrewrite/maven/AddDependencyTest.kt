@@ -22,7 +22,7 @@ import org.junit.jupiter.params.provider.ValueSource
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.marker.JavaProject
-import org.openrewrite.java.marker.JavaSourceSet
+import org.openrewrite.java.tree.J
 
 class AddDependencyTest {
     private val mavenParser = MavenParser.builder().build()
@@ -427,14 +427,10 @@ class AddDependencyTest {
         )
     }
 
-    private fun JavaParser.parseWithProvenance(sourceSet: String, vararg javaSources: String) =
-        parse(*javaSources).map { j ->
-            j.withMarkers(
-                j.markers
-                    .addIfAbsent(JavaSourceSet(randomId(), sourceSet, emptySet()))
-                    .addIfAbsent(javaProject)
-            )
-        }
+    private fun JavaParser.parseWithProvenance(sourceSet: String, vararg javaSources: String): List<J.CompilationUnit> {
+        setSourceSet(sourceSet)
+        return parse(*javaSources).map { j -> j.withMarkers(j.markers.addIfAbsent(javaProject)) }
+    }
 
     private fun MavenParser.parseWithProvenance(vararg pomSources: String) = parse(*pomSources).map { j ->
         j.withMarkers(j.markers.addIfAbsent(javaProject))
