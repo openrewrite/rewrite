@@ -67,22 +67,22 @@ public class JavaSourceSet implements Marker {
                     ctx.getOnError().accept(e);
                 }
             }
+        }
 
-            for (ClassInfo classInfo : new ClassGraph()
-                    .enableMemoryMapping()
-                    .enableAnnotationInfo()
-                    .enableClassInfo()
-                    .enableMethodInfo()
-                    .enableFieldInfo()
-                    .enableSystemJarsAndModules()
-                    .acceptPackages("java")
-                    .scan()
-                    .getAllClasses()) {
-                try {
-                    fqns.add(builder.type(classInfo, new HashMap<>()));
-                } catch (Exception e) {
-                    ctx.getOnError().accept(e);
-                }
+        for (ClassInfo classInfo : new ClassGraph()
+                .enableMemoryMapping()
+                .enableAnnotationInfo()
+                .enableClassInfo()
+                .enableMethodInfo()
+                .enableFieldInfo()
+                .enableSystemJarsAndModules()
+                .acceptPackages("java")
+                .scan()
+                .getAllClasses()) {
+            try {
+                fqns.add(builder.type(classInfo, new HashMap<>()));
+            } catch (Exception e) {
+                ctx.getOnError().accept(e);
             }
         }
 
@@ -97,7 +97,7 @@ public class JavaSourceSet implements Marker {
         }
 
         public JavaType.Class type(@Nullable ClassInfo aClass, Map<String, JavaType.Class> stack) {
-            if(aClass == null) {
+            if (aClass == null) {
                 //noinspection ConstantConditions
                 return null;
             }
