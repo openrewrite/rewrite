@@ -30,7 +30,7 @@ public class ExactVersion implements VersionComparator {
 
     @Override
     public int compare(@Nullable String currentVersion, String v1, String v2) {
-        return 0;
+        return v1.compareTo(v2);
     }
 
     public static Validated build(String pattern) {

@@ -148,4 +148,32 @@ class ChangeParentPomTest : MavenRecipeTest {
             </project>
         """
     )
+
+    @Test
+    fun doNotDowngradeToLowerVersionWhenArtifactsAreTheSame() = assertUnchanged(
+        recipe = ChangeParentPom(
+            "org.springframework.boot",
+            null,
+            "spring-boot-starter-parent",
+            null,
+            "1.5.12.RELEASE",
+            null
+        ),
+        before = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <parent>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-parent</artifactId>
+                <version>1.5.22.RELEASE</version>
+                <relativePath/> <!-- lookup parent from repository -->
+              </parent>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+            </project>
+        """
+    )
 }

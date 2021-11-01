@@ -160,7 +160,10 @@ public class ChangeParentPom extends Recipe {
 
                 return availableVersions.stream()
                         .filter(v -> versionComparator.isValid(currentVersion, v))
-                        .max((v1, v2) -> versionComparator.compare(currentVersion, v1, v2));
+                        .max((v1, v2) -> versionComparator.compare(currentVersion, v1, v2))
+                        // Once a target version is resolved, only apply the change if the new artifact is different from
+                        // the old artifact OR the new version is greater than the current version.
+                        .filter(resolved -> newGroupId != null || newArtifactId != null || versionComparator.compare(currentVersion, currentVersion, resolved) < 0);
             }
         };
     }
