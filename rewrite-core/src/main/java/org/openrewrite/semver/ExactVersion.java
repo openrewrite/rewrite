@@ -19,18 +19,17 @@ import lombok.Value;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 
-@Value
-public class ExactVersion implements VersionComparator {
+public class ExactVersion extends LatestRelease {
     String version;
+
+    public ExactVersion(String pattern) {
+        super(pattern);
+        this.version = pattern;
+    }
 
     @Override
     public boolean isValid(@Nullable String currentVersion, String version) {
         return this.version.equals(version);
-    }
-
-    @Override
-    public int compare(@Nullable String currentVersion, String v1, String v2) {
-        return 0;
     }
 
     public static Validated build(String pattern) {
