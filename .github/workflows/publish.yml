@@ -24,12 +24,19 @@ jobs:
         with:
           distribution: "temurin"
           java-version: "11"
-          cache: "gradle"
 
       - name: publish-candidate
         if: contains(github.ref, '-rc.')
         timeout-minutes: 30
-        run: ./gradlew ${GRADLE_SWITCHES} -Prelease.disableGitChecks=true -Prelease.useLastTag=true candidate publish closeAndReleaseSonatypeStagingRepository
+        uses: gradle/gradle-build-action@v2
+        with:
+          arguments: |
+            ${{env.GRADLE_SWITCHES}} 
+            -Prelease.disableGitChecks=true 
+            -Prelease.useLastTag=true 
+            candidate 
+            publish 
+            closeAndReleaseSonatypeStagingRepository
         env:
           ORG_GRADLE_PROJECT_sonatypeUsername: ${{ secrets.OSSRH_USERNAME }}
           ORG_GRADLE_PROJECT_sonatypePassword: ${{ secrets.OSSRH_TOKEN }}
@@ -40,7 +47,15 @@ jobs:
       - name: publish-release
         if: (!contains(github.ref, '-rc.'))
         timeout-minutes: 30
-        run: ./gradlew ${GRADLE_SWITCHES} -Prelease.disableGitChecks=true -Prelease.useLastTag=true final publish closeAndReleaseSonatypeStagingRepository
+        uses: gradle/gradle-build-action@v2
+        with:
+          arguments: |
+            ${{env.GRADLE_SWITCHES}} 
+            -Prelease.disableGitChecks=true 
+            -Prelease.useLastTag=true 
+            final 
+            publish 
+            closeAndReleaseSonatypeStagingRepository
         env:
           ORG_GRADLE_PROJECT_sonatypeUsername: ${{ secrets.OSSRH_USERNAME }}
           ORG_GRADLE_PROJECT_sonatypePassword: ${{ secrets.OSSRH_TOKEN }}
