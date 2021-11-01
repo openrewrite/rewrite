@@ -31,7 +31,7 @@ public class UpgradeParentVersion extends Recipe {
         this.artifactId = artifactId;
         this.newVersion = newVersion;
         this.versionPattern = versionPattern;
-        changeParentPom = new ChangeParentPom(groupId, groupId, artifactId, artifactId, newVersion, versionPattern);
+        changeParentPom = new ChangeParentPom(groupId, groupId, artifactId, artifactId, newVersion, versionPattern, false);
     }
 
     @Option(displayName = "Group",

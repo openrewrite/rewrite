@@ -24,7 +24,6 @@ import org.openrewrite.maven.internal.MavenMetadata;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
-import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.ChangeTagValueVisitor;
@@ -86,6 +85,24 @@ public class ChangeParentPom extends Recipe {
             required = false)
     @Nullable
     String versionPattern;
+
+    @Option(displayName = "Allow version downgrades",
+            description = "If the new parent has the same group/artifact, this flag can be used to only upgrade the " +
+                    "version if the target version is newer than the current.",
+            example = "false",
+            required = false)
+    @Nullable
+    boolean allowVersionDowngrades;
+
+    public ChangeParentPom(String oldGroupId, @Nullable String newGroupId, String oldArtifactId, @Nullable String newArtifactId, String newVersion, @Nullable String versionPattern, @Nullable Boolean allowVersionDowngrades) {
+        this.oldGroupId = oldGroupId;
+        this.newGroupId = newGroupId;
+        this.oldArtifactId = oldArtifactId;
+        this.newArtifactId = newArtifactId;
+        this.newVersion = newVersion;
+        this.versionPattern = versionPattern;
+        this.allowVersionDowngrades = allowVersionDowngrades != null && allowVersionDowngrades;
+    }
 
     @Override
     protected MavenVisitor getSingleSourceApplicableTest() {
@@ -163,7 +180,7 @@ public class ChangeParentPom extends Recipe {
                         .max((v1, v2) -> versionComparator.compare(currentVersion, v1, v2))
                         // Once a target version is resolved, only apply the change if the new artifact is different from
                         // the old artifact OR the new version is greater than the current version.
-                        .filter(resolved -> newGroupId != null || newArtifactId != null || versionComparator.compare(currentVersion, currentVersion, resolved) < 0);
+                        .filter(resolved -> allowVersionDowngrades || newGroupId != null || newArtifactId != null || versionComparator.compare(currentVersion, currentVersion, resolved) < 0);
             }
         };
     }
