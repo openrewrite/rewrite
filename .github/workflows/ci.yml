@@ -28,7 +28,6 @@ jobs:
         gu-binary: ["gu"]
         os: ["ubuntu-latest"]
     runs-on: ${{ matrix.os }}
-    if: github.repository_owner == 'openrewrite'
     steps:
       - uses: actions/checkout@v2
         with:
