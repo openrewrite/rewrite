@@ -347,7 +347,7 @@ class ReloadableJava8Parser implements JavaParser {
         private final byte[] classBytes;
 
         private PackageAwareJavaFileObject(byte[] classBytes) {
-            super(URI.create("dontCare"), Kind.CLASS);
+            super(URI.create("file:///.byteArray"), Kind.CLASS);
 
             AtomicReference<String> pkgRef = new AtomicReference<>();
             AtomicReference<String> nameRef = new AtomicReference<>();

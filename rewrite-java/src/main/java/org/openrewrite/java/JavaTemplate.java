@@ -389,11 +389,11 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                     if(loc.equals(METHOD_INVOCATION_ARGUMENTS)) {
                         m = substitutions.unsubstitute(templateParser.parseMethodArguments(getCursor(), substitutedTemplate, loc));
                         m = autoFormat(m, 0, getCursor().getParentOrThrow());
-                        m = method.withArguments(m.getArguments());
+                        m = method.withArguments(m.getArguments()).withMethodType(m.getMethodType());
                     } else {
                         m = substitutions.unsubstitute(templateParser.parseMethod(getCursor(), substitutedTemplate, loc));
                         m = autoFormat(m, 0, getCursor().getParentOrThrow());
-                        m = method.withName(m.getName()).withArguments(m.getArguments());
+                        m = method.withName(m.getName()).withArguments(m.getArguments()).withMethodType(m.getMethodType());
                     }
 
                     // This will only happen if the template encountered non-fatal errors during parsing
