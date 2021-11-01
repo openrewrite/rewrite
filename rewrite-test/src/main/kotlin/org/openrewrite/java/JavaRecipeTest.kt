@@ -31,7 +31,7 @@ import java.util.function.Predicate
 
 interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
     val typeCache: JavaTypeCache
-        get() = JvmTypeCache.fromJavaVersion(ClasspathJavaTypeCache())
+        get() = ClasspathJavaTypeCache()
 
     override val parser: JavaParser
         get() = JavaParser.fromJavaVersion().build()

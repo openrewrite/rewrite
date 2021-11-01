@@ -3210,10 +3210,7 @@ public interface J extends Serializable, Tree {
             if (type == this.methodType) {
                 return this;
             }
-            if (type instanceof JavaType.Method) {
-                return new MethodInvocation(id, prefix, markers, select, typeParameters, name, arguments, (JavaType.Method) type);
-            }
-            return this;
+            return new MethodInvocation(id, prefix, markers, select, typeParameters, name, arguments, (JavaType.Method) type);
         }
 
         @SuppressWarnings("unchecked")
