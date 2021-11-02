@@ -20,6 +20,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Maven;
+import org.openrewrite.maven.tree.MavenModel;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlVisitor;
@@ -66,8 +67,12 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
 
     @Override
     public final Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
+        // Maven visitors should not attempt to apply themselves to non-Maven Xml.Documents
+        if(!document.getMarkers().findFirst(MavenModel.class).isPresent()) {
+            return document;
+        }
         Xml.Document refactored = (Xml.Document) super.visitDocument(document, ctx);
-        if (refactored != document) {
+        if (refactored != document && refactored.getMarkers().findFirst(MavenModel.class).isPresent()) {
             return new Maven(refactored);
         }
         return refactored;
