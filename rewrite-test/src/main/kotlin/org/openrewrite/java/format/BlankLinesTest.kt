@@ -16,6 +16,7 @@
 package org.openrewrite.java.format
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
@@ -62,6 +63,36 @@ interface BlankLinesTest : JavaRecipeTest {
             public enum TheEnum {
                 FIRST,
                 SECOND
+            }
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1171")
+    @Disabled
+    fun enumWithinClassShouldRespectMinimumAfterClassHeader(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        recipe = AutoFormat(),
+        parser = jp.styles(blankLines()).build(),
+        before = """
+            class ExampleClass {
+                enum ExampleEnum {
+                    FIRST,
+                    SECOND
+                }
+            }
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1171")
+    @Disabled
+    fun classWithinClassShouldRespectMinimumAfterClassHeader(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        recipe = AutoFormat(),
+        parser = jp.styles(blankLines()).build(),
+        before = """
+            class ExampleClass {
+                class InnerExampleClass {
+                }
             }
         """
     )
