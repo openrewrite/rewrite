@@ -510,6 +510,124 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     }
 
     @Test
+    fun upgradeAddsPropertySectionToOverrideManagedDependencyPropertyVersion() = assertChanged(
+        recipe = UpgradeDependencyVersion(
+            "junit",
+            "junit",
+            "4.x",
+            null,
+            false
+        ),
+        before = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <parent>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-parent</artifactId>
+                <version>2.12</version>
+              </parent>
+            
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+            
+              <dependencies>
+                <dependency>
+                  <groupId>junit</groupId>
+                  <artifactId>junit</artifactId>
+                </dependency>
+              </dependencies>
+            </project>
+        """.trimIndent(),
+        after = """            
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <parent>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-parent</artifactId>
+                <version>2.12</version>
+              </parent>
+            
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <properties>
+                <version.junit>4.13.2</version.junit>
+              </properties>
+            
+              <dependencies>
+                <dependency>
+                  <groupId>junit</groupId>
+                  <artifactId>junit</artifactId>
+                </dependency>
+              </dependencies>
+            </project>
+        """.trimIndent()
+    )
+
+    @Test
+    fun upgradeAddsPropertyToOverrideManagedDependencyPropertyVersion() = assertChanged(
+        recipe = UpgradeDependencyVersion(
+            "junit",
+            "junit",
+            "4.x",
+            null,
+            false
+        ),
+        before = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <parent>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-parent</artifactId>
+                <version>2.12</version>
+              </parent>
+            
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <properties>
+              </properties>
+            
+              <dependencies>
+                <dependency>
+                  <groupId>junit</groupId>
+                  <artifactId>junit</artifactId>
+                </dependency>
+              </dependencies>
+            </project>
+        """.trimIndent(),
+        after = """            
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <parent>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-parent</artifactId>
+                <version>2.12</version>
+              </parent>
+            
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <properties>
+                <version.junit>4.13.2</version.junit>
+              </properties>
+
+              <dependencies>
+                <dependency>
+                  <groupId>junit</groupId>
+                  <artifactId>junit</artifactId>
+                </dependency>
+              </dependencies>
+            </project>
+        """.trimIndent()
+    )
+
+    @Test
     fun upgradeDependencyHandlesDependencyManagement() = assertChanged(
         recipe = UpgradeDependencyVersion(
             "io.micronaut",
