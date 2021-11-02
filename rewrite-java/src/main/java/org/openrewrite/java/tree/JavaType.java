@@ -355,7 +355,6 @@ public interface JavaType extends Serializable {
 
     @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
     @Value
-    @EqualsAndHashCode(callSuper = false)
     class GenericTypeVariable extends FullyQualified {
         String name;
 
@@ -429,6 +428,20 @@ public interface JavaType extends Serializable {
         @Override
         public List<Variable> getVisibleSupertypeMembers() {
             return bound == null ? emptyList() : bound.getVisibleSupertypeMembers();
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            GenericTypeVariable that = (GenericTypeVariable) o;
+            return name.equals(that.name) && Objects.equals(bound == null ? null : bound.getFullyQualifiedName(),
+                    that.bound == null ? null : that.bound.getFullyQualifiedName());
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(name, bound == null ? null : bound.getFullyQualifiedName());
         }
     }
 

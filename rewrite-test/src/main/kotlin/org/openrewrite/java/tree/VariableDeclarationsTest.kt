@@ -26,6 +26,21 @@ import org.openrewrite.java.JavaTreeTest.NestingLevel.Class
 interface VariableDeclarationsTest : JavaTreeTest {
 
     @Test
+    fun generic(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, JavaTreeTest.NestingLevel.CompilationUnit, """
+            import java.util.Collections;
+            import java.util.ArrayList;
+            
+            class Test {
+                void test() {
+                    ArrayList<String> categories = new ArrayList<>();
+                    Collections.sort(categories);
+                }
+            }
+        """
+    )
+
+    @Test
     fun fieldDefinition(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Class, """
             public String a = "";
