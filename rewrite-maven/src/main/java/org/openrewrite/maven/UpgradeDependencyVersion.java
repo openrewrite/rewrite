@@ -131,7 +131,7 @@ public class UpgradeDependencyVersion extends Recipe {
                             if (model.getParent() != null) {
                                 DependencyManagementDependency.Defined managedDefinition = findManagedVersion(model.getParent(), dependency);
                                 if (managedDefinition != null) {
-                                    //If managed definition's effective version is no equal to the new version and the
+                                    //If managed definition's effective version is not equal to the new version and the
                                     //managed dependency's defined version is expressed as a property, Add/change the property
                                     //value.
                                     Optional<String> newer = findNewerDependencyVersion(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), ctx);
@@ -181,6 +181,7 @@ public class UpgradeDependencyVersion extends Recipe {
             return versionComparator.upgrade(currentVersion, availableVersions);
         }
     }
+
     /**
      * Given a Pom and a specific dependency, find the nearest ancestor that manages the dependency and return the managed
      * dependency definition.
