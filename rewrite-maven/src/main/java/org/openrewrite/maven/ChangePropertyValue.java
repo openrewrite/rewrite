@@ -82,14 +82,15 @@ public class ChangePropertyValue extends Recipe {
                 Xml.Tag root = m.getRoot();
                 Optional<Xml.Tag> properties = root.getChild("properties");
                 if (!properties.isPresent()) {
-                    doAfterVisit(new AddToTagVisitor<>(root, Xml.Tag.build("<properties>\n<" + key + ">" + newValue + "</" + key + ">\n</properties>"),
-                            new MavenTagInsertionComparator(root.getChildren())));
-                    doAfterVisit(new AutoFormatVisitor<>(root));
+                    Xml.Tag propertiesTag = Xml.Tag.build("<properties>\n<" + key + ">" + newValue + "</" + key + ">\n</properties>");
+                    doAfterVisit(new AddToTagVisitor<>(root, propertiesTag, new MavenTagInsertionComparator(root.getChildren())));
+                    doAfterVisit(new AutoFormatVisitor<>(propertiesTag));
 
                 } else if (!properties.get().getChildValue(key).isPresent()) {
-                    doAfterVisit(new AddToTagVisitor<>(properties.get(), Xml.Tag.build("<" + key + ">" + newValue + "</" + key + ">"),
+                    Xml.Tag propertyTag = Xml.Tag.build("<" + key + ">" + newValue + "</" + key + ">");
+                    doAfterVisit(new AddToTagVisitor<>(properties.get(), propertyTag,
                             new MavenTagInsertionComparator(properties.get().getChildren())));
-                    doAfterVisit(new AutoFormatVisitor<>(properties.get()));
+                    doAfterVisit(new AutoFormatVisitor<>(propertyTag));
                 }
 
             }
