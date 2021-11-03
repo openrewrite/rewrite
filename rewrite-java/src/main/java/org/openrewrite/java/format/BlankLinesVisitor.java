@@ -80,7 +80,7 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration j = super.visitClassDeclaration(classDecl, p);
-        if (j.getBody() != null) {
+        if (j.getBody() != null && j.getKind() != J.ClassDeclaration.Kind.Type.Enum) {
             List<JRightPadded<Statement>> statements = j.getBody().getPadding().getStatements();
             j = j.withBody(j.getBody().getPadding().withStatements(ListUtils.map(statements, (i, s) -> {
                 if (i == 0) {
@@ -96,21 +96,24 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
                     style.getMinimum().getBeforeClassEnd())));
         }
 
-        JavaSourceFile cu = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
-        boolean hasImports = !cu.getImports().isEmpty();
-        boolean firstClass = j.equals(cu.getClasses().get(0));
+        Object nextEnclosing = getCursor().dropParentUntil(c -> c instanceof J.ClassDeclaration || c instanceof JavaSourceFile).getValue();
+        if (nextEnclosing instanceof JavaSourceFile) {
+            JavaSourceFile cu = (JavaSourceFile) nextEnclosing;
+            boolean hasImports = !cu.getImports().isEmpty();
+            boolean firstClassInFile = j.isScope(cu.getClasses().get(0));
 
-        j = firstClass ?
-                (hasImports ? minimumLines(j, style.getMinimum().getAfterImports()) : j) :
-                minimumLines(j, style.getMinimum().getAroundClass());
+            j = firstClassInFile ?
+                    (hasImports ? minimumLines(j, style.getMinimum().getAfterImports()) : j) :
+                    minimumLines(j, style.getMinimum().getAroundClass());
 
-        if (!hasImports && firstClass) {
-            if (cu.getPackageDeclaration() == null) {
-                if (!j.getPrefix().getWhitespace().isEmpty()) {
-                    j = j.withPrefix(j.getPrefix().withWhitespace(""));
+            if (!hasImports && firstClassInFile) {
+                if (cu.getPackageDeclaration() == null) {
+                    if (!j.getPrefix().getWhitespace().isEmpty()) {
+                        j = j.withPrefix(j.getPrefix().withWhitespace(""));
+                    }
+                } else {
+                    j = minimumLines(j, style.getMinimum().getAfterPackage());
                 }
-            } else {
-                j = minimumLines(j, style.getMinimum().getAfterPackage());
             }
         }
 

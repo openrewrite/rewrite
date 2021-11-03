@@ -16,7 +16,6 @@
 package org.openrewrite.java.format
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
@@ -68,36 +67,6 @@ interface BlankLinesTest : JavaRecipeTest {
     )
 
     @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/1171")
-    @Disabled
-    fun enumWithinClassShouldRespectMinimumAfterClassHeader(jp: JavaParser.Builder<*, *>) = assertUnchanged(
-        recipe = AutoFormat(),
-        parser = jp.styles(blankLines()).build(),
-        before = """
-            class ExampleClass {
-                enum ExampleEnum {
-                    FIRST,
-                    SECOND
-                }
-            }
-        """
-    )
-
-    @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/1171")
-    @Disabled
-    fun classWithinClassShouldRespectMinimumAfterClassHeader(jp: JavaParser.Builder<*, *>) = assertUnchanged(
-        recipe = AutoFormat(),
-        parser = jp.styles(blankLines()).build(),
-        before = """
-            class ExampleClass {
-                class InnerExampleClass {
-                }
-            }
-        """
-    )
-
-    @Test
     fun eachMethodOnItsOwnLine(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(blankLines()).build(),
         before = """
@@ -141,6 +110,12 @@ interface BlankLinesTest : JavaRecipeTest {
             
                 public class InnerClass {
                 }
+
+                public enum InnerEnum {
+
+                    FIRST,
+                    SECOND
+                }
             }
         """,
         after = """
@@ -160,6 +135,11 @@ interface BlankLinesTest : JavaRecipeTest {
                 }
             
                 public class InnerClass {
+                }
+
+                public enum InnerEnum {
+                    FIRST,
+                    SECOND
                 }
             }
         """
@@ -202,6 +182,12 @@ interface BlankLinesTest : JavaRecipeTest {
 
 
                 }
+
+                enum Test {
+                    FIRST,
+                    SECOND
+
+                }
             }
         """,
         after = """
@@ -210,6 +196,11 @@ interface BlankLinesTest : JavaRecipeTest {
             
                 {
                     field1 = 2;
+                }
+
+                enum Test {
+                    FIRST,
+                    SECOND
                 }
             }
         """
@@ -471,6 +462,10 @@ interface BlankLinesTest : JavaRecipeTest {
             }
 
             class Test2 {
+                class InnerClass0 {
+                }
+                class InnerClass1 {
+                }
             }
         """,
         after = """
@@ -481,8 +476,57 @@ interface BlankLinesTest : JavaRecipeTest {
 
 
             class Test2 {
+                class InnerClass0 {
+                }
+
+
+                class InnerClass1 {
+                }
             }
         """.trimIndent()
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1171")
+    fun minimumAroundClassNestedEnum(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(blankLines { withMinimum(minimum.withAroundClass(2)) }).build(),
+        before = """
+            enum OuterEnum {
+                FIRST,
+                SECOND
+            }
+
+            class OuterClass {
+                enum InnerEnum0 {
+                    FIRST,
+                    SECOND
+                }
+                enum InnerEnum1 {
+                    FIRST,
+                    SECOND
+                }
+            }
+        """,
+        after = """
+            enum OuterEnum {
+                FIRST,
+                SECOND
+            }
+
+
+            class OuterClass {
+                enum InnerEnum0 {
+                    FIRST,
+                    SECOND
+                }
+
+
+                enum InnerEnum1 {
+                    FIRST,
+                    SECOND
+                }
+            }
+        """
     )
 
     @Test
@@ -499,6 +543,60 @@ interface BlankLinesTest : JavaRecipeTest {
             public class Test {
 
                 private int field1;
+            }
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1171")
+    fun minimumAfterClassHeaderNestedClasses(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(blankLines { withMinimum(minimum.withAfterClassHeader(1)) }).build(),
+        before = """
+            class OuterClass {
+                class InnerClass0 {
+                    private int unused = 0;
+                }
+
+                class InnerClass1 {
+                    private int unused = 0;
+                }
+            }
+        """,
+        after = """
+            class OuterClass {
+
+                class InnerClass0 {
+
+                    private int unused = 0;
+                }
+
+                class InnerClass1 {
+
+                    private int unused = 0;
+                }
+            }
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1171")
+    fun minimumAfterClassHeaderNestedEnum(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(blankLines { withMinimum(minimum.withAfterClassHeader(1)) }).build(),
+        before = """
+            class OuterClass {
+                enum InnerEnum0 {
+                    FIRST,
+                    SECOND
+                }
+            }
+        """,
+        after = """
+            class OuterClass {
+
+                enum InnerEnum0 {
+                    FIRST,
+                    SECOND
+                }
             }
         """
     )

@@ -1461,7 +1461,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         """,
         after = """
             class Test {
-            
                 @SuppressWarnings("other")
                 class Inner1 {
                 }
