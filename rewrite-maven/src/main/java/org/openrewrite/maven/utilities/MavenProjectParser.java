@@ -154,6 +154,9 @@ public class MavenProjectParser {
     }
 
     private void parseResources(List<Path> resources, Path projectDirectory, List<SourceFile> sourceFiles, List<Marker> projectProvenance, JavaSourceSet sourceSet) {
+        List<Marker> provenance = new ArrayList<>(projectProvenance);
+        provenance.add(sourceSet);
+
         sourceFiles.addAll(ListUtils.map(new XmlParser().parse(
                 resources.stream()
                         .filter(p -> p.getFileName().toString().endsWith(".xml") ||
@@ -165,7 +168,7 @@ public class MavenProjectParser {
                         .collect(Collectors.toList()),
                 projectDirectory,
                 ctx
-        ), addProvenance(projectProvenance)));
+        ), addProvenance(provenance)));
 
         sourceFiles.addAll(ListUtils.map(new YamlParser().parse(
                 resources.stream()
@@ -173,7 +176,7 @@ public class MavenProjectParser {
                         .collect(Collectors.toList()),
                 projectDirectory,
                 ctx
-        ), addProvenance(projectProvenance)));
+        ), addProvenance(provenance)));
 
         sourceFiles.addAll(ListUtils.map(new PropertiesParser().parse(
                 resources.stream()
@@ -181,7 +184,7 @@ public class MavenProjectParser {
                         .collect(Collectors.toList()),
                 projectDirectory,
                 ctx
-        ), addProvenance(projectProvenance)));
+        ), addProvenance(provenance)));
     }
 
     private <S extends SourceFile> S addProjectProvenance(S s, List<Marker> projectProvenance) {
