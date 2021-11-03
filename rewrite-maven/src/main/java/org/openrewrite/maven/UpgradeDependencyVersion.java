@@ -129,8 +129,18 @@ public class UpgradeDependencyVersion extends Recipe {
                         if (StringUtils.matchesGlob(dependency.getGroupId(), groupId) &&
                                 StringUtils.matchesGlob(dependency.getArtifactId(), artifactId)) {
                             if (model.getParent() != null) {
-                                String managedVersion = model.getParent().getManagedVersion(dependency.getGroupId(), dependency.getArtifactId());
-                                if (managedVersion != null) {
+                                DependencyManagementDependency.Defined managedDefinition = findManagedVersion(model.getParent(), dependency);
+                                if (managedDefinition != null) {
+                                    //If managed definition's effective version is no equal to the new version and the
+                                    //managed dependency's defined version is expressed as a property, Add/change the property
+                                    //value.
+                                    Optional<String> newer = findNewerDependencyVersion(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), ctx);
+                                    if (newer.isPresent() && !newer.get().equals(managedDefinition.getVersion())) {
+                                        String managedVersion = managedDefinition.getRequestedVersion();
+                                        if (managedVersion.startsWith("${")) {
+                                            doAfterVisit(new ChangePropertyValue(managedVersion, newer.get(), true));
+                                        }
+                                    }
                                     return dependency;
                                 }
                             }
@@ -171,6 +181,41 @@ public class UpgradeDependencyVersion extends Recipe {
             return versionComparator.upgrade(currentVersion, availableVersions);
         }
     }
+    /**
+     * Given a Pom and a specific dependency, find the nearest ancestor that manages the dependency and return the managed
+     * dependency definition.
+     *
+     * It searches first in this pom's dependencyManagement, then recurses on the parent. As soon
+     * as we find a reference to the dependency, we return that version.
+     *
+     * @param pom The current pom to search and then traverse upward
+     * @param dependency The dependency for which we are searching for a managed version
+     * @return Returns the managed dependency version. Returns null if it is never found in any dependencyManagement block.
+     */
+    @Nullable
+    private DependencyManagementDependency.Defined findManagedVersion(Pom pom, Pom.Dependency dependency) {
+        if (pom.getDependencyManagement() != null) {
+            Collection<DependencyManagementDependency> managedDependencies = pom.getDependencyManagement().getDependencies();
+            for (DependencyManagementDependency managedDependency : managedDependencies) {
+                if (!(managedDependency instanceof DependencyManagementDependency.Defined)) {
+                    continue;
+                }
+                DependencyManagementDependency.Defined definedDependency = (DependencyManagementDependency.Defined) managedDependency;
+                if (dependency.getGroupId().equals(definedDependency.getGroupId())
+                        && dependency.getArtifactId().equals(definedDependency.getArtifactId())) {
+                    if (definedDependency.getVersion() != null) {
+                        return definedDependency;
+                    }
+                }
+            }
+        }
+
+        if (pom.getParent() == null) {
+            return null;
+        }
+
+        return findManagedVersion(pom.getParent(), dependency);
+    }
 
     private class ChangeDependencyVersionVisitor extends MavenVisitor {
         private final String newVersion;
@@ -191,7 +236,7 @@ public class UpgradeDependencyVersion extends Recipe {
                     String version = versionTag.get().getValue().orElse(null);
                     if (version != null) {
                         if (version.trim().startsWith("${") && !newVersion.equals(model.getValue(version.trim()))) {
-                            doAfterVisit(new ChangePropertyValue(version, newVersion));
+                            doAfterVisit(new ChangePropertyValue(version, newVersion, false));
                         } else if (!newVersion.equals(version)) {
                             doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), newVersion));
                         }

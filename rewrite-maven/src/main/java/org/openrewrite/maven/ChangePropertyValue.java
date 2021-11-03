@@ -17,12 +17,15 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.tree.Maven;
+import org.openrewrite.xml.AddToTagVisitor;
+import org.openrewrite.xml.AutoFormatVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
+
+import java.util.Optional;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -37,6 +40,12 @@ public class ChangePropertyValue extends Recipe {
             description = "Value to apply to the matching property.",
             example = "4.13")
     String newValue;
+
+    @Option(displayName = "Add If Missing",
+            description = "Add the property if it is missing from the pom file.",
+            required = false,
+            example = "false")
+    Boolean addIfMissing;
 
     @Override
     public String getDisplayName() {
@@ -53,7 +62,7 @@ public class ChangePropertyValue extends Recipe {
         return new ChangePropertyValueVisitor();
     }
 
-    public ChangePropertyValue(String key, String newValue) {
+    public ChangePropertyValue(String key, String newValue, @Nullable Boolean addIfMissing) {
         //Customizing lombok constructor to replace the property markers.
         //noinspection ConstantConditions
         if (key != null) {
@@ -61,9 +70,32 @@ public class ChangePropertyValue extends Recipe {
         }
         this.key = key;
         this.newValue = newValue;
+        this.addIfMissing = addIfMissing != null && addIfMissing;
     }
 
     private class ChangePropertyValueVisitor extends MavenVisitor {
+
+        public Maven visitMaven(Maven maven, ExecutionContext ctx) {
+            Maven m = super.visitMaven(maven, ctx);
+
+            if (addIfMissing) {
+                Xml.Tag root = m.getRoot();
+                Optional<Xml.Tag> properties = root.getChild("properties");
+                if (!properties.isPresent()) {
+                    Xml.Tag propertiesTag = Xml.Tag.build("<properties>\n<" + key + ">" + newValue + "</" + key + ">\n</properties>");
+                    doAfterVisit(new AddToTagVisitor<>(root, propertiesTag, new MavenTagInsertionComparator(root.getChildren())));
+                    doAfterVisit(new AutoFormatVisitor<>(propertiesTag));
+
+                } else if (!properties.get().getChildValue(key).isPresent()) {
+                    Xml.Tag propertyTag = Xml.Tag.build("<" + key + ">" + newValue + "</" + key + ">");
+                    doAfterVisit(new AddToTagVisitor<>(properties.get(), propertyTag,
+                            new MavenTagInsertionComparator(properties.get().getChildren())));
+                    doAfterVisit(new AutoFormatVisitor<>(propertyTag));
+                }
+
+            }
+            return m;
+        }
 
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {

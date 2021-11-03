@@ -70,37 +70,69 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     )
 
     @Test
-    fun trustParent() = assertUnchanged(
-        recipe = UpgradeDependencyVersion(
-            "junit",
-            "junit",
-            "4.x",
-            null,
-            true
-        ),
-        before = """
-            <project>
-              <modelVersion>4.0.0</modelVersion>
-              
-              <parent>
-                <groupId>com.fasterxml.jackson</groupId>
-                <artifactId>jackson-parent</artifactId>
-                <version>2.12</version>
-              </parent>
-              
-              <groupId>com.mycompany.app</groupId>
-              <artifactId>my-app</artifactId>
-              <version>1</version>
-              
-              <dependencies>
-                <dependency>
-                  <groupId>junit</groupId>
-                  <artifactId>junit</artifactId>
-                </dependency>
-              </dependencies>
-            </project>
-        """
-    )
+    fun trustParent(@TempDir tempDir: Path) {
+        val parent = tempDir.resolve("pom.xml")
+        val child = tempDir.resolve("server/pom.xml")
+        child.toFile().parentFile.mkdirs()
+
+        parent.toFile().writeText(
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <packaging>pom</packaging>
+                    <groupId>com.mycompany</groupId>
+                    <artifactId>my-parent</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.google.guava</groupId>
+                                <artifactId>guava</artifactId>
+                                <version>13.0.1</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+            """.trimIndent()
+        )
+
+        child.toFile().writeText(
+            """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  
+                  <parent>
+                    <groupId>com.mycompany</groupId>
+                    <artifactId>my-parent</artifactId>
+                    <version>1</version>
+                  </parent>
+                
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-child</artifactId>
+                  <version>1</version>
+                  
+                  <dependencies>
+                    <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """.trimIndent()
+        )
+
+        assertUnchanged(
+            recipe = UpgradeDependencyVersion(
+                "com.google.guava",
+                "guava",
+                "14.0",
+                "",
+                true
+            ),
+            dependsOn = arrayOf(parent.toFile()),
+            before = child.toFile()
+        )
+    }
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/739")
@@ -508,6 +540,124 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
             """
         )
     }
+
+    @Test
+    fun upgradeAddsPropertySectionToOverrideManagedDependencyPropertyVersion() = assertChanged(
+        recipe = UpgradeDependencyVersion(
+            "junit",
+            "junit",
+            "4.x",
+            null,
+            false
+        ),
+        before = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <parent>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-parent</artifactId>
+                <version>2.12</version>
+              </parent>
+            
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+            
+              <dependencies>
+                <dependency>
+                  <groupId>junit</groupId>
+                  <artifactId>junit</artifactId>
+                </dependency>
+              </dependencies>
+            </project>
+        """.trimIndent(),
+        after = """            
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <parent>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-parent</artifactId>
+                <version>2.12</version>
+              </parent>
+            
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <properties>
+                <version.junit>4.13.2</version.junit>
+              </properties>
+            
+              <dependencies>
+                <dependency>
+                  <groupId>junit</groupId>
+                  <artifactId>junit</artifactId>
+                </dependency>
+              </dependencies>
+            </project>
+        """.trimIndent()
+    )
+
+    @Test
+    fun upgradeAddsPropertyToOverrideManagedDependencyPropertyVersion() = assertChanged(
+        recipe = UpgradeDependencyVersion(
+            "junit",
+            "junit",
+            "4.x",
+            null,
+            false
+        ),
+        before = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <parent>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-parent</artifactId>
+                <version>2.12</version>
+              </parent>
+            
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <properties>
+              </properties>
+            
+              <dependencies>
+                <dependency>
+                  <groupId>junit</groupId>
+                  <artifactId>junit</artifactId>
+                </dependency>
+              </dependencies>
+            </project>
+        """.trimIndent(),
+        after = """            
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <parent>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-parent</artifactId>
+                <version>2.12</version>
+              </parent>
+            
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <properties>
+                <version.junit>4.13.2</version.junit>
+              </properties>
+
+              <dependencies>
+                <dependency>
+                  <groupId>junit</groupId>
+                  <artifactId>junit</artifactId>
+                </dependency>
+              </dependencies>
+            </project>
+        """.trimIndent()
+    )
 
     @Test
     fun upgradeDependencyHandlesDependencyManagement() = assertChanged(

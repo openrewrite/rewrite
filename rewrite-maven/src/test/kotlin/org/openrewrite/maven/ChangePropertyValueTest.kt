@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test
 class ChangePropertyValueTest : MavenRecipeTest {
     @Test
     fun property() = assertChanged(
-        recipe = ChangePropertyValue("guava.version", "29.0-jre"),
+        recipe = ChangePropertyValue("guava.version", "29.0-jre", false),
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>
@@ -53,26 +53,26 @@ class ChangePropertyValueTest : MavenRecipeTest {
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = ChangePropertyValue(null, null)
+        var recipe = ChangePropertyValue(null, null, false)
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("key")
         assertThat(valid.failures()[1].property).isEqualTo("newValue")
 
-        recipe = ChangePropertyValue(null, "8")
+        recipe = ChangePropertyValue(null, "8", false)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("key")
 
-        recipe = ChangePropertyValue("java.version", null)
+        recipe = ChangePropertyValue("java.version", null, false)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("newValue")
 
-        recipe = ChangePropertyValue("java.version", "8")
+        recipe = ChangePropertyValue("java.version", "8", false)
         valid = recipe.validate()
         assertThat(valid.isValid).isTrue()
     }

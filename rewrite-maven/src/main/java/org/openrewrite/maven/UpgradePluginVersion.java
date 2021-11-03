@@ -180,7 +180,7 @@ public class UpgradePluginVersion extends Recipe {
                     String version = versionTag.get().getValue().orElse(null);
                     if (version != null) {
                         if (version.trim().startsWith("${") && !newVersion.equals(model.getValue(version.trim()))) {
-                            doAfterVisit(new ChangePropertyValue(version, newVersion));
+                            doAfterVisit(new ChangePropertyValue(version, newVersion, false));
                         } else if (!newVersion.equals(version)) {
                             doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), newVersion));
                         }
