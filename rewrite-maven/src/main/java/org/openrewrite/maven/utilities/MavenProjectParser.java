@@ -22,6 +22,7 @@ import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.marker.JavaVersion;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.marker.Marker;
@@ -71,6 +72,29 @@ public class MavenProjectParser {
         this.ctx = ctx;
     }
 
+    /**
+     * Given a root path to a maven project, this parser will parse the maven project (includining submodules)
+     * and return a list of ALL source files for all maven modules under the root path.
+     * <PRE>
+     * Notes About Provenance Information:
+     *
+     * There are always three markers applied to each source file and there can potentially be up to five provenance
+     * markers in total:
+     *
+     * BuildTool     - What build tool was used to compile the source file (This will always be Maven)
+     * JavaVersion   - What Java version/vendor was used when compiling the source file.
+     * JavaProject   - For each maven module/sub-module, the same JavaProject will be associated with ALL source files
+     *                 belonging to that module.
+     *
+     * Optional:
+     *
+     * GitProvenance - If the entire project exists in the context of a git repository, all source files (for all modules) will have the same GitProvenance.
+     * JavaSourceSet - All Java source files and all resource files that exist in src/main or src/test will have a JavaSourceSet marker assigned to them.
+     *
+     * </PRE>
+     * @param projectDirectory A path to the root folder containing a meven project.
+     * @return A list of source files that have been parsed from the root folder
+     */
     public List<SourceFile> parse(Path projectDirectory) {
         GitProvenance gitProvenance = GitProvenance.fromProjectDirectory(projectDirectory);
         List<Maven> mavens = mavenParser.parse(Maven.getMavenPoms(projectDirectory, ctx), projectDirectory, ctx);
@@ -91,18 +115,37 @@ public class MavenProjectParser {
             List<Path> dependencies = downloadArtifacts(maven.getModel().getDependencies(Scope.Compile));
             javaParser.setSourceSet("main");
             javaParser.setClasspath(dependencies);
-            JavaSourceSet mainSourceSet = javaParser.getSourceSet(ctx);
-            sourceFiles.addAll(ListUtils.map(javaParser.parse(maven.getJavaSources(projectDirectory, ctx), projectDirectory, ctx),
-                    addProvenance(projectProvenance)));
+            List<J.CompilationUnit> mainJavaSourceFiles = ListUtils.map(javaParser.parse(
+                    maven.getJavaSources(projectDirectory, ctx), projectDirectory, ctx), addProvenance(projectProvenance));
+            sourceFiles.addAll(mainJavaSourceFiles);
+            // Any resources parsed from "main/resources" should also have the main source set added to them. Because the
+            // source set contains the classpath of the parser (including any source files that may have been compiled), it
+            // is preferable to use the SourceSet marker from the first java source file (if it exists), otherwise, get the
+            // source set from the parser.
+            JavaSourceSet mainSourceSet = mainJavaSourceFiles.isEmpty() ?
+                    javaParser.getSourceSet(ctx) :
+                    mainJavaSourceFiles.get(0)
+                            .getMarkers()
+                            .findFirst(JavaSourceSet.class)
+                            .orElse(javaParser.getSourceSet(ctx));
+            parseResources(maven.getResources(projectDirectory, ctx), projectDirectory, sourceFiles, projectProvenance, mainSourceSet);
 
             List<Path> testDependencies = downloadArtifacts(maven.getModel().getDependencies(Scope.Test));
             javaParser.setSourceSet("test");
             javaParser.setClasspath(testDependencies);
-            JavaSourceSet testSourceSet = javaParser.getSourceSet(ctx);
-            sourceFiles.addAll(ListUtils.map(javaParser.parse(maven.getTestJavaSources(projectDirectory, ctx), projectDirectory, ctx),
-                    addProvenance(projectProvenance)));
-
-            parseResources(maven.getResources(projectDirectory, ctx), projectDirectory, sourceFiles, projectProvenance, mainSourceSet);
+            List<J.CompilationUnit> testJavaSourceFiles = ListUtils.map(javaParser.parse(
+                    maven.getTestJavaSources(projectDirectory, ctx), projectDirectory, ctx), addProvenance(projectProvenance));
+            sourceFiles.addAll(testJavaSourceFiles);
+            // Any resources parsed from "test/resources" should also have the test source set added to them. Because the
+            // source set contains the classpath of the parser (including any source files that may have been compiled), it
+            // is preferable to use the SourceSet marker from the first java source file (if it exists), otherwise, get the
+            // source set from the parser.
+            JavaSourceSet testSourceSet = testJavaSourceFiles.isEmpty() ?
+                    javaParser.getSourceSet(ctx) :
+                    testJavaSourceFiles.get(0)
+                            .getMarkers()
+                            .findFirst(JavaSourceSet.class)
+                            .orElse(javaParser.getSourceSet(ctx));
             parseResources(maven.getTestResources(projectDirectory, ctx), projectDirectory, sourceFiles, projectProvenance, testSourceSet);
         }
 
