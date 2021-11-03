@@ -25,6 +25,8 @@ import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -485,8 +487,12 @@ public class TypeMapping {
         if (sym.classfile == null) {
             return Paths.get("__source_set__");
         } else if (sym.classfile.getClass().getSimpleName().equals("JarFileObject")) {
-            String pathWithClass = sym.classfile.toUri().toString();
-            return Paths.get(pathWithClass.substring("jar:file://".length(), pathWithClass.indexOf('!')));
+            try {
+                String pathWithClass = sym.classfile.toUri().toString();
+                return Paths.get(new URI(pathWithClass.substring("jar:".length(), pathWithClass.indexOf('!'))));
+            } catch (URISyntaxException e) {
+                throw new RuntimeException(e);
+            }
         }
         return Paths.get(sym.classfile.toUri());
     }
