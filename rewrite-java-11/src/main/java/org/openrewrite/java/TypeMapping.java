@@ -334,6 +334,11 @@ public class TypeMapping {
                         }
                     }
                 }
+            } else if (selectType instanceof Type.ForAll) {
+                Type.ForAll fa = (Type.ForAll) selectType;
+                if (!fa.argtypes(false).isEmpty()) {
+                    argumentTypeSignatures.add(fa.argtypes(false));
+                }
             }
 
             return typeCache.computeMethod(classfile(symbol.owner.type), signature(symbol.owner.type), methodName, signature(selectType.getReturnType()),

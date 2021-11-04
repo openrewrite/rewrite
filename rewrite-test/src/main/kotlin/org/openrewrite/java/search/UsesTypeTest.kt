@@ -17,10 +17,37 @@ package org.openrewrite.java.search
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
+import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 
 interface UsesTypeTest : JavaRecipeTest {
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1169")
+    @Test
+    fun emptyConstructor(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = toRecipe {
+            UsesType<ExecutionContext>("java.util.ArrayList")
+        },
+        before = """
+            import java.util.ArrayList;
+            import java.util.List;
+            
+            class Test {
+                List<String> l = new ArrayList<>();
+            }
+        """,
+        after = """
+            /*~~>*/import java.util.ArrayList;
+            import java.util.List;
+            
+            class Test {
+                List<String> l = new ArrayList<>();
+            }
+        """
+    )
+
     @Test
     fun usesTypeFindsImports(jp: JavaParser) = assertChanged(
         jp,
