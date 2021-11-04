@@ -247,8 +247,8 @@ public class Java11Parser implements JavaParser {
             }
         }
 
-        JavaSourceSet finalSourceSet = sourceSet.withClasspath(classpath);
-        return ListUtils.map(mappedCus, cu -> cu.withMarkers(cu.getMarkers().add(finalSourceSet)));
+        sourceSetProvenance = sourceSet.withClasspath(classpath);
+        return ListUtils.map(mappedCus, cu -> cu.withMarkers(cu.getMarkers().add(sourceSetProvenance)));
     }
 
     @Override

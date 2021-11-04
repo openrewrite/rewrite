@@ -35,6 +35,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.NamedStyles;
 
@@ -215,7 +216,18 @@ class ReloadableJava8Parser implements JavaParser {
                 .filter(Objects::nonNull)
                 .collect(toList());
 
-        return ListUtils.map(mappedCus, cu -> cu.withMarkers(cu.getMarkers().add(getSourceSet(ctx))));
+        JavaSourceSet sourceSet = getSourceSet(ctx);
+        Set<JavaType.FullyQualified> classpath = sourceSet.getClasspath();
+        for (J.CompilationUnit cu : mappedCus) {
+            for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
+                if(type instanceof JavaType.FullyQualified) {
+                    classpath.add((JavaType.FullyQualified) type);
+                }
+            }
+        }
+
+        sourceSetProvenance = sourceSet.withClasspath(classpath);
+        return ListUtils.map(mappedCus, cu -> cu.withMarkers(cu.getMarkers().add(sourceSetProvenance)));
     }
 
     @Override
