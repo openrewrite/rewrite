@@ -534,7 +534,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         Statement tempStat = (Statement) visitStatement(f, p);
         if (!(tempStat instanceof J.FieldAccess)) {
-            return temp;
+            return tempStat;
         } else {
             f = (J.FieldAccess) tempStat;
         }
