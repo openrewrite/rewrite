@@ -99,19 +99,6 @@ public class ChangeMethodTargetToStatic extends Recipe {
                     TypeUtils.isOfClassType(method.getSelect().getType(), fullyQualifiedTargetTypeName);
 
             if ((!isStatic || !isSameReceiverType) && methodMatcher.matches(method)) {
-                if (m.getSelect() == null) {
-                    maybeAddImport(fullyQualifiedTargetTypeName, m.getSimpleName());
-                } else {
-                    maybeAddImport(fullyQualifiedTargetTypeName);
-                    m = method.withSelect(J.Identifier.build(randomId(),
-                            method.getSelect() == null ?
-                                    Space.EMPTY :
-                                    method.getSelect().getPrefix(),
-                            Markers.EMPTY,
-                            classType.getClassName(),
-                            classType)
-                    );
-                }
                 JavaType.Method transformedType = null;
                 if (method.getMethodType() != null) {
                     maybeRemoveImport(method.getMethodType().getDeclaringType());
@@ -128,6 +115,19 @@ public class ChangeMethodTargetToStatic extends Recipe {
                         transformedType = transformedType.withGenericSignature(transformedType.getGenericSignature()
                                 .withReturnType(returnTypeType));
                     }
+                }
+                if (m.getSelect() == null) {
+                    maybeAddImport(fullyQualifiedTargetTypeName, m.getSimpleName());
+                } else {
+                    maybeAddImport(fullyQualifiedTargetTypeName);
+                    m = method.withSelect(J.Identifier.build(randomId(),
+                            method.getSelect() == null ?
+                                    Space.EMPTY :
+                                    method.getSelect().getPrefix(),
+                            Markers.EMPTY,
+                            classType.getClassName(),
+                            classType)
+                    );
                 }
                 m = m.withMethodType(transformedType);
             }
