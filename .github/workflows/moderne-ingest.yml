@@ -1,21 +1,18 @@
 ---
-name: Moderne ingest
+name: moderne-ingest
 
 on:
-  workflow_dispatch: {}
   push:
     branches: [main]
+  workflow_dispatch: {}
   schedule:
-    - cron: "0 18 * * *"
+    - cron: 0 16 * * *
 
 jobs:
   ingest:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-      - name: ingest
-        uses: docker://moderne/ingest:java11-latest
+      - uses: docker://moderne/ingest:java11-latest
         env:
           MODERNE_API_ACCESS_TOKEN: ${{ secrets.MODERNE_API_ACCESS_TOKEN }}
