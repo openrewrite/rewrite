@@ -766,6 +766,13 @@ interface BlankLinesTest : JavaRecipeTest {
                 }
                 private int field2;
             }
+            public enum Enum {
+                A, B;
+                {
+                
+                }
+                private int field;
+            }
         """,
         after = """
             public class Test {
@@ -776,6 +783,16 @@ interface BlankLinesTest : JavaRecipeTest {
                 }
 
                 private int field2;
+            }
+            
+            public enum Enum {
+                A, B;
+            
+                {
+                
+                }
+            
+                private int field;
             }
         """
     )

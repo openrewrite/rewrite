@@ -80,11 +80,14 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration j = super.visitClassDeclaration(classDecl, p);
-        if (j.getBody() != null && j.getKind() != J.ClassDeclaration.Kind.Type.Enum) {
+        if (j.getBody() != null) {
             List<JRightPadded<Statement>> statements = j.getBody().getPadding().getStatements();
+            J.ClassDeclaration.Kind.Type classKind = j.getKind();
             j = j.withBody(j.getBody().getPadding().withStatements(ListUtils.map(statements, (i, s) -> {
                 if (i == 0) {
-                    s = minimumLines(s, style.getMinimum().getAfterClassHeader());
+                    if (classKind != J.ClassDeclaration.Kind.Type.Enum) {
+                        s = minimumLines(s, style.getMinimum().getAfterClassHeader());
+                    }
                 } else if (statements.get(i - 1).getElement() instanceof J.Block) {
                     s = minimumLines(s, style.getMinimum().getAroundInitializer());
                 }
