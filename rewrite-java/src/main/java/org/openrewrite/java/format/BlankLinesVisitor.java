@@ -22,8 +22,10 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.BlankLinesStyle;
 import org.openrewrite.java.tree.*;
 
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
 public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     @Nullable
@@ -90,6 +92,9 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
                     }
                 } else if (statements.get(i - 1).getElement() instanceof J.Block) {
                     s = minimumLines(s, style.getMinimum().getAroundInitializer());
+                } else if (s.getElement() instanceof J.ClassDeclaration) {
+                    // Apply `style.getMinimum().getAroundClass()` to inner classes.
+                    s = minimumLines(s, style.getMinimum().getAroundClass());
                 }
 
                 return s;
@@ -99,24 +104,23 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
                     style.getMinimum().getBeforeClassEnd())));
         }
 
-        Object nextEnclosing = getCursor().dropParentUntil(c -> c instanceof J.ClassDeclaration || c instanceof JavaSourceFile).getValue();
-        if (nextEnclosing instanceof JavaSourceFile) {
-            JavaSourceFile cu = (JavaSourceFile) nextEnclosing;
-            boolean hasImports = !cu.getImports().isEmpty();
-            boolean firstClassInFile = j.isScope(cu.getClasses().get(0));
+        JavaSourceFile cu = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
+        boolean hasImports = !cu.getImports().isEmpty();
+        boolean firstClass = j.equals(cu.getClasses().get(0));
+        Set<J.ClassDeclaration> classes = new HashSet<>(cu.getClasses());
 
-            j = firstClassInFile ?
-                    (hasImports ? minimumLines(j, style.getMinimum().getAfterImports()) : j) :
-                    minimumLines(j, style.getMinimum().getAroundClass());
+        j = firstClass ?
+                (hasImports ? minimumLines(j, style.getMinimum().getAfterImports()) : j) :
+                // Apply `style.getMinimum().getAroundClass()` to classes declared in the SourceFile.
+                (classes.contains(j)) ? minimumLines(j, style.getMinimum().getAroundClass()) : j;
 
-            if (!hasImports && firstClassInFile) {
-                if (cu.getPackageDeclaration() == null) {
-                    if (!j.getPrefix().getWhitespace().isEmpty()) {
-                        j = j.withPrefix(j.getPrefix().withWhitespace(""));
-                    }
-                } else {
-                    j = minimumLines(j, style.getMinimum().getAfterPackage());
+        if (!hasImports && firstClass) {
+            if (cu.getPackageDeclaration() == null) {
+                if (!j.getPrefix().getWhitespace().isEmpty()) {
+                    j = j.withPrefix(j.getPrefix().withWhitespace(""));
                 }
+            } else {
+                j = minimumLines(j, style.getMinimum().getAfterPackage());
             }
         }
 
