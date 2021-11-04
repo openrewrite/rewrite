@@ -17,12 +17,54 @@ package org.openrewrite.java.search
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
+import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 
 @Suppress("RedundantOperationOnEmptyContainer")
 interface UsesMethodTest : JavaRecipeTest {
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1169")
+    @Test
+    fun emptyConstructor(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = toRecipe {
+            UsesMethod("abc.Thing newConcurrentHashSet()")
+        },
+        dependsOn = arrayOf(
+            """
+                package abc;
+                
+                import java.util.Set;
+                import java.util.Collections;
+                import java.util.concurrent.ConcurrentHashMap;
+                public class Thing {
+                    public static <E> Set<E> newConcurrentHashSet() {
+                        return Collections.newSetFromMap(new ConcurrentHashMap<>());
+                    }
+                    public static <E> Set<E> newConcurrentHashSet(Iterable<? extends E> elements) {
+                        return newConcurrentHashSet();
+                    }
+                }
+            """
+        ),
+        before = """
+            package abc;
+            
+            import java.util.Set;
+            class Test {
+                Set<String> s = Thing.newConcurrentHashSet();
+            }
+        """,
+        after = """
+            /*~~>*/package abc;
+            
+            import java.util.Set;
+            class Test {
+                Set<String> s = Thing.newConcurrentHashSet();
+            }
+        """
+    )
     @Test
     fun usesMethodReferences(jp: JavaParser) = assertChanged(
         jp,
