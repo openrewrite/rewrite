@@ -14,39 +14,19 @@ on:
   schedule:
     - cron: 0 16 * * *
 
-env:
-  GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-
 concurrency:
-  group: ${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-      - uses: gradle/wrapper-validation-action@v1
-      - uses: DeLaGuardo/setup-graalvm@5.0
-        with:
-          java: java11
-          graalvm: 21.2.0
-      - name: install-polyglot-languages
-        run: |
-          gu install nodejs python ruby R llvm-toolchain
-      - name: build
-        uses: gradle/gradle-build-action@v2
-        with:
-          arguments: build
-      - name: publish-snapshots
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
-        uses: gradle/gradle-build-action@v2
-        with:
-          arguments: snapshot publish -PforceSigning -x test
-        env:
-          ORG_GRADLE_PROJECT_sonatypeUsername: ${{ secrets.OSSRH_USERNAME }}
-          ORG_GRADLE_PROJECT_sonatypePassword: ${{ secrets.OSSRH_TOKEN }}
-          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.OSSRH_SIGNING_KEY }}
-          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.OSSRH_SIGNING_PASSWORD }}
+    uses: openrewrite/gh-automation/.github/workflows/ci-gradle.yml@main
+    secrets:
+      gradle_enterprise_access_key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
+      ossrh_username: ${{ secrets.OSSRH_USERNAME }}
+      ossrh_token: ${{ secrets.OSSRH_TOKEN }}
+      ossrh_signing_key: ${{ secrets.OSSRH_SIGNING_KEY }}
+      ossrh_signing_password: ${{ secrets.OSSRH_SIGNING_PASSWORD }}
+    with:
+      build_on_graal: true
+      install_graal_languages: nodejs python ruby R llvm-toolchain
