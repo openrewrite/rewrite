@@ -65,6 +65,7 @@ interface UsesMethodTest : JavaRecipeTest {
             }
         """
     )
+
     @Test
     fun usesMethodReferences(jp: JavaParser) = assertChanged(
         jp,
