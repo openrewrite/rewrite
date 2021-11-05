@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package org.openrewrite.yaml.search
 import org.junit.jupiter.api.Test
 import org.openrewrite.yaml.YamlRecipeTest
 
-class FindKeyTest: YamlRecipeTest {
+class FindKeyTest : YamlRecipeTest {
 
     @Test
     fun findKey() = assertChanged(
@@ -36,4 +36,5 @@ class FindKeyTest: YamlRecipeTest {
               namespace: monitoring-tools
         """
     )
+
 }

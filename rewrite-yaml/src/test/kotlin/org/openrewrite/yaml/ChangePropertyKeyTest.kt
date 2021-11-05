@@ -19,25 +19,25 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Issue
+import org.openrewrite.Recipe
 import java.nio.file.Path
 
 class ChangePropertyKeyTest : YamlRecipeTest {
-    private val changeProp = ChangePropertyKey(
-        "management.metrics.binders.files.enabled",
-        "management.metrics.enable.process.files",
-        null
-    )
+    override val recipe: Recipe
+        get() = ChangePropertyKey(
+            "management.metrics.binders.files.enabled",
+            "management.metrics.enable.process.files",
+            null
+        )
 
     @Test
     fun singleEntry() = assertChanged(
-        recipe = changeProp,
         before = "management.metrics.binders.files.enabled: true",
         after = "management.metrics.enable.process.files: true"
     )
 
     @Test
     fun nestedEntry() = assertChanged(
-        recipe = changeProp,
         before = """
             unrelated.property: true
             management.metrics:
@@ -55,7 +55,6 @@ class ChangePropertyKeyTest : YamlRecipeTest {
 
     @Test
     fun nestedEntryEmptyPartialPathRemoved() = assertChanged(
-        recipe = changeProp,
         before = """
             unrelated.property: true
             management.metrics:

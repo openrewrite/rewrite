@@ -18,12 +18,13 @@ package org.openrewrite.yaml.search
 import org.junit.jupiter.api.Test
 import org.openrewrite.yaml.YamlRecipeTest
 
-class FindPropertyTest: YamlRecipeTest {
+class FindPropertyTest : YamlRecipeTest {
 
     @Test
     fun findProperty() = assertChanged(
         recipe = FindProperty("management.metrics.binders.files.enabled"),
-            before = "management.metrics.binders.files.enabled: true",
-            after = "management.metrics.binders.files.enabled: ~~>true"
+        before = "management.metrics.binders.files.enabled: true",
+        after = "management.metrics.binders.files.enabled: ~~>true"
     )
+
 }
