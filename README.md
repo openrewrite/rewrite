@@ -14,7 +14,7 @@ Feel free to join us on [Slack](https://join.slack.com/t/rewriteoss/shared_invit
 
 Follow us on [Twitter](https://twitter.com/moderneinc) and [LinkedIn](https://www.linkedin.com/company/moderneinc).
 
-## Refactoring at Scale
+## Refactoring at Scale 
 
 [![Moderne](./doc/video_preview.png)](https://youtu.be/BCWyMm7WFCI)
 
