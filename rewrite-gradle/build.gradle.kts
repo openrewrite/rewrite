@@ -50,10 +50,7 @@ tasks.withType<ShadowJar> {
     configurations = listOf(project.configurations.compileClasspath.get())
     archiveClassifier.set(null as String?)
     minimize {
-        exclude(
-            "org/slf4j/impl/*.class",
-            "org/gradle/internal/logging/slf4j/*.class"
-        )
+        exclude("org/slf4j/impl/*.class")
     }
     dependencies {
         include(dependency("org.gradle:"))
