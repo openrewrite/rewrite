@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,15 @@ import java.util.Set;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindProperties extends Recipe {
+    @Override
+    public String getDisplayName() {
+        return "Find property";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Find uses of a property by key or keys by pattern.";
+    }
 
     @Option(displayName = "Property key",
             description = "A property glob expression that properties are matched against.",
@@ -56,16 +65,6 @@ public class FindProperties extends Recipe {
     }
 
     @Override
-    public String getDisplayName() {
-        return "Find property";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Find uses of a property by key or keys by pattern.";
-    }
-
-    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new PropertiesVisitor<ExecutionContext>() {
             @Override
@@ -78,4 +77,5 @@ public class FindProperties extends Recipe {
             }
         };
     }
+
 }

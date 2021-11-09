@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,7 +52,7 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P
 
     @Override
     public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
-        if(marker instanceof SearchResult) {
+        if (marker instanceof SearchResult) {
             String description = ((SearchResult) marker).getDescription();
             p.out.append("~~")
                     .append(description == null ? "" : "(" + description + ")~~")

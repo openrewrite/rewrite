@@ -23,7 +23,6 @@ import java.nio.file.Path
 
 @Suppress("UnusedProperty")
 class ChangePropertyValueTest : PropertiesRecipeTest {
-
     override val recipe = ChangePropertyValue(
         "management.metrics.binders.files.enabled",
         "false",

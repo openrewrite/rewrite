@@ -13,7 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@NonNullApi
-package org.openrewrite.properties.tree;
+package org.openrewrite.properties.search
 
-import org.openrewrite.internal.lang.NonNullApi;
+import org.junit.jupiter.api.Test
+import org.openrewrite.properties.PropertiesRecipeTest
+
+@Suppress("UnusedProperty")
+class FindPropertiesTest : PropertiesRecipeTest {
+
+    @Test
+    fun findProperty() = assertChanged(
+        recipe = FindProperties("management.metrics.binders.files.enabled"),
+        before = "management.metrics.binders.files.enabled=true",
+        after = "management.metrics.binders.files.enabled=true"
+    )
+
+}

@@ -60,7 +60,7 @@ public class DeleteProperty extends Recipe {
         return new PropertiesVisitor<ExecutionContext>() {
             @Override
             public Properties visitEntry(Properties.Entry entry, ExecutionContext context) {
-                if(entry.getKey().equals(propertyKey)) {
+                if (entry.getKey().equals(propertyKey)) {
                     //noinspection ConstantConditions
                     return null;
                 }

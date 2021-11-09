@@ -20,7 +20,6 @@ import org.openrewrite.Recipe
 
 @Suppress("UnusedProperty")
 class DeletePropertyTest : PropertiesRecipeTest {
-
     override val recipe: Recipe
         get() = DeleteProperty("delete.me", null)
 
