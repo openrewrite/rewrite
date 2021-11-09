@@ -27,9 +27,6 @@ import org.openrewrite.properties.tree.Properties;
 import java.util.HashSet;
 import java.util.Set;
 
-/**
- * Finds occurrences of a property key.
- */
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindProperties extends Recipe {
@@ -40,12 +37,12 @@ public class FindProperties extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Find uses of a property by key or keys by pattern.";
+        return "Finds occurrences of a property key.";
     }
 
     @Option(displayName = "Property key",
-            description = "A property glob expression that properties are matched against.",
-            example = "guava*")
+            description = "The property key to look for.",
+            example = "management.metrics.binders.files.enabled")
     String propertyKey;
 
     public static Set<Properties.Entry> find(Properties p, String propertyKey) {
