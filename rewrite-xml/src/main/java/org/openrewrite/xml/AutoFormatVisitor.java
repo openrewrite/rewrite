@@ -15,6 +15,8 @@
  */
 package org.openrewrite.xml;
 
+import org.openrewrite.Cursor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.search.FindIndentXmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -31,13 +33,8 @@ public class AutoFormatVisitor<P> extends XmlVisitor<P> {
         this.scope = scope;
     }
 
-    private final FindIndentXmlVisitor<P> findIndent = new FindIndentXmlVisitor<>(0);
-
-    @Override
-    public Xml visitDocument(Xml.Document document, P p) {
-        findIndent.visit(document, p);
-        return super.visitDocument(document, p);
-    }
+    @Nullable
+    private FindIndentXmlVisitor<P> findIndent = null;
 
     @Override
     public Xml preVisit(Xml tree, P p) {
@@ -49,7 +46,7 @@ public class AutoFormatVisitor<P> extends XmlVisitor<P> {
                 if(getCursor().getValue() instanceof Xml.Attribute){
                     indentMultiple++;
                 }
-
+                findIndent = getIndent(getCursor(), p);
                 int indentToUse = findIndent.getMostCommonIndent() > 0 ?
                         findIndent.getMostCommonIndent() : 4; /* default to 4 spaces */
 
@@ -63,5 +60,16 @@ public class AutoFormatVisitor<P> extends XmlVisitor<P> {
             }
         }
         return x;
+    }
+
+    private FindIndentXmlVisitor<P> getIndent(Cursor c, P p) {
+        if(findIndent == null) {
+            while(c.getParent() != null && c.getParent().getValue() instanceof Xml.Tag) {
+                c = c.getParent();
+            }
+            findIndent = new FindIndentXmlVisitor<>(0);
+            findIndent.visit((Xml.Tag) c.getValue(), p);
+        }
+        return findIndent;
     }
 }
