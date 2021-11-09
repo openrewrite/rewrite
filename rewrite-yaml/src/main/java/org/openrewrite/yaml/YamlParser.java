@@ -213,7 +213,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                                 style = Yaml.Scalar.Style.PLAIN;
                                 break;
                         }
-                        BlockBuilder builder = blockStack.peek();
+                        BlockBuilder builder = blockStack.isEmpty() ? null : blockStack.peek();
                         if (builder instanceof SequenceBuilder) {
                             // Inline sequences like [1, 2] need to keep track of any whitespace between the element
                             // and its trailing comma.
@@ -228,7 +228,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                             lastEnd = event.getEndMark().getIndex() + commaIndex + 1;
                             sequenceBuilder.push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, anchor, scalarValue), commaPrefix);
 
-                        } else {
+                        } else if (builder != null){
                             builder.push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, anchor, scalarValue));
                             lastEnd = event.getEndMark().getIndex();
                         }
@@ -278,9 +278,20 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                         BlockBuilder builder = blockStack.peek();
                         builder.push(new Yaml.Alias(randomId(), fmt, Markers.EMPTY, anchor));
                         lastEnd = event.getEndMark().getIndex();
-                    }
                         break;
-                    case StreamEnd:
+                    }
+                    case StreamEnd: {
+                        String fmt = newLine + reader.prefix(lastEnd, event);
+                        if (document == null && !fmt.isEmpty()) {
+                            documents.add(
+                                    new Yaml.Document(
+                                            randomId(), fmt, Markers.EMPTY, false,
+                                            new Yaml.Mapping(randomId(), Markers.EMPTY, emptyList()),
+                                            new Yaml.Document.End(randomId(), "", Markers.EMPTY, false)
+                                    ));
+                        }
+                        break;
+                    }
                     case StreamStart:
                         break;
                 }

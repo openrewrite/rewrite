@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.yaml.YamlParser
 
+@Suppress("YAMLUnusedAnchor")
 class MappingTest: YamlParserTest {
 
     @Disabled
@@ -129,6 +130,37 @@ class MappingTest: YamlParserTest {
             }
     )
 
+    @Test
+    fun multiDocOnlyComments() = assertRoundTrip(
+        source = """
+            # doc-1-pre
+            ---
+            # doc-1-end
+            ...
+            ---
+            # doc-2-pre
+        """,
+        afterConditions = { docs ->
+            Assertions.assertThat(docs.documents.size).isEqualTo(2)
+            val doc = docs.documents.first()
+            Assertions.assertThat(doc.prefix).isEqualTo("# doc-1-pre\n")
+            Assertions.assertThat(doc.end.prefix).isEqualTo("\n# doc-1-end\n")
+            val doc2 = docs.documents[1]
+            Assertions.assertThat(doc2.end.prefix).isEqualTo("\n# doc-2-pre")
+        }
+    )
+
+    @Test
+    fun singleDocOnlyComments() = assertRoundTrip(
+        source = """
+            # doc-1-pre
+        """,
+        afterConditions = { docs ->
+            Assertions.assertThat(docs.documents.size).isEqualTo(1)
+            val doc = docs.documents.first()
+            Assertions.assertThat(doc.prefix).isEqualTo("# doc-1-pre")
+        }
+    )
 
     @Issue("https://github.com/spring-projects/spring-boot/issues/8438")
     @Test
