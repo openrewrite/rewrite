@@ -26,7 +26,8 @@ import org.openrewrite.java.tree.JavaSourceFile;
 
 import java.time.Duration;
 import java.util.*;
-import java.util.regex.Pattern;
+
+import static org.openrewrite.internal.NameCaseConvention.LOWER_CAMEL;
 
 /**
  * This recipe converts local variables and method parameters to camel case convention.
@@ -74,8 +75,6 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
     }
 
     private static class RenameNonCompliantNames extends JavaIsoVisitor<ExecutionContext> {
-        private final Pattern namingConvention = Pattern.compile("^[a-z][a-zA-Z0-9]*$");
-
         @Override
         public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
             Map<J.VariableDeclarations.NamedVariable, String> renameVariablesMap = new LinkedHashMap<>();
@@ -107,10 +106,10 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
                     !(parentScope.getValue() instanceof J.ForLoop.Control) &&
                     // Does not apply to catches with 1 character.
                     !((parentScope.getValue() instanceof J.Try.Catch || parentScope.getValue() instanceof J.MultiCatch) && variable.getSimpleName().length() == 1) &&
-                    // Name does not match regex pattern.
-                    !namingConvention.matcher(variable.getSimpleName()).matches()) {
+                    // Name does not match camelCase pattern.
+                    !LOWER_CAMEL.matches(variable.getSimpleName())) {
 
-                String toName = convertToCamelCase(variable.getSimpleName());
+                String toName = LOWER_CAMEL.format(variable.getSimpleName());
                 ((Map<J.VariableDeclarations.NamedVariable, String>) getCursor().getNearestMessage("RENAME_VARIABLES_KEY")).put(variable, toName);
             }
 
@@ -146,42 +145,6 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
                             is instanceof J.Lambda
             );
         }
-
-        /**
-         * Renames `oldName` to java camel case naming convention.
-         * - The first character will be lower case.
-         * - Preserves other existing capitalized characters.
-         * - Special characters `$` and `_` will be removed.
-         *      - If a special character is removed the following alphanumeric will be capitalized.
-         */
-        private static String convertToCamelCase(String oldName) {
-            StringBuilder builder = new StringBuilder();
-            boolean setCaps = false;
-            for (int i = 0; i < oldName.length(); i++) {
-                char c = oldName.charAt(i);
-                switch (c) {
-                    case '$':
-                    case '_':
-                        if (builder.length() > 0) {
-                            setCaps = true;
-                        }
-                        continue;
-                    default:
-                        break;
-                }
-
-                if (builder.length() == 0) {
-                    builder.append(String.valueOf(oldName.charAt(i)).toLowerCase());
-                } else {
-                    if (setCaps) {
-                        builder.append(String.valueOf(oldName.charAt(i)).toUpperCase());
-                        setCaps = false;
-                    } else {
-                        builder.append(oldName.charAt(i));
-                    }
-                }
-            }
-            return builder.toString();
-        }
     }
+
 }
