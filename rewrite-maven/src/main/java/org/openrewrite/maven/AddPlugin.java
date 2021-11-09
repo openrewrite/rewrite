@@ -140,7 +140,6 @@ public class AddPlugin extends Recipe {
                             (dependencies != null ? dependencies.trim() + "\n" : "") +
                             "</plugin>");
                     t = (Xml.Tag) new AddToTagVisitor<>(plugins, pluginTag).visit(t, ctx, getCursor().getParent());
-                    t = (Xml.Tag) new AutoFormatVisitor<>(pluginTag).visit(t, ctx, getCursor().getParent());
                 }
             }
 
