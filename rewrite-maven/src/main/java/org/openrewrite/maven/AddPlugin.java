@@ -17,13 +17,11 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.xml.AddToTagVisitor;
+import org.openrewrite.xml.AutoFormatVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
@@ -93,21 +91,10 @@ public class AddPlugin extends Recipe {
         public Maven visitMaven(Maven maven, ExecutionContext ctx) {
             Xml.Tag root = maven.getRoot();
             if (!root.getChild("build").isPresent()) {
-                doAfterVisit(new AddToTagVisitor<>(root, Xml.Tag.build("<build>\n" +
-                        "<plugins>\n" +
-                        "<plugin>\n" +
-                        "<groupId>" + groupId + "</groupId>\n" +
-                        "<artifactId>" + artifactId + "</artifactId>\n" +
-                        "<version>" + version + "</version>\n" +
-                        (executions != null ? executions.trim() + "\n" : "") +
-                        (configuration != null ? configuration.trim() + "\n" : "") +
-                        (dependencies != null ? dependencies.trim() + "\n" : "") +
-                        "</plugin>\n" +
-                        "</plugins>\n" +
-                        "</build>"),
-                        new MavenTagInsertionComparator(root.getChildren())));
+                assert getCursor().getParent() != null;
+                maven = (Maven) new AddToTagVisitor<>(root, Xml.Tag.build("<build/>")).visit(maven, ctx, getCursor().getParent());
+                assert maven != null;
             }
-
             return super.visitMaven(maven, ctx);
         }
 
@@ -117,38 +104,47 @@ public class AddPlugin extends Recipe {
 
             if (BUILD_MATCHER.matches(getCursor())) {
                 Optional<Xml.Tag> maybePlugins = t.getChild("plugins");
-                if (!maybePlugins.isPresent()) {
-                    doAfterVisit(new AddToTagVisitor<>(t, Xml.Tag.build("<plugins/>")));
+                Xml.Tag plugins;
+                if(maybePlugins.isPresent()) {
+                    plugins = maybePlugins.get();
                 } else {
-                    Xml.Tag plugins = maybePlugins.get();
+                    assert getCursor().getParent() != null;
+                    t = (Xml.Tag) new AddToTagVisitor<>(t, Xml.Tag.build("<plugins/>")).visit(t, ctx, getCursor().getParent());
+                    assert t != null;
+                    //noinspection OptionalGetWithoutIsPresent
+                    plugins = t.getChild("plugins").get();
+                }
 
-                    Optional<Xml.Tag> maybePlugin = plugins.getChildren().stream()
-                            .filter(plugin ->
-                                    plugin.getName().equals("plugin") &&
-                                            groupId.equals(plugin.getChildValue("groupId").orElse(null)) &&
-                                            artifactId.equals(plugin.getChildValue("artifactId").orElse(null))
-                            )
-                            .findAny();
+                Optional<Xml.Tag> maybePlugin = plugins.getChildren().stream()
+                        .filter(plugin ->
+                                plugin.getName().equals("plugin") &&
+                                        groupId.equals(plugin.getChildValue("groupId").orElse(null)) &&
+                                        artifactId.equals(plugin.getChildValue("artifactId").orElse(null))
+                        )
+                        .findAny();
 
-                    if (maybePlugin.isPresent()) {
-                        Xml.Tag plugin = maybePlugin.get();
-                        if (!version.equals(plugin.getChildValue("version").orElse(null))) {
-                            //noinspection OptionalGetWithoutIsPresent
-                            doAfterVisit(new ChangeTagValueVisitor<>(plugin.getChild("version").get(), version));
-                        }
-                    } else {
-                        doAfterVisit(new AddToTagVisitor<>(plugins, Xml.Tag.build("<plugin>\n" +
-                                "<groupId>" + groupId + "</groupId>\n" +
-                                "<artifactId>" + artifactId + "</artifactId>\n" +
-                                "<version>" + version + "</version>\n" +
-                                (executions != null ? executions.trim() + "\n" : "") +
-                                (configuration != null ? configuration.trim() + "\n" : "") +
-                                (dependencies != null ? dependencies.trim() + "\n" : "") +
-                                "</plugin>")));
+                assert getCursor().getParent() != null;
+                if (maybePlugin.isPresent()) {
+                    Xml.Tag plugin = maybePlugin.get();
+                    if (!version.equals(plugin.getChildValue("version").orElse(null))) {
+                        //noinspection OptionalGetWithoutIsPresent
+                        t = (Xml.Tag) new ChangeTagValueVisitor<>(plugin.getChild("version").get(), version).visit(t, ctx, getCursor().getParent());
                     }
+                } else {
+                    Xml.Tag pluginTag = Xml.Tag.build("<plugin>\n" +
+                            "<groupId>" + groupId + "</groupId>\n" +
+                            "<artifactId>" + artifactId + "</artifactId>\n" +
+                            "<version>" + version + "</version>\n" +
+                            (executions != null ? executions.trim() + "\n" : "") +
+                            (configuration != null ? configuration.trim() + "\n" : "") +
+                            (dependencies != null ? dependencies.trim() + "\n" : "") +
+                            "</plugin>");
+                    t = (Xml.Tag) new AddToTagVisitor<>(plugins, pluginTag).visit(t, ctx, getCursor().getParent());
+                    t = (Xml.Tag) new AutoFormatVisitor<>(pluginTag).visit(t, ctx, getCursor().getParent());
                 }
             }
 
+            //noinspection ConstantConditions
             return t;
         }
     }

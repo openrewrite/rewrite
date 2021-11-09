@@ -25,13 +25,9 @@ class AddPluginTest : MavenRecipeTest {
 
     @Test
     fun addPluginWithConfiguration() = assertChanged(
-        recipe = AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", "100.0", """
-            <configuration>
-              <activeRecipes>
-                <recipe>io.moderne.FindTest</recipe>
-              </activeRecipes>
-            </configuration>
-        """.trimIndent(), null, null),
+        recipe = AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", "100.0",
+            "<configuration>\n<activeRecipes>\n<recipe>io.moderne.FindTest</recipe>\n</activeRecipes>\n</configuration>",
+            null, null),
         before = """
             <project>
               <groupId>com.mycompany.app</groupId>

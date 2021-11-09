@@ -44,13 +44,13 @@ public class AddToTagVisitor<P> extends XmlVisitor<P> {
     @Override
     public Xml visitTag(Xml.Tag t, P p) {
         if (scope.isScope(t)) {
-            boolean formatRequested = false;
+            boolean formatParent = false;
+            assert getCursor().getParent() != null;
             if (t.getClosing() == null) {
                 t = t.withClosing(new Xml.Tag.Closing(Tree.randomId(), "\n",
                         Markers.EMPTY, t.getName(), ""))
                         .withBeforeTagDelimiterPrefix("");
-                doAfterVisit(new AutoFormatVisitor<>(t));
-                formatRequested = true;
+                formatParent = true;
             }
 
             //noinspection ConstantConditions
@@ -72,10 +72,14 @@ public class AddToTagVisitor<P> extends XmlVisitor<P> {
 
             t = t.withContent(content);
 
-            if (!formatRequested) {
-                doAfterVisit(new AutoFormatVisitor<>(formattedTagToAdd));
+            if(formatParent) {
+                t = (Xml.Tag) new AutoFormatVisitor<>(t).visit(t, p, getCursor().getParent());
+            } else {
+                t = (Xml.Tag) new AutoFormatVisitor<>(formattedTagToAdd).visit(t, p, getCursor().getParent());
             }
         }
+
+        assert t != null;
         return super.visitTag(t, p);
     }
 }
