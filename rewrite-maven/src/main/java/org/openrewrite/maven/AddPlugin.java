@@ -21,7 +21,6 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.xml.AddToTagVisitor;
-import org.openrewrite.xml.AutoFormatVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
@@ -91,9 +90,7 @@ public class AddPlugin extends Recipe {
         public Maven visitMaven(Maven maven, ExecutionContext ctx) {
             Xml.Tag root = maven.getRoot();
             if (!root.getChild("build").isPresent()) {
-                assert getCursor().getParent() != null;
-                maven = (Maven) new AddToTagVisitor<>(root, Xml.Tag.build("<build/>")).visit(maven, ctx, getCursor().getParent());
-                assert maven != null;
+                maven = (Maven) new AddToTagVisitor<>(root, Xml.Tag.build("<build/>")).visitNonNull(maven, ctx, getCursor().getParentOrThrow());
             }
             return super.visitMaven(maven, ctx);
         }
@@ -108,9 +105,7 @@ public class AddPlugin extends Recipe {
                 if(maybePlugins.isPresent()) {
                     plugins = maybePlugins.get();
                 } else {
-                    assert getCursor().getParent() != null;
-                    t = (Xml.Tag) new AddToTagVisitor<>(t, Xml.Tag.build("<plugins/>")).visit(t, ctx, getCursor().getParent());
-                    assert t != null;
+                    t = (Xml.Tag) new AddToTagVisitor<>(t, Xml.Tag.build("<plugins/>")).visitNonNull(t, ctx, getCursor().getParentOrThrow());
                     //noinspection OptionalGetWithoutIsPresent
                     plugins = t.getChild("plugins").get();
                 }
@@ -123,12 +118,11 @@ public class AddPlugin extends Recipe {
                         )
                         .findAny();
 
-                assert getCursor().getParent() != null;
                 if (maybePlugin.isPresent()) {
                     Xml.Tag plugin = maybePlugin.get();
                     if (!version.equals(plugin.getChildValue("version").orElse(null))) {
                         //noinspection OptionalGetWithoutIsPresent
-                        t = (Xml.Tag) new ChangeTagValueVisitor<>(plugin.getChild("version").get(), version).visit(t, ctx, getCursor().getParent());
+                        t = (Xml.Tag) new ChangeTagValueVisitor<>(plugin.getChild("version").get(), version).visitNonNull(t, ctx, getCursor().getParentOrThrow());
                     }
                 } else {
                     Xml.Tag pluginTag = Xml.Tag.build("<plugin>\n" +
@@ -139,11 +133,10 @@ public class AddPlugin extends Recipe {
                             (configuration != null ? configuration.trim() + "\n" : "") +
                             (dependencies != null ? dependencies.trim() + "\n" : "") +
                             "</plugin>");
-                    t = (Xml.Tag) new AddToTagVisitor<>(plugins, pluginTag).visit(t, ctx, getCursor().getParent());
+                    t = (Xml.Tag) new AddToTagVisitor<>(plugins, pluginTag).visitNonNull(t, ctx, getCursor().getParentOrThrow());
                 }
             }
 
-            //noinspection ConstantConditions
             return t;
         }
     }
