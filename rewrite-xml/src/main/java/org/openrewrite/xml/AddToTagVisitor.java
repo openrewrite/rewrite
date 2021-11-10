@@ -15,6 +15,7 @@
  */
 package org.openrewrite.xml;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
@@ -81,6 +82,35 @@ public class AddToTagVisitor<P> extends XmlVisitor<P> {
 
         assert t != null;
         return super.visitTag(t, p);
+    }
+
+    /**
+     * Add a tag to the children of another tag
+     *
+     * @param parent the tag that will have 'newChild' added to its children
+     * @param newChild the tag to add as a child of 'parent'
+     * @param parentCursor A cursor pointing one level above 'parent'. Determines the final indentation of 'newChild'.
+     *
+     * @return 'parent' with 'newChild' amongst its child elements
+     */
+    public static Xml.Tag addToTag(Xml.Tag parent, Xml.Tag newChild, Cursor parentCursor) {
+        return addToTag(parent, parent, newChild, parentCursor);
+    }
+
+    /**
+     * Add a tag to the children of another tag
+     *
+     * @param parentScope a tag which contains 'parent' as a direct or transitive child element.
+     * @param parent the tag that will have 'newChild' added to its children
+     * @param newChild the tag to add as a child of 'parent'
+     * @param parentCursor A cursor pointing one level above 'parentScope'. Determines the final indentation of 'newChild'.
+     *
+     * @return 'parentScope' which somewhere contains 'parent' with 'newChild' amongst its child elements
+     */
+    public static Xml.Tag addToTag(Xml.Tag parentScope, Xml.Tag parent, Xml.Tag newChild, Cursor parentCursor) {
+        //noinspection ConstantConditions
+        return (Xml.Tag) new AddToTagVisitor<Void>(parent, newChild)
+                .visitNonNull(parentScope, null, parentCursor);
     }
 }
 

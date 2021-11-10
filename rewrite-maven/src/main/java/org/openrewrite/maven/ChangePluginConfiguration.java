@@ -28,7 +28,10 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
 
-import static org.openrewrite.xml.TagUtils.*;
+import static org.openrewrite.xml.AddToTagVisitor.addToTag;
+import static org.openrewrite.xml.FilterTagChildrenVisitor.filterChildren;
+import static org.openrewrite.xml.MapTagChildrenVisitor.mapChildren;
+import static org.openrewrite.xml.SemanticallyEqual.areEqual;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -84,7 +87,7 @@ public class ChangePluginConfiguration extends Recipe {
                         }
                         Optional<Xml.Tag> maybeConfigurationTag = plugin.getChild("configuration");
                         Xml.Tag configurationTag = Xml.Tag.build("<configuration>\n" + configuration + "\n</configuration>");
-                        if(maybeConfigurationTag.isPresent() && !semanticallyEqual(configurationTag, maybeConfigurationTag.get())) {
+                        if(maybeConfigurationTag.isPresent() && !areEqual(configurationTag, maybeConfigurationTag.get())) {
                             final Xml.Tag originalPlugin = plugin;
                             plugin = addToTag(plugin, configurationTag, getCursor());
                             final Xml.Tag finalPlugin = filterChildren(plugin, child -> child != maybeConfigurationTag.get());
@@ -99,7 +102,6 @@ public class ChangePluginConfiguration extends Recipe {
                         }
                     }
                 }
-                //noinspection ConstantConditions
                 return plugins;
             }
         };

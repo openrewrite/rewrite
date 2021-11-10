@@ -45,4 +45,30 @@ public class FilterTagChildrenVisitor<T> extends XmlVisitor<T> {
         }
         return t;
     }
+
+
+    /**
+     * Filter the children of a tag to only those that match the supplied predicate.
+     *
+     * @param parent the tag whose direct child elements are to be filtered by 'childTest'
+     * @param childTest the predicate used to evaluate the direct child elements of 'parent'.
+     * @return 'parent' with its children that matched 'childTest'
+     */
+    public static Xml.Tag filterChildren(Xml.Tag parent, Predicate<Content> childTest) {
+        return filterChildren(parent, parent, childTest);
+    }
+
+    /**
+     * Filter the children of a tag to only those that match the supplied predicate.
+     *
+     * @param parentScope a tag which contains 'parent' as a direct or transitive child element.
+     * @param parent the tag whose direct child elements are to be filtered by 'childTest'
+     * @param childTest the predicate used to evaluate the direct child elements of 'parent'.
+     * @return 'parentScope` which somewhere contains 'parent' with its children that matched 'childTest'
+     */
+    public static Xml.Tag filterChildren(Xml.Tag parentScope, Xml.Tag parent, Predicate<Content> childTest) {
+        //noinspection ConstantConditions
+        return (Xml.Tag) new FilterTagChildrenVisitor<Void>(parent, childTest)
+                .visitNonNull(parentScope, null);
+    }
 }

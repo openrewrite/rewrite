@@ -29,7 +29,10 @@ import java.util.Arrays;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static org.openrewrite.xml.TagUtils.*;
+import static org.openrewrite.xml.AddToTagVisitor.addToTag;
+import static org.openrewrite.xml.FilterTagChildrenVisitor.filterChildren;
+import static org.openrewrite.xml.MapTagChildrenVisitor.mapChildren;
+import static org.openrewrite.xml.SemanticallyEqual.areEqual;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -101,7 +104,7 @@ public class ChangePluginDependencies extends Recipe {
                         }
                         Optional<Xml.Tag> maybeDependenciesTag = plugin.getChild("dependencies");
 
-                        if(maybeDependenciesTag.isPresent() && !semanticallyEqual(dependenciesTag, maybeDependenciesTag.get())) {
+                        if(maybeDependenciesTag.isPresent() && !areEqual(dependenciesTag, maybeDependenciesTag.get())) {
                             final Xml.Tag originalPlugin = plugin;
                             plugin = addToTag(plugin, dependenciesTag, getCursor());
                             final Xml.Tag finalPlugin = filterChildren(plugin, child -> child != maybeDependenciesTag.get());

@@ -42,4 +42,29 @@ public class MapTagChildrenVisitor<T> extends XmlVisitor<T> {
         }
         return t;
     }
+
+
+    /**
+     * Transform the children of a tag with the supplied mapping function.
+     *
+     * @param parent the tag whose direct child elements are to be transformed by 'map'.
+     * @param map the function used to transform the direct child elements of 'parent'.
+     * @return 'parent' with its children transformed by 'map'
+     */
+    public static Xml.Tag mapChildren(Xml.Tag parent, UnaryOperator<Content> map) {
+        return mapChildren(parent, parent, map);
+    }
+
+    /**
+     * Transform the children of a tag with the supplied mapping function.
+     *
+     * @param parentScope a tag which contains 'parent' as a direct or transitive child element.
+     * @param parent the tag whose direct child elements are to be transformed by 'map'.
+     * @param map the function used to transform the direct child elements of 'parent'.
+     * @return 'parentScope' which somewhere contains 'parent' with its children transformed by 'map'
+     */
+    public static Xml.Tag mapChildren(Xml.Tag parentScope, Xml.Tag parent, UnaryOperator<Content> map) {
+        //noinspection ConstantConditions
+        return (Xml.Tag) new MapTagChildrenVisitor<Void>(parent, map).visitNonNull(parentScope, null);
+    }
 }
