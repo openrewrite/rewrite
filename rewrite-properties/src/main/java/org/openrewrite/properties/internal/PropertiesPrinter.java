@@ -26,6 +26,7 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P
     @Override
     public Properties visitFile(Properties.File file, PrintOutputCapture<P> p) {
         p.out.append(file.getPrefix());
+        visitMarkers(file.getMarkers(), p);
         visit(file.getContent(), p);
         p.out.append(file.getEof());
         return file;
@@ -33,8 +34,9 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P
 
     @Override
     public Properties visitEntry(Properties.Entry entry, PrintOutputCapture<P> p) {
-        p.out.append(entry.getPrefix())
-                .append(entry.getKey())
+        p.out.append(entry.getPrefix());
+        visitMarkers(entry.getMarkers(), p);
+        p.out.append(entry.getKey())
                 .append(entry.getBeforeEquals())
                 .append('=')
                 .append(entry.getValue().getPrefix())
@@ -44,8 +46,9 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P
 
     @Override
     public Properties visitComment(Properties.Comment comment, PrintOutputCapture<P> p) {
-        p.out.append(comment.getPrefix())
-                .append('#')
+        p.out.append(comment.getPrefix());
+        visitMarkers(comment.getMarkers(), p);
+        p.out.append('#')
                 .append(comment.getMessage());
         return comment;
     }
