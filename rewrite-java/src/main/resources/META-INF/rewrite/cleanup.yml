@@ -19,32 +19,20 @@ name: org.openrewrite.java.cleanup.Cleanup
 displayName: Code cleanup
 description: Automatically cleanup code, e.g. remove unnecessary parentheses, simplify expressions.
 recipeList:
-  - org.openrewrite.java.cleanup.CaseInsensitiveComparisonsDoNotChangeCase
-  - org.openrewrite.java.cleanup.CovariantEquals
+  - org.openrewrite.java.cleanup.DefaultComesLast
   - org.openrewrite.java.cleanup.EmptyBlock
+  - org.openrewrite.java.format.EmptyNewlineAtEndOfFile
+  - org.openrewrite.java.cleanup.ExplicitLambdaArgumentTypes
+  - org.openrewrite.java.cleanup.ForLoopControlVariablePostfixOperators
+  - org.openrewrite.java.cleanup.MethodParamPad
+  - org.openrewrite.java.cleanup.NoWhitespaceAfter
+  - org.openrewrite.java.cleanup.NoWhitespaceBefore
+  - org.openrewrite.java.cleanup.PadEmptyForLoopComponents
+  - org.openrewrite.java.cleanup.TypecastParenPad
   - org.openrewrite.java.cleanup.EqualsAvoidsNull
   - org.openrewrite.java.cleanup.ExplicitInitialization
+  - org.openrewrite.java.cleanup.FallThrough
   - org.openrewrite.java.cleanup.HideUtilityClassConstructor
-#  - org.openrewrite.java.cleanup.MethodNameCasing
-  - org.openrewrite.java.cleanup.ModifierOrder
-  - org.openrewrite.java.cleanup.NestedEnumsAreNotStatic
-  - org.openrewrite.java.cleanup.NewStringBuilderBufferWithCharArgument
-  - org.openrewrite.java.cleanup.NoDoubleBraceInitialization
-  - org.openrewrite.java.cleanup.NoToStringOnStringType
-  - org.openrewrite.java.cleanup.NoValueOfOnStringType
-  - org.openrewrite.java.cleanup.RedundantFileCreation
-  - org.openrewrite.java.cleanup.SimplifyBooleanExpression
-  - org.openrewrite.java.cleanup.SimplifyBooleanReturn
-  - org.openrewrite.java.cleanup.StaticMethodNotFinal
-  - org.openrewrite.java.cleanup.UnnecessaryExplicitTypeArguments
+  - org.openrewrite.java.cleanup.NeedBraces
+  - org.openrewrite.java.cleanup.OperatorWrap
   - org.openrewrite.java.cleanup.UnnecessaryParentheses
-  - org.openrewrite.java.cleanup.UnnecessaryThrows
-  - org.openrewrite.java.cleanup.UseDiamondOperator
-  - org.openrewrite.java.cleanup.UnnecessaryPrimitiveAnnotations
-  - org.openrewrite.java.cleanup.UseJavaStyleArrayDeclarations
-  - org.openrewrite.java.cleanup.PrimitiveWrapperClassConstructorToValueOf
-  - org.openrewrite.java.cleanup.BigDecimalRoundingConstantsToEnums
-  - org.openrewrite.java.cleanup.FinalClass
-  - org.openrewrite.java.cleanup.PadEmptyForLoopComponents
-  - org.openrewrite.java.cleanup.CatchClauseOnlyRethrows
-  - org.openrewrite.java.cleanup.ControlFlowIndentation
