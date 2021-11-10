@@ -1889,7 +1889,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         List<J.Annotation> annotations = new ArrayList<>();
         boolean inComment = false;
         boolean inMultilineComment = false;
-        for (int i = cursor; i <= maxAnnotationPosition; i++) {
+        for (int i = cursor; i <= maxAnnotationPosition && i < source.length(); i++) {
             if (annotationPosTable.containsKey(i)) {
                 annotations.add(convert(annotationPosTable.get(i)));
                 i = cursor;
