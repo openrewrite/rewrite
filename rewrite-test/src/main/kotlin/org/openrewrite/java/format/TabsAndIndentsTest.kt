@@ -275,6 +275,32 @@ interface TabsAndIndentsTest : JavaRecipeTest {
     )
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1173")
+    fun methodInvocationLambdaBlockOnSameLine(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.styles(tabsAndIndents()).build(),
+        dependsOn = arrayOf("""
+            import java.util.function.Predicate;
+
+            class SomeUtility {
+                static boolean test(String property, Predicate<String> test) {
+                    return false;
+                }
+            }
+        """.trimIndent()),
+        before = """
+            class Test {
+
+                void method() {
+                    SomeUtility.test(
+                            "hello", s -> {
+                                return true;
+                            });                    
+                }
+            }
+        """
+    )
+
+    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/679")
     fun lambdaBodyWithNestedMethodInvocationLambdaStatementBodyIndent(jp: JavaParser.Builder<*, *>) = assertUnchanged(
         jp.styles(tabsAndIndents()).build(),

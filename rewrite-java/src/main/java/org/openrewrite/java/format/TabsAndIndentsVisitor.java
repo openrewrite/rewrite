@@ -287,18 +287,14 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     case METHOD_INVOCATION_ARGUMENT:
                         if (!elem.getPrefix().getLastWhitespace().contains("\n")) {
                             JContainer<J> args = getCursor().getParentOrThrow().getValue();
-                            boolean seenArg = false;
                             boolean anyOtherArgOnOwnLine = false;
                             for (JRightPadded<J> arg : args.getPadding().getElements()) {
                                 if (arg == getCursor().getValue()) {
-                                    seenArg = true;
                                     continue;
                                 }
-                                if (seenArg) {
-                                    if (arg.getElement().getPrefix().getLastWhitespace().contains("\n")) {
-                                        anyOtherArgOnOwnLine = true;
-                                        break;
-                                    }
+                                if (arg.getElement().getPrefix().getLastWhitespace().contains("\n")) {
+                                    anyOtherArgOnOwnLine = true;
+                                    break;
                                 }
                             }
                             if (!anyOtherArgOnOwnLine) {
