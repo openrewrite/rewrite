@@ -69,8 +69,8 @@ interface PropertiesRecipeTest : RecipeTest<Properties.File> {
     fun assertUnchanged(
         parser: PropertiesParser = this.parser,
         recipe: Recipe = this.recipe!!,
-        before: String,
-        dependsOn: Array<String> = emptyArray()
+        @Language("properties") before: String,
+        @Language("properties") dependsOn: Array<String> = emptyArray()
     ) {
         super.assertUnchangedBase(parser, recipe, before, dependsOn)
     }
@@ -78,9 +78,9 @@ interface PropertiesRecipeTest : RecipeTest<Properties.File> {
     fun assertUnchanged(
         parser: PropertiesParser = this.parser,
         recipe: Recipe = this.recipe!!,
-        before: File,
+        @Language("properties") before: File,
         relativeTo: Path? = null,
-        dependsOn: Array<File> = emptyArray()
+        @Language("properties") dependsOn: Array<File> = emptyArray()
     ) {
         super.assertUnchangedBase(parser, recipe, before, relativeTo, dependsOn)
     }
