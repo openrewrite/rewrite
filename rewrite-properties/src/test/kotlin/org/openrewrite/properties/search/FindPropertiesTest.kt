@@ -25,7 +25,7 @@ class FindPropertiesTest : PropertiesRecipeTest {
     fun findProperty() = assertChanged(
         recipe = FindProperties("management.metrics.binders.files.enabled"),
         before = "management.metrics.binders.files.enabled=true",
-        after = "~~>management.metrics.binders.files.enabled=true"
+        after = "management.metrics.binders.files.enabled=~~>true"
     )
 
 }
