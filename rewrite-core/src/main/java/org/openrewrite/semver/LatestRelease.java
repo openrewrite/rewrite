@@ -105,7 +105,7 @@ public class LatestRelease implements VersionComparator {
             String v1Part = v1Gav.group(i);
             String v2Part = v2Gav.group(i);
             if (v1Part == null) {
-                return v2Part == null ? 0 : -11;
+                return v2Part == null ? nv1.toString().compareTo(nv2.toString()) : -11;
             } else if (v2Part == null) {
                 return 1;
             }

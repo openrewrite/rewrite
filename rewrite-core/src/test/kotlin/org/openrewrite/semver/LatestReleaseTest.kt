@@ -99,4 +99,10 @@ class LatestReleaseTest {
         assertThat(LatestRelease.normalizeVersion("29.0-jre")).isEqualTo("29.0.0-jre")
         assertThat(LatestRelease.normalizeVersion("29-jre")).isEqualTo("29.0.0-jre")
     }
+
+    @Test
+    fun datedSnapshotVersions() {
+        assertThat(latestRelease.compare(null, "7.17.0-20211102.000501-28",
+            "7.17.0-20211102.012229-29")).isLessThan(0)
+    }
 }
