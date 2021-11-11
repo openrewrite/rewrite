@@ -484,6 +484,8 @@ public class TypeMapping {
             return classfile(type.getUpperBound());
         } else if (type == Type.noType || type == Type.stuckType) {
             return Paths.get("__does_not_exist__");
+        } else if (type instanceof Type.JCPrimitiveType || type instanceof Type.JCVoidType) {
+            return Paths.get("__source_set__");
         }
         throw new IllegalStateException("Attempted to get a classfile path from a type of " + type.getClass().getName());
     }
