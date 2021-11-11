@@ -16,12 +16,15 @@
 package org.openrewrite.properties
 
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 
 @Suppress("UnusedProperty")
 class DeletePropertyTest : PropertiesRecipeTest {
     override val recipe: Recipe
-        get() = DeleteProperty("delete.me", null)
+        get() = DeleteProperty("delete.me", null, null)
 
     @Test
     fun basic() = assertChanged(
@@ -35,4 +38,42 @@ class DeletePropertyTest : PropertiesRecipeTest {
             delete.me.not = bar
         """
     )
+
+    @ParameterizedTest
+    @ValueSource(
+        strings = [
+            "acme.my-project.person.first-name",
+            "acme.myProject.person.firstName",
+            "acme.my_project.person.first_name",
+        ]
+    )
+    @Issue("https://github.com/openrewrite/rewrite/issues/1168")
+    fun relaxedBinding(propertyKey: String) = assertChanged(
+        recipe = DeleteProperty(propertyKey, true, null),
+        before = """
+            spring.datasource.schema=classpath*:db/database/schema.sql
+            acme.my-project.person.first-name=example
+            acme.myProject.person.firstName=example
+            acme.my_project.person.first_name=example
+        """,
+        after = "spring.datasource.schema=classpath*:db/database/schema.sql"
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1168")
+    fun exactMatch() = assertChanged(
+        recipe = DeleteProperty("acme.my-project.person.first-name", false, null),
+        before = """
+            spring.datasource.schema=classpath*:db/database/schema.sql
+            acme.my-project.person.first-name=example
+            acme.myProject.person.firstName=example
+            acme.my_project.person.first_name=example
+        """,
+        after = """
+            spring.datasource.schema=classpath*:db/database/schema.sql
+            acme.myProject.person.firstName=example
+            acme.my_project.person.first_name=example
+        """
+    )
+
 }

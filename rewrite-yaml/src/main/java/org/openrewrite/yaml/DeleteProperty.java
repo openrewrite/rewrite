@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -43,6 +44,14 @@ public class DeleteProperty extends Recipe {
             description = "Simplify nested map hierarchies into their simplest dot separated property form.",
             example = "true")
     Boolean coalesce;
+
+    @Incubating(since = "7.17.0")
+    @Option(displayName = "Use relaxed binding",
+            description = "Whether to match the `propertyKey` using [relaxed binding](https://docs.spring.io/spring-boot/docs/2.5.6/reference/html/features.html#features.external-config.typesafe-configuration-properties.relaxed-binding) " +
+                    "rules. Default is `true`. Set to `false`  to use exact matching.",
+            required = false)
+    @Nullable
+    Boolean relaxedBinding;
 
     @Incubating(since = "7.8.0")
     @Option(displayName = "Optional file matcher",
@@ -87,7 +96,7 @@ public class DeleteProperty extends Recipe {
                         .map(e2 -> e2.getKey().getValue())
                         .collect(Collectors.joining("."));
 
-                if (prop.equals(propertyKey)) {
+                if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.equalsRelaxedBinding(prop, propertyKey) : prop.equals(propertyKey)) {
                     doAfterVisit(new DeletePropertyVisitor<>(entry));
                     if (coalesce) {
                         maybeCoalesceProperties();
@@ -137,4 +146,5 @@ public class DeleteProperty extends Recipe {
             return m;
         }
     }
+
 }

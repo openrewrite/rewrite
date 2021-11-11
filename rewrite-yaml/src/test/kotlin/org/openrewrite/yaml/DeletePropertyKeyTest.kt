@@ -17,16 +17,15 @@ package org.openrewrite.yaml
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import java.nio.file.Path
 
 class DeletePropertyKeyTest : YamlRecipeTest {
     override val recipe: Recipe
-        get() = DeleteProperty(
-            "management.metrics.binders.files.enabled",
-            true,
-            null
-        )
+        get() = DeleteProperty("management.metrics.binders.files.enabled", true, null, null)
 
     @Test
     fun singleEntry() = assertChanged(
@@ -48,6 +47,36 @@ class DeletePropertyKeyTest : YamlRecipeTest {
         """
     )
 
+    @ParameterizedTest
+    @ValueSource(
+        strings = [
+            "acme.my-project.person.first-name",
+            "acme.myProject.person.firstName",
+            "acme.my_project.person.first_name",
+        ]
+    )
+    @Issue("https://github.com/openrewrite/rewrite/issues/1168")
+    fun relaxedBinding(propertyKey: String) = assertChanged(
+        recipe = DeleteProperty(propertyKey, false, true, null),
+        before = "acme.my-project.person.first-name: example",
+        after = ""
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1168")
+    fun exactMatch() = assertChanged(
+        recipe = DeleteProperty("acme.my-project.person.first-name", false, false, null),
+        before = """
+            acme.myProject.person.firstName: example
+            acme.my_project.person.first_name: example
+            acme.my-project.person.first-name: example
+        """,
+        after = """
+            acme.myProject.person.firstName: example
+            acme.my_project.person.first_name: example
+        """
+    )
+
     @Test
     fun changeOnlyMatchingFile(@TempDir tempDir: Path) {
         val matchingFile = tempDir.resolve("a.yml").apply {
@@ -58,8 +87,9 @@ class DeletePropertyKeyTest : YamlRecipeTest {
             toFile().parentFile.mkdirs()
             toFile().writeText("apiVersion: v1")
         }.toFile()
-        val recipe = DeleteProperty("apiVersion", true, "**/a.yml")
+        val recipe = DeleteProperty("apiVersion", true, null, "**/a.yml")
         assertChanged(recipe = recipe, before = matchingFile, after = "")
         assertUnchanged(recipe = recipe, before = nonMatchingFile)
     }
+
 }

@@ -16,15 +16,57 @@
 package org.openrewrite.yaml.search
 
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
+import org.openrewrite.Issue
 import org.openrewrite.yaml.YamlRecipeTest
 
 class FindPropertyTest : YamlRecipeTest {
 
     @Test
     fun findProperty() = assertChanged(
-        recipe = FindProperty("management.metrics.binders.files.enabled"),
+        recipe = FindProperty("management.metrics.binders.files.enabled", null),
         before = "management.metrics.binders.files.enabled: true",
         after = "management.metrics.binders.files.enabled: ~~>true"
+    )
+
+    @ParameterizedTest
+    @ValueSource(
+        strings = [
+            "acme.my-project.person.first-name",
+            "acme.myProject.person.firstName",
+            "acme.my_project.person.first_name",
+        ]
+    )
+    @Issue("https://github.com/openrewrite/rewrite/issues/1168")
+    fun relaxedBinding(propertyKey: String) = assertChanged(
+        recipe = FindProperty(propertyKey, true),
+        before = """
+            acme.my-project.person.first-name: example
+            acme.myProject.person.firstName: example
+            acme.my_project.person.first_name: example
+        """,
+        after = """
+            acme.my-project.person.first-name: ~~>example
+            acme.myProject.person.firstName: ~~>example
+            acme.my_project.person.first_name: ~~>example
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1168")
+    fun exactMatch() = assertChanged(
+        recipe = FindProperty("acme.my-project.person.first-name", false),
+        before = """
+            acme.my-project.person.first-name: example
+            acme.myProject.person.firstName: example
+            acme.my_project.person.first_name: example
+        """,
+        after = """
+            acme.my-project.person.first-name: ~~>example
+            acme.myProject.person.firstName: example
+            acme.my_project.person.first_name: example
+        """
     )
 
 }

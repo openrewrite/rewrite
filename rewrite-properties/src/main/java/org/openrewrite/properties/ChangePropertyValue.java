@@ -18,6 +18,7 @@ package org.openrewrite.properties;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
 
@@ -41,6 +42,14 @@ public class ChangePropertyValue extends Recipe {
             description = "Only change the property value if it matches the configured `oldValue`.")
     @Nullable
     String oldValue;
+
+    @Incubating(since = "7.17.0")
+    @Option(displayName = "Use relaxed binding",
+            description = "Whether to match the `propertyKey` using [relaxed binding](https://docs.spring.io/spring-boot/docs/2.5.6/reference/html/features.html#features.external-config.typesafe-configuration-properties.relaxed-binding) " +
+                    "rules. Default is `true`. Set to `false`  to use exact matching.",
+            required = false)
+    @Nullable
+    Boolean relaxedBinding;
 
     @Option(displayName = "Optional file matcher",
             description = "Matching files will be modified. This is a glob expression.",
@@ -73,13 +82,12 @@ public class ChangePropertyValue extends Recipe {
     }
 
     public class ChangePropertyValueVisitor<P> extends PropertiesVisitor<P> {
-
         public ChangePropertyValueVisitor() {
         }
 
         @Override
         public Properties visitEntry(Properties.Entry entry, P p) {
-            if (entry.getKey().equals(propertyKey)) {
+            if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.equalsRelaxedBinding(entry.getKey(), propertyKey) : entry.getKey().equals(propertyKey)) {
                 if (oldValue == null ? !entry.getValue().getText().equals(newValue) : oldValue.equals(entry.getValue().getText())) {
                     entry = entry.withValue(entry.getValue().withText(newValue));
                 }

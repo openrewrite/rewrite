@@ -17,10 +17,9 @@ package org.openrewrite.properties.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
+import org.openrewrite.internal.NameCaseConvention;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 
@@ -45,11 +44,27 @@ public class FindProperties extends Recipe {
             example = "management.metrics.binders.files.enabled")
     String propertyKey;
 
-    public static Set<Properties.Entry> find(Properties p, String propertyKey) {
+    @Incubating(since = "7.17.0")
+    @Option(displayName = "Use relaxed binding",
+            description = "Whether to match the `propertyKey` using [relaxed binding](https://docs.spring.io/spring-boot/docs/2.5.6/reference/html/features.html#features.external-config.typesafe-configuration-properties.relaxed-binding) " +
+                    "rules. Default is `true`. Set to `false`  to use exact matching.",
+            required = false)
+    @Nullable
+    Boolean relaxedBinding;
+
+    /**
+     * Find a set of matching {@link Properties}.
+     *
+     * @param p              The set of properties to search over.
+     * @param propertyKey    The name of property key to look for.
+     * @param relaxedBinding Whether to match the propertyKey using relaxed binding rules. Default is true. Explicitly set to "false" to use exact matching.
+     * @return The set of found properties matching the propertyKey.
+     */
+    public static Set<Properties.Entry> find(Properties p, String propertyKey, @Nullable Boolean relaxedBinding) {
         PropertiesVisitor<Set<Properties.Entry>> findVisitor = new PropertiesVisitor<Set<Properties.Entry>>() {
             @Override
             public Properties visitEntry(Properties.Entry entry, Set<Properties.Entry> ps) {
-                if (entry.getKey().equals(propertyKey)) {
+                if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.equalsRelaxedBinding(entry.getKey(), propertyKey) : entry.getKey().equals(propertyKey)) {
                     ps.add(entry);
                 }
                 return super.visitEntry(entry, ps);
@@ -66,7 +81,7 @@ public class FindProperties extends Recipe {
         return new PropertiesVisitor<ExecutionContext>() {
             @Override
             public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
-                if (entry.getKey().equals(propertyKey)) {
+                if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.equalsRelaxedBinding(entry.getKey(), propertyKey) : entry.getKey().equals(propertyKey)) {
                     entry = entry.withValue(entry.getValue().withMarkers(entry.getValue().getMarkers().searchResult()));
                 }
                 return super.visitEntry(entry, ctx);

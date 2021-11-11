@@ -74,7 +74,7 @@ public class AddProperty extends Recipe {
             public Properties visitFile(Properties.File file, ExecutionContext executionContext) {
                 Properties p = super.visitFile(file, executionContext);
                 if (!StringUtils.isBlank(property) && !StringUtils.isBlank(value)) {
-                    Set<Properties.Entry> properties = FindProperties.find(p, property);
+                    Set<Properties.Entry> properties = FindProperties.find(p, property, false);
                     if (properties.isEmpty()) {
                         Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, value);
                         Properties.Entry entry = new Properties.Entry(Tree.randomId(), "\n", Markers.EMPTY, property, "", propertyValue);

@@ -18,6 +18,7 @@ package org.openrewrite.properties;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
 
@@ -34,6 +35,14 @@ public class ChangePropertyKey extends Recipe {
             description = "The new name for the key identified by `oldPropertyKey`.",
             example = "management.metrics.enable.process.files")
     String newPropertyKey;
+
+    @Incubating(since = "7.17.0")
+    @Option(displayName = "Use relaxed binding",
+            description = "Whether to match the `oldPropertyKey` using [relaxed binding](https://docs.spring.io/spring-boot/docs/2.5.6/reference/html/features.html#features.external-config.typesafe-configuration-properties.relaxed-binding) " +
+                    "rules. Default is `true`. Set to `false`  to use exact matching.",
+            required = false)
+    @Nullable
+    Boolean relaxedBinding;
 
     @Incubating(since = "7.8.0")
     @Option(displayName = "Optional file matcher",
@@ -67,13 +76,12 @@ public class ChangePropertyKey extends Recipe {
     }
 
     public class ChangePropertyKeyVisitor<P> extends PropertiesVisitor<P> {
-
         public ChangePropertyKeyVisitor() {
         }
 
         @Override
         public Properties visitEntry(Properties.Entry entry, P p) {
-            if (entry.getKey().equals(oldPropertyKey)) {
+            if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.equalsRelaxedBinding(entry.getKey(), oldPropertyKey) : entry.getKey().equals(oldPropertyKey)) {
                 entry = entry.withKey(newPropertyKey).withPrefix(entry.getPrefix());
             }
             return super.visitEntry(entry, p);

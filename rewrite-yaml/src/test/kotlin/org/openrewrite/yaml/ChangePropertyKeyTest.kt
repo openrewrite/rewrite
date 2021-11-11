@@ -18,6 +18,8 @@ package org.openrewrite.yaml
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import java.nio.file.Path
@@ -27,6 +29,7 @@ class ChangePropertyKeyTest : YamlRecipeTest {
         get() = ChangePropertyKey(
             "management.metrics.binders.files.enabled",
             "management.metrics.enable.process.files",
+            null,
             null
         )
 
@@ -70,22 +73,14 @@ class ChangePropertyKeyTest : YamlRecipeTest {
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1114")
     fun `change path to one path longer`() = assertChanged(
-        recipe = ChangePropertyKey(
-            "a.b.c",
-            "a.b.c.d",
-            null
-        ),
+        recipe = ChangePropertyKey("a.b.c", "a.b.c.d", null, null),
         before = "a.b.c: true",
         after = "a.b.c.d: true"
     )
 
     @Test
     fun `change path to one path shorter`() = assertChanged(
-        recipe = ChangePropertyKey(
-            "a.b.c.d",
-            "a.b.c",
-            null
-        ),
+        recipe = ChangePropertyKey("a.b.c.d", "a.b.c", null, null),
         before = "a.b.c.d: true",
         after = "a.b.c: true"
     )
@@ -103,29 +98,80 @@ class ChangePropertyKeyTest : YamlRecipeTest {
         val recipe = ChangePropertyKey(
             "management.metrics.binders.files.enabled",
             "management.metrics.enable.process.files",
+            null,
             "**/a.yml"
         )
         assertChanged(recipe = recipe, before = matchingFile, after = "management.metrics.enable.process.files: true")
         assertUnchanged(recipe = recipe, before = nonMatchingFile)
     }
 
+    @ParameterizedTest
+    @ValueSource(
+        strings = [
+            "acme.my-project.person.first-name",
+            "acme.myProject.person.firstName",
+            "acme.my_project.person.first_name",
+        ]
+    )
+    @Issue("https://github.com/openrewrite/rewrite/issues/1168")
+    fun relaxedBinding(propertyKey: String) = assertChanged(
+        recipe = ChangePropertyKey(propertyKey, "acme.my-project.person.changed-first-name-key", true, null),
+        before = """
+            unrelated.root: true
+            acme.my-project:
+                unrelated: true
+                person:
+                    unrelated: true
+                    first-name: example
+        """,
+        after = """
+            unrelated.root: true
+            acme.my-project:
+                unrelated: true
+                person:
+                    unrelated: true
+                    changed-first-name-key: example
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1168")
+    fun exactMatch() = assertChanged(
+        recipe = ChangePropertyKey(
+            "acme.my-project.person.first-name",
+            "acme.my-project.person.changed-first-name-key",
+            false,
+            null
+        ),
+        before = """
+            acme.myProject.person.firstName: example
+            acme.my_project.person.first_name: example
+            acme.my-project.person.first-name: example
+        """,
+        after = """
+            acme.myProject.person.firstName: example
+            acme.my_project.person.first_name: example
+            acme.my-project.person.changed-first-name-key: example
+        """
+    )
+
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = ChangePropertyKey(null, null, null)
+        var recipe = ChangePropertyKey(null, null, null, null)
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("newPropertyKey")
         assertThat(valid.failures()[1].property).isEqualTo("oldPropertyKey")
 
-        recipe = ChangePropertyKey(null, "management.metrics.enable.process.files", null)
+        recipe = ChangePropertyKey(null, "management.metrics.enable.process.files", null, null)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("oldPropertyKey")
 
-        recipe = ChangePropertyKey("management.metrics.binders.files.enabled", null, null)
+        recipe = ChangePropertyKey("management.metrics.binders.files.enabled", null, null, null)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(1)
@@ -135,9 +181,11 @@ class ChangePropertyKeyTest : YamlRecipeTest {
             ChangePropertyKey(
                 "management.metrics.binders.files.enabled",
                 "management.metrics.enable.process.files",
+                null,
                 null
             )
         valid = recipe.validate()
         assertThat(valid.isValid).isTrue
     }
+
 }

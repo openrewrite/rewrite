@@ -18,8 +18,11 @@ package org.openrewrite.yaml.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Incubating;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
+import org.openrewrite.internal.NameCaseConvention;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.tree.Yaml;
@@ -41,6 +44,14 @@ public class FindProperty extends Recipe {
             description = "The key to look for.",
             example = "management.metrics.binders.files.enabled")
     String propertyKey;
+
+    @Incubating(since = "7.17.0")
+    @Option(displayName = "Use relaxed binding",
+            description = "Whether to match the `propertyKey` using [relaxed binding](https://docs.spring.io/spring-boot/docs/2.5.6/reference/html/features.html#features.external-config.typesafe-configuration-properties.relaxed-binding) " +
+                    "rules. Default is `true`. Set to `false`  to use exact matching.",
+            required = false)
+    @Nullable
+    Boolean relaxedBinding;
 
     @Override
     public String getDisplayName() {
@@ -69,7 +80,7 @@ public class FindProperty extends Recipe {
                         .map(e2 -> e2.getKey().getValue())
                         .collect(Collectors.joining("."));
 
-                if (prop.equals(propertyKey)) {
+                if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.equalsRelaxedBinding(prop, propertyKey) : prop.equals(propertyKey)) {
                     e = e.withValue(e.getValue().withMarkers(e.getValue().getMarkers().searchResult()));
                 }
 
@@ -78,7 +89,7 @@ public class FindProperty extends Recipe {
         };
     }
 
-    public static Set<Yaml.Block> find(Yaml y, String propertyKey) {
+    public static Set<Yaml.Block> find(Yaml y, String propertyKey, @Nullable Boolean relaxedBinding) {
         YamlVisitor<Set<Yaml.Block>> findVisitor = new YamlIsoVisitor<Set<Yaml.Block>>() {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, Set<Yaml.Block> values) {
@@ -93,7 +104,7 @@ public class FindProperty extends Recipe {
                         .map(e2 -> e2.getKey().getValue())
                         .collect(Collectors.joining("."));
 
-                if (prop.equals(propertyKey)) {
+                if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.equalsRelaxedBinding(prop, propertyKey) : prop.equals(propertyKey)) {
                     values.add(entry.getValue());
                 }
 
@@ -105,4 +116,5 @@ public class FindProperty extends Recipe {
         findVisitor.visit(y, values);
         return values;
     }
+
 }

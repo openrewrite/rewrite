@@ -24,7 +24,7 @@ class Issue1020 : PropertiesRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1020")
     @Test
     fun removalOfDoublePound() = assertUnchanged(
-        recipe = ChangePropertyKey("server.port", "chassis.name", null),
+        recipe = ChangePropertyKey("server.port", "chassis.name", null, null),
         before = """
             key=**##**chassis.management.metrics.export.cloudwatch.awsAccessKey
         """
@@ -33,7 +33,7 @@ class Issue1020 : PropertiesRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1020")
     @Test
     fun removalOfSlashPound() = assertUnchanged(
-        recipe = ChangePropertyValue("server.tomcat.accesslog.enabled", "true", null, null),
+        recipe = ChangePropertyValue("server.tomcat.accesslog.enabled", "true", null, null, null),
         before = """
             boot.features=https://docs.spring.io/spring-boot/docs/current/reference/htmlsingle**/#**boot-features-jersey
             server.tomcat.accesslog.enabled=true
