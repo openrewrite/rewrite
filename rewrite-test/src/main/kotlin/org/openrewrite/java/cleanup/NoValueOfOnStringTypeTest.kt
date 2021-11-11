@@ -29,47 +29,46 @@ interface NoValueOfOnStringTypeTest : JavaRecipeTest {
     fun doNotChangeOnObject() = assertUnchanged(
         before = """
             class Test {
-                String method() {
-                    Object obj;
+                static String method(Object obj) {
                     return String.valueOf(obj);
                 }
             }
         """
     )
 
-    @Suppress("UnnecessaryCallToStringValueOf")
     @Test
+    @Suppress("UnnecessaryCallToStringValueOf")
     fun valueOfOnString() = assertChanged(
         before = """
             class Test {
-                String method() {
+                static String method() {
                     return String.valueOf("hello");
-                }
-            } 
-        """,
-        after = """
-            class Test {
-                String method() {
-                    return "hello";
-                }
-            } 
-        """
-    )
-
-    @Suppress("UnnecessaryCallToStringValueOf")
-    @Test
-    fun valueOfOnPrimitiveForBinary() = assertChanged(
-        before = """
-            class Test {
-                public void count(int i){
-                  System.out.println("Count: " + String.valueOf(i));
                 }
             }
         """,
         after = """
             class Test {
-                public void count(int i){
-                  System.out.println("Count: " + i);
+                static String method() {
+                    return "hello";
+                }
+            }
+        """
+    )
+
+    @Test
+    @Suppress("UnnecessaryCallToStringValueOf")
+    fun valueOfOnPrimitiveForBinary() = assertChanged(
+        before = """
+            class Test {
+                static void count(int i) {
+                    System.out.println("Count: " + String.valueOf(i));
+                }
+            }
+        """,
+        after = """
+            class Test {
+                static void count(int i) {
+                    System.out.println("Count: " + i);
                 }
             }
         """
@@ -79,7 +78,7 @@ interface NoValueOfOnStringTypeTest : JavaRecipeTest {
     fun valueOfOnStringVariable() = assertUnchanged(
         before = """
             class Test {
-                String method(String val) {
+                static String method(String val) {
                     return String.valueOf(val);
                 }
             }
@@ -87,13 +86,15 @@ interface NoValueOfOnStringTypeTest : JavaRecipeTest {
     )
 
     @Test
+    @Suppress("UnnecessaryCallToStringValueOf")
     fun valueOfOnMethodInvocation() = assertUnchanged(
         before = """
             class Test {
-                void method1() {
+                static void method1() {
                     String a = String.valueOf(method2());
                 }
-                String method2() {
+
+                static String method2() {
                     return "";
                 }
             }
