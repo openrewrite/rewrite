@@ -58,19 +58,17 @@ public class NoToStringOnStringType extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getVisitor() {
-        return new NoToStringOnStringTypeVisitor();
-    }
+        return new JavaVisitor<ExecutionContext>() {
+            private final JavaTemplate t = JavaTemplate.builder(this::getCursor, "#{any(java.lang.String)}").build();
 
-    private static class NoToStringOnStringTypeVisitor extends JavaVisitor<ExecutionContext> {
-        private final JavaTemplate t = JavaTemplate.builder(this::getCursor, "#{any(java.lang.String)}").build();
-
-        @Override
-        public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-            if (TO_STRING.matches(mi)) {
-                return mi.withTemplate(t, mi.getCoordinates().replace(), mi.getSelect());
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                if (TO_STRING.matches(mi)) {
+                    return mi.withTemplate(t, mi.getCoordinates().replace(), mi.getSelect());
+                }
+                return mi;
             }
-            return mi;
-        }
+        };
     }
 }

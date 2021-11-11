@@ -62,38 +62,37 @@ public class NoValueOfOnStringType extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getVisitor() {
-        return new NoValueOfOnStringTypeVisitor();
+        return new JavaVisitor<ExecutionContext>() {
+            private final JavaTemplate t = JavaTemplate.builder(this::getCursor, "#{any(java.lang.String)}").build();
+
+            private boolean isLiteralString(Expression e) {
+                return e instanceof J.Literal && TypeUtils.isString(e.getType());
+            }
+
+            private boolean isThisElementAnOperandInABinaryStringConcatenation(Cursor c) {
+                J maybeBinary = c.dropParentUntil(J.class::isInstance).getValue();
+                if (maybeBinary instanceof J.Binary) {
+                    J.Binary parent = (J.Binary) maybeBinary;
+                    if (parent.getOperator() == J.Binary.Type.Addition) {
+                        // We already know _one_ of the operands will be the MethodInvocation we're checking, but this is clean.
+                        return TypeUtils.isString(parent.getLeft().getType()) && TypeUtils.isString(parent.getRight().getType());
+                    }
+                }
+                return false;
+            }
+
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                if (VALUE_OF.matches(mi) && mi.getArguments().size() == 1) {
+                    Expression argument = mi.getArguments().get(0);
+                    if (isLiteralString(argument) || isThisElementAnOperandInABinaryStringConcatenation(getCursor())) {
+                        return mi.withTemplate(t, mi.getCoordinates().replace(), argument);
+                    }
+                }
+                return mi;
+            }
+        };
     }
 
-    private static class NoValueOfOnStringTypeVisitor extends JavaVisitor<ExecutionContext> {
-        private final JavaTemplate t = JavaTemplate.builder(this::getCursor, "#{any(java.lang.String)}").build();
-
-        private static boolean isLiteralString(Expression e) {
-            return e instanceof J.Literal && TypeUtils.isString(e.getType());
-        }
-
-        private static boolean isThisElementAnOperandInABinaryStringConcatenation(Cursor c) {
-            J maybeBinary = c.dropParentUntil(J.class::isInstance).getValue();
-            if (maybeBinary instanceof J.Binary) {
-                J.Binary parent = (J.Binary) maybeBinary;
-                if (parent.getOperator() == J.Binary.Type.Addition) {
-                    // We already know _one_ of the operands will be the MethodInvocation we're checking, but this is clean.
-                    return TypeUtils.isString(parent.getLeft().getType()) && TypeUtils.isString(parent.getRight().getType());
-                }
-            }
-            return false;
-        }
-
-        @Override
-        public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-            if (VALUE_OF.matches(mi) && mi.getArguments().size() == 1) {
-                Expression argument = mi.getArguments().get(0);
-                if (isLiteralString(argument) || isThisElementAnOperandInABinaryStringConcatenation(getCursor())) {
-                    return mi.withTemplate(t, mi.getCoordinates().replace(), argument);
-                }
-            }
-            return mi;
-        }
-    }
 }
