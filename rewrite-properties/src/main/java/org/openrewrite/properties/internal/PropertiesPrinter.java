@@ -39,8 +39,9 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P
         p.out.append(entry.getKey())
                 .append(entry.getBeforeEquals())
                 .append('=')
-                .append(entry.getValue().getPrefix())
-                .append(entry.getValue().getText());
+                .append(entry.getValue().getPrefix());
+        visitMarkers(entry.getValue().getMarkers(), p);
+        p.out.append(entry.getValue().getText());
         return entry;
     }
 
