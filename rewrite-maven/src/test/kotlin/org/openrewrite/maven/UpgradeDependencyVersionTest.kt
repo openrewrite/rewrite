@@ -18,17 +18,17 @@ package org.openrewrite.maven
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
+import org.junit.jupiter.params.provider.CsvSource
 import org.openrewrite.Issue
 import java.nio.file.Path
 
 class UpgradeDependencyVersionTest : MavenRecipeTest {
     @ParameterizedTest
-    @ValueSource(strings = ["com.google.guava:guava", "*:*"])
-    fun upgradeVersion(ga: String) = assertChanged(
+    @CsvSource(value = ["com.google.guava:guava", "*:*"], delimiter = ':')
+    fun upgradeVersion(groupId: String, artifactId: String) = assertChanged(
         recipe = UpgradeDependencyVersion(
-            ga.substringBefore(':'),
-            ga.substringAfter(':'),
+            groupId,
+            artifactId,
             "latest.patch",
             null,
             null
