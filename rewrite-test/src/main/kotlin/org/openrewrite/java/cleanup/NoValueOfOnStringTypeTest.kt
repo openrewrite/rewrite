@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.cleanup
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
@@ -37,19 +36,36 @@ interface NoValueOfOnStringTypeTest : JavaRecipeTest {
     )
 
     @Test
-    @Suppress("UnnecessaryCallToStringValueOf")
-    fun valueOfOnString() = assertChanged(
+    @Suppress(
+        "UnnecessaryCallToStringValueOf",
+        "UnusedAssignment",
+        "StringConcatenationMissingWhitespace",
+        "ImplicitArrayToString"
+    )
+    fun valueOfOnLiterals() = assertChanged(
         before = """
             class Test {
-                static String method() {
-                    return String.valueOf("hello");
+                static void method(char[] data) {
+                    String str = String.valueOf("changeMe");
+                    str = String.valueOf(0);
+                    str = "changeMe" + String.valueOf(0);
+                    str = String.valueOf(data);
+                    str = "changeMe" + String.valueOf(data);
+                    str = String.valueOf(data, 0, 0);
+                    str = "doNotChangeMe" + String.valueOf(data, 0, 0);
                 }
             }
         """,
         after = """
             class Test {
-                static String method() {
-                    return "hello";
+                static void method(char[] data) {
+                    String str = "changeMe";
+                    str = String.valueOf(0);
+                    str = "changeMe" + 0;
+                    str = String.valueOf(data);
+                    str = "changeMe" + data;
+                    str = String.valueOf(data, 0, 0);
+                    str = "doNotChangeMe" + String.valueOf(data, 0, 0);
                 }
             }
         """
@@ -57,7 +73,7 @@ interface NoValueOfOnStringTypeTest : JavaRecipeTest {
 
     @Test
     @Suppress("UnnecessaryCallToStringValueOf")
-    fun valueOfOnPrimitiveForBinary() = assertChanged(
+    fun valueOfOnNonStringPrimitiveWithinBinaryConcatenation() = assertChanged(
         before = """
             class Test {
                 static void count(int i) {
@@ -75,11 +91,72 @@ interface NoValueOfOnStringTypeTest : JavaRecipeTest {
     )
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1200")
+    fun valueOfIsMethodInvocationPartOfBinary() = assertUnchanged(
+        before = """
+            class Test {
+                static String method(Long id) {
+                    return "example" + Test.method(String.valueOf(id));
+                }
+
+                static String method(String str) {
+                    return str;
+                }
+            }
+        """
+    )
+
+    @Test
     fun valueOfOnStringVariable() = assertUnchanged(
         before = """
             class Test {
                 static String method(String val) {
                     return String.valueOf(val);
+                }
+            }
+        """
+    )
+
+    @Test
+    @Suppress("UnnecessaryCallToStringValueOf", "StringConcatenationMissingWhitespace")
+    fun valueOfOnStandaloneNonStringPrimitive() = assertChanged(
+        before = """
+            class Test {
+                static void method(int i) {
+                    String str = String.valueOf(i) + "example";
+                }
+            }
+        """,
+        after = """
+            class Test {
+                static void method(int i) {
+                    String str = i + "example";
+                }
+            }
+        """
+    )
+
+    @Test
+    fun concatenationResultingInNonString() = assertUnchanged(
+        before = """
+            class Test {
+                static void method(int i) {
+                    String str = String.valueOf(i) + i;
+                }
+            }
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1200")
+    @Suppress("IndexOfReplaceableByContains", "StatementWithEmptyBody")
+    fun valueOfOnIntWithinBinaryComparison() = assertUnchanged(
+        before = """
+            class Test {
+                static void method(String str, int i) {
+                    if (str.indexOf(String.valueOf(i)) >= 0) {
+                        // do nothing
+                    }
                 }
             }
         """
@@ -96,23 +173,6 @@ interface NoValueOfOnStringTypeTest : JavaRecipeTest {
 
                 static String method2() {
                     return "";
-                }
-            }
-        """
-    )
-
-    @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/1200")
-    @Disabled
-    fun handleConcatenationBinary() = assertUnchanged(
-        before = """
-            class Test {
-                static String callMe(String str) {
-                    return str;
-                }
-
-                static String method(Long id) {
-                    return "example" + callMe(String.valueOf(id));
                 }
             }
         """

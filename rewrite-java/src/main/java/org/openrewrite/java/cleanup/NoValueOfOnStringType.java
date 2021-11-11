@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.JavaTemplate;
@@ -39,12 +40,14 @@ public class NoValueOfOnStringType extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Replaces unnecessary `String#valueOf(..)` method invocations with the argument.";
+        return "Replace unnecessary `String#valueOf(..)` method invocations with the argument directly. " +
+                "This occurs when the argument to `String#valueOf(arg)` is a string literal, such as `String.valueOf(\"example\")`. " +
+                "Or, when the `String#valueOf(..)` invocation is used in a concatenation, such as `\"example\" + String.valueOf(\"example\")`.";
     }
 
     @Override
     protected UsesMethod<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>("java.lang.String valueOf(..)");
+        return new UsesMethod<>(VALUE_OF);
     }
 
     @Override
@@ -59,21 +62,38 @@ public class NoValueOfOnStringType extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getVisitor() {
-        return new JavaVisitor<ExecutionContext>() {
-            @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (VALUE_OF.matches(mi)) {
-                    Expression argument = mi.getArguments().get(0);
-                    if ((argument instanceof J.Literal && TypeUtils.isString(argument.getType()))
-                            || getCursor().firstEnclosing(J.Binary.class) != null) {
-                        return mi.withTemplate(JavaTemplate.builder(this::getCursor, "#{any(java.lang.String)}").build(),
-                                mi.getCoordinates().replace(),
-                                argument);
-                    }
+        return new NoValueOfOnStringTypeVisitor();
+    }
+
+    private static class NoValueOfOnStringTypeVisitor extends JavaVisitor<ExecutionContext> {
+        private final JavaTemplate t = JavaTemplate.builder(this::getCursor, "#{any(java.lang.String)}").build();
+
+        private static boolean isLiteralString(Expression e) {
+            return e instanceof J.Literal && TypeUtils.isString(e.getType());
+        }
+
+        private static boolean isThisElementAnOperandInABinaryStringConcatenation(Cursor c) {
+            J maybeBinary = c.dropParentUntil(J.class::isInstance).getValue();
+            if (maybeBinary instanceof J.Binary) {
+                J.Binary parent = (J.Binary) maybeBinary;
+                if (parent.getOperator() == J.Binary.Type.Addition) {
+                    // We already know _one_ of the operands will be the MethodInvocation we're checking, but this is clean.
+                    return TypeUtils.isString(parent.getLeft().getType()) && TypeUtils.isString(parent.getRight().getType());
                 }
-                return mi;
             }
-        };
+            return false;
+        }
+
+        @Override
+        public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+            if (VALUE_OF.matches(mi) && mi.getArguments().size() == 1) {
+                Expression argument = mi.getArguments().get(0);
+                if (isLiteralString(argument) || isThisElementAnOperandInABinaryStringConcatenation(getCursor())) {
+                    return mi.withTemplate(t, mi.getCoordinates().replace(), argument);
+                }
+            }
+            return mi;
+        }
     }
 }
