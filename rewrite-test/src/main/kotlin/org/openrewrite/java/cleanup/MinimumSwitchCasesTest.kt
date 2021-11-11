@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.cleanup
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
@@ -247,4 +248,47 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1212")
+    @Disabled
+    fun importsOnEnum() = assertChanged(
+        before = """
+            import java.time.DayOfWeek;
+
+            class Test {
+                DayOfWeek day;
+
+                void test() {
+                    switch (day) {
+                        case MONDAY:
+                            someMethod();
+                            break;
+                    }
+                }
+
+                void someMethod() {
+                    // empty
+                }
+            }
+        """,
+        after = """
+            import java.time.DayOfWeek;
+
+            class Test {
+                DayOfWeek day;
+
+                void test() {
+                    if (day == DayOfWeek.MONDAY) {
+                        someMethod();
+                    }
+                }
+
+                void someMethod() {
+                    // empty
+                }
+            }
+        """
+    )
+
 }
