@@ -18,14 +18,11 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -36,24 +33,17 @@ public class NoToStringOnStringType extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "No #toString() on String";
+        return "Unnecessary String#toString()";
     }
 
     @Override
     public String getDescription() {
-        return "Removes`#toString()` from Strings.";
+        return "Remove unnecessary `String#toString()` invocations on objects which are already a string.";
     }
 
-    @Nullable
     @Override
     protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                doAfterVisit(new UsesMethod<>("java.lang.String toString()"));
-                return cu;
-            }
-        };
+        return new UsesMethod<>(TO_STRING);
     }
 
     @Override
@@ -68,17 +58,19 @@ public class NoToStringOnStringType extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getVisitor() {
-        return new JavaVisitor<ExecutionContext>() {
-            @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, executionContext);
-                if (TO_STRING.matches(mi)) {
-                    return mi.withTemplate(JavaTemplate.builder(this::getCursor, "#{any(java.lang.String)}").build(),
-                            mi.getCoordinates().replace(),
-                            mi.getSelect());
-                }
-                return mi;
+        return new NoToStringOnStringTypeVisitor();
+    }
+
+    private static class NoToStringOnStringTypeVisitor extends JavaVisitor<ExecutionContext> {
+        private final JavaTemplate t = JavaTemplate.builder(this::getCursor, "#{any(java.lang.String)}").build();
+
+        @Override
+        public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+            if (TO_STRING.matches(mi)) {
+                return mi.withTemplate(t, mi.getCoordinates().replace(), mi.getSelect());
             }
-        };
+            return mi;
+        }
     }
 }

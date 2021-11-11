@@ -27,8 +27,7 @@ interface NoToStringOnStringTypeTest : JavaRecipeTest {
     fun doNotChangeOnObject() = assertUnchanged(
         before = """
             class Test {
-                String method() {
-                    Object obj;
+                static String method(Object obj) {
                     return obj.toString();
                 }
             }
@@ -36,17 +35,18 @@ interface NoToStringOnStringTypeTest : JavaRecipeTest {
     )
 
     @Test
+    @Suppress("StringOperationCanBeSimplified")
     fun toStringOnString() = assertChanged(
         before = """
             class Test {
-                String method() {
+                static String method() {
                     return "hello".toString();
                 }
             } 
         """,
         after = """
             class Test {
-                String method() {
+                static String method() {
                     return "hello";
                 }
             } 
@@ -54,44 +54,49 @@ interface NoToStringOnStringTypeTest : JavaRecipeTest {
     )
 
     @Test
+    @Suppress("StringOperationCanBeSimplified")
     fun toStringOnStringVariable() = assertChanged(
         before = """
             class Test {
-                String method(String val) {
-                    return val.toString();
+                static String method(String str) {
+                    return str.toString();
                 }
             } 
         """,
         after = """
             class Test {
-                String method(String val) {
-                    return val;
+                static String method(String str) {
+                    return str;
                 }
             } 
         """
     )
 
     @Test
+    @Suppress("StringOperationCanBeSimplified")
     fun toStringOnMethodInvocation() = assertChanged(
         before = """
             class Test {
-                void method1() {
-                    String a = method2().toString();
+                static void method1() {
+                    String str = method2().toString();
                 }
-                String method2() {
+
+                static String method2() {
                     return "";
                 }
             }
         """,
         after = """
             class Test {
-                void method1() {
-                    String a = method2();
+                static void method1() {
+                    String str = method2();
                 }
-                String method2() {
+
+                static String method2() {
                     return "";
                 }
             }
         """
     )
+
 }
