@@ -15,7 +15,9 @@
  */
 package org.openrewrite.java.cleanup
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaRecipeTest
 
@@ -97,4 +99,22 @@ interface NoValueOfOnStringTypeTest : JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1200")
+    @Disabled
+    fun handleConcatenationBinary() = assertUnchanged(
+        before = """
+            class Test {
+                static String callMe(String str) {
+                    return str;
+                }
+
+                static String method(Long id) {
+                    return "example" + callMe(String.valueOf(id));
+                }
+            }
+        """
+    )
+
 }
