@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
@@ -342,6 +343,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     )
 
     @Test
+    @Disabled("https://github.com/openrewrite/rewrite/issues/1204")
     fun upgradeGuava() = assertChanged(
         recipe = UpgradeDependencyVersion(
             "com.google.guava",
@@ -387,6 +389,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     )
 
     @Test
+    @Disabled("https://github.com/openrewrite/rewrite/issues/1204")
     fun upgradeGuavaInParent(@TempDir tempDir: Path) {
         val parent = tempDir.resolve("pom.xml")
         val server = tempDir.resolve("server/pom.xml")
@@ -463,6 +466,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     }
 
     @Test
+    @Disabled("https://github.com/openrewrite/rewrite/issues/1204")
     @Issue("https://github.com/openrewrite/rewrite/issues/891")
     fun upgradeDependencyOnlyTargetsSpecificDependencyProperty(@TempDir tempDir: Path) {
         val parent = tempDir.resolve("pom.xml")

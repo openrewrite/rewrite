@@ -16,6 +16,7 @@
 package org.openrewrite.semver
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
 
@@ -75,6 +76,13 @@ class LatestReleaseTest {
     @Test
     fun guavaVariants() {
         assertThat(latestRelease.compare("1.0", "25.0-jre", "29.0-jre")).isLessThan(0)
+    }
+
+    @Test
+    @Disabled("https://github.com/openrewrite/rewrite/issues/1204")
+    // feel free to move this under "guavaVariants", todo
+    fun guavaVariantsMetadataBoundaries() {
+        assertThat(latestRelease.compare("1.0", "25", "25.0-jre")).isEqualTo(0)
     }
 
     @Test
