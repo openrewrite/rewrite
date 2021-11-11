@@ -46,6 +46,7 @@ public class AddOrUpdateChild<P> extends XmlVisitor<P> {
                     }
                     return it;
                 });
+                t = (Xml.Tag) new AutoFormatVisitor<P>(t).visit(t, p, getCursor().getParentOrThrow());
             } else {
                 t = addToTag(t, child, getCursor().getParentOrThrow());
             }

@@ -28,10 +28,8 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
 
-import static org.openrewrite.xml.AddToTagVisitor.addToTag;
+import static org.openrewrite.xml.AddOrUpdateChild.addOrUpdateChild;
 import static org.openrewrite.xml.FilterTagChildrenVisitor.filterChildren;
-import static org.openrewrite.xml.MapTagChildrenVisitor.mapChildren;
-import static org.openrewrite.xml.SemanticallyEqual.areEqual;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -83,22 +81,11 @@ public class ChangePluginExecutions extends Recipe {
                     if (maybePlugin.isPresent()) {
                         Xml.Tag plugin = maybePlugin.get();
                         if (executions == null) {
-                            return filterChildren(plugins, plugin, child -> !(child instanceof Xml.Tag && "executions".equals(((Xml.Tag) child).getName())));
-                        }
-                        Optional<Xml.Tag> maybeExecutionsTag = plugin.getChild("executions");
-                        Xml.Tag executionsTag = Xml.Tag.build("<executions>\n" + executions + "\n</executions>");
-                        if(maybeExecutionsTag.isPresent() && !areEqual(executionsTag, maybeExecutionsTag.get())) {
-                            final Xml.Tag originalPlugin = plugin;
-                            plugin = addToTag(plugin, executionsTag, getCursor());
-                            final Xml.Tag finalPlugin = filterChildren(plugin, child -> child != maybeExecutionsTag.get());
-                            plugins = mapChildren(plugins, it -> {
-                                if (it == originalPlugin) {
-                                    return finalPlugin;
-                                }
-                                return it;
-                            });
-                        } else if(!maybeExecutionsTag.isPresent()) {
-                            plugins = addToTag(plugins, maybePlugin.get(), executionsTag, getCursor().getParentOrThrow());
+                            plugins = filterChildren(plugins, plugin, child -> !(child instanceof Xml.Tag && "executions".equals(((Xml.Tag) child).getName())));
+                        } else {
+                            plugins = addOrUpdateChild(plugins, plugin,
+                                    Xml.Tag.build("<executions>\n" + executions + "\n</executions>"),
+                                    getCursor().getParentOrThrow());
                         }
                     }
                 }

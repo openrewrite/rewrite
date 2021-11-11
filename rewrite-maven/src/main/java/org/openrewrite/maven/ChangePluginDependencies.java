@@ -29,10 +29,8 @@ import java.util.Arrays;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static org.openrewrite.xml.AddToTagVisitor.addToTag;
+import static org.openrewrite.xml.AddOrUpdateChild.addOrUpdateChild;
 import static org.openrewrite.xml.FilterTagChildrenVisitor.filterChildren;
-import static org.openrewrite.xml.MapTagChildrenVisitor.mapChildren;
-import static org.openrewrite.xml.SemanticallyEqual.areEqual;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -100,22 +98,9 @@ public class ChangePluginDependencies extends Recipe {
                     if (maybePlugin.isPresent()) {
                         Xml.Tag plugin = maybePlugin.get();
                         if (dependencies == null) {
-                            return filterChildren(plugins, plugin, child -> !(child instanceof Xml.Tag && "dependencies".equals(((Xml.Tag) child).getName())));
-                        }
-                        Optional<Xml.Tag> maybeDependenciesTag = plugin.getChild("dependencies");
-
-                        if(maybeDependenciesTag.isPresent() && !areEqual(dependenciesTag, maybeDependenciesTag.get())) {
-                            final Xml.Tag originalPlugin = plugin;
-                            plugin = addToTag(plugin, dependenciesTag, getCursor());
-                            final Xml.Tag finalPlugin = filterChildren(plugin, child -> child != maybeDependenciesTag.get());
-                            plugins = mapChildren(plugins, it -> {
-                                if (it == originalPlugin) {
-                                    return finalPlugin;
-                                }
-                                return it;
-                            });
-                        } else if(!maybeDependenciesTag.isPresent()) {
-                            plugins = addToTag(plugins, maybePlugin.get(), dependenciesTag, getCursor().getParentOrThrow());
+                            plugins = filterChildren(plugins, plugin, child -> !(child instanceof Xml.Tag && "dependencies".equals(((Xml.Tag) child).getName())));
+                        } else {
+                            plugins = addOrUpdateChild(plugins, plugin, dependenciesTag, getCursor().getParentOrThrow());
                         }
                     }
                 }
