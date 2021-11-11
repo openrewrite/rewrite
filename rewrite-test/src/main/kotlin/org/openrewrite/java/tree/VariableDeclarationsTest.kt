@@ -118,4 +118,19 @@ interface VariableDeclarationsTest : JavaTreeTest {
         assertTrue(inv.hasModifier(J.Modifier.Type.Static))
         assertTrue(inv.hasModifier(J.Modifier.Type.Final))
     }
+
+    @Test
+    fun primitiveClassType(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, Class, """
+            public String fred;
+            public Class a = boolean.class;
+        """
+    )
+
+    @Test
+    fun voidClassType(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, Class, """
+            Class<?> interfaceClass() default void.class;
+        """
+    )
 }
