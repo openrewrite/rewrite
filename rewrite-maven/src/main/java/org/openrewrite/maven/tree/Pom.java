@@ -75,6 +75,7 @@ public class Pom {
     @Nullable
     String description;
 
+    @With
     @Nullable
     String packaging;
 
