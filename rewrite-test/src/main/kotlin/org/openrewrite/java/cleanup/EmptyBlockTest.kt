@@ -52,6 +52,18 @@ interface EmptyBlockTest : JavaRecipeTest {
     )
 
     @Test
+    fun emptyBlockWithComment(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            public class A {
+                {
+                    // comment
+                }
+            }
+        """
+    )
+
+    @Test
     fun emptySynchronized(jp: JavaParser) = assertChanged(
         jp,
         before = """

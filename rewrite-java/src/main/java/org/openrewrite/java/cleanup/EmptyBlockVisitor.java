@@ -223,7 +223,7 @@ public class EmptyBlockVisitor<P> extends JavaIsoVisitor<P> {
     private boolean isEmptyBlock(Statement blockNode) {
         return EmptyBlockStyle.BlockPolicy.STATEMENT.equals(emptyBlockStyle.getBlockPolicy()) &&
                 blockNode instanceof J.Block &&
-                ((J.Block) blockNode).getStatements().isEmpty();
+                ((J.Block) blockNode).getStatements().isEmpty() && ((J.Block) blockNode).getEnd().getComments().isEmpty();
     }
 
     private static class ExtractSideEffectsOfIfCondition<P> extends JavaVisitor<P> {
