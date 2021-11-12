@@ -58,7 +58,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
     String returnType;
 
     @Option(displayName = "Match on overrides",
-            description = "When enabled, find methods that are overloads of the method pattern.",
+            description = "When enabled, find methods that are overrides of the method pattern.",
             required = false)
     @Nullable
     Boolean matchOverrides;
