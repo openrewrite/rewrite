@@ -23,6 +23,7 @@ import org.openrewrite.java.ChangeMethodName;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -58,6 +59,7 @@ public class MethodNameCasing extends Recipe {
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
                 if (method.getMethodType() != null &&
                         !method.isConstructor() &&
+                        Boolean.FALSE.equals(TypeUtils.isOverride(method.getMethodType())) &&
                         !standardMethodName.matcher(method.getSimpleName()).matches()) {
                     StringBuilder standardized = new StringBuilder();
 
@@ -85,7 +87,7 @@ public class MethodNameCasing extends Recipe {
                     }
 
                     if (!StringUtils.isBlank(standardized.toString())) {
-                        doNext(new ChangeMethodName(MethodMatcher.methodPattern(method), standardized.toString(), null));
+                        doNext(new ChangeMethodName(MethodMatcher.methodPattern(method), standardized.toString(), true));
                     }
                 }
 

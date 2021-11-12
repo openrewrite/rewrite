@@ -78,4 +78,31 @@ interface MethodNameCasingTest: JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    fun changeMethodNameWhenOverride() = assertChanged(
+        dependsOn = arrayOf(
+            """
+            class ParentClass {
+                void _method() {
+                }
+            }
+        """
+        ),
+        before = """
+            class Test extends ParentClass {
+                @Override
+                void _method() {
+                }
+            }
+        """,
+        after = """
+            class Test extends ParentClass {
+                @Override
+                void method() {
+                }
+            }
+        """
+    )
+
 }
