@@ -34,7 +34,7 @@ class NameCaseConventionTest {
             "FooBBar:foo-bbar",
             "fooBBar:foo-bbar",
             "fooBar:foo-bar",
-            "test.Foo bar:test.foo-bar",
+            "foo bar:foo_bar",
         ], delimiter = ':'
     )
     fun lowerHyphen(input: String, expected: String) {
@@ -46,7 +46,8 @@ class NameCaseConventionTest {
         value = [
             "Foo:foo",
             "Foo-Bar:foo_bar",
-            "FOO.FOO-BAR:foo.foo_bar"
+            "FOO.FOO-BAR:foo.foo_bar",
+            "foo bar:foo_bar",
         ], delimiter = ':'
     )
     fun lowerUnderscore(input: String, expected: String) {
@@ -89,7 +90,8 @@ class NameCaseConventionTest {
             "foo-bar:FOO_BAR",
             "foo_bar:FOO_BAR",
             "FooBar:FOO_BAR",
-            "Foo.fooBar:FOO_FOO_BAR",
+            "Foo.fooBar:FOO.FOO_BAR",
+            "foo bar:FOO_BAR"
         ], delimiter = ':'
     )
     fun upperUnderscore(input: String, expected: String) {
