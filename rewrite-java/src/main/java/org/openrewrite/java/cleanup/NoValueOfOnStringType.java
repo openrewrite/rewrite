@@ -71,7 +71,11 @@ public class NoValueOfOnStringType extends Recipe {
                 if (VALUE_OF.matches(mi) && mi.getArguments().size() == 1) {
                     J parent = getCursor().getParent() != null ? getCursor().getParent().firstEnclosing(J.class) : null;
                     Expression argument = mi.getArguments().get(0);
-                    if (TypeUtils.isString(argument.getType()) || (parent instanceof J.Binary && TypeUtils.asPrimitive(argument.getType()) != null)) {
+
+                    if (TypeUtils.isString(argument.getType())
+                            || (parent instanceof J.Binary
+                                            && ((J.Binary) parent).getOperator() == J.Binary.Type.Addition
+                                            && TypeUtils.asPrimitive(argument.getType()) != null)) {
                         return mi.withTemplate(t, mi.getCoordinates().replace(), argument);
                     }
                 }

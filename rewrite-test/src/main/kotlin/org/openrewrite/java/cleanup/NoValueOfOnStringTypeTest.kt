@@ -107,17 +107,6 @@ interface NoValueOfOnStringTypeTest : JavaRecipeTest {
     )
 
     @Test
-    fun valueOfOnStringVariable() = assertUnchanged(
-        before = """
-            class Test {
-                static String method(String val) {
-                    return val;
-                }
-            }
-        """
-    )
-
-    @Test
     @Suppress("UnnecessaryCallToStringValueOf", "StringConcatenationMissingWhitespace")
     fun valueOfOnStandaloneNonStringPrimitive() = assertChanged(
         before = """
