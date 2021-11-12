@@ -54,12 +54,12 @@ public class FindMethods extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Find methods";
+        return "Find method usages";
     }
 
     @Override
     public String getDescription() {
-        return "Find methods by pattern.";
+        return "Find method usages by pattern.";
     }
 
     @Override
