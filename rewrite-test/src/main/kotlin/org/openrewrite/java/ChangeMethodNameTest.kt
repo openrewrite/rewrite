@@ -47,7 +47,7 @@ interface ChangeMethodNameTest : JavaRecipeTest {
                 public void singleArg(String s) {}
             }
         """.trimIndent()),
-        recipe = ChangeMethodName("com.abc.B singleArg(String)", "bar", null),
+        recipe = ChangeMethodName("com.abc.B singleArg(String)", "bar", true),
         before = """
             package com.abc;
             class A {
@@ -76,6 +76,41 @@ interface ChangeMethodNameTest : JavaRecipeTest {
             val barRefType = barReference.methodType as Method
             assertThat(barRefType.name).isEqualTo("bar")
         }
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1215")
+    @Suppress("MethodMayBeStatic", "RedundantOperationOnEmptyContainer")
+    fun changeMethodNameDoNotMatchOverriddenMethods() = assertChanged(
+        recipe = ChangeMethodName("com.abc.Parent method(String)", "changed", false),
+        before = """
+            package com.abc;
+
+            class Parent {
+                public void method(String s) {
+                }
+            }
+
+            class Test extends Parent {
+                @Override
+                public void method(String s) {
+                }
+            }
+        """,
+        after = """
+            package com.abc;
+
+            class Parent {
+                public void changed(String s) {
+                }
+            }
+
+            class Test extends Parent {
+                @Override
+                public void method(String s) {
+                }
+            }
+        """
     )
 
     @Test

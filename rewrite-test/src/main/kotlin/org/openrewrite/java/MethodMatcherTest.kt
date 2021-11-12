@@ -172,6 +172,34 @@ interface MethodMatcherTest {
         assertTrue(MethodMatcher("a.A getInteger()").matches(getIntegerMethod, classDecl))
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1215")
+    fun strictMatchMethodOverride(jp: JavaParser) {
+        val cu = jp.parse(
+            """
+            package com.abc;
+
+            class Parent {
+                public void method(String s) {
+                }
+            }
+
+            class Test extends Parent {
+                @Override
+                public void method(String s) {
+                }
+            }
+        """
+        ).first()
+        val parentMethodDefinition = (cu.classes[0].body.statements[0] as J.MethodDeclaration).methodType
+        val childMethodOverride = (cu.classes[1].body.statements[0] as J.MethodDeclaration).methodType
+        assertFalse(MethodMatcher("com.abc.Parent method(String)", false).matches(childMethodOverride))
+        assertTrue(MethodMatcher("com.abc.Parent method(String)", true).matches(parentMethodDefinition))
+        assertTrue(MethodMatcher("com.abc.Parent method(String)", true).matches(childMethodOverride))
+        assertTrue(MethodMatcher("com.abc.Parent method(String)", false).matches(parentMethodDefinition))
+        assertFalse(MethodMatcher("com.abc.Test method(String)", true).matches(parentMethodDefinition))
+    }
+
     @Issue("#383")
     @Test
     fun matchesMethodWithWildcardForClassInPackage(jp: JavaParser) {
