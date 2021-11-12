@@ -16,61 +16,16 @@
 package org.openrewrite.maven
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Recipe
 
-class ChangePluginDependenciesTest: MavenRecipeTest {
+class AddPluginDependencyTest: MavenRecipeTest {
 
-    @Test
-    fun removeDependencies() = assertChanged(
-        recipe = ChangePluginDependencies("org.openrewrite.maven", "rewrite-maven-plugin", null),
-        before = """
-            <project>
-                <groupId>org.example</groupId>
-                <artifactId>foo</artifactId>
-                <version>1.0</version>
-                
-                <build>
-                    <plugins>
-                        <plugin>
-                            <groupId>org.openrewrite.maven</groupId>
-                            <artifactId>rewrite-maven-plugin</artifactId>
-                            <version>4.1.5</version>
-                            <dependencies>
-                                <dependency>
-                                    <groupId>org.openrewrite.recipe</groupId>
-                                    <artifactId>rewrite-spring</artifactId>
-                                    <version>1.0.0</version>
-                                </dependency>
-                            </dependencies>
-                        </plugin>
-                    </plugins>
-                </build>
-            </project>
-        """,
-        after = """
-            <project>
-                <groupId>org.example</groupId>
-                <artifactId>foo</artifactId>
-                <version>1.0</version>
-                
-                <build>
-                    <plugins>
-                        <plugin>
-                            <groupId>org.openrewrite.maven</groupId>
-                            <artifactId>rewrite-maven-plugin</artifactId>
-                            <version>4.1.5</version>
-                        </plugin>
-                    </plugins>
-                </build>
-            </project>
-        """
-    )
+    override val recipe: Recipe
+        get() = AddPluginDependency("org.openrewrite.maven", "rewrite-maven-plugin",
+            "org.openrewrite.recipe", "rewrite-spring", "1.0.0")
 
     @Test
-    fun addDependencies() = assertChanged(
-        recipe = ChangePluginDependencies(
-            "org.openrewrite.maven",
-            "rewrite-maven-plugin",
-            "org.openrewrite.recipe:rewrite-spring:1.0.0"),
+    fun addWithNoExistingDependencies() = assertChanged(
         before = """
             <project>
                 <groupId>org.example</groupId>
@@ -115,11 +70,7 @@ class ChangePluginDependenciesTest: MavenRecipeTest {
     )
 
     @Test
-    fun replaceDependencies() = assertChanged(
-        recipe = ChangePluginDependencies(
-            "org.openrewrite.maven",
-            "rewrite-maven-plugin",
-            "org.openrewrite.recipe:rewrite-spring:1.0.0, org.openrewrite.recipe:rewrite-testing-frameworks:1.0.0"),
+    fun addWithExistingDependency() = assertChanged(
         before = """
             <project>
                 <groupId>org.example</groupId>
@@ -132,7 +83,75 @@ class ChangePluginDependenciesTest: MavenRecipeTest {
                             <groupId>org.openrewrite.maven</groupId>
                             <artifactId>rewrite-maven-plugin</artifactId>
                             <version>4.1.5</version>
-                            <dependencies />
+                            <dependencies>
+                                <dependency>
+                                    <groupId>org.foo</groupId>
+                                    <artifactId>bar</artifactId>
+                                    <version>1.0.0</version>
+                                </dependency>
+                                <dependency>
+                                    <groupId>org.openrewrite.recipe</groupId>
+                                    <artifactId>rewrite-spring</artifactId>
+                                    <version>0.1.0</version>
+                                </dependency>
+                            </dependencies>
+                        </plugin>
+                    </plugins>
+                </build>
+            </project>
+        """,
+        after = """
+            <project>
+                <groupId>org.example</groupId>
+                <artifactId>foo</artifactId>
+                <version>1.0</version>
+                
+                <build>
+                    <plugins>
+                        <plugin>
+                            <groupId>org.openrewrite.maven</groupId>
+                            <artifactId>rewrite-maven-plugin</artifactId>
+                            <version>4.1.5</version>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>org.foo</groupId>
+                                    <artifactId>bar</artifactId>
+                                    <version>1.0.0</version>
+                                </dependency>
+                                <dependency>
+                                    <groupId>org.openrewrite.recipe</groupId>
+                                    <artifactId>rewrite-spring</artifactId>
+                                    <version>1.0.0</version>
+                                </dependency>
+                            </dependencies>
+                        </plugin>
+                    </plugins>
+                </build>
+            </project>
+        """
+    )
+
+    @Test
+    fun updateExistingDependencyVersion() = assertChanged(
+        before = """
+            <project>
+                <groupId>org.example</groupId>
+                <artifactId>foo</artifactId>
+                <version>1.0</version>
+                
+                <build>
+                    <plugins>
+                        <plugin>
+                            <groupId>org.openrewrite.maven</groupId>
+                            <artifactId>rewrite-maven-plugin</artifactId>
+                            <version>4.1.5</version>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>org.openrewrite.recipe</groupId>
+                                    <artifactId>rewrite-spring</artifactId>
+                                    <version>0.1.0</version>
+                                </dependency>
+                            </dependencies>
                         </plugin>
                     </plugins>
                 </build>
@@ -156,10 +175,58 @@ class ChangePluginDependenciesTest: MavenRecipeTest {
                                     <artifactId>rewrite-spring</artifactId>
                                     <version>1.0.0</version>
                                 </dependency>
+                            </dependencies>
+                        </plugin>
+                    </plugins>
+                </build>
+            </project>
+        """
+    )
+
+    @Test
+    fun removePluginVersion() = assertChanged(
+        recipe = AddPluginDependency("org.openrewrite.maven", "rewrite-maven-plugin",
+            "org.openrewrite.recipe", "rewrite-spring", null),
+        before = """
+            <project>
+                <groupId>org.example</groupId>
+                <artifactId>foo</artifactId>
+                <version>1.0</version>
+                
+                <build>
+                    <plugins>
+                        <plugin>
+                            <groupId>org.openrewrite.maven</groupId>
+                            <artifactId>rewrite-maven-plugin</artifactId>
+                            <version>4.1.5</version>
+                            <dependencies>
                                 <dependency>
                                     <groupId>org.openrewrite.recipe</groupId>
-                                    <artifactId>rewrite-testing-frameworks</artifactId>
-                                    <version>1.0.0</version>
+                                    <artifactId>rewrite-spring</artifactId>
+                                    <version>0.1.0</version>
+                                </dependency>
+                            </dependencies>
+                        </plugin>
+                    </plugins>
+                </build>
+            </project>
+        """,
+        after = """
+            <project>
+                <groupId>org.example</groupId>
+                <artifactId>foo</artifactId>
+                <version>1.0</version>
+                
+                <build>
+                    <plugins>
+                        <plugin>
+                            <groupId>org.openrewrite.maven</groupId>
+                            <artifactId>rewrite-maven-plugin</artifactId>
+                            <version>4.1.5</version>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>org.openrewrite.recipe</groupId>
+                                    <artifactId>rewrite-spring</artifactId>
                                 </dependency>
                             </dependencies>
                         </plugin>
