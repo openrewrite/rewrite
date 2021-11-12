@@ -36,6 +36,7 @@ class ImportLayoutStyleTest {
         val style = mapper.writeValueAsString(ImportLayoutStyle
             .builder()
             .importPackage("import java.*")
+            .importPackage("import javax.*", false)
             .importAllOthers()
             .importStaticAllOthers()
             .build())
@@ -54,7 +55,7 @@ class ImportLayoutStyleTest {
                 "layout" to listOf(
                         "import java.*",
                         "<blank line>",
-                        "import javax.*",
+                        "import javax.* without subpackages",
                         "<blank line>",
                         "import all other imports",
                         "<blank line>",
@@ -85,7 +86,7 @@ class ImportLayoutStyleTest {
                 assertThat(importLayout.layout[2])
                     .isInstanceOf(ImportLayoutStyle.Block.ImportPackage::class.java)
                     .matches { b -> !(b as ImportLayoutStyle.Block.ImportPackage).isStatic }
-                    .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == "javax\\..+" }
+                    .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == "javax\\.[^.]+" }
 
                 assertThat(importLayout.layout[3]).isInstanceOf(ImportLayoutStyle.Block.BlankLines::class.java)
 

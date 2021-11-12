@@ -812,10 +812,12 @@ class Deserializer extends JsonDeserializer<ImportLayoutStyle> {
                                 builder.importAllOthers();
                             }
                         } else {
+                            boolean withSubpackages = !block.contains(" without subpackages");
+                            block = withSubpackages ? block : block.substring(0, block.indexOf(" without subpackage"));
                             if (statik) {
-                                builder.staticImportPackage(block);
+                                builder.staticImportPackage(block, withSubpackages);
                             } else {
-                                builder.importPackage(block);
+                                builder.importPackage(block, withSubpackages);
                             }
                         }
                     } else {
@@ -866,10 +868,11 @@ class Serializer extends JsonSerializer<ImportLayoutStyle> {
                                 "all other imports";
                     } else if (block instanceof ImportLayoutStyle.Block.ImportPackage) {
                         ImportLayoutStyle.Block.ImportPackage importPackage = (ImportLayoutStyle.Block.ImportPackage) block;
+                        String withSubpackages = importPackage.getPackageWildcard().pattern().contains("[^.]+") ? " without subpackages" : "";
                         return "import " + (importPackage.isStatic() ? "static " : "") + importPackage.getPackageWildcard().pattern()
                                 .replace("\\.", ".")
                                 .replace(".+", "*")
-                                .replace("[^.]+", "*");
+                                .replace("[^.]+", "*") + withSubpackages;
                     }
                     return new UnsupportedOperationException("Unknown block type " + block.getClass().getName());
                 })
