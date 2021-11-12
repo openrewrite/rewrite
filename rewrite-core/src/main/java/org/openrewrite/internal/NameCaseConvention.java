@@ -167,7 +167,7 @@ public enum NameCaseConvention {
     }
 
     private static String upperUnderscore(String str) {
-        return nameCaseJoiner(str.replace('-', '_').replace(' ', '-'), false, '_')
+        return nameCaseJoiner(str.replace('-', '_').replace(' ', '_'), false, '_')
                 .toUpperCase();
     }
 

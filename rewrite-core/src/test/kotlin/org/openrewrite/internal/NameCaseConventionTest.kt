@@ -34,7 +34,7 @@ class NameCaseConventionTest {
             "FooBBar:foo-bbar",
             "fooBBar:foo-bbar",
             "fooBar:foo-bar",
-            "foo bar:foo_bar",
+            "foo bar:foo-bar",
         ], delimiter = ':'
     )
     fun lowerHyphen(input: String, expected: String) {
