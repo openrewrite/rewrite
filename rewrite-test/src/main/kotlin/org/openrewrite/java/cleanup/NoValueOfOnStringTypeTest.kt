@@ -91,6 +91,18 @@ interface NoValueOfOnStringTypeTest : JavaRecipeTest {
     )
 
     @Test
+    @Suppress("UnnecessaryCallToStringValueOf")
+    fun valueOfOnNonStringPrimitiveWithinBinaryNotAString() = assertUnchanged(
+        before = """
+            class Test {
+                static void count(int i) {
+                    String fred = String.valueOf(i) + i;
+                }
+            }
+        """
+    )
+
+    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1200")
     fun valueOfIsMethodInvocationPartOfBinary() = assertUnchanged(
         before = """
@@ -126,18 +138,11 @@ interface NoValueOfOnStringTypeTest : JavaRecipeTest {
     )
 
     @Test
-    fun concatenationResultingInNonString() = assertChanged(
+    fun concatenationResultingInNonString() = assertUnchanged(
         before = """
             class Test {
                 static void method(int i) {
-                    String str = String.valueOf(i) + i;
-                }
-            }
-        """,
-        after = """
-            class Test {
-                static void method(int i) {
-                    String str = i + i;
+                    String str = i + String.valueOf(i);
                 }
             }
         """

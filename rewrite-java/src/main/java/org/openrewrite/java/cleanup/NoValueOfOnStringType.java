@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.JavaTemplate;
@@ -24,6 +23,7 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.time.Duration;
@@ -69,19 +69,37 @@ public class NoValueOfOnStringType extends Recipe {
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 if (VALUE_OF.matches(mi) && mi.getArguments().size() == 1) {
-                    J parent = getCursor().getParent() != null ? getCursor().getParent().firstEnclosing(J.class) : null;
                     Expression argument = mi.getArguments().get(0);
 
-                    if (TypeUtils.isString(argument.getType())
-                            || (parent instanceof J.Binary
-                                            && ((J.Binary) parent).getOperator() == J.Binary.Type.Addition
-                                            && TypeUtils.asPrimitive(argument.getType()) != null)) {
+                    if (TypeUtils.isString(argument.getType()) || removeValueOfFromBinaryExpression(argument)) {
                         return mi.withTemplate(t, mi.getCoordinates().replace(), argument);
                     }
                 }
                 return mi;
             }
+
+            /**
+             * If the String#valueOf method is within a binary expression and the argument is a primitive, the valueOf
+             * can be removed if the binary expression's type is a String.
+             *
+             * @param argument The argument of the valueOf method.
+             * @return True if the method can be removed.
+             */
+            private boolean removeValueOfFromBinaryExpression(Expression argument) {
+
+                if (TypeUtils.asPrimitive(argument.getType()) != null) {
+                    J parent = getCursor().getParent() != null ? getCursor().getParent().firstEnclosing(J.class) : null;
+                    if (parent instanceof J.Binary) {
+                        J.Binary b = (J.Binary) parent;
+                        JavaType otherType = b.getRight() == getCursor().getValue() ? b.getLeft().getType() : b.getRight().getType();
+                        return TypeUtils.isString(otherType) && b.getOperator() == J.Binary.Type.Addition;
+                    }
+                }
+                return false;
+            }
+
         };
     }
+
 
 }
