@@ -63,7 +63,7 @@ interface NoValueOfOnStringTypeTest : JavaRecipeTest {
                     str = String.valueOf(0);
                     str = "changeMe" + 0;
                     str = String.valueOf(data);
-                    str = "changeMe" + data;
+                    str = "changeMe" + String.valueOf(data);
                     str = String.valueOf(data, 0, 0);
                     str = "doNotChangeMe" + String.valueOf(data, 0, 0);
                 }
@@ -111,7 +111,7 @@ interface NoValueOfOnStringTypeTest : JavaRecipeTest {
         before = """
             class Test {
                 static String method(String val) {
-                    return String.valueOf(val);
+                    return val;
                 }
             }
         """
@@ -137,11 +137,18 @@ interface NoValueOfOnStringTypeTest : JavaRecipeTest {
     )
 
     @Test
-    fun concatenationResultingInNonString() = assertUnchanged(
+    fun concatenationResultingInNonString() = assertChanged(
         before = """
             class Test {
                 static void method(int i) {
                     String str = String.valueOf(i) + i;
+                }
+            }
+        """,
+        after = """
+            class Test {
+                static void method(int i) {
+                    String str = i + i;
                 }
             }
         """
@@ -164,11 +171,22 @@ interface NoValueOfOnStringTypeTest : JavaRecipeTest {
 
     @Test
     @Suppress("UnnecessaryCallToStringValueOf")
-    fun valueOfOnMethodInvocation() = assertUnchanged(
+    fun valueOfOnMethodInvocation() = assertChanged(
         before = """
             class Test {
                 static void method1() {
                     String a = String.valueOf(method2());
+                }
+
+                static String method2() {
+                    return "";
+                }
+            }
+        """,
+        after = """
+            class Test {
+                static void method1() {
+                    String a = method2();
                 }
 
                 static String method2() {

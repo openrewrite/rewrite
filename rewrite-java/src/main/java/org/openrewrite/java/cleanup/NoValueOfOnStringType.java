@@ -65,28 +65,13 @@ public class NoValueOfOnStringType extends Recipe {
         return new JavaVisitor<ExecutionContext>() {
             private final JavaTemplate t = JavaTemplate.builder(this::getCursor, "#{any(java.lang.String)}").build();
 
-            private boolean isLiteralString(Expression e) {
-                return e instanceof J.Literal && TypeUtils.isString(e.getType());
-            }
-
-            private boolean isThisElementAnOperandInABinaryStringConcatenation(Cursor c) {
-                J maybeBinary = c.dropParentUntil(J.class::isInstance).getValue();
-                if (maybeBinary instanceof J.Binary) {
-                    J.Binary parent = (J.Binary) maybeBinary;
-                    if (parent.getOperator() == J.Binary.Type.Addition) {
-                        // We already know _one_ of the operands will be the MethodInvocation we're checking, but this is clean.
-                        return TypeUtils.isString(parent.getLeft().getType()) && TypeUtils.isString(parent.getRight().getType());
-                    }
-                }
-                return false;
-            }
-
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 if (VALUE_OF.matches(mi) && mi.getArguments().size() == 1) {
+                    J parent = getCursor().getParent() != null ? getCursor().getParent().firstEnclosing(J.class) : null;
                     Expression argument = mi.getArguments().get(0);
-                    if (isLiteralString(argument) || isThisElementAnOperandInABinaryStringConcatenation(getCursor())) {
+                    if (TypeUtils.isString(argument.getType()) || (parent instanceof J.Binary && TypeUtils.asPrimitive(argument.getType()) != null)) {
                         return mi.withTemplate(t, mi.getCoordinates().replace(), argument);
                     }
                 }
