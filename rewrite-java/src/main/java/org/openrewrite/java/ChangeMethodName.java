@@ -65,7 +65,7 @@ public class ChangeMethodName extends Recipe {
             @Override
             public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
                 doAfterVisit(new UsesMethod<>(methodPattern, matchOverrides));
-                doAfterVisit(new DeclaresMethod<>(methodPattern));
+                doAfterVisit(new DeclaresMethod<>(methodPattern, matchOverrides));
                 return cu;
             }
         };

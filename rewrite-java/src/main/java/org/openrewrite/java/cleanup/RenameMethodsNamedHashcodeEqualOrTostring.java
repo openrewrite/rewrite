@@ -33,8 +33,8 @@ import java.util.Collections;
 import java.util.Set;
 
 public class RenameMethodsNamedHashcodeEqualOrTostring extends Recipe {
-    private static final MethodMatcher NO_ARGS = new MethodMatcher("*..* *()");
-    private static final MethodMatcher OBJECT_ARG = new MethodMatcher("*..* *(java.lang.Object)");
+    private static final MethodMatcher NO_ARGS = new MethodMatcher("*..* *()", true);
+    private static final MethodMatcher OBJECT_ARG = new MethodMatcher("*..* *(java.lang.Object)", true);
 
     @Override
     public String getDisplayName() {
