@@ -16,7 +16,6 @@
 package org.openrewrite.xml
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.internal.StringUtils
@@ -64,7 +63,6 @@ class XmlParserTest {
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/145")
-    @Disabled
     @Test
     fun commentBeforeContent() = assertUnchanged(
         before = """
@@ -75,7 +73,6 @@ class XmlParserTest {
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/145")
-    @Disabled
     @Test
     fun commentBeforeContentNewline() = assertUnchanged(
         before ="""
@@ -90,7 +87,6 @@ class XmlParserTest {
 
 
     @Issue("https://github.com/openrewrite/rewrite/issues/145")
-    @Disabled
     @Test
     fun commentAfterContent() = assertUnchanged(
         before = """
