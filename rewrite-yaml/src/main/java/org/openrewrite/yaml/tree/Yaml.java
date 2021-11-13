@@ -29,7 +29,6 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.internal.YamlPrinter;
 
-import java.io.Serializable;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
@@ -38,7 +37,7 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-public interface Yaml extends Serializable, Tree {
+public interface Yaml extends Tree {
 
     @SuppressWarnings("unchecked")
     @Override

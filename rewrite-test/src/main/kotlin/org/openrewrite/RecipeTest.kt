@@ -15,21 +15,15 @@
  */
 package org.openrewrite
 
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import org.assertj.core.api.Assertions.*
 import org.junit.jupiter.api.fail
 import org.openrewrite.config.Environment
 import org.openrewrite.scheduling.DirectScheduler
-import org.openrewrite.scheduling.ForkJoinScheduler
 import java.io.File
-import java.io.IOException
-import java.io.UncheckedIOException
 import java.nio.file.Path
 import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.ForkJoinPool
 
 interface RecipeTest<T : SourceFile> {
     val recipe: Recipe?
@@ -198,113 +192,6 @@ interface RecipeTest<T : SourceFile> {
         override fun getVisitor(): TreeVisitor<*, ExecutionContext> = visitor()
     }
 
-    @Suppress("UNCHECKED_CAST")
-    fun assertChangedBase(
-        recipe: Recipe = this.recipe!!,
-        moderneAstLink: String,
-        moderneApiBearerToken: String = apiTokenFromUserHome(),
-        after: String,
-        cycles: Int = 2,
-        expectedCyclesThatMakeChanges: Int = cycles - 1,
-        afterConditions: (T) -> Unit = { }
-    ) {
-        val treeSerializer = TreeSerializer<T>()
-        val httpClient = OkHttpClient.Builder().build()
-        try {
-            val request = Request.Builder()
-                .url(moderneAstLink)
-                .header("Authorization", moderneApiBearerToken)
-                .build()
-
-            httpClient.newCall(request).execute().use { response ->
-                check(response.isSuccessful) { "Unexpected status $response" }
-                val source = treeSerializer.read(response.peekBody(Long.MAX_VALUE).byteStream())
-
-                val recipeSchedulerCheckingExpectedCycles =
-                    RecipeSchedulerCheckingExpectedCycles(
-                        ForkJoinScheduler(ForkJoinPool(1)),
-                        expectedCyclesThatMakeChanges
-                    )
-
-                var results = recipe.run(
-                    listOf(source),
-                    executionContext,
-                    recipeSchedulerCheckingExpectedCycles,
-                    cycles,
-                    expectedCyclesThatMakeChanges + 1
-                )
-
-                results = results.filter { it.before == source }
-
-                if (results.isEmpty()) {
-                    fail<Any>("The recipe must make changes")
-                }
-
-                val result = results.first()
-
-                assertThat(result).`as`("The recipe must make changes").isNotNull
-                assertThat(result!!.after).isNotNull
-                assertThat(result.after!!.printAll())
-                    .isEqualTo(after.trimIndentPreserveCRLF())
-                afterConditions(result.after as T)
-
-                recipeSchedulerCheckingExpectedCycles.verify()
-            }
-        } catch (e: IOException) {
-            throw UncheckedIOException(e)
-        }
-    }
-
-    fun assertUnchanged(
-        recipe: Recipe = this.recipe!!,
-        moderneAstLink: String,
-        moderneApiBearerToken: String = apiTokenFromUserHome()
-    ) {
-        val treeSerializer = TreeSerializer<T>()
-        val httpClient = OkHttpClient.Builder().build()
-        try {
-            val request = Request.Builder()
-                .url(moderneAstLink)
-                .header("Authorization", moderneApiBearerToken)
-                .build()
-
-            httpClient.newCall(request).execute().use { response ->
-                check(response.isSuccessful) { "Unexpected status $response" }
-                val source = treeSerializer.read(response.peekBody(Long.MAX_VALUE).byteStream())
-
-                val results = recipe
-                    .run(
-                        listOf(source),
-                        executionContext,
-                        2
-                    )
-
-                results.forEach { result ->
-                    if (result.diff().isEmpty()) {
-                        fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.")
-                    }
-                }
-
-                for (result in results) {
-                    assertThat(result.after?.printAll())
-                        .`as`("The recipe must not make changes")
-                        .isEqualTo(result.before?.printAll())
-                }
-            }
-        } catch (e: IOException) {
-            throw UncheckedIOException(e)
-        }
-    }
-
-    fun apiTokenFromUserHome(): String {
-        val tokenFile = File(System.getProperty("user.home") + "/.moderne/token.txt")
-        if (!tokenFile.exists()) {
-            throw IllegalStateException("No token file was not found at ~/.moderne/token.txt")
-        }
-        val token = tokenFile.readText().trim()
-        return if (token.startsWith("Bearer ")) token else "Bearer $token"
-    }
-
     private class RecipeSchedulerCheckingExpectedCycles(
         private val delegate: RecipeScheduler,
         private val expectedCyclesThatMakeChanges: Int
@@ -350,7 +237,7 @@ interface RecipeTest<T : SourceFile> {
 
     private fun String.trimIndentPreserveCRLF() = replace('\r', '⏎').trimIndent().replace('⏎', '\r')
 
-    fun fromRuntimeClasspath(recipe: String) = Environment.builder()
+    fun fromRuntimeClasspath(recipe: String): Recipe = Environment.builder()
         .scanRuntimeClasspath()
         .build()
         .activateRecipes(recipe)

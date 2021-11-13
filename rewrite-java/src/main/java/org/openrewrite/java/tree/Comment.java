@@ -15,11 +15,10 @@
  */
 package org.openrewrite.java.tree;
 
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import org.openrewrite.NonCyclicSerializable;
 import org.openrewrite.marker.Markers;
 
-@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
-public interface Comment {
+public interface Comment extends NonCyclicSerializable {
     Markers getMarkers();
     <C extends Comment> C withMarkers(Markers markers);
 

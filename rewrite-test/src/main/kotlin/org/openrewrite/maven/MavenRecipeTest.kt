@@ -63,26 +63,6 @@ interface MavenRecipeTest : RecipeTest<Maven> {
             .build()
 
     fun assertChanged(
-        recipe: Recipe = this.recipe!!,
-        moderneAstLink: String,
-        moderneApiBearerToken: String = apiTokenFromUserHome(),
-        @Language("xml") after: String,
-        cycles: Int = 2,
-        expectedCyclesThatMakeChanges: Int = cycles - 1,
-        afterConditions: (Maven) -> Unit = { }
-    ) {
-        super.assertChangedBase(
-            recipe,
-            moderneAstLink,
-            moderneApiBearerToken,
-            after,
-            cycles,
-            expectedCyclesThatMakeChanges,
-            afterConditions
-        )
-    }
-
-    fun assertChanged(
         parser: MavenParser = this.parser,
         recipe: Recipe = this.recipe!!,
         @Language("xml") before: String,

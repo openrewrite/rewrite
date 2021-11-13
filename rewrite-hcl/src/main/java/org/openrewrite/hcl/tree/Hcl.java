@@ -28,7 +28,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.template.SourceTemplate;
 
-import java.io.Serializable;
 import java.lang.ref.WeakReference;
 import java.nio.file.Path;
 import java.util.List;
@@ -36,7 +35,7 @@ import java.util.UUID;
 
 @SuppressWarnings("unused")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-public interface Hcl extends Serializable, Tree {
+public interface Hcl extends Tree {
 
     @SuppressWarnings("unchecked")
     @Override

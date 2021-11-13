@@ -16,10 +16,8 @@
 package org.openrewrite.hcl.tree;
 
 import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.TreeSerializer;
 import org.openrewrite.hcl.HclParser;
 import org.openrewrite.hcl.HclVisitor;
-import org.openrewrite.internal.StringUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -34,12 +32,5 @@ public interface HclTreeTest {
 
         Hcl processed = new HclVisitor<>().visit(cf, new Object());
         assertThat(processed).as("Processing is idempotent").isSameAs(cf);
-
-        TreeSerializer<Hcl.ConfigFile> treeSerializer = new TreeSerializer<>();
-        Hcl.ConfigFile roundTripCf = treeSerializer.read(treeSerializer.write(cf));
-
-        assertThat(roundTripCf.printAll())
-                .as("Source code is printed the same after parsing")
-                .isEqualTo(StringUtils.trimIndent(code));
     }
 }

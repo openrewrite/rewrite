@@ -29,7 +29,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
-import java.io.Serializable;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
@@ -44,9 +43,7 @@ import static org.openrewrite.Tree.randomId;
 
 @SuppressWarnings("unchecked")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-public interface Polyglot extends Serializable, Tree {
-
-    UUID getId();
+public interface Polyglot extends Tree {
 
     Value getValue();
 

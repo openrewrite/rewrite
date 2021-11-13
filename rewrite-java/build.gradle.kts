@@ -24,7 +24,7 @@ dependencies {
     implementation("commons-lang:commons-lang:latest.release")
     implementation("io.github.classgraph:classgraph:latest.release")
 
-    api("com.fasterxml.jackson.core:jackson-annotations:2.12.+")
+    api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
 
     implementation("org.ow2.asm:asm:latest.release")
     implementation("org.ow2.asm:asm-util:latest.release")

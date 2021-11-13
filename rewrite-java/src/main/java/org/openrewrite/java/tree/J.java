@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.tree;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.*;
@@ -33,7 +32,6 @@ import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.template.SourceTemplate;
 
-import java.io.Serializable;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.nio.file.Path;
@@ -49,7 +47,7 @@ import static java.util.stream.Collectors.toList;
 
 @SuppressWarnings("unused")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-public interface J extends Serializable, Tree {
+public interface J extends Tree {
     static void clearCaches() {
         Identifier.flyweights.clear();
         JavaTemplateParser.clearCache();
@@ -944,7 +942,7 @@ public interface J extends Serializable, Tree {
                 return this;
             }
 
-            if (!(type instanceof JavaType.FullyQualified)) {
+            if (type != null && !(type instanceof JavaType.FullyQualified)) {
                 throw new IllegalArgumentException("A class can only be type attributed with a fully qualified type name");
             }
 
@@ -1097,7 +1095,6 @@ public interface J extends Serializable, Tree {
         }
     }
 
-    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -2046,7 +2043,6 @@ public interface J extends Serializable, Tree {
             return build(id, prefix, markers, simpleName, type, null);
         }
 
-        @JsonCreator
         public static Identifier build(UUID id,
                                        Space prefix,
                                        Markers markers,
@@ -2068,7 +2064,7 @@ public interface J extends Serializable, Tree {
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @Data
-        public static final class IdentifierFlyweight implements Serializable {
+        public static final class IdentifierFlyweight {
             String simpleName;
 
             @Nullable
@@ -3886,16 +3882,16 @@ public interface J extends Serializable, Tree {
 
         @Override
         public JavaType getType() {
-            return tree instanceof Expression ? ((Expression) tree).getType() :
-                    tree instanceof NameTree ? ((NameTree) tree).getType() :
+            return tree.getElement() instanceof Expression ? ((Expression) tree.getElement()).getType() :
+                    tree.getElement() instanceof NameTree ? ((NameTree) tree.getElement()).getType() :
                             null;
         }
 
         @SuppressWarnings("unchecked")
         @Override
         public Parentheses<J2> withType(@Nullable JavaType type) {
-            return tree instanceof Expression ? ((Expression) tree).withType(type) :
-                    tree instanceof NameTree ? ((NameTree) tree).withType(type) :
+            return tree.getElement() instanceof Expression ? withTree(((Expression) tree.getElement()).withType(type)) :
+                    tree.getElement() instanceof NameTree ? withTree(((NameTree) tree.getElement()).withType(type)) :
                             this;
         }
 
@@ -3968,7 +3964,7 @@ public interface J extends Serializable, Tree {
 
         @Override
         public List<J> getSideEffects() {
-            return tree instanceof Expression ? ((Expression) tree).getSideEffects() : emptyList();
+            return tree.getElement() instanceof Expression ? ((Expression) tree.getElement()).getSideEffects() : emptyList();
         }
 
         @Override
@@ -3989,8 +3985,8 @@ public interface J extends Serializable, Tree {
         @SuppressWarnings("unchecked")
         @Override
         public ControlParentheses<J2> withType(@Nullable JavaType type) {
-            return tree instanceof Expression ? ((Expression) tree).withType(type) :
-                    tree instanceof NameTree ? ((NameTree) tree).withType(type) :
+            return tree.getElement() instanceof Expression ? withTree(((Expression) tree.getElement()).withType(type)) :
+                    tree.getElement() instanceof NameTree ? withTree(((NameTree) tree.getElement()).withType(type)) :
                             this;
         }
 

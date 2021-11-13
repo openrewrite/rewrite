@@ -99,19 +99,11 @@ public class TypeMapping {
                                 kind = JavaType.Class.Kind.Class;
                             }
 
-                            JavaType.FullyQualified owner = null;
-                            if (sym.owner instanceof Symbol.ClassSymbol) {
-                                owner = TypeUtils.asFullyQualified(type(sym.owner.type, stack));
-                            }
-
                             return new JavaType.Class(
                                     sym.flags_field,
                                     sym.className(),
                                     kind,
-                                    null, null, null, null,
-                                    TypeUtils.asFullyQualified(type(classType.supertype_field == null ? symType.supertype_field :
-                                            classType.supertype_field, stack)),
-                                    owner
+                                    null, null,null, null, null, null
                             );
                         });
 
@@ -121,6 +113,14 @@ public class TypeMapping {
                 if (newlyCreated.get()) {
                     Map<String, JavaType.Class> stackWithSym = new HashMap<>(stack);
                     stackWithSym.put(sym.className(), clazz);
+
+                    JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(classType.supertype_field == null ? symType.supertype_field :
+                            classType.supertype_field, stack));
+
+                    JavaType.FullyQualified owner = null;
+                    if (sym.owner instanceof Symbol.ClassSymbol) {
+                        owner = TypeUtils.asFullyQualified(type(sym.owner.type, stack));
+                    }
 
                     List<JavaType.Variable> fields = null;
                     List<JavaType.Method> methods = null;
@@ -152,10 +152,8 @@ public class TypeMapping {
                         }
                     }
 
-                    List<JavaType.FullyQualified> interfaces;
-                    if (symType.interfaces_field == null) {
-                        interfaces = null;
-                    } else {
+                    List<JavaType.FullyQualified> interfaces = null;
+                    if (symType.interfaces_field != null) {
                         interfaces = new ArrayList<>(symType.interfaces_field.length());
                         for (com.sun.tools.javac.code.Type iParam : symType.interfaces_field) {
                             JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(iParam, stack));
@@ -176,7 +174,7 @@ public class TypeMapping {
                         }
                     }
 
-                    clazz.unsafeSet(annotations, interfaces, fields, methods);
+                    clazz.unsafeSet(supertype, owner, annotations, interfaces, fields, methods);
                 }
 
                 if (classType.typarams_field == null || classType.typarams_field.length() == 0) {
@@ -194,7 +192,7 @@ public class TypeMapping {
                     JavaType.Parameterized parameterized = typeCache.computeParameterized(getClasspathElement(sym), sym.className(),
                             shallowGenericTypeVariables.toString(), () -> {
                                 newlyCreated.set(true);
-                                return new JavaType.Parameterized(clazz, emptyList());
+                                return new JavaType.Parameterized(null, null);
                             });
 
                     if (newlyCreated.get()) {
@@ -206,7 +204,7 @@ public class TypeMapping {
                             }
                         }
 
-                        parameterized.unsafeSet(typeParameters);
+                        parameterized.unsafeSet(clazz, typeParameters);
                     }
 
                     return parameterized;
@@ -296,7 +294,7 @@ public class TypeMapping {
                         return null;
                     }
 
-                    List<JavaType.FullyQualified> annotations = emptyList();
+                    List<JavaType.FullyQualified> annotations = null;
                     if (!symbol.getDeclarationAttributes().isEmpty()) {
                         annotations = new ArrayList<>(symbol.getDeclarationAttributes().size());
                         for (Attribute.Compound a : symbol.getDeclarationAttributes()) {
@@ -309,8 +307,8 @@ public class TypeMapping {
 
                     return new JavaType.Variable(
                             symbol.flags_field,
-                            owner,
                             symbol.name.toString(),
+                            owner,
                             type(symbol.type, stack),
                             annotations
                     );
@@ -343,7 +341,7 @@ public class TypeMapping {
 
             return typeCache.computeMethod(classfile(symbol.owner.type), signature(symbol.owner.type), methodName, signature(selectType.getReturnType()),
                     argumentTypeSignatures.toString(), () -> {
-                        List<String> paramNames = emptyList();
+                        List<String> paramNames = null;
                         if (!methodSymbol.params().isEmpty()) {
                             paramNames = new ArrayList<>(methodSymbol.params().size());
                             for (Symbol.VarSymbol p : methodSymbol.params()) {
@@ -356,7 +354,7 @@ public class TypeMapping {
                                 ((com.sun.tools.javac.code.Type.ForAll) methodSymbol.type).qtype :
                                 methodSymbol.type;
 
-                        List<JavaType.FullyQualified> exceptionTypes = emptyList();
+                        List<JavaType.FullyQualified> exceptionTypes = null;
                         if (selectType instanceof Type.MethodType) {
                             Type.MethodType methodType = (Type.MethodType) selectType;
                             if (!methodType.thrown.isEmpty()) {
@@ -391,7 +389,7 @@ public class TypeMapping {
                             return null;
                         }
 
-                        List<JavaType.FullyQualified> annotations = emptyList();
+                        List<JavaType.FullyQualified> annotations = null;
                         if (!methodSymbol.getDeclarationAttributes().isEmpty()) {
                             annotations = new ArrayList<>(methodSymbol.getDeclarationAttributes().size());
                             for (Attribute.Compound a : methodSymbol.getDeclarationAttributes()) {
@@ -406,10 +404,10 @@ public class TypeMapping {
                                 methodSymbol.flags_field,
                                 declaringType,
                                 methodName,
+                                paramNames,
                                 methodSignature(genericSignatureType, stack),
                                 methodSignature(selectType, stack),
-                                paramNames,
-                                Collections.unmodifiableList(exceptionTypes),
+                                exceptionTypes,
                                 annotations
                         );
                     });

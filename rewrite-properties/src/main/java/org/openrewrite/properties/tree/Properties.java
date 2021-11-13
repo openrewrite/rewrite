@@ -29,13 +29,12 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.internal.PropertiesPrinter;
 
-import java.io.Serializable;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-public interface Properties extends Serializable, Tree {
+public interface Properties extends Tree {
 
     @SuppressWarnings("unchecked")
     @Override

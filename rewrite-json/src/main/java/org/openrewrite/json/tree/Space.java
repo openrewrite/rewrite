@@ -15,10 +15,10 @@
  */
 package org.openrewrite.json.tree;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.EqualsAndHashCode;
+import org.openrewrite.NonCyclicSerializable;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
@@ -35,7 +35,7 @@ import static java.util.Collections.emptyList;
  */
 @EqualsAndHashCode
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-public class Space {
+public class Space implements NonCyclicSerializable {
     public static final Space EMPTY = new Space("", emptyList());
 
     private final List<Comment> comments;
@@ -55,7 +55,6 @@ public class Space {
         this.whitespace = whitespace == null || whitespace.isEmpty() ? null : whitespace;
     }
 
-    @JsonCreator
     public static Space build(@Nullable String whitespace, List<Comment> comments) {
         if (comments.isEmpty()) {
             if (whitespace == null || whitespace.isEmpty()) {

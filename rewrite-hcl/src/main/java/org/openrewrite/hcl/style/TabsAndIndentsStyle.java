@@ -16,7 +16,7 @@
 package org.openrewrite.hcl.style;
 
 import lombok.AccessLevel;
-import lombok.Data;
+import lombok.Value;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.hcl.HclStyle;
@@ -24,14 +24,14 @@ import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@Data
+@Value
 @With
 public class TabsAndIndentsStyle implements HclStyle {
     public static final TabsAndIndentsStyle DEFAULT = new TabsAndIndentsStyle(false, 2, 2);
 
-    private Boolean useTabCharacter;
-    private Integer tabSize;
-    private Integer indentSize;
+    Boolean useTabCharacter;
+    Integer tabSize;
+    Integer indentSize;
 
     @Override
     public Style applyDefaults() {

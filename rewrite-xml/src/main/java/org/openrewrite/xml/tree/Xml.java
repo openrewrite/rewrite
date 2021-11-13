@@ -33,7 +33,6 @@ import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.internal.XmlListMarkersVisitor;
 import org.openrewrite.xml.internal.XmlPrinter;
 
-import java.io.Serializable;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -46,7 +45,7 @@ import static org.openrewrite.Tree.randomId;
  * The XML <a href="https://www.w3.org/TR/xml11/#syntax">spec</a>.
  */
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-public interface Xml extends Serializable, Tree {
+public interface Xml extends Tree {
 
     @SuppressWarnings("unchecked")
     @Override

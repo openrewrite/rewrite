@@ -16,10 +16,10 @@
 package org.openrewrite.style;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import org.openrewrite.SourceFile;
+import org.openrewrite.NonCyclicSerializable;
 
 /**
  * Styles represent project-level standards that each source file is expected to follow, e.g.
@@ -29,12 +29,7 @@ import org.openrewrite.SourceFile;
  */
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
-public interface Style {
-    @JsonProperty("@c")
-    default String getJacksonPolymorphicTypeTag() {
-        return getClass().getName();
-    }
-
+public interface Style extends NonCyclicSerializable {
     default Style merge(Style lowerPrecedence) {
         return this;
     }

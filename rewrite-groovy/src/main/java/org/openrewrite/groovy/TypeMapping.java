@@ -33,7 +33,6 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
-import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 
 @RequiredArgsConstructor
@@ -77,21 +76,27 @@ class TypeMapping {
                                     .collect(Collectors.toList())
                     );
 
+                    List<String> paramNames = Arrays.stream(node.getParameters())
+                            .map(org.codehaus.groovy.ast.Parameter::getName)
+                            .collect(Collectors.toList());
+
+                    List<JavaType.FullyQualified> thrownExceptions = Arrays.stream(node.getExceptions())
+                            .map(e -> (JavaType.FullyQualified) type(e, emptyMap()))
+                            .collect(Collectors.toList());
+
+                    List<JavaType.FullyQualified> annotations = node.getAnnotations().stream()
+                            .map(a -> (JavaType.FullyQualified) type(a.getClassNode(), emptyMap()))
+                            .collect(Collectors.toList());
+
                     return new JavaType.Method(
                             node.getModifiers(),
                             (JavaType.FullyQualified) type(node.getDeclaringClass(), emptyMap()),
                             node.getName(),
+                            paramNames.isEmpty() ? null : paramNames,
                             signature,
                             signature,
-                            Arrays.stream(node.getParameters())
-                                    .map(org.codehaus.groovy.ast.Parameter::getName)
-                                    .collect(Collectors.toList()),
-                            Arrays.stream(node.getExceptions())
-                                    .map(e -> (JavaType.FullyQualified) type(e, emptyMap()))
-                                    .collect(Collectors.toList()),
-                            node.getAnnotations().stream()
-                                    .map(a -> (JavaType.FullyQualified) type(a.getClassNode(), emptyMap()))
-                                    .collect(Collectors.toList())
+                            thrownExceptions.isEmpty() ? null : thrownExceptions,
+                            annotations.isEmpty() ? null : annotations
                     );
                 }
         );
@@ -135,11 +140,15 @@ class TypeMapping {
                 Paths.get("dontknow"),
                 clazz.getName(),
                 genericSignatures.toString(),
-                () -> new JavaType.Parameterized(type(clazz, stack), emptyList())
+                () -> {
+                    newlyCreated.set(true);
+                    return new JavaType.Parameterized(null, null);
+                }
         );
 
         if (newlyCreated.get()) {
             parameterized.unsafeSet(
+                    type(clazz, stack),
                     Arrays.stream(generics)
                             .map(g -> {
                                 if (g.getUpperBounds() != null) {
@@ -192,9 +201,7 @@ class TypeMapping {
                     clazz.getModifiers(),
                     clazz.getName(),
                     kind,
-                    null, null, null, null,
-                    type(clazz.getSuperclass(), stack),
-                    type(clazz.getDeclaringClass(), stack)
+                    null, null, null, null, null, null
             );
         });
 
@@ -202,20 +209,33 @@ class TypeMapping {
             Map<String, JavaType.Class> stackWithSym = new HashMap<>(stack);
             stackWithSym.put(clazz.getName(), mappedClazz);
 
+            JavaType.FullyQualified supertype = type(clazz.getSuperclass(), stack);
+            JavaType.FullyQualified owner = type(clazz.getDeclaringClass(), stack);
+
+            List<JavaType.FullyQualified> annotations = Arrays.stream(clazz.getDeclaredAnnotations())
+                    .map(a -> (JavaType.FullyQualified) type(a.annotationType(), stackWithSym))
+                    .collect(Collectors.toList());
+
+            List<JavaType.FullyQualified> interfaces = Arrays.stream(clazz.getInterfaces())
+                    .map(i -> (JavaType.FullyQualified) type(i, stackWithSym))
+                    .collect(Collectors.toList());
+
+            List<JavaType.Variable> members = Arrays.stream(clazz.getDeclaredFields())
+                    .filter(f -> !clazz.getName().equals("java.lang.String") || !f.getName().equals("serialPersistentFields"))
+                    .map(f -> field(f, stackWithSym))
+                    .collect(Collectors.toList());
+
+            List<JavaType.Method> methods = Arrays.stream(clazz.getDeclaredMethods())
+                    .map(m -> method(m, stackWithSym))
+                    .collect(Collectors.toList());
+
             mappedClazz.unsafeSet(
-                    Arrays.stream(clazz.getDeclaredAnnotations())
-                            .map(a -> (JavaType.FullyQualified) type(a.annotationType(), stackWithSym))
-                            .collect(Collectors.toList()),
-                    Arrays.stream(clazz.getInterfaces())
-                            .map(i -> (JavaType.FullyQualified) type(i, stackWithSym))
-                            .collect(Collectors.toList()),
-                    Arrays.stream(clazz.getDeclaredFields())
-                            .filter(f -> !clazz.getName().equals("java.lang.String") || !f.getName().equals("serialPersistentFields"))
-                            .map(f -> field(f, stackWithSym))
-                            .collect(Collectors.toList()),
-                    Arrays.stream(clazz.getDeclaredMethods())
-                            .map(m -> method(m, stackWithSym))
-                            .collect(Collectors.toList())
+                    supertype,
+                    owner,
+                    annotations.isEmpty() ? null : annotations,
+                    interfaces.isEmpty() ? null : interfaces,
+                    members.isEmpty() ? null : members,
+                    methods.isEmpty() ? null : methods
             );
         }
 
@@ -229,8 +249,8 @@ class TypeMapping {
                 field.getName(),
                 () -> new JavaType.Variable(
                         field.getModifiers(),
-                        type(field.getDeclaringClass(), stack),
                         field.getName(),
+                        type(field.getDeclaringClass(), stack),
                         type(field.getType(), stack),
                         Arrays.stream(field.getDeclaredAnnotations())
                                 .map(a -> (JavaType.FullyQualified) type(a.annotationType(), stack))
@@ -253,22 +273,30 @@ class TypeMapping {
                 method.getName(),
                 method.getReturnType().getName(),
                 argumentTypeSignatures.toString(),
-                () -> new JavaType.Method(
-                        method.getModifiers(),
-                        type(method.getDeclaringClass(), stack),
-                        method.getName(),
-                        null,
-                        null,
-                        Arrays.stream(method.getParameters())
-                                .map(Parameter::getName)
-                                .collect(Collectors.toList()),
-                        Arrays.stream(method.getExceptionTypes())
-                                .map(e -> (JavaType.FullyQualified) type(e, stack))
-                                .collect(Collectors.toList()),
-                        Arrays.stream(method.getDeclaredAnnotations())
-                                .map(a -> (JavaType.FullyQualified) type(a.annotationType(), stack))
-                                .collect(Collectors.toList())
-                )
+                () -> {
+                    List<String> paramNames = Arrays.stream(method.getParameters())
+                            .map(Parameter::getName)
+                            .collect(Collectors.toList());
+
+                    List<JavaType.FullyQualified> thrownExceptions = Arrays.stream(method.getExceptionTypes())
+                            .map(e -> (JavaType.FullyQualified) type(e, stack))
+                            .collect(Collectors.toList());
+
+                    List<JavaType.FullyQualified> annotations = Arrays.stream(method.getDeclaredAnnotations())
+                            .map(a -> (JavaType.FullyQualified) type(a.annotationType(), stack))
+                            .collect(Collectors.toList());
+
+                    return new JavaType.Method(
+                            method.getModifiers(),
+                            type(method.getDeclaringClass(), stack),
+                            method.getName(),
+                            paramNames.isEmpty() ? null : paramNames,
+                            null,
+                            null,
+                            thrownExceptions.isEmpty() ? null : thrownExceptions,
+                            annotations.isEmpty() ? null : annotations
+                    );
+                }
         );
     }
 }

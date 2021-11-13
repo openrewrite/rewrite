@@ -17,7 +17,6 @@ package org.openrewrite.groovy.tree;
 
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.TreeSerializer;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.internal.StringUtils;
@@ -36,12 +35,5 @@ public interface GroovyTreeTest {
 
         J processed = new GroovyVisitor<>().visit(cu, new Object());
         assertThat(processed).as("Processing is idempotent").isSameAs(cu);
-
-        TreeSerializer<G.CompilationUnit> treeSerializer = new TreeSerializer<>();
-        G.CompilationUnit roundTripCu = treeSerializer.read(treeSerializer.write(cu));
-
-        assertThat(roundTripCu.printAll())
-                .as("Source code is printed the same after parsing")
-                .isEqualTo(StringUtils.trimIndent(code));
     }
 }

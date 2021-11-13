@@ -26,14 +26,13 @@ import org.openrewrite.json.JsonVisitor;
 import org.openrewrite.json.internal.JsonPrinter;
 import org.openrewrite.marker.Markers;
 
-import java.io.Serializable;
 import java.lang.ref.WeakReference;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-public interface Json extends Serializable, Tree {
+public interface Json extends Tree {
 
     @SuppressWarnings("unchecked")
     @Override

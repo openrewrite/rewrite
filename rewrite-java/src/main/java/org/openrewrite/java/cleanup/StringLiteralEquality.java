@@ -92,9 +92,9 @@ public class StringLiteralEquality extends Recipe {
                             Flag.Public.getBitMask(),
                             Objects.requireNonNull(TYPE_STRING),
                             "equals",
-                            INVOCATION_SIGNATURE,
-                            INVOCATION_SIGNATURE,
                             Collections.singletonList("o"),
+                            INVOCATION_SIGNATURE,
+                            INVOCATION_SIGNATURE,
                             Collections.emptyList(),
                             Collections.emptyList()
                     )

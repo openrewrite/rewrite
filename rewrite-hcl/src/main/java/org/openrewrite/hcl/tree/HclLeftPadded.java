@@ -15,27 +15,20 @@
  */
 package org.openrewrite.hcl.tree;
 
-import lombok.AccessLevel;
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import lombok.With;
-import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
 import java.util.function.UnaryOperator;
 
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+@Value
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-@Data
+@With
 public class HclLeftPadded<T> {
-    @With
     Space before;
-
-    @With
     T element;
-
-    @With
     Markers markers;
 
     public HclLeftPadded<T> map(UnaryOperator<T> map) {

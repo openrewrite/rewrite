@@ -28,18 +28,6 @@ interface PropertiesRecipeTest : RecipeTest<Properties.File> {
         get() = PropertiesParser()
 
     fun assertChanged(
-        recipe: Recipe = this.recipe!!,
-        moderneAstLink: String,
-        moderneApiBearerToken: String = apiTokenFromUserHome(),
-        @Language("properties") after: String,
-        cycles: Int = 2,
-        expectedCyclesThatMakeChanges: Int = cycles - 1,
-        afterConditions: (Properties.File) -> Unit = { }
-    ) {
-        super.assertChangedBase(recipe, moderneAstLink, moderneApiBearerToken, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
-    }
-
-    fun assertChanged(
         parser: PropertiesParser = this.parser,
         recipe: Recipe = this.recipe!!,
         @Language("properties") before: String,

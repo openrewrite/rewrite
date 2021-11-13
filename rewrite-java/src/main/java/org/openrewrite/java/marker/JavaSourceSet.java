@@ -158,9 +158,7 @@ public class JavaSourceSet implements Marker {
                                 Flag.flagsToBitMap(flags),
                                 aClass.getName(),
                                 kind,
-                                null, null, null, null,
-                                type(aClass.getSuperclass(), stack),
-                                null
+                                null,null, null, null, null, null
                         );
                     }
             );
@@ -168,6 +166,26 @@ public class JavaSourceSet implements Marker {
             if (newlyCreated.get()) {
                 Map<String, JavaType.Class> stackWithSym = new HashMap<>(stack);
                 stackWithSym.put(aClass.getName(), clazz);
+
+                JavaType.FullyQualified supertype = type(aClass.getSuperclass(), stackWithSym);
+                JavaType.FullyQualified owner = aClass.getOuterClasses().isEmpty() ? null :
+                        type(aClass.getOuterClasses().get(0), stackWithSym);
+
+                List<JavaType.FullyQualified> annotations = null;
+                if(!aClass.getAnnotationInfo().isEmpty()) {
+                    annotations = new ArrayList<>(aClass.getAnnotationInfo().size());
+                    for (AnnotationInfo annotationInfo : aClass.getAnnotationInfo()) {
+                        annotations.add(type(annotationInfo.getClassInfo(), stackWithSym));
+                    }
+                }
+
+                List<JavaType.FullyQualified> interfaces = null;
+                if(!aClass.getInterfaces().isEmpty()) {
+                    interfaces = new ArrayList<>(aClass.getInterfaces().size());
+                    for (ClassInfo anInterface : aClass.getInterfaces()) {
+                        interfaces.add(type(anInterface, stackWithSym));
+                    }
+                }
 
                 List<JavaType.Variable> variables = null;
                 if (!aClass.getFieldInfo().isEmpty()) {
@@ -189,7 +207,7 @@ public class JavaSourceSet implements Marker {
                     }
                 }
 
-                clazz.unsafeSet(null, null, variables, methods);
+                clazz.unsafeSet(supertype, owner, annotations, interfaces, variables, methods);
             }
 
             return clazz;
@@ -211,7 +229,7 @@ public class JavaSourceSet implements Marker {
                             }
                         }
 
-                        return new JavaType.Variable(fieldInfo.getModifiers(), owner, fieldInfo.getName(),
+                        return new JavaType.Variable(fieldInfo.getModifiers(), fieldInfo.getName(), owner,
                                 JavaType.buildType(fieldInfo.getTypeDescriptor().toString()), annotations);
                     });
         }
@@ -234,31 +252,39 @@ public class JavaSourceSet implements Marker {
 
                 JavaType.Method.Signature signature = new JavaType.Method.Signature(JavaType.buildType(methodInfo.getTypeDescriptor().getResultType().toString()), parameterTypes);
 
-                List<String> methodParams = new ArrayList<>(methodInfo.getParameterInfo().length);
-                for (MethodParameterInfo methodParameterInfo : methodInfo.getParameterInfo()) {
-                    methodParams.add(methodParameterInfo.getName());
-                }
-
-                List<JavaType.FullyQualified> thrownExceptions = new ArrayList<>(methodInfo.getTypeDescriptor()
-                        .getThrowsSignatures().size());
-                for (ClassRefOrTypeVariableSignature throwsSignature : methodInfo.getTypeDescriptor().getThrowsSignatures()) {
-                    if (throwsSignature instanceof ClassRefTypeSignature) {
-                        thrownExceptions.add(type(((ClassRefTypeSignature) throwsSignature).getClassInfo(), stack));
+                List<String> paramNames = null;
+                if(methodInfo.getParameterInfo().length > 0) {
+                    paramNames = new ArrayList<>(methodInfo.getParameterInfo().length);
+                    for (MethodParameterInfo methodParameterInfo : methodInfo.getParameterInfo()) {
+                        paramNames.add(methodParameterInfo.getName());
                     }
                 }
 
-                List<JavaType.FullyQualified> annotations = new ArrayList<>(methodInfo.getAnnotationInfo().size());
-                for (AnnotationInfo annotationInfo : methodInfo.getAnnotationInfo()) {
-                    annotations.add(type(annotationInfo.getClassInfo(), stack));
+                List<JavaType.FullyQualified> thrownExceptions = null;
+                if(!methodInfo.getTypeDescriptor().getThrowsSignatures().isEmpty()) {
+                    thrownExceptions = new ArrayList<>(methodInfo.getTypeDescriptor().getThrowsSignatures().size());
+                    for (ClassRefOrTypeVariableSignature throwsSignature : methodInfo.getTypeDescriptor().getThrowsSignatures()) {
+                        if (throwsSignature instanceof ClassRefTypeSignature) {
+                            thrownExceptions.add(type(((ClassRefTypeSignature) throwsSignature).getClassInfo(), stack));
+                        }
+                    }
+                }
+
+                List<JavaType.FullyQualified> annotations = null;
+                if(!methodInfo.getAnnotationInfo().isEmpty()) {
+                    annotations = new ArrayList<>(methodInfo.getAnnotationInfo().size());
+                    for (AnnotationInfo annotationInfo : methodInfo.getAnnotationInfo()) {
+                        annotations.add(type(annotationInfo.getClassInfo(), stack));
+                    }
                 }
 
                 return new JavaType.Method(
                         methodInfo.getModifiers(),
                         type(methodInfo.getClassInfo(), stack),
                         methodInfo.getName(),
+                        paramNames,
                         null,
                         signature,
-                        methodParams,
                         thrownExceptions,
                         annotations
                 );

@@ -28,18 +28,6 @@ interface JsonRecipeTest : RecipeTest<Json.Document> {
         get() = JsonParser()
 
     fun assertChanged(
-        recipe: Recipe = this.recipe!!,
-        moderneAstLink: String,
-        moderneApiBearerToken: String = apiTokenFromUserHome(),
-        @Language("json5") after: String,
-        cycles: Int = 2,
-        expectedCyclesThatMakeChanges: Int = cycles - 1,
-        afterConditions: (Json.Document) -> Unit = { }
-    ) {
-        super.assertChangedBase(recipe, moderneAstLink, moderneApiBearerToken, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
-    }
-
-    fun assertChanged(
         parser: JsonParser = this.parser,
         recipe: Recipe = this.recipe!!,
         @Language("json5") before: String,

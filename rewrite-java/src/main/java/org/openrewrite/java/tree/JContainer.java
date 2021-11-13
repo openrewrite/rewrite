@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java.tree;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.RequiredArgsConstructor;
+import org.openrewrite.NonCyclicSerializable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
@@ -38,7 +38,7 @@ import static java.util.Collections.emptyList;
  *
  * @param <T> The type of the inner list of elements.
  */
-public class JContainer<T> {
+public class JContainer<T> implements NonCyclicSerializable {
     private transient Padding<T> padding;
 
     private static final JContainer<?> EMPTY = new JContainer<>(Space.EMPTY, emptyList(), Markers.EMPTY);
@@ -57,7 +57,6 @@ public class JContainer<T> {
         return build(Space.EMPTY, elements, Markers.EMPTY);
     }
 
-    @JsonCreator
     public static <T> JContainer<T> build(Space before, List<JRightPadded<T>> elements, Markers markers) {
         if (before.isEmpty() && elements.isEmpty()) {
             return empty();

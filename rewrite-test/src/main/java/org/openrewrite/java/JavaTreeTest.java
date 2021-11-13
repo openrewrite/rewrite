@@ -19,7 +19,6 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.BeforeEach;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.TreeSerializer;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.cache.ClasspathJavaTypeCache;
 import org.openrewrite.java.cache.JvmTypeCache;

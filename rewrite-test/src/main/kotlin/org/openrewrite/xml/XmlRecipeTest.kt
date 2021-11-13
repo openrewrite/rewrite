@@ -28,18 +28,6 @@ interface XmlRecipeTest : RecipeTest<Xml.Document> {
         get() = XmlParser()
 
     fun assertChanged(
-        recipe: Recipe = this.recipe!!,
-        moderneAstLink: String,
-        moderneApiBearerToken: String = apiTokenFromUserHome(),
-        @Language("xml") after: String,
-        cycles: Int = 2,
-        expectedCyclesThatMakeChanges: Int = cycles - 1,
-        afterConditions: (Xml.Document) -> Unit = { }
-    ) {
-        super.assertChangedBase(recipe, moderneAstLink, moderneApiBearerToken, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
-    }
-
-    fun assertChanged(
         parser: XmlParser = this.parser,
         recipe: Recipe = this.recipe!!,
         @Language("xml") before: String,

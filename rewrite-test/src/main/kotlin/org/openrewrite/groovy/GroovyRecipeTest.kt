@@ -29,18 +29,6 @@ interface GroovyRecipeTest : RecipeTest<G.CompilationUnit> {
         get() = GroovyParser.builder().build()
 
     fun assertChanged(
-        recipe: Recipe = this.recipe!!,
-        moderneAstLink: String,
-        moderneApiBearerToken: String = apiTokenFromUserHome(),
-        @Language("groovy") after: String,
-        cycles: Int = 2,
-        expectedCyclesThatMakeChanges: Int = cycles - 1,
-        afterConditions: (G.CompilationUnit) -> Unit = { }
-    ) {
-        super.assertChangedBase(recipe, moderneAstLink, moderneApiBearerToken, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
-    }
-
-    fun assertChanged(
         parser: Parser<G.CompilationUnit> = this.parser,
         recipe: Recipe = this.recipe!!,
         @Language("groovy") before: String,

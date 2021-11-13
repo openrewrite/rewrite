@@ -16,15 +16,11 @@
 package org.openrewrite.marker;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
-import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
 public interface Marker extends Tree {
     @Override
     default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {

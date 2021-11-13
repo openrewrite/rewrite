@@ -29,12 +29,11 @@ import org.openrewrite.java.JavadocPrinter;
 import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.marker.Markers;
 
-import java.io.Serializable;
 import java.util.List;
 import java.util.UUID;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-public interface Javadoc extends Serializable, Tree {
+public interface Javadoc extends Tree {
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {

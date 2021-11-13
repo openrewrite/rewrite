@@ -17,18 +17,15 @@ package org.openrewrite.json.tree;
 
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.NonCyclicSerializable;
 import org.openrewrite.marker.Markers;
 
 @Value
-public class Comment {
+@With
+public class Comment implements NonCyclicSerializable {
     boolean multiline;
 
-    @With
     String text;
-
-    @With
     String suffix;
-
-    @With
     Markers markers;
 }

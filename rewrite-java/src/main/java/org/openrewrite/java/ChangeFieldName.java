@@ -67,8 +67,8 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
     public J.Identifier visitIdentifier(J.Identifier ident, P p) {
         J.Identifier i = super.visitIdentifier(ident, p);
 
-        if (i.getFieldType() instanceof JavaType.Variable) {
-            JavaType.Variable varType = (JavaType.Variable) i.getFieldType();
+        if (i.getFieldType() != null) {
+            JavaType.Variable varType = i.getFieldType();
             if (varType.getName().equals(hasName) && TypeUtils.isOfClassType(varType.getOwner(), classType)) {
                 i = J.Identifier.build(
                         randomId(),
@@ -78,8 +78,8 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
                         i.getType(),
                         new JavaType.Variable(
                                 Flag.flagsToBitMap(varType.getFlags()),
-                                varType.getOwner(),
                                 toName,
+                                varType.getOwner(),
                                 varType.getType(),
                                 varType.getAnnotations()
                         )

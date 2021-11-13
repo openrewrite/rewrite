@@ -15,7 +15,9 @@
  */
 package org.openrewrite.groovy.tree;
 
-public class GRightPadded {
+import org.openrewrite.NonCyclicSerializable;
+
+public class GRightPadded implements NonCyclicSerializable {
     public enum Location {
         LIST_LITERAL_ELEMENT_SUFFIX(GSpace.Location.LIST_LITERAL_ELEMENT_SUFFIX),
         MAP_ENTRY_KEY(GSpace.Location.MAP_ENTRY_KEY_SUFFIX),

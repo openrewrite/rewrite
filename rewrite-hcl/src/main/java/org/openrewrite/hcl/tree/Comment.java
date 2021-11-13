@@ -15,27 +15,17 @@
  */
 package org.openrewrite.hcl.tree;
 
-import lombok.AccessLevel;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.Value;
 import lombok.With;
-import lombok.experimental.FieldDefaults;
+import org.openrewrite.NonCyclicSerializable;
 import org.openrewrite.marker.Markers;
 
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@EqualsAndHashCode
-@Data
-public class Comment {
-    @With
+@Value
+@With
+public class Comment implements NonCyclicSerializable {
     Style style;
-
-    @With
     String text;
-
-    @With
     String suffix;
-
-    @With
     Markers markers;
 
     public enum Style {

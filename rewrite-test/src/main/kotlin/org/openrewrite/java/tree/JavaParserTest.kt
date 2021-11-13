@@ -20,7 +20,6 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Parser
-import org.openrewrite.TreeSerializer
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.search.FindTypes
 import java.nio.file.Paths
@@ -75,20 +74,16 @@ interface JavaParserTest {
 
     @Test
     fun relativeSourcePath(jp: JavaParser) {
-        val projectDir = Paths.get("/Users/jon/Projects/github/Netflix/eureka")
+        val projectDir = Paths.get("/Users/jon/test")
         val sourcePath =
-            Paths.get("/Users/jon/Projects/github/Netflix/eureka/eureka-client-archaius2/src/main/java/com/netflix/discovery/EurekaArchaius2ClientConfig.java")
+            Paths.get("/Users/jon/test/src/main/java/Test.java")
         val cu = jp.parseInputs(
             listOf(Parser.Input(sourcePath) { "class Test {}".byteInputStream() }),
             projectDir,
             InMemoryExecutionContext()
         )[0]
 
-        assertThat(cu.sourcePath).isEqualTo(Paths.get("eureka-client-archaius2/src/main/java/com/netflix/discovery/EurekaArchaius2ClientConfig.java"))
-        val serializer = TreeSerializer<J.CompilationUnit>()
-
-        val cu2 = serializer.read(serializer.write(cu))
-        assertThat(cu2.sourcePath).isEqualTo(Paths.get("eureka-client-archaius2/src/main/java/com/netflix/discovery/EurekaArchaius2ClientConfig.java"))
+        assertThat(cu.sourcePath).isEqualTo(Paths.get("src/main/java/Test.java"))
     }
 
     @Test

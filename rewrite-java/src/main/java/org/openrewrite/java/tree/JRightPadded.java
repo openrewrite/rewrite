@@ -15,11 +15,10 @@
  */
 package org.openrewrite.java.tree;
 
-import lombok.AccessLevel;
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import lombok.With;
-import lombok.experimental.FieldDefaults;
+import org.openrewrite.NonCyclicSerializable;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
@@ -36,17 +35,12 @@ import java.util.stream.Collectors;
  *
  * @param <T>
  */
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+@Value
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-@Data
-public class JRightPadded<T> {
-    @With
+@With
+public class JRightPadded<T> implements NonCyclicSerializable {
     T element;
-
-    @With
     Space after;
-
-    @With
     Markers markers;
 
     public JRightPadded<T> map(UnaryOperator<T> map) {

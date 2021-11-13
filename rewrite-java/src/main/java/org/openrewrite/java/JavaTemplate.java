@@ -341,10 +341,11 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                         paramTypes.add(namedVariable.getType());
                                     }
                                 }
-                                type = new JavaType.Method(Flag.flagsToBitMap(type.getFlags()), type.getDeclaringType(), type.getName(),
+
+                                type = new JavaType.Method(Flag.flagsToBitMap(type.getFlags()), type.getDeclaringType(), type.getName(), paramNames,
                                         type.getGenericSignature().withParamTypes(paramTypes),
                                         type.getResolvedSignature().withParamTypes(paramTypes),
-                                        paramNames, type.getThrownExceptions(), type.getAnnotations());
+                                        type.getThrownExceptions(), type.getAnnotations());
                             }
 
                             return method.withParameters(parameters).withMethodType(type);
@@ -362,7 +363,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                     newThrows.add((JavaType.FullyQualified) exceptionIdent.getType());
                                 }
                                 type = new JavaType.Method(Flag.flagsToBitMap(type.getFlags()), type.getDeclaringType(), type.getName(),
-                                        type.getGenericSignature(), type.getResolvedSignature(), type.getParamNames(), newThrows,
+                                        type.getParamNames(), type.getGenericSignature(), type.getResolvedSignature(), newThrows,
                                         type.getAnnotations());
                             }
 

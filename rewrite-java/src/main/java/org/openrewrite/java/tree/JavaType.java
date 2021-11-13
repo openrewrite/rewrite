@@ -15,13 +15,16 @@
  */
 package org.openrewrite.java.tree;
 
-import com.fasterxml.jackson.annotation.*;
-import lombok.*;
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import lombok.AccessLevel;
+import lombok.Value;
+import lombok.With;
 import lombok.experimental.NonFinal;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.internal.ClassIdResolver;
 
-import java.io.Serializable;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -29,8 +32,8 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static java.util.stream.Collectors.joining;
 
-@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
-public interface JavaType extends Serializable {
+@JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
+public interface JavaType {
     /**
      * Return a JavaType for the specified string.
      * The string is expected to be either a primitive type like "int" or a fully-qualified-class name like "java.lang.String"
@@ -44,7 +47,6 @@ public interface JavaType extends Serializable {
         }
     }
 
-    @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
     @Value
     @With
     class MultiCatch implements JavaType {
@@ -108,18 +110,14 @@ public interface JavaType extends Serializable {
         }
     }
 
-    @JsonIdentityInfo(generator = ObjectIdGenerators.PropertyGenerator.class,
-            resolver = ClassIdResolver.class,
-            property = "fullyQualifiedName")
     @Value
     @With
     class Class extends FullyQualified {
         public static final Class CLASS = new Class(Flag.Public.getBitMask(), "java.lang.Class", Kind.Class,
                 null, null, null, null, null, null);
-        public static final Class ENUM = new Class(Flag.Public.getBitMask(), "java.lang.Class", Kind.Class,
+        public static final Class ENUM = new Class(Flag.Public.getBitMask(), "java.lang.Enum", Kind.Class,
                 null, null, null, null, null, null);
 
-        @Getter(AccessLevel.NONE)
         @With(AccessLevel.NONE)
         long flagsBitMap;
 
@@ -128,10 +126,26 @@ public interface JavaType extends Serializable {
 
         @Nullable
         @NonFinal
+        FullyQualified supertype;
+
+        @Nullable
+        @NonFinal
+        FullyQualified owningClass;
+
+        @Nullable
+        @NonFinal
         List<FullyQualified> annotations;
 
         public List<FullyQualified> getAnnotations() {
             return annotations == null ? emptyList() : annotations;
+        }
+
+        @Nullable
+        @NonFinal
+        List<FullyQualified> interfaces;
+
+        public List<FullyQualified> getInterfaces() {
+            return interfaces == null ? emptyList() : interfaces;
         }
 
         @Nullable
@@ -145,26 +159,12 @@ public interface JavaType extends Serializable {
 
         @Nullable
         @NonFinal
-        List<FullyQualified> interfaces;
-
-        public List<FullyQualified> getInterfaces() {
-            return interfaces == null ? emptyList() : interfaces;
-        }
-
-        @Nullable
-        @NonFinal
         List<Method> methods;
 
         @JsonManagedReference
         public List<Method> getMethods() {
             return methods == null ? emptyList() : methods;
         }
-
-        @Nullable
-        FullyQualified supertype;
-
-        @Nullable
-        FullyQualified owningClass;
 
         public boolean hasFlags(Flag... test) {
             return Flag.hasFlags(flagsBitMap, test);
@@ -205,9 +205,8 @@ public interface JavaType extends Serializable {
                 owningClass = build(fullyQualifiedName.substring(0, lastDot));
             }
 
-            return new JavaType.Class(1, fullyQualifiedName, Kind.Class, emptyList(),
-                    emptyList(), emptyList(), emptyList(),
-                    null, owningClass);
+            return new JavaType.Class(1, fullyQualifiedName, Kind.Class, null, owningClass,
+                    emptyList(), emptyList(), emptyList(), emptyList());
         }
 
         public List<Variable> getVisibleSupertypeMembers() {
@@ -226,8 +225,11 @@ public interface JavaType extends Serializable {
         /**
          * Only meant to be used by parsers to avoid infinite recursion when building Class instances.
          */
-        public void unsafeSet(@Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces,
+        public void unsafeSet(@Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
+                              @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces,
                               @Nullable List<Variable> members, @Nullable List<Method> methods) {
+            this.supertype = supertype;
+            this.owningClass = owningClass;
             this.annotations = annotations;
             this.interfaces = interfaces;
             this.members = members;
@@ -260,29 +262,34 @@ public interface JavaType extends Serializable {
         }
     }
 
-    @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
     @Value
     @With
     class Parameterized extends FullyQualified {
+        @NonFinal
+        @Nullable
         FullyQualified type;
 
         @NonFinal
+        @Nullable
         List<JavaType> typeParameters;
 
         /**
          * Only meant to be used by parsers to avoid infinite recursion when building Class instances.
          */
-        public void unsafeSet(List<JavaType> typeParameters) {
+        public void unsafeSet(FullyQualified type, List<JavaType> typeParameters) {
+            this.type = type;
             this.typeParameters = typeParameters;
         }
 
         @Override
         public String getFullyQualifiedName() {
+            assert type != null;
             return type.getFullyQualifiedName();
         }
 
         @Override
         public Parameterized withFullyQualifiedName(String fullyQualifiedName) {
+            assert type != null;
             if (type.getFullyQualifiedName().equals(fullyQualifiedName)) {
                 return this;
             }
@@ -291,56 +298,68 @@ public interface JavaType extends Serializable {
 
         @Override
         public List<FullyQualified> getAnnotations() {
+            assert type != null;
             return type.getAnnotations();
         }
 
         @Override
         public boolean hasFlags(Flag... test) {
+            assert type != null;
             return type.hasFlags();
         }
 
         @Override
         public Set<Flag> getFlags() {
+            assert type != null;
             return type.getFlags();
         }
 
         @Override
         public List<FullyQualified> getInterfaces() {
+            assert type != null;
             return type.getInterfaces();
         }
 
         @Override
         public JavaType.Class.Kind getKind() {
+            assert type != null;
             return type.getKind();
         }
 
         @Override
         public List<Variable> getMembers() {
+            assert type != null;
             return type.getMembers();
         }
 
         @Override
         public List<Method> getMethods() {
+            assert type != null;
             return type.getMethods();
         }
 
         @Override
         public FullyQualified getOwningClass() {
+            assert type != null;
             return type.getOwningClass();
         }
 
         @Override
         public FullyQualified getSupertype() {
+            assert type != null;
             return type.getSupertype();
         }
 
         @Override
         public List<Variable> getVisibleSupertypeMembers() {
+            assert type != null;
             return type.getVisibleSupertypeMembers();
         }
 
         @Override
         public boolean equals(Object o) {
+            assert type != null;
+            assert typeParameters != null;
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             Parameterized that = (Parameterized) o;
@@ -353,21 +372,14 @@ public interface JavaType extends Serializable {
         }
     }
 
-    @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
     @Value
+    @With
     class GenericTypeVariable extends FullyQualified {
         String name;
 
+        @NonFinal
         @Nullable
-        @With
         FullyQualified bound;
-
-        public GenericTypeVariable withName(String fullyQualifiedName) {
-            if (this.name.equals(fullyQualifiedName)) {
-                return this;
-            }
-            return new GenericTypeVariable(fullyQualifiedName, bound);
-        }
 
         @Override
         public String getFullyQualifiedName() {
@@ -378,6 +390,10 @@ public interface JavaType extends Serializable {
             return bound == null || bound.getFullyQualifiedName().equals(fullyQualifiedName) ?
                     this :
                     withBound(JavaType.Class.build(fullyQualifiedName));
+        }
+
+        public void unsafeSet(@Nullable FullyQualified bound) {
+            this.bound = bound;
         }
 
         @Override
@@ -445,10 +461,8 @@ public interface JavaType extends Serializable {
         }
     }
 
-    @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
     @Value
     class Array implements JavaType {
-        @Nullable
         JavaType elemType;
     }
 
@@ -535,29 +549,63 @@ public interface JavaType extends Serializable {
 
     @Value
     @With
+    @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
     class Method {
-        @Getter(AccessLevel.NONE)
         @With(AccessLevel.PRIVATE)
         long flagsBitMap;
 
+        @NonFinal
         @JsonBackReference
         FullyQualified declaringType;
 
         String name;
 
         @Nullable
+        List<String> paramNames;
+
+        @NonFinal
+        @Nullable
         JavaType.Method.Signature genericSignature;
 
+        @NonFinal
         @Nullable
         JavaType.Method.Signature resolvedSignature;
 
-        List<String> paramNames;
+        @NonFinal
+        @Nullable
         List<FullyQualified> thrownExceptions;
+
+        @NonFinal
+        @Nullable
         List<FullyQualified> annotations;
+
+        public void unsafeSet(FullyQualified declaringType,
+                              @Nullable JavaType.Method.Signature genericSignature,
+                              @Nullable JavaType.Method.Signature resolvedSignature,
+                              @Nullable List<FullyQualified> thrownExceptions,
+                              @Nullable List<FullyQualified> annotations) {
+            this.declaringType = declaringType;
+            this.genericSignature = genericSignature;
+            this.resolvedSignature = resolvedSignature;
+            this.thrownExceptions = thrownExceptions != null && thrownExceptions.isEmpty() ? null : thrownExceptions;
+            this.annotations = annotations != null && annotations.isEmpty() ? null : annotations;
+        }
+
+        public List<String> getParamNames() {
+            return paramNames == null ? emptyList() : paramNames;
+        }
+
+        public List<FullyQualified> getThrownExceptions() {
+            return thrownExceptions == null ? emptyList() : thrownExceptions;
+        }
+
+        public List<FullyQualified> getAnnotations() {
+            return annotations == null ? emptyList() : annotations;
+        }
 
         @Value
         @With
-        public static class Signature implements Serializable {
+        public static class Signature {
             @Nullable
             JavaType returnType;
 
@@ -578,7 +626,7 @@ public interface JavaType extends Serializable {
 
         @Override
         public String toString() {
-            return "Method{" + name + "(" + String.join(", ", paramNames) + ")}";
+            return "Method{" + name + "(" + String.join(", ", (paramNames == null ? emptyList() : paramNames)) + ")}";
         }
 
         @Override
@@ -597,20 +645,28 @@ public interface JavaType extends Serializable {
 
     @Value
     @With
+    @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
     class Variable {
         @With(AccessLevel.NONE)
-        @Getter(AccessLevel.NONE)
         long flagsBitMap;
-
-        @JsonBackReference
-        FullyQualified owner;
 
         String name;
 
+        @NonFinal
+        @JsonBackReference
+        FullyQualified owner;
+
+        @NonFinal
         @Nullable
         JavaType type;
 
+        @NonFinal
+        @Nullable
         List<FullyQualified> annotations;
+
+        public List<FullyQualified> getAnnotations() {
+            return annotations == null ? emptyList() : annotations;
+        }
 
         public boolean hasFlags(Flag... test) {
             return Flag.hasFlags(flagsBitMap, test);
@@ -618,6 +674,13 @@ public interface JavaType extends Serializable {
 
         public Set<Flag> getFlags() {
             return Flag.bitMapToFlags(flagsBitMap);
+        }
+
+        public void unsafeSet(FullyQualified owner, @Nullable JavaType type,
+                              @Nullable List<FullyQualified> annotations) {
+            this.owner = owner;
+            this.type = type;
+            this.annotations = annotations;
         }
 
         @Override

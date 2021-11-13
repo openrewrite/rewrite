@@ -158,7 +158,7 @@ subprojects {
         }
         jvmArgs = listOf(
             "-XX:+UnlockDiagnosticVMOptions",
-            "-XX:+ShowHiddenFrames",
+            "-XX:+ShowHiddenFrames"
         )
         javaLauncher.set(javaToolchains.launcherFor {
             languageVersion.set(JavaLanguageVersion.of(11))

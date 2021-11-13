@@ -27,7 +27,6 @@ import org.openrewrite.java.cache.JvmTypeCache
 import org.openrewrite.java.tree.J
 import java.io.File
 import java.nio.file.Path
-import java.util.function.Predicate
 
 interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
     val typeCache: JavaTypeCache
@@ -52,26 +51,6 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
     @AfterEach
     fun afterRecipe() {
         parser.reset()
-    }
-
-    fun assertChanged(
-        recipe: Recipe = this.recipe!!,
-        moderneAstLink: String,
-        moderneApiBearerToken: String = apiTokenFromUserHome(),
-        @Language("java") after: String,
-        cycles: Int = 2,
-        expectedCyclesThatMakeChanges: Int = cycles - 1,
-        afterConditions: (J.CompilationUnit) -> Unit = { }
-    ) {
-        super.assertChangedBase(
-            recipe,
-            moderneAstLink,
-            moderneApiBearerToken,
-            after,
-            cycles,
-            expectedCyclesThatMakeChanges,
-            afterConditions
-        )
     }
 
     fun assertChanged(

@@ -15,10 +15,9 @@
  */
 package org.openrewrite.marker;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
-import lombok.Getter;
+import lombok.Value;
 import lombok.With;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
@@ -35,27 +34,16 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 @Incubating(since = "7.0.0")
+@Value
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public class Markers implements Tree {
-    public static final Markers EMPTY = new Markers(randomId(), emptyList()) {
-        @Override
-        public String toString() {
-            return "Markers{EMPTY}";
-        }
-    };
+    public static final Markers EMPTY = new Markers(randomId(), emptyList());
 
-    private final UUID id;
+    UUID id;
 
-    @Getter
     @With
-    private final List<Marker> markers;
+    List<Marker> markers;
 
-    private Markers(UUID id, List<Marker> markers) {
-        this.id = id;
-        this.markers = markers;
-    }
-
-    @JsonCreator
     public static Markers build(Collection<? extends Marker> markers) {
         List<Marker> markerList;
         if (markers instanceof List) {
@@ -174,11 +162,6 @@ public class Markers implements Tree {
 
     public Markers searchResult(@Nullable String description) {
         return computeByType(new SearchResult(randomId(), description), (s1, s2) -> s1 == null ? s2 : s1);
-    }
-
-    @Override
-    public UUID getId() {
-        return id;
     }
 
     @Override

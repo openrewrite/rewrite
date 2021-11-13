@@ -15,11 +15,10 @@
  */
 package org.openrewrite.hcl.tree;
 
-import lombok.AccessLevel;
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import lombok.With;
-import lombok.experimental.FieldDefaults;
+import org.openrewrite.NonCyclicSerializable;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
@@ -36,17 +35,12 @@ import java.util.stream.Collectors;
  *
  * @param <T> The type of instance that is being padded.
  */
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+@Value
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-@Data
-public class HclRightPadded<T> {
-    @With
+@With
+public class HclRightPadded<T> implements NonCyclicSerializable {
     T element;
-
-    @With
     Space after;
-
-    @With
     Markers markers;
 
     public HclRightPadded<T> map(UnaryOperator<T> map) {
