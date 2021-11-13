@@ -194,10 +194,12 @@ public class Autodetect extends NamedStyles {
                         .mapToObj(c -> c == ' ')
                         .collect(Collectors.groupingBy(identity(), counting()));
 
-                if (indentTypeCounts.getOrDefault(true, 0L) >= indentTypeCounts.getOrDefault(false, 0L)) {
-                    stats.linesWithSpaceIndents++;
-                } else {
-                    stats.linesWithTabIndents++;
+                if(!indentTypeCounts.isEmpty()) {
+                    if (indentTypeCounts.getOrDefault(true, 0L) >= indentTypeCounts.getOrDefault(false, 0L)) {
+                        stats.linesWithSpaceIndents++;
+                    } else {
+                        stats.linesWithTabIndents++;
+                    }
                 }
             }
 

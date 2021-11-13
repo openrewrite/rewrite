@@ -17,11 +17,35 @@ package org.openrewrite.java.style
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.style.GeneralFormatStyle
 import org.openrewrite.style.NamedStyles
 
 interface AutodetectTest {
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1221")
+    @Test
+    fun springDemoApp(jp: JavaParser) {
+        val cus = jp.parse("""
+            package com.kmccarpenter.demospring;
+
+            import org.springframework.boot.SpringApplication;
+            import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+            @SpringBootApplication
+            public class DemoSpringApplication {
+
+            	public static void main(String[] args) {
+            		SpringApplication.run(DemoSpringApplication.class, args);
+            	}
+
+            }
+        """.trimIndent())
+        val styles = Autodetect.detect(cus)
+        val tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle::class.java, listOf(styles))
+        assertThat(tabsAndIndents.useTabCharacter).isTrue
+    }
 
     @Test
     fun springCloudTabsAndIndents(jp: JavaParser) {
