@@ -17,6 +17,7 @@ package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
@@ -89,4 +90,30 @@ interface UnnecessaryExplicitTypeArgumentsTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1211")
+    @Test
+    fun doesNotIntroduceAmbiguity() = assertUnchanged(
+        before = """
+            import java.util.Collection;
+
+            public class Test {
+            
+                <G> G foo() {
+                    return null;
+                }
+            
+                <E> E fetch(E entity) {
+                    return null;
+                }
+            
+                <E> Collection<E> fetch(Collection<E> entity) {
+                    return null;
+                }
+            
+                void test() {
+                    Integer bar = fetch(this.<Integer>foo());
+                }
+            }
+        """
+    )
 }
