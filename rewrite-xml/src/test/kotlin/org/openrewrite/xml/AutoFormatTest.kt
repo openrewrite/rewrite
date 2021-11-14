@@ -17,13 +17,16 @@ package org.openrewrite.xml
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.Recipe
 
 class AutoFormatTest : XmlRecipeTest {
+
+    override val recipe: Recipe
+        get() = AutoFormat()
 
     @Issue("https://github.com/openrewrite/rewrite/issues/707")
     @Test
     fun autoFormatAttributes() = assertUnchanged(
-        recipe = AutoFormat(),
         before = """
             <databaseChangeLog
               xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -35,7 +38,6 @@ class AutoFormatTest : XmlRecipeTest {
 
     @Test
     fun autoFormatTag() = assertChanged(
-        recipe = AutoFormat(),
         before = """
             <project>
               <dependencies>
@@ -71,4 +73,15 @@ class AutoFormatTest : XmlRecipeTest {
             </project>
         """
     )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1189")
+    fun tagContentIndentation() = assertUnchanged(
+        before = """
+            <foo>
+                bar
+            </foo>
+        """
+    )
+
 }
