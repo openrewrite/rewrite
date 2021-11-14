@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("DuplicateBranchesInSwitch", "IfStatementWithIdenticalBranches")
+
 package org.openrewrite.java.cleanup
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
@@ -251,7 +252,6 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1212")
-    @Disabled
     fun importsOnEnum() = assertChanged(
         before = """
             import java.time.DayOfWeek;
@@ -260,15 +260,29 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
                 DayOfWeek day;
 
                 void test() {
+                    switch(day) {
+                        case MONDAY:
+                            someMethod();
+                            break;
+                    }
+                    switch(day) {
+                        case MONDAY:
+                            someMethod();
+                        default:
+                            someMethod();
+                            break;
+                    }
                     switch (day) {
                         case MONDAY:
+                            someMethod();
+                            break;
+                        case TUESDAY:
                             someMethod();
                             break;
                     }
                 }
 
                 void someMethod() {
-                    // empty
                 }
             }
         """,
@@ -282,13 +296,21 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
                     if (day == DayOfWeek.MONDAY) {
                         someMethod();
                     }
+                    if (day == DayOfWeek.MONDAY) {
+                        someMethod();
+                    } else {
+                        someMethod();
+                    }
+                    if (day == DayOfWeek.MONDAY) {
+                        someMethod();
+                    } else if (day == DayOfWeek.TUESDAY) {
+                        someMethod();
+                    }
                 }
 
                 void someMethod() {
-                    // empty
                 }
             }
         """
     )
-
 }

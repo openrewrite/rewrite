@@ -20,10 +20,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Statement;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -37,7 +34,8 @@ public class MinimumSwitchCases extends Recipe {
 
     @Override
     public String getDescription() {
-        return "`switch` statements are useful when there are many different cases depending on the value of the same expression. For just one or two cases however, the code will be more readable with `if` statements.";
+        return "`switch` statements are useful when many code paths branch depending on the value of a single expression. " +
+                "For just one or two code paths, the code will be more readable with `if` statements.";
     }
 
     @Override
@@ -63,6 +61,11 @@ public class MinimumSwitchCases extends Recipe {
                     "} else if(#{any(java.lang.String)}.equals(#{any(java.lang.String)})) {\n" +
                     "}").build();
 
+            final JavaTemplate ifElseIfEnum = JavaTemplate.builder(this::getCursor, "" +
+                    "if(#{any()} == #{}) {\n" +
+                    "} else if(#{any()} == #{}) {\n" +
+                    "}").build();
+
             final JavaTemplate ifElsePrimitive = JavaTemplate.builder(this::getCursor, "" +
                     "if(#{any()} == #{any()}) {\n" +
                     "} else {\n" +
@@ -73,12 +76,21 @@ public class MinimumSwitchCases extends Recipe {
                     "} else {\n" +
                     "}").build();
 
+            final JavaTemplate ifElseEnum = JavaTemplate.builder(this::getCursor, "" +
+                    "if(#{any()} == #{}) {\n" +
+                    "} else {\n" +
+                    "}").build();
+
             final JavaTemplate ifPrimitive = JavaTemplate.builder(this::getCursor, "" +
                     "if(#{any()} == #{any()}) {\n" +
                     "}").build();
 
             final JavaTemplate ifString = JavaTemplate.builder(this::getCursor, "" +
                     "if(#{any(java.lang.String)}.equals(#{any(java.lang.String)})) {\n" +
+                    "}").build();
+
+            final JavaTemplate ifEnum = JavaTemplate.builder(this::getCursor, "" +
+                    "if(#{any()} == #{}) {\n" +
                     "}").build();
 
             @Override
@@ -111,6 +123,17 @@ public class MinimumSwitchCases extends Recipe {
                         } else {
                             generatedIf = switzh.withTemplate(ifElseIfString, switzh.getCoordinates().replace(),
                                     cases[0].getPattern(), tree, cases[1].getPattern(), tree);
+                        }
+                    } else if(switchesOnEnum(switzh)) {
+                        if (cases[1] == null) {
+                            generatedIf = switzh.withTemplate(ifEnum, switzh.getCoordinates().replace(),
+                                    tree, enumIdentToFieldAccessString(cases[0].getPattern()));
+                        } else if (isDefault(cases[1])) {
+                            generatedIf = switzh.withTemplate(ifElseEnum, switzh.getCoordinates().replace(),
+                                    tree, enumIdentToFieldAccessString(cases[0].getPattern()));
+                        } else {
+                            generatedIf = switzh.withTemplate(ifElseIfEnum, switzh.getCoordinates().replace(),
+                                    tree, enumIdentToFieldAccessString(cases[0].getPattern()), tree, enumIdentToFieldAccessString(cases[1].getPattern()));
                         }
                     } else {
                         if (cases[1] == null) {
@@ -151,6 +174,19 @@ public class MinimumSwitchCases extends Recipe {
             private boolean isDefault(J.Case caze) {
                 return caze.getPattern() instanceof J.Identifier && ((J.Identifier) caze.getPattern()).getSimpleName().equals("default");
             }
+
+            private boolean switchesOnEnum(J.Switch switzh) {
+                JavaType selectorType = switzh.getSelector().getTree().getType();
+                return selectorType instanceof JavaType.Class
+                        && ((JavaType.Class)selectorType).getKind() == JavaType.Class.Kind.Enum;
+            }
+
+            private String enumIdentToFieldAccessString(Expression casePattern) {
+                J.Identifier ident = (J.Identifier) casePattern;
+                //noinspection ConstantConditions
+                return ((JavaType.Class)ident.getType()).getClassName() + "." + ident.getSimpleName();
+            }
+
         };
     }
 }
