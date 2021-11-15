@@ -18,6 +18,7 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaRecipeTest
 
@@ -68,6 +69,33 @@ interface NestedEnumsAreNotStaticTest : JavaRecipeTest {
             
                 private enum DEF {
                     D, E, F
+                }
+            }
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1222")
+    fun doesNotReformatWholeEnum() = assertChanged(
+        before = """
+            public class Test {
+                public static enum testEnum {
+                    Account;
+            
+                    public final String field;
+            
+                    private testEnum() {this.field = this.name();}
+                }
+            }
+        """,
+        after = """
+            public class Test {
+                public enum testEnum {
+                    Account;
+            
+                    public final String field;
+            
+                    private testEnum() {this.field = this.name();}
                 }
             }
         """
