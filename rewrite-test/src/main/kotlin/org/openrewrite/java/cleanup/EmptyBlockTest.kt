@@ -64,7 +64,7 @@ interface EmptyBlockTest : JavaRecipeTest {
 
     @Suppress("EmptySynchronizedStatement")
     @Test
-    fun emptySynchronized(jp: JavaParser) = assertUnchanged(
+    fun emptySynchronized(jp: JavaParser) = assertChanged(
         jp,
         before = """
             public class A {
@@ -72,6 +72,13 @@ interface EmptyBlockTest : JavaRecipeTest {
                     final Object o = new Object();
                     synchronized(o) {
                     }
+                }
+            }
+        """,
+        after = """
+            public class A {
+                {
+                    final Object o = new Object();
                 }
             }
         """
