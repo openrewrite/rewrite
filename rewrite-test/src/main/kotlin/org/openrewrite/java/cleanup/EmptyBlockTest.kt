@@ -53,7 +53,6 @@ interface EmptyBlockTest : JavaRecipeTest {
 
     @Test
     fun emptyBlockWithComment(jp: JavaParser) = assertUnchanged(
-        jp,
         before = """
             public class A {
                 {
@@ -63,8 +62,9 @@ interface EmptyBlockTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("EmptySynchronizedStatement")
     @Test
-    fun emptySynchronized(jp: JavaParser) = assertChanged(
+    fun emptySynchronized(jp: JavaParser) = assertUnchanged(
         jp,
         before = """
             public class A {
@@ -72,13 +72,6 @@ interface EmptyBlockTest : JavaRecipeTest {
                     final Object o = new Object();
                     synchronized(o) {
                     }
-                }
-            }
-        """,
-        after = """
-            public class A {
-                {
-                    final Object o = new Object();
                 }
             }
         """
@@ -109,7 +102,7 @@ interface EmptyBlockTest : JavaRecipeTest {
     )
 
     @Test
-    fun emptyCatchBlockWithIOException(jp: JavaParser) = assertChanged(
+    fun emptyCatchBlockWithIOException(jp: JavaParser) = assertUnchanged(
         jp,
         before = """
             import java.io.FileInputStream;
@@ -121,22 +114,6 @@ interface EmptyBlockTest : JavaRecipeTest {
                     try {
                         new FileInputStream(new File("somewhere"));
                     } catch (IOException e) {
-                    }
-                }
-            }
-        """,
-        after = """
-            import java.io.FileInputStream;
-            import java.io.IOException;
-            import java.io.UncheckedIOException;
-            import java.nio.file.*;
-            
-            public class A {
-                public void foo() {
-                    try {
-                        new FileInputStream(new File("somewhere"));
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
                     }
                 }
             }
@@ -167,7 +144,6 @@ interface EmptyBlockTest : JavaRecipeTest {
                     try {
                         new FileInputStream(new File("somewhere"));
                     } catch (Throwable t) {
-                        throw new RuntimeException(t);
                     }
                 }
             }

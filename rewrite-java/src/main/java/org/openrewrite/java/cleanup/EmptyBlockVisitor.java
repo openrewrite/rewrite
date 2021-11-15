@@ -92,26 +92,6 @@ public class EmptyBlockVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.Try.Catch visitCatch(J.Try.Catch catzh, P p) {
-        J.Try.Catch c = super.visitCatch(catzh, p);
-
-        if (Boolean.TRUE.equals(emptyBlockStyle.getLiteralCatch()) && isEmptyBlock(c.getBody())) {
-            String throwName;
-            if (TypeUtils.isOfClassType(c.getParameter().getTree().getTypeAsFullyQualified(), "java.io.IOException")) {
-                throwName = "UncheckedIOException";
-                maybeAddImport("java.io.UncheckedIOException");
-            } else {
-                throwName = "RuntimeException";
-            }
-
-            c = c.withTemplate(throwException, c.getBody().getCoordinates().lastStatement(), throwName,
-                    c.getParameter().getTree().getVariables().get(0).getName());
-        }
-
-        return c;
-    }
-
-    @Override
     public J.Try visitTry(J.Try tryable, P p) {
         J.Try t = super.visitTry(tryable, p);
 
@@ -203,15 +183,6 @@ public class EmptyBlockVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.Synchronized visitSynchronized(J.Synchronized synch, P p) {
-        if (Boolean.TRUE.equals(emptyBlockStyle.getLiteralSynchronized()) && isEmptyBlock(synch.getBody())) {
-            doAfterVisit(new DeleteStatement<>(synch));
-        }
-
-        return super.visitSynchronized(synch, p);
-    }
-
-    @Override
     public J.Switch visitSwitch(J.Switch switzh, P p) {
         if (Boolean.TRUE.equals(emptyBlockStyle.getLiteralSwitch()) && isEmptyBlock(switzh.getCases())) {
             doAfterVisit(new DeleteStatement<>(switzh));
@@ -221,9 +192,15 @@ public class EmptyBlockVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private boolean isEmptyBlock(Statement blockNode) {
-        return EmptyBlockStyle.BlockPolicy.STATEMENT.equals(emptyBlockStyle.getBlockPolicy()) &&
-                blockNode instanceof J.Block &&
-                ((J.Block) blockNode).getStatements().isEmpty() && ((J.Block) blockNode).getEnd().getComments().isEmpty();
+        if (blockNode instanceof J.Block) {
+            J.Block block = (J.Block)blockNode;
+            if (EmptyBlockStyle.BlockPolicy.STATEMENT.equals(emptyBlockStyle.getBlockPolicy())) {
+                return block.getStatements().isEmpty();
+            } else if (EmptyBlockStyle.BlockPolicy.TEXT.equals(emptyBlockStyle.getBlockPolicy())) {
+                return block.getStatements().isEmpty() && block.getEnd().getComments().isEmpty();
+            }
+        }
+        return false;
     }
 
     private static class ExtractSideEffectsOfIfCondition<P> extends JavaVisitor<P> {
