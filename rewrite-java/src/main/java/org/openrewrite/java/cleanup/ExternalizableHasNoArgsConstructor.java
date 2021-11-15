@@ -106,7 +106,7 @@ public class ExternalizableHasNoArgsConstructor extends Recipe {
                 if (statement instanceof J.MethodDeclaration) {
                     J.MethodDeclaration md = (J.MethodDeclaration) statement;
                     if (md.isConstructor()) {
-                        if (md.getParameters().get(0) instanceof J.Empty) {
+                        if (md.getParameters().isEmpty() || md.getParameters().get(0) instanceof J.Empty) {
                             hasNoArgsConstructor = true;
                         } else {
                             hasDefaultConstructor = false;

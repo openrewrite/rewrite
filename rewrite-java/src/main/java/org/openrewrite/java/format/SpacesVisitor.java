@@ -174,8 +174,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         if (m.getBody() != null) {
             m = m.withBody(spaceBefore(m.getBody(), style.getBeforeLeftBrace().getMethodLeftBrace()));
         }
-        Statement firstParam = m.getParameters().iterator().next();
-        if (firstParam instanceof J.Empty) {
+        if (m.getParameters().isEmpty() || m.getParameters().iterator().next() instanceof J.Empty) {
             boolean useSpace = style.getWithin().getEmptyMethodDeclarationParentheses();
             m = m.getPadding().withParameters(
                     m.getPadding().getParameters().getPadding().withElements(
@@ -241,8 +240,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
         J.MethodInvocation m = super.visitMethodInvocation(method, p);
         m = m.getPadding().withArguments(spaceBefore(m.getPadding().getArguments(), style.getBeforeParentheses().getMethodCall()));
-        Expression firstArg = m.getArguments().iterator().next();
-        if (firstArg instanceof J.Empty) {
+        if (m.getArguments().isEmpty() || m.getArguments().iterator().next() instanceof J.Empty) {
             boolean useSpace = style.getWithin().getEmptyMethodCallParentheses();
             m = m.getPadding().withArguments(
                     m.getPadding().getArguments().getPadding().withElements(
@@ -857,7 +855,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                 i = JContainer.withElements(i, ListUtils.map(i.getElements(), (idx, elem) -> idx == 0 ? elem : spaceBefore(elem, true)));
             }
 
-            if (i.getElements().iterator().next() instanceof J.Empty) {
+            if (i.getElements().isEmpty() || i.getElements().iterator().next() instanceof J.Empty) {
                 boolean useSpaceWithinEmptyArrayInitializerBraces = style.getWithin().getEmptyArrayInitializerBraces();
                 i = i.map(expr -> spaceBefore(expr, useSpaceWithinEmptyArrayInitializerBraces));
             } else {
@@ -1002,7 +1000,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             );
         }
         if (pt.getPadding().getTypeParameters() != null &&
-                !(pt.getPadding().getTypeParameters().getElements().iterator().next() instanceof J.Empty)) {
+                !(pt.getPadding().getTypeParameters().getElements().isEmpty() || pt.getPadding().getTypeParameters().getElements().iterator().next() instanceof J.Empty)) {
             int typeParametersSize = pt.getPadding().getTypeParameters().getElements().size();
             pt = pt.getPadding().withTypeParameters(
                     pt.getPadding().getTypeParameters().getPadding().withElements(
