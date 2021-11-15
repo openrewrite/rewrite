@@ -101,11 +101,18 @@ public class LatestRelease implements VersionComparator {
         v1Gav.matches();
         v2Gav.matches();
 
+        //Remove the metadata pattern from the normalized versions, this only impacts the comparison when all version
+        //parts are the same:
+        //
+        // HyphenRange [25-28] should include "28-jre" and "28-android" as possible candidates.
+        String normalized1 = metadataPattern == null ? nv1.toString() : nv1.toString().replace(metadataPattern, "");
+        String normalized2 = metadataPattern == null ? nv2.toString() : nv1.toString().replace(metadataPattern, "");
+
         for (int i = 1; i < nv1.length(); i++) {
             String v1Part = v1Gav.group(i);
             String v2Part = v2Gav.group(i);
             if (v1Part == null) {
-                return v2Part == null ? nv1.toString().compareTo(nv2.toString()) : -11;
+                return v2Part == null ? normalized1.compareTo(normalized2) : -1;
             } else if (v2Part == null) {
                 return 1;
             }
@@ -116,7 +123,7 @@ public class LatestRelease implements VersionComparator {
             }
         }
 
-        return nv1.toString().compareTo(nv2.toString());
+        return normalized1.compareTo(normalized2);
     }
 
     public static Validated build(String toVersion, @Nullable String metadataPattern) {
