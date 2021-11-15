@@ -793,7 +793,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             );
         }
         l = l.withBody(spaceBefore(l.getBody(), style.getAroundOperators().getLambdaArrow()));
-        if (!(l.getParameters().getParameters().iterator().next() instanceof J.Empty)) {
+        if (!(l.getParameters().getParameters().isEmpty() || l.getParameters().getParameters().iterator().next() instanceof J.Empty)) {
             int parametersSize = l.getParameters().getParameters().size();
             l = l.withParameters(
                     l.getParameters().getPadding().withParams(
