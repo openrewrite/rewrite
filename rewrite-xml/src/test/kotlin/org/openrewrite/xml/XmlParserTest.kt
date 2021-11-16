@@ -130,11 +130,33 @@ class XmlParserTest {
     )
 
     @Test
-    fun parseDTDWithMarkupDecl() = assertUnchanged(
+    fun dtdSubsetMarkupDecl() = assertUnchanged(
         before = """
             <?xml version="1.0"?>
             <!DOCTYPE p [
                 <!ELEMENT p ANY>
+            ]>
+            <p>Hello world!</p>
+        """.trimIndent()
+    )
+
+    @Test
+    fun dtdSubsetParamEntityRef() = assertUnchanged(
+        before = """
+            <?xml version="1.0"?>
+            <!DOCTYPE p [
+                %entity;
+            ]>
+            <p>Hello world!</p>
+        """.trimIndent()
+    )
+
+    @Test
+    fun dtdSubsetComment() = assertUnchanged(
+        before = """
+            <?xml version="1.0"?>
+            <!DOCTYPE p [
+                <!-- comment -->
             ]>
             <p>Hello world!</p>
         """.trimIndent()

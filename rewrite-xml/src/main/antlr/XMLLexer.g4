@@ -64,14 +64,16 @@ DTD_STRING       :  STRING -> type(STRING) ;
 // INSIDE of DTD SUBSET -----------------------------------
 mode INSIDE_DTD_SUBSET;
 
-DTD_SUBSET_CLOSE    :  ']'     -> popMode ;
-MARKUP_OPEN         :  '<!'    -> pushMode(INSIDE_MARKUP) ;
-DTS_SUBSET_S        :  S       -> skip ;
+DTD_SUBSET_CLOSE    :  ']'            -> popMode ;
+MARKUP_OPEN         :  '<!'           -> pushMode(INSIDE_MARKUP) ;
+DTS_SUBSET_S        :  S              -> skip ;
 
-DTD_SUBSET_COMMENT  :  COMMENT -> type(COMMENT) ;
+DTD_PERef           :  ParamEntityRef -> type(ParamEntityRef) ;
+DTD_SUBSET_COMMENT  :  COMMENT        -> type(COMMENT) ;
 
 // INSIDE of MARKUP ---------------------------------------
 mode INSIDE_MARKUP;
+
 MARK_UP_CLOSE       :  '>' -> popMode ;
 MARKUP_SUBSET_OPEN  :  '[' -> more, pushMode(INSIDE_MARKUP_SUBSET) ;
 MARKUP_S            :  S -> skip ;
