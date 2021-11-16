@@ -17,6 +17,7 @@ package org.openrewrite.xml.internal;
 
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
@@ -27,6 +28,8 @@ import org.openrewrite.xml.tree.Misc;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.BiFunction;
 
@@ -260,6 +263,37 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                         .map(s -> convert(s, (attr, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, attr.getText())))
                         .collect(toList());
             }
+
+            Xml.DocTypeDecl.ExternalSubsets externalSubsets = null;
+            if (c.intsubset() != null) {
+                String subsetPrefix = prefix(c.DTD_SUBSET_OPEN());
+                cursor = c.DTD_SUBSET_OPEN().getSymbol().getStopIndex() + 1;
+
+                List<Xml.Element> elements = new ArrayList<>();
+                List<ParseTree> children = c.intsubset().children;
+                for (int i = 0; i < children.size(); i++) {
+                    ParserRuleContext element = (ParserRuleContext) children.get(i);
+                    // Markup declarations are not fully implemented.
+                    // n.getText() includes element subsets.
+                    Xml.Ident ident = convert(element, (n, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, n.getText()));
+
+                    String beforeElementTag = "";
+                    if (i == children.size() - 1) {
+                        beforeElementTag = prefix(c.DTD_SUBSET_CLOSE());
+                        cursor = c.DTD_SUBSET_CLOSE().getSymbol().getStopIndex() + 1;
+                    }
+
+                    elements.add(
+                            new Xml.Element(
+                                    randomId(),
+                                    prefix(element),
+                                    Markers.EMPTY,
+                                    Collections.singletonList(ident),
+                                    beforeElementTag));
+                }
+                externalSubsets = new Xml.DocTypeDecl.ExternalSubsets(randomId(), subsetPrefix, Markers.EMPTY, elements);
+            }
+
             String beforeTagDelimiterPrefix = prefix(c.DTD_CLOSE());
             return new Xml.DocTypeDecl(randomId(),
                     prefix,
@@ -267,7 +301,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     name,
                     externalId,
                     internalSubset,
-                    null, // TODO implement me!
+                    externalSubsets,
                     beforeTagDelimiterPrefix);
         });
     }

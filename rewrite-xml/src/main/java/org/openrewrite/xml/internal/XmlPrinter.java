@@ -144,9 +144,8 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
     public Xml visitElement(Xml.Element element, PrintOutputCapture<P> p) {
         p.out.append(element.getPrefix());
         visitMarkers(element.getMarkers(), p);
-        p.out.append("<!ELEMENT");
         visit(element.getSubset(), p);
-        p.out.append('>');
+        p.out.append(element.getBeforeTagDelimiterPrefix());
         return element;
     }
 
