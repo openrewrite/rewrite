@@ -42,7 +42,7 @@ public class IndexOfChecksShouldUseAStartPosition extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Replaces `indexOf(String)` in binary operations if the compared value is an int and not equal to -1.";
+        return "Replaces `indexOf(String)` in binary operations if the compared value is an int and not less than 1.";
     }
 
     @Override
@@ -71,7 +71,7 @@ public class IndexOfChecksShouldUseAStartPosition extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
 
             private boolean isValueNotCompliant(J.Literal literal) {
-                return !(literal.getValue() instanceof Integer && (literal.getValue()).equals(-1));
+                return !(literal.getValue() instanceof Integer && ((Integer)(literal.getValue()) <= 0));
             }
 
             @Override
@@ -95,26 +95,7 @@ public class IndexOfChecksShouldUseAStartPosition extends Recipe {
                             "-1",
                             null,
                             JavaType.Primitive.Int));
-                } else if (b.getLeft() instanceof J.Literal && isValueNotCompliant((J.Literal)b.getLeft()) &&
-                        b.getOperator() == J.Binary.Type.LessThan &&
-                        b.getRight() instanceof J.MethodInvocation && STRING_INDEX_MATCHER.matches(b.getRight())) {
-
-                    J.MethodInvocation m = (J.MethodInvocation) b.getRight();
-                    b = b.withRight(m.withTemplate(JavaTemplate.builder(this::getCursor, "#{any(java.lang.String)}, #{any(int)}").build(),
-                            m.getCoordinates().replaceArguments(),
-                            m.getArguments().get(0),
-                            b.getLeft()));
-
-                    b = b.withLeft(new J.Literal(
-                            Tree.randomId(),
-                            b.getLeft().getPrefix(),
-                            Markers.EMPTY,
-                            -1,
-                            "-1",
-                            null,
-                            JavaType.Primitive.Int));
                 }
-
                 return b;
             }
         };

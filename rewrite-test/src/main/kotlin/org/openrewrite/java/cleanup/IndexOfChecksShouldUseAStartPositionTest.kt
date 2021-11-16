@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
@@ -30,6 +31,18 @@ interface IndexOfChecksShouldUseAStartPositionTest : JavaRecipeTest {
             class Test {
                 boolean hasIndex(String str) {
                     return str.indexOf("x", 2) > -1;
+                }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1225")
+    @Test
+    fun intentIsStringDoesNotStartWithSearchString(jp: JavaParser) = assertUnchanged(
+        before = """
+            class Test {
+                boolean doesNotStartWithX(String str) {
+                    return str.indexOf("x") > 0;
                 }
             }
         """
@@ -80,19 +93,12 @@ interface IndexOfChecksShouldUseAStartPositionTest : JavaRecipeTest {
     )
 
     @Test
-    fun changeRhs(jp: JavaParser) = assertChanged(
+    fun doNotChangeRhs(jp: JavaParser) = assertUnchanged(
         jp,
         before = """
             class Test {
                 boolean hasIndex(String str) {
                     return 2 < str.indexOf("str");
-                }
-            }
-        """,
-        after = """
-            class Test {
-                boolean hasIndex(String str) {
-                    return -1 < str.indexOf("str", 2);
                 }
             }
         """
