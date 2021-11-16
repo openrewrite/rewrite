@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/tyler.vangorder/work/rewrite/rewrite-xml/src/main/antlr/XMLParser.g4 by ANTLR 4.9.2
 package org.openrewrite.xml.internal.grammar;
+
+// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-xml/src/main/antlr/XMLParser.g4 by ANTLR 4.9.2
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 
 /**
@@ -61,6 +62,18 @@ public interface XMLParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitIntsubset(XMLParser.IntsubsetContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link XMLParser#markupdecl}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitMarkupdecl(XMLParser.MarkupdeclContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link XMLParser#declSep}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitDeclSep(XMLParser.DeclSepContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link XMLParser#externalid}.
 	 * @param ctx the parse tree

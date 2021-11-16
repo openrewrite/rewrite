@@ -147,6 +147,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     public Xml.ProcessingInstruction visitXmldecl(XMLParser.XmldeclContext ctx) {
         return convert(ctx, (c, prefix) -> {
                     cursor = ctx.SPECIAL_OPEN_XML().getSymbol().getStopIndex() + 1;
+                    String name = convert(ctx.SPECIAL_OPEN_XML(), (n, p) -> n.getText()).substring(2);
                     List<Xml.Attribute> attributes = ctx.attribute().stream()
                             .map(this::visitAttribute)
                             .collect(toList());
@@ -154,7 +155,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                             randomId(),
                             prefix,
                             Markers.EMPTY,
-                            "xml",
+                            name,
                             attributes,
                             prefix(ctx.getStop())
                     );
@@ -250,14 +251,16 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
             Xml.Ident name = convert(c.Name(), (n, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, n.getText()));
             Xml.Ident externalId = null;
             List<Xml.Ident> internalSubset = null;
-            if (!c.externalid().getStart().equals(c.CLOSE().getSymbol())) {
-                externalId = convert(c.externalid(),
-                        (n, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, n.Name().getText()));
+            if (!c.externalid().getStart().equals(c.DTD_CLOSE().getSymbol())) {
+                if (c.externalid().Name() != null) {
+                    externalId = convert(c.externalid(),
+                            (n, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, n.Name().getText()));
+                }
                 internalSubset = c.STRING().stream()
                         .map(s -> convert(s, (attr, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, attr.getText())))
                         .collect(toList());
             }
-            String beforeTagDelimiterPrefix = prefix(c.CLOSE());
+            String beforeTagDelimiterPrefix = prefix(c.DTD_CLOSE());
             return new Xml.DocTypeDecl(randomId(),
                     prefix,
                     Markers.EMPTY,

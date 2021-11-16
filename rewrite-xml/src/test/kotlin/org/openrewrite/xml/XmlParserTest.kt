@@ -31,10 +31,10 @@ class XmlParserTest {
 
     @Test
     fun parseXmlDocument() = assertUnchanged(
-            // TODO add this back after <?xml at some point... <?xml-stylesheet href="mystyle.css" type="text/css"?>
-            before = """
+        before = """
                 <?xml
                     version="1.0" encoding="UTF-8"?>
+                <?xml-stylesheet href="mystyle.css" type="text/css"?>
                 <!DOCTYPE beans PUBLIC "-//SPRING//DTD BEAN 2.0//EN"
                     "http://www.springframework.org/dtd/spring-beans-2.0.dtd">
                 <beans >
@@ -45,7 +45,7 @@ class XmlParserTest {
 
     @Test
     fun parsePomDocument() = assertUnchanged(
-            before = """
+        before = """
             <?xml version="1.0" encoding="UTF-8"?>
             <!-- comment -->
             <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -78,7 +78,7 @@ class XmlParserTest {
     @Disabled
     @Test
     fun commentBeforeContentNewline() = assertUnchanged(
-        before ="""
+        before = """
             <foo>
                 <a>
                     <!-- comment -->
@@ -126,6 +126,17 @@ class XmlParserTest {
                     <appender-ref ref="CONSOLE"/>
                 </root>
             </configuration>
+        """.trimIndent()
+    )
+
+    @Test
+    fun parseDTDWithMarkupDecl() = assertUnchanged(
+        before = """
+            <?xml version="1.0"?>
+            <!DOCTYPE p [
+                <!ELEMENT p ANY>
+            ]>
+            <p>Hello world!</p>
         """.trimIndent()
     )
 }

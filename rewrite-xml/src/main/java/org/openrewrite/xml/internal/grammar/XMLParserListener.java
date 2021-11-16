@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/tyler.vangorder/work/rewrite/rewrite-xml/src/main/antlr/XMLParser.g4 by ANTLR 4.9.2
 package org.openrewrite.xml.internal.grammar;
+
+// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-xml/src/main/antlr/XMLParser.g4 by ANTLR 4.9.2
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
 /**
@@ -82,6 +83,26 @@ public interface XMLParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitIntsubset(XMLParser.IntsubsetContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link XMLParser#markupdecl}.
+	 * @param ctx the parse tree
+	 */
+	void enterMarkupdecl(XMLParser.MarkupdeclContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link XMLParser#markupdecl}.
+	 * @param ctx the parse tree
+	 */
+	void exitMarkupdecl(XMLParser.MarkupdeclContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link XMLParser#declSep}.
+	 * @param ctx the parse tree
+	 */
+	void enterDeclSep(XMLParser.DeclSepContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link XMLParser#declSep}.
+	 * @param ctx the parse tree
+	 */
+	void exitDeclSep(XMLParser.DeclSepContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link XMLParser#externalid}.
 	 * @param ctx the parse tree
