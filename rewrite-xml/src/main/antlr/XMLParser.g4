@@ -31,33 +31,60 @@ parser grammar XMLParser;
 
 options { tokenVocab=XMLLexer; }
 
-document                :   prolog element;
+document
+    :   prolog element
+    ;
 
-prolog                  :   xmldecl* misc*;
+prolog
+    :   xmldecl* misc*
+    ;
 
-xmldecl                 :   SPECIAL_OPEN_XML attribute * SPECIAL_CLOSE ;
+xmldecl
+    :   SPECIAL_OPEN_XML attribute* SPECIAL_CLOSE
+    ;
 
-misc                    :   COMMENT | doctypedecl | processinginstruction ;
+misc
+    :   (COMMENT | doctypedecl | processinginstruction)
+    ;
 
-doctypedecl             :   ELEMENT_OPEN DOCTYPE Name externalid STRING* intsubset? CLOSE ;
+doctypedecl
+    :   DTD_OPEN DOCTYPE Name externalid STRING* (DTD_SUBSET_OPEN intsubset DTD_SUBSET_CLOSE)? DTD_CLOSE
+    ;
 
-intsubset               :   SUBSET_OPEN STRING* SUBSET_CLOSE ;
+intsubset
+    :   (markupdecl | declSep)* ;
 
-externalid              :   Name? ;
+markupdecl
+    :   (MARKUP_OPEN MARKUP_TEXT? MARKUP_SUBSET* MARKUP_TEXT? MARK_UP_CLOSE)
+    |   processinginstruction
+    |   COMMENT
+    ;
 
-processinginstruction   :   SPECIAL_OPEN Name attribute * SPECIAL_CLOSE ;
+declSep
+    :   ParamEntityRef
+    ;
 
-content                 :   (element | reference | CDATA | COMMENT | chardata) ;
+externalid
+    :   Name?
+    ;
 
-element                 :   '<' Name attribute* '>' content* '<' '/' Name '>'
-                        |   '<' Name attribute* '/>'
-                        ;
+processinginstruction
+    :   SPECIAL_OPEN Name attribute* SPECIAL_CLOSE
+    ;
 
-reference               :   EntityRef | CharRef ;
+content
+    :   (element | reference | CDATA | COMMENT | chardata) ;
 
-attribute               :   Name '=' STRING ; // Our STRING is AttValue in spec
+element
+    :   OPEN Name attribute* CLOSE content* OPEN '/' Name CLOSE
+    |   OPEN Name attribute* '/>'
+    ;
 
-/** ``All text that is not markup constitutes the character data of
- *  the document.''
- */
-chardata                :   TEXT | SEA_WS ;
+reference
+    :   (EntityRef | CharRef) ;
+
+attribute
+    :   Name '=' STRING ; // Our STRING is AttValue in spec
+
+chardata
+    :   (TEXT | SEA_WS) ;

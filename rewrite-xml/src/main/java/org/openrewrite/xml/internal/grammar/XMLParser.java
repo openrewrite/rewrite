@@ -13,19 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/tyler.vangorder/work/rewrite/rewrite-xml/src/main/antlr/XMLParser.g4 by ANTLR 4.9.2
 package org.openrewrite.xml.internal.grammar;
 
-import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.atn.ATN;
-import org.antlr.v4.runtime.atn.ATNDeserializer;
-import org.antlr.v4.runtime.atn.ParserATNSimulator;
-import org.antlr.v4.runtime.atn.PredictionContextCache;
+// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-xml/src/main/antlr/XMLParser.g4 by ANTLR 4.9.2
+import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
-import org.antlr.v4.runtime.tree.ParseTreeListener;
-import org.antlr.v4.runtime.tree.ParseTreeVisitor;
-import org.antlr.v4.runtime.tree.TerminalNode;
-
+import org.antlr.v4.runtime.*;
+import org.antlr.v4.runtime.tree.*;
 import java.util.List;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast"})
@@ -34,39 +28,44 @@ public class XMLParser extends Parser {
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
-		new PredictionContextCache();
+			new PredictionContextCache();
 	public static final int
-		COMMENT=1, CDATA=2, EntityRef=3, CharRef=4, SEA_WS=5, SPECIAL_OPEN_XML=6, 
-		OPEN=7, SPECIAL_OPEN=8, ELEMENT_OPEN=9, TEXT=10, CLOSE=11, SPECIAL_CLOSE=12, 
-		SLASH_CLOSE=13, SLASH=14, SUBSET_OPEN=15, SUBSET_CLOSE=16, EQUALS=17, 
-		DOCTYPE=18, STRING=19, Name=20, S=21;
+			COMMENT=1, CDATA=2, ParamEntityRef=3, EntityRef=4, CharRef=5, SEA_WS=6,
+			SPECIAL_OPEN_XML=7, OPEN=8, SPECIAL_OPEN=9, DTD_OPEN=10, TEXT=11, DTD_CLOSE=12,
+			DTD_SUBSET_OPEN=13, DTD_S=14, DOCTYPE=15, DTD_SUBSET_CLOSE=16, MARKUP_OPEN=17,
+			DTS_SUBSET_S=18, MARK_UP_CLOSE=19, MARKUP_S=20, MARKUP_TEXT=21, MARKUP_SUBSET=22,
+			CLOSE=23, SPECIAL_CLOSE=24, SLASH_CLOSE=25, S=26, SLASH=27, EQUALS=28,
+			STRING=29, Name=30;
 	public static final int
-		RULE_document = 0, RULE_prolog = 1, RULE_xmldecl = 2, RULE_misc = 3, RULE_doctypedecl = 4, 
-		RULE_intsubset = 5, RULE_externalid = 6, RULE_processinginstruction = 7, 
-		RULE_content = 8, RULE_element = 9, RULE_reference = 10, RULE_attribute = 11, 
-		RULE_chardata = 12;
+			RULE_document = 0, RULE_prolog = 1, RULE_xmldecl = 2, RULE_misc = 3, RULE_doctypedecl = 4,
+			RULE_intsubset = 5, RULE_markupdecl = 6, RULE_declSep = 7, RULE_externalid = 8,
+			RULE_processinginstruction = 9, RULE_content = 10, RULE_element = 11,
+			RULE_reference = 12, RULE_attribute = 13, RULE_chardata = 14;
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"document", "prolog", "xmldecl", "misc", "doctypedecl", "intsubset", 
-			"externalid", "processinginstruction", "content", "element", "reference", 
-			"attribute", "chardata"
+				"document", "prolog", "xmldecl", "misc", "doctypedecl", "intsubset",
+				"markupdecl", "declSep", "externalid", "processinginstruction", "content",
+				"element", "reference", "attribute", "chardata"
 		};
 	}
 	public static final String[] ruleNames = makeRuleNames();
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, null, null, null, null, null, "'<'", "'<?'", "'<!'", null, 
-			"'>'", "'?>'", "'/>'", "'/'", "'['", "']'", "'='", "'DOCTYPE'"
+				null, null, null, null, null, null, null, null, "'<'", "'<?'", null,
+				null, null, null, null, "'DOCTYPE'", null, null, null, null, null, null,
+				null, null, "'?>'", "'/>'", null, "'/'", "'='"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "COMMENT", "CDATA", "EntityRef", "CharRef", "SEA_WS", "SPECIAL_OPEN_XML", 
-			"OPEN", "SPECIAL_OPEN", "ELEMENT_OPEN", "TEXT", "CLOSE", "SPECIAL_CLOSE", 
-			"SLASH_CLOSE", "SLASH", "SUBSET_OPEN", "SUBSET_CLOSE", "EQUALS", "DOCTYPE", 
-			"STRING", "Name", "S"
+				null, "COMMENT", "CDATA", "ParamEntityRef", "EntityRef", "CharRef", "SEA_WS",
+				"SPECIAL_OPEN_XML", "OPEN", "SPECIAL_OPEN", "DTD_OPEN", "TEXT", "DTD_CLOSE",
+				"DTD_SUBSET_OPEN", "DTD_S", "DOCTYPE", "DTD_SUBSET_CLOSE", "MARKUP_OPEN",
+				"DTS_SUBSET_S", "MARK_UP_CLOSE", "MARKUP_S", "MARKUP_TEXT", "MARKUP_SUBSET",
+				"CLOSE", "SPECIAL_CLOSE", "SLASH_CLOSE", "S", "SLASH", "EQUALS", "STRING",
+				"Name"
 		};
 	}
 	private static final String[] _SYMBOLIC_NAMES = makeSymbolicNames();
@@ -152,10 +151,10 @@ public class XMLParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(26);
-			prolog();
-			setState(27);
-			element();
+				setState(30);
+				prolog();
+				setState(31);
+				element();
 			}
 		}
 		catch (RecognitionException re) {
@@ -208,34 +207,34 @@ public class XMLParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(32);
-			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (_la==SPECIAL_OPEN_XML) {
-				{
-				{
-				setState(29);
-				xmldecl();
-				}
-				}
-				setState(34);
+				setState(36);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
-			}
-			setState(38);
-			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (((_la & ~0x3f) == 0 && ((1L << _la) & ((1L << COMMENT) | (1L << SPECIAL_OPEN) | (1L << ELEMENT_OPEN))) != 0)) {
-				{
-				{
-				setState(35);
-				misc();
+				while (_la==SPECIAL_OPEN_XML) {
+					{
+						{
+							setState(33);
+							xmldecl();
+						}
+					}
+					setState(38);
+					_errHandler.sync(this);
+					_la = _input.LA(1);
 				}
-				}
-				setState(40);
+				setState(42);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
-			}
+				while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << COMMENT) | (1L << SPECIAL_OPEN) | (1L << DTD_OPEN))) != 0)) {
+					{
+						{
+							setState(39);
+							misc();
+						}
+					}
+					setState(44);
+					_errHandler.sync(this);
+					_la = _input.LA(1);
+				}
 			}
 		}
 		catch (RecognitionException re) {
@@ -284,24 +283,24 @@ public class XMLParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(41);
-			match(SPECIAL_OPEN_XML);
-			setState(45);
-			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (_la==Name) {
-				{
-				{
-				setState(42);
-				attribute();
-				}
-				}
-				setState(47);
+				setState(45);
+				match(SPECIAL_OPEN_XML);
+				setState(49);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
-			}
-			setState(48);
-			match(SPECIAL_CLOSE);
+				while (_la==Name) {
+					{
+						{
+							setState(46);
+							attribute();
+						}
+					}
+					setState(51);
+					_errHandler.sync(this);
+					_la = _input.LA(1);
+				}
+				setState(52);
+				match(SPECIAL_CLOSE);
 			}
 		}
 		catch (RecognitionException re) {
@@ -346,32 +345,32 @@ public class XMLParser extends Parser {
 		MiscContext _localctx = new MiscContext(_ctx, getState());
 		enterRule(_localctx, 6, RULE_misc);
 		try {
-			setState(53);
-			_errHandler.sync(this);
-			switch (_input.LA(1)) {
-			case COMMENT:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(50);
-				match(COMMENT);
+			enterOuterAlt(_localctx, 1);
+			{
+				setState(57);
+				_errHandler.sync(this);
+				switch (_input.LA(1)) {
+					case COMMENT:
+					{
+						setState(54);
+						match(COMMENT);
+					}
+					break;
+					case DTD_OPEN:
+					{
+						setState(55);
+						doctypedecl();
+					}
+					break;
+					case SPECIAL_OPEN:
+					{
+						setState(56);
+						processinginstruction();
+					}
+					break;
+					default:
+						throw new NoViableAltException(this);
 				}
-				break;
-			case ELEMENT_OPEN:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(51);
-				doctypedecl();
-				}
-				break;
-			case SPECIAL_OPEN:
-				enterOuterAlt(_localctx, 3);
-				{
-				setState(52);
-				processinginstruction();
-				}
-				break;
-			default:
-				throw new NoViableAltException(this);
 			}
 		}
 		catch (RecognitionException re) {
@@ -386,20 +385,22 @@ public class XMLParser extends Parser {
 	}
 
 	public static class DoctypedeclContext extends ParserRuleContext {
-		public TerminalNode ELEMENT_OPEN() { return getToken(XMLParser.ELEMENT_OPEN, 0); }
+		public TerminalNode DTD_OPEN() { return getToken(XMLParser.DTD_OPEN, 0); }
 		public TerminalNode DOCTYPE() { return getToken(XMLParser.DOCTYPE, 0); }
 		public TerminalNode Name() { return getToken(XMLParser.Name, 0); }
 		public ExternalidContext externalid() {
 			return getRuleContext(ExternalidContext.class,0);
 		}
-		public TerminalNode CLOSE() { return getToken(XMLParser.CLOSE, 0); }
+		public TerminalNode DTD_CLOSE() { return getToken(XMLParser.DTD_CLOSE, 0); }
 		public List<TerminalNode> STRING() { return getTokens(XMLParser.STRING); }
 		public TerminalNode STRING(int i) {
 			return getToken(XMLParser.STRING, i);
 		}
+		public TerminalNode DTD_SUBSET_OPEN() { return getToken(XMLParser.DTD_SUBSET_OPEN, 0); }
 		public IntsubsetContext intsubset() {
 			return getRuleContext(IntsubsetContext.class,0);
 		}
+		public TerminalNode DTD_SUBSET_CLOSE() { return getToken(XMLParser.DTD_SUBSET_CLOSE, 0); }
 		public DoctypedeclContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -426,40 +427,44 @@ public class XMLParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(55);
-			match(ELEMENT_OPEN);
-			setState(56);
-			match(DOCTYPE);
-			setState(57);
-			match(Name);
-			setState(58);
-			externalid();
-			setState(62);
-			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (_la==STRING) {
-				{
-				{
 				setState(59);
-				match(STRING);
-				}
-				}
-				setState(64);
+				match(DTD_OPEN);
+				setState(60);
+				match(DOCTYPE);
+				setState(61);
+				match(Name);
+				setState(62);
+				externalid();
+				setState(66);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
-			}
-			setState(66);
-			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (_la==SUBSET_OPEN) {
-				{
-				setState(65);
-				intsubset();
+				while (_la==STRING) {
+					{
+						{
+							setState(63);
+							match(STRING);
+						}
+					}
+					setState(68);
+					_errHandler.sync(this);
+					_la = _input.LA(1);
 				}
-			}
+				setState(73);
+				_errHandler.sync(this);
+				_la = _input.LA(1);
+				if (_la==DTD_SUBSET_OPEN) {
+					{
+						setState(69);
+						match(DTD_SUBSET_OPEN);
+						setState(70);
+						intsubset();
+						setState(71);
+						match(DTD_SUBSET_CLOSE);
+					}
+				}
 
-			setState(68);
-			match(CLOSE);
+				setState(75);
+				match(DTD_CLOSE);
 			}
 		}
 		catch (RecognitionException re) {
@@ -474,11 +479,17 @@ public class XMLParser extends Parser {
 	}
 
 	public static class IntsubsetContext extends ParserRuleContext {
-		public TerminalNode SUBSET_OPEN() { return getToken(XMLParser.SUBSET_OPEN, 0); }
-		public TerminalNode SUBSET_CLOSE() { return getToken(XMLParser.SUBSET_CLOSE, 0); }
-		public List<TerminalNode> STRING() { return getTokens(XMLParser.STRING); }
-		public TerminalNode STRING(int i) {
-			return getToken(XMLParser.STRING, i);
+		public List<MarkupdeclContext> markupdecl() {
+			return getRuleContexts(MarkupdeclContext.class);
+		}
+		public MarkupdeclContext markupdecl(int i) {
+			return getRuleContext(MarkupdeclContext.class,i);
+		}
+		public List<DeclSepContext> declSep() {
+			return getRuleContexts(DeclSepContext.class);
+		}
+		public DeclSepContext declSep(int i) {
+			return getRuleContext(DeclSepContext.class,i);
 		}
 		public IntsubsetContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -506,24 +517,194 @@ public class XMLParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(70);
-			match(SUBSET_OPEN);
-			setState(74);
-			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (_la==STRING) {
-				{
-				{
-				setState(71);
-				match(STRING);
-				}
-				}
-				setState(76);
+				setState(81);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
+				while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << COMMENT) | (1L << ParamEntityRef) | (1L << SPECIAL_OPEN) | (1L << MARKUP_OPEN))) != 0)) {
+					{
+						setState(79);
+						_errHandler.sync(this);
+						switch (_input.LA(1)) {
+							case COMMENT:
+							case SPECIAL_OPEN:
+							case MARKUP_OPEN:
+							{
+								setState(77);
+								markupdecl();
+							}
+							break;
+							case ParamEntityRef:
+							{
+								setState(78);
+								declSep();
+							}
+							break;
+							default:
+								throw new NoViableAltException(this);
+						}
+					}
+					setState(83);
+					_errHandler.sync(this);
+					_la = _input.LA(1);
+				}
 			}
-			setState(77);
-			match(SUBSET_CLOSE);
+		}
+		catch (RecognitionException re) {
+			_localctx.exception = re;
+			_errHandler.reportError(this, re);
+			_errHandler.recover(this, re);
+		}
+		finally {
+			exitRule();
+		}
+		return _localctx;
+	}
+
+	public static class MarkupdeclContext extends ParserRuleContext {
+		public TerminalNode MARKUP_OPEN() { return getToken(XMLParser.MARKUP_OPEN, 0); }
+		public TerminalNode MARK_UP_CLOSE() { return getToken(XMLParser.MARK_UP_CLOSE, 0); }
+		public List<TerminalNode> MARKUP_TEXT() { return getTokens(XMLParser.MARKUP_TEXT); }
+		public TerminalNode MARKUP_TEXT(int i) {
+			return getToken(XMLParser.MARKUP_TEXT, i);
+		}
+		public List<TerminalNode> MARKUP_SUBSET() { return getTokens(XMLParser.MARKUP_SUBSET); }
+		public TerminalNode MARKUP_SUBSET(int i) {
+			return getToken(XMLParser.MARKUP_SUBSET, i);
+		}
+		public ProcessinginstructionContext processinginstruction() {
+			return getRuleContext(ProcessinginstructionContext.class,0);
+		}
+		public TerminalNode COMMENT() { return getToken(XMLParser.COMMENT, 0); }
+		public MarkupdeclContext(ParserRuleContext parent, int invokingState) {
+			super(parent, invokingState);
+		}
+		@Override public int getRuleIndex() { return RULE_markupdecl; }
+		@Override
+		public void enterRule(ParseTreeListener listener) {
+			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterMarkupdecl(this);
+		}
+		@Override
+		public void exitRule(ParseTreeListener listener) {
+			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitMarkupdecl(this);
+		}
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitMarkupdecl(this);
+			else return visitor.visitChildren(this);
+		}
+	}
+
+	public final MarkupdeclContext markupdecl() throws RecognitionException {
+		MarkupdeclContext _localctx = new MarkupdeclContext(_ctx, getState());
+		enterRule(_localctx, 12, RULE_markupdecl);
+		int _la;
+		try {
+			setState(100);
+			_errHandler.sync(this);
+			switch (_input.LA(1)) {
+				case MARKUP_OPEN:
+					enterOuterAlt(_localctx, 1);
+				{
+					{
+						setState(84);
+						match(MARKUP_OPEN);
+						setState(86);
+						_errHandler.sync(this);
+						switch ( getInterpreter().adaptivePredict(_input,8,_ctx) ) {
+							case 1:
+							{
+								setState(85);
+								match(MARKUP_TEXT);
+							}
+							break;
+						}
+						setState(91);
+						_errHandler.sync(this);
+						_la = _input.LA(1);
+						while (_la==MARKUP_SUBSET) {
+							{
+								{
+									setState(88);
+									match(MARKUP_SUBSET);
+								}
+							}
+							setState(93);
+							_errHandler.sync(this);
+							_la = _input.LA(1);
+						}
+						setState(95);
+						_errHandler.sync(this);
+						_la = _input.LA(1);
+						if (_la==MARKUP_TEXT) {
+							{
+								setState(94);
+								match(MARKUP_TEXT);
+							}
+						}
+
+						setState(97);
+						match(MARK_UP_CLOSE);
+					}
+				}
+				break;
+				case SPECIAL_OPEN:
+					enterOuterAlt(_localctx, 2);
+				{
+					setState(98);
+					processinginstruction();
+				}
+				break;
+				case COMMENT:
+					enterOuterAlt(_localctx, 3);
+				{
+					setState(99);
+					match(COMMENT);
+				}
+				break;
+				default:
+					throw new NoViableAltException(this);
+			}
+		}
+		catch (RecognitionException re) {
+			_localctx.exception = re;
+			_errHandler.reportError(this, re);
+			_errHandler.recover(this, re);
+		}
+		finally {
+			exitRule();
+		}
+		return _localctx;
+	}
+
+	public static class DeclSepContext extends ParserRuleContext {
+		public TerminalNode ParamEntityRef() { return getToken(XMLParser.ParamEntityRef, 0); }
+		public DeclSepContext(ParserRuleContext parent, int invokingState) {
+			super(parent, invokingState);
+		}
+		@Override public int getRuleIndex() { return RULE_declSep; }
+		@Override
+		public void enterRule(ParseTreeListener listener) {
+			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterDeclSep(this);
+		}
+		@Override
+		public void exitRule(ParseTreeListener listener) {
+			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitDeclSep(this);
+		}
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitDeclSep(this);
+			else return visitor.visitChildren(this);
+		}
+	}
+
+	public final DeclSepContext declSep() throws RecognitionException {
+		DeclSepContext _localctx = new DeclSepContext(_ctx, getState());
+		enterRule(_localctx, 14, RULE_declSep);
+		try {
+			enterOuterAlt(_localctx, 1);
+			{
+				setState(102);
+				match(ParamEntityRef);
 			}
 		}
 		catch (RecognitionException re) {
@@ -560,20 +741,20 @@ public class XMLParser extends Parser {
 
 	public final ExternalidContext externalid() throws RecognitionException {
 		ExternalidContext _localctx = new ExternalidContext(_ctx, getState());
-		enterRule(_localctx, 12, RULE_externalid);
+		enterRule(_localctx, 16, RULE_externalid);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(80);
-			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (_la==Name) {
-				{
-				setState(79);
-				match(Name);
+				setState(105);
+				_errHandler.sync(this);
+				_la = _input.LA(1);
+				if (_la==Name) {
+					{
+						setState(104);
+						match(Name);
+					}
 				}
-			}
 
 			}
 		}
@@ -619,31 +800,31 @@ public class XMLParser extends Parser {
 
 	public final ProcessinginstructionContext processinginstruction() throws RecognitionException {
 		ProcessinginstructionContext _localctx = new ProcessinginstructionContext(_ctx, getState());
-		enterRule(_localctx, 14, RULE_processinginstruction);
+		enterRule(_localctx, 18, RULE_processinginstruction);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(82);
-			match(SPECIAL_OPEN);
-			setState(83);
-			match(Name);
-			setState(87);
-			_errHandler.sync(this);
-			_la = _input.LA(1);
-			while (_la==Name) {
-				{
-				{
-				setState(84);
-				attribute();
-				}
-				}
-				setState(89);
+				setState(107);
+				match(SPECIAL_OPEN);
+				setState(108);
+				match(Name);
+				setState(112);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
-			}
-			setState(90);
-			match(SPECIAL_CLOSE);
+				while (_la==Name) {
+					{
+						{
+							setState(109);
+							attribute();
+						}
+					}
+					setState(114);
+					_errHandler.sync(this);
+					_la = _input.LA(1);
+				}
+				setState(115);
+				match(SPECIAL_CLOSE);
 			}
 		}
 		catch (RecognitionException re) {
@@ -690,48 +871,48 @@ public class XMLParser extends Parser {
 
 	public final ContentContext content() throws RecognitionException {
 		ContentContext _localctx = new ContentContext(_ctx, getState());
-		enterRule(_localctx, 16, RULE_content);
+		enterRule(_localctx, 20, RULE_content);
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(97);
-			_errHandler.sync(this);
-			switch (_input.LA(1)) {
-			case OPEN:
-				{
-				setState(92);
-				element();
+				setState(122);
+				_errHandler.sync(this);
+				switch (_input.LA(1)) {
+					case OPEN:
+					{
+						setState(117);
+						element();
+					}
+					break;
+					case EntityRef:
+					case CharRef:
+					{
+						setState(118);
+						reference();
+					}
+					break;
+					case CDATA:
+					{
+						setState(119);
+						match(CDATA);
+					}
+					break;
+					case COMMENT:
+					{
+						setState(120);
+						match(COMMENT);
+					}
+					break;
+					case SEA_WS:
+					case TEXT:
+					{
+						setState(121);
+						chardata();
+					}
+					break;
+					default:
+						throw new NoViableAltException(this);
 				}
-				break;
-			case EntityRef:
-			case CharRef:
-				{
-				setState(93);
-				reference();
-				}
-				break;
-			case CDATA:
-				{
-				setState(94);
-				match(CDATA);
-				}
-				break;
-			case COMMENT:
-				{
-				setState(95);
-				match(COMMENT);
-				}
-				break;
-			case SEA_WS:
-			case TEXT:
-				{
-				setState(96);
-				chardata();
-				}
-				break;
-			default:
-				throw new NoViableAltException(this);
-			}
 			}
 		}
 		catch (RecognitionException re) {
@@ -793,85 +974,85 @@ public class XMLParser extends Parser {
 
 	public final ElementContext element() throws RecognitionException {
 		ElementContext _localctx = new ElementContext(_ctx, getState());
-		enterRule(_localctx, 18, RULE_element);
+		enterRule(_localctx, 22, RULE_element);
 		int _la;
 		try {
 			int _alt;
-			setState(127);
+			setState(152);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,13,_ctx) ) {
-			case 1:
-				enterOuterAlt(_localctx, 1);
+			switch ( getInterpreter().adaptivePredict(_input,18,_ctx) ) {
+				case 1:
+					enterOuterAlt(_localctx, 1);
 				{
-				setState(99);
-				match(OPEN);
-				setState(100);
-				match(Name);
-				setState(104);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				while (_la==Name) {
-					{
-					{
-					setState(101);
-					attribute();
-					}
-					}
-					setState(106);
+					setState(124);
+					match(OPEN);
+					setState(125);
+					match(Name);
+					setState(129);
 					_errHandler.sync(this);
 					_la = _input.LA(1);
-				}
-				setState(107);
-				match(CLOSE);
-				setState(111);
-				_errHandler.sync(this);
-				_alt = getInterpreter().adaptivePredict(_input,11,_ctx);
-				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
-					if ( _alt==1 ) {
+					while (_la==Name) {
 						{
-						{
-						setState(108);
-						content();
+							{
+								setState(126);
+								attribute();
+							}
 						}
-						} 
+						setState(131);
+						_errHandler.sync(this);
+						_la = _input.LA(1);
 					}
-					setState(113);
+					setState(132);
+					match(CLOSE);
+					setState(136);
 					_errHandler.sync(this);
-					_alt = getInterpreter().adaptivePredict(_input,11,_ctx);
-				}
-				setState(114);
-				match(OPEN);
-				setState(115);
-				match(SLASH);
-				setState(116);
-				match(Name);
-				setState(117);
-				match(CLOSE);
+					_alt = getInterpreter().adaptivePredict(_input,16,_ctx);
+					while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
+						if ( _alt==1 ) {
+							{
+								{
+									setState(133);
+									content();
+								}
+							}
+						}
+						setState(138);
+						_errHandler.sync(this);
+						_alt = getInterpreter().adaptivePredict(_input,16,_ctx);
+					}
+					setState(139);
+					match(OPEN);
+					setState(140);
+					match(SLASH);
+					setState(141);
+					match(Name);
+					setState(142);
+					match(CLOSE);
 				}
 				break;
-			case 2:
-				enterOuterAlt(_localctx, 2);
+				case 2:
+					enterOuterAlt(_localctx, 2);
 				{
-				setState(118);
-				match(OPEN);
-				setState(119);
-				match(Name);
-				setState(123);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				while (_la==Name) {
-					{
-					{
-					setState(120);
-					attribute();
-					}
-					}
-					setState(125);
+					setState(143);
+					match(OPEN);
+					setState(144);
+					match(Name);
+					setState(148);
 					_errHandler.sync(this);
 					_la = _input.LA(1);
-				}
-				setState(126);
-				match(SLASH_CLOSE);
+					while (_la==Name) {
+						{
+							{
+								setState(145);
+								attribute();
+							}
+						}
+						setState(150);
+						_errHandler.sync(this);
+						_la = _input.LA(1);
+					}
+					setState(151);
+					match(SLASH_CLOSE);
 				}
 				break;
 			}
@@ -911,21 +1092,21 @@ public class XMLParser extends Parser {
 
 	public final ReferenceContext reference() throws RecognitionException {
 		ReferenceContext _localctx = new ReferenceContext(_ctx, getState());
-		enterRule(_localctx, 20, RULE_reference);
+		enterRule(_localctx, 24, RULE_reference);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(129);
-			_la = _input.LA(1);
-			if ( !(_la==EntityRef || _la==CharRef) ) {
-			_errHandler.recoverInline(this);
-			}
-			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
-				_errHandler.reportMatch(this);
-				consume();
-			}
+				setState(154);
+				_la = _input.LA(1);
+				if ( !(_la==EntityRef || _la==CharRef) ) {
+					_errHandler.recoverInline(this);
+				}
+				else {
+					if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+					_errHandler.reportMatch(this);
+					consume();
+				}
 			}
 		}
 		catch (RecognitionException re) {
@@ -964,16 +1145,16 @@ public class XMLParser extends Parser {
 
 	public final AttributeContext attribute() throws RecognitionException {
 		AttributeContext _localctx = new AttributeContext(_ctx, getState());
-		enterRule(_localctx, 22, RULE_attribute);
+		enterRule(_localctx, 26, RULE_attribute);
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(131);
-			match(Name);
-			setState(132);
-			match(EQUALS);
-			setState(133);
-			match(STRING);
+				setState(156);
+				match(Name);
+				setState(157);
+				match(EQUALS);
+				setState(158);
+				match(STRING);
 			}
 		}
 		catch (RecognitionException re) {
@@ -1011,21 +1192,21 @@ public class XMLParser extends Parser {
 
 	public final ChardataContext chardata() throws RecognitionException {
 		ChardataContext _localctx = new ChardataContext(_ctx, getState());
-		enterRule(_localctx, 24, RULE_chardata);
+		enterRule(_localctx, 28, RULE_chardata);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(135);
-			_la = _input.LA(1);
-			if ( !(_la==SEA_WS || _la==TEXT) ) {
-			_errHandler.recoverInline(this);
-			}
-			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
-				_errHandler.reportMatch(this);
-				consume();
-			}
+				setState(160);
+				_la = _input.LA(1);
+				if ( !(_la==SEA_WS || _la==TEXT) ) {
+					_errHandler.recoverInline(this);
+				}
+				else {
+					if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+					_errHandler.reportMatch(this);
+					consume();
+				}
 			}
 		}
 		catch (RecognitionException re) {
@@ -1040,44 +1221,54 @@ public class XMLParser extends Parser {
 	}
 
 	public static final String _serializedATN =
-		"\3\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964\3\27\u008c\4\2\t\2"+
-		"\4\3\t\3\4\4\t\4\4\5\t\5\4\6\t\6\4\7\t\7\4\b\t\b\4\t\t\t\4\n\t\n\4\13"+
-		"\t\13\4\f\t\f\4\r\t\r\4\16\t\16\3\2\3\2\3\2\3\3\7\3!\n\3\f\3\16\3$\13"+
-		"\3\3\3\7\3\'\n\3\f\3\16\3*\13\3\3\4\3\4\7\4.\n\4\f\4\16\4\61\13\4\3\4"+
-		"\3\4\3\5\3\5\3\5\5\58\n\5\3\6\3\6\3\6\3\6\3\6\7\6?\n\6\f\6\16\6B\13\6"+
-		"\3\6\5\6E\n\6\3\6\3\6\3\7\3\7\7\7K\n\7\f\7\16\7N\13\7\3\7\3\7\3\b\5\b"+
-		"S\n\b\3\t\3\t\3\t\7\tX\n\t\f\t\16\t[\13\t\3\t\3\t\3\n\3\n\3\n\3\n\3\n"+
-		"\5\nd\n\n\3\13\3\13\3\13\7\13i\n\13\f\13\16\13l\13\13\3\13\3\13\7\13p"+
-		"\n\13\f\13\16\13s\13\13\3\13\3\13\3\13\3\13\3\13\3\13\3\13\7\13|\n\13"+
-		"\f\13\16\13\177\13\13\3\13\5\13\u0082\n\13\3\f\3\f\3\r\3\r\3\r\3\r\3\16"+
-		"\3\16\3\16\2\2\17\2\4\6\b\n\f\16\20\22\24\26\30\32\2\4\3\2\5\6\4\2\7\7"+
-		"\f\f\2\u0090\2\34\3\2\2\2\4\"\3\2\2\2\6+\3\2\2\2\b\67\3\2\2\2\n9\3\2\2"+
-		"\2\fH\3\2\2\2\16R\3\2\2\2\20T\3\2\2\2\22c\3\2\2\2\24\u0081\3\2\2\2\26"+
-		"\u0083\3\2\2\2\30\u0085\3\2\2\2\32\u0089\3\2\2\2\34\35\5\4\3\2\35\36\5"+
-		"\24\13\2\36\3\3\2\2\2\37!\5\6\4\2 \37\3\2\2\2!$\3\2\2\2\" \3\2\2\2\"#"+
-		"\3\2\2\2#(\3\2\2\2$\"\3\2\2\2%\'\5\b\5\2&%\3\2\2\2\'*\3\2\2\2(&\3\2\2"+
-		"\2()\3\2\2\2)\5\3\2\2\2*(\3\2\2\2+/\7\b\2\2,.\5\30\r\2-,\3\2\2\2.\61\3"+
-		"\2\2\2/-\3\2\2\2/\60\3\2\2\2\60\62\3\2\2\2\61/\3\2\2\2\62\63\7\16\2\2"+
-		"\63\7\3\2\2\2\648\7\3\2\2\658\5\n\6\2\668\5\20\t\2\67\64\3\2\2\2\67\65"+
-		"\3\2\2\2\67\66\3\2\2\28\t\3\2\2\29:\7\13\2\2:;\7\24\2\2;<\7\26\2\2<@\5"+
-		"\16\b\2=?\7\25\2\2>=\3\2\2\2?B\3\2\2\2@>\3\2\2\2@A\3\2\2\2AD\3\2\2\2B"+
-		"@\3\2\2\2CE\5\f\7\2DC\3\2\2\2DE\3\2\2\2EF\3\2\2\2FG\7\r\2\2G\13\3\2\2"+
-		"\2HL\7\21\2\2IK\7\25\2\2JI\3\2\2\2KN\3\2\2\2LJ\3\2\2\2LM\3\2\2\2MO\3\2"+
-		"\2\2NL\3\2\2\2OP\7\22\2\2P\r\3\2\2\2QS\7\26\2\2RQ\3\2\2\2RS\3\2\2\2S\17"+
-		"\3\2\2\2TU\7\n\2\2UY\7\26\2\2VX\5\30\r\2WV\3\2\2\2X[\3\2\2\2YW\3\2\2\2"+
-		"YZ\3\2\2\2Z\\\3\2\2\2[Y\3\2\2\2\\]\7\16\2\2]\21\3\2\2\2^d\5\24\13\2_d"+
-		"\5\26\f\2`d\7\4\2\2ad\7\3\2\2bd\5\32\16\2c^\3\2\2\2c_\3\2\2\2c`\3\2\2"+
-		"\2ca\3\2\2\2cb\3\2\2\2d\23\3\2\2\2ef\7\t\2\2fj\7\26\2\2gi\5\30\r\2hg\3"+
-		"\2\2\2il\3\2\2\2jh\3\2\2\2jk\3\2\2\2km\3\2\2\2lj\3\2\2\2mq\7\r\2\2np\5"+
-		"\22\n\2on\3\2\2\2ps\3\2\2\2qo\3\2\2\2qr\3\2\2\2rt\3\2\2\2sq\3\2\2\2tu"+
-		"\7\t\2\2uv\7\20\2\2vw\7\26\2\2w\u0082\7\r\2\2xy\7\t\2\2y}\7\26\2\2z|\5"+
-		"\30\r\2{z\3\2\2\2|\177\3\2\2\2}{\3\2\2\2}~\3\2\2\2~\u0080\3\2\2\2\177"+
-		"}\3\2\2\2\u0080\u0082\7\17\2\2\u0081e\3\2\2\2\u0081x\3\2\2\2\u0082\25"+
-		"\3\2\2\2\u0083\u0084\t\2\2\2\u0084\27\3\2\2\2\u0085\u0086\7\26\2\2\u0086"+
-		"\u0087\7\23\2\2\u0087\u0088\7\25\2\2\u0088\31\3\2\2\2\u0089\u008a\t\3"+
-		"\2\2\u008a\33\3\2\2\2\20\"(/\67@DLRYcjq}\u0081";
+			"\3\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964\3 \u00a5\4\2\t\2\4"+
+					"\3\t\3\4\4\t\4\4\5\t\5\4\6\t\6\4\7\t\7\4\b\t\b\4\t\t\t\4\n\t\n\4\13\t"+
+					"\13\4\f\t\f\4\r\t\r\4\16\t\16\4\17\t\17\4\20\t\20\3\2\3\2\3\2\3\3\7\3"+
+					"%\n\3\f\3\16\3(\13\3\3\3\7\3+\n\3\f\3\16\3.\13\3\3\4\3\4\7\4\62\n\4\f"+
+					"\4\16\4\65\13\4\3\4\3\4\3\5\3\5\3\5\5\5<\n\5\3\6\3\6\3\6\3\6\3\6\7\6C"+
+					"\n\6\f\6\16\6F\13\6\3\6\3\6\3\6\3\6\5\6L\n\6\3\6\3\6\3\7\3\7\7\7R\n\7"+
+					"\f\7\16\7U\13\7\3\b\3\b\5\bY\n\b\3\b\7\b\\\n\b\f\b\16\b_\13\b\3\b\5\b"+
+					"b\n\b\3\b\3\b\3\b\5\bg\n\b\3\t\3\t\3\n\5\nl\n\n\3\13\3\13\3\13\7\13q\n"+
+					"\13\f\13\16\13t\13\13\3\13\3\13\3\f\3\f\3\f\3\f\3\f\5\f}\n\f\3\r\3\r\3"+
+					"\r\7\r\u0082\n\r\f\r\16\r\u0085\13\r\3\r\3\r\7\r\u0089\n\r\f\r\16\r\u008c"+
+					"\13\r\3\r\3\r\3\r\3\r\3\r\3\r\3\r\7\r\u0095\n\r\f\r\16\r\u0098\13\r\3"+
+					"\r\5\r\u009b\n\r\3\16\3\16\3\17\3\17\3\17\3\17\3\20\3\20\3\20\2\2\21\2"+
+					"\4\6\b\n\f\16\20\22\24\26\30\32\34\36\2\4\3\2\6\7\4\2\b\b\r\r\2\u00ad"+
+					"\2 \3\2\2\2\4&\3\2\2\2\6/\3\2\2\2\b;\3\2\2\2\n=\3\2\2\2\fS\3\2\2\2\16"+
+					"f\3\2\2\2\20h\3\2\2\2\22k\3\2\2\2\24m\3\2\2\2\26|\3\2\2\2\30\u009a\3\2"+
+					"\2\2\32\u009c\3\2\2\2\34\u009e\3\2\2\2\36\u00a2\3\2\2\2 !\5\4\3\2!\"\5"+
+					"\30\r\2\"\3\3\2\2\2#%\5\6\4\2$#\3\2\2\2%(\3\2\2\2&$\3\2\2\2&\'\3\2\2\2"+
+					"\',\3\2\2\2(&\3\2\2\2)+\5\b\5\2*)\3\2\2\2+.\3\2\2\2,*\3\2\2\2,-\3\2\2"+
+					"\2-\5\3\2\2\2.,\3\2\2\2/\63\7\t\2\2\60\62\5\34\17\2\61\60\3\2\2\2\62\65"+
+					"\3\2\2\2\63\61\3\2\2\2\63\64\3\2\2\2\64\66\3\2\2\2\65\63\3\2\2\2\66\67"+
+					"\7\32\2\2\67\7\3\2\2\28<\7\3\2\29<\5\n\6\2:<\5\24\13\2;8\3\2\2\2;9\3\2"+
+					"\2\2;:\3\2\2\2<\t\3\2\2\2=>\7\f\2\2>?\7\21\2\2?@\7 \2\2@D\5\22\n\2AC\7"+
+					"\37\2\2BA\3\2\2\2CF\3\2\2\2DB\3\2\2\2DE\3\2\2\2EK\3\2\2\2FD\3\2\2\2GH"+
+					"\7\17\2\2HI\5\f\7\2IJ\7\22\2\2JL\3\2\2\2KG\3\2\2\2KL\3\2\2\2LM\3\2\2\2"+
+					"MN\7\16\2\2N\13\3\2\2\2OR\5\16\b\2PR\5\20\t\2QO\3\2\2\2QP\3\2\2\2RU\3"+
+					"\2\2\2SQ\3\2\2\2ST\3\2\2\2T\r\3\2\2\2US\3\2\2\2VX\7\23\2\2WY\7\27\2\2"+
+					"XW\3\2\2\2XY\3\2\2\2Y]\3\2\2\2Z\\\7\30\2\2[Z\3\2\2\2\\_\3\2\2\2][\3\2"+
+					"\2\2]^\3\2\2\2^a\3\2\2\2_]\3\2\2\2`b\7\27\2\2a`\3\2\2\2ab\3\2\2\2bc\3"+
+					"\2\2\2cg\7\25\2\2dg\5\24\13\2eg\7\3\2\2fV\3\2\2\2fd\3\2\2\2fe\3\2\2\2"+
+					"g\17\3\2\2\2hi\7\5\2\2i\21\3\2\2\2jl\7 \2\2kj\3\2\2\2kl\3\2\2\2l\23\3"+
+					"\2\2\2mn\7\13\2\2nr\7 \2\2oq\5\34\17\2po\3\2\2\2qt\3\2\2\2rp\3\2\2\2r"+
+					"s\3\2\2\2su\3\2\2\2tr\3\2\2\2uv\7\32\2\2v\25\3\2\2\2w}\5\30\r\2x}\5\32"+
+					"\16\2y}\7\4\2\2z}\7\3\2\2{}\5\36\20\2|w\3\2\2\2|x\3\2\2\2|y\3\2\2\2|z"+
+					"\3\2\2\2|{\3\2\2\2}\27\3\2\2\2~\177\7\n\2\2\177\u0083\7 \2\2\u0080\u0082"+
+					"\5\34\17\2\u0081\u0080\3\2\2\2\u0082\u0085\3\2\2\2\u0083\u0081\3\2\2\2"+
+					"\u0083\u0084\3\2\2\2\u0084\u0086\3\2\2\2\u0085\u0083\3\2\2\2\u0086\u008a"+
+					"\7\31\2\2\u0087\u0089\5\26\f\2\u0088\u0087\3\2\2\2\u0089\u008c\3\2\2\2"+
+					"\u008a\u0088\3\2\2\2\u008a\u008b\3\2\2\2\u008b\u008d\3\2\2\2\u008c\u008a"+
+					"\3\2\2\2\u008d\u008e\7\n\2\2\u008e\u008f\7\35\2\2\u008f\u0090\7 \2\2\u0090"+
+					"\u009b\7\31\2\2\u0091\u0092\7\n\2\2\u0092\u0096\7 \2\2\u0093\u0095\5\34"+
+					"\17\2\u0094\u0093\3\2\2\2\u0095\u0098\3\2\2\2\u0096\u0094\3\2\2\2\u0096"+
+					"\u0097\3\2\2\2\u0097\u0099\3\2\2\2\u0098\u0096\3\2\2\2\u0099\u009b\7\33"+
+					"\2\2\u009a~\3\2\2\2\u009a\u0091\3\2\2\2\u009b\31\3\2\2\2\u009c\u009d\t"+
+					"\2\2\2\u009d\33\3\2\2\2\u009e\u009f\7 \2\2\u009f\u00a0\7\36\2\2\u00a0"+
+					"\u00a1\7\37\2\2\u00a1\35\3\2\2\2\u00a2\u00a3\t\3\2\2\u00a3\37\3\2\2\2"+
+					"\25&,\63;DKQSX]afkr|\u0083\u008a\u0096\u009a";
 	public static final ATN _ATN =
-		new ATNDeserializer().deserialize(_serializedATN.toCharArray());
+			new ATNDeserializer().deserialize(_serializedATN.toCharArray());
 	static {
 		_decisionToDFA = new DFA[_ATN.getNumberOfDecisions()];
 		for (int i = 0; i < _ATN.getNumberOfDecisions(); i++) {

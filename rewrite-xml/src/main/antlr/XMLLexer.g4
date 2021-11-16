@@ -30,63 +30,105 @@
 lexer grammar XMLLexer;
 
 // Default "mode": Everything OUTSIDE of a tag
-COMMENT       : '<!--' .*? '-->' ;
-CDATA    : '<![CDATA[' .*? ']]>' ;
+COMMENT           :  '<!--' .*? '-->' ;
+CDATA             :  '<![CDATA[' .*? ']]>' ;
 
-/** Scarf all DTD stuff, Entity Declarations like <!ENTITY ...>,
- *  and Notation Declarations <!NOTATION ...>
- */
-EntityRef     :   '&' Name ';' ;
-CharRef       :   '&#' DIGIT+ ';'
-              |   '&#x' HEXDIGIT+ ';'
-              ;
+ParamEntityRef    :  '%' Name ';' ;
+EntityRef         :  '&' Name ';' ;
+CharRef           :  '&#' DIGIT+ ';'
+                  |  '&#x' HEXDIGIT+ ';'
+                  ;
 
-SEA_WS        :   (' '|'\t'|'\r'? '\n')+  -> skip;
+SEA_WS            :  (' '|'\t'|'\r'? '\n')+       -> skip ;
 
-SPECIAL_OPEN_XML : ('<?xml-stylesheet'|'<?xml')    -> pushMode(INSIDE) ;
-OPEN             :   '<'                           -> pushMode(INSIDE) ;
-SPECIAL_OPEN     :   '<?'                          -> pushMode(INSIDE) ;
-ELEMENT_OPEN     :   '<!'                          -> pushMode(INSIDE) ;
+SPECIAL_OPEN_XML  :  ('<?xml-stylesheet'|'<?xml') -> pushMode(INSIDE) ;
+OPEN              :  '<'                          -> pushMode(INSIDE) ;
+SPECIAL_OPEN      :  '<?'                         -> pushMode(INSIDE) ;
 
-TEXT          :   ~[<&]+ ;        // match any 16 bit char other than < and &
+DTD_OPEN          :  '<!'                         -> pushMode(INSIDE_DTD) ;
+
+TEXT              :  ~[<&]+ ;  // match any 16 bit char other than < and &
+
+// INSIDE of DTD ------------------------------------------
+mode INSIDE_DTD;
+
+DTD_CLOSE        :  '>'    -> popMode ;
+DTD_SUBSET_OPEN  :  '['    -> pushMode(INSIDE_DTD_SUBSET) ;
+DTD_S            :   S     -> skip ;
+
+DOCTYPE          :  'DOCTYPE' ;
+
+DTD_NAME         :  Name   -> type(Name) ;
+DTD_STRING       :  STRING -> type(STRING) ;
+
+// INSIDE of DTD SUBSET -----------------------------------
+mode INSIDE_DTD_SUBSET;
+
+DTD_SUBSET_CLOSE    :  ']'     -> popMode ;
+MARKUP_OPEN         :  '<!'    -> pushMode(INSIDE_MARKUP) ;
+DTS_SUBSET_S        :  S       -> skip ;
+
+DTD_SUBSET_COMMENT  :  COMMENT -> type(COMMENT) ;
+
+// INSIDE of MARKUP ---------------------------------------
+mode INSIDE_MARKUP;
+MARK_UP_CLOSE       :  '>' -> popMode ;
+MARKUP_SUBSET_OPEN  :  '[' -> more, pushMode(INSIDE_MARKUP_SUBSET) ;
+MARKUP_S            :  S -> skip ;
+
+MARKUP_TEXT         :  ~[>[]+ ;  // match any 16 bit char other than > and [
+
+// INSIDE of MARKUP SUBSET --------------------------------
+mode INSIDE_MARKUP_SUBSET;
+
+MARKUP_SUBSET  :  ']' -> popMode ;
+TXT            :  .   -> more ;  // Collect all of the markup subset text.
 
 // ----------------- Everything INSIDE of a tag ---------------------
 mode INSIDE;
 
-CLOSE       :   '>'                     -> popMode ;
-SPECIAL_CLOSE:  '?>'                    -> popMode ; // close <?xml...?>
-SLASH_CLOSE :   '/>'                    -> popMode ;
-SLASH       :   '/' ;
-SUBSET_OPEN :   '[' ;
-SUBSET_CLOSE:   ']' ;
-EQUALS      :   '=' ;
-DOCTYPE     :   'DOCTYPE';
-STRING      :   '"' ~[<"]* '"'
-            |   '\'' ~[<']* '\''
-            ;
-Name        :   NameStartChar NameChar* ;
-S           :   [ \t\r\n]               -> skip ;
+CLOSE          :  '>'                     -> popMode ;
+SPECIAL_CLOSE  :  '?>'                    -> popMode ; // close <?xml...?>
+SLASH_CLOSE    :  '/>'                    -> popMode ;
+S              :  [ \t\r\n]               -> skip ;
+
+SLASH          :  '/' ;
+EQUALS         :  '=' ;
+STRING         :  '"' ~[<"]* '"'
+               |  '\'' ~[<']* '\''
+               ;
+
+Name           :  NameStartChar NameChar* ;
 
 fragment
-HEXDIGIT    :   [a-fA-F0-9] ;
+HEXDIGIT       :   [a-fA-F0-9] ;
 
 fragment
-DIGIT       :   [0-9] ;
+DIGIT          :   [0-9] ;
 
 fragment
-NameChar    :   NameStartChar
-            |   '-' | '_' | '.' | DIGIT
-            |   '\u00B7'
-            |   '\u0300'..'\u036F'
-            |   '\u203F'..'\u2040'
-            ;
+NameChar
+    :   NameStartChar
+    |   '-' | '_' | '.'
+    | DIGIT
+    |   '\u00B7'
+    |   '\u0300'..'\u036F'
+    |   '\u203F'..'\u2040'
+    ;
 
 fragment
 NameStartChar
-            :   [:a-zA-Z_]
-            |   '\u2070'..'\u218F'
-            |   '\u2C00'..'\u2FEF'
-            |   '\u3001'..'\uD7FF'
-            |   '\uF900'..'\uFDCF'
-            |   '\uFDF0'..'\uFFFD'
-            ;
+    : [_:]
+    | [a-zA-Z]
+    | '\u00C0'..'\u00D6'
+    | '\u00D8'..'\u00F6'
+    | '\u00F8'..'\u02FF'
+    | '\u0370'..'\u037D'
+    | '\u037F'..'\u1FFF'
+    | '\u200C'..'\u200D'
+    | '\u2070'..'\u218F'
+    | '\u3001'..'\uD7FF'
+    | '\uF900'..'\uFDCF'
+    | '\uFDF0'..'\uFFFD'
+    | '\u{10000}'..'\u{EFFFF}'
+    ;
