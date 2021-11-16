@@ -59,7 +59,7 @@ public class MethodNameCasing extends Recipe {
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
                 if (method.getMethodType() != null &&
                         !method.isConstructor() &&
-                        Boolean.FALSE.equals(TypeUtils.isOverride(method.getMethodType())) &&
+                        !TypeUtils.isOverride(method.getMethodType()) &&
                         !standardMethodName.matcher(method.getSimpleName()).matches()) {
                     StringBuilder standardized = new StringBuilder();
 

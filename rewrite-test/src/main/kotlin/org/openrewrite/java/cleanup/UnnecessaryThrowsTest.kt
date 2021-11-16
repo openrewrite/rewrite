@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("RedundantThrows")
+
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
@@ -33,11 +35,10 @@ interface UnnecessaryThrowsTest : JavaRecipeTest {
             import java.io.FileNotFoundException;
             import java.io.IOException;
             import java.io.UncheckedIOException;
-            
             class Test {
-                void test() throws FileNotFoundException, UncheckedIOException {
+                private void test() throws FileNotFoundException, UncheckedIOException {
                 }
-            
+
                 void test() throws IOException, UncheckedIOException {
                     new FileInputStream("test");
                 }
@@ -47,9 +48,8 @@ interface UnnecessaryThrowsTest : JavaRecipeTest {
             import java.io.FileInputStream;
             import java.io.IOException;
             import java.io.UncheckedIOException;
-            
             class Test {
-                void test() throws UncheckedIOException {
+                private void test() throws UncheckedIOException {
                 }
             
                 void test() throws IOException, UncheckedIOException {
@@ -59,6 +59,7 @@ interface UnnecessaryThrowsTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("EmptyTryBlock")
     @Issue("https://github.com/openrewrite/rewrite/issues/631")
     @Test
     fun necessaryThrowsFromCloseable(jp: JavaParser) = assertUnchanged(
@@ -156,6 +157,26 @@ interface UnnecessaryThrowsTest : JavaRecipeTest {
         """),
         before = """
             public class FooImpl implements Foo {
+                public void bar() throws Exception {
+                    // no-op
+                }
+            }
+        """
+    )
+
+    @Test
+    fun doNotRemoveDocumentedExceptions(jp: JavaParser) = assertUnchanged(
+        before = """
+            public class ParentFoo {
+                /**
+                 * @throws Exception Throws an exception
+                 */
+                public void bar() throws Exception { // this throws should not be removed
+                }
+            }
+            
+            class Foo extends ParentFoo {
+                @Override
                 public void bar() throws Exception {
                     // no-op
                 }
