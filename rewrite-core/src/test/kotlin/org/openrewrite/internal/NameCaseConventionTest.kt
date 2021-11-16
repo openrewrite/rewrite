@@ -35,6 +35,7 @@ class NameCaseConventionTest {
             "fooBBar:foo-bbar",
             "fooBar:foo-bar",
             "foo bar:foo-bar",
+            " foo  bar :foo-bar",
         ], delimiter = ':'
     )
     fun lowerHyphen(input: String, expected: String) {
@@ -44,10 +45,22 @@ class NameCaseConventionTest {
     @ParameterizedTest
     @CsvSource(
         value = [
+            "a:a",
+            "abc:abc",
+            "1:1",
+            "123:123",
+            "1a:1a",
+            "a1:a1",
+            "\$:\$",
+            "\$a:\$a",
+            "a\$:a\$",
+            "a\$a:a\$a",
+            "a_a:a_a",
             "Foo:foo",
             "Foo-Bar:foo_bar",
             "FOO.FOO-BAR:foo.foo_bar",
             "foo bar:foo_bar",
+            " foo  bar :foo_bar",
         ], delimiter = ':'
     )
     fun lowerUnderscore(input: String, expected: String) {
@@ -60,9 +73,16 @@ class NameCaseConventionTest {
             "rename_one:renameOne",
             "RenameTwo:renameTwo",
             "__rename__three__:renameThree",
-            "_Rename__Four:renameFour",
+            "_Rename___Four_:renameFour",
+            "\$a:\$a",
+            "a\$:a\$",
+            "a\$a:a\$a",
+            "a_a:aA",
+            "_a:a",
             "foo.config-client.enabled:foo.configClient.enabled",
             "foo-bar:fooBar",
+            "foo bar:fooBar",
+            " foo  bar :fooBar",
         ], delimiter = ':'
     )
     fun lowerCamel(input: String, expected: String) {
@@ -77,6 +97,8 @@ class NameCaseConventionTest {
             "__rename__three__:RenameThree",
             "_Rename__Four:RenameFour",
             "foo-bar:FooBar",
+            "foo bar:FooBar",
+            " foo  bar :FooBar",
         ], delimiter = ':'
     )
     fun upperCamel(input: String, expected: String) {
@@ -91,7 +113,8 @@ class NameCaseConventionTest {
             "foo_bar:FOO_BAR",
             "FooBar:FOO_BAR",
             "Foo.fooBar:FOO.FOO_BAR",
-            "foo bar:FOO_BAR"
+            "foo bar:FOO_BAR",
+            " foo  bar :FOO_BAR",
         ], delimiter = ':'
     )
     fun upperUnderscore(input: String, expected: String) {

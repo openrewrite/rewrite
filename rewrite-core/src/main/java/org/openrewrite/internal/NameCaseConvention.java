@@ -17,6 +17,8 @@ package org.openrewrite.internal;
 
 import org.openrewrite.Incubating;
 
+import java.util.regex.Pattern;
+
 /**
  * Utilities for standard name case conventions.
  */
@@ -53,6 +55,8 @@ public enum NameCaseConvention {
      */
     UPPER_UNDERSCORE;
 
+    private static final Pattern CAMEL_CASE_SPLIT = Pattern.compile("[\\s_-]");
+
     /**
      * Formats the input to the style of this {@link NameCaseConvention}.
      *
@@ -70,9 +74,9 @@ public enum NameCaseConvention {
             case LOWER_UNDERSCORE:
                 return lowerUnderscore(str);
             case LOWER_CAMEL:
-                return lowerCamel(str);
+                return toCamelCase(str, true);
             case UPPER_CAMEL:
-                return upperCamel(str);
+                return toCamelCase(str, false);
             case UPPER_UNDERSCORE:
                 return upperUnderscore(str);
             default:
@@ -118,52 +122,23 @@ public enum NameCaseConvention {
     }
 
     /**
-     * Returns input formatted using the Java "camelCase" naming convention. Uses these rules:
+     * Returns input formatted using the Java "camelCase" (or "CamelCase") naming convention.
      *
-     * <ul>
-     * <li>The first character will be lowercase.
-     * <li>Preserves other existing capitalized characters.
-     * <li>Special characters `$`, `-`, and `_` will be removed.
-     * <li>If a special character is removed, the following alphanumeric will be capitalized.
-     * </ul>
-     *
-     * @param str The input string to check.
+     * @param str                  The input string to check.
+     * @param lowerCaseFirstLetter Whether the first letter should be lowerCase or UpperCase.
      * @return The string formatted as {@link NameCaseConvention#LOWER_CAMEL}.
      */
-    @SuppressWarnings("ContinueStatement")
-    private static String lowerCamel(String str) {
-        StringBuilder builder = new StringBuilder();
-        boolean setCaps = false;
-        for (int i = 0; i < str.length(); i++) {
-            char c = str.charAt(i);
-            switch (c) {
-                case '$':
-                case '-':
-                case '_':
-                    if (builder.length() > 0) {
-                        setCaps = true;
-                    }
-                    continue;
-                default:
-                    break;
-            }
-
-            if (builder.length() == 0) {
-                builder.append(String.valueOf(str.charAt(i)).toLowerCase());
-            } else {
-                if (setCaps) {
-                    builder.append(String.valueOf(str.charAt(i)).toUpperCase());
-                    setCaps = false;
-                } else {
-                    builder.append(str.charAt(i));
-                }
-            }
+    private static String toCamelCase(String str, boolean lowerCaseFirstLetter) {
+        StringBuilder sb = new StringBuilder(str.length());
+        for (String s : CAMEL_CASE_SPLIT.split(str)) {
+            String capitalize = StringUtils.capitalize(s);
+            sb.append(capitalize);
         }
-        return builder.toString();
-    }
-
-    private static String upperCamel(String str) {
-        return StringUtils.capitalize(lowerCamel(str));
+        String result = sb.toString();
+        if (lowerCaseFirstLetter) {
+            return StringUtils.uncapitalize(result);
+        }
+        return result;
     }
 
     private static String upperUnderscore(String str) {
@@ -171,9 +146,9 @@ public enum NameCaseConvention {
                 .toUpperCase();
     }
 
-    private static String nameCaseJoiner(String str, boolean lowerCase, char separatorChar) {
+    private static String nameCaseJoiner(String str, boolean lowerCaseFirstLetter, char separatorChar) {
         StringBuilder builder = new StringBuilder();
-        if (lowerCase) {
+        if (lowerCaseFirstLetter) {
             char[] chars = str.toCharArray();
             boolean first = true;
             char last = '0';
