@@ -18,6 +18,7 @@ package org.openrewrite.java.tree;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.List;
+import java.util.Optional;
 
 import static java.util.Collections.emptyList;
 
@@ -137,17 +138,61 @@ public class TypeUtils {
      * Determine if a method overrides a method from a superclass or interface.
      *
      * @return `true` if a superclass or implemented interface declares a non-private method with matching signature.
-     *         `null` if the supplied method is `null` if it is missing its generic signature.
+     *         `false` if a match is not found or the method, declaring type, or generic signature is null.
      */
-    @Nullable
-    public static Boolean isOverride(@Nullable JavaType.Method method) {
-        if(method == null || method.getGenericSignature() == null) {
-            return null;
+    public static boolean isOverride(@Nullable JavaType.Method method) {
+        return findOverriddenMethod(method).isPresent();
+    }
+
+    /**
+     * Given a method type, searches the declaring type's parent and interfaces for a method with the same name and
+     * signature.
+     *
+     * NOTE: This method will return an empty optional if the method, the method's declaring type, or the method's
+     *       generic signature is null.
+     *
+     * @return An optional overridden method type declared in the parent.
+     */
+    public static Optional<JavaType.Method> findOverriddenMethod(@Nullable JavaType.Method method) {
+        if(method == null || method.getGenericSignature() == null || method.getDeclaringType() == null) {
+            return Optional.empty();
         }
         JavaType.FullyQualified dt = method.getDeclaringType();
         List<JavaType> argTypes = method.getGenericSignature().getParamTypes();
-        return declaresOverridableMethod(dt.getSupertype(), method.getName(), argTypes)
-                || dt.getInterfaces().stream().anyMatch(i -> declaresOverridableMethod(i, method.getName(), argTypes));
+        Optional<JavaType.Method> methodResult =  findDeclaredMethod(dt.getSupertype(), method.getName(), argTypes);
+        if (!methodResult.isPresent()) {
+            for (JavaType.FullyQualified i : dt.getInterfaces()) {
+                methodResult =  findDeclaredMethod(i, method.getName(), argTypes);
+                if (methodResult.isPresent()) {
+                    break;
+                }
+            }
+        }
+        return methodResult.filter(m -> !m.getFlags().contains(Flag.Private) && !m.getFlags().contains(Flag.Static));
+    }
+
+    public static Optional<JavaType.Method> findDeclaredMethod(@Nullable JavaType.FullyQualified clazz, String name, List<JavaType> argumentTypes) {
+        if (clazz == null) {
+            return Optional.empty();
+        }
+        for (JavaType.Method method : clazz.getMethods()) {
+            if (methodHasSignature(method, name, argumentTypes)) {
+                return Optional.of(method);
+            }
+        }
+
+        Optional<JavaType.Method> methodResult = findDeclaredMethod(clazz.getSupertype(), name, argumentTypes);
+        if (methodResult.isPresent()) {
+            return methodResult;
+        }
+
+        for(JavaType.FullyQualified i : clazz.getInterfaces()) {
+            methodResult = findDeclaredMethod(i, name, argumentTypes);
+            if (methodResult.isPresent()) {
+                return methodResult;
+            }
+        }
+        return Optional.empty();
     }
 
     private static boolean methodHasSignature(JavaType.Method m, String name, List<JavaType> argTypes) {
@@ -166,31 +211,7 @@ public class TypeUtils {
                 return false;
             }
         }
-
         return true;
-    }
-
-    private static boolean declaresOverridableMethod(@Nullable JavaType.FullyQualified clazz, String name, List<JavaType> argTypes) {
-        if(clazz == null) {
-            return false;
-        }
-        if(clazz.getMethods().stream()
-                .filter(m -> !m.getFlags().contains(Flag.Private) && !m.getFlags().contains(Flag.Static))
-                .anyMatch(m -> methodHasSignature(m, name, argTypes))) {
-            return true;
-        }
-        JavaType.FullyQualified supertype = clazz.getSupertype();
-        if(declaresOverridableMethod(supertype, name, argTypes)) {
-            return true;
-        }
-
-        for(JavaType.FullyQualified i : clazz.getInterfaces()) {
-            if(declaresOverridableMethod(i, name, argTypes)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     static boolean deepEquals(@Nullable List<? extends JavaType> ts1, @Nullable List<? extends JavaType> ts2) {
