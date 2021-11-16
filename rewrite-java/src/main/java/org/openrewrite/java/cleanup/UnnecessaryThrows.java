@@ -42,7 +42,7 @@ public class UnnecessaryThrows extends Recipe {
     public String getDescription() {
         return "Remove unnecessary `throws` declarations. This recipe will only remove unused, checked exception if:\n" +
                 "\n" +
-                "- The declaring class or the method declaration are `final`\n" +
+                "- The declaring class or the method declaration is `final`\n" +
                 "- The method declaration is `static` or `private`\n" +
                 "- If the method overriding a method declaration in a super class and the super does not throw the exception.\n" +
                 "- If the method is `public` or `protected` and the exception is not documented via a JavaDoc as a `@throws` tag.";
