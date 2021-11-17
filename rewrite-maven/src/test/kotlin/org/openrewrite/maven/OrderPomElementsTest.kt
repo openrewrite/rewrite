@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
@@ -89,13 +88,13 @@ class OrderPomElementsTest : MavenRecipeTest {
                 <name>Some Project</name>
                 <dependencies>
                     <dependency>
-                    <!-- artifact content
+                        <!-- artifact content
                             comment -->
                         <artifactId>my-project</artifactId>
                         <scope>test</scope>
                         <!-- group content -->
                         <groupId>my.org.project</groupId>
-                    <!-- version content -->
+                        <!-- version content -->
                         <version>4.3.0</version>
                     </dependency>
                 </dependencies>
@@ -165,7 +164,7 @@ class OrderPomElementsTest : MavenRecipeTest {
         """
     )
 
-    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/1230")
     @Test
     fun updateOrderCorrectNewLines() = assertChanged(
         before = """
@@ -237,8 +236,8 @@ class OrderPomElementsTest : MavenRecipeTest {
                 <version>4.3.0</version>
                 
                 <name>Some Project</name>
-                <description>Some project desc</description>
                 
+                <description>Some project desc</description>
                 <properties>
                 </properties>
                 

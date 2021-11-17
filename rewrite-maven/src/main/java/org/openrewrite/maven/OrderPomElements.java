@@ -85,24 +85,38 @@ public class OrderPomElements extends Recipe {
                 Maven mvn = super.visitMaven(maven, ctx);
                 Xml.Tag root = mvn.getRoot();
                 if (root.getContent() != null) {
-                    List<Content> previousContent = new ArrayList<>();
+                    Map<String, List<Content>> groupedContents = new HashMap<>(root.getContent().size());
+
+                    // Group comments with the next non-comment content.
+                    List<Content> groupedContent = new ArrayList<>();
+
+                    // Collect content that does not exist in `REQUIRED_ORDER`.
                     List<Content> otherContent = new ArrayList<>();
-                    Map<String, List<Content>> groupedContents = new HashMap<>();
+
+                    // Save the first UUID of grouped content and the size of the grouped content.
+                    // The group sizes are used to preserve the original layout of new lines.
+                    Map<UUID, Integer> groupSizes = new HashMap<>();
+
                     for (Content content : root.getContent()) {
                         if (content instanceof Xml.Comment) {
-                            previousContent.add(content);
+                            groupedContent.add(content);
                         } else if (content instanceof Xml.Tag) {
-                            previousContent.add(content);
-                            groupedContents.put(((Xml.Tag) content).getName(), previousContent);
-                            previousContent = new ArrayList<>();
+                            groupedContent.add(content);
+                            groupedContents.put(((Xml.Tag) content).getName(), groupedContent);
+
+                            groupSizes.put(groupedContent.get(0).getId(), groupedContent.size());
+                            groupedContent = new ArrayList<>();
                         } else {
-                            previousContent.add((content));
-                            otherContent.addAll(previousContent);
-                            previousContent = new ArrayList<>();
+                            groupedContent.add((content));
+                            otherContent.addAll(groupedContent);
+
+                            groupSizes.put(groupedContent.get(0).getId(), groupedContent.size());
+                            groupedContent = new ArrayList<>();
                         }
                     }
 
-                    List<Content> updatedOrder = new ArrayList<>();
+                    List<Content> updatedOrder = new ArrayList<>(root.getContent().size());
+                    // Apply required order.
                     for (String order : REQUIRED_ORDER) {
                         if (groupedContents.containsKey(order)) {
                             updatedOrder.addAll(groupedContents.get(order));
@@ -110,11 +124,28 @@ public class OrderPomElements extends Recipe {
                         }
                     }
 
+                    // Add remaining tags that may not have been in the `REQUIRED_ORDER` list.
                     for (List<Content> value : groupedContents.values()) {
                         updatedOrder.addAll(value);
                     }
 
+                    // Add non-tag content.
                     updatedOrder.addAll(otherContent);
+
+                    int beforeIndex = 0;
+                    int afterIndex = 0;
+                    for (int i = 0; i < root.getContent().size() &&
+                            beforeIndex != root.getContent().size() &&
+                            afterIndex != updatedOrder.size(); i++) {
+
+                        Content original = root.getContent().get(beforeIndex);
+                        Content updated = updatedOrder.get(afterIndex);
+
+                        updatedOrder.set(afterIndex, (Content) updated.withPrefix(original.getPrefix()));
+
+                        beforeIndex += groupSizes.get(original.getId());
+                        afterIndex += groupSizes.get(updated.getId());
+                    }
 
                     boolean foundChange = false;
                     for (int i = 0; i < root.getContent().size(); i++) {
@@ -148,12 +179,12 @@ public class OrderPomElements extends Recipe {
                     int artifactPos = -1;
                     int versionPos = -1;
                     Map<String, List<Content>> gavGroups = new HashMap<>();
-                    List<Content> prevContent = new ArrayList<>();
+                    List<Content> groupedContent = new ArrayList<>();
                     List<Content> otherContent = new ArrayList<>();
                     for (int i = 0; i < gavParent.getContent().size(); i++) {
                         Content content = gavParent.getContent().get(i);
                         if (content instanceof Xml.Comment) {
-                            prevContent.add(content);
+                            groupedContent.add(content);
                         } else if (content instanceof Xml.Tag) {
                             Xml.Tag tag = (Xml.Tag) content;
                             if ("groupId".equals(tag.getName())) {
@@ -168,20 +199,20 @@ public class OrderPomElements extends Recipe {
                                 case "groupId":
                                 case "artifactId":
                                 case "version":
-                                    prevContent.add(tag);
-                                    gavGroups.put(tag.getName(), prevContent);
-                                    prevContent = new ArrayList<>();
+                                    groupedContent.add(tag);
+                                    gavGroups.put(tag.getName(), groupedContent);
+                                    groupedContent = new ArrayList<>();
                                     break;
                                 default:
-                                    otherContent.addAll(prevContent);
+                                    otherContent.addAll(groupedContent);
                                     otherContent.add(content);
-                                    prevContent = new ArrayList<>();
+                                    groupedContent = new ArrayList<>();
                                     break;
                             }
                         } else {
-                            otherContent.addAll(prevContent);
+                            otherContent.addAll(groupedContent);
                             otherContent.add(content);
-                            prevContent = new ArrayList<>();
+                            groupedContent = new ArrayList<>();
                         }
                     }
 
