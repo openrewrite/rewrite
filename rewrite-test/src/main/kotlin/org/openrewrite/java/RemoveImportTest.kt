@@ -18,6 +18,9 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
+import org.openrewrite.Tree
+import org.openrewrite.java.style.ImportLayoutStyle
+import org.openrewrite.style.NamedStyles
 
 interface RemoveImportTest : JavaRecipeTest {
     fun removeImport(type: String, force: Boolean = false) = toRecipe {
@@ -471,6 +474,177 @@ interface RemoveImportTest : JavaRecipeTest {
                     int value2 = VALUE_2;
                     int methodValue = method1();
                 }
+            }
+        """
+    )
+
+    @Test
+    fun doNotUnfoldPackage() = assertUnchanged(
+        JavaParser.fromJavaVersion().styles(
+            listOf(
+                NamedStyles(
+                    Tree.randomId(), "test", "test", "test", emptySet(), listOf(
+                        ImportLayoutStyle.builder()
+                            .packageToFold("java.util.*")
+                            .importAllOthers()
+                            .importStaticAllOthers()
+                            .build()
+                    )
+                )
+            )
+        ).build(),
+        recipe = removeImport("java.util.Map"),
+        before = """
+            import java.util.*;
+            
+            class Test {
+                List<String> l;
+            }
+        """
+    )
+
+    @Test
+    fun doNotUnfoldSubPackage() = assertUnchanged(
+        JavaParser.fromJavaVersion().styles(
+            listOf(
+                NamedStyles(
+                    Tree.randomId(), "test", "test", "test", emptySet(), listOf(
+                        ImportLayoutStyle.builder()
+                            .packageToFold("java.util.*")
+                            .importAllOthers()
+                            .importStaticAllOthers()
+                            .build()
+                    )
+                )
+            )
+        ).build(),
+        recipe = removeImport("java.util.concurrent.ConcurrentLinkedQueue"),
+        before = """
+            import java.util.*;
+            import java.util.concurrent.*;
+            
+            class Test {
+                Map<Integer, Integer> m = new ConcurrentHashMap<>();
+            }
+        """
+    )
+
+    @Test
+    fun unfoldSubpackage() = assertChanged(
+        JavaParser.fromJavaVersion().styles(
+            listOf(
+                NamedStyles(
+                    Tree.randomId(), "test", "test", "test", emptySet(), listOf(
+                        ImportLayoutStyle.builder()
+                            .packageToFold("java.util.*", false)
+                            .importAllOthers()
+                            .importStaticAllOthers()
+                            .build()
+                    )
+                )
+            )
+        ).build(),
+        recipe = removeImport("java.util.concurrent.ConcurrentLinkedQueue"),
+        before = """
+            import java.util.*;
+            import java.util.concurrent.*;
+            
+            class Test {
+                Map<Integer, Integer> m = new ConcurrentHashMap<>();
+            }
+        """,
+        after = """
+            import java.util.*;
+            import java.util.concurrent.ConcurrentHashMap;
+            
+            class Test {
+                Map<Integer, Integer> m = new ConcurrentHashMap<>();
+            }
+        """
+    )
+
+    @Test
+    fun doNotUnfoldStaticPackage() = assertUnchanged(
+        JavaParser.fromJavaVersion().styles(
+            listOf(
+                NamedStyles(
+                    Tree.randomId(), "test", "test", "test", emptySet(), listOf(
+                        ImportLayoutStyle.builder()
+                            .staticPackageToFold("java.util.Collections.*")
+                            .importAllOthers()
+                            .importStaticAllOthers()
+                            .build()
+                    )
+                )
+            )
+        ).build(),
+        recipe = removeImport("java.util.Collections.emptyMap"),
+        before = """
+            import java.util.*;
+            import static java.util.Collections.*;
+            
+            class Test {
+                List<String> l = emptyList();
+            }
+        """
+    )
+
+    @Test
+    fun doNotUnfoldStaticSubPackage() = assertUnchanged(
+        JavaParser.fromJavaVersion().styles(
+            listOf(
+                NamedStyles(
+                    Tree.randomId(), "test", "test", "test", emptySet(), listOf(
+                        ImportLayoutStyle.builder()
+                            .staticPackageToFold("java.util.*")
+                            .importAllOthers()
+                            .importStaticAllOthers()
+                            .build()
+                    )
+                )
+            )
+        ).build(),
+        recipe = removeImport("java.util.Collections.emptyMap"),
+        before = """
+            import java.util.List;
+            import static java.util.Collections.*;
+            
+            class Test {
+                List<Integer> l = emptyList();
+            }
+        """
+    )
+
+    @Test
+    fun unfoldStaticSubpackage() = assertChanged(
+        JavaParser.fromJavaVersion().styles(
+            listOf(
+                NamedStyles(
+                    Tree.randomId(), "test", "test", "test", emptySet(), listOf(
+                        ImportLayoutStyle.builder()
+                            .packageToFold("java.util.*", false)
+                            .importAllOthers()
+                            .importStaticAllOthers()
+                            .build()
+                    )
+                )
+            )
+        ).build(),
+        recipe = removeImport("java.util.Collections.emptyMap"),
+        before = """
+            import java.util.List;
+            import static java.util.Collections.*;
+            
+            class Test {
+                List<Integer> l = emptyList();
+            }
+        """,
+        after = """
+            import java.util.List;
+            import static java.util.Collections.emptyList;
+            
+            class Test {
+                List<Integer> l = emptyList();
             }
         """
     )

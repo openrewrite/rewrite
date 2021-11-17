@@ -31,6 +31,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.java.style.ImportLayoutStyle.isPackageAlwaysFolded;
 
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class RemoveImport<P> extends JavaIsoVisitor<P> {
@@ -127,7 +128,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                     if (methodsAndFieldsUsed.isEmpty() && otherMethodsAndFieldsInTypeUsed.isEmpty()) {
                         spaceForNextImport.set(impoort.getPrefix());
                         return null;
-                    } else if (methodsAndFieldsUsed.size() + otherMethodsAndFieldsInTypeUsed.size() < importLayoutStyle.getNameCountToUseStarImport()) {
+                    } else if (!isPackageAlwaysFolded(importLayoutStyle.getPackagesToFold(), impoort) &&
+                            methodsAndFieldsUsed.size() + otherMethodsAndFieldsInTypeUsed.size() < importLayoutStyle.getNameCountToUseStarImport()) {
                         methodsAndFieldsUsed.addAll(otherMethodsAndFieldsInTypeUsed);
                         return unfoldStarImport(impoort, methodsAndFieldsUsed);
                     }
@@ -143,6 +145,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 return null;
             } else if (!keepImport && impoort.getPackageName().equals(owner) &&
                     "*".equals(impoort.getClassName()) &&
+                    !isPackageAlwaysFolded(importLayoutStyle.getPackagesToFold(), impoort) &&
                     otherTypesInPackageUsed.size() < importLayoutStyle.getClassCountToUseStarImport()) {
                 if (otherTypesInPackageUsed.isEmpty()) {
                     spaceForNextImport.set(impoort.getPrefix());

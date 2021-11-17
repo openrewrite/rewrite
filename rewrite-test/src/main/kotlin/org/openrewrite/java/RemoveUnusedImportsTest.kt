@@ -18,6 +18,9 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
+import org.openrewrite.Tree
+import org.openrewrite.java.style.ImportLayoutStyle
+import org.openrewrite.style.NamedStyles
 
 interface RemoveUnusedImportsTest : JavaRecipeTest {
     override val recipe: Recipe
@@ -502,6 +505,96 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
                 private void method() {
                     Bar.helper();
                 }
+            }
+        """
+    )
+
+    @Test
+    fun doNotUnfoldPackage() = assertUnchanged(
+        JavaParser.fromJavaVersion().styles(
+            listOf(
+                NamedStyles(
+                    Tree.randomId(), "test", "test", "test", emptySet(), listOf(
+                        ImportLayoutStyle.builder()
+                            .packageToFold("java.util.*")
+                            .staticPackageToFold("java.util.Collections.*")
+                            .importAllOthers()
+                            .importStaticAllOthers()
+                            .build()
+                    )
+                )
+            )
+        ).build(),
+        before = """
+            import java.util.*;
+            
+            import static java.util.Collections.*;
+
+            class Test {
+                List<String> l = emptyList();
+            }
+        """
+    )
+
+    @Test
+    fun unfoldSubpackage() = assertChanged(
+        JavaParser.fromJavaVersion().styles(
+            listOf(
+                NamedStyles(
+                    Tree.randomId(), "test", "test", "test", emptySet(), listOf(
+                        ImportLayoutStyle.builder()
+                            .packageToFold("java.util.*", false)
+                            .staticPackageToFold("java.util.*", false)
+                            .importAllOthers()
+                            .importStaticAllOthers()
+                            .build()
+                    )
+                )
+            )
+        ).build(),
+        before = """
+            import java.util.concurrent.*;
+            
+            import static java.util.Collections.*;
+
+            class Test {
+                ConcurrentHashMap<String, String> m = emptyMap();
+            }
+        """,
+        after = """
+            import java.util.concurrent.ConcurrentHashMap;
+            
+            import static java.util.Collections.emptyMap;
+            
+            class Test {
+                ConcurrentHashMap<String, String> m = emptyMap();
+            }
+        """
+    )
+
+    @Test
+    fun doNotUnfoldSubpackage() = assertUnchanged(
+        JavaParser.fromJavaVersion().styles(
+            listOf(
+                NamedStyles(
+                    Tree.randomId(), "test", "test", "test", emptySet(), listOf(
+                        ImportLayoutStyle.builder()
+                            .packageToFold("java.util.*", true)
+                            .staticPackageToFold("java.util.*", true)
+                            .importAllOthers()
+                            .importStaticAllOthers()
+                            .build()
+                    )
+                )
+            )
+        ).build(),
+        before = """
+            import java.util.concurrent.*;
+            
+            import static java.util.Collections.*;
+            
+            class Test {
+                ConcurrentHashMap<String, String> m = emptyMap();
             }
         """
     )
