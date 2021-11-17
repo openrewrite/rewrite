@@ -17,6 +17,7 @@ package org.openrewrite.maven
 
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 
 class OrderPomElementsTest : MavenRecipeTest {
@@ -64,6 +65,9 @@ class OrderPomElementsTest : MavenRecipeTest {
             </project>
         """
     )
+
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/1228")
     @Test
     fun updateOrder() = assertChanged(
         before = """
@@ -90,6 +94,7 @@ class OrderPomElementsTest : MavenRecipeTest {
                         <groupId>my.org.project</groupId>
                         <!-- version content -->
                         <version>4.3.0</version>
+                        <scope>test</scope>
                     </dependency>
                 </dependencies>
                 <dependencyManagement>
@@ -97,6 +102,8 @@ class OrderPomElementsTest : MavenRecipeTest {
                         <version>2</version>
                         <groupId>my.org.project</groupId>
                         <artifactId>my-project-thing</artifactId>
+                        <type>pom</type>
+                        <scope>import</scope>
                     </dependency>
                 </dependencyManagement>
                 <repositories>

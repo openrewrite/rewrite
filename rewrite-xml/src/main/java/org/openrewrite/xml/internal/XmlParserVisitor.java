@@ -104,6 +104,11 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     false,
                     ctx.reference().EntityRef().getText(),
                     "");
+        } else if (ctx.COMMENT() != null) {
+            return convert(ctx.COMMENT(), (comment, prefix) -> new Xml.Comment(randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    comment.getText().substring("<!--".length(), comment.getText().length() - "-->".length())));
         }
 
         return super.visitContent(ctx);
