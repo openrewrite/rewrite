@@ -18,7 +18,7 @@ package org.openrewrite.maven;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.xml.AutoFormat;
+import org.openrewrite.xml.*;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
@@ -85,22 +85,37 @@ public class OrderPomElements extends Recipe {
                 Maven mvn = super.visitMaven(maven, ctx);
                 Xml.Tag root = mvn.getRoot();
                 if (root.getContent() != null) {
-                    List<Content> content = new ArrayList<>(root.getContent());
-                    List<Content> updatedOrder = new ArrayList<>();
-                    for (String order : REQUIRED_ORDER) {
-                        for (Iterator<? extends Content> iterator = content.iterator(); iterator.hasNext(); ) {
-                            Content c = iterator.next();
-                            if (c instanceof Xml.Tag) {
-                                Xml.Tag tag = (Xml.Tag) c;
-                                if (tag.getName().equals(order)) {
-                                    updatedOrder.add(c);
-                                    iterator.remove();
-                                    break;
-                                }
-                            }
+                    List<Content> previousContent = new ArrayList<>();
+                    List<Content> otherContent = new ArrayList<>();
+                    Map<String, List<Content>> groupedContents = new HashMap<>();
+                    for (Content content : root.getContent()) {
+                        if (content instanceof Xml.Comment) {
+                            previousContent.add(content);
+                        } else if (content instanceof Xml.Tag) {
+                            previousContent.add(content);
+                            groupedContents.put(((Xml.Tag) content).getName(), previousContent);
+                            previousContent = new ArrayList<>();
+                        } else {
+                            previousContent.add((content));
+                            otherContent.addAll(previousContent);
+                            previousContent = new ArrayList<>();
                         }
                     }
-                    updatedOrder.addAll(content);
+
+                    List<Content> updatedOrder = new ArrayList<>();
+                    for (String order : REQUIRED_ORDER) {
+                        if (groupedContents.containsKey(order)) {
+                            updatedOrder.addAll(groupedContents.get(order));
+                            groupedContents.remove(order);
+                        }
+                    }
+
+                    for (List<Content> value : groupedContents.values()) {
+                        updatedOrder.addAll(value);
+                    }
+
+                    updatedOrder.addAll(otherContent);
+
                     boolean foundChange = false;
                     for (int i = 0; i < root.getContent().size(); i++) {
                         if (root.getContent().get(i) != updatedOrder.get(i)) {
@@ -112,7 +127,7 @@ public class OrderPomElements extends Recipe {
                     if (foundChange) {
                         root = root.withContent(updatedOrder);
                         mvn = mvn.withRoot(root);
-                        doAfterVisit(new AutoFormat());
+                        mvn = (Maven) new AutoFormatVisitor<>().visitNonNull(mvn, ctx);
                     }
                 }
                 return mvn;
@@ -128,35 +143,60 @@ public class OrderPomElements extends Recipe {
             }
 
             private Xml.Tag orderGav(Xml.Tag gavParent) {
-                List<? extends Content> gavParentContent = gavParent.getChildren();
-                int groupPos = -1;
-                int artifactPos = -1;
-                int versionPos = -1;
-                Map<String, Content> gavGroups = new HashMap<>();
-                for (int i = 0; i < gavParentContent.size(); i++) {
-                    Content content = gavParentContent.get(i);
-                    Xml.Tag tag = (Xml.Tag) content;
-                    if ("groupId".equals(tag.getName())) {
-                        gavGroups.put("group", tag);
-                        groupPos = i;
-                    } else if ("artifactId".equals(tag.getName())) {
-                        gavGroups.put("artifact", tag);
-                        artifactPos = i;
-                    } else if ("version".equals(tag.getName())) {
-                        gavGroups.put("version", tag);
-                        versionPos = i;
-                    }
-                }
-                if ((groupPos > artifactPos ||
-                        (versionPos > -1 && (artifactPos > versionPos)))) {
-                    List<Content> orderedContents = new ArrayList<>();
-                    for (String type : new String[]{"group", "artifact", "version"}) {
-                        Content gavContent = gavGroups.get(type);
-                        if(gavContent != null) {
-                            orderedContents.add(gavContent);
+                if (gavParent.getContent() != null) {
+                    int groupPos = -1;
+                    int artifactPos = -1;
+                    int versionPos = -1;
+                    Map<String, List<Content>> gavGroups = new HashMap<>();
+                    List<Content> prevContent = new ArrayList<>();
+                    List<Content> otherContent = new ArrayList<>();
+                    for (int i = 0; i < gavParent.getContent().size(); i++) {
+                        Content content = gavParent.getContent().get(i);
+                        if (content instanceof Xml.Comment) {
+                            prevContent.add(content);
+                        } else if (content instanceof Xml.Tag) {
+                            Xml.Tag tag = (Xml.Tag) content;
+                            if ("groupId".equals(tag.getName())) {
+                                groupPos = i;
+                            } else if ("artifactId".equals(tag.getName())) {
+                                artifactPos = i;
+                            } else if ("version".equals(tag.getName())) {
+                                versionPos = i;
+                            }
+
+                            switch (tag.getName()) {
+                                case "groupId":
+                                case "artifactId":
+                                case "version":
+                                    prevContent.add(tag);
+                                    gavGroups.put(tag.getName(), prevContent);
+                                    prevContent = new ArrayList<>();
+                                    break;
+                                default:
+                                    otherContent.addAll(prevContent);
+                                    otherContent.add(content);
+                                    prevContent = new ArrayList<>();
+                                    break;
+                            }
+                        } else {
+                            otherContent.addAll(prevContent);
+                            otherContent.add(content);
+                            prevContent = new ArrayList<>();
                         }
                     }
-                    gavParent = gavParent.withContent(orderedContents);
+
+                    if ((groupPos > artifactPos ||
+                            (versionPos > -1 && (artifactPos > versionPos)))) {
+                        List<Content> orderedContents = new ArrayList<>();
+                        for (String type : new String[]{"groupId", "artifactId", "version"}) {
+                            List<Content> gavContents = gavGroups.get(type);
+                            if(gavContents != null) {
+                                orderedContents.addAll(gavContents);
+                            }
+                        }
+                        orderedContents.addAll(otherContent);
+                        gavParent = gavParent.withContent(orderedContents);
+                    }
                 }
                 return gavParent;
             }

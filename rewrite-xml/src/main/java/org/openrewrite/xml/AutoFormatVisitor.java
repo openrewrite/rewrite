@@ -43,7 +43,9 @@ public class AutoFormatVisitor<P> extends XmlVisitor<P> {
             String prefix = x.getPrefix();
             if (prefix.contains("\n") && (scope.length == 0 || stream(scope).anyMatch(s -> getCursor().isScopeInPath(s)))) {
                 int indentMultiple = (int) getCursor().getPathAsStream().filter(Xml.Tag.class::isInstance).count() - 1;
-                if(getCursor().getValue() instanceof Xml.Attribute || getCursor().getValue() instanceof Xml.CharData){
+                if(getCursor().getValue() instanceof Xml.Attribute ||
+                        getCursor().getValue() instanceof Xml.CharData ||
+                        getCursor().getValue() instanceof Xml.Comment){
                     indentMultiple++;
                 }
                 findIndent = getIndent(getCursor(), p);

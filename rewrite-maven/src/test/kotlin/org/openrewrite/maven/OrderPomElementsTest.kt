@@ -66,7 +66,6 @@ class OrderPomElementsTest : MavenRecipeTest {
         """
     )
 
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/1228")
     @Test
     fun updateOrder() = assertChanged(
@@ -77,6 +76,9 @@ class OrderPomElementsTest : MavenRecipeTest {
                     <artifactId>parent-pom-test</artifactId>
                     <version>1.0-SNAPSHOT</version>
                 </parent>
+                <!-- modelVersion1 -->
+                
+                <!-- modelVersion2 -->
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>my-project</artifactId>
                 <groupId>my.org.project</groupId>
@@ -87,23 +89,23 @@ class OrderPomElementsTest : MavenRecipeTest {
                 <name>Some Project</name>
                 <dependencies>
                     <dependency>
-                        <!-- artifact content
+                    <!-- artifact content
                             comment -->
                         <artifactId>my-project</artifactId>
+                        <scope>test</scope>
                         <!-- group content -->
                         <groupId>my.org.project</groupId>
-                        <!-- version content -->
+                    <!-- version content -->
                         <version>4.3.0</version>
-                        <scope>test</scope>
                     </dependency>
                 </dependencies>
                 <dependencyManagement>
                     <dependency>
+                        <type>pom</type>
                         <version>2</version>
                         <groupId>my.org.project</groupId>
-                        <artifactId>my-project-thing</artifactId>
-                        <type>pom</type>
                         <scope>import</scope>
+                        <artifactId>my-project-thing</artifactId>
                     </dependency>
                 </dependencyManagement>
                 <repositories>
@@ -116,6 +118,9 @@ class OrderPomElementsTest : MavenRecipeTest {
         """,
         after = """
             <project>
+                <!-- modelVersion1 -->
+                
+                <!-- modelVersion2 -->
                 <modelVersion>4.0.0</modelVersion>
                 <parent>
                     <groupId>org.example</groupId>
@@ -134,6 +139,8 @@ class OrderPomElementsTest : MavenRecipeTest {
                         <groupId>my.org.project</groupId>
                         <artifactId>my-project-thing</artifactId>
                         <version>2</version>
+                        <type>pom</type>
+                        <scope>import</scope>
                     </dependency>
                 </dependencyManagement>
                 <dependencies>
@@ -145,6 +152,7 @@ class OrderPomElementsTest : MavenRecipeTest {
                         <artifactId>my-project</artifactId>
                         <!-- version content -->
                         <version>4.3.0</version>
+                        <scope>test</scope>
                     </dependency>
                 </dependencies>
                 <repositories>
@@ -168,6 +176,9 @@ class OrderPomElementsTest : MavenRecipeTest {
                     <version>1.0-SNAPSHOT</version>
                 </parent>
                 
+                <!-- model version comment -->
+                
+                <!-- model version comment 2 -->
                 <modelVersion>4.0.0</modelVersion>
                 
                 <artifactId>my-project</artifactId>
@@ -210,6 +221,9 @@ class OrderPomElementsTest : MavenRecipeTest {
         """,
         after = """
             <project>
+                <!-- model version comment -->
+                
+                <!-- model version comment 2 -->
                 <modelVersion>4.0.0</modelVersion>
                 
                 <parent>
