@@ -29,11 +29,22 @@ interface MethodMatcherTest {
     fun argRegex(signature: String) = MethodMatcher(signature).argumentPattern.toRegex()
 
     @Test
-    fun matchesSuperclassType(jp: JavaParser) {
+    @Suppress("rawtypes")
+    fun matchesSuperclassTypeOfInterfaces(jp: JavaParser) {
         val listType = (jp.parse("class Test { java.util.List l; }")[0].classes[0].body.statements[0] as J.VariableDeclarations).typeAsFullyQualified
-        assertTrue(MethodMatcher("java.util.Collection size()", true).matchesTargetType(listType));
+        assertTrue(MethodMatcher("java.util.Collection size()", true).matchesTargetType(listType))
+        assertFalse(MethodMatcher("java.util.Collection size()").matchesTargetType(listType))
+        // ensuring subtypes do not match parents, regardless of matchOverrides
+        assertFalse(MethodMatcher("java.util.List size()", true).matchesTargetType(JavaType.Class.build("java.util.Collection")))
+        assertFalse(MethodMatcher("java.util.List size()").matchesTargetType(JavaType.Class.build("java.util.Collection")))
+    }
 
-        assertTrue(MethodMatcher("Object equals(Object)").matchesTargetType(JavaType.Class.build("java.lang.String")))
+    @Test
+    fun matchesSuperclassTypeOfClasses(jp: JavaParser) {
+        assertTrue(MethodMatcher("Object equals(Object)", true).matchesTargetType(JavaType.Class.build("java.lang.String")))
+        assertFalse(MethodMatcher("Object equals(Object)").matchesTargetType(JavaType.Class.build("java.lang.String")))
+        // ensuring subtypes do not match parents, regardless of matchOverrides
+        assertFalse(MethodMatcher("String equals(String)", true).matchesTargetType(JavaType.Class.build("java.lang.Object")))
         assertFalse(MethodMatcher("String equals(String)").matchesTargetType(JavaType.Class.build("java.lang.Object")))
     }
 
@@ -102,7 +113,10 @@ interface MethodMatcherTest {
 
     @Test
     fun matchesSuperclassArgumentTypes(jp: JavaParser) {
-        assertTrue(MethodMatcher("Object equals(Object)").matchesTargetType(JavaType.Class.build("java.lang.String")))
+        assertTrue(MethodMatcher("Object equals(Object)", true).matchesTargetType(JavaType.Class.build("java.lang.String")))
+        assertFalse(MethodMatcher("Object equals(Object)").matchesTargetType(JavaType.Class.build("java.lang.String")))
+        // ensuring subtypes do not match parents, regardless of matchOverrides
+        assertFalse(MethodMatcher("String equals(String)", true).matchesTargetType(JavaType.Class.build("java.lang.Object")))
         assertFalse(MethodMatcher("String equals(String)").matchesTargetType(JavaType.Class.build("java.lang.Object")))
     }
 
@@ -172,7 +186,45 @@ interface MethodMatcherTest {
         assertTrue(MethodMatcher("a.A getInteger()").matches(getIntegerMethod, classDecl))
     }
 
-    @Issue("#383")
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1215")
+    fun strictMatchMethodOverride(jp: JavaParser) {
+        val cu = jp.parse(
+            """
+                package com.abc;
+
+                class Parent {
+                    public void method(String s) {
+                    }
+
+                    @Override
+                    public String toString() {
+                        return "empty";
+                    }
+                }
+
+                class Test extends Parent {
+                    @Override
+                    public void method(String s) {
+                    }
+                }
+        """
+        ).first()
+        val parentMethodDefinition = (cu.classes[0].body.statements[0] as J.MethodDeclaration).methodType
+        val childMethodOverride = (cu.classes[1].body.statements[0] as J.MethodDeclaration).methodType
+        assertFalse(MethodMatcher("com.abc.Parent method(String)", false).matches(childMethodOverride))
+        assertTrue(MethodMatcher("com.abc.Parent method(String)", true).matches(parentMethodDefinition))
+        assertTrue(MethodMatcher("com.abc.Parent method(String)", true).matches(childMethodOverride))
+        assertTrue(MethodMatcher("com.abc.Parent method(String)", false).matches(parentMethodDefinition))
+        assertFalse(MethodMatcher("com.abc.Test method(String)", true).matches(parentMethodDefinition))
+
+        val parentToStringDefinition = (cu.classes[0].body.statements[1] as J.MethodDeclaration).methodType
+        assertTrue(MethodMatcher("com.abc.Parent toString()", true).matches(parentToStringDefinition))
+        assertTrue(MethodMatcher("java.lang.Object toString()", true).matches(parentToStringDefinition))
+        assertFalse(MethodMatcher("java.lang.Object toString()", false).matches(parentToStringDefinition))
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/383")
     @Test
     fun matchesMethodWithWildcardForClassInPackage(jp: JavaParser) {
         val cu = jp.parse(
@@ -205,6 +257,7 @@ interface MethodMatcherTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/492")
     @Test
+    @Suppress("SpellCheckingInspection")
     fun matchesWildcardedMethodNameStartingWithJavaKeyword(jp: JavaParser) {
         assertTrue(nameRegex("A assert*()").matches("assertThat"))
     }

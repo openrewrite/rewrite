@@ -195,11 +195,13 @@ public class MethodMatcher {
 
         if (targetTypePattern.matcher(type.getFullyQualifiedName()).matches()) {
             return true;
-        } else if (!type.getFullyQualifiedName().equals("java.lang.Object") && matchesTargetType(type.getSupertype() == null ? JavaType.Class.build("java.lang.Object") : type.getSupertype())) {
-            return true;
         }
 
         if (matchOverrides) {
+            if (!type.getFullyQualifiedName().equals("java.lang.Object") && matchesTargetType(JavaType.Class.build("java.lang.Object"))) {
+                return true;
+            }
+
             if (matchesTargetType(type.getSupertype())) {
                 return true;
             }
@@ -348,7 +350,7 @@ class FormalParameterVisitor extends MethodSignatureParserBaseVisitor<String> {
         return String.join("", argumentPatterns).replace("...", "\\[\\]");
     }
 
-    private static abstract class Argument {
+    private abstract static class Argument {
         abstract String getRegex();
 
         private static final Argument DOT_DOT = new Argument() {
