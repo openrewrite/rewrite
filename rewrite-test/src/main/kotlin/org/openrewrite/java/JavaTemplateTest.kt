@@ -1740,4 +1740,39 @@ interface JavaTemplateTest : JavaRecipeTest {
             }
         """
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1198")
+    @Test
+    @Suppress("UnnecessaryBoxing", "UnnecessaryLocalVariable", "CachedNumberConstructorCall", "UnnecessaryTemporaryOnConversionToString")
+    fun replaceNamedVariableInitializerMethodInvocation(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.logCompilationWarningsAndErrors(true).build(),
+        recipe = toRecipe {
+            object : JavaVisitor<ExecutionContext>() {
+                val matcher = MethodMatcher("Integer valueOf(..)")
+                val t = JavaTemplate.builder({ cursor }, "new Integer(#{any()})").build()
+                override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J {
+                    if (matcher.matches(method)) {
+                        return method.withTemplate(t, method.coordinates.replace(), method.arguments.get(0))
+                    }
+                    return super.visitMethodInvocation(method, p)
+                }
+            }
+        },
+        before = """
+            class Test {
+                private String asString(int i) {
+                    String s = Integer.valueOf(i).toString();
+                    return s;
+                }
+            }
+        """,
+        after = """
+            class Test {
+                private String asString(int i) {
+                    String s = new Integer(i).toString();
+                    return s;
+                }
+            }
+        """
+    )
 }

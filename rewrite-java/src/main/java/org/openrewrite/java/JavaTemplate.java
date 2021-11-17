@@ -417,7 +417,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                     }
                     return m;
                 }
-                return maybeReplaceStatement(method, J.class, true, 0);
+                return maybeReplaceStatement(method, J.class, getCursor().firstEnclosing(J.VariableDeclarations.class) == null, 0);
             }
 
             @Override
