@@ -1743,7 +1743,9 @@ interface JavaTemplateTest : JavaRecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1198")
     @Test
-    @Suppress("UnnecessaryBoxing", "UnnecessaryLocalVariable", "CachedNumberConstructorCall", "UnnecessaryTemporaryOnConversionToString")
+    @Suppress("UnnecessaryBoxing", "UnnecessaryLocalVariable", "CachedNumberConstructorCall", "UnnecessaryTemporaryOnConversionToString",
+        "deprecation"
+    )
     fun replaceNamedVariableInitializerMethodInvocation(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.logCompilationWarningsAndErrors(true).build(),
         recipe = toRecipe {
@@ -1759,19 +1761,89 @@ interface JavaTemplateTest : JavaRecipeTest {
             }
         },
         before = """
+            import java.util.Arrays;
+            import java.util.List;
+            import java.util.function.Function;
             class Test {
-                private String asString(int i) {
-                    String s = Integer.valueOf(i).toString();
-                    return s;
+                void t() {
+                    List<String> nums = Arrays.asList("1", "2", "3");
+                    nums.forEach(s -> Integer.valueOf(s));
+                }
+                void inLambda(int i) {
+                    Function<String, Integer> toString = it -> {
+                        try {
+                            return Integer.valueOf(it);
+                        }catch (NumberFormatException ex) {
+                            ex.printStackTrace();
+                        }
+                        return 0;
+                    };
+                }
+                String inClassDeclaration(int i) {
+                    return new Object() {
+                        void foo() {
+                            Integer.valueOf(i);
+                        }
+                    }.toString();
                 }
             }
         """,
         after = """
+            import java.util.Arrays;
+            import java.util.List;
+            import java.util.function.Function;
             class Test {
-                private String asString(int i) {
-                    String s = new Integer(i).toString();
-                    return s;
+                void t() {
+                    List<String> nums = Arrays.asList("1", "2", "3");
+                    nums.forEach(s -> new Integer(s));
                 }
+                void inLambda(int i) {
+                    Function<String, Integer> toString = it -> {
+                        try {
+                            return new Integer(it);
+                        }catch (NumberFormatException ex) {
+                            ex.printStackTrace();
+                        }
+                        return 0;
+                    };
+                }
+                String inClassDeclaration(int i) {
+                    return new Object() {
+                        void foo() {
+                            new Integer(i);
+                        }
+                    }.toString();
+                }
+            }
+        """
+    )
+
+    @Test
+    @Suppress("UnnecessaryBoxing", "UnnecessaryLocalVariable", "CachedNumberConstructorCall", "UnnecessaryTemporaryOnConversionToString")
+    fun lamdaIsVariableInitializer(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.logCompilationWarningsAndErrors(true).build(),
+        recipe = toRecipe {
+            object : JavaVisitor<ExecutionContext>() {
+                val matcher = MethodMatcher("Integer valueOf(..)")
+                val t = JavaTemplate.builder({ cursor }, "new Integer(#{any()})").doBeforeParseTemplate(System.out::println).build()
+                override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J {
+                    if (matcher.matches(method)) {
+                        return method.withTemplate(t, method.coordinates.replace(), method.arguments.get(0))
+                    }
+                    return super.visitMethodInvocation(method, p)
+                }
+            }
+        },
+        before = """
+            import java.util.function.Function;
+            class Test {
+                Function<String, Integer> asInteger = it -> Integer.valueOf(it);
+            }
+        """,
+        after = """
+            import java.util.function.Function;
+            class Test {
+                Function<String, Integer> asInteger = it -> new Integer(it);
             }
         """
     )
