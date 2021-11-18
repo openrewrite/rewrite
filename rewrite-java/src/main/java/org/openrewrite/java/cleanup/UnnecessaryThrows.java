@@ -183,7 +183,7 @@ public class UnnecessaryThrows extends Recipe {
             //Remove any candidates that are defined in Javadocs for the method.
             new JavaVisitor<Set<JavaType.FullyQualified>>() {
                 @Override
-                protected JavadocVisitor<Set<JavaType.FullyQualified>> initJavadocVisitor() {
+                protected JavadocVisitor<Set<JavaType.FullyQualified>> getJavadocVisitor() {
                     return new JavadocVisitor<Set<JavaType.FullyQualified>>(this) {
                         @Override
                         public Javadoc visitThrows(Javadoc.Throws aThrows, Set<JavaType.FullyQualified> candidates) {

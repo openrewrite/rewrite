@@ -40,22 +40,12 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     /**
-     * This method returns the instance of a Javadoc visitor that is used by this JavaVisitor.
-     *
-     * Note: The javadoc visitor instance is created on-demand, the first time this method is called. Subclasses
-     *       can override `initJavadocVisitor` to customize the behavior of the Javadoc visitor.
+     * This method returns a new instance of a Javadoc visitor that will be used by this JavaVisitor.
      *
      * @return The JavadocVisitor associated with the JavaVisitor.
      */
-    final protected JavadocVisitor<P> getJavadocVisitor() {
-        if (javadocVisitor == null) {
-            javadocVisitor = initJavadocVisitor();
-        }
-        return javadocVisitor;
-    }
-
-    protected JavadocVisitor<P> initJavadocVisitor() {
-       return new JavadocVisitor<>(this);
+    protected JavadocVisitor<P> getJavadocVisitor() {
+        return new JavadocVisitor<>(this);
     }
 
     /**
@@ -155,7 +145,10 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         Space s = space;
         s = s.withComments(ListUtils.map(s.getComments(), comment -> {
             if(comment instanceof Javadoc) {
-                return (Comment) getJavadocVisitor().visit((Javadoc) comment, p);
+                if (javadocVisitor == null) {
+                    javadocVisitor = getJavadocVisitor();
+                }
+                return (Comment) javadocVisitor.visit((Javadoc) comment, p);
             }
             return comment;
         }));
