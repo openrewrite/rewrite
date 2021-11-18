@@ -181,26 +181,24 @@ public class UnnecessaryThrows extends Recipe {
         }
         if (!candidates.isEmpty()) {
             //Remove any candidates that are defined in Javadocs for the method.
-            new RemoveJavaDocExceptionCandidates().visit(method, candidates);
+            new JavaVisitor<Set<JavaType.FullyQualified>>() {
+                @Override
+                protected JavadocVisitor<Set<JavaType.FullyQualified>> getJavadocVisitor() {
+                    return new JavadocVisitor<Set<JavaType.FullyQualified>>(this) {
+                        @Override
+                        public Javadoc visitThrows(Javadoc.Throws aThrows, Set<JavaType.FullyQualified> candidates) {
+                            if (aThrows.getExceptionName() instanceof TypeTree) {
+                                JavaType.FullyQualified exceptionType = TypeUtils.asFullyQualified(((TypeTree) aThrows.getExceptionName()).getType());
+                                if (exceptionType != null) {
+                                    candidates.remove(exceptionType);
+                                }
+                            }
+                            return super.visitThrows(aThrows, candidates);
+                        }
+                    };
+                }
+            }.visit(method, candidates);
         }
         return candidates;
-    }
-
-    private static class RemoveJavaDocExceptionCandidates extends JavaVisitor<Set<JavaType.FullyQualified>> {
-        private RemoveJavaDocExceptionCandidates() {
-            super();
-            javadocVisitor = new JavadocVisitor<Set<JavaType.FullyQualified>>() {
-                @Override
-                public Javadoc visitThrows(Javadoc.Throws aThrows, Set<JavaType.FullyQualified> candidates) {
-                    if (aThrows.getExceptionName() instanceof TypeTree) {
-                        JavaType.FullyQualified exceptionType = TypeUtils.asFullyQualified(((TypeTree) aThrows.getExceptionName()).getType());
-                        if (exceptionType != null) {
-                            candidates.remove(exceptionType);
-                        }
-                    }
-                    return super.visitThrows(aThrows, candidates);
-                }
-            };
-        }
     }
 }

@@ -19,6 +19,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.style.GeneralFormatStyle;
@@ -29,7 +30,7 @@ public class NormalizeLineBreaksVisitor<P> extends JavaIsoVisitor<P> {
 
     private final GeneralFormatStyle style;
 
-    private final JavadocVisitor<Integer> lineBreakJavadocVisitor = new JavadocVisitor<Integer>() {
+    private final JavadocVisitor<Integer> lineBreakJavadocVisitor = new JavadocVisitor<Integer>(new JavaVisitor<>()) {
         @Override
         public Javadoc visitLineBreak(Javadoc.LineBreak lineBreak, Integer integer) {
             return lineBreak.withMargin(normalizeNewLines(lineBreak.getMargin(), style.isUseCRLFNewLines()));

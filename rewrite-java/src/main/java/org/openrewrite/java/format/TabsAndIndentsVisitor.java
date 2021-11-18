@@ -21,6 +21,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.*;
@@ -499,7 +500,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             int indent = getLengthOfWhitespace(margin);
             int shift = column - indent;
             if (shift != 0) {
-                return (Javadoc.DocComment) new JavadocVisitor<Integer>() {
+                return (Javadoc.DocComment) new JavadocVisitor<Integer>(new JavaVisitor<>()) {
                     @Override
                     public Javadoc visitLineBreak(Javadoc.LineBreak lineBreak, Integer p) {
                         if (shift < 0) {

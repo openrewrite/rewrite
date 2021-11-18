@@ -23,7 +23,7 @@ import java.util.List;
 
 public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
     public JavadocPrinter() {
-        this.javaVisitor = new JavadocJavaPrinter();
+        super(new JavadocJavaPrinter<>());
     }
 
     @Override
@@ -315,7 +315,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         }
     }
 
-    class JavadocJavaPrinter extends JavaVisitor<PrintOutputCapture<P>> {
+    static class JavadocJavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, PrintOutputCapture<P> p) {
             visitMarkers(method.getMarkers(), p);

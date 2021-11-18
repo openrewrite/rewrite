@@ -21,6 +21,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.*;
@@ -49,7 +50,7 @@ public class NormalizeTabsOrSpacesVisitor<P> extends JavaIsoVisitor<P> {
             if (c.isMultiline()) {
                 if (c instanceof Javadoc) {
                     c = c.withSuffix(normalize(c.getSuffix()));
-                    return (Comment) new JavadocVisitor<Integer>() {
+                    return (Comment) new JavadocVisitor<Integer>(new JavaVisitor<>()) {
                         @Override
                         public Javadoc visitLineBreak(Javadoc.LineBreak lineBreak, Integer integer) {
                             return lineBreak.withMargin(normalize(lineBreak.getMargin()));

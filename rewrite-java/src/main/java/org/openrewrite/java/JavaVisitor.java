@@ -30,11 +30,22 @@ import java.util.List;
 import java.util.Objects;
 
 public class JavaVisitor<P> extends TreeVisitor<J, P> {
-    protected JavadocVisitor<P> javadocVisitor = new JavadocVisitor<>(this);
+
+    @Nullable
+    private JavadocVisitor<P> javadocVisitor;
 
     @Override
     public String getLanguage() {
         return "java";
+    }
+
+    /**
+     * This method returns a new instance of a Javadoc visitor that will be used by this JavaVisitor.
+     *
+     * @return The JavadocVisitor associated with the JavaVisitor.
+     */
+    protected JavadocVisitor<P> getJavadocVisitor() {
+        return new JavadocVisitor<>(this);
     }
 
     /**
@@ -134,6 +145,9 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         Space s = space;
         s = s.withComments(ListUtils.map(s.getComments(), comment -> {
             if(comment instanceof Javadoc) {
+                if (javadocVisitor == null) {
+                    javadocVisitor = getJavadocVisitor();
+                }
                 return (Comment) javadocVisitor.visit((Javadoc) comment, p);
             }
             return comment;
