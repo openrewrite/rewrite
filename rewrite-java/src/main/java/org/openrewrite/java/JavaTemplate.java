@@ -417,12 +417,12 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                     }
                     return m;
                 }
-                Cursor varDeclsCursor = getCursor().dropParentUntil(v -> v instanceof J.CompilationUnit
+                Cursor varDeclsCursor = getCursor().dropParentUntil(v -> v instanceof JavaSourceFile
                         || v instanceof J.VariableDeclarations
                         || v instanceof J.Lambda
                         || v instanceof J.ClassDeclaration
                 );
-                return maybeReplaceStatement(method, J.class, varDeclsCursor.getValue() instanceof J.VariableDeclarations, 0);
+                return maybeReplaceStatement(method, J.class, !(varDeclsCursor.getValue() instanceof J.VariableDeclarations), 0);
             }
 
             @Override
