@@ -37,6 +37,10 @@ class Java8AddLicenseHeaderTest : Java8Test, AddLicenseHeaderTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8AddOrUpdateAnnotationAttribute : Java8Test, AddOrUpdateAnnotationAttributeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8AddSerialVersionUidToSerializableTest : Java8Test, AddSerialVersionUidToSerializableTest
 
 @DebugOnly

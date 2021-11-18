@@ -108,6 +108,10 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                         annotation.isScope(insertionPoint)) {
                     List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
                     return gen.get(0).withPrefix(annotation.getPrefix());
+                } else if(loc.equals(ANNOTATION_ARGUMENTS) && mode.equals(JavaCoordinates.Mode.REPLACEMENT) &&
+                        annotation.isScope(insertionPoint)) {
+                    List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), "@Example(" + substitutedTemplate + ")"));
+                    return annotation.withArguments(gen.get(0).getArguments());
                 }
 
                 return super.visitAnnotation(annotation, integer);

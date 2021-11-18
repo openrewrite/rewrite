@@ -39,6 +39,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class AddLicenseHeaderTck : AddLicenseHeaderTest
 
     @Nested
+    class AddOrUpdateAnnotationAttributeTck : AddOrUpdateAnnotationAttributeTest
+
+    @Nested
     inner class AddSerialVersionUidToSerializableTck : AddSerialVersionUidToSerializableTest
 
     @Nested

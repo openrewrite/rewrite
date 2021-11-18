@@ -37,6 +37,10 @@ class Java11AddLicenseHeaderTest : Java11Test, AddLicenseHeaderTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11AddOrUpdateAnnotationAttribute : Java11Test, AddOrUpdateAnnotationAttributeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11AddSerialVersionUidToSerializableTest : Java11Test, AddSerialVersionUidToSerializableTest
 
 @DebugOnly

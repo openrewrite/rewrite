@@ -62,6 +62,10 @@ public abstract class CoordinateBuilder {
         public JavaCoordinates replace() {
             return replace(Space.Location.ANNOTATION_PREFIX);
         }
+
+        public JavaCoordinates replaceArguments() {
+            return replace(Space.Location.ANNOTATION_ARGUMENTS);
+        }
     }
 
     public static class Block extends Statement {
