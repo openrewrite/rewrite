@@ -23,10 +23,6 @@ import org.openrewrite.java.tree.Javadoc;
 public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
     protected JavaVisitor<P> javaVisitor;
 
-    public JavadocVisitor() {
-        this(new JavaVisitor<>());
-    }
-
     public JavadocVisitor(JavaVisitor<P> javaVisitor) {
         this.javaVisitor = javaVisitor;
     }

@@ -21,6 +21,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.tree.*;
 
@@ -153,7 +154,7 @@ public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
                         TextComment textComment = (TextComment) c;
                         c = textComment.withText(textComment.getText().replace("\n", "\n" + shift));
                     } else if (c instanceof Javadoc) {
-                        c = (Comment) new JavadocVisitor<Integer>() {
+                        c = (Comment) new JavadocVisitor<Integer>(new JavaVisitor<>()) {
                             @Override
                             public Javadoc visitLineBreak(Javadoc.LineBreak lineBreak, Integer integer) {
                                 return lineBreak.withMargin(shift + lineBreak.getMargin());
