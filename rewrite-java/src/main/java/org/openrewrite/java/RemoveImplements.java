@@ -78,7 +78,7 @@ public class RemoveImplements extends Recipe {
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration cd, ExecutionContext ctx) {
                 if(!(cd.getType() instanceof JavaType.Class) || cd.getImplements() == null) {
-                    return cd;
+                    return super.visitClassDeclaration(cd, ctx);
                 }
                 JavaType.Class cdt = (JavaType.Class) cd.getType();
                 if((filter == null || cdt.getFullyQualifiedName().startsWith(filter)) && cdt.getInterfaces().stream().anyMatch(it -> isOfClassType(it, interfaceType))) {
