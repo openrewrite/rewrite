@@ -15,19 +15,18 @@
  */
 package org.openrewrite.java
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 
 interface ChangeMethodAccessLevelTest : JavaRecipeTest {
 
     @Test
-    fun changeMethodAccessLevelFromPublicToPrivate(jp: JavaParser) = assertChanged(
-        jp,
+    fun publicToPrivate() = assertChanged(
         recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "private", null),
         before = """
             package com.abc;
-            class A {
 
+            class A {
                 @SuppressWarnings("ALL") // comment
                 public void aMethod(String s) {
                 }
@@ -47,8 +46,8 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
         """,
         after = """
             package com.abc;
-            class A {
 
+            class A {
                 @SuppressWarnings("ALL") // comment
                 private void aMethod(String s) {
                 }
@@ -69,13 +68,12 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
     )
 
     @Test
-    fun changeMethodAccessLevelFromPackagePrivateToProtected(jp: JavaParser) = assertChanged(
-        jp,
+    fun packagePrivateToProtected() = assertChanged(
         recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", null),
         before = """
             package com.abc;
-            class A {
 
+            class A {
                 @SuppressWarnings("ALL") // comment
                 static void aMethod(String s) {
                 }
@@ -95,8 +93,8 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
         """,
         after = """
             package com.abc;
-            class A {
 
+            class A {
                 @SuppressWarnings("ALL") // comment
                 protected static void aMethod(String s) {
                 }
@@ -117,13 +115,12 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
     )
 
     @Test
-    fun changeMethodAccessLevelFromPublicToPackagePrivate(jp: JavaParser) = assertChanged(
-        jp,
+    fun publicToPackagePrivate() = assertChanged(
         recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "package", null),
         before = """
             package com.abc;
-            class A {
 
+            class A {
                 @SuppressWarnings("ALL") // comment
                 public void aMethod(String s) {
                 }
@@ -143,8 +140,8 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
         """,
         after = """
             package com.abc;
-            class A {
 
+            class A {
                 // comment
                 @SuppressWarnings("ALL")
                 void aMethod(String s) {
@@ -166,11 +163,60 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
     )
 
     @Test
-    fun changeMethodAccessLevelOnMethodWithAlreadyCorrectAccessLevel(jp: JavaParser) = assertUnchanged(
-        jp,
+    fun publicToPackagePrivateWildcard() = assertChanged(
+        recipe = ChangeMethodAccessLevel("com.abc.A *(..)", "package", null),
+        before = """
+            package com.abc;
+
+            class A {
+                // comment
+                public A(Integer i) {
+                }
+
+                @Deprecated // comment
+                public A(Float f) {
+                }
+
+                @Deprecated // comment
+                public void aMethod(String s) {
+                }
+
+                // comment
+                public void aMethod(Integer i) {
+                }
+            }
+        """,
+        after = """
+            package com.abc;
+
+            class A {
+                // comment
+                A(Integer i) {
+                }
+
+                // comment
+                @Deprecated
+                A(Float f) {
+                }
+
+                // comment
+                @Deprecated
+                void aMethod(String s) {
+                }
+
+                // comment
+                void aMethod(Integer i) {
+                }
+            }
+        """
+    )
+
+    @Test
+    fun doNotChangeExistingAccessLevel() = assertUnchanged(
         recipe = ChangeMethodAccessLevel("com.abc.A aMethod(String)", "public", null),
         before = """
             package com.abc;
+
             class A {
                 // comment
                 public void aMethod(String s) {
@@ -180,11 +226,11 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
     )
 
     @Test
-    fun fromPackagePrivateToProtectedWithOtherModifier(jp: JavaParser) = assertChanged(
-        jp,
+    fun packagePrivateToProtectedWithOtherModifier() = assertChanged(
         recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", null),
         before = """
             package com.abc;
+
             class A {
                 // comment
                 @Deprecated
@@ -194,6 +240,7 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
         """,
         after = """
             package com.abc;
+
             class A {
                 // comment
                 @Deprecated
@@ -204,14 +251,15 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
     )
 
     @Test
-    fun fromPackagePrivateToProtectedWithConstructor(jp: JavaParser) = assertChanged(
-        jp,
+    fun packagePrivateToProtectedWithConstructor() = assertChanged(
         recipe = ChangeMethodAccessLevel("com.abc.A A(..)", "protected", null),
         before = """
             package com.abc;
+
             class A {
                 A(Integer i) {
                 }
+
                 // comment
                 A() {
                 }
@@ -219,9 +267,11 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
         """,
         after = """
             package com.abc;
+
             class A {
                 protected A(Integer i) {
                 }
+
                 // comment
                 protected A() {
                 }
@@ -229,44 +279,82 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
         """
     )
 
-    @Disabled
     @Test
-    fun fromPublicToPackagePrivate(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = ChangeMethodAccessLevel("com.abc.A *(..)", "package", null),
+    @Issue("https://github.com/openrewrite/rewrite/issues/1215")
+    @Suppress("MethodMayBeStatic")
+    fun methodPatternExactMatch() = assertChanged(
+        recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", null),
         before = """
             package com.abc;
+
             class A {
-                // comment
-                public A(Integer i) {
+                public String aMethod() {
+                    return "example_A";
                 }
-                @Deprecated // comment
-                public A(Float f) {
-                }
-                @Deprecated // comment
-                public void aMethod(String s) {
-                }
-                // comment
-                public void aMethod(Integer i) {
+            }
+
+            class B extends A {
+                @Override
+                public String aMethod() {
+                    return "example_B";
                 }
             }
         """,
         after = """
             package com.abc;
+
             class A {
-                // comment
-                A(Integer i) {
+                protected String aMethod() {
+                    return "example_A";
                 }
-                @Deprecated // comment
-                A(Float f) {
-                }
-                @Deprecated // comment
-                void aMethod(String s) {
-                }
-                // comment
-                void aMethod(Integer i) {
+            }
+
+            class B extends A {
+                @Override
+                public String aMethod() {
+                    return "example_B";
                 }
             }
         """
     )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1215")
+    @Suppress("MethodMayBeStatic")
+    fun matchOverrides() = assertChanged(
+        recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", true),
+        before = """
+            package com.abc;
+
+            class A {
+                public String aMethod() {
+                    return "example_A";
+                }
+            }
+
+            class B extends A {
+                @Override
+                public String aMethod() {
+                    return "example_B";
+                }
+            }
+        """,
+        after = """
+            package com.abc;
+
+            class A {
+                protected String aMethod() {
+                    return "example_A";
+                }
+            }
+
+            class B extends A {
+                @Override
+                protected String aMethod() {
+                    return "example_B";
+                }
+            }
+        """
+    )
+
 }
