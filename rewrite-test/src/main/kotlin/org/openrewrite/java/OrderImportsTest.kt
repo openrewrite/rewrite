@@ -17,6 +17,7 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.Tree
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.style.ImportLayoutStyle
 import org.openrewrite.style.NamedStyles
@@ -541,6 +542,30 @@ interface OrderImportsTest : JavaRecipeTest {
             import kotlin.Lazy;
             import kotlin.Pair;
             import kotlin.String;
+        """
+    )
+
+    @Test
+    fun foldPackageWithExistingImports() = assertChanged(
+        JavaParser.fromJavaVersion().styles(
+            listOf(
+                NamedStyles(
+                    randomId(), "test", "test", "test", emptySet(), listOf(
+                        ImportLayoutStyle.builder()
+                            .packageToFold("java.util.*", false)
+                            .importAllOthers()
+                            .importStaticAllOthers()
+                            .build()
+                    )
+                )
+            )
+        ).build(),
+        recipe = OrderImports(false),
+        before = """
+            import java.util.List;
+        """,
+        after = """
+            import java.util.*;
         """
     )
 }

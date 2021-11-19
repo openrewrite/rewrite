@@ -32,6 +32,8 @@ import org.openrewrite.marker.Markers;
 import java.time.Duration;
 import java.util.*;
 
+import static org.openrewrite.java.style.ImportLayoutStyle.isPackageAlwaysFolded;
+
 /**
  * This recipe will remove any imports for types that are not referenced within the compilation unit. This recipe
  * is aware of the import layout style and will correctly handle unfolding of wildcard imports if the import counts
@@ -136,7 +138,9 @@ public class RemoveUnusedImports extends Recipe {
                         anImport.used = false;
                         changed = true;
                     } else if ("*".equals(qualid.getSimpleName())) {
-                        if (((methodsAndFields == null ? 0 : methodsAndFields.size()) +
+                        if (isPackageAlwaysFolded(layoutStyle.getPackagesToFold(), elem)) {
+                            anImport.used = true;
+                        } else if (((methodsAndFields == null ? 0 : methodsAndFields.size()) +
                                 (staticClasses == null ? 0 : staticClasses.size())) < layoutStyle.getNameCountToUseStarImport()) {
                             // replacing the star with a series of unfolded imports
                             anImport.imports.clear();
@@ -177,7 +181,9 @@ public class RemoveUnusedImports extends Recipe {
                         anImport.used = false;
                         changed = true;
                     } else if ("*".equals(elem.getQualid().getSimpleName())) {
-                        if (types.size() < layoutStyle.getClassCountToUseStarImport()) {
+                        if (isPackageAlwaysFolded(layoutStyle.getPackagesToFold(), elem)) {
+                            anImport.used = true;
+                        } else if (types.size() < layoutStyle.getClassCountToUseStarImport()) {
                             // replacing the star with a series of unfolded imports
                             anImport.imports.clear();
 

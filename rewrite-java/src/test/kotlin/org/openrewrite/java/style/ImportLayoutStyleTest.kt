@@ -35,6 +35,10 @@ class ImportLayoutStyleTest {
     fun roundTripSerialize() {
         val style = mapper.writeValueAsString(ImportLayoutStyle
             .builder()
+            .packageToFold("java.awt.*")
+            .packageToFold("java.swing.*", false)
+            .staticPackageToFold("org.unit.Assert.*")
+            .staticPackageToFold("org.mockito.Matchers.*", false)
             .importPackage("import java.*")
             .importPackage("import javax.*", false)
             .importAllOthers()
@@ -62,6 +66,12 @@ class ImportLayoutStyleTest {
                         "import org.springframework.*",
                         "<blank line>",
                         "import static all other imports"
+                ),
+                "packages to fold" to listOf(
+                    "import java.awt.*",
+                    "import java.swing.* without subpackages",
+                    "import static org.unit.Assert.*",
+                    "import static org.mockito.Matchers.* without subpackages"
                 )
         )
 
@@ -108,6 +118,26 @@ class ImportLayoutStyleTest {
                     .isInstanceOf(ImportLayoutStyle.Block.ImportPackage::class.java)
                     .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).isStatic }
                     .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == ".+" }
+
+                assertThat(importLayout.packagesToFold[0])
+                    .isInstanceOf(ImportLayoutStyle.Block.ImportPackage::class.java)
+                    .matches { b -> !(b as ImportLayoutStyle.Block.ImportPackage).isStatic }
+                    .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == "java\\.awt\\..+" }
+
+                assertThat(importLayout.packagesToFold[1])
+                    .isInstanceOf(ImportLayoutStyle.Block.ImportPackage::class.java)
+                    .matches { b -> !(b as ImportLayoutStyle.Block.ImportPackage).isStatic }
+                    .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == "java\\.swing\\.[^.]+" }
+
+                assertThat(importLayout.packagesToFold[2])
+                    .isInstanceOf(ImportLayoutStyle.Block.ImportPackage::class.java)
+                    .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).isStatic }
+                    .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == "org\\.unit\\.Assert\\..+" }
+
+                assertThat(importLayout.packagesToFold[3])
+                    .isInstanceOf(ImportLayoutStyle.Block.ImportPackage::class.java)
+                    .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).isStatic }
+                    .matches { b -> (b as ImportLayoutStyle.Block.ImportPackage).packageWildcard.toString() == "org\\.mockito\\.Matchers\\.[^.]+" }
             }
         }
     }
@@ -132,6 +162,8 @@ class ImportLayoutStyleTest {
                         .importPackage("org.springframework.*")
                         .blankLine()
                         .importStaticAllOthers()
+                        .packageToFold("java.awt.*")
+                        .packageToFold("java.swing.*")
                         .build()
                 )
         )

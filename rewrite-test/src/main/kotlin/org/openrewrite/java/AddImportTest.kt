@@ -16,11 +16,10 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.ExecutionContext
-import org.openrewrite.Issue
-import org.openrewrite.Recipe
-import org.openrewrite.TreeVisitor
+import org.openrewrite.*
+import org.openrewrite.java.style.ImportLayoutStyle
 import org.openrewrite.java.tree.J
+import org.openrewrite.style.NamedStyles
 
 interface AddImportTest : JavaRecipeTest {
     fun addImports(vararg adds: () -> TreeVisitor<*, ExecutionContext>): Recipe = adds
@@ -838,6 +837,127 @@ interface AddImportTest : JavaRecipeTest {
             class Test {
                 List list;
             }
+        """
+    )
+
+    @Test
+    fun foldPackageWithEmptyImports() = assertChanged(
+        JavaParser.fromJavaVersion().styles(
+            listOf(
+                NamedStyles(
+                    Tree.randomId(), "test", "test", "test", emptySet(), listOf(
+                        ImportLayoutStyle.builder()
+                            .packageToFold("java.util.*")
+                            .importAllOthers()
+                            .importStaticAllOthers()
+                            .build()
+                    )
+                )
+            )
+        ).build(),
+        recipe = addImports({ AddImport("java.util.List", null, false) }),
+        before = """
+        """,
+        after = """
+            import java.util.*;
+        """
+    )
+
+    @Test
+    fun foldPackageWithExistingImports() = assertChanged(
+        JavaParser.fromJavaVersion().styles(
+            listOf(
+                NamedStyles(
+                    Tree.randomId(), "test", "test", "test", emptySet(), listOf(
+                        ImportLayoutStyle.builder()
+                            .packageToFold("java.util.*", false)
+                            .importAllOthers()
+                            .importStaticAllOthers()
+                            .build()
+                    )
+                )
+            )
+        ).build(),
+        recipe = addImports({ AddImport("java.util.Map", null, false) }),
+        before = """
+            import java.util.List;
+        """,
+        after = """
+            import java.util.*;
+        """
+    )
+
+    @Test
+    fun foldSubPackageWithExistingImports() = assertChanged(
+        JavaParser.fromJavaVersion().styles(
+            listOf(
+                NamedStyles(
+                    Tree.randomId(), "test", "test", "test", emptySet(), listOf(
+                        ImportLayoutStyle.builder()
+                            .packageToFold("java.util.*", true)
+                            .importAllOthers()
+                            .importStaticAllOthers()
+                            .build()
+                    )
+                )
+            )
+        ).build(),
+        recipe = addImports({ AddImport("java.util.concurrent.ConcurrentHashMap", null, false) }),
+        before = """
+            import java.util.List;
+        """,
+        after = """
+            import java.util.List;
+            import java.util.concurrent.*;
+        """
+    )
+
+    @Test
+    fun foldStaticSubPackageWithEmptyImports() = assertChanged(
+        JavaParser.fromJavaVersion().styles(
+            listOf(
+                NamedStyles(
+                    Tree.randomId(), "test", "test", "test", emptySet(), listOf(
+                        ImportLayoutStyle.builder()
+                            .staticPackageToFold("java.util.*", true)
+                            .importAllOthers()
+                            .importStaticAllOthers()
+                            .build()
+                    )
+                )
+            )
+        ).build(),
+        recipe = addImports({ AddImport("java.util.Collections", "emptyMap", false) }),
+        before = """
+        """,
+        after = """
+            import static java.util.Collections.*;
+        """
+    )
+
+    @Test
+    fun foldStaticSubPackageWithExistingImports() = assertChanged(
+        JavaParser.fromJavaVersion().styles(
+            listOf(
+                NamedStyles(
+                    Tree.randomId(), "test", "test", "test", emptySet(), listOf(
+                        ImportLayoutStyle.builder()
+                            .staticPackageToFold("java.util.*", true)
+                            .importAllOthers()
+                            .importStaticAllOthers()
+                            .build()
+                    )
+                )
+            )
+        ).build(),
+        recipe = addImports({ AddImport("java.util.Collections", "emptyMap", false) }),
+        before = """
+            import java.util.List;
+        """,
+        after = """
+            import java.util.List;
+            
+            import static java.util.Collections.*;
         """
     )
 

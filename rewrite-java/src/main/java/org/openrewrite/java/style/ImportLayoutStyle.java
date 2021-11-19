@@ -75,13 +75,17 @@ public class ImportLayoutStyle implements JavaStyle {
     @EqualsAndHashCode.Include
     private final List<Block> layout;
 
+    @EqualsAndHashCode.Include
+    private final List<Block> packagesToFold;
+
     private final List<Block> blocksNoCatchalls;
     private final List<Block> blocksOnlyCatchalls;
 
-    public ImportLayoutStyle(int classCountToUseStarImport, int nameCountToUseStarImport, List<Block> layout) {
+    public ImportLayoutStyle(int classCountToUseStarImport, int nameCountToUseStarImport, List<Block> layout, List<Block> packagesToFold) {
         this.classCountToUseStarImport = classCountToUseStarImport;
         this.nameCountToUseStarImport = nameCountToUseStarImport;
         this.layout = layout;
+        this.packagesToFold = packagesToFold;
 
         // Divide the blocks into those that accept imports from any package ("catchalls") and those that accept imports from only specific packages
         Map<Boolean, List<Block>> blockGroups = layout.stream()
@@ -105,26 +109,30 @@ public class ImportLayoutStyle implements JavaStyle {
         JRightPadded<J.Import> paddedToAdd = new JRightPadded<>(toAdd, Space.EMPTY, Markers.EMPTY);
 
         if (originalImports.isEmpty()) {
-            return singletonList(pkg == null ?
-                    paddedToAdd :
-                    paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(Space.format("\n\n")))
-            );
+            paddedToAdd = pkg == null ? paddedToAdd : paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(Space.format("\n\n")));
+            paddedToAdd = isPackageAlwaysFolded(packagesToFold, paddedToAdd.getElement()) ? paddedToAdd.withElement(paddedToAdd.getElement().withQualid(
+                    paddedToAdd.getElement().getQualid().withName(
+                            paddedToAdd.getElement().getQualid().getName().withName("*")
+                    )
+            )) : paddedToAdd;
+            return singletonList(paddedToAdd);
         }
 
         // don't star fold just yet, because we are only going to star fold adjacent imports along with
         // the import to add at most. we don't even want to star fold other non-adjacent imports in the same
         // block that should be star folded according to the layout style (minimally invasive change).
-        List<JRightPadded<J.Import>> ideallyOrdered = new ImportLayoutStyle(Integer.MAX_VALUE, Integer.MAX_VALUE, layout)
-                .orderImports(ListUtils.concat(originalImports, paddedToAdd), new HashSet<>());
+        List<JRightPadded<J.Import>> ideallyOrdered =
+                new ImportLayoutStyle(Integer.MAX_VALUE, Integer.MAX_VALUE, layout, packagesToFold)
+                        .orderImports(ListUtils.concat(originalImports, paddedToAdd), new HashSet<>());
 
         if (ideallyOrdered.size() == originalImports.size()) {
             Set<String> originalPaths = new HashSet<>();
             for (JRightPadded<J.Import> originalImport : originalImports) {
-                originalPaths.add(originalImport.getElement().getQualid().toString());
+                originalPaths.add(originalImport.getElement().getQualid().printTrimmed());
             }
             int sharedImports = 0;
             for (JRightPadded<J.Import> importJRightPadded : ideallyOrdered) {
-                if (originalPaths.contains(importJRightPadded.getElement().getQualid().toString())) {
+                if (originalPaths.contains(importJRightPadded.getElement().getQualid().printTrimmed())) {
                     sharedImports++;
                 }
             }
@@ -226,8 +234,8 @@ public class ImportLayoutStyle implements JavaStyle {
             }
         }
 
-        if (isFoldable && ((paddedToAdd.getElement().isStatic() && nameCountToUseStarImport <= sameCount) ||
-                (!paddedToAdd.getElement().isStatic() && classCountToUseStarImport <= sameCount))) {
+        if (isFoldable && (((paddedToAdd.getElement().isStatic() && nameCountToUseStarImport <= sameCount) ||
+                (!paddedToAdd.getElement().isStatic() && classCountToUseStarImport <= sameCount)) || isPackageAlwaysFolded(packagesToFold, paddedToAdd.getElement()))) {
             starFold.set(true);
             if (insertPosition != starFoldFrom.get()) {
                 // if we're adding to the middle of a group of imports that are getting star folded,
@@ -266,7 +274,12 @@ public class ImportLayoutStyle implements JavaStyle {
                         null;
             } else if (finalAfter != null && anImport.getElement().isScope(finalAfter.getElement())) {
                 if (starFold.get()) {
-                    return finalAfter;
+                    // The added import is always folded, and is the first package occurence in the imports.
+                    if (starFoldFrom.get() == starFoldTo.get()) {
+                        return Arrays.asList(finalToAdd, finalAfter);
+                    } else {
+                        return finalAfter;
+                    }
                 } else if (isNewBlock.get()) {
                     return anImport.getElement().isStatic() && !finalToAdd.getElement().isStatic() ?
                             Arrays.asList(finalToAdd, finalAfter) : Arrays.asList(finalAfter, finalToAdd);
@@ -330,7 +343,7 @@ public class ImportLayoutStyle implements JavaStyle {
                 }
             } else {
                 for (JRightPadded<J.Import> orderedImport : block.orderedImports(
-                        layoutState, classCountToUseStarImport, nameCountToUseStarImport, importLayoutConflictDetection)) {
+                        layoutState, classCountToUseStarImport, nameCountToUseStarImport, importLayoutConflictDetection, packagesToFold)) {
 
                     boolean whitespaceContainsCRLF = orderedImport.getElement().getPrefix().getWhitespace().contains("\r\n");
                     Space prefix;
@@ -373,6 +386,7 @@ public class ImportLayoutStyle implements JavaStyle {
 
     public static class Builder {
         private final List<Block> blocks = new ArrayList<>();
+        private final List<Block> packagesToFold = new ArrayList<>();
         private int classCountToUseStarImport = 5;
         private int nameCountToUseStarImport = 3;
 
@@ -414,6 +428,24 @@ public class ImportLayoutStyle implements JavaStyle {
             return staticImportPackage(packageWildcard, true);
         }
 
+        public Builder packageToFold(String packageWildcard, Boolean withSubpackages) {
+            packagesToFold.add(new Block.ImportPackage(false, packageWildcard, withSubpackages));
+            return this;
+        }
+
+        public Builder packageToFold(String packageWildcard) {
+            return packageToFold(packageWildcard, true);
+        }
+
+        public Builder staticPackageToFold(String packageWildcard, Boolean withSubpackages) {
+            packagesToFold.add(new Block.ImportPackage(true, packageWildcard, withSubpackages));
+            return this;
+        }
+
+        public Builder staticPackageToFold(String packageWildcard) {
+            return staticPackageToFold(packageWildcard, true);
+        }
+
         public Builder classCountToUseStarImport(int classCountToUseStarImport) {
             this.classCountToUseStarImport = classCountToUseStarImport;
             return this;
@@ -438,7 +470,7 @@ public class ImportLayoutStyle implements JavaStyle {
                             .collect(toList()));
                 }
             }
-            return new ImportLayoutStyle(classCountToUseStarImport, nameCountToUseStarImport, blocks);
+            return new ImportLayoutStyle(classCountToUseStarImport, nameCountToUseStarImport, blocks, packagesToFold);
         }
     }
 
@@ -455,6 +487,21 @@ public class ImportLayoutStyle implements JavaStyle {
         public List<JRightPadded<J.Import>> getImports(Block block) {
             return imports.getOrDefault(block, emptyList());
         }
+    }
+
+    @SuppressWarnings("deprecation")
+    public static boolean isPackageAlwaysFolded(List<Block> packagesToFold, J.Import checkImport) {
+        boolean isPackageFolded = false;
+        String anImportName = checkImport.getQualid().printTrimmed();
+        for (Block block : packagesToFold) {
+            Block.ImportPackage importPackage = (Block.ImportPackage) block;
+            if (checkImport.isStatic() == importPackage.isStatic()) {
+                if (importPackage.packageWildcard.matcher(anImportName).matches()) {
+                    isPackageFolded = true;
+                }
+            }
+        }
+        return isPackageFolded;
     }
 
     private static class ImportLayoutConflictDetection {
@@ -576,7 +623,7 @@ public class ImportLayoutStyle implements JavaStyle {
         /**
          * @return Imports belonging to this block, folded appropriately.
          */
-        List<JRightPadded<J.Import>> orderedImports(LayoutState layoutState, int classCountToUseStarImport, int nameCountToUseStarImport, ImportLayoutConflictDetection importLayoutConflictDetection);
+        List<JRightPadded<J.Import>> orderedImports(LayoutState layoutState, int classCountToUseStarImport, int nameCountToUseStarImport, ImportLayoutConflictDetection importLayoutConflictDetection, List<Block> packagesToFold);
 
         /**
          * A specialized block implementation to act as a blank line separator between import groupings.
@@ -594,7 +641,7 @@ public class ImportLayoutStyle implements JavaStyle {
             }
 
             @Override
-            public List<JRightPadded<J.Import>> orderedImports(LayoutState layoutState, int classCountToUseStarImport, int nameCountToUseStartImport, ImportLayoutConflictDetection importLayoutConflictDetection) {
+            public List<JRightPadded<J.Import>> orderedImports(LayoutState layoutState, int classCountToUseStarImport, int nameCountToUseStartImport, ImportLayoutConflictDetection importLayoutConflictDetection, List<Block> packagesToFold) {
                 return emptyList();
             }
 
@@ -604,6 +651,7 @@ public class ImportLayoutStyle implements JavaStyle {
             }
         }
 
+        @SuppressWarnings("deprecation")
         class ImportPackage implements Block {
 
             // VisibleForTesting
@@ -650,7 +698,7 @@ public class ImportLayoutStyle implements JavaStyle {
             }
 
             @Override
-            public List<JRightPadded<J.Import>> orderedImports(LayoutState layoutState, int classCountToUseStarImport, int nameCountToUseStarImport, ImportLayoutConflictDetection importLayoutConflictDetection) {
+            public List<JRightPadded<J.Import>> orderedImports(LayoutState layoutState, int classCountToUseStarImport, int nameCountToUseStarImport, ImportLayoutConflictDetection importLayoutConflictDetection, List<Block> packagesToFold) {
                 List<JRightPadded<J.Import>> imports = layoutState.getImports(this);
 
                 Map<String, List<JRightPadded<J.Import>>> groupedImports = imports
@@ -672,7 +720,7 @@ public class ImportLayoutStyle implements JavaStyle {
                             .anyMatch(it -> it.getElement().getQualid().getSimpleName().equals("*"));
 
                     if (importLayoutConflictDetection.isPackageFoldable(packageOrOuterClassName(toStar)) &&
-                            (importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1))) {
+                            (isPackageAlwaysFolded(packagesToFold, toStar.getElement()) || importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1))) {
 
                         J.FieldAccess qualid = toStar.getElement().getQualid();
                         J.Identifier name = qualid.getName();
@@ -792,36 +840,54 @@ class Deserializer extends JsonDeserializer<ImportLayoutStyle> {
                     currentField = p.getCurrentName();
                     break;
                 case VALUE_STRING:
-                    if (!"layout".equals(currentField)) {
-                        break;
-                    }
-                    String block = p.getText().trim();
-                    if (block.equals("<blank line>")) {
-                        builder.blankLine();
-                    } else if (block.startsWith("import ")) {
-                        block = block.substring("import ".length());
-                        boolean statik = false;
-                        if (block.startsWith("static")) {
-                            statik = true;
-                            block = block.substring("static ".length());
-                        }
-                        if (block.equals("all other imports")) {
-                            if (statik) {
-                                builder.importStaticAllOthers();
+                    if ("layout".equals(currentField)) {
+                        String block = p.getText().trim();
+                        if (block.equals("<blank line>")) {
+                            builder.blankLine();
+                        } else if (block.startsWith("import ")) {
+                            block = block.substring("import ".length());
+                            boolean statik = false;
+                            if (block.startsWith("static")) {
+                                statik = true;
+                                block = block.substring("static ".length());
+                            }
+                            if (block.equals("all other imports")) {
+                                if (statik) {
+                                    builder.importStaticAllOthers();
+                                } else {
+                                    builder.importAllOthers();
+                                }
                             } else {
-                                builder.importAllOthers();
+                                boolean withSubpackages = !block.contains(" without subpackages");
+                                block = withSubpackages ? block : block.substring(0, block.indexOf(" without subpackage"));
+                                if (statik) {
+                                    builder.staticImportPackage(block, withSubpackages);
+                                } else {
+                                    builder.importPackage(block, withSubpackages);
+                                }
                             }
                         } else {
+                            throw new IllegalArgumentException("Syntax error in layout block [" + block + "]");
+                        }
+                    } else if ("packages to fold".equals(currentField)) {
+                        String block = p.getText().trim();
+                        if (block.startsWith("import ")) {
+                            block = block.substring("import ".length());
+                            boolean statik = false;
+                            if (block.startsWith("static")) {
+                                statik = true;
+                                block = block.substring("static ".length());
+                            }
                             boolean withSubpackages = !block.contains(" without subpackages");
                             block = withSubpackages ? block : block.substring(0, block.indexOf(" without subpackage"));
                             if (statik) {
-                                builder.staticImportPackage(block, withSubpackages);
+                                builder.staticPackageToFold(block, withSubpackages);
                             } else {
-                                builder.importPackage(block, withSubpackages);
+                                builder.packageToFold(block, withSubpackages);
                             }
                         }
                     } else {
-                        throw new IllegalArgumentException("Syntax error in layout block [" + block + "]");
+                        break;
                     }
                     break;
                 case VALUE_NUMBER_INT:
@@ -878,8 +944,26 @@ class Serializer extends JsonSerializer<ImportLayoutStyle> {
                 })
                 .toArray(String[]::new);
 
+        @SuppressWarnings("SuspiciousToArrayCall") String[] packagesToFold = value.getPackagesToFold().stream()
+                .map(block -> {
+                    if (block instanceof ImportLayoutStyle.Block.ImportPackage) {
+                        ImportLayoutStyle.Block.ImportPackage importPackage = (ImportLayoutStyle.Block.ImportPackage) block;
+                        String withSubpackages = importPackage.getPackageWildcard().pattern().contains("[^.]+") ? " without subpackages" : "";
+                        return "import " + (importPackage.isStatic() ? "static " : "") + importPackage.getPackageWildcard().pattern()
+                                .replace("\\.", ".")
+                                .replace(".+", "*")
+                                .replace("[^.]+", "*")  + withSubpackages;
+                    }
+                    return new UnsupportedOperationException("Unknown block type " + block.getClass().getName());
+                })
+                .toArray(String[]::new);
+
         gen.writeArrayFieldStart("layout");
         gen.writeArray(blocks, 0, blocks.length);
+        gen.writeEndArray();
+
+        gen.writeArrayFieldStart("packages to fold");
+        gen.writeArray(packagesToFold, 0, packagesToFold.length);
         gen.writeEndArray();
     }
 }
