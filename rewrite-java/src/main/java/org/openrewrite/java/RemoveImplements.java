@@ -17,8 +17,16 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
+
+import static java.util.stream.Collectors.toList;
+import static org.openrewrite.java.tree.TypeUtils.isOfClassType;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -41,7 +49,70 @@ public class RemoveImplements extends Recipe {
 
     @Option(displayName = "Filter",
             description = "Only apply the interface removal to classes with fully qualified names that begin with this filter. " +
-                    "Supplying the fully qualified name of a class limits ",
-            example = "com.yourorg")
+                    "`null` or empty matches all classes.",
+            example = "com.yourorg.")
+    @Nullable
     String filter;
+
+    @Override
+    protected JavaIsoVisitor<ExecutionContext> getSingleSourceApplicableTest() {
+        return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDeclaration, ExecutionContext ctx) {
+                J.ClassDeclaration cd = super.visitClassDeclaration(classDeclaration, ctx);
+                if(!(cd.getType() instanceof JavaType.Class) || cd.getImplements() == null) {
+                    return cd;
+                }
+                JavaType.Class cdt = (JavaType.Class) cd.getType();
+                if((filter == null || cdt.getFullyQualifiedName().startsWith(filter)) && cdt.getInterfaces().stream().anyMatch(it -> isOfClassType(it, interfaceType))) {
+                    return cd.withMarkers(cd.getMarkers().searchResult(""));
+                }
+                return cd;
+            }
+        };
+    }
+
+    @Override
+    public JavaIsoVisitor<ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration cd, ExecutionContext ctx) {
+                if(!(cd.getType() instanceof JavaType.Class) || cd.getImplements() == null) {
+                    return cd;
+                }
+                JavaType.Class cdt = (JavaType.Class) cd.getType();
+                if((filter == null || cdt.getFullyQualifiedName().startsWith(filter)) && cdt.getInterfaces().stream().anyMatch(it -> isOfClassType(it, interfaceType))) {
+                    cd = cd.withImplements(cd.getImplements().stream()
+                            .filter(implement -> !isOfClassType(implement.getType(), interfaceType))
+                            .collect(toList()));
+                    cdt = cdt.withInterfaces(cdt.getInterfaces().stream()
+                            .filter(it -> !isOfClassType(it, interfaceType))
+                            .collect(toList()));
+                    cd = cd.withType(cdt);
+                    maybeRemoveImport(interfaceType);
+                    getCursor().putMessage(cdt.getFullyQualifiedName(), cdt);
+                }
+                return super.visitClassDeclaration(cd, ctx);
+            }
+
+            @Override
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration md, ExecutionContext context) {
+                if(md.getMethodType() == null) {
+                    return super.visitMethodDeclaration(md, context);
+                }
+                Object maybeClassType = getCursor().getNearestMessage(md.getMethodType().getDeclaringType().getFullyQualifiedName());
+                if(!(maybeClassType instanceof JavaType.Class)) {
+                    return super.visitMethodDeclaration(md, context);
+                }
+                JavaType.Class cdt = (JavaType.Class)maybeClassType;
+                md = md.withMethodType(md.getMethodType().withDeclaringType(cdt));
+                if(md.getAllAnnotations().stream().noneMatch(ann -> isOfClassType(ann.getType(), "java.lang.Override")) || TypeUtils.isOverride(md.getMethodType())) {
+                    return super.visitMethodDeclaration(md, context);
+                }
+                md = (J.MethodDeclaration) new RemoveAnnotation("@java.lang.Override").getVisitor().visit(md, context, getCursor());
+                assert md != null;
+                return super.visitMethodDeclaration(md, context);
+            }
+        };
+    }
 }

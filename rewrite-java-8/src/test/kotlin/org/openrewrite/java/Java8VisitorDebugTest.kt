@@ -401,6 +401,10 @@ class Java8RemoveExtraSemicolonsTest : Java8Test, RemoveExtraSemicolonsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8RemoveImplementsTest : Java8Test, RemoveImplementsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8RemoveUnusedLocalVariablesTest : Java8Test, RemoveUnusedLocalVariablesTest
 
 @DebugOnly

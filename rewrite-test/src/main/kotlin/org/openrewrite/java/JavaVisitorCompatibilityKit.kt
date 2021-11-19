@@ -321,6 +321,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class RemoveExtraSemicolonsTck : RemoveExtraSemicolonsTest
 
     @Nested
+    inner class RemoveImplementsTck : RemoveImplementsTest
+
+    @Nested
     inner class RemoveUnusedLocalVariablesTck : RemoveUnusedLocalVariablesTest
 
     @Nested
