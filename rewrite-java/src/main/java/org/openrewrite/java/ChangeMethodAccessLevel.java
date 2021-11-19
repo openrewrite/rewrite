@@ -70,7 +70,7 @@ public class ChangeMethodAccessLevel extends Recipe {
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
         J.Modifier.Type type;
-        switch(newAccessLevel) {
+        switch (newAccessLevel) {
             case "public":
                 type = J.Modifier.Type.Public;
                 break;
@@ -84,6 +84,6 @@ public class ChangeMethodAccessLevel extends Recipe {
                 type = null;
         }
 
-        return new ChangeMethodAccessLevelVisitor<>(new MethodMatcher(methodPattern), type);
+        return new ChangeMethodAccessLevelVisitor<>(new MethodMatcher(methodPattern, matchOverrides), type);
     }
 }
