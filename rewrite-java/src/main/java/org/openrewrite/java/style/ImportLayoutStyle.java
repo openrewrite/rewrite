@@ -58,7 +58,8 @@ import static org.openrewrite.internal.StreamUtils.distinctBy;
  * <P><P>
  * <li>classCountToUseStarImport  - How many imports from the same package must be present before they should be collapsed into a star import. The default is 5.</li>
  * <li>nameCountToUseStarImport - How many static imports from the same type must be present before they should be collapsed into a static star import. The default is 3.</li>
- * <li>layout - An ordered list of import groupings which define exactly how imports should be organized within a compilation unit</li>
+ * <li>layout - An ordered list of import groupings which define exactly how imports should be organized within a compilation unit.</li>
+ * <li>packagesToFold - An ordered list of packages which are folded when 1 or more types are in use.</li>
  */
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Getter
