@@ -43,7 +43,6 @@ recipeList:
   - org.openrewrite.java.cleanup.LambdaBlockToExpression
   - org.openrewrite.java.cleanup.MethodNameCasing
   - org.openrewrite.java.cleanup.MinimumSwitchCases
-  #- org.openrewrite.java.cleanup.MissingOverrideAnnotation
   - org.openrewrite.java.cleanup.ModifierOrder
   - org.openrewrite.java.cleanup.MultipleVariableDeclarations
   - org.openrewrite.java.cleanup.NestedEnumsAreNotStatic
@@ -64,8 +63,6 @@ recipeList:
   - org.openrewrite.java.cleanup.RemoveUnusedLocalVariables
   - org.openrewrite.java.cleanup.RemoveUnusedPrivateMethods
   - org.openrewrite.java.cleanup.RenameLocalVariablesToCamelCase
-  #- org.openrewrite.java.cleanup.RenameMethodsNamedHashcodeEqualOrTostring
-  #- org.openrewrite.java.cleanup.ReplaceDuplicateStringLiterals
   - org.openrewrite.java.cleanup.SimplifyBooleanExpression
   - org.openrewrite.java.cleanup.SimplifyBooleanReturn
   - org.openrewrite.java.cleanup.StaticMethodNotFinal
