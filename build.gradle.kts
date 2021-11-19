@@ -2,7 +2,6 @@ import com.github.jk1.license.LicenseReportExtension
 import nebula.plugin.contacts.Contact
 import nebula.plugin.contacts.ContactsExtension
 import nl.javadude.gradle.plugins.license.LicenseExtension
-import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform.getCurrentOperatingSystem
 import java.util.*
 
 plugins {
@@ -60,22 +59,12 @@ subprojects {
     apply(plugin = "com.github.jk1.dependency-license-report")
 
     java {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        toolchain {
+            languageVersion.set(JavaLanguageVersion.of(11))
+        }
     }
 
-    val compiler = javaToolchains.compilerFor {
-        languageVersion.set(JavaLanguageVersion.of(11))
-    }
-
-    val maybeExe = if(getCurrentOperatingSystem().isWindows) {
-        ".exe"
-    } else {
-        ""
-    }
-    val javac = compiler.get().metadata.installationPath.file("bin/javac${maybeExe}")
-
-    if(!name.contains("benchmark")) {
+    if (!name.contains("benchmark")) {
         apply(plugin = "maven-publish")
         apply(plugin = "signing")
 
@@ -137,9 +126,6 @@ subprojects {
 
     tasks.withType<Javadoc>().configureEach {
         options.encoding = "UTF-8"
-        executable = javaToolchains.javadocToolFor {
-            languageVersion.set(JavaLanguageVersion.of(11))
-        }.get().executablePath.toString()
     }
 
     configure<LicenseExtension> {
@@ -174,20 +160,6 @@ subprojects {
     configurations.all {
         exclude("com.google.errorprone", "*")
         resolutionStrategy.cacheDynamicVersionsFor(0, "seconds")
-    }
-
-    tasks.named<JavaCompile>("compileJava").configure {
-        sourceCompatibility = JavaVersion.VERSION_1_8.toString()
-        targetCompatibility = JavaVersion.VERSION_1_8.toString()
-
-        options.isFork = true
-        options.forkOptions.executable = javac.toString()
-        options.compilerArgs.addAll(listOf("--release", "8"))
-    }
-
-    java {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
     }
 
     configure<LicenseReportExtension> {

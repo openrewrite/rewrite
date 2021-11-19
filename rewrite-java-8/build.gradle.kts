@@ -33,8 +33,9 @@ dependencies {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(8))
+    }
 }
 
 tasks.withType<KotlinCompile>().configureEach {
@@ -42,14 +43,6 @@ tasks.withType<KotlinCompile>().configureEach {
         jdkHome = compiler.get().metadata.installationPath.asFile.absolutePath
         jvmTarget = "1.8"
     }
-}
-
-tasks.withType<JavaCompile>().configureEach {
-    sourceCompatibility = JavaVersion.VERSION_1_8.toString()
-    targetCompatibility = JavaVersion.VERSION_1_8.toString()
-    options.isFork = true
-    options.forkOptions.executable = javac.toString()
-    options.compilerArgs.clear() // remove `--release 8` set in root gradle build
 }
 
 tasks.withType<Test>().configureEach {
@@ -60,10 +53,4 @@ tasks.withType<Test>().configureEach {
     javaLauncher.set(javaToolchains.launcherFor {
         languageVersion.set(JavaLanguageVersion.of(8))
     })
-}
-
-tasks.withType<Javadoc>().configureEach {
-    executable = javaToolchains.javadocToolFor {
-        languageVersion.set(JavaLanguageVersion.of(8))
-    }.get().executablePath.toString()
 }
