@@ -61,7 +61,6 @@ public class IsEmptyCallOnCollections extends Recipe {
     protected JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
             final JavaTemplate isEmpty = JavaTemplate.builder(this::getCursor, "#{}#{any(java.util.Collection)}.isEmpty()")
-                    .doBeforeParseTemplate(System.out::println)
                     .build();
 
             @Override
