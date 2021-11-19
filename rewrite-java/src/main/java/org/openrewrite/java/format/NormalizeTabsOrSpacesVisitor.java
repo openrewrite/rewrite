@@ -49,17 +49,17 @@ public class NormalizeTabsOrSpacesVisitor<P> extends JavaIsoVisitor<P> {
             Comment c = comment;
             if (c.isMultiline()) {
                 if (c instanceof Javadoc) {
-                    c = c.withSuffix(normalize(c.getSuffix()));
+                    c = c.withSuffix(normalize(c.getSuffix(), false));
                     return (Comment) new JavadocVisitor<Integer>(new JavaVisitor<>()) {
                         @Override
                         public Javadoc visitLineBreak(Javadoc.LineBreak lineBreak, Integer integer) {
-                            return lineBreak.withMargin(normalize(lineBreak.getMargin()));
+                            return lineBreak.withMargin(normalize(lineBreak.getMargin(), true));
                         }
                     }.visitNonNull((Javadoc) c, 0);
                 } else {
                     TextComment textComment = (TextComment) c;
                     if (textComment.getText().contains("\t")) {
-                        c = textComment.withText(normalize(textComment.getText()));
+                        c = textComment.withText(normalize(textComment.getText(), true));
                     }
                 }
             }
@@ -72,12 +72,12 @@ public class NormalizeTabsOrSpacesVisitor<P> extends JavaIsoVisitor<P> {
     private String normalizeAfterFirstNewline(String text) {
         int firstNewline = text.indexOf('\n');
         if (firstNewline >= 0 && firstNewline != text.length() - 1) {
-            return text.substring(0, firstNewline + 1) + normalize(text.substring(firstNewline + 1));
+            return text.substring(0, firstNewline + 1) + normalize(text.substring(firstNewline + 1), false);
         }
         return text;
     }
 
-    private String normalize(String text) {
+    private String normalize(String text, boolean isComment) {
         if (!StringUtils.isNullOrEmpty(text)) {
             if (style.getUseTabCharacter() ? text.contains(" ") : text.contains("\t")) {
                 StringBuilder textBuilder = new StringBuilder();
@@ -93,8 +93,8 @@ public class NormalizeTabsOrSpacesVisitor<P> extends JavaIsoVisitor<P> {
                         textBuilder.append(c);
                     } else if (!inMargin) {
                         textBuilder.append(c);
-                    } else if (style.getUseTabCharacter() && c == ' '
-                            && i + 1 < charArray.length && charArray[i + 1] != '*') {
+                    } else if (style.getUseTabCharacter() && c == ' ' && (!isComment ||
+                            (i + 1 < charArray.length && charArray[i + 1] != '*'))) {
                         int j = i + 1;
                         for (; j < charArray.length && j < style.getTabSize(); j++) {
                             if (charArray[j] != ' ') {

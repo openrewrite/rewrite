@@ -138,6 +138,9 @@ interface NormalizeTabsOrSpacesTest : JavaRecipeTest {
     fun doNotReplaceSpacesBeforeAsterisks(jp: JavaParser.Builder<*, *>) = assertUnchanged(
         jp.styles(tabsAndIndents { withUseTabCharacter(true) }).build(),
         before = """
+            /**
+             * 
+             */
             public class Test {
             	/*
             	 * Preserve `*`'s on
@@ -167,6 +170,26 @@ interface NormalizeTabsOrSpacesTest : JavaRecipeTest {
                  */
                 public class Inner {
                 }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1237")
+    @Test
+    fun normalizeLastWhitespace(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(tabsAndIndents { withUseTabCharacter(true) }).build(),
+        before = """
+            public class Test {
+            	public void test() {
+            		int n = 1;
+             }
+            }
+        """,
+        after = """
+            public class Test {
+            	public void test() {
+            		int n = 1;
+            	}
             }
         """
     )
