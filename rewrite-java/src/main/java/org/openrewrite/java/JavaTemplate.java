@@ -125,7 +125,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                             List<Statement> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(
                                     new Cursor(getCursor(), insertionPoint),
                                     Statement.class,
-                                    substitutedTemplate, false, loc));
+                                    substitutedTemplate, loc));
                             return block.withStatements(
                                     ListUtils.concatAll(
                                             block.getStatements(),
@@ -140,7 +140,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                 List<Statement> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(
                                         new Cursor(getCursor(), insertionPoint),
                                         Statement.class,
-                                        substitutedTemplate, false, loc));
+                                        substitutedTemplate, loc));
 
                                 Cursor parent = getCursor();
                                 for (int i = 0; i < gen.size(); i++) {
@@ -256,7 +256,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                 if (loc.equals(LAMBDA_PARAMETERS_PREFIX) && lambda.getParameters().isScope(insertionPoint)) {
                     return lambda.withParameters(substitutions.unsubstitute(templateParser.parseLambdaParameters(substitutedTemplate)));
                 }
-                return maybeReplaceStatement(lambda, J.class, true, 0);
+                return maybeReplaceStatement(lambda, J.class, 0);
             }
 
             @Override
@@ -287,7 +287,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                         }
                         case BLOCK_PREFIX: {
                             List<Statement> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(getCursor(), Statement.class,
-                                    substitutedTemplate, false, loc));
+                                    substitutedTemplate, loc));
                             J.Block body = method.getBody();
                             if (body == null) {
                                 body = EMPTY_BLOCK;
@@ -301,8 +301,8 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                             // Update the J.MethodDeclaration's type information to reflect its new parameter list
                             JavaType.Method type = method.getMethodType();
                             if (type != null) {
-                                List<String> paramNames = new ArrayList<>();
-                                List<JavaType> paramTypes = new ArrayList<>();
+                                List<String> paramNames = new ArrayList<>(parameters.size());
+                                List<JavaType> paramTypes = new ArrayList<>(parameters.size());
                                 for (Statement parameter : parameters) {
                                     if (!(parameter instanceof J.VariableDeclarations)) {
                                         throw new IllegalArgumentException(
@@ -422,7 +422,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                     }
                     return m;
                 }
-                return maybeReplaceStatement(method, J.class, true, 0);
+                return maybeReplaceStatement(method, J.class, 0);
             }
 
             @Override
@@ -435,15 +435,15 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
             @Override
             public J visitStatement(Statement statement, Integer p) {
-                return maybeReplaceStatement(statement, Statement.class, false, p);
+                return maybeReplaceStatement(statement, Statement.class, p);
             }
 
             @NotNull
-            private <J3 extends J> J3 maybeReplaceStatement(Statement statement, Class<J3> expected, boolean mightBeUsedAsExpression, Integer p) {
+            private <J3 extends J> J3 maybeReplaceStatement(Statement statement, Class<J3> expected, Integer p) {
                 if (loc.equals(STATEMENT_PREFIX) && statement.isScope(insertionPoint)) {
                     if (mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
-                        List<J3> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(getCursor(), expected, substitutedTemplate,
-                                mightBeUsedAsExpression, loc));
+                        List<J3> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(getCursor(),
+                                expected, substitutedTemplate, loc));
                         if (gen.size() != 1) {
                             throw new IllegalArgumentException("Expected a template that would generate exactly one " +
                                     "statement to replace one statement, but generated " + gen.size());
@@ -486,6 +486,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         return new Builder(parentScope, code);
     }
 
+    @SuppressWarnings("unused")
     public static class Builder {
         private final Supplier<Cursor> parentScope;
         private final String code;

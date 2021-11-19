@@ -51,10 +51,15 @@ public class BlockStatementTemplateGenerator {
             "  static native short shortp();" +
             "  static native float floatp();" +
             "}";
+    private static final String METHOD_INVOCATION_STUBS = "" +
+            "class __M__ {" +
+            "  static native Object any(Object o);" +
+            "  static native <T> Object anyT();" +
+            "}";
 
     private final Set<String> imports;
 
-    public String template(Cursor cursor, String template, boolean mightBeUsedAsExpression, Space.Location location) {
+    public String template(Cursor cursor, String template, Space.Location location) {
         //noinspection ConstantConditions
         return Timer.builder("rewrite.template.generate.statement")
                 .register(Metrics.globalRegistry)
@@ -73,8 +78,7 @@ public class BlockStatementTemplateGenerator {
 
                     template(next(cursor), cursor.getValue(), before, after, newSetFromMap(new IdentityHashMap<>()));
 
-                    return before.toString().trim() + (mightBeUsedAsExpression ? "Object o = " : "") +
-                            "\n/*" + TEMPLATE_COMMENT + "*/" + template + "\n" + after;
+                    return before.toString().trim() + "\n/*" + TEMPLATE_COMMENT + "*/" + template + "\n" + after;
                 });
     }
 
@@ -132,7 +136,7 @@ public class BlockStatementTemplateGenerator {
         templated.add(cursor.getValue());
         J j = cursor.getValue();
         if (j instanceof JavaSourceFile) {
-            before.insert(0, EXPR_STATEMENT_PARAM);
+            before.insert(0, EXPR_STATEMENT_PARAM + METHOD_INVOCATION_STUBS);
 
             JavaSourceFile cu = (JavaSourceFile) j;
             for (J.Import anImport : cu.getImports()) {
@@ -236,9 +240,37 @@ public class BlockStatementTemplateGenerator {
             after.append("}\nreturn ").append(valueOfType(l.getType())).append(";\n};\n");
 
             before.insert(0, l.withBody(null).withPrefix(Space.EMPTY).printTrimmed(cursor).trim());
-            before.insert(0, "Object lambda = ");
         } else if (j instanceof J.VariableDeclarations) {
             before.insert(0, variable((J.VariableDeclarations) j, false, cursor) + '=');
+        } else if(j instanceof J.MethodInvocation) {
+            // If prior is an argument, wrap in __M__.any(prior)
+            // If prior is a type parameter, wrap in __M__.anyT<prior>()
+            // For anything else, ignore the invocation
+            J.MethodInvocation m = (J.MethodInvocation) j;
+            if(m.getArguments().stream().anyMatch(arg -> arg == prior)) {
+                before.insert(0, "__M__.any(");
+                if(cursor.getParentOrThrow().firstEnclosing(J.class) instanceof J.Block) {
+                    after.append(");");
+                } else {
+                    after.append(")");
+                }
+            } else if(m.getTypeParameters() != null && m.getTypeParameters().stream().anyMatch(tp -> tp == prior)) {
+                before.insert(0, "__M__.anyT<");
+                if(cursor.getParentOrThrow().firstEnclosing(J.class) instanceof J.Block) {
+                    after.append(">();");
+                } else {
+                    after.append(">()");
+                }
+            }
+        } else if(j instanceof J.Return) {
+            before.insert(0, "return ");
+            after.append(";");
+        } else if(j instanceof J.If) {
+            J.If iff = (J.If)j;
+            if(prior == iff.getIfCondition()) {
+                before.insert(0, "boolean __b" + cursor.getPathAsStream().count() + "__ =");
+                after.append(";");
+            }
         }
         template(next(cursor), j, before, after, templated);
     }

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("DuplicatedCode")
 package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
@@ -245,13 +246,16 @@ interface JavaTemplateTest : JavaRecipeTest {
         jp.logCompilationWarningsAndErrors(true).build(),
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "n = 1;").build()
+                val t = JavaTemplate.builder({ cursor }, "return n == 1;").build()
 
-                override fun visitAssignment(assignment: J.Assignment, p: ExecutionContext): J {
-                    if (assignment.assignment is J.Literal && Integer.valueOf(0) == (assignment.assignment as J.Literal).value) {
-                        return assignment.withTemplate(t, assignment.coordinates.replace())
+                override fun visitReturn(retrn: J.Return, p: ExecutionContext): J {
+                    if(retrn.expression is J.Binary) {
+                        val binary = retrn.expression as J.Binary
+                        if(binary.right is J.Literal &&  Integer.valueOf(0) == (binary.right as J.Literal).value) {
+                            return retrn.withTemplate(t, retrn.coordinates.replace())
+                        }
                     }
-                    return assignment
+                    return retrn
                 }
             }
         },
@@ -262,8 +266,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                 int n;
 
                 void method(Stream<Object> obj) {
-                    obj.map(o -> {
-                        return n = 0;
+                    obj.filter(o -> {
+                        return n == 0;
                     });
                 }
             }
@@ -275,8 +279,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                 int n;
 
                 void method(Stream<Object> obj) {
-                    obj.map(o -> {
-                        return n = 1;
+                    obj.filter(o -> {
+                        return n == 1;
                     });
                 }
             }
@@ -285,18 +289,21 @@ interface JavaTemplateTest : JavaRecipeTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1120")
-    @Suppress("UnusedAssignment", "ResultOfMethodCallIgnored")
+    @Suppress("UnusedAssignment", "ResultOfMethodCallIgnored", "ConstantConditions")
     fun replaceStatementInLambdaBodyWithVariableDeclaredInBlock(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.logCompilationWarningsAndErrors(true).build(),
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "n = 1;").build()
+                val t = JavaTemplate.builder({ cursor }, "return n == 1;").build()
 
-                override fun visitAssignment(assignment: J.Assignment, p: ExecutionContext): J {
-                    if (assignment.assignment is J.Literal && Integer.valueOf(0) == (assignment.assignment as J.Literal).value) {
-                        return assignment.withTemplate(t, assignment.coordinates.replace())
+                override fun visitReturn(retrn: J.Return, p: ExecutionContext): J {
+                    if(retrn.expression is J.Binary) {
+                        val binary = retrn.expression as J.Binary
+                        if(binary.right is J.Literal &&  Integer.valueOf(0) == (binary.right as J.Literal).value) {
+                            return retrn.withTemplate(t, retrn.coordinates.replace())
+                        }
                     }
-                    return assignment
+                    return retrn
                 }
             }
         },
@@ -305,9 +312,9 @@ interface JavaTemplateTest : JavaRecipeTest {
 
             class Test {
                 static void method(Stream<Object> obj) {
-                    obj.map(o -> {
-                        int n;
-                        return n = 0;
+                    obj.filter(o -> {
+                        int n = 0;
+                        return n == 0;
                     });
                 }
             }
@@ -317,9 +324,9 @@ interface JavaTemplateTest : JavaRecipeTest {
 
             class Test {
                 static void method(Stream<Object> obj) {
-                    obj.map(o -> {
-                        int n;
-                        return n = 1;
+                    obj.filter(o -> {
+                        int n = 0;
+                        return n == 1;
                     });
                 }
             }
@@ -408,6 +415,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("ClassInitializerMayBeStatic")
     @Test
     fun replaceMethodNameAndArgumentsSimultaneously(jp: JavaParser) = assertChanged(
         jp,
@@ -622,9 +630,9 @@ interface JavaTemplateTest : JavaRecipeTest {
             assertThat(type.resolvedSignature!!.paramTypes[1])
                 .matches({
                     it is JavaType.Parameterized
-                            && it.type.fullyQualifiedName == "java.util.List"
-                            && it.typeParameters.size == 1
-                            && it.typeParameters.first().asFullyQualified()!!.fullyQualifiedName == "java.lang.String"
+                            && it.type!!.fullyQualifiedName == "java.util.List"
+                            && it.typeParameters!!.size == 1
+                            && it.typeParameters!!.first().asFullyQualified()!!.fullyQualifiedName == "java.lang.String"
                 }, "Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'")
         }
     )
@@ -1737,6 +1745,114 @@ interface JavaTemplateTest : JavaRecipeTest {
             abstract class Test {
                 void test(){
                 }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1198")
+    @Test
+    @Suppress("UnnecessaryBoxing", "UnnecessaryLocalVariable", "CachedNumberConstructorCall", "UnnecessaryTemporaryOnConversionToString",
+        "deprecation", "ResultOfMethodCallIgnored"
+    )
+    fun replaceNamedVariableInitializerMethodInvocation(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.logCompilationWarningsAndErrors(true).build(),
+        recipe = toRecipe {
+            object : JavaVisitor<ExecutionContext>() {
+                val matcher = MethodMatcher("Integer valueOf(..)")
+                val t = JavaTemplate.builder({ cursor }, "new Integer(#{any()})").build()
+                override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J {
+                    if (matcher.matches(method)) {
+                        return method.withTemplate(t, method.coordinates.replace(), method.arguments[0])
+                    }
+                    return super.visitMethodInvocation(method, p)
+                }
+            }
+        },
+        before = """
+            import java.util.Arrays;
+            import java.util.List;
+            import java.util.function.Function;
+            class Test {
+                void t() {
+                    List<String> nums = Arrays.asList("1", "2", "3");
+                    nums.forEach(s -> Integer.valueOf(s));
+                }
+                void inLambda(int i) {
+                    Function<String, Integer> toString = it -> {
+                        try {
+                            return Integer.valueOf(it);
+                        }catch (NumberFormatException ex) {
+                            ex.printStackTrace();
+                        }
+                        return 0;
+                    };
+                }
+                String inClassDeclaration(int i) {
+                    return new Object() {
+                        void foo() {
+                            Integer.valueOf(i);
+                        }
+                    }.toString();
+                }
+            }
+        """,
+        after = """
+            import java.util.Arrays;
+            import java.util.List;
+            import java.util.function.Function;
+            class Test {
+                void t() {
+                    List<String> nums = Arrays.asList("1", "2", "3");
+                    nums.forEach(s -> new Integer(s));
+                }
+                void inLambda(int i) {
+                    Function<String, Integer> toString = it -> {
+                        try {
+                            return new Integer(it);
+                        }catch (NumberFormatException ex) {
+                            ex.printStackTrace();
+                        }
+                        return 0;
+                    };
+                }
+                String inClassDeclaration(int i) {
+                    return new Object() {
+                        void foo() {
+                            new Integer(i);
+                        }
+                    }.toString();
+                }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1198")
+    @Test
+    @Suppress("UnnecessaryBoxing", "UnnecessaryLocalVariable", "CachedNumberConstructorCall", "UnnecessaryTemporaryOnConversionToString", "deprecation")
+    fun lambdaIsVariableInitializer(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.logCompilationWarningsAndErrors(true).build(),
+        recipe = toRecipe {
+            object : JavaVisitor<ExecutionContext>() {
+                val matcher = MethodMatcher("Integer valueOf(..)")
+                val t = JavaTemplate.builder({ cursor }, "new Integer(#{any()})").doBeforeParseTemplate(System.out::println).build()
+                override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J {
+                    if (matcher.matches(method)) {
+                        return method.withTemplate(t, method.coordinates.replace(), method.arguments[0])
+                    }
+                    return super.visitMethodInvocation(method, p)
+                }
+            }
+        },
+        before = """
+            import java.util.function.Function;
+            class Test {
+                Function<String, Integer> asInteger = it -> Integer.valueOf(it);
+            }
+        """,
+        after = """
+            import java.util.function.Function;
+            class Test {
+                Function<String, Integer> asInteger = it -> new Integer(it);
             }
         """
     )

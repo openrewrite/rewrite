@@ -158,9 +158,8 @@ public class JavaTemplateParser {
 
     public <J2 extends J> List<J2> parseBlockStatements(Cursor cursor, Class<J2> expected,
                                                         String template,
-                                                        boolean mightBeUsedAsExpression,
                                                         Space.Location location) {
-        @Language("java") String stub = statementTemplateGenerator.template(cursor, template, mightBeUsedAsExpression, location);
+        @Language("java") String stub = statementTemplateGenerator.template(cursor, template, location);
         onBeforeParseTemplate.accept(stub);
         return cache(stub, () -> {
             JavaSourceFile cu = compileTemplate(stub);
@@ -176,7 +175,7 @@ public class JavaTemplateParser {
         } else {
             methodWithReplacedNameAndArgs = method.getSelect().print(cursor) + "." + template + ";";
         }
-        @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacedNameAndArgs, true, location);
+        @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacedNameAndArgs, location);
         onBeforeParseTemplate.accept(stub);
         List<J> invocations = cache(stub, () -> {
             JavaSourceFile cu = compileTemplate(stub);
@@ -191,7 +190,7 @@ public class JavaTemplateParser {
         J.MethodInvocation method = cursor.getValue();
         String methodWithReplacementArgs = method.withArguments(Collections.emptyList()).printTrimmed(cursor)
                 .replaceAll("\\)$", template + ");");
-        @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacementArgs, false, location);
+        @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacementArgs, location);
         onBeforeParseTemplate.accept(stub);
         List<J> invocations = cache(stub, () -> {
             JavaSourceFile cu = compileTemplate(stub);
