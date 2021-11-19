@@ -67,7 +67,7 @@ class ImportLayoutStyleTest {
                         "<blank line>",
                         "import static all other imports"
                 ),
-                "packages to fold" to listOf(
+                "packagesToFold" to listOf(
                     "import java.awt.*",
                     "import java.swing.* without subpackages",
                     "import static org.unit.Assert.*",

@@ -869,7 +869,7 @@ class Deserializer extends JsonDeserializer<ImportLayoutStyle> {
                         } else {
                             throw new IllegalArgumentException("Syntax error in layout block [" + block + "]");
                         }
-                    } else if ("packages to fold".equals(currentField)) {
+                    } else if ("packagesToFold".equals(currentField)) {
                         String block = p.getText().trim();
                         if (block.startsWith("import ")) {
                             block = block.substring("import ".length());
@@ -962,7 +962,7 @@ class Serializer extends JsonSerializer<ImportLayoutStyle> {
         gen.writeArray(blocks, 0, blocks.length);
         gen.writeEndArray();
 
-        gen.writeArrayFieldStart("packages to fold");
+        gen.writeArrayFieldStart("packagesToFold");
         gen.writeArray(packagesToFold, 0, packagesToFold.length);
         gen.writeEndArray();
     }
