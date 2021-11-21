@@ -98,7 +98,7 @@ public class NoPrimitiveWrappersForToStringOrCompareTo extends Recipe {
                     }
                     if (arg != null && !TypeUtils.isString(arg.getType()) && mi.getSelect() != null) {
                         JavaType.FullyQualified fq = mi.getMethodType().getDeclaringType();
-                        mi = mi.withSelect(J.Identifier.build(UUID.randomUUID(), mi.getSelect().getPrefix(), Markers.EMPTY, fq.getClassName(), fq));
+                        mi = mi.withSelect(new J.Identifier(UUID.randomUUID(), mi.getSelect().getPrefix(), Markers.EMPTY, fq.getClassName(), fq, null));
                         //noinspection ArraysAsListWithZeroOrOneArgument
                         mi = mi.withArguments(Arrays.asList(arg));
                     }
@@ -115,9 +115,9 @@ public class NoPrimitiveWrappersForToStringOrCompareTo extends Recipe {
 
                     if (arg != null && !TypeUtils.isString(arg.getType()) && mi.getSelect() != null) {
                         JavaType.FullyQualified fq = mi.getMethodType().getDeclaringType();
-                        mi = mi.withSelect(J.Identifier.build(UUID.randomUUID(), mi.getSelect().getPrefix(), Markers.EMPTY, fq.getClassName(), fq));
+                        mi = mi.withSelect(new J.Identifier(UUID.randomUUID(), mi.getSelect().getPrefix(), Markers.EMPTY, fq.getClassName(), fq, null));
                         mi = mi.withArguments(ListUtils.concat(arg, mi.getArguments()));
-                        mi = maybeAutoFormat(mi, mi.withName(mi.getName().withName("compare")), executionContext);
+                        mi = maybeAutoFormat(mi, mi.withName(mi.getName().withSimpleName("compare")), executionContext);
                     }
                 }
             }

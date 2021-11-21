@@ -58,7 +58,7 @@ public interface TypeTree extends NameTree {
 
             if (i == 0) {
                 fullName = part;
-                expr = Identifier.build(randomId(), Space.format(whitespaceBefore.toString()), Markers.EMPTY, part, null);
+                expr = new Identifier(randomId(), Space.format(whitespaceBefore.toString()), Markers.EMPTY, part, null, null);
             } else {
                 fullName += "." + part;
                 expr = new J.FieldAccess(
@@ -68,11 +68,12 @@ public interface TypeTree extends NameTree {
                         expr,
                         new JLeftPadded<>(
                                 Space.format(nextLeftPad),
-                                Identifier.build(
+                                new Identifier(
                                         randomId(),
                                         Space.format(whitespaceBefore.toString()),
                                         Markers.EMPTY,
                                         part.trim(),
+                                        null,
                                         null
                                 ),
                                 Markers.EMPTY

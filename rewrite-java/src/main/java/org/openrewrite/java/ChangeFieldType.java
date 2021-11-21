@@ -46,11 +46,13 @@ public class ChangeFieldType<P> extends JavaIsoVisitor<P> {
 
             mv = mv.withTypeExpression(mv.getTypeExpression() == null ?
                     null :
-                    J.Identifier.build(mv.getTypeExpression().getId(),
+                    new J.Identifier(mv.getTypeExpression().getId(),
                             mv.getTypeExpression().getPrefix(),
                             Markers.EMPTY,
                             newFieldType.getClassName(),
-                            newFieldType)
+                            newFieldType,
+                            null
+                    )
             );
 
             mv = mv.withVariables(ListUtils.map(mv.getVariables(), var -> {

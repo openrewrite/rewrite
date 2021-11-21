@@ -73,11 +73,12 @@ public class NoStaticImport extends Recipe {
                         }
 
                         maybeAddImport(receiverType.getFullyQualifiedName());
-                        m = m.withSelect(J.Identifier.build(Tree.randomId(),
+                        m = m.withSelect(new J.Identifier(Tree.randomId(),
                                 Space.EMPTY,
                                 Markers.EMPTY,
                                 receiverType.getClassName(),
-                                receiverType)
+                                receiverType,
+                                null)
                         );
                     }
 

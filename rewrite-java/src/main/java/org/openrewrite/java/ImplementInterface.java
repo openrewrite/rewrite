@@ -43,12 +43,13 @@ public class ImplementInterface<P> extends JavaIsoVisitor<P> {
                 .noneMatch(f -> interfaceType.equals(f.getType())))) {
             maybeAddImport(interfaceType);
 
-            c = c.withImplements(ListUtils.concat(c.getImplements(), J.Identifier.build(
+            c = c.withImplements(ListUtils.concat(c.getImplements(), new J.Identifier(
                     randomId(),
                     format(" "),
                     Markers.EMPTY,
                     interfaceType.getClassName(),
-                    interfaceType
+                    interfaceType,
+                    null
             )));
 
             JContainer<TypeTree> anImplements = c.getPadding().getImplements();

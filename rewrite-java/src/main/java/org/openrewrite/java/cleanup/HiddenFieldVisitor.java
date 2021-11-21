@@ -137,7 +137,7 @@ public class HiddenFieldVisitor<P> extends JavaIsoVisitor<P> {
                 Cursor parentScope = getCursorToParentScope(getCursor());
                 J.ClassDeclaration enclosingClass = getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class);
                 while (// don't use a variable name of any existing variable "downstream" of the renamed variable's scope
-                        !FindNameShadows.find(parentScope.getValue(), v.withName(v.getName().withName(nextName)), enclosingClass, hiddenFieldStyle).isEmpty() ||
+                        !FindNameShadows.find(parentScope.getValue(), v.withName(v.getName().withSimpleName(nextName)), enclosingClass, hiddenFieldStyle).isEmpty() ||
                                 // don't use a variable name of any existing variables already defined in the "upstream" cursor path of the renamed variable's scope
                                 !FindExistingVariableDeclarations.find(enclosingCU, getCursor(), nextName).isEmpty()
                 ) {

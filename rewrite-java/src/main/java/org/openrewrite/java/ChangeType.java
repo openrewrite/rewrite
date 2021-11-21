@@ -222,10 +222,10 @@ public class ChangeType extends Recipe {
                                     .withType(null)
                                     .withPrefix(i.getPrefix()));
                         } else {
-                            i = i.withName(((JavaType.FullyQualified) targetType).getClassName());
+                            i = i.withSimpleName(((JavaType.FullyQualified) targetType).getClassName());
                         }
                     } else if (targetType instanceof JavaType.Primitive) {
-                        i = i.withName(((JavaType.Primitive) targetType).getKeyword());
+                        i = i.withSimpleName(((JavaType.Primitive) targetType).getKeyword());
                     }
                 }
             }

@@ -97,7 +97,7 @@ public class ChangeMethodName extends Recipe {
                 if (type != null) {
                     type = type.withName(newMethodName);
                 }
-                m = m.withName(m.getName().withName(newMethodName))
+                m = m.withName(m.getName().withSimpleName(newMethodName))
                         .withMethodType(type);
             }
             return m;
@@ -111,7 +111,7 @@ public class ChangeMethodName extends Recipe {
                 if (type != null) {
                     type = type.withName(newMethodName);
                 }
-                m = m.withName(m.getName().withName(newMethodName))
+                m = m.withName(m.getName().withSimpleName(newMethodName))
                         .withMethodType(type);
             }
             return m;
@@ -125,7 +125,7 @@ public class ChangeMethodName extends Recipe {
                 if (type != null) {
                     type = type.withName(newMethodName);
                 }
-                m = m.withReference(m.getReference().withName(newMethodName)).withMethodType(type);
+                m = m.withReference(m.getReference().withSimpleName(newMethodName)).withMethodType(type);
             }
             return m;
         }

@@ -105,13 +105,14 @@ public class ChangeMethodTargetToVariable extends Recipe {
                     methodType = m.getMethodType().withDeclaringType(this.variableType).withFlags(flags);
                 }
 
-                m = m.withSelect(J.Identifier.build(randomId(),
+                m = m.withSelect(new J.Identifier(randomId(),
                         m.getSelect() == null ?
                                 Space.EMPTY :
                                 m.getSelect().getPrefix(),
                         Markers.EMPTY,
                         variableName,
-                        this.variableType)
+                        this.variableType,
+                        null)
                 ).withMethodType(methodType);
             }
             return m;

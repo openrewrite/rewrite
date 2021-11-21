@@ -49,7 +49,6 @@ import static java.util.stream.Collectors.toList;
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public interface J extends Tree {
     static void clearCaches() {
-        Identifier.flyweights.clear();
         JavaTemplateParser.clearCache();
     }
 
@@ -1282,6 +1281,7 @@ public interface J extends Tree {
             return body.getElement();
         }
 
+        @SuppressWarnings("unchecked")
         public DoWhileLoop withBody(Statement body) {
             return getPadding().withBody(this.body.withElement(body));
         }
@@ -1643,6 +1643,7 @@ public interface J extends Tree {
             return body.getElement();
         }
 
+        @SuppressWarnings("unchecked")
         public ForEachLoop withBody(Statement body) {
             return getPadding().withBody(this.body.withElement(body));
         }
@@ -1804,6 +1805,7 @@ public interface J extends Tree {
             return body.getElement();
         }
 
+        @SuppressWarnings("unchecked")
         public ForLoop withBody(Statement body) {
             return getPadding().withBody(this.body.withElement(body));
         }
@@ -1950,12 +1952,10 @@ public interface J extends Tree {
         }
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    final class Identifier implements J, TypeTree, Expression {
-        // keyed by name, type, and then field type
-        private static final Map<String, Map<JavaType, Map<JavaType.Variable, IdentifierFlyweight>>> flyweights = new WeakHashMap<>();
-
+    @With
+    class Identifier implements J, TypeTree, Expression {
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -1966,112 +1966,17 @@ public interface J extends Tree {
         @Getter
         Markers markers;
 
-        IdentifierFlyweight identifier;
-
-        private Identifier(UUID id, IdentifierFlyweight identifier, Space prefix, Markers markers) {
-            this.id = id;
-            this.identifier = identifier;
-            this.prefix = prefix;
-            this.markers = markers;
-        }
-
-        @Override
-        public JavaType getType() {
-            return identifier.getType();
-        }
+        String simpleName;
 
         @Nullable
-        public JavaType.Variable getFieldType() {
-            return identifier.getFieldType();
-        }
+        JavaType type;
 
-        @SuppressWarnings("unchecked")
-        @Override
-        public Identifier withId(UUID id) {
-            if (id == getId()) {
-                return this;
-            }
-            return build(id, prefix, markers, getSimpleName(), getType(), getFieldType());
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public Identifier withType(@Nullable JavaType type) {
-            if (type == getType()) {
-                return this;
-            }
-            return build(id, prefix, markers, getSimpleName(), type, getFieldType());
-        }
-
-        public String getSimpleName() {
-            return identifier.getSimpleName();
-        }
+        @Nullable
+        JavaType.Variable fieldType;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitIdentifier(this, p);
-        }
-
-        public Identifier withName(String name) {
-            if (name.equals(identifier.getSimpleName())) {
-                return this;
-            }
-            return build(id, prefix, markers, name, getType(), getFieldType());
-        }
-
-        @SuppressWarnings("unchecked")
-        public Identifier withMarkers(Markers markers) {
-            if (markers == this.markers) {
-                return this;
-            }
-            return build(id, prefix, markers, identifier.getSimpleName(), getType(), getFieldType());
-        }
-
-        @SuppressWarnings("unchecked")
-        public Identifier withPrefix(Space prefix) {
-            if (prefix == this.prefix) {
-                return this;
-            }
-            return build(id, prefix, markers, identifier.getSimpleName(), getType(), getFieldType());
-        }
-
-        public static Identifier build(UUID id,
-                                       Space prefix,
-                                       Markers markers,
-                                       String simpleName,
-                                       @Nullable JavaType type) {
-            return build(id, prefix, markers, simpleName, type, null);
-        }
-
-        public static Identifier build(UUID id,
-                                       Space prefix,
-                                       Markers markers,
-                                       String simpleName,
-                                       @Nullable JavaType type,
-                                       @Nullable JavaType.Variable fieldType) {
-            synchronized (flyweights) {
-                return new Identifier(
-                        id,
-                        flyweights
-                                .computeIfAbsent(simpleName, n -> new HashMap<>())
-                                .computeIfAbsent(type, t -> new HashMap<>())
-                                .computeIfAbsent(fieldType, t -> new IdentifierFlyweight(simpleName, type, fieldType)),
-                        prefix,
-                        markers
-                );
-            }
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @Data
-        public static final class IdentifierFlyweight {
-            String simpleName;
-
-            @Nullable
-            JavaType type;
-
-            @Nullable
-            JavaType.Variable fieldType;
         }
     }
 
@@ -2957,12 +2862,7 @@ public interface J extends Tree {
             if (type == this.methodType) {
                 return this;
             }
-
-            if (!(type instanceof JavaType.Method)) {
-                throw new IllegalArgumentException("A method can only be type attributed with a method type");
-            }
-
-            return new MethodDeclaration(id, prefix, markers, leadingAnnotations, modifiers, typeParameters, returnTypeExpression, name, parameters, throwz, body, defaultValue, (JavaType.Method) type);
+            return new MethodDeclaration(id, prefix, markers, leadingAnnotations, modifiers, typeParameters, returnTypeExpression, name, parameters, throwz, body, defaultValue, type);
         }
 
         public JavaType getType() {
@@ -3206,7 +3106,7 @@ public interface J extends Tree {
             if (type == this.methodType) {
                 return this;
             }
-            return new MethodInvocation(id, prefix, markers, select, typeParameters, name, arguments, (JavaType.Method) type);
+            return new MethodInvocation(id, prefix, markers, select, typeParameters, name, arguments, type);
         }
 
         @SuppressWarnings("unchecked")
@@ -5005,6 +4905,7 @@ public interface J extends Tree {
             return body.getElement();
         }
 
+        @SuppressWarnings("unchecked")
         public WhileLoop withBody(Statement body) {
             return getPadding().withBody(this.body.withElement(body));
         }

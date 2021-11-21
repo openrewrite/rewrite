@@ -44,7 +44,7 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
         J.ClassDeclaration enclosingClass = getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class);
         if (variable.isField(getCursor()) && matchesClass(enclosingClass.getType()) &&
                 variable.getSimpleName().equals(hasName)) {
-            v = v.withName(v.getName().withName(toName));
+            v = v.withName(v.getName().withSimpleName(toName));
         }
         if (variable.getPadding().getInitializer() != null) {
             v = v.getPadding().withInitializer(visitLeftPadded(variable.getPadding().getInitializer(),
@@ -58,7 +58,7 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
         J.FieldAccess f = super.visitFieldAccess(fieldAccess, p);
         if (matchesClass(fieldAccess.getTarget().getType()) &&
                 fieldAccess.getSimpleName().equals(hasName)) {
-            f = f.getPadding().withName(f.getPadding().getName().withElement(f.getPadding().getName().getElement().withName(toName)));
+            f = f.getPadding().withName(f.getPadding().getName().withElement(f.getPadding().getName().getElement().withSimpleName(toName)));
         }
         return f;
     }
@@ -70,7 +70,7 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
         if (i.getFieldType() != null) {
             JavaType.Variable varType = i.getFieldType();
             if (varType.getName().equals(hasName) && TypeUtils.isOfClassType(varType.getOwner(), classType)) {
-                i = J.Identifier.build(
+                i = new J.Identifier(
                         randomId(),
                         i.getPrefix(),
                         i.getMarkers(),

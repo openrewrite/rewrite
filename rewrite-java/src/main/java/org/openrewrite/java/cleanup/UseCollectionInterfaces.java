@@ -118,20 +118,23 @@ public class UseCollectionInterfaces extends Recipe {
 
                             TypeTree typeExpression;
                             if (m.getReturnTypeExpression() instanceof J.Identifier) {
-                                typeExpression = J.Identifier.build(
+                                typeExpression = new J.Identifier(
                                         Tree.randomId(),
                                         m.getReturnTypeExpression().getPrefix(),
                                         Markers.EMPTY,
                                         newType.getClassName(),
-                                        newType);
+                                        newType,
+                                        null
+                                );
                             } else {
                                 J.ParameterizedType parameterizedType = (J.ParameterizedType) m.getReturnTypeExpression();
-                                J.Identifier returnType = J.Identifier.build(
+                                J.Identifier returnType = new J.Identifier(
                                         Tree.randomId(),
                                         Space.EMPTY,
                                         Markers.EMPTY,
                                         newType.getClassName(),
-                                        newType);
+                                        newType,
+                                        null);
                                 typeExpression = parameterizedType.withClazz(returnType);
                             }
                             m = m.withReturnTypeExpression(typeExpression);
@@ -158,20 +161,24 @@ public class UseCollectionInterfaces extends Recipe {
                         if (mv.getTypeExpression() == null) {
                             typeExpression = null;
                         } else if (mv.getTypeExpression() instanceof J.Identifier) {
-                            typeExpression = J.Identifier.build(
+                            typeExpression = new J.Identifier(
                                     mv.getTypeExpression().getId(),
                                     mv.getTypeExpression().getPrefix(),
                                     Markers.EMPTY,
                                     newType.getClassName(),
-                                    newType);
+                                    newType,
+                                    null
+                            );
                         } else {
                             J.ParameterizedType parameterizedType = (J.ParameterizedType) mv.getTypeExpression();
-                            J.Identifier returnType = J.Identifier.build(
+                            J.Identifier returnType = new J.Identifier(
                                     mv.getTypeExpression().getId(),
                                     Space.EMPTY,
                                     Markers.EMPTY,
                                     newType.getClassName(),
-                                    newType);
+                                    newType,
+                                    null
+                            );
                             typeExpression = parameterizedType.withClazz(returnType);
                         }
 

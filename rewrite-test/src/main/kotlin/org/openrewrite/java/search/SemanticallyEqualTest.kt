@@ -169,19 +169,19 @@ interface SemanticallyEqualTest {
         )
 
         val firstIdent = cu[0].classes[0].leadingAnnotations[0].annotationType
-        val secondIdent = J.Identifier.build(
+        val secondIdent = J.Identifier(
             randomId(),
             Space.EMPTY,
             Markers.EMPTY,
             "MyAnnotation",
-            JavaType.buildType("MyAnnotation")
+            JavaType.buildType("MyAnnotation"), null
         )
-        val thirdIdent = J.Identifier.build(
+        val thirdIdent = J.Identifier(
             randomId(),
             Space.EMPTY,
             Markers.EMPTY,
             "YourAnnotation",
-            JavaType.buildType("YourAnnotation")
+            JavaType.buildType("YourAnnotation"), null
         )
 
         assertThat(SemanticallyEqual.areEqual(firstIdent, secondIdent)).isTrue
@@ -218,21 +218,21 @@ interface SemanticallyEqualTest {
             randomId(),
             Space.EMPTY,
             Markers.EMPTY,
-            J.Identifier.build(
+            J.Identifier(
                 randomId(),
                 Space.EMPTY,
                 Markers.EMPTY,
                 "FastTest",
-                JavaType.Class.build("FastTest")
+                JavaType.Class.build("FastTest"), null
             ),
             JLeftPadded(
                 Space.EMPTY,
-                J.Identifier.build(
+                J.Identifier(
                     randomId(),
                     Space.EMPTY,
                     Markers.EMPTY,
                     "class",
-                    null
+                    null, null
                 ),
                 Markers.EMPTY
             ),
@@ -272,12 +272,12 @@ interface SemanticallyEqualTest {
             randomId(),
             Space.EMPTY,
             Markers.EMPTY,
-            J.Identifier.build(
+            J.Identifier(
                 randomId(),
                 Space.EMPTY,
                 Markers.EMPTY,
                 "value",
-                null
+                null, null
             ),
             JLeftPadded(
                 Space.format(" "),
@@ -295,7 +295,7 @@ interface SemanticallyEqualTest {
             JavaType.Primitive.Boolean
         )
         val thirdAssign = secondAssign.withVariable(
-            (secondAssign.variable as J.Identifier).withName("otherValue")
+            (secondAssign.variable as J.Identifier).withSimpleName("otherValue")
         )
         val fourthAssign = secondAssign.withAssignment(
             (secondAssign.assignment as J.Literal).withValue(false)

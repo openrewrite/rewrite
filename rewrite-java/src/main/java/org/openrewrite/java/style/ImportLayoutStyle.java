@@ -113,7 +113,7 @@ public class ImportLayoutStyle implements JavaStyle {
             paddedToAdd = pkg == null ? paddedToAdd : paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(Space.format("\n\n")));
             paddedToAdd = isPackageAlwaysFolded(packagesToFold, paddedToAdd.getElement()) ? paddedToAdd.withElement(paddedToAdd.getElement().withQualid(
                     paddedToAdd.getElement().getQualid().withName(
-                            paddedToAdd.getElement().getQualid().getName().withName("*")
+                            paddedToAdd.getElement().getQualid().getName().withSimpleName("*")
                     )
             )) : paddedToAdd;
             return singletonList(paddedToAdd);
@@ -250,7 +250,7 @@ public class ImportLayoutStyle implements JavaStyle {
         if (starFold.get()) {
             paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withQualid(
                     paddedToAdd.getElement().getQualid().withName(
-                            paddedToAdd.getElement().getQualid().getName().withName("*")
+                            paddedToAdd.getElement().getQualid().getName().withSimpleName("*")
                     )
             ));
             after = starFoldTo.get() < originalImports.size() ?
@@ -739,7 +739,7 @@ public class ImportLayoutStyle implements JavaStyle {
 
                         if (starImportExists || !oneOfTheTypesIsInAnotherGroupToo.isPresent()) {
                             ordered.add(toStar.withElement(toStar.getElement().withQualid(qualid.withName(
-                                    name.withName("*")))));
+                                    name.withSimpleName("*")))));
                             continue;
                         }
                     }

@@ -74,7 +74,7 @@ public class NoEmptyCollectionWithRawType extends Recipe {
                 J.Identifier name = anImport.getQualid().getName();
                 if (anImport.isStatic() && name.getSimpleName().startsWith("EMPTY_") &&
                         TypeUtils.isOfClassType(anImport.getQualid().getTarget().getType(), "java.util.Collections")) {
-                    return anImport.withQualid(anImport.getQualid().withName(name.withName(updateFields.get(name.getSimpleName()))));
+                    return anImport.withQualid(anImport.getQualid().withName(name.withSimpleName(updateFields.get(name.getSimpleName()))));
                 }
                 return super.visitImport(anImport, executionContext);
             }
@@ -86,13 +86,14 @@ public class NoEmptyCollectionWithRawType extends Recipe {
                 if (varType != null && varType.getOwner().getFullyQualifiedName().equals("java.util.Collections") &&
                         varType.getName().startsWith("EMPTY_")) {
 
-                    J.Identifier methodId = J.Identifier.build(
+                    J.Identifier methodId = new J.Identifier(
                             Tree.randomId(),
                             Space.EMPTY,
                             Markers.EMPTY,
                             updateFields.get(varType.getName()),
                             null,
-                            null);
+                            null
+                    );
 
                     return new J.MethodInvocation(
                             Tree.randomId(),

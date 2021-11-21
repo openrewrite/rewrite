@@ -149,7 +149,7 @@ public class RemoveUnusedImports extends Recipe {
                             if (methodsAndFields != null) {
                                 methodsAndFields.stream().sorted().forEach(method ->
                                         anImport.imports.add(new JRightPadded<>(elem
-                                                .withQualid(qualid.withName(name.withName(method)))
+                                                .withQualid(qualid.withName(name.withSimpleName(method)))
                                                 .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY))
                                 );
                             }
@@ -157,7 +157,7 @@ public class RemoveUnusedImports extends Recipe {
                             if (staticClasses != null) {
                                 staticClasses.forEach(fqn ->
                                         anImport.imports.add(new JRightPadded<>(elem
-                                                .withQualid(qualid.withName(name.withName(fqn.getClassName().contains(".") ? fqn.getClassName().substring(fqn.getClassName().lastIndexOf(".") + 1) : fqn.getClassName())))
+                                                .withQualid(qualid.withName(name.withSimpleName(fqn.getClassName().contains(".") ? fqn.getClassName().substring(fqn.getClassName().lastIndexOf(".") + 1) : fqn.getClassName())))
                                                 .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY))
                                 );
                             }
@@ -190,7 +190,7 @@ public class RemoveUnusedImports extends Recipe {
                             // add each unfolded import
                             types.stream().map(JavaType.FullyQualified::getClassName).sorted().distinct().forEach(type ->
                                     anImport.imports.add(new JRightPadded<>(elem
-                                            .withQualid(qualid.withName(name.withName(type)))
+                                            .withQualid(qualid.withName(name.withSimpleName(type)))
                                             .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY))
                             );
 

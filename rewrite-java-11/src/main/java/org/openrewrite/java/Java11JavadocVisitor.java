@@ -399,11 +399,12 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     public J.Identifier visitIdentifier(com.sun.source.doctree.IdentifierTree node, List<Javadoc> body) {
         String name = node.getName().toString();
         sourceBefore(name);
-        return J.Identifier.build(
+        return new J.Identifier(
                 randomId(),
                 Space.EMPTY,
                 Markers.EMPTY,
                 name,
+                null,
                 null
         );
     }
@@ -544,7 +545,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
         } else {
             qualifierType = typeMapping.type(enclosingClassType);
             if (source.charAt(cursor) == '#') {
-                qualifier = J.Identifier.build(randomId(), Space.EMPTY, Markers.EMPTY, "", qualifierType);
+                qualifier = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, "", qualifierType, null);
                 cursor++;
             } else {
                 qualifier = null;
@@ -553,11 +554,12 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
         }
 
         if (ref.memberName != null) {
-            J.Identifier name = J.Identifier.build(
+            J.Identifier name = new J.Identifier(
                     randomId(),
                     Space.EMPTY,
                     Markers.EMPTY,
                     ref.memberName.toString(),
+                    null,
                     null
             );
 
@@ -1009,10 +1011,10 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
             cursor += fieldAccess.name.toString().length();
             return new J.FieldAccess(randomId(), fmt, Markers.EMPTY,
                     selected,
-                    JLeftPadded.build(J.Identifier.build(randomId(),
+                    JLeftPadded.build(new J.Identifier(randomId(),
                             Space.EMPTY,
                             Markers.EMPTY,
-                            fieldAccess.name.toString(), null)),
+                            fieldAccess.name.toString(), null, null)),
                     typeMapping.type(node));
         }
 
@@ -1021,7 +1023,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
             String name = node.getName().toString();
             cursor += name.length();
             JavaType type = typeMapping.type(node);
-            return J.Identifier.build(randomId(), fmt, Markers.EMPTY, name, type);
+            return new J.Identifier(randomId(), fmt, Markers.EMPTY, name, type, null);
         }
 
         @Override
@@ -1029,7 +1031,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
             JCTree.JCPrimitiveTypeTree primitiveType = (JCTree.JCPrimitiveTypeTree) node;
             String name = primitiveType.toString();
             cursor += name.length();
-            return J.Identifier.build(randomId(), fmt, Markers.EMPTY, name, typeMapping.primitiveType(primitiveType.typetag));
+            return new J.Identifier(randomId(), fmt, Markers.EMPTY, name, typeMapping.primitiveType(primitiveType.typetag), null);
         }
     }
 }

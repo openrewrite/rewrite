@@ -102,11 +102,12 @@ public class ExplicitLambdaArgumentTypes extends Recipe {
                         ((JavaType.GenericTypeVariable) nv.getType()).getName() : buildName(nv.getType());
                 assert name != null;
                 multiVariable = multiVariable.withTypeExpression(
-                        J.Identifier.build(Tree.randomId(),
+                        new J.Identifier(Tree.randomId(),
                                 Space.EMPTY,
                                 Markers.EMPTY,
                                 name,
-                                nv.getType()
+                                nv.getType(),
+                                null
                         )
                 );
                 getCursor().dropParentUntil(J.Lambda.class::isInstance).putMessage(ADDED_EXPLICIT_TYPE_KEY, true);

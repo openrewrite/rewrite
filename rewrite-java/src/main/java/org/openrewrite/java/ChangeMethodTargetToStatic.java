@@ -23,8 +23,6 @@ import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 
 import java.util.LinkedHashSet;
@@ -120,13 +118,16 @@ public class ChangeMethodTargetToStatic extends Recipe {
                     maybeAddImport(fullyQualifiedTargetTypeName, m.getSimpleName());
                 } else {
                     maybeAddImport(fullyQualifiedTargetTypeName);
-                    m = method.withSelect(J.Identifier.build(randomId(),
-                            method.getSelect() == null ?
-                                    Space.EMPTY :
-                                    method.getSelect().getPrefix(),
-                            Markers.EMPTY,
-                            classType.getClassName(),
-                            classType)
+                    m = method.withSelect(
+                            new J.Identifier(randomId(),
+                                    method.getSelect() == null ?
+                                            Space.EMPTY :
+                                            method.getSelect().getPrefix(),
+                                    Markers.EMPTY,
+                                    classType.getClassName(),
+                                    classType,
+                                    null
+                            )
                     );
                 }
                 m = m.withMethodType(transformedType);

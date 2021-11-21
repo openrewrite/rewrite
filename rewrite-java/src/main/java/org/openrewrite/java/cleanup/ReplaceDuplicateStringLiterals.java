@@ -279,7 +279,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
         public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
             if (literals.contains(literal)) {
                 assert isClass.getType() != null;
-                return J.Identifier.build(
+                return new J.Identifier(
                         Tree.randomId(),
                         literal.getPrefix(),
                         literal.getMarkers(),
