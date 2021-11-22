@@ -150,7 +150,6 @@ public interface JavaType {
 
         @Nullable
         @NonFinal
-        @JsonManagedReference
         List<Variable> members;
 
         public List<Variable> getMembers() {
@@ -161,7 +160,6 @@ public interface JavaType {
         @NonFinal
         List<Method> methods;
 
-        @JsonManagedReference
         public List<Method> getMethods() {
             return methods == null ? emptyList() : methods;
         }
@@ -555,7 +553,6 @@ public interface JavaType {
         long flagsBitMap;
 
         @NonFinal
-        @JsonBackReference
         FullyQualified declaringType;
 
         String name;
@@ -653,7 +650,6 @@ public interface JavaType {
         String name;
 
         @NonFinal
-        @JsonBackReference
         FullyQualified owner;
 
         @NonFinal
