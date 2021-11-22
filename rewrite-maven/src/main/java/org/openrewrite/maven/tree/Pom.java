@@ -20,6 +20,7 @@ import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.openrewrite.NonCyclicSerializable;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -31,10 +32,10 @@ import java.util.stream.Stream;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 
-@JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+@Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class Pom {
+@JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
+public class Pom implements NonCyclicSerializable {
 
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
 
@@ -129,40 +130,6 @@ public class Pom {
     @EqualsAndHashCode.Include
     @Getter
     Map<String, String> propertyOverrides;
-
-    private Pom(
-            @Nullable String groupId,
-            String artifactId,
-            @Nullable String version,
-            @Nullable String datedSnapshotVersion,
-            @Nullable String name,
-            @Nullable String description,
-            @Nullable String packaging,
-            @Nullable String classifier,
-            @Nullable Pom parent,
-            List<Dependency> dependencies,
-            DependencyManagement dependencyManagement,
-            Collection<License> licenses,
-            Collection<MavenRepository> repositories,
-            Map<String, String> properties,
-            Map<String, String> propertyOverrides) {
-
-        this.groupId = groupId;
-        this.artifactId = artifactId;
-        this.version = version;
-        this.datedSnapshotVersion = datedSnapshotVersion;
-        this.name = name;
-        this.description = description;
-        this.packaging = packaging;
-        this.classifier = classifier;
-        this.parent = parent;
-        this.dependencies = dependencies;
-        this.dependencyManagement = dependencyManagement;
-        this.licenses = licenses;
-        this.repositories = repositories;
-        this.properties = properties;
-        this.propertyOverrides = propertyOverrides;
-    }
 
     public Set<Dependency> getDependencies(Scope scope) {
         Set<Dependency> dependenciesForScope = new TreeSet<>(Comparator.comparing(Dependency::getCoordinates));
