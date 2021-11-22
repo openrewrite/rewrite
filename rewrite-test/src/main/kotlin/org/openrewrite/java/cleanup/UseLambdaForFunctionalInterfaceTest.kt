@@ -20,11 +20,11 @@ import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 
-interface UseLambdaForFunctionalInterfaceTest: JavaRecipeTest {
+@Suppress("Convert2Lambda")
+interface UseLambdaForFunctionalInterfaceTest : JavaRecipeTest {
     override val recipe: Recipe
         get() = UseLambdaForFunctionalInterface()
 
-    @Suppress("Convert2Lambda")
     @Test
     fun useLambda(jp: JavaParser) = assertChanged(
         jp,
@@ -43,6 +43,28 @@ interface UseLambdaForFunctionalInterfaceTest: JavaRecipeTest {
             import java.util.function.Function;
             class Test {
                 Function<Integer, Integer> f = n -> n + 1;
+            }
+        """
+    )
+
+    @Test
+    fun useLambdaNoParameters(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import java.util.function.Supplier;
+            class Test {
+                Supplier<Integer> s = new Supplier<Integer>() {
+                    @Override 
+                    public Integer get() {
+                        return 1;
+                    }
+                };
+            }
+        """,
+        after = """
+            import java.util.function.Supplier;
+            class Test {
+                Supplier<Integer> s = () -> 1;
             }
         """
     )
