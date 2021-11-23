@@ -279,7 +279,14 @@ class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
         if (!className.contains(".")) {
             try {
                 int arrInit = className.lastIndexOf("\\[");
-                Class.forName("java.lang." + (arrInit == -1 ? className : className.substring(0, arrInit)), false, TypeVisitor.class.getClassLoader());
+                String beforeArr = arrInit == -1 ? className : className.substring(0, arrInit);
+                if (JavaType.Primitive.fromKeyword(beforeArr) != null) {
+                    if(beforeArr.equals("String")) {
+                        return "java.lang." + className;
+                    }
+                    return className;
+                }
+                Class.forName("java.lang." + beforeArr, false, TypeVisitor.class.getClassLoader());
                 return "java.lang." + className;
             } catch (ClassNotFoundException ignored) {
             }

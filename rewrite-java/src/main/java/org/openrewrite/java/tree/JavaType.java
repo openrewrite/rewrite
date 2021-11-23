@@ -15,9 +15,7 @@
  */
 package org.openrewrite.java.tree;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.AccessLevel;
 import lombok.Value;
@@ -27,6 +25,7 @@ import org.openrewrite.internal.lang.Nullable;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
@@ -368,6 +367,11 @@ public interface JavaType {
         public int hashCode() {
             return Objects.hash(type, typeParameters);
         }
+
+        @Override
+        public String toString() {
+            return "Parameterized{" + getFullyQualifiedName() + "}";
+        }
     }
 
     @Value
@@ -457,11 +461,21 @@ public interface JavaType {
         public int hashCode() {
             return Objects.hash(name, bound == null ? null : bound.getFullyQualifiedName());
         }
+
+        @Override
+        public String toString() {
+            return "GenericTypeVariable{" + name + " extends " + getFullyQualifiedName() + "}";
+        }
     }
 
     @Value
     class Array implements JavaType {
         JavaType elemType;
+
+        @Override
+        public String toString() {
+            return "Array{" + elemType + "}";
+        }
     }
 
     enum Primitive implements JavaType {
@@ -623,7 +637,7 @@ public interface JavaType {
 
         @Override
         public String toString() {
-            return "Method{" + name + "(" + String.join(", ", (paramNames == null ? emptyList() : paramNames)) + ")}";
+            return "Method{" + (declaringType == null ? "<unknown>" : declaringType) + "#" + name + "(" + String.join(", ", (paramNames == null ? emptyList() : paramNames)) + ")}";
         }
 
         @Override
@@ -690,6 +704,11 @@ public interface JavaType {
         @Override
         public int hashCode() {
             return Objects.hash(owner, name);
+        }
+
+        @Override
+        public String toString() {
+            return "Variable{" + (owner == null ? "<unknown>" : owner) + "#" + name + "}";
         }
     }
 }
