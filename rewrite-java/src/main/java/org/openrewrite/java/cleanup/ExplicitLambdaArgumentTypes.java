@@ -110,6 +110,7 @@ public class ExplicitLambdaArgumentTypes extends Recipe {
                                 null
                         )
                 );
+                maybeAddImport(TypeUtils.asFullyQualified(nv.getType()));
                 getCursor().dropParentUntil(J.Lambda.class::isInstance).putMessage(ADDED_EXPLICIT_TYPE_KEY, true);
             }
             return super.visitVariableDeclarations(multiVariable, ctx);
