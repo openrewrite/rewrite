@@ -78,7 +78,7 @@ public class MethodParamPad extends Recipe {
                         )
                 );
             }
-            doAfterVisit(new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, md));
+            md = (J.MethodDeclaration)new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle).visitNonNull(md, ctx);
             return md;
         }
 
@@ -92,7 +92,7 @@ public class MethodParamPad extends Recipe {
                         )
                 );
             }
-            doAfterVisit(new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, mi));
+            mi = (J.MethodInvocation)new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle).visitNonNull(mi, ctx);
             return mi;
         }
 
@@ -106,10 +106,8 @@ public class MethodParamPad extends Recipe {
                         )
                 );
             }
-            doAfterVisit(new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, nc));
+            nc = (J.NewClass)new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle).visitNonNull(nc, ctx);
             return nc;
         }
-
     }
-
 }
