@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,9 @@
  */
 package org.openrewrite.yaml.format
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.yaml.YamlRecipeTest
 import org.openrewrite.yaml.style.YamlDefaultStyles
@@ -68,4 +70,21 @@ class IndentsTest : YamlRecipeTest {
                     age: 7
         """
     )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1135")
+    @Disabled
+    fun maintainIndentSpacingOnMixedTypeSequences() = assertUnchanged(
+        before = """
+            steps:
+              - checkout
+              - run:
+                  name: Install dependencies
+                  command: npm ci
+              - run:
+                  name: Run tests
+                  command: npm run test:ci
+        """
+    )
+
 }
