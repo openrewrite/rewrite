@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,10 @@
  */
 package org.openrewrite.yaml
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.openrewrite.Issue
 import java.nio.file.Path
 
 class DeleteKeyTest : YamlRecipeTest {
@@ -103,6 +105,54 @@ class DeleteKeyTest : YamlRecipeTest {
               - kind: User
                 name: some-user
               - name: monitoring-tools
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1175")
+    @Disabled
+    fun deleteKeyTest() = assertChanged(
+        recipe = DeleteKey("$.jobs.build.strategy.fail-fast", null),
+        before = """
+            on:
+              push:
+                branches:
+                  - main
+                tags-ignore:
+                  - "*"
+              pull_request:
+                branches:
+                  - main
+              workflow_dispatch: {}
+              schedule:
+                - cron: 0 18 * * *
+            jobs:
+              build:
+                strategy:
+                  fail-fast: false
+                  matrix:
+                    java: ["11"]
+                    os: ["ubuntu-latest"]
+        """,
+        after = """
+            on:
+              push:
+                branches:
+                  - main
+                tags-ignore:
+                  - "*"
+              pull_request:
+                branches:
+                  - main
+              workflow_dispatch: {}
+              schedule:
+                - cron: 0 18 * * *
+            jobs:
+              build:
+                strategy:
+                  matrix:
+                    java: ["11"]
+                    os: ["ubuntu-latest"]
         """
     )
 
