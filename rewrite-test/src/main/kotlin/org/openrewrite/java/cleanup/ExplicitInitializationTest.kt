@@ -25,6 +25,30 @@ interface ExplicitInitializationTest: JavaRecipeTest {
         get() = ExplicitInitialization()
 
     @Test
+    fun ignoreInterfaces() = assertUnchanged(
+        before = """
+            interface Test {
+                private int a = 0;
+                default void s() {
+                    int i = 0;
+                }
+            }
+        """
+    )
+
+    @Test
+    fun blockStatement() = assertUnchanged(
+        before = """
+            class Test {
+                void doSomething() {
+                    for (int i=0; i<10; i++) {
+                        System.out.println(i);
+                    }
+                }
+            }
+        """
+    )
+    @Test
     fun removeExplicitInitialization() = assertChanged(
         before = """
             class Test {

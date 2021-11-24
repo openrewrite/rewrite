@@ -36,10 +36,12 @@ public class ExplicitInitializationVisitor<P> extends JavaIsoVisitor<P> {
         J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, p);
 
         Cursor variableDeclsCursor = getCursor().dropParentUntil(J.class::isInstance);
-        if (!(variableDeclsCursor // J.VariableDecls
+        J maybeClassDecl = variableDeclsCursor
                 .dropParentUntil(J.class::isInstance) // maybe J.Block
                 .dropParentUntil(J.class::isInstance) // maybe J.ClassDecl
-                .getValue() instanceof J.ClassDeclaration)) {
+                .getValue();
+        if (!(maybeClassDecl instanceof J.ClassDeclaration)
+                || J.ClassDeclaration.Kind.Type.Class != ((J.ClassDeclaration)maybeClassDecl).getKind()) {
             return v;
         }
 
