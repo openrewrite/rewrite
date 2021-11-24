@@ -4,6 +4,8 @@ We use [Gradle](https://gradle.org/) to build this project.
 The gradle wrapper checked into this project defines the gradle version to use.  
 When building from the command line invoke the wrapper with `./gradlew build` on unix-style terminals and `gradlew build` on windows-style terminals.
 
+NOTE: windows-style users should ensure that they configure `core.autocrlf = false` as Rewrite requires unix-style line endings. This can be done at clone time by using `git clone -c core.autocrlf=false https://github.com/openrewrite/rewrite.git`.
+
 ### CLI Environment Configuration:
 
 * [JDK](https://adoptopenjdk.net/) version: 11
