@@ -100,18 +100,19 @@ public class ExplicitLambdaArgumentTypes extends Recipe {
                 J.VariableDeclarations.NamedVariable nv = multiVariable.getVariables().get(0);
                 String name = nv.getType() instanceof JavaType.GenericTypeVariable ?
                         ((JavaType.GenericTypeVariable) nv.getType()).getName() : buildName(nv.getType());
-                assert name != null;
-                multiVariable = multiVariable.withTypeExpression(
-                        new J.Identifier(Tree.randomId(),
-                                Space.EMPTY,
-                                Markers.EMPTY,
-                                name,
-                                nv.getType(),
-                                null
-                        )
-                );
-                maybeAddImport(TypeUtils.asFullyQualified(nv.getType()));
-                getCursor().dropParentUntil(J.Lambda.class::isInstance).putMessage(ADDED_EXPLICIT_TYPE_KEY, true);
+                if (name != null) {
+                    multiVariable = multiVariable.withTypeExpression(
+                            new J.Identifier(Tree.randomId(),
+                                    Space.EMPTY,
+                                    Markers.EMPTY,
+                                    name,
+                                    nv.getType(),
+                                    null
+                            )
+                    );
+                    maybeAddImport(TypeUtils.asFullyQualified(nv.getType()));
+                    getCursor().dropParentUntil(J.Lambda.class::isInstance).putMessage(ADDED_EXPLICIT_TYPE_KEY, true);
+                }
             }
             return super.visitVariableDeclarations(multiVariable, ctx);
         }
