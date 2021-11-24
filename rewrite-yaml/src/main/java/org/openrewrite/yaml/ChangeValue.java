@@ -70,11 +70,11 @@ public class ChangeValue extends Recipe {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext context) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, context);
-
                 if (matcher.matches(getCursor()) && (!(e.getValue() instanceof Yaml.Scalar) || !((Yaml.Scalar) e.getValue()).getValue().equals(value))) {
                     Yaml.Anchor anchor = (e.getValue() instanceof Yaml.Scalar) ? ((Yaml.Scalar) e.getValue()).getAnchor() : null;
+                    String prefix = e.getValue() instanceof Yaml.Sequence ? ((Yaml.Sequence) e.getValue()).getOpeningBracketPrefix() : e.getValue().getPrefix();
                     e = e.withValue(
-                            new Yaml.Scalar(randomId(), e.getValue().getPrefix(), Markers.EMPTY,
+                            new Yaml.Scalar(randomId(), prefix, Markers.EMPTY,
                                     Yaml.Scalar.Style.PLAIN, anchor, value)
                     );
                 }

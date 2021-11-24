@@ -42,6 +42,27 @@ class ChangeValueTest : YamlRecipeTest {
     )
 
     @Test
+    fun changeSequenceValue() = assertChanged(
+        recipe = ChangeValue(
+            "$.metadata.name",
+            "monitoring",
+            null
+        ),
+        before = """
+            apiVersion: v1
+            metadata:
+              name: [monitoring-tools]
+              namespace: monitoring-tools
+        """,
+        after = """
+            apiVersion: v1
+            metadata:
+              name: monitoring
+              namespace: monitoring-tools
+        """
+    )
+
+    @Test
     fun changeRelativeKey() = assertChanged(
         recipe = ChangeValue(
             ".name",
