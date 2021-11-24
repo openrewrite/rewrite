@@ -160,4 +160,15 @@ class XmlParserTest {
             <p>Hello world!</p>
         """.trimIndent()
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1243")
+    @Test
+    fun processingInstructions() = assertUnchanged(
+        before = """
+            <?xml-stylesheet href="mystyle.css" type="text/css"?>
+            <execution>
+                <?m2e execute onConfiguration,onIncremental?>
+            </execution>
+        """.trimIndent()
+    )
 }

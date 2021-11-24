@@ -138,7 +138,7 @@ public interface Xml extends Tree {
 
         @Nullable
         @With
-        List<ProcessingInstruction> xmlDecls;
+        XmlDecl xmlDecl;
 
         @With
         List<Misc> misc;
@@ -152,7 +152,7 @@ public interface Xml extends Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class ProcessingInstruction implements Xml, Misc {
+    class XmlDecl implements Xml, Misc {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -167,6 +167,37 @@ public interface Xml extends Tree {
 
         @With
         List<Attribute> attributes;
+
+        /**
+         * Space before '&gt;'
+         */
+        @With
+        String beforeTagDelimiterPrefix;
+
+        @Override
+        public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
+            return v.visitXmlDecl(this, p);
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    class ProcessingInstruction implements Xml, Content, Misc {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        String prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        String name;
+
+        @With
+        CharData processingInstructions;
 
         /**
          * Space before '&gt;'

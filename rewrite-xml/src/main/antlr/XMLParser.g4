@@ -36,7 +36,7 @@ document
     ;
 
 prolog
-    :   xmldecl* misc*
+    :   xmldecl? misc*
     ;
 
 xmldecl
@@ -69,11 +69,11 @@ externalid
     ;
 
 processinginstruction
-    :   SPECIAL_OPEN Name attribute* SPECIAL_CLOSE
+    :   SPECIAL_OPEN PI_TEXT SPECIAL_CLOSE
     ;
 
 content
-    :   (element | reference | CDATA | COMMENT | chardata) ;
+    :   (element | reference | processinginstruction | CDATA | COMMENT | chardata) ;
 
 element
     :   OPEN Name attribute* CLOSE content* OPEN '/' Name CLOSE

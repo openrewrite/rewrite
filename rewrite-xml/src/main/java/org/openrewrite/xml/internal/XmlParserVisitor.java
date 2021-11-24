@@ -67,7 +67,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                 randomId(),
                 prefix,
                 Markers.EMPTY,
-                ctx.xmldecl().stream().map(this::visitXmldecl).collect(toList()),
+                visitXmldecl(ctx.xmldecl()),
                 ctx.misc().stream().map(this::visit).map(Misc.class::cast).collect(toList()))
         );
     }
@@ -152,14 +152,14 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     }
 
     @Override
-    public Xml.ProcessingInstruction visitXmldecl(XMLParser.XmldeclContext ctx) {
+    public Xml.XmlDecl visitXmldecl(XMLParser.XmldeclContext ctx) {
         return convert(ctx, (c, prefix) -> {
                     cursor = ctx.SPECIAL_OPEN_XML().getSymbol().getStopIndex() + 1;
                     String name = convert(ctx.SPECIAL_OPEN_XML(), (n, p) -> n.getText()).substring(2);
                     List<Xml.Attribute> attributes = ctx.attribute().stream()
                             .map(this::visitAttribute)
                             .collect(toList());
-                    return new Xml.ProcessingInstruction(
+                    return new Xml.XmlDecl(
                             randomId(),
                             prefix,
                             Markers.EMPTY,
@@ -174,16 +174,16 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     @Override
     public Xml.ProcessingInstruction visitProcessinginstruction(XMLParser.ProcessinginstructionContext ctx) {
         return convert(ctx, (c, prefix) -> {
-                    String name = convert(ctx.Name(), (n, p) -> n.getText());
-                    List<Xml.Attribute> attributes = ctx.attribute().stream()
-                            .map(this::visitAttribute)
-                            .collect(toList());
+                    String name = convert(ctx.SPECIAL_OPEN(), (n, p) -> n.getText()).substring(2);
+
+                    Xml.CharData piText = convert(c.PI_TEXT(), (cdata, p) ->
+                                    charData(cdata.getText(), false));
                     return new Xml.ProcessingInstruction(
                             randomId(),
                             prefix,
                             Markers.EMPTY,
                             name,
-                            attributes,
+                            piText,
                             prefix(ctx.getStop())
                     );
                 }

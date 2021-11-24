@@ -40,6 +40,17 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public Xml visitXmlDecl(Xml.XmlDecl xmlDecl, PrintOutputCapture<P> p) {
+        visitMarkers(xmlDecl.getMarkers(), p);
+        p.out.append("<?")
+                .append(xmlDecl.getName());
+        visit(xmlDecl.getAttributes(), p);
+        p.out.append(xmlDecl.getBeforeTagDelimiterPrefix())
+                .append("?>");
+        return xmlDecl;
+    }
+
+    @Override
     public Xml visitTag(Xml.Tag tag, PrintOutputCapture<P> p) {
         p.out.append(tag.getPrefix());
         visitMarkers(tag.getMarkers(), p);
@@ -100,7 +111,7 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
         visitMarkers(pi.getMarkers(), p);
         p.out.append("<?")
                 .append(pi.getName());
-        visit(pi.getAttributes(), p);
+        visit(pi.getProcessingInstructions(), p);
         p.out.append(pi.getBeforeTagDelimiterPrefix())
                 .append("?>");
         return pi;

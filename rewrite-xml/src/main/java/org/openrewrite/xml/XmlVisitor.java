@@ -40,8 +40,13 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
         return d.withMarkers(visitMarkers(d.getMarkers(), p));
     }
 
+    public Xml visitXmlDecl(Xml.XmlDecl xmlDecl, P p) {
+        xmlDecl = xmlDecl.withAttributes(ListUtils.map(xmlDecl.getAttributes(), a -> visitAndCast(a, p)));
+        return xmlDecl.withMarkers(visitMarkers(xmlDecl.getMarkers(), p));
+    }
+
     public Xml visitProcessingInstruction(Xml.ProcessingInstruction pi, P p) {
-        pi = pi.withAttributes(ListUtils.map(pi.getAttributes(), a -> visitAndCast(a, p)));
+        pi = pi.withProcessingInstructions(visitAndCast(pi.getProcessingInstructions(), p));
         return pi.withMarkers(visitMarkers(pi.getMarkers(), p));
     }
 
@@ -76,7 +81,7 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
 
     public Xml visitProlog(Xml.Prolog prolog, P p) {
         Xml.Prolog pl = prolog;
-        pl = pl.withXmlDecls(ListUtils.map(pl.getXmlDecls(), d -> visitAndCast(d, p)));
+        pl = pl.withXmlDecl(visitAndCast(prolog.getXmlDecl(), p));
         pl = pl.withMisc(ListUtils.map(pl.getMisc(), m -> visitAndCast(m, p)));
         return pl.withMarkers(visitMarkers(pl.getMarkers(), p));
     }
