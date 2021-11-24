@@ -125,28 +125,4 @@ interface ChangeMethodTargetToStaticTest : JavaRecipeTest {
             }
         """
     )
-
-    @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
-    @Test
-    fun checkValidation() {
-        var recipe = ChangeMethodTargetToStatic(null, null, null, null)
-        var valid = recipe.validate()
-        assertThat(valid.isValid).isFalse()
-        assertThat(valid.failures()).hasSize(2)
-        assertThat(valid.failures()[0].property).isEqualTo("fullyQualifiedTargetTypeName")
-        assertThat(valid.failures()[1].property).isEqualTo("methodPattern")
-
-        recipe = ChangeMethodTargetToStatic(null, "java.lang.String", null, null)
-        valid = recipe.validate()
-        assertThat(valid.isValid).isFalse()
-        assertThat(valid.failures()).hasSize(1)
-        assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
-
-        recipe = ChangeMethodTargetToStatic("java.lang.String emptyString(..)", null, null, null)
-        valid = recipe.validate()
-        assertThat(valid.isValid).isFalse()
-        assertThat(valid.failures()).hasSize(1)
-        assertThat(valid.failures()[0].property).isEqualTo("fullyQualifiedTargetTypeName")
-    }
-
 }

@@ -21,13 +21,11 @@ import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.java.JavaExecutionContextView
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.cache.ClasspathJavaTypeCache
-import org.openrewrite.java.cache.JavaTypeCache
-import org.openrewrite.java.cache.JvmTypeCache
+import org.openrewrite.java.cache.*
 
 interface FindInheritedFieldsTest {
     val typeCache: JavaTypeCache
-        get() = JvmTypeCache.fromJavaVersion(ClasspathJavaTypeCache())
+        get() = SimpleJavaTypeCache()
 
     val executionContext: ExecutionContext
         get() {

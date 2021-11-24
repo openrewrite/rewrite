@@ -17,20 +17,18 @@ package org.openrewrite.java.cache;
 
 import org.openrewrite.java.tree.JavaType;
 
-import java.nio.file.Path;
-import java.util.List;
 import java.util.function.Supplier;
 
 public interface JavaTypeCache {
     void clear();
 
-    JavaType.Class computeClass(Path classpathElement, String fullyQualifiedName, Supplier<JavaType.Class> fq);
+    JavaType.Class computeClass(String fullyQualifiedName, Supplier<JavaType.Class> fq);
 
-    JavaType.GenericTypeVariable computeGeneric(Path classpathElement, String name, String fullyQualifiedName, Supplier<JavaType.GenericTypeVariable> g);
+    JavaType.GenericTypeVariable computeGeneric(String name, String fullyQualifiedName, Supplier<JavaType.GenericTypeVariable> g);
 
-    JavaType.Method computeMethod(Path classpathElement, String fullyQualifiedName, String method, String resolvedReturnType, String resolvedArgumentTypeSignatures, Supplier<JavaType.Method> m);
+    JavaType.Method computeMethod(String fullyQualifiedName, String methodName, String resolvedReturnType, String resolvedArgumentTypeSignatures, Supplier<JavaType.Method> m);
 
-    JavaType.Parameterized computeParameterized(Path classpathElement, String fullyQualifiedName, String typeVariableSignatures, Supplier<JavaType.Parameterized> m);
+    JavaType.Parameterized computeParameterized(String fullyQualifiedName, String typeVariableSignatures, Supplier<JavaType.Parameterized> m);
 
-    JavaType.Variable computeVariable(Path classpathElement, String fullyQualifiedName, String variable, Supplier<JavaType.Variable> v);
+    JavaType.Variable computeVariable(String fullyQualifiedName, String variableName, Supplier<JavaType.Variable> v);
 }

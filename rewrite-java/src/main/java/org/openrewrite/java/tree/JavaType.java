@@ -25,7 +25,6 @@ import org.openrewrite.internal.lang.Nullable;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
@@ -98,6 +97,11 @@ public interface JavaType {
                         return takeWhile.get();
                     })
                     .collect(joining("."));
+        }
+
+        public boolean isAssignableTo(String fullyQualifiedName) {
+            return getFullyQualifiedName().equals(fullyQualifiedName) ||
+                    getInterfaces().stream().anyMatch(anInterface -> anInterface.isAssignableTo(fullyQualifiedName));
         }
 
         public boolean isAssignableFrom(@Nullable FullyQualified clazz) {
@@ -267,7 +271,6 @@ public interface JavaType {
         FullyQualified type;
 
         @NonFinal
-        @Nullable
         List<JavaType> typeParameters;
 
         /**

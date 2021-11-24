@@ -34,6 +34,7 @@ import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.cache.SimpleJavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -237,18 +238,21 @@ public class Java11Parser implements JavaParser {
                 .filter(Objects::nonNull)
                 .collect(toList());
 
-        JavaSourceSet sourceSet = getSourceSet(ctx);
-        Set<JavaType.FullyQualified> classpath = sourceSet.getClasspath();
-        for (J.CompilationUnit cu : mappedCus) {
-            for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
-                if(type instanceof JavaType.FullyQualified) {
-                    classpath.add((JavaType.FullyQualified) type);
+        if(!ctxView.isSkipSourceSetMarker()) {
+            JavaSourceSet sourceSet = getSourceSet(ctx);
+            Set<JavaType.FullyQualified> classpath = sourceSet.getClasspath();
+            for (J.CompilationUnit cu : mappedCus) {
+                for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
+                    if (type instanceof JavaType.FullyQualified) {
+                        classpath.add((JavaType.FullyQualified) type);
+                    }
                 }
             }
+            sourceSetProvenance = sourceSet.withClasspath(classpath);
+            return ListUtils.map(mappedCus, cu -> cu.withMarkers(cu.getMarkers().add(sourceSetProvenance)));
         }
 
-        sourceSetProvenance = sourceSet.withClasspath(classpath);
-        return ListUtils.map(mappedCus, cu -> cu.withMarkers(cu.getMarkers().add(sourceSetProvenance)));
+        return mappedCus;
     }
 
     @Override
@@ -283,11 +287,13 @@ public class Java11Parser implements JavaParser {
 
     private void compileDependencies() {
         if (dependsOn != null) {
-            parseInputs(dependsOn, null, new InMemoryExecutionContext());
+            InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+            parseInputs(dependsOn, null, new JavaExecutionContextView(ctx)
+                    .setTypeCache(new SimpleJavaTypeCache())
+                    .setSkipSourceSetMarker(true));
         }
         Modules.instance(context).newRound();
     }
-
 
     /**
      * Initialize modules

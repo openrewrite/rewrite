@@ -23,8 +23,7 @@ import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.java.JavaExecutionContextView;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.RandomizeIdVisitor;
-import org.openrewrite.java.cache.ClasspathJavaTypeCache;
-import org.openrewrite.java.cache.JvmTypeCache;
+import org.openrewrite.java.cache.SimpleJavaTypeCache;
 import org.openrewrite.java.tree.*;
 
 import java.util.*;
@@ -170,7 +169,7 @@ public class JavaTemplateParser {
     public J.MethodInvocation parseMethod(Cursor cursor, String template, Space.Location location) {
         J.MethodInvocation method = cursor.getValue();
         String methodWithReplacedNameAndArgs;
-        if(method.getSelect() == null) {
+        if (method.getSelect() == null) {
             methodWithReplacedNameAndArgs = template + ";";
         } else {
             methodWithReplacedNameAndArgs = method.getSelect().print(cursor) + "." + template + ";";
@@ -241,8 +240,9 @@ public class JavaTemplateParser {
     }
 
     private JavaSourceFile compileTemplate(@Language("java") String stub) {
-        JavaExecutionContextView ctxView = new JavaExecutionContextView(new InMemoryExecutionContext());
-        ctxView.setTypeCache(JvmTypeCache.fromJavaVersion(new ClasspathJavaTypeCache()));
+        JavaExecutionContextView ctxView = new JavaExecutionContextView(new InMemoryExecutionContext())
+                .setTypeCache(new SimpleJavaTypeCache())
+                .setSkipSourceSetMarker(true);
         return stub.contains("@SubAnnotation") ?
                 parser.get().reset().parse(ctxView, stub, SUBSTITUTED_ANNOTATION).get(0) :
                 parser.get().reset().parse(ctxView, stub).get(0);
@@ -253,7 +253,7 @@ public class JavaTemplateParser {
         List<J2> js;
         synchronized (templateCacheLock) {
             js = (List<J2>) templateCache.get(stub);
-            if(js == null) {
+            if (js == null) {
                 js = (List<J2>) ifAbsent.get();
                 templateCache.put(stub, js);
             }

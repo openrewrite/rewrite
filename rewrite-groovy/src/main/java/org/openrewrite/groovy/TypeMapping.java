@@ -28,7 +28,6 @@ import org.openrewrite.java.tree.TypeUtils;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Parameter;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
@@ -57,7 +56,6 @@ class TypeMapping {
         }
 
         return typeCache.computeMethod(
-                Paths.get("dontknow"),
                 node.getDeclaringClass().getName(),
                 node.getName(),
                 node.getReturnType().getName(),
@@ -137,7 +135,6 @@ class TypeMapping {
         AtomicBoolean newlyCreated = new AtomicBoolean(false);
 
         JavaType.Parameterized parameterized = typeCache.computeParameterized(
-                Paths.get("dontknow"),
                 clazz.getName(),
                 genericSignatures.toString(),
                 () -> {
@@ -185,7 +182,7 @@ class TypeMapping {
 
         AtomicBoolean newlyCreated = new AtomicBoolean(false);
 
-        JavaType.Class mappedClazz = typeCache.computeClass(Paths.get("dontknow"), clazz.getName(), () -> {
+        JavaType.Class mappedClazz = typeCache.computeClass(clazz.getName(), () -> {
             JavaType.Class.Kind kind;
             if ((clazz.getModifiers() & KIND_BITMASK_ENUM) != 0) {
                 kind = JavaType.Class.Kind.Enum;
@@ -244,7 +241,6 @@ class TypeMapping {
 
     private JavaType.Variable field(Field field, Map<String, JavaType.Class> stack) {
         return typeCache.computeVariable(
-                Paths.get("dontknow"),
                 field.getDeclaringClass().getName(),
                 field.getName(),
                 () -> new JavaType.Variable(
@@ -268,7 +264,6 @@ class TypeMapping {
         }
 
         return typeCache.computeMethod(
-                Paths.get("dontknow"),
                 method.getDeclaringClass().getName(),
                 method.getName(),
                 method.getReturnType().getName(),

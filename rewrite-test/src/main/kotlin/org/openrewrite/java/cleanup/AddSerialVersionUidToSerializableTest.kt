@@ -15,11 +15,13 @@
  */
 package org.openrewrite.java.cleanup
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 
+@Disabled
 interface AddSerialVersionUidToSerializableTest : JavaRecipeTest {
     override val recipe: Recipe?
         get() = AddSerialVersionUidToSerializable()
@@ -168,5 +170,4 @@ interface AddSerialVersionUidToSerializableTest : JavaRecipeTest {
             }
         """.trimIndent()
     )
-
 }

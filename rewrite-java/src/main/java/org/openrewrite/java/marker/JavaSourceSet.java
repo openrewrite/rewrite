@@ -22,7 +22,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaExecutionContextView;
 import org.openrewrite.java.tree.Flag;
@@ -35,6 +34,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
+import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -73,7 +73,7 @@ public class JavaSourceSet implements Marker {
         }
 
         fqns.addAll(jvmClasses(ctx));
-        return new JavaSourceSet(Tree.randomId(), sourceSetName, fqns);
+        return new JavaSourceSet(randomId(), sourceSetName, fqns);
     }
 
     private static Collection<JavaType.FullyQualified> jvmClasses(ExecutionContext ctx) {
@@ -136,7 +136,6 @@ public class JavaSourceSet implements Marker {
             AtomicBoolean newlyCreated = new AtomicBoolean(false);
 
             JavaType.Class clazz = ctx.getTypeCache().computeClass(
-                    getClasspathElement(aClass),
                     aClass.getName(),
                     () -> {
                         newlyCreated.set(true);
@@ -215,7 +214,6 @@ public class JavaSourceSet implements Marker {
 
         private JavaType.Variable variableType(FieldInfo fieldInfo, Map<String, JavaType.Class> stack) {
             return ctx.getTypeCache().computeVariable(
-                    getClasspathElement(fieldInfo.getClassInfo()),
                     fieldInfo.getClassName(),
                     fieldInfo.getName(),
                     () -> {

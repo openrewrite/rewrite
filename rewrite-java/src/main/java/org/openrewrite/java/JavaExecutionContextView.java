@@ -17,24 +17,33 @@ package org.openrewrite.java;
 
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.java.cache.ClasspathJavaTypeCache;
 import org.openrewrite.java.cache.JavaTypeCache;
-import org.openrewrite.java.cache.JvmTypeCache;
+import org.openrewrite.java.cache.SimpleJavaTypeCache;
 
 public class JavaExecutionContextView extends DelegatingExecutionContext {
-    private static final JavaTypeCache GLOBAL_TYPE_CACHE = JvmTypeCache.fromJavaVersion(new ClasspathJavaTypeCache());
-
     private static final String TYPE_CACHE = "org.openrewrite.java.typeCache";
+    private static final String SKIP_SOURCE_SET_MARKER = "org.openrewrite.java.skipSourceSetMarker";
 
     public JavaExecutionContextView(ExecutionContext delegate) {
         super(delegate);
     }
 
-    public void setTypeCache(JavaTypeCache typeCache) {
+    public JavaExecutionContextView setTypeCache(JavaTypeCache typeCache) {
         putMessage(TYPE_CACHE, typeCache);
+        return this;
     }
 
     public JavaTypeCache getTypeCache() {
-        return getMessage(TYPE_CACHE, GLOBAL_TYPE_CACHE);
+        return getMessage(TYPE_CACHE, new SimpleJavaTypeCache());
+    }
+
+    public JavaExecutionContextView setSkipSourceSetMarker(boolean skip) {
+        putMessage(SKIP_SOURCE_SET_MARKER, skip);
+        return this;
+    }
+
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
+    public boolean isSkipSourceSetMarker() {
+        return getMessage(SKIP_SOURCE_SET_MARKER, false);
     }
 }

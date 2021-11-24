@@ -20,8 +20,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.cache.ClasspathJavaTypeCache;
-import org.openrewrite.java.cache.JvmTypeCache;
+import org.openrewrite.java.cache.SimpleJavaTypeCache;
 import org.openrewrite.java.tree.J;
 
 import java.util.Arrays;
@@ -33,8 +32,9 @@ import static org.assertj.core.api.Assertions.fail;
 public interface JavaTreeTest {
     default ExecutionContext getExecutionContext() {
         ExecutionContext ctx = new InMemoryExecutionContext(t -> fail("Failed to parse", t));
-        new JavaExecutionContextView(ctx).setTypeCache(JvmTypeCache.fromJavaVersion(new ClasspathJavaTypeCache()));
-        return ctx;
+        return new JavaExecutionContextView(ctx)
+                .setTypeCache(new SimpleJavaTypeCache())
+                .setSkipSourceSetMarker(true);
     }
 
     @BeforeEach

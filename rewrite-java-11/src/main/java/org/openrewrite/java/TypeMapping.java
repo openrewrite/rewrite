@@ -32,8 +32,7 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
+import static java.util.Collections.*;
 
 @RequiredArgsConstructor
 public class TypeMapping {
@@ -49,7 +48,7 @@ public class TypeMapping {
     }
 
     @Nullable
-    public JavaType type(@Nullable com.sun.tools.javac.code.Type type, Map<String, JavaType.Class> stack) {
+    private JavaType type(@Nullable com.sun.tools.javac.code.Type type, Map<String, JavaType.Class> stack) {
         if (type instanceof Type.ClassType) {
             if (type instanceof com.sun.tools.javac.code.Type.ErrorType) {
                 return null;
@@ -72,7 +71,6 @@ public class TypeMapping {
                 AtomicBoolean newlyCreated = new AtomicBoolean(false);
 
                 JavaType.Class clazz = typeCache.computeClass(
-                        getClasspathElement(sym),
                         sym.className(), () -> {
                             newlyCreated.set(true);
 
@@ -103,7 +101,7 @@ public class TypeMapping {
                                     sym.flags_field,
                                     sym.className(),
                                     kind,
-                                    null, null,null, null, null, null
+                                    null, null, null, null, null, null
                             );
                         });
 
@@ -140,14 +138,14 @@ public class TypeMapping {
                                 if (fields == null) {
                                     fields = new ArrayList<>();
                                 }
-                                fields.add(variableType(elem, stackWithSym));
+                                fields.add(variableType(elem, stackWithSym, clazz));
                             } else if (elem instanceof Symbol.MethodSymbol &&
                                     (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
                                             Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
                                 if (methods == null) {
                                     methods = new ArrayList<>();
                                 }
-                                methods.add(methodType(elem.type, elem, elem.getSimpleName().toString(), stackWithSym));
+                                methods.add(methodType(elem.type, elem, elem.getSimpleName().toString(), stackWithSym, clazz));
                             }
                         }
                     }
@@ -167,7 +165,7 @@ public class TypeMapping {
                     if (!sym.getDeclarationAttributes().isEmpty()) {
                         annotations = new ArrayList<>(sym.getDeclarationAttributes().size());
                         for (Attribute.Compound a : sym.getDeclarationAttributes()) {
-                            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(a.type, stack));
+                            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(a.type, stackWithSym));
                             if (fq != null) {
                                 annotations.add(fq);
                             }
@@ -189,7 +187,7 @@ public class TypeMapping {
                     }
 
                     newlyCreated.set(false);
-                    JavaType.Parameterized parameterized = typeCache.computeParameterized(getClasspathElement(sym), sym.className(),
+                    JavaType.Parameterized parameterized = typeCache.computeParameterized(sym.className(),
                             shallowGenericTypeVariables.toString(), () -> {
                                 newlyCreated.set(true);
                                 return new JavaType.Parameterized(null, null);
@@ -212,7 +210,6 @@ public class TypeMapping {
             }
         } else if (type instanceof Type.TypeVar) {
             return typeCache.computeGeneric(
-                    classfile(type.getUpperBound()),
                     type.tsym.name.toString(),
                     signature(type.getUpperBound()),
                     () -> new JavaType.GenericTypeVariable(type.tsym.name.toString(),
@@ -233,7 +230,7 @@ public class TypeMapping {
             // <? super T>        --> GenericTypeVariable
             Type.WildcardType wildcard = (Type.WildcardType) type;
             if (wildcard.kind == BoundKind.UNBOUND) {
-                return JavaType.Class.build("java.lang.Object");
+                return typeCache.computeClass("java.lang.Class", () -> JavaType.Class.build("java.lang.Object"));
             } else {
                 return type(wildcard.type, stack);
             }
@@ -283,14 +280,23 @@ public class TypeMapping {
 
     @Nullable
     public JavaType.Variable variableType(@Nullable Symbol symbol, Map<String, JavaType.Class> stack) {
+        return variableType(symbol, stack, null);
+    }
+
+    @Nullable
+    private JavaType.Variable variableType(@Nullable Symbol symbol, Map<String, JavaType.Class> stack,
+                                           @Nullable JavaType.FullyQualified owner) {
         if (!(symbol instanceof Symbol.VarSymbol) || symbol.owner instanceof Symbol.MethodSymbol) {
             return null;
         }
 
-        return typeCache.computeVariable(classfile(symbol.owner.type), signature(symbol.owner.type), symbol.name.toString(),
+        return typeCache.computeVariable(signature(symbol.owner.type), symbol.name.toString(),
                 () -> {
-                    JavaType.FullyQualified owner = TypeUtils.asFullyQualified(type(symbol.owner.type, stack));
+                    JavaType.FullyQualified resolvedOwner = owner;
                     if (owner == null) {
+                        resolvedOwner = TypeUtils.asFullyQualified(type(symbol.owner.type, stack));
+                    }
+                    if (resolvedOwner == null) {
                         return null;
                     }
 
@@ -308,7 +314,7 @@ public class TypeMapping {
                     return new JavaType.Variable(
                             symbol.flags_field,
                             symbol.name.toString(),
-                            owner,
+                            resolvedOwner,
                             type(symbol.type, stack),
                             annotations
                     );
@@ -318,6 +324,13 @@ public class TypeMapping {
     @Nullable
     public JavaType.Method methodType(@Nullable com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol,
                                       String methodName, Map<String, JavaType.Class> stack) {
+        return methodType(selectType, symbol, methodName, stack, null);
+    }
+
+    @Nullable
+    private JavaType.Method methodType(@Nullable com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol,
+                                       String methodName, Map<String, JavaType.Class> stack,
+                                       @Nullable JavaType.FullyQualified declaringType) {
         // if the symbol is not a method symbol, there is a parser error in play
         Symbol.MethodSymbol methodSymbol = symbol instanceof Symbol.MethodSymbol ? (Symbol.MethodSymbol) symbol : null;
 
@@ -334,12 +347,12 @@ public class TypeMapping {
                 }
             } else if (selectType instanceof Type.ForAll) {
                 Type.ForAll fa = (Type.ForAll) selectType;
-                if (!fa.argtypes(false).isEmpty()) {
-                    argumentTypeSignatures.add(fa.argtypes(false));
-                }
+                return methodType(fa.qtype, symbol, methodName, stack, declaringType);
             }
 
-            return typeCache.computeMethod(classfile(symbol.owner.type), signature(symbol.owner.type), methodName, signature(selectType.getReturnType()),
+            return typeCache.computeMethod(signature(symbol.owner.type),
+                    methodName,
+                    signature(selectType.getReturnType()),
                     argumentTypeSignatures.toString(), () -> {
                         List<String> paramNames = null;
                         if (!methodSymbol.params().isEmpty()) {
@@ -362,7 +375,7 @@ public class TypeMapping {
                                 for (com.sun.tools.javac.code.Type exceptionType : methodType.thrown) {
                                     JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(exceptionType, stack));
                                     if (javaType == null) {
-                                        // if the type cannot be resolved to a class (it might not be on the classpath or it might have
+                                        // if the type cannot be resolved to a class (it might not be on the classpath, or it might have
                                         // been mapped to cyclic)
                                         if (exceptionType instanceof Type.ClassType) {
                                             Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
@@ -378,14 +391,16 @@ public class TypeMapping {
                             }
                         }
 
-                        JavaType.FullyQualified declaringType = null;
-                        if (methodSymbol.owner instanceof Symbol.ClassSymbol || methodSymbol.owner instanceof Symbol.TypeVariableSymbol) {
-                            declaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner.type, stack));
-                        } else if (methodSymbol.owner instanceof Symbol.VarSymbol) {
-                            declaringType = new JavaType.GenericTypeVariable(methodSymbol.owner.name.toString(), null);
+                        JavaType.FullyQualified resolvedDeclaringType = declaringType;
+                        if (declaringType == null) {
+                            if (methodSymbol.owner instanceof Symbol.ClassSymbol || methodSymbol.owner instanceof Symbol.TypeVariableSymbol) {
+                                resolvedDeclaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner.type, stack));
+                            } else if (methodSymbol.owner instanceof Symbol.VarSymbol) {
+                                resolvedDeclaringType = new JavaType.GenericTypeVariable(methodSymbol.owner.name.toString(), null);
+                            }
                         }
 
-                        if (declaringType == null) {
+                        if (resolvedDeclaringType == null) {
                             return null;
                         }
 
@@ -402,7 +417,7 @@ public class TypeMapping {
 
                         return new JavaType.Method(
                                 methodSymbol.flags_field,
-                                declaringType,
+                                resolvedDeclaringType,
                                 methodName,
                                 paramNames,
                                 methodSignature(genericSignatureType, stack),
@@ -435,6 +450,7 @@ public class TypeMapping {
                     }
                 }
             }
+
             return new JavaType.Method.Signature(type(mt.restype, stack), paramTypes);
         }
         return null;

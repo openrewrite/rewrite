@@ -36,14 +36,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class AddSerialVersionUidToSerializable extends Recipe {
 
-    private static final JavaType.Class SERIALIZABLE_FQ =  JavaType.Class.build("java.io.Serializable");
-    private static final JavaType.Class COLLECTION_FQ =  JavaType.Class.build("java.util.Collection");
-    private static final JavaType.Class MAP_FQ =  JavaType.Class.build("java.util.Map");
-    private static final JavaType.Class THROWABLE_FQ = JavaType.Class.build("java.lang.Throwable");
-
     @Override
     public String getDisplayName() {
-        return "Add `SerialVersionUID` to a Serializable class when it's missing.";
+        return "Add `serialVersionUID` to a `Serializable` class when missing";
     }
 
     @Override
@@ -61,7 +56,7 @@ public class AddSerialVersionUidToSerializable extends Recipe {
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
-            JavaTemplate template = JavaTemplate.builder(this::getCursor, "private static final long serialVersionUID = 1").build();
+            final JavaTemplate template = JavaTemplate.builder(this::getCursor, "private static final long serialVersionUID = 1").build();
 
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
@@ -117,7 +112,7 @@ public class AddSerialVersionUidToSerializable extends Recipe {
             return implementsSerializable(((JavaType.Array) type).getElemType());
         } else if (type instanceof JavaType.Parameterized) {
             JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
-            if (COLLECTION_FQ.isAssignableFrom(parameterized) || MAP_FQ.isAssignableFrom(parameterized)) {
+            if (parameterized.isAssignableTo("java.util.Collection") || parameterized.isAssignableTo("java.util.Map")) {
                 //If the type is either a collection or a map, make sure the type parameters are serializable. We
                 //force all type parameters to be checked to correctly scoop up all non-serializable candidates.
                 boolean typeParametersSerializable = true;
@@ -130,8 +125,8 @@ public class AddSerialVersionUidToSerializable extends Recipe {
         } else if (type instanceof JavaType.FullyQualified) {
             JavaType.FullyQualified fq = (JavaType.FullyQualified) type;
             if (fq.getKind() != JavaType.Class.Kind.Interface &&
-                    !THROWABLE_FQ.isAssignableFrom(fq)) {
-                return SERIALIZABLE_FQ.isAssignableFrom(fq);
+                    !fq.isAssignableTo("java.lang.Throwable")) {
+                return !fq.isAssignableTo("java.io.Serializable");
             }
         }
         return false;

@@ -17,8 +17,10 @@ package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
+import org.openrewrite.java.JavaExecutionContextView
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 
@@ -26,6 +28,14 @@ import org.openrewrite.java.JavaRecipeTest
 interface UnnecessaryExplicitTypeArgumentsTest : JavaRecipeTest {
     override val recipe: Recipe?
         get() = UnnecessaryExplicitTypeArguments()
+
+    override val executionContext: ExecutionContext
+        get() {
+            val ctx = JavaExecutionContextView(super.executionContext)
+            ctx.typeCache = typeCache
+            ctx.isSkipSourceSetMarker = false
+            return ctx
+        }
 
     @Test
     fun unnecessaryExplicitTypeArguments(jp: JavaParser) = assertChanged(
