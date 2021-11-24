@@ -21,13 +21,8 @@ import org.junit.jupiter.params.provider.ValueSource
 class ChangeDependencyVersionTest : GradleRecipeTest {
     @ParameterizedTest
     @ValueSource(strings = ["org.openrewrite:rewrite-core", "*:*"])
-    fun findDependency(ga: String) = assertChanged(
-        recipe = ChangeDependencyVersion(
-            ga.substringBefore(':'),
-            ga.substringAfter(':'),
-            "latest.integration",
-            null
-        ),
+    fun findDependency(gav: String) = assertChanged(
+        recipe = ChangeDependencyVersion(gav, "latest.integration", null),
         before = """
             dependencies {
                 api 'org.openrewrite:rewrite-core:latest.release'
@@ -44,13 +39,8 @@ class ChangeDependencyVersionTest : GradleRecipeTest {
 
     @ParameterizedTest
     @ValueSource(strings = ["org.openrewrite:rewrite-core", "*:*"])
-    fun findMapStyleDependency(ga: String) = assertChanged(
-        recipe = ChangeDependencyVersion(
-            ga.substringBefore(':'),
-            ga.substringAfter(':'),
-            "latest.integration",
-            null
-        ),
+    fun findMapStyleDependency(gav: String) = assertChanged(
+        recipe = ChangeDependencyVersion(gav, "latest.integration", null),
         before = """
             dependencies {
                 api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'

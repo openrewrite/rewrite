@@ -130,11 +130,11 @@ public class ChangeDependencyArtifactId extends Recipe {
                         if ("group".equals(keyValue)) {
                             groupId = valueValue;
                         } else if ("name".equals(keyValue) && !newArtifactId.equals(valueValue)) {
-                            artifactEntry = arg;
-                            artifactId = valueValue;
                             if (value.getValueSource() != null) {
                                 versionStringDelimiter = value.getValueSource().substring(0, value.getValueSource().indexOf(valueValue));
                             }
+                            artifactEntry = arg;
+                            artifactId = valueValue;
                         } else if("version".equals(keyValue)) {
                             version = valueValue;
                         }
