@@ -41,9 +41,10 @@ CharRef           :  '&#' DIGIT+ ';'
 
 SEA_WS            :  (' '|'\t'|'\r'? '\n')+       -> skip ;
 
-SPECIAL_OPEN_XML  :  ('<?xml-stylesheet'|'<?xml') -> pushMode(INSIDE) ;
+SPECIAL_OPEN_XML  :  '<?xml' S                    -> pushMode(INSIDE) ;
 OPEN              :  '<'                          -> pushMode(INSIDE) ;
-SPECIAL_OPEN      :  '<?'                         -> pushMode(INSIDE) ;
+
+SPECIAL_OPEN      :  '<?'Name                     -> pushMode(INSIDE_PROCESS_INSTRUCTION) ;
 
 DTD_OPEN          :  '<!'                         -> pushMode(INSIDE_DTD) ;
 
@@ -86,7 +87,15 @@ mode INSIDE_MARKUP_SUBSET;
 MARKUP_SUBSET  :  ']' -> popMode ;
 TXT            :  .   -> more ;  // Collect all of the markup subset text.
 
-// ----------------- Everything INSIDE of a tag ---------------------
+// INSIDE of a Processing instruction ---------------------
+mode INSIDE_PROCESS_INSTRUCTION;
+
+PI_SPECIAL_CLOSE  :  SPECIAL_CLOSE        -> type(SPECIAL_CLOSE), popMode ; // close <?Name...?>
+PI_S              :  S                    -> skip ;
+
+PI_TEXT           : ~[?>]+ ;  // match any 16 bit char other than ? and >
+
+// INSIDE of a tag ----------------------------------------
 mode INSIDE;
 
 CLOSE          :  '>'                     -> popMode ;
