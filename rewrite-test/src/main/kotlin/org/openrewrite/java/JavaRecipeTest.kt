@@ -21,10 +21,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
-import org.openrewrite.java.cache.DeepEqualityJavaTypeCache
 import org.openrewrite.java.cache.JavaTypeCache
 import org.openrewrite.java.cache.SimpleJavaTypeCache
-import org.openrewrite.java.cache.SourceSetJavaTypeCache
 import org.openrewrite.java.tree.J
 import java.io.File
 import java.nio.file.Path
