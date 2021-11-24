@@ -32,10 +32,7 @@ import java.lang.ref.WeakReference;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Set;
-import java.util.Stack;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
@@ -60,6 +57,12 @@ public class Result {
     @Getter
     @Nullable
     private final Duration timeSavings;
+
+    @Nullable
+    private transient WeakReference<String> diff;
+
+    @Nullable
+    private Path relativeTo;
 
     @Deprecated
     public Set<Recipe> getRecipesThatMadeChanges() {
@@ -94,6 +97,21 @@ public class Result {
      * @return Git-style patch diff representing the changes to this compilation unit.
      */
     public String diff(@Nullable Path relativeTo) {
+        String d;
+        if (this.diff == null) {
+            d = computeDiff(relativeTo);
+            this.diff = new WeakReference<>(d);
+        } else {
+            d = this.diff.get();
+            if (d == null || !Objects.equals(this.relativeTo, relativeTo)) {
+                d = computeDiff(relativeTo);
+                this.diff = new WeakReference<>(d);
+            }
+        }
+        return d;
+    }
+
+    private String computeDiff(@Nullable Path relativeTo) {
         Path sourcePath;
         if (after != null) {
             sourcePath = after.getSourcePath();
@@ -116,6 +134,7 @@ public class Result {
                 after == null ? "" : after.printAll(),
                 recipes.stream().map(Stack::peek).collect(Collectors.toSet())
         )) {
+            this.relativeTo = relativeTo;
             return diffEntry.getDiff();
         }
     }
