@@ -25,7 +25,7 @@ import org.openrewrite.java.cache.*
 
 interface FindInheritedFieldsTest {
     val typeCache: JavaTypeCache
-        get() = SimpleJavaTypeCache()
+        get() = DelegatingJavaTypeCache()
 
     val executionContext: ExecutionContext
         get() {

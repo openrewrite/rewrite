@@ -18,13 +18,13 @@ package org.openrewrite.java;
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.cache.JavaTypeCache;
-import org.openrewrite.java.cache.SimpleJavaTypeCache;
+import org.openrewrite.java.cache.DelegatingJavaTypeCache;
 
 public class JavaExecutionContextView extends DelegatingExecutionContext {
     private static final String TYPE_CACHE = "org.openrewrite.java.typeCache";
     private static final String SKIP_SOURCE_SET_MARKER = "org.openrewrite.java.skipSourceSetMarker";
 
-    private final JavaTypeCache DEFAULT_TYPE_CACHE = new SimpleJavaTypeCache();
+    private final JavaTypeCache DEFAULT_TYPE_CACHE = new DelegatingJavaTypeCache();
 
     public JavaExecutionContextView(ExecutionContext delegate) {
         super(delegate);

@@ -21,7 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.cache.SimpleJavaTypeCache;
+import org.openrewrite.java.cache.DelegatingJavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.style.NamedStyles;
@@ -150,7 +150,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     @Override
     default List<J.CompilationUnit> parse(@Language("java") String... sources) {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-        return parse(new JavaExecutionContextView(ctx).setTypeCache(new SimpleJavaTypeCache()), sources);
+        return parse(new JavaExecutionContextView(ctx).setTypeCache(new DelegatingJavaTypeCache()), sources);
     }
 
     @Override

@@ -33,7 +33,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.cache.SimpleJavaTypeCache;
+import org.openrewrite.java.cache.DelegatingJavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -265,7 +265,7 @@ class ReloadableJava8Parser implements JavaParser {
         if (dependsOn != null) {
             InMemoryExecutionContext ctx = new InMemoryExecutionContext();
             parseInputs(dependsOn, null, new JavaExecutionContextView(ctx)
-                    .setTypeCache(new SimpleJavaTypeCache())
+                    .setTypeCache(new DelegatingJavaTypeCache())
                     .setSkipSourceSetMarker(true));
         }
         Check.instance(context).compiled.clear();

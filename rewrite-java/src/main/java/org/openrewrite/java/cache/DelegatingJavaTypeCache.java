@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.cache;
 
-import lombok.RequiredArgsConstructor;
 import org.openrewrite.java.tree.JavaType;
 
 import java.util.HashMap;
@@ -23,16 +22,25 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 /**
- * Bypasses deep equality checking for types when we know we are in the same source set as previous cache checks
+ * Bypasses delegate for types when we know we are in the same source set as previous cache checks
  * because there is presumed to only be one type definition per fully-qualified class name.
  */
-@RequiredArgsConstructor
-public class SimpleJavaTypeCache implements JavaTypeCache {
+public class DelegatingJavaTypeCache implements JavaTypeCache {
     private final Map<String, JavaType.Class> classCache = new HashMap<>();
     private final Map<String, Map<String, JavaType.GenericTypeVariable>> genericCache = new HashMap<>();
     private final Map<String, Map<String, Map<String, Map<String, JavaType.Method>>>> methodCache = new HashMap<>();
     private final Map<String, Map<String, JavaType.Variable>> variableCache = new HashMap<>();
     private final Map<String, Map<String, JavaType.Parameterized>> parameterizedCache = new HashMap<>();
+
+    private final JavaTypeCache delegate;
+
+    public DelegatingJavaTypeCache() {
+        this(new NoopJavaTypeCache());
+    }
+
+    public DelegatingJavaTypeCache(JavaTypeCache delegate) {
+        this.delegate = delegate;
+    }
 
     @Override
     public void clear() {
@@ -43,7 +51,7 @@ public class SimpleJavaTypeCache implements JavaTypeCache {
 
     @Override
     public JavaType.Class computeClass(String fullyQualifiedName, Supplier<JavaType.Class> fq) {
-        return classCache.computeIfAbsent(fullyQualifiedName, n -> fq.get());
+        return classCache.computeIfAbsent(fullyQualifiedName, n -> delegate.computeClass(fullyQualifiedName, fq));
     }
 
     @Override
@@ -54,7 +62,7 @@ public class SimpleJavaTypeCache implements JavaTypeCache {
         if(genericTypeVariable != null) {
             return genericTypeVariable;
         }
-        genericTypeVariable = g.get();
+        genericTypeVariable = delegate.computeGeneric(name, fullyQualifiedName, g);
         byFqn.put(fullyQualifiedName, genericTypeVariable);
         return genericTypeVariable;
     }
@@ -70,7 +78,7 @@ public class SimpleJavaTypeCache implements JavaTypeCache {
         if(method != null) {
             return method;
         }
-        method = m.get();
+        method = delegate.computeMethod(fullyQualifiedName, methodName, resolvedReturnType, resolvedArgumentTypeSignatures, m);
         byArgSignatures.put(resolvedArgumentTypeSignatures, m.get());
         return method;
     }
@@ -84,7 +92,7 @@ public class SimpleJavaTypeCache implements JavaTypeCache {
         if(parameterized != null) {
             return parameterized;
         }
-        parameterized = p.get();
+        parameterized = delegate.computeParameterized(fullyQualifiedName, typeVariableSignatures, p);
         byVariable.put(typeVariableSignatures, parameterized);
         return parameterized;
     }
@@ -98,7 +106,7 @@ public class SimpleJavaTypeCache implements JavaTypeCache {
         if(variable != null) {
             return variable;
         }
-        variable = v.get();
+        variable = delegate.computeVariable(fullyQualifiedName, variableName, v);
         byVariable.put(variableName, variable);
         return variable;
     }

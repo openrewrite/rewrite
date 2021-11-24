@@ -28,7 +28,7 @@ public interface JavaTypeCache {
 
     JavaType.Method computeMethod(String fullyQualifiedName, String methodName, String resolvedReturnType, String resolvedArgumentTypeSignatures, Supplier<JavaType.Method> m);
 
-    JavaType.Parameterized computeParameterized(String fullyQualifiedName, String typeVariableSignatures, Supplier<JavaType.Parameterized> m);
+    JavaType.Parameterized computeParameterized(String fullyQualifiedName, String typeVariableSignatures, Supplier<JavaType.Parameterized> p);
 
     JavaType.Variable computeVariable(String fullyQualifiedName, String variableName, Supplier<JavaType.Variable> v);
 }

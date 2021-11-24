@@ -22,14 +22,14 @@ import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.java.cache.JavaTypeCache
-import org.openrewrite.java.cache.SimpleJavaTypeCache
+import org.openrewrite.java.cache.DelegatingJavaTypeCache
 import org.openrewrite.java.tree.J
 import java.io.File
 import java.nio.file.Path
 
 interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
     val typeCache: JavaTypeCache
-        get() = SimpleJavaTypeCache()
+        get() = DelegatingJavaTypeCache(delegate)
 
     override val parser: JavaParser
         get() = JavaParser.fromJavaVersion().build()

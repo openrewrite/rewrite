@@ -34,7 +34,7 @@ import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.cache.SimpleJavaTypeCache;
+import org.openrewrite.java.cache.DelegatingJavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -289,7 +289,7 @@ public class Java11Parser implements JavaParser {
         if (dependsOn != null) {
             InMemoryExecutionContext ctx = new InMemoryExecutionContext();
             parseInputs(dependsOn, null, new JavaExecutionContextView(ctx)
-                    .setTypeCache(new SimpleJavaTypeCache())
+                    .setTypeCache(new DelegatingJavaTypeCache())
                     .setSkipSourceSetMarker(true));
         }
         Modules.instance(context).newRound();
