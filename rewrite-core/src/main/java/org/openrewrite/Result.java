@@ -61,9 +61,6 @@ public class Result {
     @Nullable
     private final Duration timeSavings;
 
-    @Nullable
-    private transient WeakReference<String> diff;
-
     @Deprecated
     public Set<Recipe> getRecipesThatMadeChanges() {
         return recipes.stream().map(Stack::peek).collect(Collectors.toSet());
@@ -97,21 +94,6 @@ public class Result {
      * @return Git-style patch diff representing the changes to this compilation unit.
      */
     public String diff(@Nullable Path relativeTo) {
-        String d;
-        if (this.diff == null) {
-            d = computeDiff(relativeTo);
-            this.diff = new WeakReference<>(d);
-        } else {
-            d = this.diff.get();
-            if (d == null) {
-                d = computeDiff(relativeTo);
-                this.diff = new WeakReference<>(d);
-            }
-        }
-        return d;
-    }
-
-    private String computeDiff(@Nullable Path relativeTo) {
         Path sourcePath;
         if (after != null) {
             sourcePath = after.getSourcePath();
