@@ -29,7 +29,7 @@ import java.nio.file.Path
 
 interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
     val typeCache: JavaTypeCache
-        get() = DelegatingJavaTypeCache(delegate)
+        get() = DelegatingJavaTypeCache()
 
     override val parser: JavaParser
         get() = JavaParser.fromJavaVersion().build()
