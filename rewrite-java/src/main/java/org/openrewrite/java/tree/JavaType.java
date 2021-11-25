@@ -283,8 +283,7 @@ public interface JavaType {
 
         @Override
         public String getFullyQualifiedName() {
-            assert type != null;
-            return type.getFullyQualifiedName();
+            return type == null ? "" : type.getFullyQualifiedName();
         }
 
         @Override
