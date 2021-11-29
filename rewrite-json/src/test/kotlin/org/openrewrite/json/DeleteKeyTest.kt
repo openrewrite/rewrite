@@ -15,7 +15,9 @@
  */
 package org.openrewrite.json
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 
 class DeleteKeyTest : JsonRecipeTest {
     @Test
@@ -63,4 +65,27 @@ class DeleteKeyTest : JsonRecipeTest {
             }
         """
     )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1175")
+    @Disabled
+    fun deleteNestedKeyRemovingUnusedKeysRecursively() = assertChanged(
+        recipe = DeleteKey("$.b.c.d", null),
+        before = """
+            {
+              "a": "a-value",
+              "b": {
+                "c": {
+                  "d": "d-value"
+                }
+              }
+            }
+        """,
+        after = """
+            {
+              "a": "a-value"
+            }
+        """
+    )
+
 }
