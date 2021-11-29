@@ -110,8 +110,23 @@ class DeleteKeyTest : YamlRecipeTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1175")
+    fun deleteNestedKeyRemovingUnusedKeysRecursively() = assertChanged(
+        recipe = DeleteKey("$.b.c.d", null),
+        before = """
+            a: a-value
+            b:
+              c:
+                d: d-value
+        """,
+        after = """
+            a: a-value
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1175")
     @Disabled
-    fun deleteKeyTest() = assertChanged(
+    fun deleteKeyKeepingUnrelatedUnusedKeys() = assertChanged(
         recipe = DeleteKey("$.jobs.build.strategy.fail-fast", null),
         before = """
             on:
