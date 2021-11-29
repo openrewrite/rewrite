@@ -23,7 +23,6 @@ import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.marker.BuildTool;
-import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.tree.Maven;
@@ -95,7 +94,6 @@ public class MavenProjectParser {
      * @return A list of source files that have been parsed from the root folder
      */
     public List<SourceFile> parse(Path projectDirectory) {
-        GitProvenance gitProvenance = GitProvenance.fromProjectDirectory(projectDirectory);
         List<Maven> mavens = mavenParser.parse(Maven.getMavenPoms(projectDirectory, ctx), projectDirectory, ctx);
         mavens = sort(mavens);
 
@@ -128,7 +126,7 @@ public class MavenProjectParser {
             parseResources(maven.getTestResources(projectDirectory, ctx), projectDirectory, sourceFiles, projectProvenance, javaParser.getSourceSet(ctx));
         }
 
-        return gitProvenance == null ? sourceFiles : ListUtils.map(sourceFiles, s -> s.withMarkers(s.getMarkers().addIfAbsent(gitProvenance)));
+        return sourceFiles;
     }
 
     private List<Marker> getJavaProvenance(Maven maven, Path projectDirectory) {
