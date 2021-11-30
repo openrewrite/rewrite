@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
@@ -91,9 +90,8 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
         """
     )
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1251")
-    @Disabled
+    @Test
     fun leaveImportIfAnnotationOnEnum(jp: JavaParser) = assertUnchanged(
         jp,
         dependsOn = arrayOf("""

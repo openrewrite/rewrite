@@ -518,6 +518,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
         e = e.withName(visitAndCast(e.getName(), p));
         e = e.withInitializer(visitAndCast(e.getInitializer(), p));
+        e = e.withAnnotations(ListUtils.map(e.getAnnotations(), a -> visitAndCast(a, p)));
         return e;
     }
 
