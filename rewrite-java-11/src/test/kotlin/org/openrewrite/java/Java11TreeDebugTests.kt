@@ -49,6 +49,10 @@ class Java11AssignmentTest: Java11Test, AssignmentTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11BinaryTest: Java11Test, BinaryTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11BlockTest: Java11Test, BlockTest
 
 @DebugOnly

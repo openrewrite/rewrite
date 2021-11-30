@@ -45,6 +45,10 @@ class Java8AssignmentTest: Java8Test, AssignmentTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8BinaryTest: Java8Test, BinaryTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8BlockTest: Java8Test, BlockTest
 
 @DebugOnly

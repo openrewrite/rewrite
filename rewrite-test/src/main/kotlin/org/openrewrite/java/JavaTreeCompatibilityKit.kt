@@ -47,6 +47,9 @@ abstract class JavaTreeCompatibilityKit {
     inner class AssignmentTck : AssignmentTest
 
     @Nested
+    inner class BinaryTck: BinaryTest
+
+    @Nested
     inner class BlockTck : BlockTest
 
     @Nested
