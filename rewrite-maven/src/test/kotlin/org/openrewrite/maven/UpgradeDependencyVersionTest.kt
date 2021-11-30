@@ -842,4 +842,48 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
             </project>
         """
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1248")
+    @Test
+    fun updateWithExactVersionRange() = assertChanged(
+        recipe = UpgradeDependencyVersion(
+            "junit",
+            "junit",
+            "4.13",
+            null,
+            false
+        ),
+        before = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+            
+              <dependencies>
+                <dependency>
+                  <groupId>junit</groupId>
+                  <artifactId>junit</artifactId>
+                  <version>[4.11]</version>
+                </dependency>
+              </dependencies>
+            </project>
+        """.trimIndent(),
+        after = """            
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+            
+              <dependencies>
+                <dependency>
+                  <groupId>junit</groupId>
+                  <artifactId>junit</artifactId>
+                  <version>4.13</version>
+                </dependency>
+              </dependencies>
+            </project>
+        """.trimIndent()
+    )
 }
