@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/tyler.vangorder/work/rewrite/rewrite-maven/src/main/antlr/VersionRangeParser.g4 by ANTLR 4.9.2
 package org.openrewrite.maven.internal.grammar;
+// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-maven/src/main/antlr/VersionRangeParser.g4 by ANTLR 4.9.2
 
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ErrorNode;
@@ -62,6 +62,18 @@ public class VersionRangeParserBaseListener implements VersionRangeParserListene
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitBounds(VersionRangeParser.BoundsContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterExactly(VersionRangeParser.ExactlyContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitExactly(VersionRangeParser.ExactlyContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/tyler.vangorder/work/rewrite/rewrite-maven/src/main/antlr/VersionRangeParser.g4 by ANTLR 4.9.2
 package org.openrewrite.maven.internal.grammar;
+// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-maven/src/main/antlr/VersionRangeParser.g4 by ANTLR 4.9.2
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 
 /**
@@ -43,6 +43,12 @@ public interface VersionRangeParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitBounds(VersionRangeParser.BoundsContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link VersionRangeParser#exactly}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitExactly(VersionRangeParser.ExactlyContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link VersionRangeParser#boundedLower}.
 	 * @param ctx the parse tree

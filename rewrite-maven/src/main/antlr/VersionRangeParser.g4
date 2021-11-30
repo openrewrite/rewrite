@@ -12,6 +12,11 @@ range
 bounds
     : boundedLower
     | unboundedLower
+    | exactly
+    ;
+
+exactly
+    : Version
     ;
 
 boundedLower

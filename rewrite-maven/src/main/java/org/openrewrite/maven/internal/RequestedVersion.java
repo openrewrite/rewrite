@@ -86,9 +86,12 @@ public class RequestedVersion {
                                     Iterator<TerminalNode> versionIter = range.bounds().boundedLower().Version().iterator();
                                     lower = toVersion(versionIter.next());
                                     upper = versionIter.hasNext() ? toVersion(versionIter.next()) : null;
-                                } else {
+                                } else if (range.bounds().unboundedLower() != null) {
                                     lower = null;
                                     upper = toVersion(range.bounds().unboundedLower().Version());
+                                } else {
+                                    lower = toVersion(range.bounds().exactly().Version());
+                                    upper = toVersion(range.bounds().exactly().Version());
                                 }
                                 return new Range(
                                         range.CLOSED_RANGE_OPEN() != null, lower,

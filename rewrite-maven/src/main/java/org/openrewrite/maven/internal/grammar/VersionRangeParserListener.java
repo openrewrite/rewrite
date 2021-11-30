@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/tyler.vangorder/work/rewrite/rewrite-maven/src/main/antlr/VersionRangeParser.g4 by ANTLR 4.9.2
 package org.openrewrite.maven.internal.grammar;
+// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-maven/src/main/antlr/VersionRangeParser.g4 by ANTLR 4.9.2
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
 /**
@@ -52,6 +52,16 @@ public interface VersionRangeParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitBounds(VersionRangeParser.BoundsContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link VersionRangeParser#exactly}.
+	 * @param ctx the parse tree
+	 */
+	void enterExactly(VersionRangeParser.ExactlyContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link VersionRangeParser#exactly}.
+	 * @param ctx the parse tree
+	 */
+	void exitExactly(VersionRangeParser.ExactlyContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link VersionRangeParser#boundedLower}.
 	 * @param ctx the parse tree
