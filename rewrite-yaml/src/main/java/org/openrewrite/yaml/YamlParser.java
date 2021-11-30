@@ -27,10 +27,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
-import org.yaml.snakeyaml.events.AliasEvent;
-import org.yaml.snakeyaml.events.DocumentEndEvent;
-import org.yaml.snakeyaml.events.Event;
-import org.yaml.snakeyaml.events.ScalarEvent;
+import org.yaml.snakeyaml.events.*;
 import org.yaml.snakeyaml.parser.Parser;
 import org.yaml.snakeyaml.parser.ParserImpl;
 import org.yaml.snakeyaml.reader.StreamReader;
@@ -148,7 +145,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                                 randomId(),
                                 fmt,
                                 Markers.EMPTY,
-                                event.getEndMark().getIndex() - event.getStartMark().getIndex() > 0,
+                                ((DocumentStartEvent) event).getExplicit(),
                                 new Yaml.Mapping(randomId(), Markers.EMPTY, emptyList()),
                                 null
                         );
@@ -228,7 +225,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                             lastEnd = event.getEndMark().getIndex() + commaIndex + 1;
                             sequenceBuilder.push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, anchor, scalarValue), commaPrefix);
 
-                        } else if (builder != null){
+                        } else if (builder != null) {
                             builder.push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, anchor, scalarValue));
                             lastEnd = event.getEndMark().getIndex();
                         }
