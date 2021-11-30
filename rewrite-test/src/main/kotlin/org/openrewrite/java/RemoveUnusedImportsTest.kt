@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
@@ -86,6 +87,37 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
             import java.util.List;
             class A {
                List<Integer> list;
+            }
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1251")
+    @Disabled
+    fun leaveImportIfAnnotationOnEnum(jp: JavaParser) = assertUnchanged(
+        jp,
+        dependsOn = arrayOf("""
+            package com.google.gson.annotations;
+            
+            import java.lang.annotation.Documented;
+            import java.lang.annotation.ElementType;
+            import java.lang.annotation.Retention;
+            import java.lang.annotation.RetentionPolicy;
+            import java.lang.annotation.Target;
+
+            @Documented
+            @Retention(RetentionPolicy.RUNTIME)
+            @Target({ElementType.FIELD, ElementType.METHOD})
+            public @interface SerializedName {
+                String value();
+            }
+        """),
+        before = """
+            import com.google.gson.annotations.SerializedName;
+            
+            public enum PKIState {
+                @SerializedName("active") ACTIVE,
+                @SerializedName("dismissed") DISMISSED
             }
         """
     )
