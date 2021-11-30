@@ -13,27 +13,37 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.groovy.tree;
+package org.openrewrite.gradle.tree;
 
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.J;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public interface GroovyTreeTest {
+public interface GradleTreeTest {
     default void assertParsePrintAndProcess(@Language("groovy") String code) {
-        G.CompilationUnit cu = GroovyParser.builder().build().parse(
+        String trimmed = StringUtils.trimIndent(code);
+        G.CompilationUnit cu = new GradleParser(GroovyParser.builder().logCompilationWarningsAndErrors(true)).parse(
                 new InMemoryExecutionContext(t -> {
                     throw new RuntimeException(t.getMessage(), t);
                 }),
-                StringUtils.trimIndent(code)
+                trimmed
         ).iterator().next();
 
         J processed = new GroovyVisitor<>().visit(cu, new Object());
-        assertThat(processed).as("Parsing is idempotent").isSameAs(cu);
+        assertThat(processed).as("Processing is idempotent").isSameAs(cu);
+
+        assertThat(cu.printAll()).as("Prints back to the original code").isEqualTo(trimmed);
+
+        //noinspection ConstantConditions
+        G.CompilationUnit missingTypes = (G.CompilationUnit) new FindMissingTypes().getVisitor().visitNonNull(cu, null);
+        assertThat(missingTypes.printAll()).as("All functions should have type attribution").isEqualTo(cu.printAll());
     }
 }

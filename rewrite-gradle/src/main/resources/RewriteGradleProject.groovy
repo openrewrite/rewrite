@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+//file:noinspection UnstableApiUsage
 import org.gradle.*
 import org.gradle.api.*
 import org.gradle.api.artifacts.*
@@ -202,13 +203,13 @@ interface DependencyHandlerSpec extends DependencyHandler {
 }
 
 interface RepositoryHandlerSpec extends RepositoryHandler {
-    MavenArtifactRepository maven(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=MavenArtifactRepository) Closure closure)
+    MavenArtifactRepository maven(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=MavenArtifactRepositorySpec) Closure closure)
     IvyArtifactRepository ivy(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=IvyArtifactRepository) Closure closure)
 }
 
-//interface TaskContainerSpec extends TaskContainer {
-//    public <T extends Task> DomainObjectCollection withType(Class<T> type, @DelegatesTo(strategy=Closure.DELEGATE_FIRST, genericTypeIndex=0) Closure<T> closure)
-//}
+interface MavenArtifactRepositorySpec extends MavenArtifactRepository {
+    void url(Object url)
+}
 
 abstract class RewriteGradleProject implements Project {
     Map ext;

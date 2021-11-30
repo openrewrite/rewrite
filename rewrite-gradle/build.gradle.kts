@@ -24,6 +24,7 @@ dependencies {
     compileOnly("org.gradle:gradle-messaging:latest.release")
     compileOnly("org.gradle:gradle-native:latest.release")
     compileOnly("org.gradle:gradle-process-services:latest.release")
+    compileOnly("org.gradle:gradle-resources:latest.release")
 
     implementation("com.squareup.okhttp3:okhttp:latest.release")
 
@@ -44,6 +45,7 @@ dependencies {
     testRuntimeOnly("org.gradle:gradle-messaging:latest.release")
     testRuntimeOnly("org.gradle:gradle-native:latest.release")
     testRuntimeOnly("org.gradle:gradle-process-services:latest.release")
+    testRuntimeOnly("org.gradle:gradle-resources:latest.release")
 }
 
 tasks.withType<ShadowJar> {

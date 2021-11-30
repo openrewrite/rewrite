@@ -41,16 +41,15 @@ public class FindMissingTypes extends Recipe {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                 JavaType.Method type = method.getMethodType();
-                Expression select = method.getSelect();
-                if(select != null) {
-                    if (type == null) {
-                        return method.withSelect(select.withMarkers(select.getMarkers().searchResult( "type is `null`")));
-                    } else if (type.getGenericSignature() == null) {
-                        return method.withSelect(select.withMarkers(select.getMarkers().searchResult("generic signature is `null`")));
-                    } else if (!type.getName().equals(method.getSimpleName())) {
-                        return method.withSelect(select.withMarkers(select.getMarkers().searchResult("type information has a different method name '" + type.getName() + "'")));
-                    }
+
+                if (type == null) {
+                    return method.withMarkers(method.getMarkers().searchResult("type is 'null'"));
+                } else if (type.getGenericSignature() == null) {
+                    return method.withMarkers(method.getMarkers().searchResult("generic signature is `null`"));
+                } else if (!type.getName().equals(method.getSimpleName())) {
+                    return method.withMarkers(method.getMarkers().searchResult("type information has a different method name '" + type.getName() + "'"));
                 }
+
                 return super.visitMethodInvocation(method, executionContext);
             }
         };
