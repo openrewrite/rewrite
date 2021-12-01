@@ -65,4 +65,20 @@ class ClassDeclarationTest : GroovyTreeTest {
             interface B extends A , C {}
         """
     )
+
+    @Test
+    fun transitiveInterfaces() = assertParsePrintAndProcess(
+        """
+        interface A {}
+        interface B extends A {}
+        interface C extends B {}
+        """
+    )
+
+    @Test
+    fun annotation() = assertParsePrintAndProcess(
+        """
+            @interface A{}
+        """
+    )
 }

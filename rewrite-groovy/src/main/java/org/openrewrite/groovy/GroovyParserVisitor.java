@@ -168,6 +168,9 @@ public class GroovyParserVisitor {
             } else if (source.startsWith("interface", cursor)) {
                 kindType = J.ClassDeclaration.Kind.Type.Interface;
                 cursor += "interface".length();
+            } else if (source.startsWith("@interface", cursor)) {
+                kindType = J.ClassDeclaration.Kind.Type.Annotation;
+                cursor += "@interface".length();
             }
             assert kindType != null;
             J.ClassDeclaration.Kind kind = new J.ClassDeclaration.Kind(randomId(), kindPrefix, Markers.EMPTY, emptyList(), kindType);
@@ -182,7 +185,7 @@ public class GroovyParserVisitor {
             JContainer<TypeTree> implementings = null;
             if (clazz.getInterfaces().length > 0) {
                 Space implPrefix;
-                if (kindType == J.ClassDeclaration.Kind.Type.Interface) {
+                if (kindType == J.ClassDeclaration.Kind.Type.Interface || kindType == J.ClassDeclaration.Kind.Type.Annotation) {
                     implPrefix = sourceBefore("extends");
                 } else {
                     implPrefix = sourceBefore("implements");
@@ -191,6 +194,10 @@ public class GroovyParserVisitor {
                 ClassNode[] interfaces = clazz.getInterfaces();
                 for (int i = 0; i < interfaces.length; i++) {
                     ClassNode anInterface = interfaces[i];
+                    // Any @annotation interface is listed as extending java.lang.annotation.Annotation, although it doesn't appear in source
+                    if(kindType == J.ClassDeclaration.Kind.Type.Annotation && "java.lang.annotation.Annotation".equals(anInterface.getName())) {
+                        continue;
+                    }
                     implTypes.add(JRightPadded.build(visitTypeTree(anInterface))
                             .withAfter(i == interfaces.length - 1 ? EMPTY : sourceBefore(",")));
                 }
