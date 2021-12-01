@@ -25,11 +25,10 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static java.util.Spliterators.spliteratorUnknownSize;
-import static java.util.stream.Collectors.toList;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;
 
@@ -97,7 +96,9 @@ public class ChangePropertyKey extends Recipe {
         @Override
         public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, P p) {
             Yaml.Mapping.Entry e = super.visitMappingEntry(entry, p);
-
+            if (getCursor().firstEnclosing(Yaml.Sequence.class) != null) {
+                return e;
+            }
             Deque<Yaml.Mapping.Entry> propertyEntries = getCursor().getPathAsStream()
                     .filter(Yaml.Mapping.Entry.class::isInstance)
                     .map(Yaml.Mapping.Entry.class::cast)
@@ -115,16 +116,18 @@ public class ChangePropertyKey extends Recipe {
                     String value = propertyEntry.getKey().getValue();
 
                     if (!propertyToTest.startsWith(value) || (propertyToTest.startsWith(value) && !propertyEntriesLeftToRight.hasNext())) {
-                        doAfterVisit(new InsertSubpropertyVisitor<>(
-                                propertyEntry,
-                                propertyToTest,
-                                entry.getValue()
-                        ));
-                        doAfterVisit(new DeletePropertyVisitor<>(entry));
-                        maybeCoalesceProperties();
+                        //noinspection ConstantConditions
+                        if(!mappingEntryExists(getCursor().firstEnclosing(Yaml.Document.class), propertyEntry, propertyToTest, p)) {
+                            doAfterVisit(new InsertSubpropertyVisitor<>(
+                                    propertyEntry,
+                                    propertyToTest,
+                                    entry.getValue()
+                            ));
+                            doAfterVisit(new DeletePropertyVisitor<>(entry));
+                            maybeCoalesceProperties();
+                        }
                         break;
                     }
-
                     propertyToTest = propertyToTest.substring(value.length() + 1);
                 }
             }
@@ -132,6 +135,22 @@ public class ChangePropertyKey extends Recipe {
             return e;
         }
 
+        private boolean mappingEntryExists(Yaml.Mapping.Document document, Yaml.Mapping.Entry entry, String property, P p) {
+            AtomicBoolean exists = new AtomicBoolean(false);
+            new YamlIsoVisitor<P>() {
+                @Override
+                public Yaml.Mapping visitMapping(Yaml.Mapping mapping, P p) {
+                    Yaml.Mapping m = super.visitMapping(mapping, p);
+                    if (m.getEntries().contains(entry)) {
+                        m.getEntries().stream()
+                                .filter(me -> !(me.getValue() instanceof Yaml.Scalar) && property.startsWith(me.getKey().getValue()))
+                                .findFirst().ifPresent(existingNonScalarEntry -> exists.set(true));
+                    }
+                    return m;
+                }
+            }.visitDocument(document, p);
+            return exists.get();
+        }
     }
 
     private static class InsertSubpropertyVisitor<P> extends YamlIsoVisitor<P> {
@@ -148,26 +167,20 @@ public class ChangePropertyKey extends Recipe {
         @Override
         public Yaml.Mapping visitMapping(Yaml.Mapping mapping, P p) {
             Yaml.Mapping m = super.visitMapping(mapping, p);
-
             if (m.getEntries().contains(scope)) {
                 String newEntryPrefix = scope.getPrefix();
                 if (newEntryPrefix.isEmpty()) {
                     newEntryPrefix = "\n";
                 }
-
-                m = m.withEntries(Stream.concat(
-                        m.getEntries().stream(),
-                        Stream.of(
-                                new Yaml.Mapping.Entry(randomId(),
-                                        newEntryPrefix,
-                                        Markers.EMPTY,
-                                        new Yaml.Scalar(randomId(), "", Markers.EMPTY,
-                                                Yaml.Scalar.Style.PLAIN, null, subproperty),
-                                        scope.getBeforeMappingValueIndicator(),
-                                        value.copyPaste()
-                                )
-                        )
-                ).collect(toList()));
+                m = m.withEntries(ListUtils.concat(m.getEntries(),
+                        new Yaml.Mapping.Entry(randomId(),
+                                newEntryPrefix,
+                                Markers.EMPTY,
+                                new Yaml.Scalar(randomId(), "", Markers.EMPTY,
+                                        Yaml.Scalar.Style.PLAIN, null, subproperty),
+                                scope.getBeforeMappingValueIndicator(),
+                                value.copyPaste())
+                ));
             }
 
             return m;

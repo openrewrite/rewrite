@@ -155,6 +155,64 @@ class ChangePropertyKeyTest : YamlRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1249")
+    @Test
+    fun doesNotMergeToSibling() = assertUnchanged(
+        recipe = ChangePropertyKey(
+            "i",
+            "a.b.c",
+            false,
+            null
+        ),
+        before = """
+            a:
+              b:
+                f0: v0
+                f1: v1
+            i:
+              f0: v0
+              f1: v1
+        """
+    )
+
+    @Test
+    fun doesNotMergeToSiblingWithCoalescedProperty() = assertUnchanged(
+        recipe = ChangePropertyKey(
+            "ii",
+            "a.b.c",
+            false,
+            null
+        ),
+        before = """
+            a.b:
+                c:
+                  f0: v0
+                  f1: v1
+            ii:
+              f0: v0
+              f1: v1
+        """
+    )
+
+    @Test
+    fun doesNotChangeKeyWhithSequenceInPath() = assertUnchanged(
+        recipe = ChangePropertyKey(
+            "a.b.c.a0",
+            "a.b.a0",
+            true,
+            null
+        ),
+        before = """
+            a:
+              b:
+                c:
+                  - a0: x
+                    a1: 'y'
+                  - aa1: x
+                    a1: 'y'
+        """
+    )
+
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
