@@ -29,6 +29,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public interface GradleTreeTest {
     default void assertParsePrintAndProcess(@Language("groovy") String code) {
+        assertParsePrintAndProcess(code, true);
+    }
+
+    default void assertParsePrintAndProcess(@Language("groovy") String code, boolean validateTypes) {
         String trimmed = StringUtils.trimIndent(code);
         G.CompilationUnit cu = new GradleParser(GroovyParser.builder().logCompilationWarningsAndErrors(true)).parse(
                 new InMemoryExecutionContext(t -> {
@@ -42,8 +46,10 @@ public interface GradleTreeTest {
 
         assertThat(cu.printAll()).as("Prints back to the original code").isEqualTo(trimmed);
 
-        //noinspection ConstantConditions
-        G.CompilationUnit missingTypes = (G.CompilationUnit) new FindMissingTypes().getVisitor().visitNonNull(cu, null);
-        assertThat(missingTypes.printAll()).as("All functions should have type attribution").isEqualTo(cu.printAll());
+        if(validateTypes) {
+            //noinspection ConstantConditions
+            G.CompilationUnit missingTypes = (G.CompilationUnit) new FindMissingTypes().getVisitor().visitNonNull(cu, null);
+            assertThat(missingTypes.printAll()).as("All functions should have type attribution").isEqualTo(cu.printAll());
+        }
     }
 }

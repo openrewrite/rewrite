@@ -17,14 +17,20 @@ dependencies {
     runtimeOnly("org.codehaus.groovy:groovy-ant:latest.release")
 
     compileOnly("org.gradle:gradle-base-services:latest.release")
+    compileOnly("org.gradle:gradle-core:latest.release")
     compileOnly("org.gradle:gradle-core-api:latest.release")
+    compileOnly("org.gradle:gradle-file-collections:latest.release")
+    compileOnly("org.gradle:gradle-jvm-services:latest.release")
     compileOnly("org.gradle:gradle-language-groovy:latest.release")
     compileOnly("org.gradle:gradle-language-java:latest.release")
     compileOnly("org.gradle:gradle-logging:latest.release")
     compileOnly("org.gradle:gradle-messaging:latest.release")
+    compileOnly("org.gradle:gradle-model-core:latest.release")
     compileOnly("org.gradle:gradle-native:latest.release")
     compileOnly("org.gradle:gradle-process-services:latest.release")
     compileOnly("org.gradle:gradle-resources:latest.release")
+    compileOnly("org.gradle:gradle-testing-base:latest.release")
+    compileOnly("org.gradle:gradle-testing-jvm:latest.release")
 
     implementation("com.squareup.okhttp3:okhttp:latest.release")
 
@@ -38,14 +44,20 @@ dependencies {
     }
 
     testRuntimeOnly("org.gradle:gradle-base-services:latest.release")
+    testRuntimeOnly("org.gradle:gradle-core:latest.release")
     testRuntimeOnly("org.gradle:gradle-core-api:latest.release")
+    testRuntimeOnly("org.gradle:gradle-file-collections:latest.release")
+    testRuntimeOnly("org.gradle:gradle-jvm-services:latest.release")
     testRuntimeOnly("org.gradle:gradle-language-groovy:latest.release")
     testRuntimeOnly("org.gradle:gradle-language-java:latest.release")
     testRuntimeOnly("org.gradle:gradle-logging:latest.release")
     testRuntimeOnly("org.gradle:gradle-messaging:latest.release")
+    testRuntimeOnly("org.gradle:gradle-model-core:latest.release")
     testRuntimeOnly("org.gradle:gradle-native:latest.release")
     testRuntimeOnly("org.gradle:gradle-process-services:latest.release")
     testRuntimeOnly("org.gradle:gradle-resources:latest.release")
+    testRuntimeOnly("org.gradle:gradle-testing-base:latest.release")
+    testRuntimeOnly("org.gradle:gradle-testing-jvm:latest.release")
 }
 
 tasks.withType<ShadowJar> {

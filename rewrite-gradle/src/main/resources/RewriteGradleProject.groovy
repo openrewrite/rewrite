@@ -213,11 +213,12 @@ interface MavenArtifactRepositorySpec extends MavenArtifactRepository {
 
 abstract class RewriteGradleProject implements Project {
     Map ext;
-
+    abstract void ext(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=Map)Closure cl)
     abstract void dependencies(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=DependencyHandlerSpec) Closure cl)
     abstract void plugins(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=PluginSpec) Closure cl)
     abstract void repositories(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=RepositoryHandlerSpec) Closure cl)
     abstract void subprojects(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=RewriteGradleProject) Closure cl)
     abstract void allprojects(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=RewriteGradleProject) Closure cl)
+    abstract void test(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=Test) Closure cl)
     void __script__() {
 }}

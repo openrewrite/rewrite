@@ -88,4 +88,19 @@ class MethodInvocationTest : GroovyTreeTest {
         def acceptsNamedArguments(Map a, int n, int m) { }
         acceptsNamedArguments(1, foo: "bar", 2, bar: "baz")
     """.trimIndent())
+
+
+    @Test
+    fun closureWithImplicitParameter() = assertParsePrintAndProcess("""
+        Closure cl = {
+            println(it)
+        }
+    """)
+
+    @Test
+    fun closureWithNamedParameter() = assertParsePrintAndProcess("""
+        Closure cl = { foo ->
+            println(foo)
+        }   
+    """)
 }
