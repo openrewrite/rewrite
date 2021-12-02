@@ -10,7 +10,7 @@ dependencies {
     api(project(":rewrite-yaml"))
     api(project(":rewrite-properties"))
 
-    api("org.eclipse.jgit:org.eclipse.jgit:latest.release")
+    api("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
 
     compileOnly("io.micrometer:micrometer-registry-prometheus:latest.release")
 

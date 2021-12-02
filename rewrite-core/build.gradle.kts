@@ -6,8 +6,8 @@ plugins {
 }
 
 dependencies {
-    compileOnly("org.eclipse.jgit:org.eclipse.jgit:latest.release")
-    testImplementation("org.eclipse.jgit:org.eclipse.jgit:latest.release")
+    compileOnly("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
+    testImplementation("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
 
     api("com.fasterxml.jackson.core:jackson-databind:latest.release")
     api("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")
