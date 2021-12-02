@@ -143,11 +143,15 @@ public class ChangePropertyKey extends Recipe {
                 public Yaml.Mapping visitMapping(Yaml.Mapping mapping, P p) {
                     Yaml.Mapping m = super.visitMapping(mapping, p);
                     if (m.getEntries().contains(entry)) {
-                        m.getEntries().stream()
-                                .filter(me -> !(me.getValue() instanceof Yaml.Scalar))
-                                .map(me -> Boolean.TRUE.equals(relaxedBinding) ? NameCaseConvention.format(NameCaseConvention.LOWER_CAMEL,me.getKey().getValue()) : me.getKey().getValue())
-                                .filter(propertyToCheck::startsWith)
-                                .findFirst().ifPresent(existingNonScalarEntry -> exists.set(true));
+                        for (Yaml.Mapping.Entry mEntry : m.getEntries()) {
+                            if (!(mEntry.getValue() instanceof Yaml.Scalar)) {
+                                String mKey = Boolean.TRUE.equals(relaxedBinding) ? NameCaseConvention.format(NameCaseConvention.LOWER_CAMEL, mEntry.getKey().getValue()) : mEntry.getKey().getValue();
+                                if (propertyToCheck.startsWith(mKey)) {
+                                    exists.set(true);
+                                    break;
+                                }
+                            }
+                        }
                     }
                     return m;
                 }
