@@ -34,7 +34,6 @@ class TestTest : GradleTreeTest {
             jvmArgs '-XX:MaxPermSize=256m'
             failFast = true
          }
-    """,
-        false
+    """
     )
 }
