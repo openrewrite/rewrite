@@ -178,17 +178,17 @@ class ChangePropertyKeyTest : YamlRecipeTest {
     @Test
     fun doesNotMergeToSiblingWithCoalescedProperty() = assertUnchanged(
         recipe = ChangePropertyKey(
-            "ii",
-            "a.b.c",
-            false,
+            "old-property",
+            "new-property.sub-property.super-sub",
+            true,
             null
         ),
         before = """
-            a.b:
-                c:
+            newProperty.subProperty:
+                superSub:
                   f0: v0
                   f1: v1
-            ii:
+            oldProperty:
               f0: v0
               f1: v1
         """

@@ -117,7 +117,7 @@ public class ChangePropertyKey extends Recipe {
 
                     if (!propertyToTest.startsWith(value) || (propertyToTest.startsWith(value) && !propertyEntriesLeftToRight.hasNext())) {
                         //noinspection ConstantConditions
-                        if(!mappingEntryExists(getCursor().firstEnclosing(Yaml.Document.class), propertyEntry, propertyToTest, p)) {
+                        if(!nonScalarMappingEntryExists(getCursor().firstEnclosing(Yaml.Document.class), propertyEntry, propertyToTest, p)) {
                             doAfterVisit(new InsertSubpropertyVisitor<>(
                                     propertyEntry,
                                     propertyToTest,
@@ -135,15 +135,18 @@ public class ChangePropertyKey extends Recipe {
             return e;
         }
 
-        private boolean mappingEntryExists(Yaml.Mapping.Document document, Yaml.Mapping.Entry entry, String property, P p) {
+        private boolean nonScalarMappingEntryExists(Yaml.Mapping.Document document, Yaml.Mapping.Entry entry, String property, P p) {
             AtomicBoolean exists = new AtomicBoolean(false);
+            String propertyToCheck = Boolean.TRUE.equals(relaxedBinding) ? NameCaseConvention.format(NameCaseConvention.LOWER_CAMEL, property) : property;
             new YamlIsoVisitor<P>() {
                 @Override
                 public Yaml.Mapping visitMapping(Yaml.Mapping mapping, P p) {
                     Yaml.Mapping m = super.visitMapping(mapping, p);
                     if (m.getEntries().contains(entry)) {
                         m.getEntries().stream()
-                                .filter(me -> !(me.getValue() instanceof Yaml.Scalar) && property.startsWith(me.getKey().getValue()))
+                                .filter(me -> !(me.getValue() instanceof Yaml.Scalar))
+                                .map(me -> Boolean.TRUE.equals(relaxedBinding) ? NameCaseConvention.format(NameCaseConvention.LOWER_CAMEL,me.getKey().getValue()) : me.getKey().getValue())
+                                .filter(propertyToCheck::startsWith)
                                 .findFirst().ifPresent(existingNonScalarEntry -> exists.set(true));
                     }
                     return m;
