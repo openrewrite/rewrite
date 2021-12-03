@@ -194,15 +194,17 @@ public class GroovyParserVisitor {
                 ClassNode[] interfaces = clazz.getInterfaces();
                 for (int i = 0; i < interfaces.length; i++) {
                     ClassNode anInterface = interfaces[i];
-                    // Any @annotation interface is listed as extending java.lang.annotation.Annotation, although it doesn't appear in source
+                    // Any annotation @interface is listed as extending java.lang.annotation.Annotation, although it doesn't appear in source
                     if(kindType == J.ClassDeclaration.Kind.Type.Annotation && "java.lang.annotation.Annotation".equals(anInterface.getName())) {
                         continue;
                     }
                     implTypes.add(JRightPadded.build(visitTypeTree(anInterface))
                             .withAfter(i == interfaces.length - 1 ? EMPTY : sourceBefore(",")));
                 }
-
-                implementings = JContainer.build(implPrefix, implTypes, Markers.EMPTY);
+                // Can be empty for an annotation @interface which only implements Annotation
+                if(implTypes.size() > 0) {
+                    implementings = JContainer.build(implPrefix, implTypes, Markers.EMPTY);
+                }
             }
 
             NavigableMap<LineColumn, List<ASTNode>> sortedByPosition = new TreeMap<>();
@@ -682,6 +684,53 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        public void visitCastExpression(CastExpression cast) {
+            // Might be looking at a Java-style cast "(type)object" or a groovy-style cast "object as type"
+            // If the CastExpression starts at the same place as the expression it contains, then it must be a groovy-style cast
+            if(cast.getLineNumber() == cast.getExpression().getLineNumber() && cast.getColumnNumber() == cast.getExpression().getColumnNumber()) {
+                Space prefix = whitespace();
+                Expression expr = visit(cast.getExpression());
+                Space asPrefix = sourceBefore("as");
+                Space typePrefix = whitespace();
+                String typeIdentifierText;
+                int i = cursor;
+                char c = source.charAt(i);
+                while(Character.isJavaIdentifierPart(c)) {
+                    i++;
+                    c = source.charAt(i);
+                }
+                typeIdentifierText = source.substring(cursor, i);
+                cursor += typeIdentifierText.length();
+
+                queue.add(new J.TypeCast(randomId(), prefix, new Markers(randomId(), singletonList(new AsStyleTypeCast(randomId()))),
+                        new J.ControlParentheses<>(randomId(), EMPTY, Markers.EMPTY,
+                                new JRightPadded<>(new J.Identifier(randomId(), typePrefix, Markers.EMPTY, typeIdentifierText, typeMapping.type(cast.getType()), null), asPrefix, Markers.EMPTY)
+                        ),
+                        expr));
+            } else {
+                Space prefix = sourceBefore("(");
+                Space identifierPrefix = whitespace();
+
+                String typeIdentifierText;
+                int i = cursor;
+                char c = source.charAt(i);
+                while(Character.isJavaIdentifierPart(c)) {
+                    i++;
+                    c = source.charAt(i);
+                }
+                typeIdentifierText = source.substring(cursor, i);
+                cursor += typeIdentifierText.length();
+                Space closingParenPrefix = sourceBefore(")");
+
+                queue.add(new J.TypeCast(randomId(), prefix, Markers.EMPTY,
+                        new J.ControlParentheses<>(randomId(), EMPTY, Markers.EMPTY,
+                                new JRightPadded<>(new J.Identifier(randomId(), identifierPrefix, Markers.EMPTY, typeIdentifierText, typeMapping.type(cast.getType()), null), closingParenPrefix, Markers.EMPTY)
+                        ),
+                        visit(cast.getExpression())));
+            }
+        }
+
+        @Override
         public void visitClosureExpression(ClosureExpression expression) {
             Space prefix = sourceBefore("{");
 
@@ -855,13 +904,13 @@ public class GroovyParserVisitor {
                 // There will always be exactly three elements in a for loop's ClosureListExpression
                 List<JRightPadded<Statement>> init = controls.get(0).getElement() instanceof List ?
                         (List<JRightPadded<Statement>>) controls.get(0).getElement() :
-                        Collections.singletonList((JRightPadded<Statement>) controls.get(0));
+                        singletonList((JRightPadded<Statement>) controls.get(0));
 
                 JRightPadded<Expression> condition = (JRightPadded<Expression>) controls.get(1);
 
                 List<JRightPadded<Statement>> update = controls.get(2).getElement() instanceof List ?
                         (List<JRightPadded<Statement>>) controls.get(2).getElement() :
-                        Collections.singletonList((JRightPadded<Statement>) controls.get(2));
+                        singletonList((JRightPadded<Statement>) controls.get(2));
                 cursor++; // skip ')'
 
                 queue.add(new J.ForLoop(randomId(), fmt, Markers.EMPTY,

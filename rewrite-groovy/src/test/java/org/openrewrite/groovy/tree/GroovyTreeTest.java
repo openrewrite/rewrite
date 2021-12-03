@@ -26,14 +26,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public interface GroovyTreeTest {
     default void assertParsePrintAndProcess(@Language("groovy") String code) {
+        String trimmed = StringUtils.trimIndent(code);
         G.CompilationUnit cu = GroovyParser.builder().build().parse(
                 new InMemoryExecutionContext(t -> {
                     throw new RuntimeException(t.getMessage(), t);
                 }),
-                StringUtils.trimIndent(code)
+                trimmed
         ).iterator().next();
 
         J processed = new GroovyVisitor<>().visit(cu, new Object());
         assertThat(processed).as("Parsing is idempotent").isSameAs(cu);
+
+
+        assertThat(cu.printAll()).as("Prints back to the original code").isEqualTo(trimmed);
     }
 }

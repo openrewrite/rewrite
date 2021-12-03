@@ -304,5 +304,15 @@ abstract class RewriteGradleProject implements Project {
     abstract void subprojects(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=RewriteGradleProject) Closure cl)
     abstract void allprojects(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=RewriteGradleProject) Closure cl)
     abstract void test(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=RewriteTestSpec) Closure cl)
+
+    // These functions don't actually exist in the Gradle API, but are syntactic sugar which forward to TaskContainer.create()
+    abstract Task task(Map<String, ?> options)
+    abstract Task task(Map<String, ?> options, Closure configureClosure)
+    abstract Task task(String name, Closure configureClosure)
+    abstract Task task(String name)
+    abstract <T extends Task> T task(String name, Class<T> type)
+    abstract <T extends Task> T task(String name, Class<T> type, Object... constructorArgs)
+    abstract <T extends Task> T task(String name, Class<T> type, Action<? super T> configuration)
+
     void __script__() {
 }}

@@ -15,7 +15,9 @@
  */
 package org.openrewrite.groovy.tree
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 
 class MethodInvocationTest : GroovyTreeTest {
 
@@ -97,6 +99,8 @@ class MethodInvocationTest : GroovyTreeTest {
         }
     """)
 
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/1236")
     @Test
     fun closureWithNamedParameter() = assertParsePrintAndProcess("""
         Closure cl = { foo ->

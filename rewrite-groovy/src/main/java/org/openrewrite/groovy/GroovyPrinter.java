@@ -154,6 +154,20 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitTypeCast(J.TypeCast t, PrintOutputCapture<P> p) {
+            if(!t.getMarkers().findFirst(AsStyleTypeCast.class).isPresent()) {
+                return super.visitTypeCast(t, p);
+            }
+            visitSpace(t.getPrefix(), Space.Location.TYPE_CAST_PREFIX, p);
+            visitMarkers(t.getMarkers(), p);
+            visit(t.getExpression(), p);
+            visitSpace(t.getClazz().getPadding().getTree().getAfter(), Space.Location.CONTROL_PARENTHESES_PREFIX, p);
+            p.out.append("as");
+            visit(t.getClazz().getTree(), p);
+            return t;
+        }
+
+        @Override
         public J visitLambda(J.Lambda lambda, PrintOutputCapture<P> p) {
             visitSpace(lambda.getPrefix(), Space.Location.LAMBDA_PREFIX, p);
             visitMarkers(lambda.getMarkers(), p);
