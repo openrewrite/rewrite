@@ -994,9 +994,15 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitListExpression(ListExpression list) {
-            queue.add(new G.ListLiteral(randomId(), sourceBefore("["), Markers.EMPTY,
-                    JContainer.build(visitRightPadded(list.getExpressions().toArray(new ASTNode[0]), ",", "]")),
-                    typeMapping.type(list.getType())));
+            if(list.getExpressions().isEmpty()) {
+                queue.add(new G.ListLiteral(randomId(), sourceBefore("["), Markers.EMPTY,
+                        JContainer.build(singletonList(new JRightPadded<>(new J.Empty(randomId(), EMPTY, Markers.EMPTY), sourceBefore("]"), Markers.EMPTY))),
+                        typeMapping.type(list.getType())));
+            } else {
+                queue.add(new G.ListLiteral(randomId(), sourceBefore("["), Markers.EMPTY,
+                        JContainer.build(visitRightPadded(list.getExpressions().toArray(new ASTNode[0]), ",", "]")),
+                        typeMapping.type(list.getType())));
+            }
         }
 
         @Override

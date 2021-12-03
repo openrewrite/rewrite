@@ -89,4 +89,12 @@ class LiteralTest : GroovyTreeTest {
             long d = 1L
         """
     )
+
+    @Test
+    fun emptyListLiteral() = assertParsePrintAndProcess(
+        """
+            def a = []
+            def b = [   ]
+        """
+    )
 }
