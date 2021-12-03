@@ -37,7 +37,6 @@ public interface GroovyTreeTest {
         J processed = new GroovyVisitor<>().visit(cu, new Object());
         assertThat(processed).as("Parsing is idempotent").isSameAs(cu);
 
-
         assertThat(cu.printAll()).as("Prints back to the original code").isEqualTo(trimmed);
     }
 }

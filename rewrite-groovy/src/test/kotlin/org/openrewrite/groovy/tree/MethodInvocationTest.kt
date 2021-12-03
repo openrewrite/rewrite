@@ -94,16 +94,25 @@ class MethodInvocationTest : GroovyTreeTest {
 
     @Test
     fun closureWithImplicitParameter() = assertParsePrintAndProcess("""
-        Closure cl = {
+        def acceptsClosure(Closure cl) {}
+        acceptsClosure {
             println(it)
         }
     """)
 
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/1236")
     @Test
     fun closureWithNamedParameter() = assertParsePrintAndProcess("""
-        Closure cl = { foo ->
+        def acceptsClosure(Closure cl) {}
+        acceptsClosure { foo ->
+            println(foo)
+        }   
+    """)
+
+    @Test
+    fun closureWithNamedParameterAndType() = assertParsePrintAndProcess("""
+        def acceptsClosure(Closure cl) {}
+        acceptsClosure { String foo ->
             println(foo)
         }   
     """)
