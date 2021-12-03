@@ -213,6 +213,27 @@ class ChangePropertyKeyTest : YamlRecipeTest {
         """
     )
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/434")
+    fun doesNotChangePropertyOrdering() = assertChanged(
+        recipe = ChangePropertyKey(
+            "description",
+            "newDescription",
+            false,
+            null
+        ),
+        before = """
+        id: something
+        description: desc
+        other: whatever
+    """,
+        after = """
+        id: something
+        newDescription: desc
+        other: whatever
+    """
+    )
+
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {

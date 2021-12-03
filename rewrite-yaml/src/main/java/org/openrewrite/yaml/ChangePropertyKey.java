@@ -118,12 +118,7 @@ public class ChangePropertyKey extends Recipe {
                     if (!propertyToTest.startsWith(value) || (propertyToTest.startsWith(value) && !propertyEntriesLeftToRight.hasNext())) {
                         //noinspection ConstantConditions
                         if(!nonScalarMappingEntryExists(getCursor().firstEnclosing(Yaml.Document.class), propertyEntry, propertyToTest, p)) {
-                            doAfterVisit(new InsertSubpropertyVisitor<>(
-                                    propertyEntry,
-                                    propertyToTest,
-                                    entry.getValue()
-                            ));
-                            doAfterVisit(new DeletePropertyVisitor<>(entry));
+                            doAfterVisit(new InsertSubpropertyVisitor<>(propertyEntry, propertyToTest, e));
                             maybeCoalesceProperties();
                         }
                         break;
@@ -163,12 +158,12 @@ public class ChangePropertyKey extends Recipe {
     private static class InsertSubpropertyVisitor<P> extends YamlIsoVisitor<P> {
         private final Yaml.Mapping.Entry scope;
         private final String subproperty;
-        private final Yaml.Block value;
+        private final Yaml.Mapping.Entry entryToReplace;
 
-        private InsertSubpropertyVisitor(Yaml.Mapping.Entry scope, String subproperty, Yaml.Block value) {
+        private InsertSubpropertyVisitor(Yaml.Mapping.Entry scope, String subproperty, Yaml.Mapping.Entry entryToReplace) {
             this.scope = scope;
             this.subproperty = subproperty;
-            this.value = value;
+            this.entryToReplace = entryToReplace;
         }
 
         @Override
@@ -179,15 +174,25 @@ public class ChangePropertyKey extends Recipe {
                 if (newEntryPrefix.isEmpty()) {
                     newEntryPrefix = "\n";
                 }
-                m = m.withEntries(ListUtils.concat(m.getEntries(),
-                        new Yaml.Mapping.Entry(randomId(),
-                                newEntryPrefix,
-                                Markers.EMPTY,
-                                new Yaml.Scalar(randomId(), "", Markers.EMPTY,
-                                        Yaml.Scalar.Style.PLAIN, null, subproperty),
-                                scope.getBeforeMappingValueIndicator(),
-                                value.copyPaste())
-                ));
+                Yaml.Mapping.Entry newEntry = new Yaml.Mapping.Entry(randomId(),
+                        newEntryPrefix,
+                        Markers.EMPTY,
+                        new Yaml.Scalar(randomId(), "", Markers.EMPTY,
+                                Yaml.Scalar.Style.PLAIN, null, subproperty),
+                        scope.getBeforeMappingValueIndicator(),
+                        entryToReplace.getValue().copyPaste());
+
+                if (m.getEntries().contains(entryToReplace)) {
+                    m = m.withEntries(ListUtils.map(m.getEntries(), e -> {
+                        if (e.equals(entryToReplace)) {
+                            return newEntry.withPrefix(e.getPrefix());
+                        }
+                        return e;
+                    }));
+                } else {
+                    m = m.withEntries(ListUtils.concat(m.getEntries(), newEntry));
+                    doAfterVisit(new DeletePropertyVisitor<>(entryToReplace));
+                }
             }
 
             return m;
