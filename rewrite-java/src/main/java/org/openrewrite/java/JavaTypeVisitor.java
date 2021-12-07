@@ -16,14 +16,13 @@
 package org.openrewrite.java;
 
 import org.openrewrite.Cursor;
-import org.openrewrite.Incubating;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.JavaType;
 
+import java.util.Iterator;
 import java.util.List;
 
-@Incubating(since = "7.13.0")
 public class JavaTypeVisitor<P> {
     private Cursor cursor = new Cursor(null, "root");
 
@@ -63,6 +62,14 @@ public class JavaTypeVisitor<P> {
 
     public JavaType visit(@Nullable JavaType javaType, P p) {
         if (javaType != null) {
+            // cut cycles
+            Iterator<Object> cursorPath = cursor.getPath();
+            while(cursorPath.hasNext()) {
+                if(javaType == cursorPath.next()) {
+                    return javaType;
+                }
+            }
+
             cursor = new Cursor(cursor, javaType);
             javaType = preVisit(javaType, p);
 
@@ -110,11 +117,16 @@ public class JavaTypeVisitor<P> {
         return visit(generic.getBound(), p);
     }
 
+    /**
+     * This does not visit the declaring type to avoid a visitor cycle.
+     * @param method The method to visit
+     * @param p Visit context
+     * @return A method
+     */
     public JavaType.Method visitMethod(JavaType.Method method, P p) {
         JavaType.Method m = method;
 
         m = m.withAnnotations(ListUtils.map(m.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p)));
-        m = m.withDeclaringType((JavaType.FullyQualified) visit(m.getDeclaringType(), p));
 
         JavaType.Method.Signature genericSignature = m.getGenericSignature();
         if (genericSignature != null) {
@@ -145,10 +157,15 @@ public class JavaTypeVisitor<P> {
         return primitive;
     }
 
+    /**
+     * This does not visit the owner to avoid a visitor cycle.
+     * @param variable The variable to visit
+     * @param p Visit context
+     * @return A variable
+     */
     public JavaType.Variable visitVariable(JavaType.Variable variable, P p) {
         JavaType.Variable v = variable;
         v = v.withAnnotations(ListUtils.map(v.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p)));
-        v = v.withOwner((JavaType.FullyQualified) visit(variable.getOwner(), p));
         v = v.withType(visit(variable.getType(), p));
         return v;
     }

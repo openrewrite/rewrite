@@ -30,7 +30,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
 
@@ -1339,7 +1338,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 // this is a lambda parameter with an inferred type expression
                 typeExpr = null;
             } else {
-                typeExpr = new J.VarType(randomId(), sourceBefore("var"), Markers.EMPTY, typeMapping.type(vartype));
+                typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.EMPTY, "var", typeMapping.type(vartype), null);
+                typeExpr = typeExpr.withMarkers(typeExpr.getMarkers().add(JavaVarKeyword.build()));
             }
         } else if (vartype instanceof JCArrayTypeTree) {
             // we'll capture the array dimensions in a bit, just convert the element type
@@ -1369,7 +1369,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         List<JLeftPadded<Space>> beforeDimensions = dimensions.get();
 
         Space varargs = null;
-        if (!(typeExpr instanceof J.VarType)) {
+        if (typeExpr == null || typeExpr.getMarkers().findFirst(JavaVarKeyword.class).isEmpty()) {
             String vartypeString = typeExpr == null ? "" : source.substring(vartype.getStartPosition(), endPos(vartype));
             Matcher varargMatcher = Pattern.compile("(\\s*)\\.{3}").matcher(vartypeString);
             if (varargMatcher.find()) {

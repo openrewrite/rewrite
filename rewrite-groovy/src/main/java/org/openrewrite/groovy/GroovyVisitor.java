@@ -89,6 +89,7 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
             l = (G.ListLiteral) temp;
         }
         l = l.getPadding().withElements(visitContainer(l.getPadding().getElements(), GContainer.Location.LIST_LITERAL_ELEMENTS, p));
+        l = l.withType(visitType(l.getType(), p));
         return l;
     }
 
@@ -104,6 +105,7 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         }
         m = m.getPadding().withKey(visitRightPadded(m.getPadding().getKey(), GRightPadded.Location.MAP_ENTRY_KEY, p));
         m = m.withValue((Expression) visit(m.getValue(), p));
+        m = m.withType(visitType(m.getType(), p));
         return m;
     }
 
@@ -118,6 +120,7 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
             m = (G.MapLiteral) temp;
         }
         m = m.getPadding().withElements(visitContainer(m.getPadding().getElements(), GContainer.Location.MAP_LITERAL_ELEMENTS, p));
+        m = m.withType(visitType(m.getType(), p));
         return m;
     }
 

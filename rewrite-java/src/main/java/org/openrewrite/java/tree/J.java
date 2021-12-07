@@ -4623,30 +4623,6 @@ public interface J extends Tree {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
-    final class VarType implements J, Expression, TypeTree {
-        @With
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        Space prefix;
-
-        @With
-        Markers markers;
-
-        @With
-        JavaType type;
-
-        @Override
-        public <P> J acceptJava(JavaVisitor<P> v, P p) {
-            return v.visitVarType(this, p);
-        }
-
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class VariableDeclarations implements J, Statement, TypedTree {

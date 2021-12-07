@@ -23,6 +23,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.JavaVarKeyword;
 import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
@@ -88,7 +89,8 @@ public class UseDiamondOperator extends Recipe {
                     //If the immediate parent is named variable, check the variable declaration to make sure it's
                     //not using local variable type inference.
                     J.VariableDeclarations variableDeclaration = c.firstEnclosing(J.VariableDeclarations.class);
-                    return variableDeclaration != null && !(variableDeclaration.getTypeExpression() instanceof J.VarType);
+                    return variableDeclaration != null && (variableDeclaration.getTypeExpression() == null ||
+                            !variableDeclaration.getTypeExpression().getMarkers().findFirst(JavaVarKeyword.class).isPresent());
                 } else if (c.getValue() instanceof J.MethodInvocation) {
                     //Do not remove the type parameters if the newClass is the receiver of a method invocation.
                     J.MethodInvocation invocation = c.getValue();
@@ -100,7 +102,5 @@ public class UseDiamondOperator extends Recipe {
                 }
             }
         };
-
     }
-
 }

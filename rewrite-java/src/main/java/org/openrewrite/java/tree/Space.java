@@ -404,7 +404,6 @@ public class Space implements NonCyclicSerializable {
         UNARY_OPERATOR,
         UNARY_PREFIX,
         VARARGS,
-        VAR_KEYWORD,
         VARIABLE_DECLARATIONS_PREFIX,
         VARIABLE_INITIALIZER,
         VARIABLE_PREFIX,

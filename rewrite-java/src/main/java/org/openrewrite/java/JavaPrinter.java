@@ -722,14 +722,6 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public J visitVarType(VarType varType, PrintOutputCapture<P> p) {
-        visitSpace(varType.getPrefix(), Space.Location.VAR_KEYWORD, p);
-        visitMarkers(varType.getMarkers(), p);
-        p.out.append("var");
-        return varType;
-    }
-
-    @Override
     public J visitVariableDeclarations(VariableDeclarations multiVariable, PrintOutputCapture<P> p) {
         visitSpace(multiVariable.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
         visitMarkers(multiVariable.getMarkers(), p);

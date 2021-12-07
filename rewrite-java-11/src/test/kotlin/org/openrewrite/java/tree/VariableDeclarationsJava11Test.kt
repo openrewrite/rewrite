@@ -72,7 +72,8 @@ class VariableDeclarationsJava11Test : JavaTreeTest, Java11Test {
         assertThat(secondVariable.prefix.comments[0].suffix).isEqualTo("   ")
     }
 
-    private fun typeTree(statement : Statement) : J.VarType {
-        return (statement as J.VariableDeclarations).typeExpression as J.VarType
+    private fun typeTree(statement : Statement) : J.Identifier {
+        assertThat(statement.markers.findFirst(JavaVarKeyword::class.java).isPresent)
+        return (statement as J.VariableDeclarations).typeExpression as J.Identifier
     }
 }
