@@ -1,6 +1,7 @@
 package org.openrewrite.maven.utilities;
 
-import lombok.Value;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.Maven;
@@ -8,7 +9,6 @@ import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.Scope;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class DependencyInspector {
 
@@ -20,47 +20,61 @@ public class DependencyInspector {
         if (pom == null) {
             return null;
         }
-        return new DependencyInspectorDependency(
+
+        DependencyInspectorDependency root = new DependencyInspectorDependency(
                 pom.getGroupId(),
                 pom.getArtifactId(),
                 pom.getVersion(),
                 pom.getVersion(),
-                "",
-                pom.getDependencies().stream().map(d -> DependencyInspector.resolveDependency(d, null, new HashSet<>())).collect(Collectors.toList()));
-    }
+                "");
 
-    private static DependencyInspectorDependency resolveDependency(Pom.Dependency dependency, Scope parentScope, Set<String> seenArtifacts) {
-        String gav = gav(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion());
+        Map<GroupArtifact, String> seenArtifacts = new HashMap<>();
+        Deque<DependencyTask> workQueue = new ArrayDeque<>();
 
-        Scope dependencyScope = parentScope == Scope.Test ? Scope.Test : dependency.getScope();
-        List<DependencyInspectorDependency> childDependencies;
-        if (seenArtifacts.add(gav)) {
+        workQueue.addFirst(new DependencyTask(root, pom, null, Collections.emptySet()));
+        while (!workQueue.isEmpty()) {
+            DependencyTask task = workQueue.removeFirst();
+            GroupArtifact ga = new GroupArtifact(task.dependency.groupId, task.dependency.artifactId);
 
-            childDependencies = new ArrayList<>();
-            for (Pom.Dependency child : dependency.getModel().getDependencies()) {
-                if (dependency.getExclusions().contains(new GroupArtifact(child.getGroupId(), child.getArtifactId()))) {
-                    //Do not add the child if it's in the exclusions of the containing dependency.
-                    continue;
+            if (!seenArtifacts.containsKey(ga)) {
+
+                seenArtifacts.put(ga, task.pom.getValue(task.pom.getVersion()));
+
+                List<DependencyInspectorDependency> children = new ArrayList<>(task.pom.getDependencies().size());
+                for (Pom.Dependency dependency : task.pom.getDependencies()) {
+                    GroupArtifact childGav = new GroupArtifact(dependency.getGroupId(), dependency.getArtifactId());
+                    if (task.exclusions.contains(childGav)) {
+                        //Do not add the child if it's in the exclusions of the containing dependency.
+                        continue;
+                    }
+                    String resolvedVersion = seenArtifacts.get(childGav);
+                    Scope childScope = dependency.getScope() == null ? Scope.Compile : dependency.getScope();
+
+                    if (task.scope == null
+                            || (task.scope == Scope.Test && dependency.getScope() == Scope.Compile)
+                            || (task.scope == Scope.Compile && (dependency.getScope() == Scope.Compile || dependency.getScope() == Scope.Runtime))) {
+                        if (task.scope == Scope.Test) {
+                            childScope = Scope.Test;
+                        }
+                        if (resolvedVersion == null) {
+                            resolvedVersion = dependency.getRequestedVersion() != null ? dependency.getRequestedVersion() : dependency.getVersion();
+                        }
+                        DependencyInspectorDependency child = new DependencyInspectorDependency(
+                                task.pom.getValue(dependency.getGroupId()),
+                                task.pom.getValue(dependency.getArtifactId()),
+                                task.pom.getValue(resolvedVersion),
+                                task.pom.getValue(dependency.getVersion()),
+                                childScope.name().toLowerCase());
+                        children.add(child);
+                        workQueue.addLast(new DependencyTask(child, dependency.getModel(), childScope, dependency.getExclusions()));
+                    }
                 }
-
-                if (dependencyScope == null
-                        || (dependencyScope == Scope.Test && child.getScope() == Scope.Compile)
-                        || (dependencyScope == Scope.Compile && (child.getScope() == Scope.Compile || child.getScope() == Scope.Runtime))) {
-
-                    childDependencies.add(resolveDependency(child, dependencyScope, seenArtifacts));
+                if (!children.isEmpty()) {
+                    task.dependency.dependencies = children;
                 }
             }
-        } else {
-            childDependencies = Collections.emptyList();
         }
-
-        return new DependencyInspectorDependency(
-                dependency.getGroupId(),
-                dependency.getArtifactId(),
-                dependency.getVersion(),
-                dependency.getRequestedVersion(),
-                dependencyScope.name().toLowerCase(),
-                childDependencies);
+        return root;
     }
 
     public static String printDependencyTree(Maven maven) {
@@ -87,9 +101,12 @@ public class DependencyInspector {
             indent = indent + "    ";
         }
 
-        buffer.append(dependency.getId());
+        buffer.append(dependency.getGroupId()).append(':').append(dependency.getArtifactId()).append(':').append(dependency.getOriginalVersion());
+        if (!dependency.getResolvedVersion().equals(dependency.getOriginalVersion())) {
+            buffer.append(" (omitted for conflict with ").append(dependency.getResolvedVersion()).append (')');
+        }
         if (!dependency.getScope().isEmpty()) {
-            buffer.append('[').append(dependency.scope).append(']');
+            buffer.append(" [").append(dependency.scope).append(']');
         }
         buffer.append('\n');
         int index = 0;
@@ -99,26 +116,32 @@ public class DependencyInspector {
         }
     }
 
-    @Value
+    private static class DependencyTask {
+
+        private DependencyInspectorDependency dependency;
+        private Pom pom;
+        @Nullable
+        private Scope scope;
+        private Set<GroupArtifact> exclusions;
+
+        private DependencyTask(DependencyInspectorDependency dependency, Pom pom, @Nullable Scope scope, Set<GroupArtifact> exclusions) {
+            this.dependency = dependency;
+            this.pom = pom;
+            this.scope = scope;
+            this.exclusions = exclusions;
+        }
+    }
+
+    @Getter
+    @RequiredArgsConstructor
     public static class DependencyInspectorDependency {
 
-        private String id;
-        private String groupId;
-        private String artifactId;
-        private String version;
-        private String originalVersion;
-        private String scope;
-        private List<DependencyInspectorDependency> dependencies;
-
-        public DependencyInspectorDependency(String groupId, String artifactId, String version, String originalVersion, String scope, List<DependencyInspectorDependency> dependencies) {
-            this.id = gav(groupId, artifactId, version);
-            this.groupId = groupId;
-            this.artifactId = artifactId;
-            this.version = version;
-            this.originalVersion = originalVersion;
-            this.scope = scope;
-            this.dependencies = dependencies;
-        }
+        private final String groupId;
+        private final String artifactId;
+        private final String resolvedVersion;
+        private final String originalVersion;
+        private final String scope;
+        private List<DependencyInspectorDependency> dependencies = Collections.emptyList();
     }
 
     private static String gav(String groupId, String artifactId, String version) {
