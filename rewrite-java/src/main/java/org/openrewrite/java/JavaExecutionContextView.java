@@ -36,7 +36,12 @@ public class JavaExecutionContextView extends DelegatingExecutionContext {
     }
 
     public JavaTypeCache getTypeCache() {
-        return getMessage(TYPE_CACHE, DEFAULT_TYPE_CACHE);
+        JavaTypeCache jtc = getMessage(TYPE_CACHE);
+        if(jtc == null) {
+            jtc = DEFAULT_TYPE_CACHE;
+            setTypeCache(jtc);
+        }
+        return jtc;
     }
 
     public JavaExecutionContextView setSkipSourceSetMarker(boolean skip) {
