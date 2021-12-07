@@ -24,8 +24,6 @@ public class JavaExecutionContextView extends DelegatingExecutionContext {
     private static final String TYPE_CACHE = "org.openrewrite.java.typeCache";
     private static final String SKIP_SOURCE_SET_MARKER = "org.openrewrite.java.skipSourceSetMarker";
 
-    private final JavaTypeCache DEFAULT_TYPE_CACHE = new DelegatingJavaTypeCache();
-
     public JavaExecutionContextView(ExecutionContext delegate) {
         super(delegate);
     }
@@ -38,7 +36,7 @@ public class JavaExecutionContextView extends DelegatingExecutionContext {
     public JavaTypeCache getTypeCache() {
         JavaTypeCache jtc = getMessage(TYPE_CACHE);
         if(jtc == null) {
-            jtc = DEFAULT_TYPE_CACHE;
+            jtc =  new DelegatingJavaTypeCache();
             setTypeCache(jtc);
         }
         return jtc;
