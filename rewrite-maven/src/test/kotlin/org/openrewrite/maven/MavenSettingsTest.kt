@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ class MavenSettingsTest {
     @Test
     fun parse() {
         val ctx = MavenExecutionContextView(InMemoryExecutionContext())
-        ctx.setMavenSettings(MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {//language=xml
             """
             <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -63,7 +63,7 @@ class MavenSettingsTest {
     @Test
     fun defaultActiveWhenNoOthersAreActive() {
         val ctx = MavenExecutionContextView(InMemoryExecutionContext())
-        ctx.setMavenSettings(MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {//language=xml
             """
             <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -105,7 +105,7 @@ class MavenSettingsTest {
     @Test
     fun defaultOnlyActiveIfNoOthersAreActive() {
         val ctx = MavenExecutionContextView(InMemoryExecutionContext())
-        ctx.setMavenSettings(MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {//language=xml
             """
             <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -151,7 +151,7 @@ class MavenSettingsTest {
     @Test
     fun mirrorReplacesRepository() {
         val ctx = MavenExecutionContextView(InMemoryExecutionContext())
-        ctx.setMavenSettings(MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {//language=xml
             """
             <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -192,7 +192,7 @@ class MavenSettingsTest {
     @Test
     fun starredMirrorWithExclusion() {
         val ctx = MavenExecutionContextView(InMemoryExecutionContext())
-        ctx.setMavenSettings(MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {//language=xml
             """
             <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -248,7 +248,7 @@ class MavenSettingsTest {
     @Test
     fun serverCredentials() {
         val ctx = MavenExecutionContextView(InMemoryExecutionContext())
-        val settings = MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
+        val settings = MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {//language=xml
             """
             <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -264,7 +264,7 @@ class MavenSettingsTest {
             """.trimIndent().byteInputStream()
         }, ctx)
 
-        assertThat(settings!!.servers).isNotNull()
+        assertThat(settings!!.servers).isNotNull
         assertThat(settings.servers!!.servers).hasSize(1)
         assertThat(settings.servers!!.servers.first())
             .matches { it.id == "server001" }
