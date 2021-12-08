@@ -437,11 +437,6 @@ public class RawMavenResolver {
                     resolved.put(parentKey, Optional.ofNullable(parent));
                 } else {
                     parent = maybeParent.orElse(null);
-                    if (parent != null) {
-                        //Need to populate the effective properties using the cached values from the pom.
-                        parent.getPropertyOverrides().forEach(partialMaven.getEffectiveProperties()::putIfAbsent);
-                        parent.getProperties().forEach(partialMaven.getEffectiveProperties()::putIfAbsent);
-                    }
                 }
             }
             partialMaven.setParent(parent);
