@@ -18,6 +18,7 @@ package org.openrewrite.maven;
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.MavenRepositoryCredentials;
@@ -26,6 +27,7 @@ import org.openrewrite.maven.tree.MavenRepositoryMirror;
 import java.net.URI;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
@@ -68,7 +70,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
      * Require dependency resolution that encounters a matching group:artifact:version coordinate to resolve to a
      * particular dated snapshot version, effectively making snapshot resolution deterministic.
      *
-     * @param pinnedSnapshotVersions A set of group:artiact:version and the dated snapshot version to pin them to.
+     * @param pinnedSnapshotVersions A set of group:artifact:version and the dated snapshot version to pin them to.
      */
     public void setPinnedSnapshotVersions(Collection<GroupArtifactVersion> pinnedSnapshotVersions) {
         putMessage(MAVEN_PINNED_SNAPSHOT_VERSIONS, pinnedSnapshotVersions);
@@ -96,14 +98,25 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         }
 
         setRepositories(settings.getActiveRepositories(activeProfiles).stream()
-                .map(repo -> new MavenRepository(
-                        repo.getId(),
-                        URI.create(repo.getUrl()),
-                        repo.getReleases() == null || repo.getReleases().isEnabled(),
-                        repo.getSnapshots() != null && repo.getSnapshots().isEnabled(),
-                        null,
-                        null
-                ))
+                .map(repo -> {
+                    try {
+                        return new MavenRepository(
+                                repo.getId(),
+                                URI.create(repo.getUrl()),
+                                repo.getReleases() == null || repo.getReleases().isEnabled(),
+                                repo.getSnapshots() != null && repo.getSnapshots().isEnabled(),
+                                null,
+                                null
+                        );
+                    } catch (Exception exception) {
+                        this.getOnError().accept(new MavenParsingException(
+                                "Unable to parse URL %s for Maven settings repository id %s",
+                                exception,
+                                repo.getUrl(), repo.getId()));
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
                 .collect(Collectors.toList()));
     }
 }
