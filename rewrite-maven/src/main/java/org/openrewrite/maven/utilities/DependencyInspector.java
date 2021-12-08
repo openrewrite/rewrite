@@ -16,7 +16,6 @@
 package org.openrewrite.maven.utilities;
 
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.Maven;
@@ -27,10 +26,30 @@ import java.util.*;
 
 public class DependencyInspector {
 
+    /**
+     * Given a Maven source file, this method returns a dependency tree of the file by navigating the pom model and
+     * its transitive dependencies. This method produces results that have close parity with those found in Eclipse's pom
+     * editor (Dependency Hierarchy). Each returned dependency reflects the original version, defined in the raw pom, along
+     * with the version that was resolved. Any duplicate dependencies that are encountered deeper in the dependency tree
+     * will have their children pruned to reduce the size of the returned hierarchy.
+     *
+     * @param maven A maven source file whose model that will be traversed to collect transitive dependencies.
+     * @return A dependency hierarchy representing the resolved, transitive dependencies of the maven file.
+     */
     public static DependencyInspectorDependency resolveDependencyTree(Maven maven) {
         return resolveDependencyTree(maven.getModel());
     }
 
+    /**
+     * Given a Pom model this method returns a dependency tree of the pom by navigating the model and its transitive
+     * dependencies. This method produces results that have close parity with those found in Eclipse's pom editor
+     * (Dependency Hierarchy). Each returned dependency reflects the original version, defined in the raw pom, along with
+     * the version that was resolved. Any duplicate dependencies that are encountered deeper in the dependency tree will
+     * have their children pruned to reduce the size of the returned hierarchy.
+     *
+     * @param pom A root pom model that will be traversed to collect transitive dependencies.
+     * @return A dependency hierarchy representing the resolved, transitive dependencies of the root pom.
+     */
     public static DependencyInspectorDependency resolveDependencyTree(@Nullable Pom pom) {
         if (pom == null) {
             return null;
@@ -46,6 +65,7 @@ public class DependencyInspector {
         Map<GroupArtifact, String> seenArtifacts = new HashMap<>();
         Deque<DependencyTask> workQueue = new ArrayDeque<>();
 
+        // Breadth first navigation of the dependencies.
         workQueue.addFirst(new DependencyTask(root, pom, null, Collections.emptySet()));
         while (!workQueue.isEmpty()) {
             DependencyTask task = workQueue.removeFirst();
@@ -53,6 +73,9 @@ public class DependencyInspector {
 
             String resolvedVersion = seenArtifacts.get(ga);
             if (resolvedVersion == null) {
+                // The children of an artifact are only traversed the first time the artifact is encountered, this
+                // matches how Eclipse's pom editor prunes the children of duplicate artifacts when they are encountered
+                // deeper in the dependency tree.
                 resolvedVersion = task.dependency.resolvedVersion;
                 seenArtifacts.putIfAbsent(ga, resolvedVersion);
 
@@ -91,10 +114,30 @@ public class DependencyInspector {
         return root;
     }
 
+    /**
+     * Given a maven source file, this method returns a string representation of the dependency hierarchy by navigating
+     * the file's model and its transitive dependencies. This method produces results that have close parity with those
+     * found in Eclipse's pom editor (Dependency Hierarchy). Each returned dependency reflects the resolved version and notes
+     * any conflicts between the resolved and original version. Any duplicate dependencies that are encountered deeper
+     * in the dependency tree will have their children pruned to reduce the size of the returned hierarchy.
+     *
+     * @param maven A maven source file whose model that will be traversed to collect transitive dependencies.
+     * @return A dependency hierarchy representing the resolved, transitive dependencies of the maven file.
+     */
     public static String printDependencyTree(Maven maven) {
         return printDependencyTree(maven.getModel());
     }
 
+    /**
+     * Given a Pom model, this method returns a string representation of the dependency hierarchy by navigating the
+     * model and its transitive dependencies. This method produces results that have close parity with those found in
+     * Eclipse's pom editor (Dependency Hierarchy). Each returned dependency reflects the resolved version and notes
+     * any conflicts between the resolved and original version. Any duplicate dependencies that are encountered deeper
+     * in the dependency tree will have their children pruned to reduce the size of the returned hierarchy.
+     *
+     * @param pom A root pom model that will be traversed to collect transitive dependencies.
+     * @return A dependency hierarchy representing the resolved, transitive dependencies of the root pom.
+     */
     public static String printDependencyTree(@Nullable Pom pom) {
 
         DependencyInspectorDependency dependencyTree = resolveDependencyTree(pom);
@@ -115,7 +158,7 @@ public class DependencyInspector {
             indent = indent + "    ";
         }
 
-        buffer/*.append(dependency.getGroupId()).append(':')*/.append(dependency.getArtifactId()).append(':').append(dependency.getOriginalVersion());
+        buffer.append(dependency.getGroupId()).append(':').append(dependency.getArtifactId()).append(':').append(dependency.getOriginalVersion());
         if (!dependency.getResolvedVersion().equals(dependency.getOriginalVersion())) {
             buffer.append(" (omitted for conflict with ").append(dependency.getResolvedVersion()).append (')');
         }
