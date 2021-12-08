@@ -212,7 +212,7 @@ public class Pom implements NonCyclicSerializable {
         }
 
         if (parent != null) {
-            return getValue(key);
+            return parent.getProperty(key);
         } else {
             return null;
         }

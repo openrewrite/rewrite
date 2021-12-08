@@ -36,9 +36,10 @@ public class DependencyInspector {
             DependencyTask task = workQueue.removeFirst();
             GroupArtifact ga = new GroupArtifact(task.dependency.groupId, task.dependency.artifactId);
 
-            if (!seenArtifacts.containsKey(ga)) {
-
-                seenArtifacts.put(ga, task.pom.getValue(task.pom.getVersion()));
+            String resolvedVersion = seenArtifacts.get(ga);
+            if (resolvedVersion == null) {
+                resolvedVersion = task.dependency.resolvedVersion;
+                seenArtifacts.putIfAbsent(ga, resolvedVersion);
 
                 List<DependencyInspectorDependency> children = new ArrayList<>(task.pom.getDependencies().size());
                 for (Pom.Dependency dependency : task.pom.getDependencies()) {
@@ -47,23 +48,19 @@ public class DependencyInspector {
                         //Do not add the child if it's in the exclusions of the containing dependency.
                         continue;
                     }
-                    String resolvedVersion = seenArtifacts.get(childGav);
                     Scope childScope = dependency.getScope() == null ? Scope.Compile : dependency.getScope();
 
-                    if (task.scope == null
-                            || (task.scope == Scope.Test && dependency.getScope() == Scope.Compile)
-                            || (task.scope == Scope.Compile && (dependency.getScope() == Scope.Compile || dependency.getScope() == Scope.Runtime))) {
+                    if (task.scope == null || ((task.scope == Scope.Test || task.scope == Scope.Compile) &&
+                            (dependency.getScope() == Scope.Compile || dependency.getScope() == Scope.Runtime))) {
                         if (task.scope == Scope.Test) {
                             childScope = Scope.Test;
                         }
-                        if (resolvedVersion == null) {
-                            resolvedVersion = dependency.getRequestedVersion() != null ? dependency.getRequestedVersion() : dependency.getVersion();
-                        }
+                        String childVersion = dependency.getRequestedVersion() != null ? dependency.getRequestedVersion() : dependency.getVersion();
                         DependencyInspectorDependency child = new DependencyInspectorDependency(
                                 task.pom.getValue(dependency.getGroupId()),
                                 task.pom.getValue(dependency.getArtifactId()),
-                                task.pom.getValue(resolvedVersion),
-                                task.pom.getValue(dependency.getVersion()),
+                                task.pom.getValue(childVersion),
+                                task.pom.getValue(childVersion),
                                 childScope.name().toLowerCase());
                         children.add(child);
                         workQueue.addLast(new DependencyTask(child, dependency.getModel(), childScope, dependency.getExclusions()));
@@ -72,6 +69,8 @@ public class DependencyInspector {
                 if (!children.isEmpty()) {
                     task.dependency.dependencies = children;
                 }
+            } else {
+                task.dependency.resolvedVersion = resolvedVersion;
             }
         }
         return root;
@@ -101,7 +100,7 @@ public class DependencyInspector {
             indent = indent + "    ";
         }
 
-        buffer.append(dependency.getGroupId()).append(':').append(dependency.getArtifactId()).append(':').append(dependency.getOriginalVersion());
+        buffer/*.append(dependency.getGroupId()).append(':')*/.append(dependency.getArtifactId()).append(':').append(dependency.getOriginalVersion());
         if (!dependency.getResolvedVersion().equals(dependency.getOriginalVersion())) {
             buffer.append(" (omitted for conflict with ").append(dependency.getResolvedVersion()).append (')');
         }
@@ -133,15 +132,22 @@ public class DependencyInspector {
     }
 
     @Getter
-    @RequiredArgsConstructor
     public static class DependencyInspectorDependency {
 
         private final String groupId;
         private final String artifactId;
-        private final String resolvedVersion;
+        private String resolvedVersion;
         private final String originalVersion;
         private final String scope;
         private List<DependencyInspectorDependency> dependencies = Collections.emptyList();
+
+        public DependencyInspectorDependency(String groupId, String artifactId, String resolvedVersion, String originalVersion, String scope) {
+            this.groupId = groupId;
+            this.artifactId = artifactId;
+            this.resolvedVersion = resolvedVersion;
+            this.originalVersion = originalVersion;
+            this.scope = scope;
+        }
     }
 
     private static String gav(String groupId, String artifactId, String version) {
