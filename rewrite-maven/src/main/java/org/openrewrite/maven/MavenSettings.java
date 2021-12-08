@@ -48,9 +48,9 @@ public class MavenSettings {
     @Getter
     Mirrors mirrors;
 
-    @With
     @Nullable
     @Getter
+    @With
     Servers servers;
 
     @Nullable
@@ -81,7 +81,8 @@ public class MavenSettings {
     }
 
     @FieldDefaults(level = AccessLevel.PRIVATE)
-    @Value
+    @Getter
+    @Setter
     public static class Profiles {
         @JacksonXmlProperty(localName = "profile")
         @JacksonXmlElementWrapper(useWrapping = false)
@@ -89,7 +90,8 @@ public class MavenSettings {
     }
 
     @FieldDefaults(level = AccessLevel.PRIVATE)
-    @Value
+    @Getter
+    @Setter
     public static class ActiveProfiles {
         @JacksonXmlProperty(localName = "activeProfile")
         @JacksonXmlElementWrapper(useWrapping = false)
@@ -97,7 +99,7 @@ public class MavenSettings {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Value
+    @Data
     public static class Profile {
         @Nullable
         String id;
@@ -118,7 +120,8 @@ public class MavenSettings {
     }
 
     @FieldDefaults(level = AccessLevel.PRIVATE)
-    @Value
+    @Getter
+    @Setter
     public static class Mirrors {
         @JacksonXmlProperty(localName = "mirror")
         @JacksonXmlElementWrapper(useWrapping = false)
@@ -126,7 +129,7 @@ public class MavenSettings {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Value
+    @Data
     public static class Mirror {
         @Nullable
         String id;
@@ -145,7 +148,8 @@ public class MavenSettings {
     }
 
     @FieldDefaults(level = AccessLevel.PRIVATE)
-    @Value
+    @Getter
+    @Setter
     public static class Servers {
         @JacksonXmlProperty(localName = "server")
         @JacksonXmlElementWrapper(useWrapping = false)
@@ -153,7 +157,7 @@ public class MavenSettings {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Value
+    @Data
     public static class Server {
         String id;
 

@@ -26,8 +26,6 @@ import java.util.List;
 import static java.util.Collections.emptyList;
 
 @FieldDefaults(level = AccessLevel.PRIVATE)
-@RequiredArgsConstructor
-@AllArgsConstructor
 @Getter
 @Setter
 public class RawRepositories {
