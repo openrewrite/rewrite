@@ -42,4 +42,20 @@ interface JavaTypeTest {
             .hasSize(1)
             .contains(JavaType.Class.build("java.lang.FunctionalInterface"))
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1267")
+    @Test
+    fun noStackOverflow(jp: JavaParser.Builder<*, *>) {
+        val cu = jp.build().parse(
+            """
+            import java.util.HashMap;
+            import java.util.Map;
+            class A {
+                Map<String, Map<String, Map<Integer, String>>> overflowMap = new HashMap<>();
+            }
+            """)
+        val foo = cu.find { it.classes[0].name.simpleName == "A" }!!
+        val foundTypes = foo.typesInUse.typesInUse
+        assertThat(foundTypes.isNotEmpty())
+    }
 }

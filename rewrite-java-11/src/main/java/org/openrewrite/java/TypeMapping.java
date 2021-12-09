@@ -180,7 +180,7 @@ public class TypeMapping {
                 } else {
                     StringJoiner shallowGenericTypeVariables = new StringJoiner(",");
                     for (Type typeParameter : classType.typarams_field) {
-                        String typeParameterSignature = signature(typeParameter);
+                        String typeParameterSignature = typeParameter.toString();
                         if (typeParameterSignature != null) {
                             shallowGenericTypeVariables.add(typeParameterSignature);
                         }

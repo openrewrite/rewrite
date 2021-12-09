@@ -179,7 +179,7 @@ public class ReloadableTypeMapping {
                 } else {
                     StringJoiner shallowGenericTypeVariables = new StringJoiner(",");
                     for (Type typeParameter : classType.typarams_field) {
-                        String typeParameterSignature = signature(typeParameter);
+                        String typeParameterSignature = typeParameter.toString();
                         if (typeParameterSignature != null) {
                             shallowGenericTypeVariables.add(typeParameterSignature);
                         }
@@ -459,7 +459,6 @@ public class ReloadableTypeMapping {
         if (type == null) {
             return null;
         } else if (type instanceof Type.ClassType) {
-            Type.ClassType classType = (Type.ClassType) type;
             Symbol.ClassSymbol sym = (Symbol.ClassSymbol) type.tsym;
             return sym.className();
         } else if (type instanceof Type.TypeVar) {
@@ -485,7 +484,6 @@ public class ReloadableTypeMapping {
 
     private Path classfile(com.sun.tools.javac.code.Type type) {
         if (type instanceof Type.ClassType) {
-            Type.ClassType classType = (Type.ClassType) type;
             Symbol.ClassSymbol sym = (Symbol.ClassSymbol) type.tsym;
             return getClasspathElement(sym);
         } else if (type instanceof Type.ArrayType) {
