@@ -15,9 +15,7 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.format.AutoFormatVisitor;
@@ -32,6 +30,11 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     @Nullable
     private JavadocVisitor<P> javadocVisitor;
+
+    @Override
+    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+        return sourceFile instanceof JavaSourceFile;
+    }
 
     @Override
     public String getLanguage() {
