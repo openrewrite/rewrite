@@ -112,8 +112,8 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
         @Override
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
             J.MethodDeclaration md = super.visitMethodDeclaration(method, p);
-            if (!md.isConstructor() || (md.hasModifier(J.Modifier.Type.Private) || md.hasModifier(J.Modifier.Type.Protected) ||
-                    (md.getMethodType() != null && md.getMethodType().getDeclaringType().getKind().equals(JavaType.Class.Kind.Enum)))) {
+            if (md.getMethodType() == null || !md.isConstructor()
+                    || (md.hasModifier(J.Modifier.Type.Private) || md.hasModifier(J.Modifier.Type.Protected) || md.getMethodType().getDeclaringType().getKind().equals(JavaType.Class.Kind.Enum))) {
                 return md;
             }
 
