@@ -80,25 +80,25 @@ public class PrimitiveWrapperClassConstructorToValueOf extends Recipe {
                     JavaTemplate.Builder valueOf;
                     switch (type.getFullyQualifiedName()) {
                         case "java.lang.Boolean":
-                            valueOf = JavaTemplate.builder(this::getCursor, "Boolean.valueOf(#{any(boolean)});");
+                            valueOf = JavaTemplate.builder(this::getCursor, "Boolean.valueOf(#{any(boolean)})");
                             break;
                         case "java.lang.Byte":
-                            valueOf = JavaTemplate.builder(this::getCursor, "Byte.valueOf(#{any(byte)});");
+                            valueOf = JavaTemplate.builder(this::getCursor, "Byte.valueOf(#{any(byte)})");
                             break;
                         case "java.lang.Character":
-                            valueOf = JavaTemplate.builder(this::getCursor, "Character.valueOf(#{any(char)});");
+                            valueOf = JavaTemplate.builder(this::getCursor, "Character.valueOf(#{any(char)})");
                             break;
                         case "java.lang.Double":
-                            valueOf = JavaTemplate.builder(this::getCursor, "Double.valueOf(#{any(double)});");
+                            valueOf = JavaTemplate.builder(this::getCursor, "Double.valueOf(#{any(double)})");
                             break;
                         case "java.lang.Integer":
-                            valueOf = JavaTemplate.builder(this::getCursor, "Integer.valueOf(#{any(int)});");
+                            valueOf = JavaTemplate.builder(this::getCursor, "Integer.valueOf(#{any(int)})");
                             break;
                         case "java.lang.Long":
-                            valueOf = JavaTemplate.builder(this::getCursor, "Long.valueOf(#{any(long)});");
+                            valueOf = JavaTemplate.builder(this::getCursor, "Long.valueOf(#{any(long)})");
                             break;
                         case "java.lang.Short":
-                            valueOf = JavaTemplate.builder(this::getCursor, "Short.valueOf(#{any(short)});");
+                            valueOf = JavaTemplate.builder(this::getCursor, "Short.valueOf(#{any(short)})");
                             break;
                         case "java.lang.Float":
                             if (arg instanceof J.Literal && JavaType.Primitive.Double == ((J.Literal) arg).getType()) {
@@ -108,9 +108,9 @@ public class PrimitiveWrapperClassConstructorToValueOf extends Recipe {
 
                             JavaType argType = arg.getType();
                             if (TypeUtils.isOfClassType(argType, "java.lang.Double")) {
-                                valueOf = JavaTemplate.builder(this::getCursor, "Float.valueOf(#{any(java.lang.Double)}.floatValue());");
+                                valueOf = JavaTemplate.builder(this::getCursor, "Float.valueOf(#{any(java.lang.Double)}.floatValue())");
                             } else {
-                                valueOf = JavaTemplate.builder(this::getCursor, "Float.valueOf(#{any(float)});");
+                                valueOf = JavaTemplate.builder(this::getCursor, "Float.valueOf(#{any(float)})");
                             }
                             break;
                         default:
