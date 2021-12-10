@@ -34,11 +34,8 @@ public class ExplicitInitializationVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
         J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, p);
+
         Cursor variableDeclsCursor = getCursor().dropParentUntil(J.class::isInstance);
-        // Groovy script variable declarations may be outside the confines of a class.
-        if (variableDeclsCursor.getParent(3) == null) {
-            return v;
-        }
         J maybeClassDecl = variableDeclsCursor
                 .dropParentUntil(J.class::isInstance) // maybe J.Block
                 .dropParentUntil(J.class::isInstance) // maybe J.ClassDecl
