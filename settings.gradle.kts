@@ -32,6 +32,9 @@ gradleEnterprise {
     server = "https://ge.openrewrite.org/"
 
     buildCache {
+        local {
+            isEnabled = false
+        }
         remote(HttpBuildCache::class) {
             url = uri("https://ge.openrewrite.org/cache/")
             isPush = isCiServer
