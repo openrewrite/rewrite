@@ -56,7 +56,7 @@ public class AddSerialVersionUidToSerializable extends Recipe {
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
-            final JavaTemplate template = JavaTemplate.builder(this::getCursor, "private static final long serialVersionUID = 1").build();
+            final JavaTemplate template = JavaTemplate.builder(this::getCursor, "private static final long serialVersionUID = 1;").build();
 
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
@@ -126,7 +126,7 @@ public class AddSerialVersionUidToSerializable extends Recipe {
             JavaType.FullyQualified fq = (JavaType.FullyQualified) type;
             if (fq.getKind() != JavaType.Class.Kind.Interface &&
                     !fq.isAssignableTo("java.lang.Throwable")) {
-                return !fq.isAssignableTo("java.io.Serializable");
+                return fq.isAssignableTo("java.io.Serializable");
             }
         }
         return false;
