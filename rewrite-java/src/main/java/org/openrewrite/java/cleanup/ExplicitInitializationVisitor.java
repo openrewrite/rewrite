@@ -71,14 +71,14 @@ public class ExplicitInitializationVisitor<P> extends JavaIsoVisitor<P> {
                         }
                         break;
                     case Char:
-                        if (literalInit.getValue() != null && literalInit.getValue() instanceof Character && (Character) literalInit.getValue() == 0) {
+                        if (literalInit.getValue() != null && (Character) literalInit.getValue() == 0) {
                             v = v.withInitializer(null);
                         }
                         break;
                     case Int:
                     case Long:
                     case Short:
-                        if (literalInit.getValue() != null && literalInit.getValue() instanceof Number && ((Number) literalInit.getValue()).intValue() == 0) {
+                        if (literalInit.getValue() != null && ((Number) literalInit.getValue()).intValue() == 0) {
                             v = v.withInitializer(null);
                         }
                         break;
