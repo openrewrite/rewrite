@@ -204,22 +204,22 @@ public final class ListUtils {
     public static <T> List<T> concat(@Nullable List<T> ls, @Nullable T t) {
         if (t == null && ls == null) {
             return emptyList();
+        } else if (t == null) {
+            return ls;
         }
         List<T> newLs = ls == null ? new ArrayList<>(1) : new ArrayList<>(ls);
-        if (t != null) {
-            newLs.add(t);
-        }
+        newLs.add(t);
         return newLs;
     }
 
     public static <T> List<T> concat(@Nullable T t, @Nullable List<T> ls) {
         if (t == null && ls == null) {
             return emptyList();
+        } else if (t == null) {
+            return ls;
         }
         List<T> newLs = ls == null ? new ArrayList<>(1) : new ArrayList<>(ls.size() + 1);
-        if (t != null) {
-            newLs.add(t);
-        }
+        newLs.add(t);
         if (ls != null) {
             newLs.addAll(ls);
         }
@@ -227,26 +227,39 @@ public final class ListUtils {
     }
 
     public static <T> List<T> concatAll(@Nullable List<T> ls, @Nullable List<T> t) {
-        if (ls == null) {
+        if (ls == null && t == null) {
+            return emptyList();
+        } else if (t == null || t.isEmpty()) {
+            return ls;
+        } else if (ls == null || ls.isEmpty()) {
             return t;
         }
-        if (t == null || t.isEmpty()) {
-            return ls;
-        }
+
         List<T> newLs = new ArrayList<>(ls);
         newLs.addAll(t);
+
+        //Prune any null elements from the resulting list.
+        //noinspection StatementWithEmptyBody
+        while (newLs.remove(null)) ;
         return newLs;
     }
 
-    public static <T> List<T> insertAll(List<T> ls, int index, List<T> t) {
-        if (ls == null) {
+    public static <T> List<T> insertAll(@Nullable List<T> ls, int index, @Nullable List<T> t) {
+        if (ls == null && t == null) {
+            return emptyList();
+        } else if (t == null || t.isEmpty()) {
+            return ls;
+        } else if (ls == null || ls.isEmpty()) {
             return t;
         }
-        if (t.isEmpty()) {
-            return ls;
-        }
+
         List<T> newLs = new ArrayList<>(ls);
         newLs.addAll(index, t);
+
+        //Prune any null elements from the resulting list.
+        //noinspection StatementWithEmptyBody
+        while (newLs.remove(null)) ;
+
         return newLs;
     }
 }
