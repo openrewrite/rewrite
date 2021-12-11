@@ -32,7 +32,9 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
+import static java.util.stream.Collectors.joining;
 
 @RequiredArgsConstructor
 public class TypeMapping {
@@ -75,15 +77,7 @@ public class TypeMapping {
                             newlyCreated.set(true);
 
                             if (!sym.completer.isTerminal()) {
-                                try {
-                                    String packageName = sym.packge().fullname.toString();
-                                    if (!packageName.startsWith("com.sun.") &&
-                                            !packageName.startsWith("sun.") &&
-                                            !packageName.startsWith("jdk.")) {
-                                        sym.complete();
-                                    }
-                                } catch (Symbol.CompletionFailure ignore) {
-                                }
+                                completeClassSymbol(sym);
                             }
 
                             JavaType.Class.Kind kind;
@@ -458,31 +452,60 @@ public class TypeMapping {
 
     @Nullable
     private String signature(@Nullable com.sun.tools.javac.code.Type type) {
+        return signature(type, new HashSet<>());
+    }
+
+    @Nullable
+    private String signature(@Nullable com.sun.tools.javac.code.Type type, Set<com.sun.tools.javac.code.Type> boundedTypes) {
         if (type == null) {
             return null;
         } else if (type instanceof Type.ClassType) {
-            Type.ClassType classType = (Type.ClassType) type;
             Symbol.ClassSymbol sym = (Symbol.ClassSymbol) type.tsym;
-            return sym.className();
+            if (!sym.completer.isTerminal()) {
+                completeClassSymbol(sym);
+            }
+            return sym.className() + (type.isParameterized() ?
+                    ((Type.ClassType) type).typarams_field.stream()
+                            .map(tp -> signature(tp, boundedTypes))
+                            .filter(Objects::nonNull)
+                            .collect(joining(",", "<", ">")) :
+                    "");
         } else if (type instanceof Type.TypeVar) {
-            return type.tsym.name.toString() + " extends " + signature(type.getUpperBound());
+            // Prevent infinite recursion on parameterized types with a super type bound to the original type.
+            // Example: `interface Recursive<T> { <U extends Recursive<? super U>> Recursive<T> method() {} }`
+            if (boundedTypes.contains(type.getUpperBound())) {
+                return type.tsym.name.toString() + " extends java.lang.Object";
+            } else {
+                boundedTypes.add(type.getUpperBound());
+                return type.tsym.name.toString() + " extends " + signature(type.getUpperBound(), boundedTypes);
+            }
         } else if (type instanceof Type.JCPrimitiveType) {
             return primitiveType(type.getTag()).getKeyword();
         } else if (type instanceof Type.JCVoidType) {
             return "void";
         } else if (type instanceof Type.ArrayType) {
-            return signature(((Type.ArrayType) type).elemtype) + "[]";
+            return signature(((Type.ArrayType) type).elemtype, boundedTypes) + "[]";
         } else if (type instanceof Type.WildcardType) {
-            Type.WildcardType wildcard = (Type.WildcardType) type;
-            if (wildcard.kind == BoundKind.UNBOUND) {
+            if (type.isUnbound()) {
                 return "java.lang.Object";
             } else {
-                return "? extends " + signature(wildcard.type);
+                return "? extends " + signature(((Type.WildcardType) type).type, boundedTypes);
             }
         } else if (com.sun.tools.javac.code.Type.noType.equals(type)) {
             return null;
         }
         return null;
+    }
+
+    private void completeClassSymbol(Symbol.ClassSymbol classSymbol) {
+        String packageName = classSymbol.packge().fullname.toString();
+        if (!packageName.startsWith("com.sun.") &&
+                !packageName.startsWith("jdk.")) {
+            try {
+                classSymbol.complete();
+            } catch (Symbol.CompletionFailure ignore) {
+            }
+        }
     }
 
     private Path classfile(com.sun.tools.javac.code.Type type) {
