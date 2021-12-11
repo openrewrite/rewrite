@@ -65,15 +65,14 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
     private String source;
     private int cursor = 0;
 
-    public ReloadableJava8JavadocVisitor(Context context, TreePath scope, ReloadableTypeMapping typeMapping, String source) {
+    public ReloadableJava8JavadocVisitor(Context context, TreePath scope, ReloadableTypeMapping typeMapping, String source, JCTree tree) {
         this.attr = Attr.instance(context);
         this.typeMapping = typeMapping;
         this.source = source;
 
         if (scope.getLeaf() instanceof JCTree.JCCompilationUnit) {
-            JCTree.JCCompilationUnit cu = (JCTree.JCCompilationUnit) scope.getLeaf();
-            this.enclosingClassType = cu.defs.get(0).type;
-            this.symbol = cu.packge;
+            this.enclosingClassType = tree.type;
+            this.symbol = ((JCTree.JCClassDecl) tree).sym;
         } else {
             com.sun.source.tree.Tree classDecl = scope.getLeaf();
             if (classDecl instanceof JCTree.JCClassDecl) {

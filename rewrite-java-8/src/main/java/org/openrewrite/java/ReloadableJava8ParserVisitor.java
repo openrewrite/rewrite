@@ -1431,7 +1431,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         try {
             String prefix = source.substring(cursor, max(((JCTree) t).getStartPosition(), cursor));
             cursor += prefix.length();
-            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, docCommentTable.getCommentTree((JCTree) t)));
+            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, docCommentTable.getCommentTree((JCTree) t)));
             return j;
         } catch (Throwable ex) {
             // this SHOULD never happen, but is here simply as a diagnostic measure in the event of unexpected exceptions
@@ -1918,7 +1918,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         return annotations;
     }
 
-    Space formatWithCommentTree(String prefix, @Nullable DCTree.DCDocComment commentTree) {
+    Space formatWithCommentTree(String prefix, JCTree tree, @Nullable DCTree.DCDocComment commentTree) {
         Space fmt = format(prefix);
         if (commentTree != null) {
             List<Comment> comments = fmt.getComments();
@@ -1939,7 +1939,8 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                             context,
                             getCurrentPath(),
                             typeMapping,
-                            source.substring(commentCursor, source.indexOf("*/", commentCursor + 1))
+                            source.substring(commentCursor, source.indexOf("*/", commentCursor + 1)),
+                            tree
                     ).scan(commentTree, new ArrayList<>()));
                     break;
                 } else {
