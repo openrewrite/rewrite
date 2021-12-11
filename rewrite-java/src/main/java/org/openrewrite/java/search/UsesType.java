@@ -17,11 +17,7 @@ package org.openrewrite.java.search;
 
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.Flag;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
 import java.util.ArrayList;
 import java.util.List;

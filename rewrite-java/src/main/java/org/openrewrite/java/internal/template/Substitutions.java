@@ -24,8 +24,6 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.internal.grammar.TemplateParameterLexer;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;

@@ -18,7 +18,6 @@ package org.openrewrite.java.tree;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.NonCyclicSerializable;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
@@ -38,7 +37,7 @@ import java.util.stream.Collectors;
 @Value
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @With
-public class JRightPadded<T> implements NonCyclicSerializable {
+public class JRightPadded<T> {
     T element;
     Space after;
     Markers markers;

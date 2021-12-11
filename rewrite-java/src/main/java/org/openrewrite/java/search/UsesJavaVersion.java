@@ -17,7 +17,6 @@ package org.openrewrite.java.search;
 
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaVersion;
-import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 
 import java.util.Optional;

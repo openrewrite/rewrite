@@ -17,7 +17,10 @@ package org.openrewrite.java.tree;
 
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
 public enum Flag {
     Public(1L),

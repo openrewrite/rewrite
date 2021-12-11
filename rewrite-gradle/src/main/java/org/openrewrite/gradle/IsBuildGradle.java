@@ -17,7 +17,6 @@ package org.openrewrite.gradle;
 
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 
 public class IsBuildGradle<P> extends JavaIsoVisitor<P> {

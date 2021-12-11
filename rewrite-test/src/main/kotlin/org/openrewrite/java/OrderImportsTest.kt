@@ -17,7 +17,6 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
-import org.openrewrite.Tree
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.style.ImportLayoutStyle
 import org.openrewrite.style.NamedStyles

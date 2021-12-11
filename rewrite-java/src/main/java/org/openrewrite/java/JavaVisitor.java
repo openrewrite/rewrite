@@ -450,6 +450,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         c = c.getPadding().withImplements(visitTypeNames(c.getPadding().getImplements(), p));
         c = c.withBody(visitAndCast(c.getBody(), p));
+        c = c.withType(visitType(c.getType(), p));
         return c;
     }
 
@@ -578,7 +579,10 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         f = f.withTarget(visitAndCast(f.getTarget(), p));
         f = f.getPadding().withName(visitLeftPadded(f.getPadding().getName(), JLeftPadded.Location.FIELD_ACCESS_NAME, p));
-        f = f.withType(visitType(f.getType(), p));
+
+        JavaType type = visitType(f.getType(), p);
+        f = f.withType(type);
+
         return f;
     }
 
@@ -642,6 +646,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             i = (J.Identifier) temp;
         }
         i = i.withFieldType(visitVariableType(i.getFieldType(), p));
+        i = i.withType(visitType(i.getType(), p));
         return i;
     }
 
@@ -1176,6 +1181,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             v = v.getPadding().withInitializer(visitLeftPadded(v.getPadding().getInitializer(),
                     JLeftPadded.Location.VARIABLE_INITIALIZER, p));
         }
+        v = v.withType(visitType(v.getType(), p));
         return v;
     }
 

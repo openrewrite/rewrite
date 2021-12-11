@@ -15,8 +15,6 @@
  */
 package org.openrewrite.java.tree;
 
-import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
@@ -32,7 +30,6 @@ import org.openrewrite.marker.Markers;
 import java.util.List;
 import java.util.UUID;
 
-@JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public interface Javadoc extends Tree {
     @SuppressWarnings("unchecked")
     @Override

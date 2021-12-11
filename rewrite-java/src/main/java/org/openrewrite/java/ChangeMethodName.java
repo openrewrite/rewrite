@@ -23,11 +23,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.TypeTree;
-import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.*;
 
 @Value
 @EqualsAndHashCode(callSuper = true)

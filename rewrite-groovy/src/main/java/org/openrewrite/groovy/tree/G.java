@@ -26,7 +26,6 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Markers;
 
 import java.lang.ref.SoftReference;

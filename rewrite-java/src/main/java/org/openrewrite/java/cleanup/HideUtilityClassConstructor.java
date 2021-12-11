@@ -19,7 +19,6 @@ import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.style.HideUtilityClassConstructorStyle;
-import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 
 import java.time.Duration;

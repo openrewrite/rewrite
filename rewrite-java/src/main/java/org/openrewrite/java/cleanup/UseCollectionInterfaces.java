@@ -20,12 +20,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.TypeTree;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.time.Duration;

@@ -15,9 +15,7 @@
  */
 package org.openrewrite.hcl.tree;
 
-import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
@@ -34,7 +32,6 @@ import java.util.List;
 import java.util.UUID;
 
 @SuppressWarnings("unused")
-@JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public interface Hcl extends Tree {
 
     @SuppressWarnings("unchecked")

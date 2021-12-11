@@ -23,8 +23,6 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesField;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
 
 @EqualsAndHashCode(callSuper = true)
 @Value

@@ -21,11 +21,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.tree.Flag;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;

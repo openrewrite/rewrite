@@ -15,9 +15,7 @@
  */
 package org.openrewrite.xml.tree;
 
-import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -44,7 +42,6 @@ import static org.openrewrite.Tree.randomId;
 /**
  * The XML <a href="https://www.w3.org/TR/xml11/#syntax">spec</a>.
  */
-@JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public interface Xml extends Tree {
 
     @SuppressWarnings("unchecked")

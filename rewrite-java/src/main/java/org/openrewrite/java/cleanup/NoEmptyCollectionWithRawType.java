@@ -23,8 +23,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 
 import java.time.Duration;

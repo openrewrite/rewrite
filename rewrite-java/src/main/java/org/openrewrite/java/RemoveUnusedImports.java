@@ -21,12 +21,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.tree.Flag;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JRightPadded;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.time.Duration;

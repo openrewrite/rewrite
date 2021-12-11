@@ -16,6 +16,8 @@
 package org.openrewrite.java.tree;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.AccessLevel;
 import lombok.Value;
@@ -31,7 +33,21 @@ import static java.util.Collections.emptySet;
 import static java.util.stream.Collectors.joining;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
+@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
 public interface JavaType {
+    @JsonProperty("@c")
+    default String getJacksonPolymorphicTypeTag() {
+        return getClass().getName();
+    }
+
+    @Nullable
+    default UUID getManagedReference() {
+        return null;
+    }
+
+    default void unsafeSetManagedReference(UUID managedReference) {
+    }
+
     /**
      * Return a JavaType for the specified string.
      * The string is expected to be either a primitive type like "int" or a fully-qualified-class name like "java.lang.String"
@@ -117,10 +133,14 @@ public interface JavaType {
     @Value
     @With
     class Class extends FullyQualified {
-        public static final Class CLASS = new Class(Flag.Public.getBitMask(), "java.lang.Class", Kind.Class,
+        public static final Class CLASS = new Class(null, Flag.Public.getBitMask(), "java.lang.Class", Kind.Class,
                 null, null, null, null, null, null);
-        public static final Class ENUM = new Class(Flag.Public.getBitMask(), "java.lang.Enum", Kind.Class,
+        public static final Class ENUM = new Class(null, Flag.Public.getBitMask(), "java.lang.Enum", Kind.Class,
                 null, null, null, null, null, null);
+
+        @Nullable
+        @NonFinal
+        UUID managedReference;
 
         @With(AccessLevel.NONE)
         long flagsBitMap;
@@ -207,7 +227,7 @@ public interface JavaType {
                 owningClass = build(fullyQualifiedName.substring(0, lastDot));
             }
 
-            return new JavaType.Class(1, fullyQualifiedName, Kind.Class, null, owningClass,
+            return new JavaType.Class(null,1, fullyQualifiedName, Kind.Class, null, owningClass,
                     emptyList(), emptyList(), emptyList(), emptyList());
         }
 
@@ -222,6 +242,11 @@ public interface JavaType {
                 members.addAll(supertype.getVisibleSupertypeMembers());
             }
             return members;
+        }
+
+        @Override
+        public void unsafeSetManagedReference(UUID managedReference) {
+            this.managedReference = managedReference;
         }
 
         /**
@@ -269,10 +294,19 @@ public interface JavaType {
     class Parameterized extends FullyQualified {
         @NonFinal
         @Nullable
+        UUID managedReference;
+
+        @NonFinal
+        @Nullable
         FullyQualified type;
 
         @NonFinal
         List<JavaType> typeParameters;
+
+        @Override
+        public void unsafeSetManagedReference(UUID managedReference) {
+            this.managedReference = managedReference;
+        }
 
         /**
          * Only meant to be used by parsers to avoid infinite recursion when building Class instances.
@@ -293,7 +327,7 @@ public interface JavaType {
             if (type.getFullyQualifiedName().equals(fullyQualifiedName)) {
                 return this;
             }
-            return new Parameterized(type.withFullyQualifiedName(fullyQualifiedName), typeParameters);
+            return new Parameterized(null, type.withFullyQualifiedName(fullyQualifiedName), typeParameters);
         }
 
         @Override
@@ -380,11 +414,20 @@ public interface JavaType {
     @Value
     @With
     class GenericTypeVariable extends FullyQualified {
+        @Nullable
+        @NonFinal
+        UUID managedReference;
+
         String name;
 
         @NonFinal
         @Nullable
         FullyQualified bound;
+
+        @Override
+        public void unsafeSetManagedReference(UUID managedReference) {
+            this.managedReference = managedReference;
+        }
 
         @Override
         public String getFullyQualifiedName() {
@@ -472,6 +515,7 @@ public interface JavaType {
     }
 
     @Value
+    @With
     class Array implements JavaType {
         JavaType elemType;
 

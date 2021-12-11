@@ -25,7 +25,6 @@ import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;

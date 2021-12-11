@@ -24,8 +24,10 @@ import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.format.ShiftFormat;
 import org.openrewrite.java.style.EmptyBlockStyle;
-import org.openrewrite.java.tree.*;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;

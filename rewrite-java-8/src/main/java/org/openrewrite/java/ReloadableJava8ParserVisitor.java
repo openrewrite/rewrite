@@ -29,7 +29,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
 
@@ -48,7 +47,6 @@ import java.util.stream.Collectors;
 
 import static java.lang.Math.max;
 import static java.util.Collections.*;
-import static java.util.Collections.emptyMap;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;

@@ -15,7 +15,10 @@
  */
 package org.openrewrite.java.format;
 
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.SourceFile;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.style.GeneralFormatStyle;

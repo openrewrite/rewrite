@@ -19,7 +19,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaSourceSet;
-import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 
 @Value

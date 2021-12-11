@@ -23,7 +23,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.xml.*;
+import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;

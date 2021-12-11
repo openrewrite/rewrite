@@ -17,8 +17,8 @@ package org.openrewrite.java;
 
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.java.cache.JavaTypeCache;
 import org.openrewrite.java.cache.DelegatingJavaTypeCache;
+import org.openrewrite.java.cache.JavaTypeCache;
 
 public class JavaExecutionContextView extends DelegatingExecutionContext {
     private static final String TYPE_CACHE = "org.openrewrite.java.typeCache";

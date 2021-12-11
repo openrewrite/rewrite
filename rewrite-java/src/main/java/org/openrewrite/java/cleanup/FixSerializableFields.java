@@ -25,8 +25,6 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 

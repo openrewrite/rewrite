@@ -15,7 +15,6 @@
  */
 package org.openrewrite.semver;
 
-import lombok.Value;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 

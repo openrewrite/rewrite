@@ -20,7 +20,6 @@ import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import org.openrewrite.NonCyclicSerializable;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -35,7 +34,7 @@ import static java.util.Collections.emptyMap;
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-public class Pom implements NonCyclicSerializable {
+public class Pom {
 
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
 

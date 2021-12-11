@@ -15,8 +15,8 @@
  */
 package org.openrewrite.hcl.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.RequiredArgsConstructor;
-import org.openrewrite.NonCyclicSerializable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
@@ -31,7 +31,7 @@ import static java.util.Collections.emptyList;
  *
  * @param <T> The type of the inner list of elements.
  */
-public class HclContainer<T> implements NonCyclicSerializable {
+public class HclContainer<T> {
     private transient Padding<T> padding;
 
     private static final HclContainer<?> EMPTY = new HclContainer<>(Space.EMPTY, emptyList(), Markers.EMPTY);
@@ -50,6 +50,7 @@ public class HclContainer<T> implements NonCyclicSerializable {
         return build(Space.EMPTY, elements, Markers.EMPTY);
     }
 
+    @JsonCreator
     public static <T> HclContainer<T> build(Space before, List<HclRightPadded<T>> elements, Markers markers) {
         if (before.isEmpty() && elements.isEmpty()) {
             return empty();

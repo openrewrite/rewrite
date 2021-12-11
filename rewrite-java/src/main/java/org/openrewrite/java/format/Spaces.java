@@ -24,7 +24,6 @@ import org.openrewrite.java.style.EmptyForInitializerPadStyle;
 import org.openrewrite.java.style.EmptyForIteratorPadStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.SpacesStyle;
-import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 
 public class Spaces extends Recipe {

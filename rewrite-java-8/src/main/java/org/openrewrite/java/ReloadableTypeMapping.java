@@ -90,6 +90,7 @@ public class ReloadableTypeMapping {
                             }
 
                             return new JavaType.Class(
+                                    null,
                                     sym.flags_field,
                                     sym.className(),
                                     kind,
@@ -182,7 +183,7 @@ public class ReloadableTypeMapping {
                     JavaType.Parameterized parameterized = typeCache.computeParameterized(sym.className(),
                             shallowGenericTypeVariables.toString(), () -> {
                                 newlyCreated.set(true);
-                                return new JavaType.Parameterized(null, null);
+                                return new JavaType.Parameterized(null, null, null);
                             });
 
                     if (newlyCreated.get()) {
@@ -204,7 +205,7 @@ public class ReloadableTypeMapping {
             return typeCache.computeGeneric(
                     type.tsym.name.toString(),
                     signature(type.getUpperBound()),
-                    () -> new JavaType.GenericTypeVariable(type.tsym.name.toString(),
+                    () -> new JavaType.GenericTypeVariable(null, type.tsym.name.toString(),
                             TypeUtils.asFullyQualified(type(type.getUpperBound(), stack)))
             );
         } else if (type instanceof Type.JCPrimitiveType) {
@@ -370,7 +371,7 @@ public class ReloadableTypeMapping {
                                         // been mapped to cyclic)
                                         if (exceptionType instanceof Type.ClassType) {
                                             Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
-                                            javaType = new JavaType.Class(Flag.Public.getBitMask(), sym.className(), JavaType.Class.Kind.Class,
+                                            javaType = new JavaType.Class(null, Flag.Public.getBitMask(), sym.className(), JavaType.Class.Kind.Class,
                                                     null, null, null, null, null, null);
                                         }
                                     }
@@ -387,7 +388,7 @@ public class ReloadableTypeMapping {
                             if (methodSymbol.owner instanceof Symbol.ClassSymbol || methodSymbol.owner instanceof Symbol.TypeVariableSymbol) {
                                 resolvedDeclaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner.type, stack));
                             } else if (methodSymbol.owner instanceof Symbol.VarSymbol) {
-                                resolvedDeclaringType = new JavaType.GenericTypeVariable(methodSymbol.owner.name.toString(), null);
+                                resolvedDeclaringType = new JavaType.GenericTypeVariable(null, methodSymbol.owner.name.toString(), null);
                             }
                         }
 

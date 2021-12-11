@@ -15,8 +15,6 @@
  */
 package org.openrewrite.java.marker;
 
-import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
@@ -26,7 +24,6 @@ import java.util.UUID;
 
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-@JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @With
 public class JavaVersion implements Marker {
     @EqualsAndHashCode.Include

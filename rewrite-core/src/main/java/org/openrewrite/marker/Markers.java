@@ -15,8 +15,6 @@
  */
 package org.openrewrite.marker;
 
-import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.Incubating;
@@ -35,7 +33,6 @@ import static org.openrewrite.Tree.randomId;
 
 @Incubating(since = "7.0.0")
 @Value
-@JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public class Markers implements Tree {
     public static final Markers EMPTY = new Markers(randomId(), emptyList());
 

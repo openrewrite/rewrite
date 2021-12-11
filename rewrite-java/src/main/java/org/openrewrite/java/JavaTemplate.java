@@ -25,8 +25,6 @@ import org.openrewrite.java.internal.template.JavaTemplateParser;
 import org.openrewrite.java.internal.template.Substitutions;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.Space.Location;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.template.SourceTemplate;
 
@@ -335,6 +333,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                                     bound = (JavaType.FullyQualified) bounds.get(0);
                                                 }
                                                 JavaType.GenericTypeVariable genericType = new JavaType.GenericTypeVariable(
+                                                        null,
                                                         typeParamIdent.getSimpleName(),
                                                         bound);
 

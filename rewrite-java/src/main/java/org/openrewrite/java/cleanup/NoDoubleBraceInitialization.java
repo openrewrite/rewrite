@@ -15,14 +15,15 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.*;
+import org.openrewrite.Cursor;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 
 import java.time.Duration;

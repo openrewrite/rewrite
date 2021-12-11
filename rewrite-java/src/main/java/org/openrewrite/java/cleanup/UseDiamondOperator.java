@@ -21,9 +21,9 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaVarKeyword;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeUtils;
-import org.openrewrite.java.tree.JavaVarKeyword;
 import org.openrewrite.marker.Markers;
 
 import java.time.Duration;

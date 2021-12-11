@@ -15,8 +15,6 @@
  */
 package org.openrewrite.json.tree;
 
-import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
@@ -31,7 +29,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 
-@JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public interface Json extends Tree {
 
     @SuppressWarnings("unchecked")

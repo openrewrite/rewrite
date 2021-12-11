@@ -17,7 +17,6 @@ package org.openrewrite.gradle.search
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.gradle.GradleRecipeTest
-import org.openrewrite.java.search.FindMethods
 
 class FindPluginTest : GradleRecipeTest {
     @Test

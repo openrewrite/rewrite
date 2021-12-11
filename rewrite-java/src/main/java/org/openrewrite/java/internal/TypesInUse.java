@@ -21,7 +21,6 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.java.tree.JavaType;
 
 import java.util.HashSet;
 import java.util.Set;

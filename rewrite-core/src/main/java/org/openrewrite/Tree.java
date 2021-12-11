@@ -15,12 +15,24 @@
  */
 package org.openrewrite;
 
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.UUID;
 
-public interface Tree extends NonCyclicSerializable {
+@JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
+@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
+public interface Tree {
+    @SuppressWarnings("unused")
+    @JsonProperty("@c")
+    default String getJacksonPolymorphicTypeTag() {
+        return getClass().getName();
+    }
+
     static UUID randomId() {
         return UUID.randomUUID();
     }

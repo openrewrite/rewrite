@@ -15,9 +15,7 @@
  */
 package org.openrewrite.yaml.tree;
 
-import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -36,7 +34,6 @@ import java.util.UUID;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
-@JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public interface Yaml extends Tree {
 
     @SuppressWarnings("unchecked")

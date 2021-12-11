@@ -21,7 +21,8 @@ import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.java.JavaExecutionContextView
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.cache.*
+import org.openrewrite.java.cache.DelegatingJavaTypeCache
+import org.openrewrite.java.cache.JavaTypeCache
 
 interface FindInheritedFieldsTest {
     val typeCache: JavaTypeCache

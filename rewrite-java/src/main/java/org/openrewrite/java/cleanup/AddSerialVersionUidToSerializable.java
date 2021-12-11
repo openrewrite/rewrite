@@ -23,8 +23,9 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 

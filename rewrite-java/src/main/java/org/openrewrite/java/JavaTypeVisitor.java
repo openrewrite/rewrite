@@ -99,7 +99,9 @@ public class JavaTypeVisitor<P> {
     }
 
     public JavaType visitArray(JavaType.Array array, P p) {
-        return visit(array.getElemType(), p);
+        JavaType.Array a = array;
+        a = a.withElemType(visit(a.getElemType(), p));
+        return a;
     }
 
     public JavaType visitClass(JavaType.Class aClass, P p) {
@@ -114,7 +116,9 @@ public class JavaTypeVisitor<P> {
     }
 
     public JavaType visitGenericTypeVariable(JavaType.GenericTypeVariable generic, P p) {
-        return visit(generic.getBound(), p);
+        JavaType.GenericTypeVariable g = generic;
+        g = g.withBound((JavaType.FullyQualified) visit(g.getBound(), p));
+        return g;
     }
 
     /**

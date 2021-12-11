@@ -26,7 +26,9 @@ import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.Space;
 
 import java.time.Duration;
-import java.util.*;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 
 public class UseJavaStyleArrayDeclarations extends Recipe {
 

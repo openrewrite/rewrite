@@ -18,13 +18,11 @@ package org.openrewrite;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import lombok.EqualsAndHashCode;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.NullUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.Marker;
 import org.openrewrite.scheduling.ForkJoinScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +32,6 @@ import java.time.Duration;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
-import static org.openrewrite.Tree.randomId;
 
 /**
  * Provides a formalized link list data structure of {@link Recipe recipes} and a {@link Recipe#run(List)} method which will

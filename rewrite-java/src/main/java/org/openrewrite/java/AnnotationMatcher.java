@@ -19,7 +19,8 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureLexer;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureParser;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 

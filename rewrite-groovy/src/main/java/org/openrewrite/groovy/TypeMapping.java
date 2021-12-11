@@ -121,7 +121,7 @@ class TypeMapping {
                     parameterizedType(node.getTypeClass(), node.getGenericsTypes(), stack) :
                     type(node.getTypeClass(), stack);
         } catch (GroovyBugError | NoClassDefFoundError ignored) {
-            return new JavaType.Class(Flag.Public.getBitMask(), node.getName(), JavaType.Class.Kind.Class,
+            return new JavaType.Class(null, Flag.Public.getBitMask(), node.getName(), JavaType.Class.Kind.Class,
                     null, null, null, null, null, null);
         }
     }
@@ -139,7 +139,7 @@ class TypeMapping {
                 genericSignatures.toString(),
                 () -> {
                     newlyCreated.set(true);
-                    return new JavaType.Parameterized(null, null);
+                    return new JavaType.Parameterized(null, null, null);
                 }
         );
 
@@ -150,6 +150,7 @@ class TypeMapping {
                             .map(g -> {
                                 if (g.getUpperBounds() != null) {
                                     return new JavaType.GenericTypeVariable(
+                                            null,
                                             g.getName(),
                                             TypeUtils.asFullyQualified(type(g.getUpperBounds()[0], stack)));
                                 }
@@ -195,6 +196,7 @@ class TypeMapping {
             }
 
             return new JavaType.Class(
+                    null,
                     clazz.getModifiers(),
                     clazz.getName(),
                     kind,

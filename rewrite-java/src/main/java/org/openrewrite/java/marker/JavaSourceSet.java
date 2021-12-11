@@ -15,8 +15,6 @@
  */
 package org.openrewrite.java.marker;
 
-import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import io.github.classgraph.*;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
@@ -38,7 +36,6 @@ import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-@JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @With
 public class JavaSourceSet implements Marker {
     private static Collection<JavaType.FullyQualified> JAVA8_CLASSPATH;
@@ -154,6 +151,7 @@ public class JavaSourceSet implements Marker {
                         }
 
                         return new JavaType.Class(
+                                null,
                                 Flag.flagsToBitMap(flags),
                                 aClass.getName(),
                                 kind,

@@ -16,8 +16,6 @@
 
 package org.openrewrite.polyglot;
 
-import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.With;
@@ -42,7 +40,6 @@ import static org.openrewrite.Tree.randomId;
 
 
 @SuppressWarnings("unchecked")
-@JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public interface Polyglot extends Tree {
 
     Value getValue();
