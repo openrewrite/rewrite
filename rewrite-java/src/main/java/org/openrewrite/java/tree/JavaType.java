@@ -45,7 +45,8 @@ public interface JavaType {
         return null;
     }
 
-    default void unsafeSetManagedReference(UUID managedReference) {
+    default JavaType withManagedReference(UUID id) {
+        return this;
     }
 
     /**
@@ -139,7 +140,6 @@ public interface JavaType {
                 null, null, null, null, null, null);
 
         @Nullable
-        @NonFinal
         UUID managedReference;
 
         @With(AccessLevel.NONE)
@@ -244,11 +244,6 @@ public interface JavaType {
             return members;
         }
 
-        @Override
-        public void unsafeSetManagedReference(UUID managedReference) {
-            this.managedReference = managedReference;
-        }
-
         /**
          * Only meant to be used by parsers to avoid infinite recursion when building Class instances.
          */
@@ -292,7 +287,6 @@ public interface JavaType {
     @Value
     @With
     class Parameterized extends FullyQualified {
-        @NonFinal
         @Nullable
         UUID managedReference;
 
@@ -302,11 +296,6 @@ public interface JavaType {
 
         @NonFinal
         List<JavaType> typeParameters;
-
-        @Override
-        public void unsafeSetManagedReference(UUID managedReference) {
-            this.managedReference = managedReference;
-        }
 
         /**
          * Only meant to be used by parsers to avoid infinite recursion when building Class instances.
@@ -415,7 +404,6 @@ public interface JavaType {
     @With
     class GenericTypeVariable extends FullyQualified {
         @Nullable
-        @NonFinal
         UUID managedReference;
 
         String name;
@@ -423,11 +411,6 @@ public interface JavaType {
         @NonFinal
         @Nullable
         FullyQualified bound;
-
-        @Override
-        public void unsafeSetManagedReference(UUID managedReference) {
-            this.managedReference = managedReference;
-        }
 
         @Override
         public String getFullyQualifiedName() {
@@ -609,7 +592,7 @@ public interface JavaType {
     @Value
     @With
     @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-    class Method {
+    class Method implements JavaType {
         @With(AccessLevel.PRIVATE)
         long flagsBitMap;
 
@@ -704,7 +687,7 @@ public interface JavaType {
     @Value
     @With
     @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-    class Variable {
+    class Variable implements JavaType {
         @With(AccessLevel.NONE)
         long flagsBitMap;
 

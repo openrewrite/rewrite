@@ -85,6 +85,10 @@ public class JavaTypeVisitor<P> {
                 return visitParameterized((JavaType.Parameterized) javaType, p);
             } else if (javaType instanceof JavaType.Primitive) {
                 return visitPrimitive((JavaType.Primitive) javaType, p);
+            } else if(javaType instanceof JavaType.Method) {
+                return visitMethod((JavaType.Method) javaType, p);
+            } else if(javaType instanceof JavaType.Variable) {
+                return visitVariable((JavaType.Variable) javaType, p);
             }
 
             cursor = cursor.getParentOrThrow();
@@ -109,8 +113,8 @@ public class JavaTypeVisitor<P> {
         c = c.withAnnotations(ListUtils.map(c.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p)));
         c = c.withSupertype((JavaType.FullyQualified) visit(c.getSupertype(), p));
         c = c.withInterfaces(ListUtils.map(c.getInterfaces(), i -> (JavaType.FullyQualified) visit(i, p)));
-        c = c.withMembers(ListUtils.map(c.getMembers(), m -> visitVariable(m, p)));
-        c = c.withMethods(ListUtils.map(c.getMethods(), m -> visitMethod(m, p)));
+        c = c.withMembers(ListUtils.map(c.getMembers(), m -> (JavaType.Variable) visit(m, p)));
+        c = c.withMethods(ListUtils.map(c.getMethods(), m -> (JavaType.Method) visit(m, p)));
         c = c.withOwningClass((JavaType.FullyQualified) visit(c.getOwningClass(), p));
         return c;
     }
@@ -127,7 +131,7 @@ public class JavaTypeVisitor<P> {
      * @param p Visit context
      * @return A method
      */
-    public JavaType.Method visitMethod(JavaType.Method method, P p) {
+    public JavaType visitMethod(JavaType.Method method, P p) {
         JavaType.Method m = method;
 
         m = m.withAnnotations(ListUtils.map(m.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p)));
@@ -167,7 +171,7 @@ public class JavaTypeVisitor<P> {
      * @param p Visit context
      * @return A variable
      */
-    public JavaType.Variable visitVariable(JavaType.Variable variable, P p) {
+    public JavaType visitVariable(JavaType.Variable variable, P p) {
         JavaType.Variable v = variable;
         v = v.withAnnotations(ListUtils.map(v.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p)));
         v = v.withType(visit(variable.getType(), p));
