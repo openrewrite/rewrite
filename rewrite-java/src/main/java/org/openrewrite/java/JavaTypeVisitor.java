@@ -44,6 +44,11 @@ public class JavaTypeVisitor<P> {
         return javaType;
     }
 
+    @Nullable
+    public JavaType postVisit(JavaType javaType, P p) {
+        return javaType;
+    }
+
     /**
      * By calling this method, you are asserting that you know that the outcome will be non-null
      * when the compiler couldn't otherwise prove this to be the case. This method is a shortcut
@@ -74,24 +79,31 @@ public class JavaTypeVisitor<P> {
             javaType = preVisit(javaType, p);
 
             if (javaType instanceof JavaType.Array) {
-                return visitArray((JavaType.Array) javaType, p);
+                javaType = visitArray((JavaType.Array) javaType, p);
             } else if (javaType instanceof JavaType.Class) {
-                return visitClass((JavaType.Class) javaType, p);
+                javaType = visitClass((JavaType.Class) javaType, p);
             } else if (javaType instanceof JavaType.GenericTypeVariable) {
-                return visitGenericTypeVariable((JavaType.GenericTypeVariable) javaType, p);
+                javaType = visitGenericTypeVariable((JavaType.GenericTypeVariable) javaType, p);
             } else if (javaType instanceof JavaType.MultiCatch) {
-                return visitMultiCatch((JavaType.MultiCatch) javaType, p);
+                javaType = visitMultiCatch((JavaType.MultiCatch) javaType, p);
             } else if (javaType instanceof JavaType.Parameterized) {
-                return visitParameterized((JavaType.Parameterized) javaType, p);
+                javaType = visitParameterized((JavaType.Parameterized) javaType, p);
             } else if (javaType instanceof JavaType.Primitive) {
-                return visitPrimitive((JavaType.Primitive) javaType, p);
+                javaType = visitPrimitive((JavaType.Primitive) javaType, p);
             } else if(javaType instanceof JavaType.Method) {
-                return visitMethod((JavaType.Method) javaType, p);
+                javaType = visitMethod((JavaType.Method) javaType, p);
             } else if(javaType instanceof JavaType.Variable) {
-                return visitVariable((JavaType.Variable) javaType, p);
+                javaType = visitVariable((JavaType.Variable) javaType, p);
+            }
+
+            if(javaType != null) {
+                javaType = postVisit(javaType, p);
             }
 
             cursor = cursor.getParentOrThrow();
+
+            //noinspection ConstantConditions
+            return javaType;
         }
 
         //noinspection ConstantConditions
