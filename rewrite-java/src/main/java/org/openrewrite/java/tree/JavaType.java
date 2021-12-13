@@ -590,24 +590,27 @@ public interface JavaType {
     }
 
     @Value
-    @With
     @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
     class Method implements JavaType {
         @With(AccessLevel.PRIVATE)
         long flagsBitMap;
 
+        @With
         @NonFinal
         FullyQualified declaringType;
 
+        @With
         String name;
 
         @Nullable
         List<String> paramNames;
 
+        @With
         @NonFinal
         @Nullable
         JavaType.Method.Signature genericSignature;
 
+        @With
         @NonFinal
         @Nullable
         JavaType.Method.Signature resolvedSignature;
@@ -636,12 +639,45 @@ public interface JavaType {
             return paramNames == null ? emptyList() : paramNames;
         }
 
+        public JavaType.Method withParamNames(@Nullable List<String> paramNames) {
+            if(paramNames != null && paramNames.isEmpty()) {
+                paramNames = null;
+            }
+            if(paramNames == this.paramNames) {
+                return this;
+            }
+            return new JavaType.Method(this.flagsBitMap, this.declaringType, this.name, paramNames,
+                    this.genericSignature, this.resolvedSignature, this.thrownExceptions, this.annotations);
+        }
+
         public List<FullyQualified> getThrownExceptions() {
             return thrownExceptions == null ? emptyList() : thrownExceptions;
         }
 
+        public JavaType.Method withThrownExceptions(@Nullable List<FullyQualified> exceptions) {
+            if(exceptions != null && exceptions.isEmpty()) {
+                exceptions = null;
+            }
+            if (exceptions == this.thrownExceptions) {
+                return this;
+            }
+            return new JavaType.Method(this.flagsBitMap, this.declaringType, this.name, this.paramNames, this.genericSignature,
+                    this.resolvedSignature, exceptions, this.annotations);
+        }
+
         public List<FullyQualified> getAnnotations() {
             return annotations == null ? emptyList() : annotations;
+        }
+
+        public JavaType.Method withAnnotations(@Nullable List<FullyQualified> annotations) {
+            if(annotations != null && annotations.isEmpty()) {
+                annotations = null;
+            }
+            if (annotations == this.annotations) {
+                return this;
+            }
+            return new JavaType.Method(this.flagsBitMap, this.declaringType, this.name, this.paramNames, this.genericSignature,
+                    this.resolvedSignature, this.thrownExceptions, annotations);
         }
 
         @Value
