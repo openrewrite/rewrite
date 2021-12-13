@@ -214,7 +214,7 @@ public final class ListUtils {
 
     public static <T> List<T> concat(@Nullable T t, @Nullable List<T> ls) {
         if (t == null && ls == null) {
-            return emptyList();
+            return null;
         } else if (t == null) {
             return ls;
         }
@@ -228,7 +228,7 @@ public final class ListUtils {
 
     public static <T> List<T> concatAll(@Nullable List<T> ls, @Nullable List<T> t) {
         if (ls == null && t == null) {
-            return emptyList();
+            return null;
         } else if (t == null || t.isEmpty()) {
             return ls;
         } else if (ls == null || ls.isEmpty()) {
@@ -238,9 +238,6 @@ public final class ListUtils {
         List<T> newLs = new ArrayList<>(ls);
         newLs.addAll(t);
 
-        //Prune any null elements from the resulting list.
-        //noinspection StatementWithEmptyBody
-        while (newLs.remove(null)) ;
         return newLs;
     }
 
@@ -255,10 +252,6 @@ public final class ListUtils {
 
         List<T> newLs = new ArrayList<>(ls);
         newLs.addAll(index, t);
-
-        //Prune any null elements from the resulting list.
-        //noinspection StatementWithEmptyBody
-        while (newLs.remove(null)) ;
 
         return newLs;
     }

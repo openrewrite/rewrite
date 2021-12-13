@@ -134,6 +134,8 @@ public class JavaTypeVisitor<P> {
     public JavaType visitMethod(JavaType.Method method, P p) {
         JavaType.Method m = method;
 
+        m = m.withDeclaringType((JavaType.FullyQualified) visit(m.getDeclaringType(), p));
+
         m = m.withAnnotations(ListUtils.map(m.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p)));
 
         JavaType.Method.Signature genericSignature = m.getGenericSignature();
@@ -173,6 +175,7 @@ public class JavaTypeVisitor<P> {
      */
     public JavaType visitVariable(JavaType.Variable variable, P p) {
         JavaType.Variable v = variable;
+        v = v.withOwner((JavaType.FullyQualified) visit(v.getOwner(), p));
         v = v.withAnnotations(ListUtils.map(v.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p)));
         v = v.withType(visit(variable.getType(), p));
         return v;
