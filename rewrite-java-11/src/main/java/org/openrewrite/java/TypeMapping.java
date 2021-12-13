@@ -19,6 +19,7 @@ import com.sun.source.tree.Tree;
 import com.sun.tools.javac.code.*;
 import com.sun.tools.javac.tree.JCTree;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.cache.JavaTypeCache;
 import org.openrewrite.java.tree.Flag;
@@ -69,6 +70,14 @@ public class TypeMapping {
                 return JavaType.Class.CLASS;
             } else if (sym.className().equals("java.lang.Enum")) {
                 return JavaType.Class.ENUM;
+            } else if (sym.className().startsWith("com.sun.") ||
+                    sym.className().startsWith("sun.") ||
+                    sym.className().startsWith("java.") ||
+                    sym.className().startsWith("jdk.") ||
+                    sym.className().startsWith("org.graalvm")) {
+                return typeCache.computeClass(sym.className(), () -> new JavaType.Class(
+                        null, sym.flags_field, sym.className(), getKind(sym),
+                        null, null, null, null, null, null));
             } else {
                 AtomicBoolean newlyCreated = new AtomicBoolean(false);
 
@@ -80,22 +89,11 @@ public class TypeMapping {
                                 completeClassSymbol(sym);
                             }
 
-                            JavaType.Class.Kind kind;
-                            if ((sym.flags_field & KIND_BITMASK_ENUM) != 0) {
-                                kind = JavaType.Class.Kind.Enum;
-                            } else if ((sym.flags_field & KIND_BITMASK_ANNOTATION) != 0) {
-                                kind = JavaType.Class.Kind.Annotation;
-                            } else if ((sym.flags_field & KIND_BITMASK_INTERFACE) != 0) {
-                                kind = JavaType.Class.Kind.Interface;
-                            } else {
-                                kind = JavaType.Class.Kind.Class;
-                            }
-
                             return new JavaType.Class(
                                     null,
                                     sym.flags_field,
                                     sym.className(),
-                                    kind,
+                                    getKind(sym),
                                     null, null, null, null, null, null
                             );
                         });
@@ -235,6 +233,21 @@ public class TypeMapping {
             return null;
         }
 
+    }
+
+    @NotNull
+    private JavaType.Class.Kind getKind(Symbol.ClassSymbol sym) {
+        JavaType.Class.Kind kind;
+        if ((sym.flags_field & KIND_BITMASK_ENUM) != 0) {
+            kind = JavaType.Class.Kind.Enum;
+        } else if ((sym.flags_field & KIND_BITMASK_ANNOTATION) != 0) {
+            kind = JavaType.Class.Kind.Annotation;
+        } else if ((sym.flags_field & KIND_BITMASK_INTERFACE) != 0) {
+            kind = JavaType.Class.Kind.Interface;
+        } else {
+            kind = JavaType.Class.Kind.Class;
+        }
+        return kind;
     }
 
     @Nullable
