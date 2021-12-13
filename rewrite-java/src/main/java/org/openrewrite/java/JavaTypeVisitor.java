@@ -67,15 +67,8 @@ public class JavaTypeVisitor<P> {
 
     public JavaType visit(@Nullable JavaType javaType, P p) {
         if (javaType != null) {
-            // cut cycles
-            Iterator<Object> cursorPath = cursor.getPath();
-            while(cursorPath.hasNext()) {
-                if(javaType == cursorPath.next()) {
-                    return javaType;
-                }
-            }
-
             cursor = new Cursor(cursor, javaType);
+
             javaType = preVisit(javaType, p);
 
             if (javaType instanceof JavaType.Array) {
