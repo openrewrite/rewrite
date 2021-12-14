@@ -356,14 +356,30 @@ public class JavaSourceSet implements Marker {
                     typeParameter.getName(),
                     signature,
                     () -> {
-                        List<JavaType> bounds = new ArrayList<>();
+                        List<JavaType> bounds = null;
                         if(typeParameter.getClassBound() != null) {
-                            bounds.add(type(typeParameter.getClassBound()));
+                            if(typeParameter.getClassBound() instanceof ClassRefTypeSignature) {
+                                ReferenceTypeSignature bound = typeParameter.getClassBound();
+                                ClassRefTypeSignature classBound = (ClassRefTypeSignature) bound;
+                                if (classBound.getClassInfo() != null && !"java.lang.Object".equals(classBound.getFullyQualifiedClassName())) {
+                                    bounds = new ArrayList<>();
+                                    bounds.add(type(typeParameter.getClassBound()));
+                                }
+                            } else {
+                                bounds = new ArrayList<>();
+                                bounds.add(type(typeParameter.getClassBound()));
+                            }
                         }
-                        if(typeParameter.getInterfaceBounds() != null) {
+                        if(typeParameter.getInterfaceBounds() != null && !typeParameter.getInterfaceBounds().isEmpty()) {
+                            if(bounds == null) {
+                                bounds = new ArrayList<>();
+                            }
                             for (ReferenceTypeSignature interfaceBound : typeParameter.getInterfaceBounds()) {
                                 bounds.add(type(interfaceBound));
                             }
+                        }
+                        if(bounds == null) {
+                            bounds = emptyList();
                         }
                         return new JavaType.GenericTypeVariable(null, typeParameter.getName(), bounds);
                     }
